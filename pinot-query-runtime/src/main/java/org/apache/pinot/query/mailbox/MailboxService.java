@@ -18,15 +18,28 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.core.instance.context.BrokerContext;
+import org.apache.pinot.core.instance.context.ControllerContext;
+import org.apache.pinot.core.instance.context.ServerContext;
+import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
@@ -72,6 +85,10 @@ public class MailboxService {
   private final PinotConfiguration _config;
   private final ChannelManager _channelManager;
   @Nullable private final TlsConfig _tlsConfig;
+  @Nullable
+  private final SslContext _clientSslContext;
+  @Nullable
+  private final SslContext _serverSslContext;
   @Nullable private final QueryAccessControlFactory _accessControlFactory;
   /**
    * The max inbound message size for the gRPC server.
@@ -84,6 +101,7 @@ public class MailboxService {
    * bloating is added by gRPC and protobuf.
    */
   private final int _maxInboundMessageSize;
+  private final boolean _grpcSenderBackpressureEnabled;
 
   private GrpcMailboxServer _grpcMailboxServer;
 
@@ -103,13 +121,68 @@ public class MailboxService {
     _instanceType = instanceType;
     _config = config;
     _tlsConfig = tlsConfig;
+    _clientSslContext = resolveClientSslContext(instanceType, tlsConfig);
+    _serverSslContext = resolveServerSslContext(instanceType, tlsConfig);
     _maxInboundMessageSize = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
     );
-    _channelManager = new ChannelManager(tlsConfig, _maxInboundMessageSize, getIdleTimeout(config));
+    _grpcSenderBackpressureEnabled = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED
+    );
+    int writeBufferHighWaterMarkBytes = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES);
+    int writeBufferLowWaterMarkBytes = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES);
+    _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config),
+        writeBufferHighWaterMarkBytes, writeBufferLowWaterMarkBytes);
     _accessControlFactory = accessControlFactory;
+    registerMailboxClientGauges();
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
+  }
+
+  /// Registers gauges exposing the memory used by the gRPC client allocator
+  /// shared by every [GrpcSendingMailbox] this service creates. The companion
+  /// gauges for the server allocator are registered in [GrpcMailboxServer].
+  ///
+  /// Notice we are wiring the shaded gRPC Netty allocator
+  /// ([io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator]) rather than
+  /// the non-shaded one.
+  ///
+  /// Only the two `MAILBOX_CLIENT_USED_*` gauges are mirrored on the client side;
+  /// the six debug-only counterparts exposed by the server (`MAILBOX_SERVER_ARENAS_*`,
+  /// `MAILBOX_SERVER_CACHE_SIZE_*`, `MAILBOX_SERVER_THREADLOCALCACHE`,
+  /// `MAILBOX_SERVER_CHUNK_SIZE`) are intentionally not mirrored here. The operational
+  /// signal that matters on the client is direct-memory pool exhaustion (the OOM that
+  /// motivated wiring these gauges in the first place); the rest are server-side
+  /// allocator-internals useful only for debugging. If you ever need to mirror the
+  /// remaining six, copy the registration block from [GrpcMailboxServer]'s constructor.
+  private void registerMailboxClientGauges() {
+    switch (_instanceType) {
+      case BROKER: {
+        BrokerMetrics brokerMetrics = BrokerMetrics.get();
+        brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_CLIENT_USED_DIRECT_MEMORY,
+            _channelManager::usedDirectMemoryBytes);
+        brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_CLIENT_USED_HEAP_MEMORY,
+            _channelManager::usedHeapMemoryBytes);
+        break;
+      }
+      case SERVER: {
+        ServerMetrics serverMetrics = ServerMetrics.get();
+        serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_CLIENT_USED_DIRECT_MEMORY,
+            _channelManager::usedDirectMemoryBytes);
+        serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_CLIENT_USED_HEAP_MEMORY,
+            _channelManager::usedHeapMemoryBytes);
+        break;
+      }
+      default:
+        // Controller does not run a MailboxService in production today, but if one is ever
+        // started for tests we silently skip metric registration rather than failing.
+        break;
+    }
   }
 
   /**
@@ -117,7 +190,7 @@ public class MailboxService {
    */
   public void start() {
     LOGGER.info("Starting GrpcMailboxServer");
-    _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig, _accessControlFactory);
+    _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig, _serverSslContext, _accessControlFactory);
     _grpcMailboxServer.start();
   }
 
@@ -146,13 +219,16 @@ public class MailboxService {
    * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
    * data is sent for the first time.
    */
+  // TODO(https://github.com/apache/pinot/issues/18539): add a global byte budget across peers; the
+  //  per-channel WriteBufferWaterMark bound is watermark.high × #peers × #concurrent_queries, which can
+  //  reach multiple GiB and re-trigger OutOfDirectMemoryError at large fan-outs.
   public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap) {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
-          _maxInboundMessageSize);
+          _maxInboundMessageSize, _grpcSenderBackpressureEnabled);
     }
   }
 
@@ -165,6 +241,50 @@ public class MailboxService {
     } catch (ExecutionException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Resets the GRPC connection backoff for the channel to the given server.
+   * @see ChannelManager#resetConnectBackoff(String, int)
+   * @return true if the channel was in TRANSIENT_FAILURE and backoff was reset
+   */
+  public boolean resetConnectBackoff(String hostname, int port) {
+    return _channelManager.resetConnectBackoff(hostname, port);
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] /
+  /// [ServerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] — bytes pinned by the
+  /// shared gRPC client allocator backing every [GrpcSendingMailbox] created
+  /// from this service.
+  @VisibleForTesting
+  public long getMailboxClientUsedDirectMemoryBytes() {
+    return _channelManager.usedDirectMemoryBytes();
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_CLIENT_USED_HEAP_MEMORY] /
+  /// [ServerGauge#MAILBOX_CLIENT_USED_HEAP_MEMORY].
+  @VisibleForTesting
+  public long getMailboxClientUsedHeapMemoryBytes() {
+    return _channelManager.usedHeapMemoryBytes();
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_SERVER_USED_DIRECT_MEMORY] /
+  /// [ServerGauge#MAILBOX_SERVER_USED_DIRECT_MEMORY] — bytes pinned by the
+  /// gRPC server allocator handling inbound mailbox traffic.
+  ///
+  /// Returns 0 before [#start] is called (the gRPC server is built lazily there).
+  @VisibleForTesting
+  public long getMailboxServerUsedDirectMemoryBytes() {
+    return _grpcMailboxServer != null ? _grpcMailboxServer.usedDirectMemoryBytes() : 0L;
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_SERVER_USED_HEAP_MEMORY] /
+  /// [ServerGauge#MAILBOX_SERVER_USED_HEAP_MEMORY].
+  ///
+  /// Returns 0 before [#start] is called.
+  @VisibleForTesting
+  public long getMailboxServerUsedHeapMemoryBytes() {
+    return _grpcMailboxServer != null ? _grpcMailboxServer.usedHeapMemoryBytes() : 0L;
   }
 
   /**
@@ -192,4 +312,137 @@ public class MailboxService {
     // Use a reasonable maximum idle timeout (1 year) to avoid overflow.
     return Duration.ofDays(365);
   }
+
+  @Nullable
+  private static SslContext resolveClientSslContext(InstanceType instanceType, @Nullable TlsConfig tlsConfig) {
+    if (tlsConfig == null) {
+      return null;
+    }
+    return getOrBuildClientSslContext(instanceType, tlsConfig);
+  }
+
+  @Nullable
+  private static SslContext resolveServerSslContext(InstanceType instanceType, @Nullable TlsConfig tlsConfig) {
+    if (tlsConfig == null) {
+      return null;
+    }
+    return getOrBuildServerSslContext(instanceType, tlsConfig);
+  }
+
+  private static SslContext getOrBuildClientSslContext(InstanceType instanceType, TlsConfig tlsConfig) {
+    return getOrBuildSslContext(instanceType, tlsConfig, ServerGrpcQueryClient::buildSslContext,
+        GrpcSslContextAccessor::getClientGrpcSslContext, GrpcSslContextAccessor::setClientGrpcSslContext);
+  }
+
+  private static SslContext getOrBuildServerSslContext(InstanceType instanceType, TlsConfig tlsConfig) {
+    return getOrBuildSslContext(instanceType, tlsConfig, GrpcQueryServer::buildGrpcSslContext,
+        GrpcSslContextAccessor::getServerGrpcSslContext, GrpcSslContextAccessor::setServerGrpcSslContext);
+  }
+
+  private static SslContext getOrBuildSslContext(InstanceType instanceType, TlsConfig tlsConfig,
+      Function<TlsConfig, SslContext> builder, Function<GrpcSslContextAccessor, SslContext> getter,
+      BiConsumer<GrpcSslContextAccessor, SslContext> setter) {
+    GrpcSslContextAccessor accessor = getGrpcSslContextAccessor(instanceType);
+    if (accessor == null) {
+      return builder.apply(tlsConfig);
+    }
+    SslContext sslContext = getter.apply(accessor);
+    if (sslContext == null) {
+      sslContext = builder.apply(tlsConfig);
+      setter.accept(accessor, sslContext);
+    }
+    return sslContext;
+  }
+
+  @Nullable
+  private static GrpcSslContextAccessor getGrpcSslContextAccessor(InstanceType instanceType) {
+    switch (instanceType) {
+      case BROKER:
+        return BROKER_GRPC_CONTEXT_ACCESSOR;
+      case SERVER:
+        return SERVER_GRPC_CONTEXT_ACCESSOR;
+      case CONTROLLER:
+        return CONTROLLER_GRPC_CONTEXT_ACCESSOR;
+      default:
+        return null;
+    }
+  }
+
+  private interface GrpcSslContextAccessor {
+    @Nullable
+    SslContext getClientGrpcSslContext();
+
+    void setClientGrpcSslContext(SslContext sslContext);
+
+    @Nullable
+    SslContext getServerGrpcSslContext();
+
+    void setServerGrpcSslContext(SslContext sslContext);
+  }
+
+  private static final GrpcSslContextAccessor BROKER_GRPC_CONTEXT_ACCESSOR = new GrpcSslContextAccessor() {
+    @Override
+    public SslContext getClientGrpcSslContext() {
+      return BrokerContext.getInstance().getClientGrpcSslContext();
+    }
+
+    @Override
+    public void setClientGrpcSslContext(SslContext sslContext) {
+      BrokerContext.getInstance().setClientGrpcSslContext(sslContext);
+    }
+
+    @Override
+    public SslContext getServerGrpcSslContext() {
+      return BrokerContext.getInstance().getServerGrpcSslContext();
+    }
+
+    @Override
+    public void setServerGrpcSslContext(SslContext sslContext) {
+      BrokerContext.getInstance().setServerGrpcSslContext(sslContext);
+    }
+  };
+
+  private static final GrpcSslContextAccessor SERVER_GRPC_CONTEXT_ACCESSOR = new GrpcSslContextAccessor() {
+    @Override
+    public SslContext getClientGrpcSslContext() {
+      return ServerContext.getInstance().getClientGrpcSslContext();
+    }
+
+    @Override
+    public void setClientGrpcSslContext(SslContext sslContext) {
+      ServerContext.getInstance().setClientGrpcSslContext(sslContext);
+    }
+
+    @Override
+    public SslContext getServerGrpcSslContext() {
+      return ServerContext.getInstance().getServerGrpcSslContext();
+    }
+
+    @Override
+    public void setServerGrpcSslContext(SslContext sslContext) {
+      ServerContext.getInstance().setServerGrpcSslContext(sslContext);
+    }
+  };
+
+  private static final GrpcSslContextAccessor CONTROLLER_GRPC_CONTEXT_ACCESSOR = new GrpcSslContextAccessor() {
+    @Override
+    public SslContext getClientGrpcSslContext() {
+      return ControllerContext.getInstance().getClientGrpcSslContext();
+    }
+
+    @Override
+    public void setClientGrpcSslContext(SslContext sslContext) {
+      ControllerContext.getInstance().setClientGrpcSslContext(sslContext);
+    }
+
+    @Override
+    public SslContext getServerGrpcSslContext() {
+      return ControllerContext.getInstance().getServerGrpcSslContext();
+    }
+
+    @Override
+    public void setServerGrpcSslContext(SslContext sslContext) {
+      ControllerContext.getInstance().setServerGrpcSslContext(sslContext);
+    }
+  };
 }

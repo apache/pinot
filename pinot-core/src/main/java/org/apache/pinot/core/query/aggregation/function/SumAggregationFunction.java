@@ -71,6 +71,14 @@ public class SumAggregationFunction extends NullableSingleInputAggregationFuncti
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(blockValSet, length, aggregationResultHolder);
+    } else {
+      aggregateMV(blockValSet, length, aggregationResultHolder);
+    }
+  }
+
+  protected void aggregateSV(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
     Double sum;
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
@@ -145,6 +153,23 @@ public class SumAggregationFunction extends NullableSingleInputAggregationFuncti
     updateAggregationResultHolder(aggregationResultHolder, sum);
   }
 
+  protected void aggregateMV(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+
+    Double sum;
+    sum = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+      double innerSum = 0;
+      for (int i = from; i < to; i++) {
+        for (double value : valuesArray[i]) {
+          innerSum += value;
+        }
+      }
+      return acum == null ? innerSum : acum + innerSum;
+    });
+
+    updateAggregationResultHolder(aggregationResultHolder, sum);
+  }
+
   protected void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Double sum) {
     if (sum != null) {
       if (_nullHandlingEnabled) {
@@ -161,6 +186,16 @@ public class SumAggregationFunction extends NullableSingleInputAggregationFuncti
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    } else {
+      aggregateMVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    }
+  }
+
+  protected void aggregateSVGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
     double[] valueArray = blockValSet.getDoubleValuesSV();
 
     if (_nullHandlingEnabled) {
@@ -179,10 +214,51 @@ public class SumAggregationFunction extends NullableSingleInputAggregationFuncti
     }
   }
 
+  protected void aggregateMVGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          if (valuesArray[i].length > 0) {
+            // "i" has to be non-null here so we can use the default value as the initial value instead of null
+            double sum = DEFAULT_VALUE;
+            for (double value : valuesArray[i]) {
+              sum += value;
+            }
+            Double result = groupByResultHolder.getResult(groupKey);
+            groupByResultHolder.setValueForKey(groupKey, result == null ? sum : result + sum);
+          }
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        int groupKey = groupKeyArray[i];
+        double sum = groupByResultHolder.getDoubleResult(groupKey);
+        for (double value : valuesArray[i]) {
+          sum += value;
+        }
+        groupByResultHolder.setValueForKey(groupKey, sum);
+      }
+    }
+  }
+
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    } else {
+      aggregateMVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    }
+  }
+
+  protected void aggregateSVGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
     double[] valueArray = blockValSet.getDoubleValuesSV();
 
     if (_nullHandlingEnabled) {
@@ -199,6 +275,41 @@ public class SumAggregationFunction extends NullableSingleInputAggregationFuncti
         double value = valueArray[i];
         for (int groupKey : groupKeysArray[i]) {
           groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + value);
+        }
+      }
+    }
+  }
+
+  protected void aggregateMVGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          double[] values = valuesArray[i];
+          if (values.length > 0) {
+            // "i" has to be non-null here so we can use the default value as the initial value instead of null
+            double sum = DEFAULT_VALUE;
+            for (double value : values) {
+              sum += value;
+            }
+            for (int groupKey : groupKeysArray[i]) {
+              Double result = groupByResultHolder.getResult(groupKey);
+              groupByResultHolder.setValueForKey(groupKey, result == null ? sum : result + sum);
+            }
+          }
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        double[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          double sum = groupByResultHolder.getDoubleResult(groupKey);
+          for (double value : values) {
+            sum += value;
+          }
+          groupByResultHolder.setValueForKey(groupKey, sum);
         }
       }
     }

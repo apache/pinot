@@ -69,6 +69,9 @@ public class ServerQueryRequest {
   // a unique query id from broker id, request id and table type.
   private final String _queryId;
 
+  // Hash of the query fingerprint.
+  private final String _queryHash;
+
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
 
@@ -94,6 +97,7 @@ public class ServerQueryRequest {
     _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
     _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
+    _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
     if (instanceRequest.getTableSegmentsInfoListSize() > 0) {
       _tableSegmentsContexts = new ArrayList<>(instanceRequest.getTableSegmentsInfoListSize());
@@ -142,6 +146,7 @@ public class ServerQueryRequest {
     _queryContext = getQueryContext(brokerRequest.getPinotQuery());
     _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
+    _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
     if (serverRequest.getTableSegmentsInfoCount() > 0) {
       _tableSegmentsContexts = new ArrayList<>(serverRequest.getTableSegmentsInfoCount());
@@ -172,6 +177,7 @@ public class ServerQueryRequest {
     _enableTrace = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_TRACE, "false"));
     _enableStreaming = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_STREAMING, "false"));
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
+    _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
 
     _segmentsToQuery = segmentsToQuery;
     _optionalSegments = null;
@@ -233,6 +239,10 @@ public class ServerQueryRequest {
     return _queryId;
   }
 
+  public String getQueryHash() {
+    return _queryHash;
+  }
+
   public TimerContext getTimerContext() {
     return _timerContext;
   }
@@ -253,6 +263,7 @@ public class ServerQueryRequest {
     // TODO: Revisit the handling for logical table when multiple tables are queries with the same cid.
     String cid = QueryIdUtils.withTypeSuffix(_cid, _tableType);
     return new QueryExecutionContext(QueryExecutionContext.QueryType.SSE, _requestId, cid,
-        QueryOptionsUtils.getWorkloadName(queryOptions), startTimeMs, deadlineMs, deadlineMs, _brokerId, instanceId);
+        QueryOptionsUtils.getWorkloadName(queryOptions), startTimeMs, deadlineMs, deadlineMs, _brokerId, instanceId,
+        _queryHash);
   }
 }

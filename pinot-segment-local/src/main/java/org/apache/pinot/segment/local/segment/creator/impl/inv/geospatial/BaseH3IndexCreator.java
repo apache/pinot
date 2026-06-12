@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial;
 
 import com.google.common.base.Preconditions;
+import com.uber.h3core.exceptions.H3Exception;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -119,14 +120,35 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   public void add(@Nullable Geometry geometry)
       throws IOException {
     if (_continueOnError && !(geometry instanceof Point)) {
-      MetricUtils.updateIndexingErrorMetric(_tableNameWithType, H3IndexType.INDEX_DISPLAY_NAME);
-      _nextDocId++;
+      skipInvalidGeometry();
       return;
     }
     Preconditions.checkState(geometry != null, "Null geometry record found and continueOnError is disabled");
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
         geometry.getGeometryType());
     Coordinate coordinate = geometry.getCoordinate();
+    if (_continueOnError && coordinate == null) {
+      skipInvalidGeometry();
+      return;
+    }
+    Preconditions.checkState(coordinate != null, "Point has null coordinate and continueOnError is disabled");
+    try {
+      addCoordinate(coordinate);
+    } catch (H3Exception e) {
+      if (_continueOnError) {
+        skipInvalidGeometry();
+        return;
+      }
+      throw e;
+    }
+  }
+
+  private void skipInvalidGeometry() {
+    MetricUtils.updateIndexingErrorMetric(_tableNameWithType, H3IndexType.INDEX_DISPLAY_NAME);
+    _nextDocId++;
+  }
+
+  private void addCoordinate(Coordinate coordinate) {
     // TODO: support multiple resolutions
     long h3Id = H3Utils.H3_CORE.latLngToCell(coordinate.y, coordinate.x, _lowestResolution);
     RoaringBitmapWriter<RoaringBitmap> bitmapWriter = _postingListMap.get(h3Id);

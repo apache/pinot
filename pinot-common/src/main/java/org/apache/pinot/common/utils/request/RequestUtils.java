@@ -38,9 +38,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.DataSource;
@@ -53,6 +55,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.sql.FilterKind;
@@ -66,8 +69,15 @@ import org.slf4j.LoggerFactory;
 public class RequestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestUtils.class);
   private static final JsonNode EMPTY_OBJECT_NODE = new ObjectMapper().createObjectNode();
+  // This class will only be loaded when a query request comes in, which should only be after the server startup has
+  // completed and the global instance config context is initialized.
+  private static boolean _useLegacyLiteralUnescaping = CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING;
 
   private RequestUtils() {
+  }
+
+  public static void setUseLegacyLiteralUnescaping(boolean useLegacyLiteralUnescaping) {
+    _useLegacyLiteralUnescaping = useLegacyLiteralUnescaping;
   }
 
   public static SqlNodeAndOptions parseQuery(String query)
@@ -246,7 +256,8 @@ public class RequestUtils {
           literal.setNullValue(true);
           break;
         default:
-          literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
+          literal.setStringValue(
+              _useLegacyLiteralUnescaping ? Strings.CS.replace(node.toValue(), "''", "'") : node.toValue());
           break;
       }
     }
@@ -539,6 +550,61 @@ public class RequestUtils {
   public static String canonicalizeFunctionNamePreservingSpecialKey(String functionName) {
     String canonicalName = canonicalizeFunctionName(functionName);
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalName, canonicalName);
+  }
+
+  /// Returns true iff {@code expression} is an {@code AS}-wrapped function call
+  /// (i.e. shaped like {@code expr AS alias} after Calcite parsing).
+  ///
+  /// Centralises the shape check that was previously open-coded in several places
+  /// (alias appliers, MV analyzer, query-context converters).  Callers that need the
+  /// alias name or the underlying expression should use {@link #unwrapAlias(Expression)}
+  /// or {@link #extractAliasOrIdentifierName(Expression)} rather than re-implementing
+  /// this check inline.
+  public static boolean isAliased(@Nullable Expression expression) {
+    if (expression == null) {
+      return false;
+    }
+    Function function = expression.getFunctionCall();
+    return function != null && SqlKind.AS.lowerName.equals(function.getOperator());
+  }
+
+  /// Strips the {@code AS alias} wrapper from a SELECT-list expression and returns the
+  /// underlying source expression.  When {@code expression} is not aliased the original
+  /// expression is returned unchanged, so this method is safe to call unconditionally
+  /// while iterating SELECT items.
+  ///
+  /// Mirrors the local helper that previously lived in
+  /// {@code MaterializedViewAnalyzer#extractSourceExpression}; callers that walk a
+  /// SELECT list to inspect the aggregate / transform under each alias should use this
+  /// method instead of re-implementing the same operand-zero indirection.
+  public static Expression unwrapAlias(Expression expression) {
+    return isAliased(expression) ? expression.getFunctionCall().getOperands().get(0) : expression;
+  }
+
+  /// Extracts the user-facing column name a SELECT-list expression resolves to:
+  ///
+  ///   - {@code expr AS alias} ⇒ {@code alias}
+  ///   - bare identifier ({@code col}) ⇒ {@code col}
+  ///   - any other shape (function/literal without an alias) ⇒
+  ///     {@link IllegalStateException}
+  ///
+  /// Used by callers that need to map SELECT items to schema columns (e.g. MV schema
+  /// coverage checks, MV column inference).  The error message lists the offending
+  /// expression in pretty-printed form so the operator can fix their SQL without
+  /// reaching for AST internals.
+  public static String extractAliasOrIdentifierName(Expression expression) {
+    if (isAliased(expression)) {
+      Expression aliasExpr = expression.getFunctionCall().getOperands().get(1);
+      Preconditions.checkState(aliasExpr.getType() == ExpressionType.IDENTIFIER,
+          "AS alias must be an identifier, got: %s", prettyPrint(aliasExpr));
+      return aliasExpr.getIdentifier().getName();
+    }
+    if (expression.getType() == ExpressionType.IDENTIFIER) {
+      return expression.getIdentifier().getName();
+    }
+    throw new IllegalStateException(
+        "Expression '" + prettyPrint(expression)
+            + "' must be a bare column or use AS <alias> to map to a schema column");
   }
 
   public static String prettyPrint(@Nullable Expression expression) {

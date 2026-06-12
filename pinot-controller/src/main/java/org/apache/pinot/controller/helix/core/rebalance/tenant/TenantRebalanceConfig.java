@@ -24,7 +24,7 @@ import io.swagger.annotations.ApiModelProperty;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 
 
 public class TenantRebalanceConfig extends RebalanceConfig {

@@ -148,7 +148,10 @@ public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationF
 
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.LONG_ARRAY;
+    // AggregationResultsBlock#setIntermediateResult and AggregationFunctionUtils#getIntermediateResult only support
+    // INT/LONG/DOUBLE/STRING/OBJECT stored types, so LongArrayList must use OBJECT to piggyback on the custom ser-de
+    // implemented in ObjectSerDeUtils.
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Override

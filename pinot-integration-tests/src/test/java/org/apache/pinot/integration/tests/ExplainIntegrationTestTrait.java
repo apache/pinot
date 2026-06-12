@@ -41,7 +41,7 @@ public interface ExplainIntegrationTestTrait {
   default void explainLogical(@Language("sql") String query, String expected, Map<String, String> queryOptions) {
     try {
       String extraOptions = queryOptions.entrySet().stream()
-          .map(entry -> "SET " + entry.getKey() + "=" + entry.getValue() + ";\n")
+          .map(entry -> "SET " + entry.getKey() + "='" + entry.getValue() + "';\n")
           .collect(Collectors.joining());
       JsonNode jsonNode = postQuery(extraOptions + "explain plan without implementation for " + query);
       if (!jsonNode.get("exceptions").isEmpty()) {
@@ -86,7 +86,7 @@ public interface ExplainIntegrationTestTrait {
               + ", Actual complete plan: " + planAsStrList);
         } else if (expectedObj instanceof String) {
           Assert.assertEquals(planAsStr, expectedObj, "Actual: " + planAsStr + ", Expected: " + expectedObj
-            + ", Actual complete plan: " + planAsStrList);
+              + ", Actual complete plan: " + planAsStrList);
         } else {
           Assert.fail("Expected object should be either Pattern or String in position " + i + ". Actual: "
               + expectedObj + " of type " + expectedObj.getClass());

@@ -146,14 +146,15 @@ public class TableNameExtractor {
   }
 
   private void visitWithItem(SqlWithItem withItem) {
-    // Track the CTE name so we don't treat it as a table later
+    // Extract table names from the CTE query definition before adding the CTE alias to
+    // filter. This handles cases where the CTE has the same name as the original table.
+    // Otherwise the table won't be added to the result.
+    if (withItem.query != null) {
+      extractTableNames(withItem.query);
+    }
     if (withItem.name != null) {
       String cteName = withItem.name.getSimple();
       _cteNames.add(cteName);
-    }
-    // Extract table names from the CTE query definition, not the CTE alias
-    if (withItem.query != null) {
-      extractTableNames(withItem.query);
     }
   }
 

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -37,11 +38,13 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.ServerGrpcRequestBuilder;
 import org.apache.pinot.core.query.reduce.StreamingReduceService;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.materializedview.handler.MaterializedViewHandler;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -58,17 +61,30 @@ import org.slf4j.LoggerFactory;
 public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcBrokerRequestHandler.class);
 
-  private final StreamingReduceService _streamingReduceService;
-  private final PinotServerStreamingQueryClient _streamingQueryClient;
-  private final FailureDetector _failureDetector;
+  protected final StreamingReduceService _streamingReduceService;
+  protected final PinotServerStreamingQueryClient _streamingQueryClient;
+  protected final FailureDetector _failureDetector;
 
-  // TODO: Support TLS
+  /// Legacy constructor without an MV handler — see [BaseSingleStageBrokerRequestHandler]'s
+  /// legacy ctor for the rationale.  Delegates with `materializedViewHandler = null`.
   public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      FailureDetector failureDetector, ThreadAccountant threadAccountant) {
+      FailureDetector failureDetector, ThreadAccountant threadAccountant,
+      MultiClusterRoutingContext multiClusterRoutingContext) {
+    this(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        failureDetector, threadAccountant, multiClusterRoutingContext, null);
+  }
+
+  /// TODO: Support TLS
+  public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      FailureDetector failureDetector, ThreadAccountant threadAccountant,
+      MultiClusterRoutingContext multiClusterRoutingContext,
+      @Nullable MaterializedViewHandler materializedViewHandler) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        threadAccountant);
+        threadAccountant, multiClusterRoutingContext, materializedViewHandler);
     _streamingReduceService = new StreamingReduceService(config);
     _streamingQueryClient = new PinotServerStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
     _failureDetector = failureDetector;
@@ -92,15 +108,25 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
+    // TODO: Add servers queried/responded stats
+    assert route.getOfflineBrokerRequest() != null || route.getRealtimeBrokerRequest() != null;
+    Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = doScatter(requestId, route,
+        requestContext);
+    return doReduce(originalBrokerRequest, responseMap, timeoutMs);
+  }
+
+  /**
+   * Executes scatter: sends the query to servers and collects per-server streaming response iterators.
+   * Subclasses may override to replace or augment the scatter step.
+   */
+  protected Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> doScatter(long requestId, TableRouteInfo route,
+      RequestContext requestContext) {
     BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
     BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
     // TODO: Routing bases on Map<ServerInstance, SegmentsToQuery> cannot be supported for logical tables.
     // The routing will be replaces to support table to segment list map in the future.
     Map<ServerInstance, SegmentsToQuery> offlineRoutingTable = route.getOfflineRoutingTable();
     Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable = route.getRealtimeRoutingTable();
-
-    // TODO: Add servers queried/responded stats
-    assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
@@ -112,6 +138,16 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       sendRequest(requestId, TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap,
           requestContext.isSampledRequest());
     }
+    return responseMap;
+  }
+
+  /**
+   * Executes the reduce step on the given responseMap.
+   * Subclasses may override to perform custom reduce logic or augment the responseMap.
+   */
+  protected BrokerResponseNative doReduce(BrokerRequest originalBrokerRequest,
+      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, long timeoutMs)
+      throws Exception {
     long reduceStartTimeNs = System.nanoTime();
     BrokerResponseNative brokerResponse =
         _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);

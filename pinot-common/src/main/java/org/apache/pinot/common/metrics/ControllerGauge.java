@@ -71,7 +71,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // TODO: Unify below subtask metrics into a single metric with status label
   NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
   NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
+  MAX_SUBTASK_WAIT_TIME_MS("MaxSubtaskWaitTimeMs", false),
   NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
+  MAX_SUBTASK_RUNNING_TIME_MS("MaxSubtaskRunningTimeMs", false),
   NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
   NUM_MINION_SUBTASKS_UNKNOWN("NumMinionSubtasksUnknown", true),
   NUM_MINION_SUBTASKS_DROPPED("NumMinionSubtasksDropped", true),
@@ -119,6 +121,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   // Number of Tasks Status
   TASK_STATUS("taskStatus", false),
+
+  // Number of tracked jobs in a task queue (per task type)
+  TASKS_TRACKED_FOR_TASK_TYPE("tasksTrackedForTaskType", false),
 
   // Number of dropped stale minion instances
   DROPPED_MINION_INSTANCES("droppedMinionInstances", true),
@@ -221,7 +226,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // The progress of a certain table rebalance job of a table
   TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false),
   // HTTP thread utilization
-  HTTP_THREAD_UTILIZATION("httpThreadUtilization", true);
+  HTTP_THREAD_UTILIZATION("httpThreadUtilization", true),
+  // Track the concurrent executions of the API resources that use @ManagedAsync
+  MANAGED_ASYNC_ACTIVE_THREADS("threads", true);
 
 
   private final String _gaugeName;

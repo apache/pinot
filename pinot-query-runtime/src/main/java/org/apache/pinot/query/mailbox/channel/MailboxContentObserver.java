@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.Context;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -47,21 +48,35 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentObserver.class);
 
   private final MailboxService _mailboxService;
-  private final StreamObserver<MailboxStatus> _responseObserver;
+  private final ServerCallStreamObserver<MailboxStatus> _responseObserver;
+  private final boolean _manualInboundFlowControlEnabled;
   private final List<ByteBuffer> _mailboxBuffers = Collections.synchronizedList(new ArrayList<>());
   private boolean _closedStream = false;
 
   private volatile ReceivingMailbox _mailbox;
 
   public MailboxContentObserver(MailboxService mailboxService, String mailboxId,
-      StreamObserver<MailboxStatus> responseObserver) {
+      ServerCallStreamObserver<MailboxStatus> responseObserver, boolean manualInboundFlowControlEnabled) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
+    _manualInboundFlowControlEnabled = manualInboundFlowControlEnabled;
     _mailbox = StringUtils.isNotBlank(mailboxId) ? _mailboxService.getReceivingMailbox(mailboxId) : null;
   }
 
   @Override
   public void onNext(MailboxContent mailboxContent) {
+    if (_manualInboundFlowControlEnabled) {
+      // Replenish one inbound-message credit immediately, before any work that might block (e.g., the
+      // offerData lock acquisition inside _mailbox.offerRaw). This decouples the sender's HTTP/2 window
+      // replenishment from the receiver's per-message processing time — gRPC will issue the WINDOW_UPDATE
+      // for this message as soon as this request(1) call sets the credit, not waiting for onNext to return.
+      // Do not move this below the blocking _mailbox.offerRaw call — it must replenish credit
+      // BEFORE the offer so the receiver doesn't gate the sender on per-message application drain time.
+      _responseObserver.request(1);
+    }
+    // Else: gRPC's auto-inbound is in place and will automatically replenish 1 credit after onNext
+    // returns. Do not call request(1) here in that mode — it would double-count the credit and break
+    // the 1-in-flight semantics that the rollback knob restores.
     if (_closedStream) {
       LOGGER.debug("Received a late message once the stream was closed. Ignoring it.");
       return;
@@ -94,7 +109,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
           closeStream();
           break;
         case ALREADY_TERMINATED:
-          LOGGER.error("Trying to offer blocks to the already closed mailbox {}. This should not happen", mailboxId);
+          // this can happen when the mailbox is cancelled by the receiver. No more messages are going to be accepted.
           closeStream();
           break;
         default:

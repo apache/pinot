@@ -61,6 +61,7 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.restlet.resources.TenantRebalanceResult;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -70,7 +71,6 @@ import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantTableWithProperties;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.ZkBasedTenantRebalanceObserver;
@@ -264,6 +264,7 @@ public class PinotTenantRestletResource {
 
   @POST
   @Path("/tenants/{tenantName}")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TENANT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "enable/disable a tenant")
@@ -390,8 +391,9 @@ public class PinotTenantRestletResource {
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
     try {
       LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+      // WorkloadChangeListener is not needed for tenant instance partitions update
       InstancePartitionsUtils.persistInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
-          instancePartitions);
+          instancePartitions, null);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions. "
           + "Reason: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -470,12 +472,12 @@ public class PinotTenantRestletResource {
 
     if (StateType.DISABLE.name().equalsIgnoreCase(stateStr)) {
       for (String instance : allInstances) {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
+        instanceResult.set(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
       }
     }
     if (StateType.ENABLE.name().equalsIgnoreCase(stateStr)) {
       for (String instance : allInstances) {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
+        instanceResult.set(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
       }
     }
     return new SuccessResponse("Changed state of tenant " + tenantName + " to " + stateStr + " successfully.");

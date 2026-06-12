@@ -321,6 +321,7 @@ const syncTableSchemaData = (data, showFieldType) => {
   const metricFields = data.metricFieldSpecs || [];
   const dateTimeField = data.dateTimeFieldSpecs || [];
   const complexFields = data.complexFieldSpecs || [];
+  const primaryKeys = new Set(data.primaryKeyColumns || []);
 
   dimensionFields.map((field) => {
     field.fieldType = 'Dimension';
@@ -341,9 +342,9 @@ const syncTableSchemaData = (data, showFieldType) => {
   const columnList = [...dimensionFields, ...metricFields, ...dateTimeField, ...complexFields];
   if (showFieldType) {
     return {
-      columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
+      columns: ['Column', 'Type', 'Field Type', 'Multi Value', 'Primary Key'],
       records: columnList.map((field) => {
-        return [field.name, field.dataType, field.fieldType, getMultiValueField(field)];
+        return [field.name, field.dataType, field.fieldType, getMultiValueField(field), primaryKeys.has(field.name)];
       }),
     };
   }
@@ -480,6 +481,21 @@ const formatTime = (time: number, format?: string): string => {
   return formatTimeInTimezone(time, format);
 }
 
+// Formats an epoch-millis value as an ISO-8601 string. Returns "—" for null / zero /
+// negative inputs (which Pinot's MV runtime metadata uses as the "never set" sentinel for
+// lastRefreshTime and similar fields). Safe to call from any UI component that surfaces
+// optional timestamps.
+const formatEpochMillis = (ms: number | null | undefined): string => {
+  if (!ms || ms <= 0) {
+    return '—';
+  }
+  try {
+    return new Date(ms).toISOString();
+  } catch {
+    return String(ms);
+  }
+}
+
 export default {
   sortArray,
   tableFormat,
@@ -496,5 +512,6 @@ export default {
   pinotTableDetailsFromArray,
   getLoadingTableData,
   formatTime,
+  formatEpochMillis,
   getRebalanceConfigValue
 };

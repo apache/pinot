@@ -21,6 +21,7 @@ package org.apache.pinot.core.routing;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
@@ -29,6 +30,7 @@ import org.apache.pinot.core.routing.timeboundary.TimeBoundaryStrategyService;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +38,39 @@ import org.slf4j.LoggerFactory;
 
 public class LogicalTableRouteProvider implements TableRouteProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableRouteProvider.class);
+  @Nullable
+  private final MultiClusterRoutingContext _multiClusterRoutingContext;
+
+  public LogicalTableRouteProvider() {
+    this(null);
+  }
+
+  public LogicalTableRouteProvider(MultiClusterRoutingContext multiClusterRoutingContext) {
+    _multiClusterRoutingContext = multiClusterRoutingContext;
+  }
+
+  /**
+   * Finds table config from local cache first, then searches federated caches if not found.
+   * Returns null if the table config is not found in any cache.
+   */
+  private TableCache findTableCache(String tableName, TableCache localTableCache) {
+    // Try local cache first
+    TableConfig tableConfig = localTableCache.getTableConfig(tableName);
+    if (tableConfig != null) {
+      return localTableCache;
+    }
+
+    // If not found locally and federation is enabled, search federated caches
+    if (_multiClusterRoutingContext != null) {
+      for (TableCache federatedCache : _multiClusterRoutingContext.getTableCacheMap().values()) {
+        tableConfig = federatedCache.getTableConfig(tableName);
+        if (tableConfig != null) {
+          return federatedCache;
+        }
+      }
+    }
+    return null;
+  }
 
   @Override
   public TableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache, RoutingManager routingManager) {
@@ -56,11 +91,22 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
 
     List<ImplicitHybridTableRouteInfo> offlineTables = new ArrayList<>();
     List<ImplicitHybridTableRouteInfo> realtimeTables = new ArrayList<>();
-    for (String physicalTableName : logicalTableConfig.getPhysicalTableConfigMap().keySet()) {
+    for (var physicalTableEntrySet : logicalTableConfig.getPhysicalTableConfigMap().entrySet()) {
+      String physicalTableName = physicalTableEntrySet.getKey();
+      PhysicalTableConfig physicalTableConfig = physicalTableEntrySet.getValue();
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(physicalTableName);
       Preconditions.checkNotNull(tableType);
+
+      // Selecting any table cache containing the physical table is acceptable for federation since
+      // fillTableConfigMetadata only reads metadata from table config, and if a table exists in multiple
+      // federated clusters, the table configs should be consistent.
+      TableCache selectedTableCache = findTableCache(physicalTableName, tableCache);
+      if (selectedTableCache == null) {
+        // if the table is not found in any cache, ignore it.
+        continue;
+      }
       ImplicitHybridTableRouteInfo physicalTableInfo = new ImplicitHybridTableRouteInfo();
-      routeProvider.fillTableConfigMetadata(physicalTableInfo, physicalTableName, tableCache);
+      routeProvider.fillTableConfigMetadata(physicalTableInfo, physicalTableName, selectedTableCache);
 
       if (physicalTableInfo.isExists()) {
         if (tableType == TableType.OFFLINE) {

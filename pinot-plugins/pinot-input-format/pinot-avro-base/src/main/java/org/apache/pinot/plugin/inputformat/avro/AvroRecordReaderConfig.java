@@ -20,17 +20,16 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
-/**
- * Config for {@link AvroRecordReader}
- */
-public class AvroRecordReaderConfig implements RecordReaderConfig {
-  private boolean _enableLogicalTypes = true;
 
-  public boolean isEnableLogicalTypes() {
-    return _enableLogicalTypes;
+/// Config for [AvroRecordReader]. See [AvroRecordExtractorConfig] for the meaning of `extractRawTimeValues`.
+public class AvroRecordReaderConfig implements RecordReaderConfig {
+  private boolean _extractRawTimeValues;
+
+  public boolean isExtractRawTimeValues() {
+    return _extractRawTimeValues;
   }
 
-  public void setEnableLogicalTypes(boolean enableLogicalTypes) {
-    _enableLogicalTypes = enableLogicalTypes;
+  public void setExtractRawTimeValues(boolean extractRawTimeValues) {
+    _extractRawTimeValues = extractRawTimeValues;
   }
 }

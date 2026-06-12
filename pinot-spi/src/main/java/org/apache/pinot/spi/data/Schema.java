@@ -20,6 +20,7 @@ package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -33,6 +34,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -40,6 +42,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -66,9 +70,14 @@ public final class Schema implements Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
   private String _schemaName;
+  @Nullable
+  private String _description;
+  @Nullable
+  private List<String> _tags;
   private boolean _enableColumnBasedNullHandling;
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
+  @SuppressWarnings("deprecation")
   private TimeFieldSpec _timeFieldSpec;
   private final List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
   private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
@@ -150,6 +159,8 @@ public final class Schema implements Serializable {
           case MAP:
           case LIST:
             break;
+          case OPEN_STRUCT:
+            break;
           default:
             throw new IllegalStateException("Unsupported data type: " + dataType + " in COMPLEX field");
         }
@@ -168,6 +179,24 @@ public final class Schema implements Serializable {
 
   public void setSchemaName(String schemaName) {
     _schemaName = schemaName;
+  }
+
+  @Nullable
+  public String getDescription() {
+    return _description;
+  }
+
+  public void setDescription(@Nullable String description) {
+    _description = description;
+  }
+
+  @Nullable
+  public List<String> getTags() {
+    return _tags;
+  }
+
+  public void setTags(@Nullable List<String> tags) {
+    _tags = tags;
   }
 
   public boolean isEnableColumnBasedNullHandling() {
@@ -238,6 +267,9 @@ public final class Schema implements Serializable {
     }
   }
 
+  /// @deprecated [TimeFieldSpec] is deprecated. Use [#getSpecForTimeColumn(String)] or
+  /// [#getDateTimeSpec(String)] instead.
+  @Deprecated
   public TimeFieldSpec getTimeFieldSpec() {
     return _timeFieldSpec;
   }
@@ -270,6 +302,7 @@ public final class Schema implements Serializable {
     }
   }
 
+  @SuppressWarnings("deprecation")
   public void addField(FieldSpec fieldSpec) {
     Preconditions.checkNotNull(fieldSpec);
     String columnName = fieldSpec.getName();
@@ -388,6 +421,8 @@ public final class Schema implements Serializable {
   public Schema withoutVirtualColumns() {
     Schema newSchema = new Schema();
     newSchema.setSchemaName(getSchemaName());
+    newSchema.setDescription(_description);
+    newSchema.setTags(_tags);
     newSchema.setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling());
     List<String> primaryKeyColumns = getPrimaryKeyColumns();
     if (primaryKeyColumns != null) {
@@ -467,6 +502,7 @@ public final class Schema implements Serializable {
    */
   @JsonIgnore
   @Nullable
+  @SuppressWarnings("deprecation")
   public DateTimeFieldSpec getSpecForTimeColumn(String timeColumnName) {
     FieldSpec fieldSpec = _fieldSpecMap.get(timeColumnName);
     if (fieldSpec != null) {
@@ -503,9 +539,20 @@ public final class Schema implements Serializable {
   /**
    * Returns a json representation of the schema.
    */
+  @JsonValue
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("schemaName", _schemaName);
+    if (StringUtils.isNotBlank(_description)) {
+      jsonObject.put("description", _description);
+    }
+    if (_tags != null && !_tags.isEmpty()) {
+      ArrayNode tagsArray = JsonUtils.newArrayNode();
+      for (String tag : _tags) {
+        tagsArray.add(tag);
+      }
+      jsonObject.set("tags", tagsArray);
+    }
     jsonObject.set("enableColumnBasedNullHandling", JsonUtils.objectToJsonNode(_enableColumnBasedNullHandling));
     if (!_dimensionFieldSpecs.isEmpty()) {
       ArrayNode jsonArray = JsonUtils.newArrayNode();
@@ -597,6 +644,16 @@ public final class Schema implements Serializable {
 
     public SchemaBuilder setSchemaName(String schemaName) {
       _schema.setSchemaName(schemaName);
+      return this;
+    }
+
+    public SchemaBuilder setDescription(@Nullable String description) {
+      _schema.setDescription(description);
+      return this;
+    }
+
+    public SchemaBuilder setTags(@Nullable List<String> tags) {
+      _schema.setTags(tags);
       return this;
     }
 
@@ -770,6 +827,17 @@ public final class Schema implements Serializable {
       return this;
     }
 
+    /**
+     * Adds an OPEN_STRUCT field to the schema.
+     *
+     * @param name field name
+     * @param childFieldSpecs per-key declared types; pass {@code Map.of()} for none
+     */
+    public SchemaBuilder addOpenStruct(String name, Map<String, FieldSpec> childFieldSpecs) {
+      _schema.addField(new ComplexFieldSpec(name, FieldSpec.DataType.OPEN_STRUCT, true, childFieldSpecs));
+      return this;
+    }
+
     public SchemaBuilder setPrimaryKeyColumns(List<String> primaryKeyColumns) {
       _schema.setPrimaryKeyColumns(primaryKeyColumns);
       return this;
@@ -802,6 +870,8 @@ public final class Schema implements Serializable {
     Schema that = (Schema) o;
     //@formatter:off
     return EqualityUtils.isEqual(_schemaName, that._schemaName)
+        && EqualityUtils.isEqual(_description, that._description)
+        && EqualityUtils.isEqual(_tags, that._tags)
         && EqualityUtils.isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs)
         && EqualityUtils.isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs)
         && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec)
@@ -838,10 +908,20 @@ public final class Schema implements Serializable {
    * Backward compatibility requires
    * (1) all columns in oldSchema should be retained.
    * (2) all column fieldSpecs should be backward compatible with the old ones.
+   * (3) primary key columns should not be changed if present(used in dimension tables, upsert, and dedup).
    *
    * @param oldSchema old schema
    */
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
+    List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
+    List<String> newPrimaryKeys = getPrimaryKeyColumns();
+    // Allow adding primary keys if not present. Helps add upsert and dedup configs to existing tables.
+    if (CollectionUtils.isNotEmpty(oldPrimaryKeys)) {
+      if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
+        return false;
+      }
+    }
+
     Set<String> columnNames = getColumnNames();
     for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
       String oldSchemaColumnName = entry.getKey();
@@ -861,6 +941,8 @@ public final class Schema implements Serializable {
   @Override
   public int hashCode() {
     int result = EqualityUtils.hashCodeOf(_schemaName);
+    result = EqualityUtils.hashCodeOf(result, _description);
+    result = EqualityUtils.hashCodeOf(result, _tags);
     result = EqualityUtils.hashCodeOf(result, _dimensionFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _metricFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
@@ -880,11 +962,24 @@ public final class Schema implements Serializable {
   public Schema clone() {
     Schema cloned = new SchemaBuilder()
         .setSchemaName(getSchemaName())
+        .setDescription(getDescription())
+        .setTags(getTags())
         .setPrimaryKeyColumns(getPrimaryKeyColumns())
         .setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling())
         .build();
     getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
     return cloned;
+  }
+
+  public static Schema cloneSchemaWithName(Schema source, String newName) {
+    try {
+      String json = JsonUtils.objectToString(source);
+      Schema cloned = JsonUtils.stringToObject(json, Schema.class);
+      cloned.setSchemaName(newName);
+      return cloned;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to clone schema", e);
+    }
   }
 
   /**
@@ -894,6 +989,7 @@ public final class Schema implements Serializable {
    * the dateTimeFieldSpec,
    *    and configure a transform function for the conversion from incoming
    */
+  @SuppressWarnings("deprecation")
   public static DateTimeFieldSpec convertToDateTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec();
     TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();

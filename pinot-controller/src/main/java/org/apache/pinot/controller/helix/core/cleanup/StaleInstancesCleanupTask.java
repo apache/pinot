@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.cleanup;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -62,7 +61,8 @@ public class StaleInstancesCleanupTask extends BasePeriodicTask {
   public StaleInstancesCleanupTask(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     super(TASK_NAME, controllerConf.getStaleInstancesCleanupTaskFrequencyInSeconds(),
-        controllerConf.getStaleInstanceCleanupTaskInitialDelaySeconds());
+        controllerConf.getStaleInstanceCleanupTaskInitialDelaySeconds(),
+        controllerConf.getStaleInstancesCleanupTaskCronExpression());
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _leadControllerManager = leadControllerManager;
     _controllerMetrics = controllerMetrics;
@@ -143,9 +143,10 @@ public class StaleInstancesCleanupTask extends BasePeriodicTask {
 
   private Set<String> getServerInstancesInUse() {
     Set<String> serverInstancesInUse = new HashSet<>();
-    _pinotHelixResourceManager.getAllTables().forEach(tableName -> serverInstancesInUse.addAll(
+    _pinotHelixResourceManager.getAllTables().forEach(tableName ->
         Optional.ofNullable(_pinotHelixResourceManager.getTableIdealState(tableName))
-            .map(is -> is.getInstanceSet(tableName)).orElse(Collections.emptySet())));
+            .ifPresent(is -> is.getPartitionSet()
+                .forEach(partitionName -> serverInstancesInUse.addAll(is.getInstanceSet(partitionName)))));
     return serverInstancesInUse;
   }
 }

@@ -46,12 +46,14 @@ import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.SqlSetOption;
+import org.apache.calcite.sql.SqlWindow;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -66,6 +68,14 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotDropMaterializedView;
+import org.apache.pinot.sql.parsers.parser.SqlPinotDropTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateMaterializedView;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowMaterializedViews;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -137,6 +147,23 @@ public class CalciteSqlParser {
         } else {
           throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
         }
+      } else if (sqlNode instanceof SqlPinotShowTables
+          || sqlNode instanceof SqlPinotShowMaterializedViews
+          || sqlNode instanceof SqlPinotCreateTable
+          || sqlNode instanceof SqlPinotShowCreateTable
+          || sqlNode instanceof SqlPinotDropTable
+          || sqlNode instanceof SqlPinotCreateMaterializedView
+          || sqlNode instanceof SqlPinotShowCreateMaterializedView
+          || sqlNode instanceof SqlPinotDropMaterializedView) {
+        // Pinot-native DDL statements; the controller dispatches these via the DDL endpoint.
+        // Ordering: Catalog → Table → Materialized View, lifecycle CREATE → SHOW CREATE → DROP,
+        // matching `DdlOperation` and `DdlCompiler#compile`.
+        if (sqlType == null) {
+          sqlType = PinotSqlType.DDL;
+          statementNode = sqlNode;
+        } else {
+          throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
+        }
       } else if (sqlNode instanceof SqlSetOption) {
         // extract options, these are non-execution statements
         List<SqlNode> operandList = ((SqlSetOption) sqlNode).getOperandList();
@@ -164,9 +191,7 @@ public class CalciteSqlParser {
     return compileToPinotQuery(compileToSqlNodeAndOptions(sql));
   }
 
-  /**
-   * Should only be used for testing query rewriters.
-   */
+  /// Should only be used for testing query rewriters.
   public static PinotQuery compileToPinotQueryWithoutRewrites(String sql) {
     return compileWithoutRewrite(compileToSqlNodeAndOptions(sql).getSqlNode());
   }
@@ -271,6 +296,25 @@ public class CalciteSqlParser {
       for (Expression filter : filterExpression.getFunctionCall().getOperands()) {
         validateFilter(filter);
       }
+    } else if (operator.equals(FilterKind.SEMANTIC_MATCH.name())) {
+      // SEMANTIC_MATCH(column, 'query text', topK) — validated here, rewritten by QueryRewriter
+      List<Expression> smOperands = filterExpression.getFunctionCall().getOperands();
+      if (smOperands.size() < 2 || smOperands.size() > 3) {
+        throw new IllegalStateException(
+            "SEMANTIC_MATCH requires 2 or 3 arguments: SEMANTIC_MATCH(column, 'query text'[, topK])");
+      }
+      if (!smOperands.get(0).isSetIdentifier()) {
+        throw new IllegalStateException(
+            "The first argument of SEMANTIC_MATCH must be a column identifier");
+      }
+      if (!smOperands.get(1).isSetLiteral() || smOperands.get(1).getLiteral().isSetNullValue()) {
+        throw new IllegalStateException(
+            "The second argument of SEMANTIC_MATCH must be a non-null string literal (query text)");
+      }
+      if (smOperands.size() == 3 && !smOperands.get(2).isSetLiteral()) {
+        throw new IllegalStateException(
+            "The third argument of SEMANTIC_MATCH must be an integer literal (topK)");
+      }
     } else if (operator.equals(FilterKind.VECTOR_SIMILARITY.name())) {
       Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
       if (!vectorIdentifier.isSetIdentifier()) {
@@ -299,6 +343,30 @@ public class CalciteSqlParser {
               + "the signature is VECTOR_SIMILARITY(float[], float[], int)");
         }
       }
+    } else if (operator.equals(FilterKind.VECTOR_SIMILARITY_RADIUS.name())) {
+      Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
+      if (!vectorIdentifier.isSetIdentifier()) {
+        throw new IllegalStateException(
+            "The first argument of VECTOR_SIMILARITY_RADIUS must be an identifier of float array, "
+                + "the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float).");
+      }
+      Expression vectorLiteral = filterExpression.getFunctionCall().getOperands().get(1);
+      if ((vectorLiteral.isSetFunctionCall() && !vectorLiteral.getFunctionCall().getOperator().equalsIgnoreCase(
+          "arrayvalueconstructor"))
+          || (vectorLiteral.isSetLiteral() && !vectorLiteral.getLiteral().isSetFloatArrayValue()
+          && !vectorLiteral.getLiteral().isSetDoubleArrayValue())) {
+        throw new IllegalStateException(
+            "The second argument of VECTOR_SIMILARITY_RADIUS must be a float/double array "
+                + "literal, the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float)");
+      }
+      if (filterExpression.getFunctionCall().getOperands().size() == 3) {
+        Expression threshold = filterExpression.getFunctionCall().getOperands().get(2);
+        if (!threshold.isSetLiteral()) {
+          throw new IllegalStateException(
+              "The third argument of VECTOR_SIMILARITY_RADIUS must be a numeric literal, "
+                  + "the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float)");
+        }
+      }
     } else {
       List<Expression> operands = filterExpression.getFunctionCall().getOperands();
       for (int i = 1; i < operands.size(); i++) {
@@ -322,9 +390,7 @@ public class CalciteSqlParser {
     return expressions;
   }
 
-  /**
-   * Check recursively if an expression contains any reference not appearing in the GROUP BY clause.
-   */
+  /// Check recursively if an expression contains any reference not appearing in the GROUP BY clause.
   private static boolean expressionOutsideGroupByList(Expression expr, Set<Expression> groupByExprs) {
     // return early for Literal, Aggregate and if we have an exact match
     if (expr.getType() == ExpressionType.LITERAL || isAggregateExpression(expr) || groupByExprs.contains(expr)) {
@@ -366,13 +432,11 @@ public class CalciteSqlParser {
     return function != null && function.getOperator().equals("as");
   }
 
-  /**
-   * Extract all the identifiers from given expressions.
-   *
-   * @param expressions
-   * @param excludeAs if true, ignores the right side identifier for AS function.
-   * @return all the identifier names.
-   */
+  /// Extract all the identifiers from given expressions.
+  ///
+  /// @param expressions
+  /// @param excludeAs if true, ignores the right side identifier for AS function.
+  /// @return all the identifier names.
   public static Set<String> extractIdentifiers(List<Expression> expressions, boolean excludeAs) {
     Set<String> identifiers = new HashSet<>();
     for (Expression expression : expressions) {
@@ -393,14 +457,12 @@ public class CalciteSqlParser {
     return identifiers;
   }
 
-  /**
-   * Compiles a String expression into {@link Expression}.
-   *
-   * @param expression String expression.
-   * @return {@link Expression} equivalent of the string.
-   *
-   * @throws SqlCompilationException if String is not a valid expression.
-   */
+  /// Compiles a String expression into [Expression].
+  ///
+  /// @param expression String expression.
+  /// @return [Expression] equivalent of the string.
+  ///
+  /// @throws SqlCompilationException if String is not a valid expression.
   public static Expression compileToExpression(String expression) {
     SqlNode sqlNode;
     try (StringReader inStream = new StringReader(expression)) {
@@ -566,14 +628,12 @@ public class CalciteSqlParser {
     validate(pinotQuery);
   }
 
-  /**
-   * Applies a specific query rewriter to the given PinotQuery and validates the result.
-   * This method searches for a rewriter by class name and applies it to transform the query.
-   *
-   * @param pinotQuery the query to be rewritten
-   * @param rewriterClass the class name of the query rewriter to apply
-   * @throws IllegalArgumentException if no rewriter with the specified class name is found
-   */
+  /// Applies a specific query rewriter to the given PinotQuery and validates the result.
+  /// This method searches for a rewriter by class name and applies it to transform the query.
+  ///
+  /// @param pinotQuery the query to be rewritten
+  /// @param rewriterClass the class name of the query rewriter to apply
+  /// @throws IllegalArgumentException if no rewriter with the specified class name is found
   public static void queryRewrite(PinotQuery pinotQuery, Class<? extends QueryRewriter> rewriterClass) {
     QueryRewriter queryRewriter = QUERY_REWRITERS.stream()
         .filter(rewriter -> rewriter.getClass().equals(rewriterClass))
@@ -662,13 +722,11 @@ public class CalciteSqlParser {
     return expression;
   }
 
-  /**
-   * DISTINCT is implemented as an aggregation function so need to take the select list items
-   * and convert them into a single function expression for handing over to execution engine
-   * either as a PinotQuery or BrokerRequest via conversion
-   * @param selectList select list items
-   * @return DISTINCT function expression
-   */
+  /// DISTINCT is implemented as an aggregation function so need to take the select list items
+  /// and convert them into a single function expression for handing over to execution engine
+  /// either as a PinotQuery or BrokerRequest via conversion
+  /// @param selectList select list items
+  /// @return DISTINCT function expression
   private static Expression convertDistinctAndSelectListToFunctionExpression(SqlNodeList selectList) {
     List<Expression> operands = new ArrayList<>(selectList.size());
     for (SqlNode node : selectList) {
@@ -756,8 +814,14 @@ public class CalciteSqlParser {
         if (node instanceof SqlDataTypeSpec) {
           // This is to handle expression like: CAST(col AS INT)
           return RequestUtils.getLiteralExpression(((SqlDataTypeSpec) node).getTypeName().getSimple());
-        } else {
+        } else if (node instanceof SqlWindow) {
+          // Window definitions appear as operands of OVER calls. PinotQuery does not model window frames directly, but
+          // compiling them as literals keeps parsing/table-name extraction from failing on multi-stage window queries.
+          return RequestUtils.getLiteralExpression(node.toString());
+        } else if (node instanceof SqlBasicCall) {
           return compileFunctionExpression((SqlBasicCall) node);
+        } else {
+          throw new SqlCompilationException("Unsupported sql node - " + node);
         }
     }
   }
@@ -780,6 +844,14 @@ public class CalciteSqlParser {
         negated = ((SqlLikeOperator) functionNode.getOperator()).isNegated();
         canonicalName = SqlKind.LIKE.name();
         break;
+      case MINUS_PREFIX:
+        // SqlKind.MINUS_PREFIX.name() would canonicalize to "minusprefix", which has no matching entry in
+        // FunctionRegistry. Map directly to the registered NegateScalarFunction name instead.
+        canonicalName = NegateScalarFunction.FUNCTION_NAME;
+        break;
+      case PLUS_PREFIX:
+        // Unary plus is identity -- unwrap to the operand directly (no function node needed).
+        return toExpression(functionNode.getOperandList().get(0));
       case OTHER:
       case OTHER_FUNCTION:
       case DOT:
@@ -831,25 +903,23 @@ public class CalciteSqlParser {
     }
   }
 
-  /**
-   * Convert Calcite operator tree made up of ITEM and DOT functions to an identifier. For example, the operator tree
-   * shown below will be converted to IDENTIFIER "jsoncolumn.data[0][1].a.b[0]".
-   *
-   * ├── ITEM(jsoncolumn.data[0][1].a.b[0])
-   *      ├── LITERAL (0)
-   *      └── DOT (jsoncolumn.daa[0][1].a.b)
-   *            ├── IDENTIFIER (b)
-   *            └── DOT (jsoncolumn.data[0][1].a)
-   *                  ├── IDENTIFIER (a)
-   *                  └── ITEM (jsoncolumn.data[0][1])
-   *                        ├── LITERAL (1)
-   *                        └── ITEM (jsoncolumn.data[0])
-   *                              ├── LITERAL (1)
-   *                              └── IDENTIFIER (jsoncolumn.data)
-   *
-   * @param functionNode Root node of the DOT and/or ITEM operator function chain.
-   * @param pathBuilder StringBuilder representation of path represented by DOT and/or ITEM function chain.
-   */
+  /// Convert Calcite operator tree made up of ITEM and DOT functions to an identifier. For example, the operator tree
+  /// shown below will be converted to IDENTIFIER "jsoncolumn.data[0][1].a.b[0]".
+  ///
+  /// ├── ITEM(jsoncolumn.data[0][1].a.b[0])
+  /// ├── LITERAL (0)
+  /// └── DOT (jsoncolumn.daa[0][1].a.b)
+  /// ├── IDENTIFIER (b)
+  /// └── DOT (jsoncolumn.data[0][1].a)
+  /// ├── IDENTIFIER (a)
+  /// └── ITEM (jsoncolumn.data[0][1])
+  /// ├── LITERAL (1)
+  /// └── ITEM (jsoncolumn.data[0])
+  /// ├── LITERAL (1)
+  /// └── IDENTIFIER (jsoncolumn.data)
+  ///
+  /// @param functionNode Root node of the DOT and/or ITEM operator function chain.
+  /// @param pathBuilder StringBuilder representation of path represented by DOT and/or ITEM function chain.
   private static void compilePathExpression(SqlBasicCall functionNode, StringBuilder pathBuilder) {
     List<SqlNode> operands = functionNode.getOperandList();
 
@@ -882,9 +952,7 @@ public class CalciteSqlParser {
     }
   }
 
-  /**
-   * Helper method to flatten the operands for the AND expression.
-   */
+  /// Helper method to flatten the operands for the AND expression.
   private static Expression compileAndExpression(SqlBasicCall andNode) {
     List<Expression> operands = new ArrayList<>();
     for (SqlNode childNode : andNode.getOperandList()) {
@@ -898,9 +966,7 @@ public class CalciteSqlParser {
     return RequestUtils.getFunctionExpression(FilterKind.AND.name(), operands);
   }
 
-  /**
-   * Helper method to flatten the operands for the OR expression.
-   */
+  /// Helper method to flatten the operands for the OR expression.
   private static Expression compileOrExpression(SqlBasicCall orNode) {
     List<Expression> operands = new ArrayList<>();
     for (SqlNode childNode : orNode.getOperandList()) {

@@ -48,7 +48,10 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
 
   private final IndexSegment _indexSegment;
   private Schema _targetSchema;
-  @Nullable private Map<String, ColumnReader> _columnReaders;
+  private Set<String> _colsToRead;
+  private Map<String, ColumnReader> _columnReaders;
+  private final boolean _skipDefaultNullValues;
+  private final boolean _initializeDefaultValueReaders;
 
   /**
    * Create a PinotSegmentColumnReaderFactory.
@@ -56,14 +59,40 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
    * @param indexSegment Source segment to read from
    */
   public PinotSegmentColumnReaderFactory(IndexSegment indexSegment) {
+    this(indexSegment, false, true);
+  }
+
+  /**
+   * Create a PinotSegmentColumnReaderFactory.
+   *
+   * @param indexSegment Source segment to read from
+   * @param skipDefaultNullValues Whether to read null values as default values or as nulls
+   *                              If true, nulls will be read as nulls.
+   *                              If false, nulls will be read as default values.
+   * @param initializeDefaultValueReaders Whether to initialize default value readers for missing columns
+   *           TODO - Ideally this factory shouldn't initialize default value readers.
+   *                  The clients of this factory should decide whether to create default value readers or not.
+   *                  This parameter is kept for backward compatibility and will be removed in future.
+   */
+  public PinotSegmentColumnReaderFactory(IndexSegment indexSegment, boolean skipDefaultNullValues,
+      boolean initializeDefaultValueReaders) {
     _indexSegment = indexSegment;
     _columnReaders = new HashMap<>();
+    _skipDefaultNullValues = skipDefaultNullValues;
+    _initializeDefaultValueReaders = initializeDefaultValueReaders;
   }
 
   @Override
   public void init(Schema targetSchema)
       throws IOException {
+    init(targetSchema, targetSchema.getPhysicalColumnNames());
+  }
+
+  @Override
+  public void init(Schema targetSchema, Set<String> colsToRead)
+      throws IOException {
     _targetSchema = targetSchema;
+    _colsToRead = colsToRead;
     _columnReaders = initializeAllColumnReaders();
     LOGGER.info("Initialized PinotSegmentColumnReaderFactory with target schema containing {} columns",
         targetSchema.getPhysicalColumnNames().size());
@@ -84,54 +113,50 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   }
 
   @Override
-  public ColumnReader getColumnReader(String columnName)
-      throws IOException {
+  public ColumnReader getColumnReader(String columnName) {
     if (_targetSchema == null) {
       throw new IllegalStateException("Factory not initialized. Call init() first.");
     }
 
-    ColumnReader reader = _columnReaders.get(columnName);
-    if (reader == null) {
-      throw new IOException("Column reader not found for column: " + columnName);
-    }
-    return reader;
+    return _columnReaders.get(columnName);
   }
 
   /**
    * Internal method to create a column reader for the specified column.
    * This method is called during initialization to create all readers.
    */
+  @Nullable
   private ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec) {
     if (targetFieldSpec.isVirtualColumn()) {
       throw new IllegalStateException("Target field spec is a virtual column.");
     }
 
-    ColumnReader columnReader;
+    ColumnReader columnReader = null;
 
     if (hasColumn(columnName)) {
       // Column exists in source segment - create a segment column reader
       LOGGER.debug("Creating segment column reader for existing column: {}", columnName);
-      columnReader = new PinotSegmentColumnReaderImpl(_indexSegment, columnName);
+      columnReader = new PinotSegmentColumnReaderImpl(_indexSegment, columnName, _skipDefaultNullValues);
     } else {
-      // New column - create a default value reader
-      LOGGER.debug("Creating default value reader for new column: {}", columnName);
-      columnReader = new DefaultValueColumnReader(columnName, getNumDocs(), targetFieldSpec);
+      if (_initializeDefaultValueReaders) {
+        // New column - create a default value reader
+        LOGGER.debug("Creating default value reader for new column: {}", columnName);
+        columnReader = new DefaultValueColumnReader(columnName, getNumDocs(), targetFieldSpec);
+      }
     }
 
     return columnReader;
   }
 
   @Override
-  public Map<String, ColumnReader> getAllColumnReaders()
-      throws IOException {
+  public Map<String, ColumnReader> getAllColumnReaders() {
     return _columnReaders;
   }
 
   /**
    * Internal method to initialize all column readers during factory initialization.
    */
-  private Map<String, ColumnReader> initializeAllColumnReaders()
-      throws IOException {
+  private Map<String, ColumnReader> initializeAllColumnReaders() {
     if (_targetSchema == null) {
       throw new IllegalStateException("Factory not initialized. Call init() first.");
     }
@@ -139,14 +164,15 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
     Map<String, ColumnReader> allReaders = new HashMap<>();
 
     // Create readers for all columns in the target schema
-    for (FieldSpec fieldSpec : _targetSchema.getAllFieldSpecs()) {
+    for (String columnName : _colsToRead) {
+      FieldSpec fieldSpec = _targetSchema.getFieldSpecFor(columnName);
       if (fieldSpec.isVirtualColumn()) {
         continue;
       }
-
-      String columnName = fieldSpec.getName();
       ColumnReader reader = createColumnReader(columnName, fieldSpec);
-      allReaders.put(columnName, reader);
+      if (reader != null) {
+        allReaders.put(columnName, reader);
+      }
     }
 
     return allReaders;

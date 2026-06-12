@@ -43,7 +43,11 @@ public class StaticTokenAuthProvider implements AuthProvider {
   public StaticTokenAuthProvider(AuthConfig authConfig) {
     String header = AuthProviderUtils.getOrDefault(authConfig, HEADER, HttpHeaders.AUTHORIZATION);
     String prefix = AuthProviderUtils.getOrDefault(authConfig, PREFIX, "Basic");
-    String userToken = authConfig.getProperties().get(TOKEN).toString();
+    Object tokenValue = authConfig.getProperties().get(TOKEN);
+    if (tokenValue == null) {
+      throw new IllegalArgumentException("Missing required auth config property: " + TOKEN);
+    }
+    String userToken = tokenValue.toString();
 
     _taskToken = makeToken(prefix, userToken);
     _requestHeaders = Collections.singletonMap(header, _taskToken);

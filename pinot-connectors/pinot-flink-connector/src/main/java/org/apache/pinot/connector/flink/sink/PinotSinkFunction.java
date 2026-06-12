@@ -18,152 +18,52 @@
  */
 package org.apache.pinot.connector.flink.sink;
 
-import java.net.URI;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.state.FunctionInitializationContext;
-import org.apache.flink.runtime.state.FunctionSnapshotContext;
-import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
-import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 import org.apache.pinot.connector.flink.common.PinotGenericRowConverter;
-import org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
-import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
- * The sink function for Pinot.
+ * Backward-compatible shim for code that still constructs the old sink class name.
  *
- * @param <T> type of record supported
+ * <p>Flink 2.x removed the legacy {@code SinkFunction} API. Use {@link PinotSink} together with
+ * {@code DataStream#sinkTo(Sink)} for new code.
+ *
+ * @param <T> type of record supported by the sink
  */
-@SuppressWarnings("NullAway")
-public class PinotSinkFunction<T> extends RichSinkFunction<T> implements CheckpointedFunction {
-
-  public static final long DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS = 500000;
-  public static final int DEFAULT_EXECUTOR_POOL_SIZE = 5;
-  public static final long DEFAULT_EXECUTOR_SHUTDOWN_WAIT_MS = 3000;
-
+@Deprecated
+public class PinotSinkFunction<T> extends PinotSink<T> {
   private static final long serialVersionUID = 1L;
-  private static final Logger LOG = LoggerFactory.getLogger(PinotSinkFunction.class);
-
-  private final long _segmentFlushMaxNumRecords;
-  private final int _executorPoolSize;
-
-  private final PinotGenericRowConverter<T> _recordConverter;
-
-  private final TableConfig _tableConfig;
-  private final Schema _schema;
-
-  @Nullable private final String _segmentNamePrefix;
-
-  // Used to set upload time in segment name, if not provided, current time is used
-  @Nullable private final Long _segmentUploadTimeMs;
-
-  private transient SegmentWriter _segmentWriter;
-  private transient SegmentUploader _segmentUploader;
-  private transient ExecutorService _executor;
-  private transient long _segmentNumRecord;
+  @Deprecated
+  public static final String DEFAULT_OUTPUT_DIR_URI = PinotSink.DEFAULT_OUTPUT_DIR_URI;
+  @Deprecated
+  public static final long DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS = PinotSink.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS;
+  @Deprecated
+  public static final int DEFAULT_EXECUTOR_POOL_SIZE = PinotSink.DEFAULT_EXECUTOR_POOL_SIZE;
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema) {
-    this(recordConverter, tableConfig, schema, DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
+    super(recordConverter, tableConfig, schema);
+  }
+
+  public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
+      String controllerBaseUrl) {
+    super(recordConverter, tableConfig, schema, controllerBaseUrl);
   }
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize) {
-    this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize, null, null);
+    super(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize);
   }
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize, @Nullable String segmentNamePrefix,
       @Nullable Long segmentUploadTimeMs) {
-    _recordConverter = recordConverter;
-    _tableConfig = tableConfig;
-    _schema = schema;
-    _segmentFlushMaxNumRecords = segmentFlushMaxNumRecords;
-    _executorPoolSize = executorPoolSize;
-    _segmentNamePrefix = segmentNamePrefix;
-    _segmentUploadTimeMs = segmentUploadTimeMs;
+    super(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize, segmentNamePrefix,
+        segmentUploadTimeMs);
   }
 
-  @Override
-  public void open(Configuration parameters)
-      throws Exception {
-    int indexOfSubtask = this.getRuntimeContext().getIndexOfThisSubtask();
-    _segmentWriter = new FlinkSegmentWriter(indexOfSubtask, getRuntimeContext().getMetricGroup(), _segmentNamePrefix,
-        _segmentUploadTimeMs);
-    _segmentWriter.init(_tableConfig, _schema);
-    _segmentUploader = new SegmentUploaderDefault();
-    _segmentUploader.init(_tableConfig);
-    _segmentNumRecord = 0;
-    _executor = Executors.newFixedThreadPool(_executorPoolSize);
-    LOG.info("Open Pinot Sink with the table {}", _tableConfig.toJsonString());
-  }
-
-  @Override
-  public void close()
-      throws Exception {
-    LOG.info("Closing Pinot Sink");
-    try {
-      if (_segmentNumRecord > 0) {
-        flush();
-      }
-    } catch (Exception e) {
-      LOG.error("Error when closing Pinot sink", e);
-    }
-    _executor.shutdown();
-    try {
-      if (!_executor.awaitTermination(DEFAULT_EXECUTOR_SHUTDOWN_WAIT_MS, TimeUnit.MILLISECONDS)) {
-        _executor.shutdownNow();
-      }
-    } catch (InterruptedException e) {
-      _executor.shutdownNow();
-    } finally {
-      _segmentWriter.close();
-    }
-  }
-
-  @Override
-  public void invoke(T value, Context context)
-      throws Exception {
-    _segmentWriter.collect(_recordConverter.convertToRow(value));
-    _segmentNumRecord++;
-    if (_segmentNumRecord >= _segmentFlushMaxNumRecords) {
-      flush();
-    }
-  }
-
-  @Override
-  public void snapshotState(FunctionSnapshotContext functionSnapshotContext)
-      throws Exception {
-    throw new UnsupportedOperationException("snapshotState is invoked in Pinot sink");
-  }
-
-  @Override
-  public void initializeState(FunctionInitializationContext functionInitializationContext)
-      throws Exception {
-    // no initialization needed
-    // ...
-  }
-
-  private void flush()
-      throws Exception {
-    URI segmentURI = _segmentWriter.flush();
-    LOG.info("Pinot segment writer flushed with {} records to {}", _segmentNumRecord, segmentURI);
-    _segmentNumRecord = 0;
-    _executor.submit(() -> {
-      try {
-        _segmentUploader.uploadSegment(segmentURI, null);
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to upload pinot segment", e);
-      }
-      LOG.info("Pinot segment uploaded to {}", segmentURI);
-    });
+  static TableConfig prepareTableConfigForSink(TableConfig tableConfig, String controllerBaseUrl) {
+    return PinotSink.prepareTableConfigForSink(tableConfig, controllerBaseUrl);
   }
 }

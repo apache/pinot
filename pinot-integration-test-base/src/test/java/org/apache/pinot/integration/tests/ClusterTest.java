@@ -76,6 +76,7 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -117,6 +118,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected String _minionBaseApiUrl;
 
   protected boolean _useMultiStageQueryEngine = false;
+  protected boolean _usePhysicalOptimizer = false;
 
   protected int getServerGrpcPort() {
     return _serverGrpcPort;
@@ -146,8 +148,16 @@ public abstract class ClusterTest extends ControllerTest {
     return _useMultiStageQueryEngine;
   }
 
+  protected boolean usePhysicalOptimizer() {
+    return _usePhysicalOptimizer;
+  }
+
   protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
     _useMultiStageQueryEngine = useMultiStageQueryEngine;
+  }
+
+  protected void setUsePhysicalOptimizer(boolean usePhysicalOptimizer) {
+    _usePhysicalOptimizer = usePhysicalOptimizer;
   }
 
   protected void disableMultiStageQueryEngine() {
@@ -256,12 +266,20 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, serverNettyPort);
     int serverGrpcPort = NetUtils.findOpenPort(serverNettyPort + 1);
     serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, serverGrpcPort);
+    // Assign the multi-stage query engine ports explicitly using the incremental findOpenPort pattern so that
+    // rapid back-to-back server starts in the same JVM don't collide on OS-ephemeral ports. Otherwise
+    // BaseServerStarter.init() falls back to NetUtils.findOpenPort() which probes and releases a ServerSocket(0)
+    // before the gRPC server binds, opening a window where the same port can be handed to a later caller.
+    int queryServerPort = NetUtils.findOpenPort(serverGrpcPort + 1);
+    serverConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, queryServerPort);
+    int queryRunnerPort = NetUtils.findOpenPort(queryServerPort + 1);
+    serverConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, queryRunnerPort);
     if (_serverAdminApiPort == 0) {
       _serverAdminApiPort = serverAdminApiPort;
       _serverNettyPort = serverNettyPort;
       _serverGrpcPort = serverGrpcPort;
     }
-    _nextServerPort = serverGrpcPort + 1;
+    _nextServerPort = queryRunnerPort + 1;
 
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
@@ -298,6 +316,14 @@ public abstract class ClusterTest extends ControllerTest {
     serverStarter.init(serverConfig);
     serverStarter.start();
     return serverStarter;
+  }
+
+  protected BaseBrokerStarter startOneBroker(PinotConfiguration brokerConfig)
+      throws Exception {
+    BaseBrokerStarter brokerStarter = createBrokerStarter();
+    brokerStarter.init(brokerConfig);
+    brokerStarter.start();
+    return brokerStarter;
   }
 
   /**
@@ -390,6 +416,24 @@ public abstract class ClusterTest extends ControllerTest {
     return startOneServer(serverConfig);
   }
 
+  protected void restartBrokers()
+      throws Exception {
+    assertNotNull(_brokerStarters, "Brokers are not started");
+    List<BaseBrokerStarter> oldBrokers = new ArrayList<>(_brokerStarters);
+    int numBrokers = _brokerStarters.size();
+    _brokerStarters.clear();
+    for (int i = 0; i < numBrokers; i++) {
+      _brokerStarters.add(restartBroker(oldBrokers.get(i)));
+    }
+  }
+
+  protected BaseBrokerStarter restartBroker(BaseBrokerStarter brokerStarter)
+      throws Exception {
+    PinotConfiguration brokerConfig = brokerStarter.getConfig();
+    brokerStarter.stop();
+    return startOneBroker(brokerConfig);
+  }
+
   /**
    * Upload all segments inside the given directory to the cluster.
    */
@@ -437,7 +481,7 @@ public abstract class ClusterTest extends ControllerTest {
     int numSegments = segmentTarFiles.size();
     assertTrue(numSegments > 0);
 
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getOrCreateAdminClient().getSegmentUploadUrl());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles.get(0);
@@ -571,7 +615,7 @@ public abstract class ClusterTest extends ControllerTest {
       Map<String, String> headers) {
     try {
       Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
-        String.valueOf(startTime), "end", String.valueOf(endTime));
+          String.valueOf(startTime), "end", String.valueOf(endTime));
       String url = buildQueryUrl(getTimeSeriesQueryApiUrl(baseUrl), queryParams);
       JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, headers));
       return sanitizeResponse(responseJsonNode);
@@ -582,9 +626,25 @@ public abstract class ClusterTest extends ControllerTest {
 
   public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
       Map<String, String> headers) {
+    return postTimeseriesQuery(baseUrl, query, startTime, endTime, null, headers, null);
+  }
+
+  public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime, String mode,
+      Map<String, String> headers, Map<String, Object> queryOptions) {
     try {
-      Map<String, String> payload = Map.of("language", "m3ql", "query", query, "start",
-          String.valueOf(startTime), "end", String.valueOf(endTime));
+      ObjectNode payload = JsonUtils.newObjectNode();
+      payload.put("language", "m3ql");
+      payload.put("query", query);
+      payload.put("start", String.valueOf(startTime));
+      payload.put("end", String.valueOf(endTime));
+      if (mode != null) {
+        payload.put("mode", mode);
+      }
+      if (queryOptions != null && !queryOptions.isEmpty()) {
+        ObjectNode queryOptionsNode = JsonUtils.newObjectNode();
+        queryOptions.forEach(queryOptionsNode::putPOJO);
+        payload.set("queryOptions", queryOptionsNode);
+      }
       return JsonUtils.stringToJsonNode(
           sendPostRequest(baseUrl + "/query/timeseries", JsonUtils.objectToString(payload), headers));
     } catch (Exception e) {
@@ -724,8 +784,9 @@ public abstract class ClusterTest extends ControllerTest {
         case DOUBLE_ARRAY:
           array[k] = jsonValue.get(k).asDouble();
           break;
-        case STRING_ARRAY:
+        case BIG_DECIMAL_ARRAY:
         case TIMESTAMP_ARRAY:
+        case STRING_ARRAY:
         case BYTES_ARRAY:
           array[k] = jsonValue.get(k).textValue();
           break;
@@ -757,11 +818,11 @@ public abstract class ClusterTest extends ControllerTest {
       case DOUBLE:
         object = jsonValue.asDouble();
         break;
+      case BIG_DECIMAL:
+      case TIMESTAMP:
       case STRING:
       case BYTES:
-      case TIMESTAMP:
       case JSON:
-      case BIG_DECIMAL:
         object = jsonValue.textValue();
         break;
       case UNKNOWN:
@@ -795,9 +856,8 @@ public abstract class ClusterTest extends ControllerTest {
 
   public JsonNode cancelQuery(String clientQueryId)
       throws Exception {
-    URI cancelURI = URI.create(getControllerRequestURLBuilder().forCancelQueryByClientId(clientQueryId));
-    Object o = _httpClient.sendDeleteRequest(cancelURI);
-    return null; // TODO
+    String response = getOrCreateAdminClient().getQueryClient().cancelQueryByClientId(clientQueryId);
+    return JsonUtils.stringToJsonNode(response);
   }
 
   /**
@@ -813,7 +873,11 @@ public abstract class ClusterTest extends ControllerTest {
     if (!useMultiStageQueryEngine()) {
       return Map.of();
     }
-    return Map.of("queryOptions", "useMultistageEngine=true");
+    StringBuilder queryOptions = new StringBuilder("useMultistageEngine=true");
+    if (usePhysicalOptimizer()) {
+      queryOptions.append("; usePhysicalOptimizer=true");
+    }
+    return Map.of("queryOptions", queryOptions.toString());
   }
 
   /**

@@ -24,8 +24,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -40,7 +41,8 @@ public class BasicAuthAccessFactory implements AccessControlFactory {
 
   @Override
   public void init(PinotConfiguration configuration) {
-    _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
+    _accessControl = new BasicAuthAccessControl(
+        BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }
 
   public AccessControl create() {
@@ -66,7 +68,7 @@ public class BasicAuthAccessFactory implements AccessControlFactory {
     public boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName) {
       Collection<String> tokens = getTokens(requesterIdentity);
       return tokens.stream()
-          .map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+          .map(BasicAuthTokenUtils::normalizeBase64Token)
           .map(_token2principal::get)
           .filter(Objects::nonNull)
           .findFirst()

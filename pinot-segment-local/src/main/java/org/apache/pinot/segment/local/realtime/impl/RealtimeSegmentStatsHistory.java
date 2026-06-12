@@ -100,7 +100,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     // numRowsIndexed can be <= numRowsConsumed when aggregateMetrics is true.
     private int _numSeconds;        // Number of seconds taken to consume them
     private long _memUsedBytes;          // Memory used for consumption (bytes)
-    private Map<String, ColumnStats> _colNameToStats = new HashMap();
+    private Map<String, ColumnStats> _colNameToStats = new HashMap<>();
 
     public int getNumRowsConsumed() {
       return _numRowsConsumed;

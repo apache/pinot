@@ -61,6 +61,8 @@ public class PinotConnectionTest {
       Assert.assertTrue(metaData.getDatabaseMajorVersion() > 0);
       Assert.assertTrue(metaData.getDatabaseMinorVersion() >= 0);
       Assert.assertEquals(metaData.getDatabaseProductName(), "APACHE_PINOT");
+      Assert.assertTrue(metaData.getDriverMajorVersion() > 0);
+      Assert.assertTrue(metaData.getDriverMinorVersion() >= 0);
       Assert.assertEquals(metaData.getDriverName(), "APACHE_PINOT_DRIVER");
       Assert.assertNotNull(metaData.getConnection());
     }

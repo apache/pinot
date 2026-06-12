@@ -22,10 +22,12 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -40,6 +42,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -47,9 +50,11 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, DispatchablePlanContext> {
   private final Set<MailboxSendNode> _visited = Collections.newSetFromMap(new IdentityHashMap<>());
   private final TableCache _tableCache;
+  private final MultiClusterRoutingContext _multiClusterRoutingContext;
 
-  public DispatchablePlanVisitor(TableCache tableCache) {
+  public DispatchablePlanVisitor(TableCache tableCache, MultiClusterRoutingContext multiClusterRoutingContext) {
     _tableCache = tableCache;
+    _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
   private static DispatchablePlanMetadata getOrCreateDispatchablePlanMetadata(PlanNode node,
@@ -101,7 +106,13 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   @Override
   public Void visitJoin(JoinNode node, DispatchablePlanContext context) {
     node.getInputs().forEach(join -> join.visit(this, context));
-    getOrCreateDispatchablePlanMetadata(node, context);
+    DispatchablePlanMetadata metadata = getOrCreateDispatchablePlanMetadata(node, context);
+    // FULL OUTER JOIN with no equi keys requires a single worker because each worker independently tracks matched
+    // right rows via a local BitSet. With multiple workers, each sees only a subset of left rows, causing spurious
+    // unmatched right rows. Using requireSingleton ensures WorkerManager picks one random server (hotspot rotation).
+    if (node.getJoinType() == JoinRelType.FULL && node.getLeftKeys().isEmpty()) {
+      metadata.setRequireSingleton(true);
+    }
     return null;
   }
 
@@ -140,7 +151,9 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitSort(SortNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    dispatchablePlanMetadata.setRequireSingleton(!node.getCollations().isEmpty() && node.getOffset() != -1);
+    // Final sort (receives from sort exchange) needs singleton worker
+    boolean isFinalSort = node.getInputs().get(0) instanceof MailboxReceiveNode;
+    dispatchablePlanMetadata.setRequireSingleton(isFinalSort);
     return null;
   }
 
@@ -153,7 +166,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
     if (tableName == null) {
       tableName = _tableCache.getActualLogicalTableName(tableNameInNode);
       Preconditions.checkNotNull(tableName, "Logical table config not found in table cache: " + tableNameInNode);
-      LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
+      LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider(_multiClusterRoutingContext);
       LogicalTableRouteInfo logicalTableRouteInfo = new LogicalTableRouteInfo();
       tableRouteProvider.fillTableConfigMetadata(logicalTableRouteInfo, tableName, _tableCache);
       dispatchablePlanMetadata.setLogicalTableRouteInfo(logicalTableRouteInfo);
@@ -174,5 +187,12 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   @Override
   public Void visitExplained(ExplainedNode node, DispatchablePlanContext context) {
     throw new UnsupportedOperationException("ExplainedNode should not be visited by DispatchablePlanVisitor");
+  }
+
+  @Override
+  public Void visitUnnest(UnnestNode node, DispatchablePlanContext context) {
+    node.getInputs().get(0).visit(this, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
+    return null;
   }
 }

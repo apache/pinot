@@ -38,7 +38,11 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
   DEEP_STORE_SEGMENT_WRITE_TIME_MS("deepStoreSegmentWriteTimeMs", true),
   // Audit logging timers
   AUDIT_REQUEST_PROCESSING_TIME("auditRequestProcessingTime", true),
-  AUDIT_RESPONSE_PROCESSING_TIME("auditResponseProcessingTime", true);
+  AUDIT_RESPONSE_PROCESSING_TIME("auditResponseProcessingTime", true),
+  // Query workload propagation metrics
+  QUERY_WORKLOAD_PROPAGATE_TIME_MS("queryWorkloadPropagateTimeMs", false),
+  QUERY_WORKLOAD_SEND_MESSAGE_TIME_MS("queryWorkloadSendMessageTimeMs", false),
+  QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_TIME_MS("queryWorkloadUpdateResourceTimeMs", true);
 
 
   private final String _timerName;

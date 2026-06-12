@@ -53,7 +53,7 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
       initialValue = new QuantileDigest(DEFAULT_MAX_ERROR);
-      initialValue.add(toLong(rawValue));
+      addToDigest(initialValue, rawValue);
       _maxByteSize = Math.max(_maxByteSize, initialValue.getByteSize());
     }
     return initialValue;
@@ -64,10 +64,24 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
     if (rawValue instanceof byte[]) {
       value.merge(deserializeAggregatedValue((byte[]) rawValue));
     } else {
-      value.add(toLong(rawValue));
+      addToDigest(value, rawValue);
     }
     _maxByteSize = Math.max(_maxByteSize, value.getByteSize());
     return value;
+  }
+
+  /**
+   * Adds a raw value (single value or multi-value array) to the QuantileDigest.
+   */
+  protected void addToDigest(QuantileDigest digest, Object rawValue) {
+    if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      for (Object value : values) {
+        digest.add(toLong(value));
+      }
+    } else {
+      digest.add(toLong(rawValue));
+    }
   }
 
   private static long toLong(Object rawValue) {

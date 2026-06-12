@@ -37,7 +37,8 @@ public class MetadataExtractorFactory {
     String metadataExtractorClassName = metadataClassName;
     try {
       LOGGER.info("Instantiating MetadataExtractor class {}", metadataExtractorClassName);
-      MetadataExtractor metadataExtractor = (MetadataExtractor) Class.forName(metadataExtractorClassName).newInstance();
+      MetadataExtractor metadataExtractor =
+          (MetadataExtractor) Class.forName(metadataExtractorClassName).getDeclaredConstructor().newInstance();
       return metadataExtractor;
     } catch (Exception e) {
       LOGGER.warn("No metadata extractor class passed in, using default");

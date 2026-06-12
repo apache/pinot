@@ -31,7 +31,6 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
@@ -159,7 +158,6 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
     _controllerStarter.start();
     _controllerConfig = _controllerStarter.getConfig();
     _controllerBaseApiUrl = _controllerConfig.generateVipUrl();
-    _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
     _controllerDataDir = _controllerConfig.getDataDir();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();

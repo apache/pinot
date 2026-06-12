@@ -33,8 +33,9 @@ import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
+import TablePagination, { TablePaginationProps } from '@material-ui/core/TablePagination';
 import TableRow from '@material-ui/core/TableRow';
-import { TablePagination, Tooltip } from '@material-ui/core';
+import { Tooltip } from '@material-ui/core';
 import {TableData, TableSortFunction} from 'Models';
 import IconButton from '@material-ui/core/IconButton';
 import FirstPageIcon from '@material-ui/icons/FirstPage';
@@ -47,7 +48,7 @@ import { Link } from 'react-router-dom';
 import Chip from '@material-ui/core/Chip';
 import { get, has, orderBy } from 'lodash';
 import app_state from '../app_state';
-import { sortBytes, sortNumberOfSegments } from '../utils/SortFunctions'
+import { sortBytes, sortCellValue, sortNumberOfSegments } from '../utils/SortFunctions'
 import Utils from '../utils/Utils';
 import TableToolbar from './TableToolbar';
 import SimpleAccordion from './SimpleAccordion';
@@ -86,6 +87,7 @@ let staticSortFunctions: Map<string, TableSortFunction> = new Map()
 staticSortFunctions.set("Number of Segments", sortNumberOfSegments);
 staticSortFunctions.set("Estimated Size", sortBytes);
 staticSortFunctions.set("Reported Size", sortBytes);
+staticSortFunctions.set("Status", sortCellValue);
 
 const StyledTableRow = withStyles((theme) =>
   createStyles({
@@ -206,25 +208,43 @@ const usePaginationStyles = makeStyles({
   },
 });
 
-function TablePaginationActions(props) {
+type PageChangeHandler = (
+  event: React.MouseEvent<HTMLButtonElement> | null,
+  page: number
+) => void;
+
+type PaginationActionsProps = {
+  count: number,
+  onChangePage?: PageChangeHandler,
+  onPageChange?: PageChangeHandler,
+  page: number,
+  rowsPerPage: number
+};
+
+type DivTablePaginationProps = TablePaginationProps<'div'> & {
+  component: 'div'
+};
+
+function TablePaginationActions(props: PaginationActionsProps) {
   const classes = usePaginationStyles();
   const theme = useTheme();
-  const { count, page, rowsPerPage, onChangePage } = props;
+  const { count, page, rowsPerPage, onChangePage, onPageChange } = props;
+  const changePage = onPageChange || onChangePage;
 
   const handleFirstPageButtonClick = (event) => {
-    onChangePage(event, 0);
+    changePage?.(event, 0);
   };
 
   const handleBackButtonClick = (event) => {
-    onChangePage(event, page - 1);
+    changePage?.(event, page - 1);
   };
 
   const handleNextButtonClick = (event) => {
-    onChangePage(event, page + 1);
+    changePage?.(event, page + 1);
   };
 
   const handleLastPageButtonClick = (event) => {
-    onChangePage(event, Math.max(0, Math.ceil(count / rowsPerPage) - 1));
+    changePage?.(event, Math.max(0, Math.ceil(count / rowsPerPage) - 1));
   };
 
   return (
@@ -271,7 +291,8 @@ function TablePaginationActions(props) {
 
 TablePaginationActions.propTypes = {
   count: PropTypes.number.isRequired,
-  onChangePage: PropTypes.func.isRequired,
+  onChangePage: PropTypes.func,
+  onPageChange: PropTypes.func,
   page: PropTypes.number.isRequired,
   rowsPerPage: PropTypes.number.isRequired,
 };
@@ -334,6 +355,20 @@ export default function CustomizedTables({
 
   const [search, setSearch] = React.useState<string>('');
 
+  const paginationProps: DivTablePaginationProps = {
+    rowsPerPageOptions: [5, 10, 25, 50, 100],
+    component: 'div',
+    count: finalData.length,
+    rowsPerPage,
+    page,
+    onChangePage: handleChangePage,
+    onPageChange: handleChangePage,
+    onChangeRowsPerPage: handleChangeRowsPerPage,
+    onRowsPerPageChange: handleChangeRowsPerPage,
+    ActionsComponent: TablePaginationActions,
+    classes: { spacer: classes.spacer },
+  };
+
   const timeoutId = React.useRef<NodeJS.Timeout>();
 
   const filterSearchResults = React.useCallback((str: string) => {
@@ -380,7 +415,7 @@ export default function CustomizedTables({
   }, [search, timeoutId, filterSearchResults]);
 
   const styleCell = (str: string) => {
-    if (str.toLowerCase() === 'good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
+    if (str.toLowerCase() === 'good' || str.toLowerCase() === 'healthy' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
           return (
             <StyledChip
               label={str}
@@ -389,7 +424,7 @@ export default function CustomizedTables({
             />
           );
         }
-    if (str.toLocaleLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
+    if (str.toLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
       return (
         <StyledChip
           label={str}
@@ -398,7 +433,16 @@ export default function CustomizedTables({
         />
       );
     }
-    if (str.toLowerCase() === 'consuming' || str.toLocaleLowerCase() === "partial" || str.toLocaleLowerCase() === "updating" ) {
+    if (str.toLowerCase() === 'disabled' || str.toLowerCase() === "queries disabled" || str.toLowerCase() === 'unhealthy') {
+      return (
+        <StyledChip
+          label={str}
+          className={classes.cellStatusConsuming}
+          variant="outlined"
+        />
+      );
+    }
+    if (str.toLowerCase() === 'consuming' || str.toLowerCase() === "partial" || str.toLowerCase() === "updating") {
       return (
         <StyledChip
           label={str}
@@ -518,8 +562,8 @@ export default function CustomizedTables({
                     key={index}
                     onClick={() => {
                       if (staticSortFunctions.has(column)) {
-                        finalData.sort((a, b) => staticSortFunctions.get(column)(a, b, column, index, order));
-                        setFinalData(finalData);
+                        const sortFunction = staticSortFunctions.get(column);
+                        setFinalData([...finalData].sort((a, b) => sortFunction(a, b, column, index, order)));
                       } else {
                         setFinalData(orderBy(finalData, column+app_state.columnNameSeparator+index, order ? 'asc' : 'desc'));
                       }
@@ -596,17 +640,7 @@ export default function CustomizedTables({
           </Table>
         </TableContainer>
         {finalData.length > 10 ? (
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25, 50, 100]}
-            component="div"
-            count={finalData.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onChangePage={handleChangePage}
-            onChangeRowsPerPage={handleChangeRowsPerPage}
-            ActionsComponent={TablePaginationActions}
-            classes={{ spacer: classes.spacer }}
-          />
+          <TablePagination {...paginationProps} />
         ) : null}
       </>
     );

@@ -23,30 +23,22 @@ import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 
 
+/// DataSource for a MAP column. Provides per-key DataSources that can be used for filtering,
+/// aggregation, and projection on individual MAP keys.
 public interface MapDataSource extends DataSource {
 
-  /**
-   * Get the map FieldSpec.
-   */
+  /// Returns the map FieldSpec.
   ComplexFieldSpec.MapFieldSpec getFieldSpec();
 
-  /**
-   * Get the Data Source representation of a single key within this map column.
-   */
-  DataSource getKeyDataSource(String key);
+  /// Returns the DataSource for the given map key's values.
+  DataSource getDataSource(String key);
 
-  /**
-   * Get the Data Source representation of all keys within this map column.
-   */
-  Map<String, DataSource> getKeyDataSources();
+  /// Returns DataSources for all keys present in this segment.
+  Map<String, DataSource> getDataSources();
 
-  /**
-   * Get the DataSourceMetadata of a single key within this map column.
-   */
-  DataSourceMetadata getKeyDataSourceMetadata(String key);
+  /// Returns the DataSourceMetadata for the given key's values.
+  DataSourceMetadata getDataSourceMetadata(String key);
 
-  /**
-   * Get the IndexContainer of a single key within this map column.
-   */
-  ColumnIndexContainer getKeyIndexContainer(String key);
+  /// Returns the ColumnIndexContainer for the given key's values.
+  ColumnIndexContainer getIndexContainer(String key);
 }

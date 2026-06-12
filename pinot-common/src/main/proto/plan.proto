@@ -41,6 +41,7 @@ message PlanNode {
     WindowNode windowNode = 15;
     ExplainNode explainNode = 16;
     EnrichedJoinNode enrichedJoinNode = 17;
+    UnnestNode unnestNode = 18;
   }
 }
 
@@ -224,6 +225,17 @@ message LiteralRow {
 
 message ValueNode {
   repeated LiteralRow literalRows = 1;
+}
+
+message UnnestNode {
+  // Expressions that evaluate to arrays/multi-values to be unnested
+  repeated Expression arrayExprs = 1;
+  // Whether the table function emits a 1-based ordinality column.
+  bool withOrdinality = 2;
+  // Optional absolute output indexes for each result column in the stage schema.
+  repeated int32 elementIndexes = 3;
+  // Optional absolute output index of the ordinality column in the stage schema.
+  optional int32 ordinalityIndex = 4;
 }
 
 enum WindowFrameType {

@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -55,7 +56,6 @@ public class UpsertUtils {
     return validDocIds != null ? validDocIds.getMutableRoaringBitmap()
         : (useEmptyForNull ? new MutableRoaringBitmap() : null);
   }
-
 
   public static void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
@@ -132,7 +132,6 @@ public class UpsertUtils {
       MutableRoaringBitmap validDocIds) {
     return new Iterator<>() {
       private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
-
       @Override
       public boolean hasNext() {
         return _docIdIterator.hasNext();
@@ -165,6 +164,46 @@ public class UpsertUtils {
     };
   }
 
+  public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
+      MutableRoaringBitmap validDocIds) {
+
+    return new Iterator<>() {
+      private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
+
+      @Override
+      public boolean hasNext() {
+        return _docIdIterator.hasNext();
+      }
+
+      @Override
+      public Map.Entry<Integer, PrimaryKey> next() {
+        int docId = _docIdIterator.next();
+        return Map.entry(docId, primaryKeyReader.getPrimaryKey(docId));
+      }
+    };
+  }
+
+  /**
+   * Returns an iterator of docId and {@link PrimaryKey} for all the documents from the segment.
+   */
+  public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
+      int numDocs) {
+    return new Iterator<>() {
+      private int _docId = 0;
+
+      @Override
+      public boolean hasNext() {
+        return _docId < numDocs;
+      }
+
+      @Override
+      public Map.Entry<Integer, PrimaryKey> next() {
+        int docId = _docId++;
+        return Map.entry(docId, primaryKeyReader.getPrimaryKey(docId));
+      }
+    };
+  }
+
   public static class RecordInfoReader implements Closeable {
     private final PrimaryKeyReader _primaryKeyReader;
     private final ComparisonColumnReader _comparisonColumnReader;
@@ -178,6 +217,21 @@ public class UpsertUtils {
       } else {
         _comparisonColumnReader = new MultiComparisonColumnReader(segment, comparisonColumns);
       }
+      if (deleteRecordColumn != null) {
+        _deleteRecordColumnReader = new PinotSegmentColumnReader(segment, deleteRecordColumn);
+      } else {
+        _deleteRecordColumnReader = null;
+      }
+    }
+
+    /**
+     * Constructor that uses a constant comparison value for all records.
+     * Used when no comparison columns are configured and segment creation time is used as the comparison value.
+     */
+    public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns,
+        Comparable constantComparisonValue, @Nullable String deleteRecordColumn) {
+      _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
+      _comparisonColumnReader = new ConstantComparisonColumnReader(constantComparisonValue);
       if (deleteRecordColumn != null) {
         _deleteRecordColumnReader = new PinotSegmentColumnReader(segment, deleteRecordColumn);
       } else {
@@ -264,6 +318,27 @@ public class UpsertUtils {
       for (PinotSegmentColumnReader comparisonColumnReader : _comparisonColumnReaders) {
         comparisonColumnReader.close();
       }
+    }
+  }
+
+  /**
+   * A comparison column reader that returns a constant value for all records.
+   * Used when no comparison columns are configured and segment creation time is used as the comparison value.
+   */
+  public static class ConstantComparisonColumnReader implements ComparisonColumnReader {
+    private final Comparable _constantValue;
+
+    public ConstantComparisonColumnReader(Comparable constantValue) {
+      _constantValue = constantValue;
+    }
+
+    @Override
+    public Comparable getComparisonValue(int docId) {
+      return _constantValue;
+    }
+
+    @Override
+    public void close() {
     }
   }
 }

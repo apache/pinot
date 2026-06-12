@@ -23,8 +23,12 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -111,8 +115,8 @@ public class CommonsConfigurationUtils {
    * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream,
-      boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
+  public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream, boolean setDefaultDelimiter,
+      @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
     // if provided stream is not null, load the existing properties from provided input stream.
@@ -153,13 +157,14 @@ public class CommonsConfigurationUtils {
 
   /**
    * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
+   * This method will merge duplicate keys to a list.
    * @param file containing properties
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromFile(@Nullable File file,
-      boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
+  public static PropertiesConfiguration fromFile(@Nullable File file, boolean setDefaultDelimiter,
+      @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
     // check if file exists, load the existing properties.
@@ -338,16 +343,16 @@ public class CommonsConfigurationUtils {
   }
 
   /**
-   * creates the instance of the {@link org.apache.commons.configuration2.PropertiesConfiguration}
-   * with custom IO factory based on kind {@link org.apache.commons.configuration2.PropertiesConfiguration.IOFactory}
-   * and legacy list delimiter {@link org.apache.commons.configuration2.convert.LegacyListDelimiterHandler}
+   * creates the instance of the {@link PropertiesConfiguration}
+   * with custom IO factory based on kind {@link PropertiesConfiguration.IOFactory}
+   * and legacy list delimiter {@link LegacyListDelimiterHandler}
    *
    * @param setDefaultDelimiter sets the default list delimiter.
    * @param ioFactoryKind IOFactory kind, can be null.
    * @return PropertiesConfiguration
    */
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setDefaultDelimiter,
-     @Nullable PropertyIOFactoryKind ioFactoryKind) {
+      @Nullable PropertyIOFactoryKind ioFactoryKind) {
     PropertiesConfiguration config = new PropertiesConfiguration();
 
     // setting IO Reader Factory of the configuration.
@@ -359,7 +364,6 @@ public class CommonsConfigurationUtils {
     if (setDefaultDelimiter) {
       config.setListDelimiterHandler(new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER));
     }
-
     return config;
   }
 
@@ -385,8 +389,8 @@ public class CommonsConfigurationUtils {
           }
         }
       } catch (IOException exception) {
-        throw new ConfigurationException(
-            "Error occurred while reading configuration file " + file.getName(), exception);
+        throw new ConfigurationException("Error occurred while reading configuration file " + file.getName(),
+            exception);
       }
     }
     return versionValue;
@@ -410,5 +414,92 @@ public class CommonsConfigurationUtils {
         new PropertiesConfiguration.PropertiesWriter(writer, DEFAULT_LIST_DELIMITER_HANDLER);
     propertiesWriter.setGlobalSeparator(VERSIONED_CONFIG_SEPARATOR);
     return propertiesWriter;
+  }
+
+  /**
+   * Validates that the given config file does not contain duplicate keys.
+   * @param configFile the config file to validate.
+   * @throws ConfigurationException if duplicate keys are found or the file cannot be read.
+   */
+  public static void validateNoDuplicateKeys(File configFile)
+      throws ConfigurationException {
+    try (Reader reader = Files.newBufferedReader(configFile.toPath(), StandardCharsets.UTF_8);
+         DuplicateKeyTrackingReader propertiesReader = new DuplicateKeyTrackingReader(reader)) {
+      Map<String, Integer> seenKeyLines = new HashMap<>();
+      while (propertiesReader.nextProperty()) {
+        String key = propertiesReader.getPropertyName();
+        if (seenKeyLines.containsKey(key)) {
+          throw new ConfigurationException(String.format(
+              "Duplicate key '%s' found in config file %s at line %d (first defined at line %d)", key,
+              configFile.getAbsolutePath(), propertiesReader.getPropertyLineNumber(), seenKeyLines.get(key)));
+        }
+        seenKeyLines.put(key, propertiesReader.getPropertyLineNumber());
+      }
+    } catch (IOException e) {
+      throw new ConfigurationException("Failed to validate config file " + configFile.getAbsolutePath(), e);
+    }
+  }
+
+  private static final class DuplicateKeyTrackingReader extends PropertiesConfiguration.PropertiesReader {
+    private int _propertyLineNumber;
+
+    private DuplicateKeyTrackingReader(Reader reader) {
+      super(reader);
+    }
+
+    private int getPropertyLineNumber() {
+      return _propertyLineNumber;
+    }
+
+    @Override
+    public String readProperty()
+        throws IOException {
+      getCommentLines().clear();
+      StringBuilder buffer = new StringBuilder();
+      _propertyLineNumber = -1;
+
+      while (true) {
+        String line = readLine();
+        if (line == null) {
+          return buffer.length() > 0 ? buffer.toString() : null;
+        }
+
+        if (isPropertiesCommentLine(line) || (_propertyLineNumber < 0 && isDoubleSlashCommentLine(line))) {
+          getCommentLines().add(line);
+          continue;
+        }
+
+        if (_propertyLineNumber < 0) {
+          _propertyLineNumber = getLineNumber();
+        }
+
+        line = line.trim();
+        if (!hasLineContinuation(line)) {
+          buffer.append(line);
+          break;
+        }
+        buffer.append(line, 0, line.length() - 1);
+      }
+
+      return buffer.toString();
+    }
+
+    private static boolean hasLineContinuation(String line) {
+      int trailingBackslashCount = 0;
+      for (int index = line.length() - 1; index >= 0 && line.charAt(index) == '\\'; index--) {
+        trailingBackslashCount++;
+      }
+      return trailingBackslashCount % 2 != 0;
+    }
+
+    private static boolean isDoubleSlashCommentLine(String line) {
+      String trimmed = line.trim();
+      return trimmed.startsWith("//");
+    }
+
+    private static boolean isPropertiesCommentLine(String line) {
+      String trimmed = line.trim();
+      return trimmed.isEmpty() || trimmed.charAt(0) == '#' || trimmed.charAt(0) == '!';
+    }
   }
 }

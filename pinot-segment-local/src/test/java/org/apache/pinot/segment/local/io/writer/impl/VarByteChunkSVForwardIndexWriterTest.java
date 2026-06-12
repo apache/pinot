@@ -67,7 +67,9 @@ public class VarByteChunkSVForwardIndexWriterTest implements PinotBuffersAfterMe
     int[] numbersOfDocs = {10, 1000};
     int[][] entryLengths = {{1, 1}, {0, 10}, {0, 100}, {100, 100}, {900, 1000}};
     int[] versions = {2, 3};
-    return Arrays.stream(ChunkCompressionType.values()).flatMap(chunkCompressionType -> IntStream.of(versions).boxed()
+    return Arrays.stream(ChunkCompressionType.values())
+        .filter(t -> t != ChunkCompressionType.DELTA && t != ChunkCompressionType.DELTADELTA)
+        .flatMap(chunkCompressionType -> IntStream.of(versions).boxed()
         .flatMap(version -> IntStream.of(numbersOfDocs).boxed().flatMap(
             totalDocs -> IntStream.of(numDocsPerChunks).boxed()
                 .flatMap(numDocsPerChunk -> Arrays.stream(entryLengths).map(lengths -> new Object[]{

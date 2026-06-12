@@ -49,6 +49,12 @@ public class JvmDefaultSslContext {
    * system property and they are files:
    * set the default SSL context to the default SSL context created by SSLFactory, and enable auto renewal of
    * SSLFactory when either key store or trust store file changes.
+   *
+   * <p>This method is called from a static block in {@code PinotAdministrator}. Failures here must not
+   * prevent the JVM from starting — for example when security providers are not yet registered or
+   * the keystore/truststore is temporarily unavailable. In such cases, a warning is logged and Pinot
+   * components will configure TLS individually during their own startup.</p>
+   *
    * TODO: need to support "javax.net.ssl.keyStoreProvider", "javax.net.ssl.trustStoreProvider", "https.protocols" and
    *  "https.cipherSuites" system properties.
    */
@@ -59,6 +65,21 @@ public class JvmDefaultSslContext {
       return;
     }
 
+    try {
+      initDefaultSslContextInternal();
+    } catch (Exception e) {
+      // Do NOT rethrow — this runs in PinotAdministrator's static initializer.
+      // Rethrowing would cause ExceptionInInitializerError and prevent the JVM from starting.
+      // Pinot components re-initialize TLS individually during their own startup.
+      LOGGER.warn("Failed to initialize JVM default SSL context. This is non-fatal — Pinot components "
+          + "will configure TLS individually during startup. trustStoreType='{}', trustStore='{}'. Error: {}",
+          System.getProperty(JVM_TRUST_STORE_TYPE), System.getProperty(JVM_TRUST_STORE), e.getMessage());
+      LOGGER.debug("Full stack trace for SSL context initialization failure:", e);
+    }
+    _initialized = true;
+  }
+
+  private static void initDefaultSslContextInternal() {
     String jvmKeyStorePath = System.getProperty(JVM_KEY_STORE);
     String jvmTrustStorePath = System.getProperty(JVM_TRUST_STORE);
 
@@ -101,8 +122,10 @@ public class JvmDefaultSslContext {
               .map(String::trim).filter(StringUtils::isNotBlank).orElse(null);
       RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(jvmSslFactory, jvmKeystoreType, jvmKeyStorePath,
           jvmKeystorePassword, jvmTrustStoreType, jvmTrustStorePath, jvmTrustStorePassword, null, null, () -> false);
+      LOGGER.info("Successfully initialized JVM default SSL context");
+    } else {
+      LOGGER.info("No key store or trust store specified via system properties, "
+          + "skipping JVM default SSL context setup");
     }
-    _initialized = true;
-    LOGGER.info("Successfully initialized mvm default SSL context");
   }
 }

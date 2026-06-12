@@ -157,10 +157,13 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
           Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
     }
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
-        .setNoDictionaryColumns(noDictionaryColumns).setInvertedIndexColumns(invertedIndexColumns)
-        .setCreateInvertedIndexDuringSegmentGeneration(true).setRangeIndexColumns(rangeIndexColumns)
-        .setFieldConfigList(fieldConfigs).build();
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("daysSinceEpoch")
+        .setNoDictionaryColumns(noDictionaryColumns)
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setRangeIndexColumns(rangeIndexColumns)
+        .setFieldConfigList(fieldConfigs)
+        .build();
   }
 
   @AfterMethod
@@ -268,7 +271,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       assertNotNull(brokerResponseNative.getExceptions());
       assertEquals(brokerResponseNative.getExceptions().size(), 0);
       DataSchema dataSchema = new DataSchema(new String[]{"column1", "column5", "column9", "column11"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
       assertEquals(resultTable.getDataSchema(), dataSchema);
       List<Object[]> resultRows = resultTable.getRows();
@@ -325,9 +328,9 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       // Selection query with filters (not including forwardIndexDisabled column) and without columns with
       // forwardIndexDisabled enabled on either segment
       String query = "SELECT column1, column5, column9, column11 FROM testTable WHERE column1 > 100000000"
-        + " AND column3 BETWEEN 20000000 AND 1000000000"
-        + " AND column5 = 'gFuH'"
-        + " AND daysSinceEpoch = 126164076 ORDER BY column1";
+          + " AND column3 BETWEEN 20000000 AND 1000000000"
+          + " AND column5 = 'gFuH'"
+          + " AND daysSinceEpoch = 126164076 ORDER BY column1";
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
@@ -581,8 +584,8 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       assertEquals(brokerResponseNative.getExceptions().size(), 0);
       assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column5", "column9"},
           new DataSchema.ColumnDataType[]{
-          DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT
-      }));
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT
+          }));
       List<Object[]> resultRows = resultTable.getRows();
       int previousColumn1 = Integer.MIN_VALUE;
       for (Object[] resultRow : resultRows) {
@@ -1367,8 +1370,8 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       assertNotNull(brokerResponseNative.getExceptions());
       assertEquals(brokerResponseNative.getExceptions().size(), 0);
       assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"max(column7)", "min(column7)", "count(*)",
-      "minmaxrange(column7)", "distinctcount(column7)", "distinctcounthll(column6)", "distinctcountrawhll(column7)",
-      "distinctcountsmarthll(column6)"},
+          "minmaxrange(column7)", "distinctcount(column7)", "distinctcounthll(column6)", "distinctcountrawhll(column7)",
+          "distinctcountsmarthll(column6)"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
               DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.INT,
               DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT}));

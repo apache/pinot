@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
@@ -64,8 +63,7 @@ public class LeadValueWindowFunction extends ValueWindowFunction {
         if (srcDataType != destDataType) {
           // Convert the default value to the same data type as the input column
           // (e.g. convert INT to LONG, FLOAT to DOUBLE, etc.
-          defaultValue = PinotDataType.getPinotDataTypeForExecution(destDataType)
-              .convert(defaultValue, PinotDataType.getPinotDataTypeForExecution(srcDataType));
+          defaultValue = destDataType.toPinotDataType().convert(defaultValue, srcDataType.toPinotDataType());
         }
       }
     }
@@ -81,7 +79,10 @@ public class LeadValueWindowFunction extends ValueWindowFunction {
       result[i] = extractValueFromRow(rows.get(i + _offset));
     }
     if (_defaultValue != null) {
-      Arrays.fill(result, numRows - _offset, numRows, _defaultValue);
+      // If an offset is provided beyond the number of rows, fill all with default value
+      // only down to 0.
+      int fillFrom = Math.max(numRows - _offset, 0);
+      Arrays.fill(result, fillFrom, numRows, _defaultValue);
     }
     return Arrays.asList(result);
   }

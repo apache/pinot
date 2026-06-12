@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.AnotB;
@@ -1077,8 +1078,12 @@ public class DistinctCountThetaSketchAggregationFunction
     return ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Comparable extractFinalResult(List<ThetaSketchAccumulator> accumulators) {
+  public Comparable extractFinalResult(@Nullable List<ThetaSketchAccumulator> accumulators) {
+    if (accumulators == null) {
+      return 0L;
+    }
     int numAccumulators = accumulators.size();
     List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
 
@@ -1546,7 +1551,8 @@ public class DistinctCountThetaSketchAggregationFunction
       DataType valueType = valueTypes[_expressionIndex];
       Object valueArray = valueArrays[_expressionIndex];
       if (_predicateEvaluator == null) {
-        _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(_predicate, null, valueType);
+        // Intermediate-result predicate evaluation has no DataSource — pass null to take the raw-value path.
+        _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(_predicate, null, valueType, null);
       }
       if (singleValue) {
         switch (valueType) {

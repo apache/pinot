@@ -40,7 +40,8 @@ import org.slf4j.LoggerFactory;
  * Interface for broker response.
  */
 public interface BrokerResponse {
-  static final Logger LOGGER = LoggerFactory.getLogger(BrokerResponse.class);
+  Logger LOGGER = LoggerFactory.getLogger(BrokerResponse.class);
+
   /**
    * Convert the broker response to JSON String.
    */
@@ -76,6 +77,8 @@ public interface BrokerResponse {
    * This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
    */
   default void emitBrokerResponseMetrics(BrokerMetrics brokerMetrics) {
+    boolean hasCriticalError = false;
+    boolean hasNonCriticalError = false;
     for (QueryProcessingException exception : this.getExceptions()) {
       QueryErrorCode queryErrorCode;
       try {
@@ -85,6 +88,18 @@ public interface BrokerResponse {
         queryErrorCode = QueryErrorCode.UNKNOWN;
       }
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.getQueryErrorMeter(queryErrorCode), 1);
+      if (queryErrorCode.isCriticalError()) {
+        hasCriticalError = true;
+      } else {
+        hasNonCriticalError = true;
+      }
+    }
+    // Emit exactly one SLA-style metric per query if there are any exceptions
+    if (hasCriticalError) {
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_CRITICAL_ERROR, 1);
+    }
+    if (hasNonCriticalError) {
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_NON_CRITICAL_ERROR, 1);
     }
   }
 
@@ -372,7 +387,6 @@ public interface BrokerResponse {
     return getRealtimeThreadMemAllocatedBytes() + getRealtimeResponseSerMemAllocatedBytes();
   }
 
-
   /**
    * Returns the total number of segments with an EmptyFilterOperator when Explain Plan is called.
    */
@@ -423,4 +437,16 @@ public interface BrokerResponse {
    * @return true if RLS filters were applied, false otherwise
    */
   boolean getRLSFiltersApplied();
+
+  /// Get the materialized view table name that was hit (used) for this query, or `null`
+  /// if no materialized view was used.  The default returns `null` so impls that do not track MV
+  /// rewrite (e.g. MSE response paths) need no explicit override; the matching *setter* is
+  /// deliberately NOT defaulted here — callers that want to record an MV-queried name must obtain
+  /// a concrete `BrokerResponseNative` and invoke its setter directly.  Without that asymmetry, a
+  /// future caller could silently drop the MV-queried name on any impl that forgot to override
+  /// the setter, producing an observability hole indistinguishable from "no MV was used".
+  @Nullable
+  default String getMaterializedViewQueried() {
+    return null;
+  }
 }

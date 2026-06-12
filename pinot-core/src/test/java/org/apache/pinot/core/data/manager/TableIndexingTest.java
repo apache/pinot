@@ -38,11 +38,8 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
-import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
-import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
-import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -85,11 +82,11 @@ public class TableIndexingTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "TableIndexingTest");
   private static final String TABLE_NAME = "mytable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
-  private static final SegmentOperationsThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentOperationsThrottler(
-      new SegmentAllIndexPreprocessThrottler(2, 4, true),
-      new SegmentStarTreePreprocessThrottler(1, 2, true),
-      new SegmentDownloadThrottler(2, 4, true),
-      new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
+  private static final SegmentOperationsThrottlerSet SEGMENT_PREPROCESS_THROTTLER = new SegmentOperationsThrottlerSet(
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(1, 2, true),
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(1, 2, true));
   public static final String COLUMN_NAME = "col";
   public static final String COLUMN_DAY_NAME = "$col$DAY";
   public static final String COLUMN_MONTH_NAME = "$col$MONTH";
@@ -112,7 +109,7 @@ public class TableIndexingTest {
   private void createTestCases() {
     String[] indexTypes = {
         "timestamp_index", "bloom_filter", "fst_index", "h3_index", "inverted_index", "json_index",
-        "native_text_index", "text_index", "range_index", "startree_index", "vector_index", "multi_col_text_index"
+        "text_index", "range_index", "startree_index", "vector_index", "multi_col_text_index"
     };
 
     _testCases = new TestCase[_schemas.size() * indexTypes.length];
@@ -162,7 +159,8 @@ public class TableIndexingTest {
 
   protected void createSchemas() {
     for (DataType type : DataType.values()) {
-      if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP || type == DataType.STRUCT) {
+      if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP || type == DataType.STRUCT
+          || type == DataType.OPEN_STRUCT) {
         continue;
       }
 
@@ -294,7 +292,7 @@ public class TableIndexingTest {
               ...
             } */
           // no params
-          indexes.put("bloom", JsonUtils.newObjectNode());
+          indexes.set("bloom", JsonUtils.newObjectNode());
 
           break;
         case "fst_index":
@@ -345,7 +343,7 @@ public class TableIndexingTest {
                  old:
                -> "tableIndexConfig": {  "invertedIndexColumns": ["uuid"], */
           // no params, has to be dictionary
-          indexes.put("inverted", new ObjectNode(JsonNodeFactory.instance));
+          indexes.set("inverted", new ObjectNode(JsonNodeFactory.instance));
           break;
         case "json_index":
             /* json index (string or json column), should be no-dictionary
@@ -361,20 +359,7 @@ public class TableIndexingTest {
               ...
               } */
           // no params, should be no dictionary, only string or json
-          indexes.put("json", new ObjectNode(JsonNodeFactory.instance));
-          break;
-        case "native_text_index":
-            /* native text index
-            "fieldConfigList":[
-              {
-                 "name":"text_col_1",
-                 "encodingType":"RAW",
-                 "indexTypes": ["TEXT"],
-                 "properties":{"fstType":"native"}
-              }
-            ] */
-          indexTypes.add(FieldConfig.IndexType.TEXT);
-          properties.put("fstType", "native");
+          indexes.set("json", new ObjectNode(JsonNodeFactory.instance));
           break;
         case "text_index":
             /* text index
@@ -503,18 +488,11 @@ public class TableIndexingTest {
         Assert.assertEquals(indexStats.get(COLUMN_WEEK_NAME).get("range_index"), 1);
         Assert.assertEquals(indexStats.get(COLUMN_MONTH_NAME).get("range_index"), 1);
       } else {
-        String expectedType;
-        if ("native_text_index".equals(indexType)) {
-          expectedType = "text_index";
-        } else {
-          expectedType = indexType;
-        }
-
         if ("startree_index".equals(indexType) && !testCase._expectedSuccess) {
           // It is possible that we successfully create the segment, but without the star-tree index
-          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(expectedType), 0);
+          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(indexType), 0);
         } else {
-          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(expectedType), 1);
+          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(indexType), 1);
         }
       }
     } catch (Throwable t) {

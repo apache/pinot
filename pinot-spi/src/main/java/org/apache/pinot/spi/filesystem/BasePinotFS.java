@@ -34,9 +34,14 @@ public abstract class BasePinotFS implements PinotFS {
   @Override
   public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
       throws IOException {
+    if (segmentUris == null || segmentUris.isEmpty()) {
+      return true;
+    }
     boolean result = true;
     for (URI segmentUri : segmentUris) {
-      result &= delete(segmentUri, forceDelete);
+      if (!delete(segmentUri, forceDelete)) {
+        result = false;
+      }
     }
     return result;
   }

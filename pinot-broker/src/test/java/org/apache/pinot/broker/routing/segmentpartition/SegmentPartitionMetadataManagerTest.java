@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -42,10 +43,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertEqualsNoOrder;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class SegmentPartitionMetadataManagerTest extends ControllerTest {
@@ -86,16 +84,16 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
 
     SegmentPartitionMetadataManager partitionMetadataManager =
-        new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN, PARTITION_COLUMN_FUNC,
-            NUM_PARTITIONS);
+        new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN, PARTITION_COLUMN_FUNC, NUM_PARTITIONS,
+            TimeUnit.MINUTES.toMillis(5));
     SegmentZkMetadataFetcher segmentZkMetadataFetcher =
         new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
     segmentZkMetadataFetcher.register(partitionMetadataManager);
 
     // Initial state should be all empty
     segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
-    TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo = partitionMetadataManager
-        .getTablePartitionReplicatedServersInfo();
+    TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo =
+        partitionMetadataManager.getTablePartitionReplicatedServersInfo();
     assertEquals(tablePartitionReplicatedServersInfo.getPartitionInfoMap(),
         new TablePartitionReplicatedServersInfo.PartitionInfo[NUM_PARTITIONS]);
     assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
@@ -152,8 +150,8 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     setSegmentZKMetadata(segment0, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, 0L);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
     tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
-    TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap = tablePartitionReplicatedServersInfo
-        .getPartitionInfoMap();
+    TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap =
+        tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEquals(partitionInfoMap[0]._segments, Collections.singleton(segment0));
     assertNull(partitionInfoMap[1]);
@@ -269,6 +267,22 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, ImmutableSet.of(SERVER_0, SERVER_1));
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
     assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
+
+    // Adding one more segment - which has an invalid partition ID greater than NUM_PARTITIONS
+    String segmentInvalid = "segment_invalid";
+    onlineSegments.add(segmentInvalid);
+    segmentAssignment.put(segmentInvalid, Collections.singletonMap(SERVER_1, ONLINE));
+    // partition ID 10000 greater than NUM_PARTITIONS (2).
+    setSegmentZKMetadata(segmentInvalid, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 10000, 0L);
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
+    assertEquals(partitionInfoMap[0]._fullyReplicatedServers, ImmutableSet.of(SERVER_0, SERVER_1));
+    assertEqualsNoOrder(partitionInfoMap[0]._segments.toArray(), new String[]{segment0, newSegment});
+    assertEquals(partitionInfoMap[1]._fullyReplicatedServers, ImmutableSet.of(SERVER_0, SERVER_1));
+    assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
+    assertFalse(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
+    assertEquals(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().get(0), segmentInvalid);
   }
 
   private void setSegmentZKMetadata(String segment, String partitionFunction, int numPartitions, int partitionId,

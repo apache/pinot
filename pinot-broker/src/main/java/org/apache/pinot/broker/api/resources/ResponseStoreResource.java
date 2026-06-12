@@ -140,6 +140,7 @@ public class ResponseStoreResource {
       @ApiParam(value = "Offset in the result set", required = true) @QueryParam("offset") int offset,
       @ApiParam(value = "Number of rows to fetch") @QueryParam("numRows") Integer numRows,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
+      @Context HttpHeaders headers,
       @Suspended AsyncResponse asyncResponse) {
     try {
       checkRequestExistsAndAuthorized(requestId, requestContext);
@@ -148,7 +149,8 @@ public class ResponseStoreResource {
             CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
       }
       asyncResponse.resume(
-          PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows)));
+          PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows),
+              headers, _brokerMetrics));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -180,6 +182,28 @@ public class ResponseStoreResource {
     throw new WebApplicationException(
         Response.status(Response.Status.NOT_FOUND).entity(String.format("Query results for %s not found.", requestId))
             .build());
+  }
+
+  @DELETE
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_RESPONSE_STORE)
+  @ApiOperation(value = "Delete expired response stores",
+      notes = "Delete all response stores whose expirationTimeMs is at or before the cutoff. "
+          + "If expiredBefore is omitted, the cutoff defaults to the current time.")
+  public String deleteExpiredResponses(
+      @ApiParam(value = "Epoch ms cutoff; responses with expirationTimeMs <= this value are deleted. "
+          + "Defaults to current time when omitted.")
+      @QueryParam("expiredBefore") Long expiredBeforeMs,
+      @Context HttpHeaders headers) {
+    long cutoff = expiredBeforeMs != null ? expiredBeforeMs : System.currentTimeMillis();
+    try {
+      int count = _responseStore.deleteExpiredResponses(cutoff);
+      return String.format("Deleted %d expired response(s).", count);
+    } catch (Exception e) {
+      throw new WebApplicationException(e,
+          Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build());
+    }
   }
 
   private void checkRequestExistsAndAuthorized(String requestId, Request requestContext)

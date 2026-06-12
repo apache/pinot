@@ -41,7 +41,6 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOv
  * Utils to parse query options.
  */
 public class QueryOptionsUtils {
-
   private QueryOptionsUtils() {
   }
 
@@ -112,9 +111,23 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static String getTableSampler(@Nullable Map<String, String> queryOptions) {
+    if (queryOptions == null || queryOptions.isEmpty()) {
+      return null;
+    }
+    return queryOptions.get(QueryOptionKey.TABLE_SAMPLER);
+  }
+
+  @Nullable
   public static Long getExtraPassiveTimeoutMs(Map<String, String> queryOptions) {
     String extraPassiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
     return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, extraPassiveTimeoutMsString, 0);
+  }
+
+  @Nullable
+  public static Long getMaxExecutionTimeMsInDistinct(Map<String, String> queryOptions) {
+    String maxExecutionTimeMs = queryOptions.get(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT);
+    return checkedParseLongPositive(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT, maxExecutionTimeMs);
   }
 
   @Nullable
@@ -135,6 +148,18 @@ public class QueryOptionsUtils {
 
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
+  }
+
+  /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`
+  /// (absence ⇒ rewrite allowed) for backward compatibility with the pre-option behavior; the
+  /// MV minion executor sets it to `false` so a materialization query is never rewritten back
+  /// onto an MV.
+  public static boolean isMaterializedViewRewriteEnabled(Map<String, String> queryOptions) {
+    if (queryOptions == null) {
+      return true;
+    }
+    String value = queryOptions.get(QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE);
+    return value == null || Boolean.parseBoolean(value);
   }
 
   public static boolean isSkipUpsertView(Map<String, String> queryOptions) {
@@ -158,6 +183,34 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
   }
 
+  /**
+   * When true, use index-based distinct operators when applicable:
+   * {@link org.apache.pinot.core.operator.query.JsonIndexDistinctOperator} for JSON columns and
+   * {@link org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator} for dictionary + inverted index columns.
+   * Set via query option useIndexBasedDistinctOperator=true.
+   */
+  public static boolean isUseIndexBasedDistinctOperator(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR));
+  }
+
+  /**
+   * Returns the cost ratio for the inverted-index-based distinct heuristic, or null if not set.
+   * The inverted index path is chosen when dictionaryCardinality * costRatio <= filteredDocCount.
+   * A cost ratio of 0 forces the inverted index path for any non-empty filter result.
+   */
+  @Nullable
+  public static Double getInvertedIndexDistinctCostRatio(Map<String, String> queryOptions) {
+    return checkedParseDoubleNonNegative(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO,
+        queryOptions.get(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO));
+  }
+
+  /// When true, [org.apache.pinot.core.operator.query.JsonIndexDistinctOperator] skips its missing-path handling —
+  /// does not add a 4-arg default, does not add null, and does not throw `Illegal Json Path`. The distinct set is
+  /// purely the values returned by the JSON-index lookup.
+  public static boolean isJsonIndexDistinctSkipMissingPath(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.JSON_INDEX_DISTINCT_SKIP_MISSING_PATH));
+  }
+
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }
@@ -165,6 +218,10 @@ public class QueryOptionsUtils {
   public static boolean isCollectGcStats(Map<String, String> queryOptions) {
     // Disabled by default
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.COLLECT_GC_STATS));
+  }
+
+  public static String getQueryHash(Map<String, String> queryOptions) {
+    return queryOptions.getOrDefault(QueryOptionKey.QUERY_HASH, CommonConstants.Broker.DEFAULT_QUERY_HASH);
   }
 
   @Nullable
@@ -325,6 +382,12 @@ public class QueryOptionsUtils {
     return checkedParseInt(QueryOptionKey.CHUNK_SIZE_EXTRACT_FINAL_RESULT, chunkSizeExtractFinalResultString, 1);
   }
 
+  @Nullable
+  public static Integer getStreamingGroupByFlushThreshold(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD);
+    return checkedParseIntNonNegative(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD, value);
+  }
+
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_NULL_HANDLING));
   }
@@ -415,6 +478,19 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getMaxRowsInDistinct(Map<String, String> queryOptions) {
+    String maxRowsInDistinct = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_DISTINCT);
+    return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_DISTINCT, maxRowsInDistinct);
+  }
+
+  @Nullable
+  public static Integer getMaxRowsWithoutChangeInDistinct(Map<String, String> queryOptions) {
+    String maxRowsWithoutChange =
+        queryOptions.get(QueryOptionKey.MAX_ROWS_WITHOUT_CHANGE_IN_DISTINCT);
+    return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_WITHOUT_CHANGE_IN_DISTINCT, maxRowsWithoutChange);
+  }
+
+  @Nullable
   public static JoinOverFlowMode getJoinOverflowMode(Map<String, String> queryOptions) {
     String joinOverflowModeStr = queryOptions.get(QueryOptionKey.JOIN_OVERFLOW_MODE);
     return joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
@@ -468,6 +544,20 @@ public class QueryOptionsUtils {
 
   public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.USE_PHYSICAL_OPTIMIZER);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  /**
+   * Reads the {@code streamStats} query option that opts a single query into the {@code SubmitWithStream}
+   * dispatch path. See {@link QueryOptionKey#STREAM_STATS}.
+   */
+  public static boolean isStreamStats(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.STREAM_STATS);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  public static boolean isMultiClusterRoutingEnabled(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
@@ -542,6 +632,44 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  private static Double checkedParseDoublePositive(String optionName, @Nullable String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    double value;
+    try {
+      value = Double.parseDouble(optionValue.trim());
+    } catch (NumberFormatException nfe) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a positive number, got: %s", optionName, optionValue));
+    }
+    if (!Double.isFinite(value) || value <= 0) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a positive number, got: %s", optionName, optionValue));
+    }
+    return value;
+  }
+
+  @Nullable
+  private static Double checkedParseDoubleNonNegative(String optionName, @Nullable String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    double value;
+    try {
+      value = Double.parseDouble(optionValue.trim());
+    } catch (NumberFormatException nfe) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a non-negative number, got: %s", optionName, optionValue));
+    }
+    if (!Double.isFinite(value) || value < 0) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a non-negative number, got: %s", optionName, optionValue));
+    }
+    return value;
+  }
+
+  @Nullable
   private static Long checkedParseLongPositive(String optionName, @Nullable String optionValue) {
     return checkedParseLong(optionName, optionValue, 1);
   }
@@ -590,5 +718,117 @@ public class QueryOptionsUtils {
   public static Integer getRegexDictSizeThreshold(Map<String, String> queryOptions) {
     String regexDictSizeThreshold = queryOptions.get(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD);
     return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
+  }
+
+  // --- Vector search query option accessors ---
+
+  /**
+   * Returns the configured nprobe value for IVF_FLAT vector search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Integer getVectorNprobe(Map<String, String> queryOptions) {
+    String nprobe = queryOptions.get(QueryOptionKey.VECTOR_NPROBE);
+    return checkedParseIntPositive(QueryOptionKey.VECTOR_NPROBE, nprobe);
+  }
+
+  /**
+   * Returns whether exact rerank is enabled for vector search. Defaults to {@code false}.
+   */
+  public static boolean isVectorExactRerank(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK));
+  }
+
+  @Nullable
+  public static Boolean getVectorExactRerank(Map<String, String> queryOptions) {
+    String exactRerank = queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK);
+    return exactRerank != null ? Boolean.parseBoolean(exactRerank) : null;
+  }
+
+  /**
+   * Returns the maximum number of ANN candidates for vector search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Integer getVectorMaxCandidates(Map<String, String> queryOptions) {
+    String maxCandidates = queryOptions.get(QueryOptionKey.VECTOR_MAX_CANDIDATES);
+    return checkedParseIntPositive(QueryOptionKey.VECTOR_MAX_CANDIDATES, maxCandidates);
+  }
+
+  /**
+   * Returns the distance threshold for vector radius/threshold search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Float getVectorDistanceThreshold(Map<String, String> queryOptions) {
+    String threshold = queryOptions.get(QueryOptionKey.VECTOR_DISTANCE_THRESHOLD);
+    if (threshold == null) {
+      return null;
+    }
+    try {
+      float value = Float.parseFloat(threshold.trim());
+      if (Float.isNaN(value) || Float.isInfinite(value)) {
+        throw new IllegalArgumentException(
+            QueryOptionKey.VECTOR_DISTANCE_THRESHOLD + " must be a finite number, got: " + threshold);
+      }
+      // Negative thresholds are valid for dot-product/inner-product distance functions
+      // where VectorDistanceUtils.computeDistance returns negated dot product.
+      return value;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          QueryOptionKey.VECTOR_DISTANCE_THRESHOLD + " must be a valid number, got: " + threshold);
+    }
+  }
+
+  /**
+   * Returns the configured efSearch value for HNSW vector search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Integer getVectorEfSearch(Map<String, String> queryOptions) {
+    String efSearch = queryOptions.get(QueryOptionKey.VECTOR_EF_SEARCH);
+    return checkedParseIntPositive(QueryOptionKey.VECTOR_EF_SEARCH, efSearch);
+  }
+
+  /**
+   * Returns whether HNSW should use relative-distance competitive checks, or {@code null} if not set.
+   */
+  @Nullable
+  public static Boolean getVectorUseRelativeDistance(Map<String, String> queryOptions) {
+    return checkedParseBooleanNullable(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE,
+        queryOptions.get(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE));
+  }
+
+  /**
+   * Returns whether HNSW should use a bounded collector queue, or {@code null} if not set.
+   */
+  @Nullable
+  public static Boolean getVectorUseBoundedQueue(Map<String, String> queryOptions) {
+    return checkedParseBooleanNullable(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE,
+        queryOptions.get(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE));
+  }
+
+  @Nullable
+  private static Boolean checkedParseBooleanNullable(String optionName, @Nullable String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    String normalized = optionValue.trim();
+    if ("true".equalsIgnoreCase(normalized)) {
+      return Boolean.TRUE;
+    }
+    if ("false".equalsIgnoreCase(normalized)) {
+      return Boolean.FALSE;
+    }
+    throw new IllegalArgumentException(optionName + " must be either true or false, got: " + optionValue);
+  }
+
+  public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
+    String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
+    if (sortExchangeCopyThreshold != null) {
+      try {
+        return Integer.parseInt(sortExchangeCopyThreshold);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(String.format("%s must be an integer, got: %s",
+            QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD, sortExchangeCopyThreshold));
+      }
+    }
+    return i;
   }
 }

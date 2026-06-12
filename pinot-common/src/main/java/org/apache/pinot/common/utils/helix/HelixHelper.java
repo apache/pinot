@@ -40,14 +40,17 @@ import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.common.workload.WorkloadChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -152,6 +155,35 @@ public class HelixHelper {
       }
       return idealState;
     });
+  }
+
+  /**
+   * Updates broker resource ideal state for the given broker with the given broker tags. Optional {@code tablesAdded}
+   * and {@code tablesRemoved} can be provided to track the tables added/removed during the update.
+   *
+   * <p>This accepts a {@link org.apache.pinot.common.workload.WorkloadChangeListener} to notify
+   * when broker resource changes, enabling workload propagation. This is expected to be only called
+   * from pinot-controller, where the listener is registered.</p>
+   */
+  public static void updateBrokerResource(HelixManager helixManager, String brokerId, List<String> brokerTags,
+      @Nullable List<String> tablesAdded, @Nullable List<String> tablesRemoved,
+      @Nullable WorkloadChangeListener listener) {
+    updateBrokerResource(helixManager, brokerId, brokerTags, tablesAdded, tablesRemoved);
+    if (listener != null) {
+      listener.onBrokerResourceChanged(tablesAdded, tablesRemoved);
+    }
+  }
+
+  public static void updateBrokerResource(HelixManager helixManager, String tableNameWithType,
+      Map<String, String> instancesStateMap, @Nullable WorkloadChangeListener listener) {
+    updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
+      assert idealState != null;
+      idealState.getRecord().getMapFields().put(tableNameWithType, instancesStateMap);
+      return idealState;
+    });
+    if (listener != null) {
+      listener.onBrokerResourceChanged(List.of(tableNameWithType), null);
+    }
   }
 
   /**
@@ -322,11 +354,13 @@ public class HelixHelper {
    */
   public static Set<String> getOfflineInstanceFromExternalView(ExternalView resourceExternalView) {
     Set<String> instanceSet = new HashSet<String>();
-    for (String partition : resourceExternalView.getPartitionSet()) {
-      Map<String, String> stateMap = resourceExternalView.getStateMap(partition);
-      for (String instance : stateMap.keySet()) {
-        if (stateMap.get(instance).equalsIgnoreCase(OFFLINE)) {
-          instanceSet.add(instance);
+    if (resourceExternalView != null) {
+      for (String partition : resourceExternalView.getPartitionSet()) {
+        Map<String, String> stateMap = resourceExternalView.getStateMap(partition);
+        for (String instance : stateMap.keySet()) {
+          if (stateMap.get(instance).equalsIgnoreCase(OFFLINE)) {
+            instanceSet.add(instance);
+          }
         }
       }
     }
@@ -534,22 +568,24 @@ public class HelixHelper {
   }
 
   public static Set<String> getTablesForBrokerTag(HelixManager helixManager, String brokerTag) {
-    Set<String> tablesForBrokerTag = new HashSet<>();
-    List<TableConfig> tableConfigs = ZKMetadataProvider.getAllTableConfigs(helixManager.getHelixPropertyStore());
-    for (TableConfig tableConfig : tableConfigs) {
-      if (TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker()).equals(brokerTag)) {
-        tablesForBrokerTag.add(tableConfig.getTableName());
-      }
-    }
-    return tablesForBrokerTag;
+    return getTablesForBrokerTags(helixManager, List.of(brokerTag));
   }
 
   public static Set<String> getTablesForBrokerTags(HelixManager helixManager, List<String> brokerTags) {
     Set<String> tablesForBrokerTags = new HashSet<>();
-    List<TableConfig> tableConfigs = ZKMetadataProvider.getAllTableConfigs(helixManager.getHelixPropertyStore());
+    ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
+    List<TableConfig> tableConfigs = ZKMetadataProvider.getAllTableConfigs(propertyStore);
     for (TableConfig tableConfig : tableConfigs) {
       if (brokerTags.contains(TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker()))) {
         tablesForBrokerTags.add(tableConfig.getTableName());
+      }
+    }
+    // Include logical tables that use any of these broker tenants
+    for (LogicalTableConfig logicalTableConfig : ZKMetadataProvider.getAllLogicalTableConfigs(propertyStore)) {
+      String logicalBrokerTag =
+          TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant());
+      if (brokerTags.contains(logicalBrokerTag)) {
+        tablesForBrokerTags.add(logicalTableConfig.getTableName());
       }
     }
     return tablesForBrokerTags;

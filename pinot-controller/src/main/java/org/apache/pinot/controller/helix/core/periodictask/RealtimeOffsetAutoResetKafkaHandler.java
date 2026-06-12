@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -51,9 +52,17 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeOffsetAutoResetKafkaHandler.class);
   private static final String STREAM_TYPE = "kafka";
 
-  public RealtimeOffsetAutoResetKafkaHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
+  /**
+   * @deprecated Use no-arg constructor + {@link #init} instead.
+   *     Kept for backward compatibility with subclasses compiled against the previous constructor-based contract.
+   */
+  @Deprecated
+  protected RealtimeOffsetAutoResetKafkaHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
       PinotHelixResourceManager pinotHelixResourceManager) {
     init(llcRealtimeSegmentManager, pinotHelixResourceManager);
+  }
+
+  protected RealtimeOffsetAutoResetKafkaHandler() {
   }
 
   @Override
@@ -70,12 +79,12 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
    * @return true if successfully started the backfill job and its ingestion
    */
   @Override
-  public boolean triggerBackfillJob(
-      String tableNameWithType, StreamConfig streamConfig, String topicName, int partitionId, long fromOffset,
-      long toOffset) {
+  public boolean triggerBackfillJob(String tableNameWithType, StreamConfig streamConfig, String topicName,
+      int partitionId, long fromOffset, long toOffset) {
     // Trigger the data replication and get the new topic's stream config.
-    Map<String, String> newTopicStreamConfig = triggerDataReplicationAndGetTopicInfo(
-        tableNameWithType, streamConfig, topicName, partitionId, fromOffset, toOffset);
+    Map<String, String> newTopicStreamConfig =
+        triggerDataReplicationAndGetTopicInfo(tableNameWithType, streamConfig, topicName, partitionId, fromOffset,
+            toOffset);
     if (newTopicStreamConfig == null) {
       return false;
     }
@@ -88,6 +97,9 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
     } catch (IOException e) {
       LOGGER.error("Cannot add backfill topic to the table config", e);
       return false;
+    } catch (TableConfigBackwardIncompatibleException e) {
+      LOGGER.error("Cannot change backfill job to the table config", e);
+      return false;
     }
     return true;
   }
@@ -99,8 +111,6 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
   protected abstract Map<String, String> triggerDataReplicationAndGetTopicInfo(
       String tableNameWithType, StreamConfig streamConfig, String topicName, int partitionId, long fromOffset,
       long toOffset);
-
-  public abstract void ensureBackfillJobsRunning(String tableNameWithType, List<String> topicNames);
 
   /**
    * Cleanup completed backfill jobs by checking if the topic is complete.

@@ -25,10 +25,13 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +60,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  *   <li>"virtualColumnProvider": the virtual column provider to use for this field.</li>
  * </ul>
  */
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "deprecation"})
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
     property = "fieldType",
@@ -93,6 +96,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final FieldSpecMetadata FIELD_SPEC_METADATA;
 
   public static final Map DEFAULT_COMPLEX_NULL_VALUE_OF_MAP = Map.of();
+  public static final Map DEFAULT_COMPLEX_NULL_VALUE_OF_OPEN_STRUCT = Map.of();
   public static final List DEFAULT_COMPLEX_NULL_VALUE_OF_LIST = List.of();
   public static final int DEFAULT_MAX_LENGTH = 512;
 
@@ -145,6 +149,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public enum MaxLengthExceedStrategy {
     TRIM_LENGTH, ERROR, SUBSTITUTE_DEFAULT_VALUE, NO_ACTION
   }
+
+  @JsonProperty("description")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  protected String _description;
+
+  @JsonProperty("tags")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  protected List<String> _tags;
 
   protected String _name;
   protected DataType _dataType;
@@ -206,6 +220,24 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setName(String name) {
     _name = name;
+  }
+
+  @Nullable
+  public String getDescription() {
+    return _description;
+  }
+
+  public void setDescription(@Nullable String description) {
+    _description = description;
+  }
+
+  @Nullable
+  public List<String> getTags() {
+    return _tags;
+  }
+
+  public void setTags(@Nullable List<String> tags) {
+    _tags = tags;
   }
 
   public DataType getDataType() {
@@ -273,6 +305,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return DEFAULT_MAX_LENGTH;
   }
 
+  /// Returns the max length of the column if it is not using the default length, `null` otherwise.
+  /// This method should be used to write the `ColumnMetadata`.
+  @JsonIgnore
+  @Nullable
+  public Integer getNonDefaultMaxLength() {
+    int effectiveMaxLength = getEffectiveMaxLength();
+    return effectiveMaxLength != DEFAULT_MAX_LENGTH ? effectiveMaxLength : null;
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   // Use getEffectiveMaxLength() for default-aware access.
   @Nullable
@@ -307,6 +348,21 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
+  /// Returns the max length exceed strategy of the column if it is not using the default strategy, `null` otherwise.
+  /// This method should be used to write the `ColumnMetadata`.
+  @JsonIgnore
+  @Nullable
+  public MaxLengthExceedStrategy getNonDefaultMaxLengthExceedStrategy() {
+    MaxLengthExceedStrategy effectiveMaxLengthExceedStrategy = getEffectiveMaxLengthExceedStrategy();
+    if (_dataType == DataType.STRING) {
+      return effectiveMaxLengthExceedStrategy != MaxLengthExceedStrategy.TRIM_LENGTH ? effectiveMaxLengthExceedStrategy
+          : null;
+    } else {
+      return effectiveMaxLengthExceedStrategy != MaxLengthExceedStrategy.NO_ACTION ? effectiveMaxLengthExceedStrategy
+          : null;
+    }
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   // Use getEffectiveMaxLengthExceedStrategy() for default-aware access.
   @Nullable
@@ -336,13 +392,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return getStringValue(_defaultNullValue);
   }
 
-  /**
-   * Helper method to return the String value for the given object.
-   * This is required as not all data types have a toString() (e.g. byte[]).
-   *
-   * @param value Value for which String value needs to be returned
-   * @return String value for the object.
-   */
+  /// Returns the [String] representation of the given object.
+  /// The input value could be:
+  /// - Default null value stored in [FieldSpec]
+  /// - Value from the records (post transform)
   public static String getStringValue(Object value) {
     if (value instanceof BigDecimal) {
       return ((BigDecimal) value).toPlainString();
@@ -350,10 +403,32 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     if (value instanceof byte[]) {
       return BytesUtils.toHexString((byte[]) value);
     }
+    if (value instanceof List || value instanceof Map) {
+      try {
+        return JsonUtils.objectToString(value);
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception serializing value: " + value, e);
+      }
+    }
     return value.toString();
   }
 
-  // Required by JSON de-serializer. DO NOT REMOVE.
+  @JsonProperty
+  private void setDefaultNullValue(@Nullable JsonNode defaultNullValue) {
+    if (defaultNullValue != null && !defaultNullValue.isNull()) {
+      if (defaultNullValue.isValueNode()) {
+        _stringDefaultNullValue = defaultNullValue.asText();
+      } else {
+        // For ARRAY and OBJECT
+        _stringDefaultNullValue = defaultNullValue.toString();
+      }
+    }
+    if (_dataType != null) {
+      _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
+    }
+  }
+
+  @JsonIgnore
   public void setDefaultNullValue(@Nullable Object defaultNullValue) {
     if (defaultNullValue != null) {
       _stringDefaultNullValue = getStringValue(defaultNullValue);
@@ -419,6 +494,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           switch (dataType) {
             case MAP:
               return DEFAULT_COMPLEX_NULL_VALUE_OF_MAP;
+            case OPEN_STRUCT:
+              return DEFAULT_COMPLEX_NULL_VALUE_OF_OPEN_STRUCT;
             case LIST:
               return DEFAULT_COMPLEX_NULL_VALUE_OF_LIST;
             case STRUCT:
@@ -498,6 +575,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     if (_virtualColumnProvider != null) {
       jsonObject.put("virtualColumnProvider", _virtualColumnProvider);
     }
+    if (_description != null) {
+      jsonObject.put("description", _description);
+    }
+    if (_tags != null && !_tags.isEmpty()) {
+      ArrayNode tagsArray = JsonUtils.newArrayNode();
+      for (String tag : _tags) {
+        tagsArray.add(tag);
+      }
+      jsonObject.set("tags", tagsArray);
+    }
     return jsonObject;
   }
 
@@ -535,10 +622,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
         case MAP:
-          jsonNode.put(key, JsonUtils.objectToJsonNode(_defaultNullValue));
-          break;
+        case OPEN_STRUCT:
         case LIST:
-          jsonNode.put(key, JsonUtils.objectToJsonNode(_defaultNullValue));
+          jsonNode.set(key, JsonUtils.objectToJsonNode(_defaultNullValue));
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + this);
@@ -568,15 +654,18 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && Objects.equals(_maxLength, that._maxLength)
         && Objects.equals(_maxLengthExceedStrategy, that._maxLengthExceedStrategy)
         && _allowTrailingZeros == that._allowTrailingZeros
-        && getStringValue(_defaultNullValue).equals(getStringValue(that._defaultNullValue))
+        && _dataType.equals(_defaultNullValue, that._defaultNullValue)
         && Objects.equals(_transformFunction, that._transformFunction)
-        && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider);
+        && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider)
+        && Objects.equals(_description, that._description)
+        && Objects.equals(_tags, that._tags);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
-        _allowTrailingZeros, getStringValue(_defaultNullValue), _transformFunction, _virtualColumnProvider);
+        _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider,
+        _description, _tags);
   }
 
   /**
@@ -611,6 +700,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BYTES(false, false),
     STRUCT(false, false),
     MAP(false, false),
+    OPEN_STRUCT(false, false),
     LIST(false, false),
     UNKNOWN(false, true);
 
@@ -709,6 +799,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case BYTES:
             return BytesUtils.toBytes(value);
           case MAP:
+          case OPEN_STRUCT:
             return JsonUtils.stringToObject(value, Map.class);
           case LIST:
             return JsonUtils.stringToObject(value, List.class);
@@ -718,6 +809,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       } catch (Exception e) {
         throw new IllegalArgumentException("Cannot convert value: '" + value + "' to type: " + this);
       }
+    }
+
+    public boolean equals(Object value1, Object value2) {
+      return this == BYTES ? Arrays.equals((byte[]) value1, (byte[]) value2) : value1.equals(value2);
+    }
+
+    public int hashCode(Object value) {
+      return this == BYTES ? Arrays.hashCode((byte[]) value) : value.hashCode();
     }
 
     /**
@@ -749,6 +848,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case BYTES:
           return ByteArray.compare((byte[]) value1, (byte[]) value2);
         case MAP:
+        case OPEN_STRUCT:
         case LIST:
           throw new UnsupportedOperationException("Cannot compare complex data types: " + this);
         default:
@@ -766,7 +866,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       if (this == BYTES) {
         return BytesUtils.toHexString((byte[]) value);
       }
-      if (this == MAP || this == LIST) {
+      if (this == MAP || this == OPEN_STRUCT || this == LIST) {
         try {
           return JsonUtils.objectToString(value);
         } catch (JsonProcessingException e) {
@@ -802,6 +902,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case BYTES:
             return BytesUtils.toByteArray(value);
           case MAP:
+          case OPEN_STRUCT:
           case LIST:
             throw new UnsupportedOperationException("Cannot convert complex data types: " + this);
           default:

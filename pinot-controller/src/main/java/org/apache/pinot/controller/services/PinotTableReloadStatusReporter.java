@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.controller.services;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -35,9 +37,11 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
+import org.apache.pinot.common.restlet.resources.PinotControllerJobMetadataDto;
+import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.controller.api.dto.PinotControllerJobMetadataDto;
-import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
@@ -47,7 +51,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.google.common.base.Preconditions.checkState;
 
 
 @Singleton
@@ -68,7 +71,8 @@ public class PinotTableReloadStatusReporter {
 
   private static double computeEstimatedRemainingTimeInMinutes(PinotTableReloadStatusResponse finalResponse,
       double timeElapsedInMinutes) {
-    int remainingSegments = finalResponse.getTotalSegmentCount() - finalResponse.getSuccessCount();
+    // Clamp to 0 to handle cases where successCount > totalSegmentCount (e.g. segments added after job started)
+    int remainingSegments = Math.max(0, finalResponse.getTotalSegmentCount() - finalResponse.getSuccessCount());
 
     double estimatedRemainingTimeInMinutes = -1;
     if (finalResponse.getSuccessCount() > 0) {
@@ -76,6 +80,26 @@ public class PinotTableReloadStatusReporter {
           ((double) remainingSegments / (double) finalResponse.getSuccessCount()) * timeElapsedInMinutes;
     }
     return estimatedRemainingTimeInMinutes;
+  }
+
+  /**
+   * Derives the overall reload job status from aggregated counts.
+   * - COMPLETED: all segments reloaded successfully, no server call failures
+   * - COMPLETED_WITH_ERRORS: reload finished but some segments failed
+   * - IN_PROGRESS: reload is still running
+   */
+  private static String deriveReloadStatus(PinotTableReloadStatusResponse response) {
+    int processed = response.getSuccessCount() + (response.getFailureCount() != null
+        ? response.getFailureCount().intValue() : 0);
+    boolean allProcessed = processed >= response.getTotalSegmentCount();
+
+    if (allProcessed && response.getTotalServerCallsFailed() == 0) {
+      if (response.getFailureCount() != null && response.getFailureCount() > 0) {
+        return "COMPLETED_WITH_ERRORS";
+      }
+      return "COMPLETED";
+    }
+    return "IN_PROGRESS";
   }
 
   private static double computeTimeElapsedInMinutes(double submissionTime) {
@@ -155,18 +179,28 @@ public class PinotTableReloadStatusReporter {
 
     long totalFailureCount = 0;
     boolean hasFailureCountData = false;
+    List<SegmentReloadFailureResponse> allFailedSegments = new ArrayList<>();
 
+    // Single iteration to aggregate counts and collect failed segments
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       try {
-        PinotTableReloadStatusResponse r =
-            JsonUtils.stringToObject(responseString, PinotTableReloadStatusResponse.class);
-        response.setSuccessCount(response.getSuccessCount() + r.getSuccessCount());
+        ServerReloadStatusResponse serverResponse =
+            JsonUtils.stringToObject(responseString, ServerReloadStatusResponse.class);
+
+        // Aggregate success count
+        response.setSuccessCount(response.getSuccessCount() + serverResponse.getSuccessCount());
 
         // Aggregate failure counts if available
-        if (r.getFailureCount() != null) {
-          totalFailureCount += r.getFailureCount();
+        if (serverResponse.getFailureCount() != null) {
+          totalFailureCount += serverResponse.getFailureCount();
           hasFailureCountData = true;
+        }
+
+        // Collect failed segments
+        if (serverResponse.getSampleSegmentReloadFailures() != null
+            && !serverResponse.getSampleSegmentReloadFailures().isEmpty()) {
+          allFailedSegments.addAll(serverResponse.getSampleSegmentReloadFailures());
         }
       } catch (Exception e) {
         response.setTotalServerCallsFailed(response.getTotalServerCallsFailed() + 1);
@@ -178,6 +212,19 @@ public class PinotTableReloadStatusReporter {
       response.setFailureCount(totalFailureCount);
     }
 
+    // Set failed segments in response if any were collected
+    if (!allFailedSegments.isEmpty()) {
+      // Limit to prevent huge responses (e.g., max 500 failures across all servers)
+      // This limit is higher than per-server limit since we're aggregating
+      int maxFailuresInResponse = 500;
+      if (allFailedSegments.size() > maxFailuresInResponse) {
+        LOG.warn("Truncating failed segments list from {} to {} for job {}",
+            allFailedSegments.size(), maxFailuresInResponse, reloadJobId);
+        allFailedSegments = allFailedSegments.subList(0, maxFailuresInResponse);
+      }
+      response.setSegmentReloadFailures(allFailedSegments);
+    }
+
     // Add derived fields
     final double timeElapsedInMinutes = computeTimeElapsedInMinutes(reloadJobMetadata.getSubmissionTimeMs());
     final double estimatedRemainingTimeInMinutes =
@@ -185,7 +232,8 @@ public class PinotTableReloadStatusReporter {
 
     return response.setMetadata(reloadJobMetadata)
         .setTimeElapsedInMinutes(timeElapsedInMinutes)
-        .setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
+        .setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes)
+        .setStatus(deriveReloadStatus(response));
   }
 
   private PinotControllerJobMetadataDto getControllerJobMetadataFromZk(String reloadJobId) {
@@ -205,6 +253,14 @@ public class PinotTableReloadStatusReporter {
 
   @VisibleForTesting
   Map<String, List<String>> getServerToSegments(PinotControllerJobMetadataDto job) {
+    if (job.getInstanceToSegmentsMap() != null) {
+      try {
+        return JsonUtils.stringToObject(job.getInstanceToSegmentsMap(), new TypeReference<>() {
+        });
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Failed to parse controller job instanceToSegmentsMap", e);
+      }
+    }
     return getServerToSegments(job.getTableNameWithType(), job.getSegmentName(), job.getInstanceName());
   }
 
@@ -221,14 +277,32 @@ public class PinotTableReloadStatusReporter {
     if (instanceName != null) {
       return Map.of(instanceName, segmentNames);
     }
-    // If instance is null, then either one or all segments are being reloaded via current segment reload restful APIs.
-    // And the if-check at the beginning of this method has handled the case of reloading all segments. So here we
-    // expect only one segment name.
-    checkState(segmentNames.size() == 1, "Only one segment is expected but got: %s", segmentNames);
+    if (segmentNames.size() == 1) {
+      String segmentName = segmentNames.get(0);
+      Map<String, List<String>> serverToSegments = new HashMap<>();
+      Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
+      for (String server : servers) {
+        serverToSegments.put(server, Collections.singletonList(segmentName));
+      }
+      return serverToSegments;
+    }
+    // TODO: For large tables with many segments, consider adding a HelixResourceManager helper
+    //  that maps servers for a provided segment set directly, rather than fetching the full
+    //  server-to-all-segments map and filtering.
+    Set<String> targetSegments = new HashSet<>(segmentNames);
     Map<String, List<String>> serverToSegments = new HashMap<>();
-    Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentNamesString);
-    for (String server : servers) {
-      serverToSegments.put(server, Collections.singletonList(segmentNamesString));
+    Map<String, List<String>> serverToAllSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, null, true);
+    for (Map.Entry<String, List<String>> entry : serverToAllSegments.entrySet()) {
+      List<String> filteredSegments = new ArrayList<>();
+      for (String segmentName : entry.getValue()) {
+        if (targetSegments.contains(segmentName)) {
+          filteredSegments.add(segmentName);
+        }
+      }
+      if (!filteredSegments.isEmpty()) {
+        serverToSegments.put(entry.getKey(), filteredSegments);
+      }
     }
     return serverToSegments;
   }

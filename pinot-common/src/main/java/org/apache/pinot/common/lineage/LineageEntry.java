@@ -31,12 +31,24 @@ public class LineageEntry {
   private final List<String> _segmentsTo;
   private final LineageEntryState _state;
   private final long _timestamp;
+  // Currently, lineage needs to be marked completed by clients be calling {@code endReplaceSegments}.
+  // For few use cases, we can simplify the client logic by allowing an observer (e.g. a controller-side periodic task)
+  // to mark lineage entries completed automatically once all the To segments are ONLINE in the external view.
+  // This field allows us to opt in to this behavior on a per-entry basis.
+  // Default false preserves client-driven completion semantics.
+  private final boolean _autoCompleteLineageEntry;
 
   public LineageEntry(List<String> segmentsFrom, List<String> segmentsTo, LineageEntryState state, long timestamp) {
+    this(segmentsFrom, segmentsTo, state, timestamp, false);
+  }
+
+  public LineageEntry(List<String> segmentsFrom, List<String> segmentsTo, LineageEntryState state, long timestamp,
+      boolean autoCompleteLineageEntry) {
     _segmentsFrom = segmentsFrom;
     _segmentsTo = segmentsTo;
     _state = state;
     _timestamp = timestamp;
+    _autoCompleteLineageEntry = autoCompleteLineageEntry;
   }
 
   public List<String> getSegmentsFrom() {
@@ -55,6 +67,10 @@ public class LineageEntry {
     return _timestamp;
   }
 
+  public boolean isAutoCompleteLineageEntry() {
+    return _autoCompleteLineageEntry;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -64,12 +80,12 @@ public class LineageEntry {
       return false;
     }
     LineageEntry that = (LineageEntry) o;
-    return _timestamp == that._timestamp && _segmentsFrom.equals(that._segmentsFrom) && _segmentsTo
-        .equals(that._segmentsTo) && _state == that._state;
+    return _timestamp == that._timestamp && _autoCompleteLineageEntry == that._autoCompleteLineageEntry
+        && _segmentsFrom.equals(that._segmentsFrom) && _segmentsTo.equals(that._segmentsTo) && _state == that._state;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_segmentsFrom, _segmentsTo, _state, _timestamp);
+    return Objects.hash(_segmentsFrom, _segmentsTo, _state, _timestamp, _autoCompleteLineageEntry);
   }
 }

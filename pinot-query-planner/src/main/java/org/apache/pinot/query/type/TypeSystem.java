@@ -62,14 +62,14 @@ public class TypeSystem extends RelDataTypeSystemImpl {
     return true;
   }
 
+  // Pinot raises the max DECIMAL precision/scale far above the SQL standard via the type-specific
+  // getMaxScale(DECIMAL)/getMaxPrecision(DECIMAL) overrides below. The no-arg getMaxNumericScale()/
+  // getMaxNumericPrecision() became final in Calcite 1.42.0 (CALCITE-7351) and now delegate to
+  // getMaxScale(DECIMAL)/getMaxPrecision(DECIMAL), so overriding them is no longer possible - and no longer
+  // necessary, since that delegation already yields MAX_DECIMAL_SCALE/MAX_DECIMAL_PRECISION.
   @Override
   public int getMaxScale(SqlTypeName typeName) {
     return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_SCALE : super.getMaxScale(typeName);
-  }
-
-  @Override
-  public int getMaxNumericScale() {
-    return MAX_DECIMAL_SCALE;
   }
 
   @Override
@@ -83,19 +83,12 @@ public class TypeSystem extends RelDataTypeSystemImpl {
   }
 
   @Override
-  public int getMaxNumericPrecision() {
-    return MAX_DECIMAL_PRECISION;
-  }
-
-  @Override
   public int getDefaultPrecision(SqlTypeName typeName) {
     return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_PRECISION : super.getDefaultPrecision(typeName);
   }
 
   @Override
   public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory, RelDataType argumentType) {
-    assert SqlTypeUtil.isNumeric(argumentType);
-
     switch (argumentType.getSqlTypeName()) {
       case DECIMAL: {
         // For BIG_DECIMAL, set the return type to BIG_DECIMAL. Check OSS issue #10318 for more details.
@@ -120,6 +113,15 @@ public class TypeSystem extends RelDataTypeSystemImpl {
       case SMALLINT:
       case INTEGER:
       case BIGINT:
+      // Calcite 1.41+ (CALCITE-1466) makes unsigned integer types reachable under BABEL conformance. Widen the
+      // supported ones to (signed) BIGINT for SUM exactly like their signed counterparts; Calcite passes the operand
+      // type to deriveSumType directly (no unsigned->signed coercion), so without these arms a SUM over a sub-64-bit
+      // unsigned column would keep its narrow type and silently overflow a 32-bit INT when accumulating many rows.
+      // UBIGINT is intentionally omitted: it is unsupported (rejected during plan conversion) because no signed type
+      // holds its full 0..2^64-1 range.
+      case UTINYINT:
+      case USMALLINT:
+      case UINTEGER:
         return typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.BIGINT),
             argumentType.isNullable());
       default:

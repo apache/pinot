@@ -124,7 +124,8 @@ public class PinotAggregateFunctionRewriteRule extends RelOptRule {
         }
         break;
       }
-      case SUM: {
+      case SUM:
+      case SUM0: {
         if (operandType == SqlTypeName.INTEGER) {
           newAgg = new PinotSqlAggFunction("SUMINT", SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),
               aggFunction.getOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);

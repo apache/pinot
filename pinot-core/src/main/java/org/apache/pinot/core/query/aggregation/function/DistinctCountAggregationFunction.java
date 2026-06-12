@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -42,19 +43,37 @@ public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggre
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    svAggregate(length, aggregationResultHolder, blockValSetMap);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      svAggregate(blockValSet, length, aggregationResultHolder);
+    } else {
+      mvAggregate(blockValSet, length, aggregationResultHolder);
+    }
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    svAggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      svAggregateGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    } else {
+      mvAggregateGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    }
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    svAggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      svAggregateGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    } else {
+      mvAggregateGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    }
   }
 
   @Override
@@ -62,9 +81,10 @@ public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggre
     return ColumnDataType.INT;
   }
 
+  @Nullable
   @Override
-  public Integer extractFinalResult(Set intermediateResult) {
-    return intermediateResult.size();
+  public Integer extractFinalResult(@Nullable Set intermediateResult) {
+    return intermediateResult == null ? 0 : intermediateResult.size();
   }
 
   @Override

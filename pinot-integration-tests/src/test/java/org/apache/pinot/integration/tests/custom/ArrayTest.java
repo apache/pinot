@@ -19,16 +19,15 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import java.io.File;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
+import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -38,7 +37,6 @@ import static org.testng.Assert.assertTrue;
 
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
-
   private static final String DEFAULT_TABLE_NAME = "ArrayTest";
   private static final String BOOLEAN_COLUMN = "boolCol";
   private static final String BOOLEAN_FROM_INT_COLUMN = "boolColFromInt";
@@ -55,6 +53,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   private static final String BOOLEAN_FROM_STRING_ARRAY_COLUMN = "booleanArrayColFromStringArray";
   private static final String LONG_ARRAY_COLUMN = "longArrayCol";
   private static final String DOUBLE_ARRAY_COLUMN = "doubleArrayCol";
+  private static final String BIG_DECIMAL_ARRAY_COLUMN = "bigDecimalArrayCol";
+  private static final String STRING_ARRAY_COLUMN = "stringArrayCol";
+  private static final String BYTES_ARRAY_COLUMN = "bytesArrayCol";
 
   @Override
   protected long getCountStarResult() {
@@ -234,32 +235,40 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
 
     query =
         String.format("SELECT "
-            + "listAgg(stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol) "
-            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+            + "listAgg(stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol), intCol "
+            + "FROM %s GROUP BY intCol LIMIT %d", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
     rows = jsonNode.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    row = rows.get(0);
-    assertEquals(row.size(), 1);
-    String[] splits = row.get(0).asText().split(" \\| ");
-    assertEquals(splits.length, getCountStarResult());
-    for (int i = 1; i < splits.length; i++) {
-      assertTrue(splits[i].compareTo(splits[i - 1]) >= 0);
+    assertEquals(rows.size(), getCountStarResult() / 10);
+    for (int rowId = 0; rowId < getCountStarResult() / 10; rowId++) {
+      row = rows.get(rowId);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      if (splits.length > 0) {
+        assertEquals(splits.length, 10);
+        for (int i = 1; i < splits.length; i++) {
+          assertTrue(splits[i].compareTo(splits[i - 1]) >= 0);
+        }
+      }
     }
 
     query =
         String.format("SELECT "
-            + "listAgg(cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol) "
-            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+            + "listAgg(cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol), stringCol "
+            + "FROM %s GROUP BY stringCol LIMIT %d", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
     rows = jsonNode.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    row = rows.get(0);
-    assertEquals(row.size(), 1);
-    splits = row.get(0).asText().split(" \\| ");
-    assertEquals(splits.length, getCountStarResult());
-    for (int i = 1; i < splits.length; i++) {
-      assertTrue(Double.parseDouble(splits[i]) >= Double.parseDouble(splits[i - 1]));
+    assertEquals(rows.size(), getCountStarResult() / 10);
+    for (int rowId = 0; rowId < getCountStarResult() / 10; rowId++) {
+      row = rows.get(rowId);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      if (splits.length > 0) {
+        assertEquals(splits.length, 10);
+        for (int i = 1; i < splits.length; i++) {
+          assertTrue(splits[i].compareTo(splits[i - 1]) >= 0);
+        }
+      }
     }
   }
 
@@ -341,32 +350,38 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
 
     query =
         String.format("SELECT "
-            + "listAgg(DISTINCT stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol) "
-            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+            + "listAgg(DISTINCT stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol), intCol "
+            + "FROM %s GROUP BY intCol LIMIT %d", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
     rows = jsonNode.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    row = rows.get(0);
-    assertEquals(row.size(), 1);
-    String[] splits = row.get(0).asText().split(" \\| ");
-    assertEquals(splits.length, getCountStarResult() / 10);
-    for (int j = 1; j < splits.length; j++) {
-      assertTrue(splits[j].compareTo(splits[j - 1]) > 0);
+    assertEquals(rows.size(), getCountStarResult() / 10);
+    for (int rowId = 0; rowId < getCountStarResult() / 10; rowId++) {
+      row = rows.get(rowId);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      if (splits.length > 1) {
+        assertEquals(splits.length, getCountStarResult());
+        for (int i = 1; i < splits.length; i++) {
+          assertTrue(splits[i].compareTo(splits[i - 1]) >= 0);
+        }
+      }
     }
 
     query =
         String.format("SELECT "
-            + "listAgg(DISTINCT cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol) "
-            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+            + "listAgg(DISTINCT cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol), stringCol "
+            + "FROM %s GROUP BY stringCol LIMIT %d", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
     rows = jsonNode.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    row = rows.get(0);
-    assertEquals(row.size(), 1);
-    splits = row.get(0).asText().split(" \\| ");
-    assertEquals(splits.length, getCountStarResult() / 10);
-    for (int j = 1; j < splits.length; j++) {
-      assertTrue(Double.parseDouble(splits[j]) > Double.parseDouble(splits[j - 1]));
+    assertEquals(rows.size(), getCountStarResult() / 10);
+    for (int rowId = 0; rowId < getCountStarResult() / 10; rowId++) {
+      row = rows.get(rowId);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      assertEquals(splits.length, 1);
+      for (int j = 1; j < splits.length; j++) {
+        assertTrue(Double.parseDouble(splits[j]) > Double.parseDouble(splits[j - 1]));
+      }
     }
   }
 
@@ -714,6 +729,208 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
   }
 
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayLengthBigDecimalAndBytes(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Each row's bigDecimalArrayCol and bytesArrayCol contains 4 elements.
+    String queryBigDecimal = String.format("SELECT COUNT(*) FROM %s WHERE arrayLength(%s) = 4",
+        getTableName(), BIG_DECIMAL_ARRAY_COLUMN);
+    assertEquals(postQuery(queryBigDecimal).get("resultTable").get("rows").get(0).get(0).asLong(),
+        getCountStarResult());
+
+    String queryBytes = String.format("SELECT COUNT(*) FROM %s WHERE arrayLength(%s) = 4",
+        getTableName(), BYTES_ARRAY_COLUMN);
+    assertEquals(postQuery(queryBytes).get("resultTable").get("rows").get(0).get(0).asLong(),
+        getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArraysOverlapBigDecimalAndBytes(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String queryBigDecimal = String.format("SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, %s)",
+        getTableName(), BIG_DECIMAL_ARRAY_COLUMN, BIG_DECIMAL_ARRAY_COLUMN);
+    assertEquals(postQuery(queryBigDecimal).get("resultTable").get("rows").get(0).get(0).asLong(),
+        getCountStarResult());
+
+    String queryBytes = String.format("SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, %s)",
+        getTableName(), BYTES_ARRAY_COLUMN, BYTES_ARRAY_COLUMN);
+    assertEquals(postQuery(queryBytes).get("resultTable").get("rows").get(0).get(0).asLong(),
+        getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvLongArrayFilterValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT filterMv(%s, 'v > 1') FROM %s WHERE %s = 0 LIMIT 1", LONG_ARRAY_COLUMN,
+        getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "LONG_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    JsonNode values = row.get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).longValue(), 2L);
+    assertEquals(values.get(1).longValue(), 3L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvLongArrayFilterPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT COUNT(*) FROM %s WHERE arrayLength(filterMv(%s, 'v > 1')) = 2",
+        getTableName(), LONG_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvRegexpLikeFilterValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT filterMv(%s, 'REGEXP_LIKE(v, ''^/api/.*'')') FROM %s WHERE %s = 0 LIMIT 1",
+        STRING_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "STRING_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    JsonNode values = row.get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).textValue(), "/api/v1");
+    assertEquals(values.get(1).textValue(), "/api/v2");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvRegexpLikeFilterPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT COUNT(*) FROM %s WHERE arrayLength(filterMv(%s, 'REGEXP_LIKE(v, ''^/api/.*'')')) = 2",
+        getTableName(), STRING_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvBooleanArrayFilterValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // BOOLEAN_ARRAY_COLUMN contains [true, true, false, false] for all rows
+    // Filter to only true values
+    String query = String.format("SELECT filterMv(%s, 'v = 1') FROM %s WHERE %s = 0 LIMIT 1",
+        BOOLEAN_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "BOOLEAN_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode values = rows.get(0).get(0);
+    assertEquals(values.size(), 2);
+    assertTrue(values.get(0).asBoolean());
+    assertTrue(values.get(1).asBoolean());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvBooleanArrayFilterPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // All rows have [true, true, false, false], so filterMv(col, 'v = 1') returns [true, true] with length 2
+    String query = String.format(
+        "SELECT COUNT(*) FROM %s WHERE arrayLength(filterMv(%s, 'v = 1')) = 2",
+        getTableName(), BOOLEAN_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvDoubleArrayFilterValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // DOUBLE_ARRAY_COLUMN contains [0.0, 0.1, 0.2, 0.3] for all rows
+    // Filter to values > 0.15
+    String query = String.format("SELECT filterMv(%s, 'v > 0.15') FROM %s WHERE %s = 0 LIMIT 1",
+        DOUBLE_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "DOUBLE_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode values = rows.get(0).get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).doubleValue(), 0.2);
+    assertEquals(values.get(1).doubleValue(), 0.3);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvDoubleArrayFilterPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // All rows have [0.0, 0.1, 0.2, 0.3], so filterMv(col, 'v > 0.15') returns [0.2, 0.3] with length 2
+    String query = String.format(
+        "SELECT COUNT(*) FROM %s WHERE arrayLength(filterMv(%s, 'v > 0.15')) = 2",
+        getTableName(), DOUBLE_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvLongArrayInPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // LONG_ARRAY_COLUMN contains [0, 1, 2, 3] for all rows
+    // Filter to values IN (1, 3)
+    String query = String.format("SELECT filterMv(%s, 'v IN (1, 3)') FROM %s WHERE %s = 0 LIMIT 1",
+        LONG_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "LONG_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode values = rows.get(0).get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).longValue(), 1L);
+    assertEquals(values.get(1).longValue(), 3L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvStringArrayNotEqPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // STRING_ARRAY_COLUMN contains ["/api/v1", "/home", "/api/v2", "/metrics"]
+    // Filter to values != '/home'
+    String query = String.format(
+        "SELECT filterMv(%s, 'v != ''/home''') FROM %s WHERE %s = 0 LIMIT 1",
+        STRING_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "STRING_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode values = rows.get(0).get(0);
+    assertEquals(values.size(), 3);
+    assertEquals(values.get(0).textValue(), "/api/v1");
+    assertEquals(values.get(1).textValue(), "/api/v2");
+    assertEquals(values.get(2).textValue(), "/metrics");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvLongArrayCompoundPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // LONG_ARRAY_COLUMN contains [0, 1, 2, 3]
+    // Filter to values > 0 AND v < 3
+    String query = String.format("SELECT filterMv(%s, 'v > 0 AND v < 3') FROM %s WHERE %s = 0 LIMIT 1",
+        LONG_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode values = result.get("rows").get(0).get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).longValue(), 1L);
+    assertEquals(values.get(1).longValue(), 2L);
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testStringArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -798,6 +1015,23 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArraySliceLong(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // LONG_ARRAY_COLUMN contains [0, 1, 2, 3]; slicing [1, 3) yields [1, 2]
+    String query = String.format("SELECT array_slice_long(%s, 1, 3) FROM %s WHERE %s = 0 LIMIT 1",
+        LONG_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "LONG_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode values = rows.get(0).get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).longValue(), 1L);
+    assertEquals(values.get(1).longValue(), 2L);
+  }
+
   @Test(dataProvider = "useV1QueryEngine")
   public void testGenerateIntArray(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -845,7 +1079,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "GENERATE_ARRAY(1, 3, -1) "
             + "FROM %s LIMIT 1", getTableName());
     JsonNode jsonNode = postQuery(query);
-    assertEquals(jsonNode.get("exceptions").size(), 1);
+    assertEquals(jsonNode.get("exceptions").size(), getNumAvroFiles());
   }
 
   @Test(dataProvider = "useV1QueryEngine")
@@ -894,7 +1128,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "GENERATE_ARRAY(2147483648, 2147483650, -1) "
             + "FROM %s LIMIT 1", getTableName());
     JsonNode jsonNode = postQuery(query);
-    assertEquals(jsonNode.get("exceptions").size(), 1);
+    assertEquals(jsonNode.get("exceptions").size(), getNumAvroFiles());
   }
 
   @Test(dataProvider = "useV1QueryEngine")
@@ -944,7 +1178,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "GENERATE_ARRAY(0.3, 0.1, 1.1) "
             + "FROM %s LIMIT 1", getTableName());
     JsonNode jsonNode = postQuery(query);
-    assertEquals(jsonNode.get("exceptions").size(), 1);
+    assertEquals(jsonNode.get("exceptions").size(), getNumAvroFiles());
   }
 
   @Test(dataProvider = "useV1QueryEngine")
@@ -994,7 +1228,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "GENERATE_ARRAY(CAST(0.3 AS DOUBLE), CAST(0.1 AS DOUBLE), CAST(1.1 AS DOUBLE)) "
             + "FROM %s LIMIT 1", getTableName());
     JsonNode jsonNode = postQuery(query);
-    assertEquals(jsonNode.get("exceptions").size(), 1);
+    assertEquals(jsonNode.get("exceptions").size(), getNumAvroFiles());
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -1069,8 +1303,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public Schema createSchema() {
-    return new Schema.SchemaBuilder().setSchemaName(getTableName())
+  public org.apache.pinot.spi.data.Schema createSchema() {
+    return new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+        .setSchemaName(getTableName())
         .addSingleValueDimension(BOOLEAN_COLUMN, FieldSpec.DataType.BOOLEAN)
         .addSingleValueDimension(BOOLEAN_FROM_INT_COLUMN, FieldSpec.DataType.BOOLEAN)
         .addSingleValueDimension(BOOLEAN_FROM_STRING_COLUMN, FieldSpec.DataType.BOOLEAN)
@@ -1086,6 +1321,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         .addMultiValueDimension(BOOLEAN_FROM_STRING_ARRAY_COLUMN, FieldSpec.DataType.BOOLEAN)
         .addMultiValueDimension(LONG_ARRAY_COLUMN, FieldSpec.DataType.LONG)
         .addMultiValueDimension(DOUBLE_ARRAY_COLUMN, FieldSpec.DataType.DOUBLE)
+        .addMultiValueDimension(BIG_DECIMAL_ARRAY_COLUMN, FieldSpec.DataType.BIG_DECIMAL)
+        .addMultiValueDimension(STRING_ARRAY_COLUMN, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(BYTES_ARRAY_COLUMN, FieldSpec.DataType.BYTES)
         .build();
   }
 
@@ -1093,83 +1331,70 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   public List<File> createAvroFiles()
       throws Exception {
     // create avro schema
-    org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
+    Schema avroSchema = Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(List.of(
-        new org.apache.avro.Schema.Field(BOOLEAN_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BOOLEAN),
-            null, null),
-        new org.apache.avro.Schema.Field(BOOLEAN_FROM_INT_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT),
-            null, null),
-        new org.apache.avro.Schema.Field(BOOLEAN_FROM_STRING_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
-            null, null),
-        new org.apache.avro.Schema.Field(INT_COLUMN, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT),
-            null, null),
-        new org.apache.avro.Schema.Field(LONG_COLUMN, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
-            null, null),
-        new org.apache.avro.Schema.Field(FLOAT_COLUMN, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.FLOAT),
-            null, null),
-        new org.apache.avro.Schema.Field(DOUBLE_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE),
-            null, null),
-        new org.apache.avro.Schema.Field(STRING_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
-            null, null),
-        new org.apache.avro.Schema.Field(TIMESTAMP_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
-            null, null),
-        new org.apache.avro.Schema.Field(GROUP_BY_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
-            null, null),
-        new org.apache.avro.Schema.Field(BOOLEAN_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BOOLEAN)),
-            null, null),
-        new org.apache.avro.Schema.Field(BOOLEAN_FROM_INT_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT)),
-            null, null),
-        new org.apache.avro.Schema.Field(BOOLEAN_FROM_STRING_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING)),
-            null, null),
-        new org.apache.avro.Schema.Field(LONG_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG)),
-            null, null),
-        new org.apache.avro.Schema.Field(DOUBLE_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE)),
-            null, null)
-    ));
+        new Schema.Field(BOOLEAN_COLUMN, Schema.create(Schema.Type.BOOLEAN), null, null),
+        new Schema.Field(BOOLEAN_FROM_INT_COLUMN, Schema.create(Schema.Type.INT), null, null),
+        new Schema.Field(BOOLEAN_FROM_STRING_COLUMN, Schema.create(Schema.Type.STRING), null, null),
+        new Schema.Field(INT_COLUMN, Schema.create(Schema.Type.INT), null, null),
+        new Schema.Field(LONG_COLUMN, Schema.create(Schema.Type.LONG), null, null),
+        new Schema.Field(FLOAT_COLUMN, Schema.create(Schema.Type.FLOAT), null, null),
+        new Schema.Field(DOUBLE_COLUMN, Schema.create(Schema.Type.DOUBLE), null, null),
+        new Schema.Field(STRING_COLUMN, Schema.create(Schema.Type.STRING), null, null),
+        new Schema.Field(TIMESTAMP_COLUMN, Schema.create(Schema.Type.LONG), null, null),
+        new Schema.Field(GROUP_BY_COLUMN, Schema.create(Schema.Type.STRING), null, null),
+        new Schema.Field(BOOLEAN_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.BOOLEAN)), null, null),
+        new Schema.Field(BOOLEAN_FROM_INT_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.INT)), null, null),
+        new Schema.Field(BOOLEAN_FROM_STRING_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.STRING)), null,
+            null),
+        new Schema.Field(LONG_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.LONG)), null, null),
+        new Schema.Field(DOUBLE_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.DOUBLE)), null, null),
+        new Schema.Field(BIG_DECIMAL_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.STRING)), null, null),
+        new Schema.Field(STRING_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.STRING)), null, null),
+        new Schema.Field(BYTES_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.BYTES)), null, null))
+    );
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    Cache<Integer, GenericData.Record> recordCache = CacheBuilder.newBuilder().build();
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      for (int i = 0; i < getCountStarResult(); i++) {
-        // add avro record to file
-        int finalI = i;
-        fileWriter.append(recordCache.get((int) (i % (getCountStarResult() / 10)), () -> {
-              // create avro record
-              GenericData.Record record = new GenericData.Record(avroSchema);
-              record.put(BOOLEAN_COLUMN, finalI % 4 == 0 || finalI % 4 == 1);
-              record.put(BOOLEAN_FROM_INT_COLUMN, finalI % 4 == 0 || finalI % 4 == 1 ? 1 : 0);
-              record.put(BOOLEAN_FROM_STRING_COLUMN, finalI % 4 == 0 || finalI % 4 == 1 ? "true" : "false");
-              record.put(INT_COLUMN, finalI);
-              record.put(LONG_COLUMN, finalI);
-              record.put(FLOAT_COLUMN, finalI + RANDOM.nextFloat());
-              record.put(DOUBLE_COLUMN, finalI + RANDOM.nextDouble());
-              record.put(STRING_COLUMN, RandomStringUtils.random(finalI));
-              record.put(TIMESTAMP_COLUMN, finalI);
-              record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
-              record.put(BOOLEAN_ARRAY_COLUMN, List.of(true, true, false, false));
-              record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, List.of(1, 1, 0, 0));
-              record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, List.of("true", "true", "false", "false"));
-              record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
-              record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
-              return record;
-            }
-        ));
-      }
+    int numRecords = (int) getCountStarResult();
+    int numUniqueRecords = numRecords / 10;
+    List<GenericData.Record> uniqueRecords = new ArrayList<>(numUniqueRecords);
+    for (int i = 0; i < numUniqueRecords; i++) {
+      uniqueRecords.add(createAvroRecord(avroSchema, i));
     }
-    return List.of(avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
+      int numAvroFiles = getNumAvroFiles();
+      for (int i = 0; i < numRecords; i++) {
+        writers.get(i % numAvroFiles).append(uniqueRecords.get(i % numUniqueRecords));
+      }
+      return avroFilesAndWriters.getAvroFiles();
+    }
+  }
+
+  private GenericData.Record createAvroRecord(Schema schema, int i) {
+    GenericData.Record record = new GenericData.Record(schema);
+    record.put(BOOLEAN_COLUMN, i % 4 == 0 || i % 4 == 1);
+    record.put(BOOLEAN_FROM_INT_COLUMN, i % 4 == 0 || i % 4 == 1 ? 1 : 0);
+    record.put(BOOLEAN_FROM_STRING_COLUMN, i % 4 == 0 || i % 4 == 1 ? "true" : "false");
+    record.put(INT_COLUMN, i);
+    record.put(LONG_COLUMN, i);
+    record.put(FLOAT_COLUMN, i + RANDOM.nextFloat());
+    record.put(DOUBLE_COLUMN, i + RANDOM.nextDouble());
+    record.put(STRING_COLUMN, RandomStringUtils.secure().next(i));
+    record.put(TIMESTAMP_COLUMN, i);
+    record.put(GROUP_BY_COLUMN, String.valueOf(i % 10));
+    record.put(BOOLEAN_ARRAY_COLUMN, List.of(true, true, false, false));
+    record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, List.of(1, 1, 0, 0));
+    record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, List.of("true", "true", "false", "false"));
+    record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
+    record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
+    record.put(BIG_DECIMAL_ARRAY_COLUMN, List.of("0.0", "0.1", "0.2", "0.3"));
+    record.put(STRING_ARRAY_COLUMN, List.of("/api/v1", "/home", "/api/v2", "/metrics"));
+    record.put(BYTES_ARRAY_COLUMN, List.of(
+        ByteBuffer.wrap(new byte[]{0x00}),
+        ByteBuffer.wrap(new byte[]{0x01}),
+        ByteBuffer.wrap(new byte[]{0x02}),
+        ByteBuffer.wrap(new byte[]{0x03})
+    ));
+    return record;
   }
 }

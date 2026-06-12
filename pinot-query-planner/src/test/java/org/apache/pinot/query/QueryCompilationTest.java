@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query;
 
+import com.google.common.base.Throwables;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
@@ -63,6 +65,192 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryPlanWithoutException(String query) {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
     assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testPolymorphicArithmeticScalarFunctionsPlanQuery() {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT abs(col3), negate(col7), least(col4, col4), greatest(col4, col4), positiveModulo(col3, col6), "
+            + "moduloOrZero(col4, col4) FROM a");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testFilteredMinMaxAggregateNullability() {
+    // A grouped MIN/MAX with a FILTER can observe an empty group, so its result must be nullable. Calcite 1.42 signals
+    // this via SqlOperatorBinding.hasEmptyGroup() (set by SqlFilterOperator at validation time), which
+    // PinotMinMaxReturnTypeInference must honor. Assert the validated RelDataType nullability directly rather than
+    // relying on the downstream Project.isValid check (a JVM `assert`, disabled when tests run without -ea, so a
+    // compile-only smoke test would pass vacuously): the filtered MIN/MAX output fields must be nullable, while a
+    // plain grouped MIN/MAX over the non-null metric col3 must NOT be -- the negative control proving it is the
+    // FILTER (hasEmptyGroup) that drives nullability, not something making every MIN/MAX nullable.
+    RelDataType filtered = _queryEnvironment.compile(
+            "SELECT col1, MIN(col3) FILTER (WHERE col3 > 0), MAX(col3) FILTER (WHERE col3 > 0) FROM a GROUP BY col1")
+        .getRelRoot().validatedRowType;
+    assertTrue(filtered.getFieldList().get(1).getType().isNullable(), "filtered MIN must be nullable");
+    assertTrue(filtered.getFieldList().get(2).getType().isNullable(), "filtered MAX must be nullable");
+
+    RelDataType plain = _queryEnvironment.compile("SELECT col1, MIN(col3), MAX(col3) FROM a GROUP BY col1")
+        .getRelRoot().validatedRowType;
+    assertFalse(plain.getFieldList().get(1).getType().isNullable(), "plain grouped MIN must not be nullable");
+    assertFalse(plain.getFieldList().get(2).getType().isNullable(), "plain grouped MAX must not be nullable");
+  }
+
+  @Test
+  public void testCorrelatedSubqueryDecorrelationNullability() {
+    // CALCITE-7379: decorrelating a scalar correlated sub-query feeding an aggregate changes the nullability of the
+    // output row type, which Calcite 1.42's stock RelDecorrelator still rejects with a Litmus.THROW assertion.
+    // PinotRelDecorrelator downgrades that (nullability-only) divergence to a warning so the query compiles. This
+    // query throws "Failed to decorrelate query" if PinotRelDecorrelator is reverted to stock
+    // RelDecorrelator.decorrelateQuery.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT a.col1, newb.sum_col3 FROM a JOIN LATERAL "
+            + "(SELECT SUM(col3) AS sum_col3 FROM b WHERE col2 = a.col2) AS newb ON TRUE");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testUnsignedTypeCastIsAccepted() {
+    // Calcite 1.42 (CALCITE-1466) parses unsigned integer types under BABEL conformance, producing SqlTypeName.U*.
+    // The representable ones (TINYINT/SMALLINT/INTEGER UNSIGNED) are ACCEPTED and reach the converter via real SQL
+    // (i.e. the U* switch arms in (P)RelToPlanNodeConverter.convertToColumnDataType are not dead code). The U* ->
+    // signed ColumnDataType mapping itself is pinned by the unit tests in RelToPlanNodeConverterTest /
+    // PRelToPlanNodeConverterTest. BIGINT UNSIGNED (UBIGINT) is instead rejected -- see
+    // testUnsignedBigintCastIsRejected.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT CAST(col3 AS INTEGER UNSIGNED), CAST(col3 AS SMALLINT UNSIGNED), "
+            + "CAST(col3 AS TINYINT UNSIGNED) FROM a");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testUnsignedBigintCastIsRejected() {
+    // BIGINT UNSIGNED (UBIGINT, 0..2^64-1) has no signed Pinot type wide enough to hold its full range, so it must be
+    // rejected at planning rather than silently wrapping values above Long.MAX_VALUE (CALCITE-1466). The representable
+    // unsigned types remain accepted (see testUnsignedTypeCastIsAccepted).
+    // Both the column-cast path (reaches convertToColumnDataType directly) and the literal-cast path (reaches it via
+    // the PinotEvaluateLiteralRule constant-folding path) must be rejected -- and assert the dedicated message so an
+    // unrelated planning failure cannot make this pass.
+    List<String> rejected = List.of(
+        "SELECT CAST(col3 AS BIGINT UNSIGNED) FROM a", "SELECT CAST(5 AS BIGINT UNSIGNED) FROM a");
+    for (String sql : rejected) {
+      Throwable thrown = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(sql));
+      assertTrue(Throwables.getStackTraceAsString(thrown).contains("unsigned 64-bit range"),
+          "expected the UBIGINT-rejection error for: " + sql + ", but got: " + thrown);
+    }
+  }
+
+  @Test
+  public void testUnsignedLiteralCastIsFolded() {
+    // Companion to testUnsignedTypeCastIsAccepted using literal (constant-foldable) casts, so the unsigned
+    // literal-folding branch in PinotEvaluateLiteralRule#convertRexCall (which normalizes an unsigned cast to its
+    // signed-equivalent type before building the RexLiteral) actually fires -- the column-cast test above never
+    // reaches literal folding. Asserts the query compiles, i.e. the unsigned literal fold does not error.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT CAST(5 AS INTEGER UNSIGNED) FROM a");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testPolymorphicArithmeticScalarFunctionsOverUnsignedOperands() {
+    // The polymorphic arithmetic scalar functions infer their return type via
+    // ArithmeticFunctionUtils.normalizeNumericType, whose unsigned arms (CALCITE-1466) keep an unsigned-cast operand
+    // integral instead of widening to DOUBLE. Plan them over unsigned-cast operands (unary, binary unsigned-unsigned,
+    // and binary unsigned-signed) so those arms are exercised end-to-end.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT negate(CAST(col3 AS INTEGER UNSIGNED)), "
+            + "least(CAST(col4 AS INTEGER UNSIGNED), CAST(col4 AS INTEGER UNSIGNED)), "
+            + "greatest(CAST(col3 AS INTEGER UNSIGNED), CAST(col3 AS INTEGER UNSIGNED)), "
+            + "moduloOrZero(CAST(col4 AS INTEGER UNSIGNED), col4) FROM a");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testWindowFunctionWithGroupByDoesNotNpe() {
+    // CALCITE-7189: Calcite 1.41+ BABEL conformance reports isNonStrictGroupBy()==true, which makes validation of a
+    // window function combined with GROUP BY (e.g. MIN(col) OVER() ... GROUP BY col) NPE in AggFinder. Pinot's
+    // Validator overrides isNonStrictGroupBy() back to false to avoid this; this query NPEs during validation if
+    // that override is removed.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT MIN(col3) OVER() FROM a GROUP BY col3");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test(dataProvider = "testUnaryOperatorQueries")
+  public void testUnaryPrefixOperatorsPlanQuery(String query) {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @DataProvider(name = "testUnaryOperatorQueries")
+  public Object[][] provideUnaryOperatorQueries() {
+    return new Object[][]{
+        // INT (col3, col6)
+        {"SELECT -col3 FROM a"},
+        {"SELECT col3 FROM a ORDER BY -col3"},
+        {"SELECT col1, col3, DENSE_RANK() OVER (PARTITION BY col1 ORDER BY "
+            + "CASE WHEN col5 = true THEN -col3 ELSE col3 END) FROM a"},
+        {"SELECT col1, RANK() OVER (ORDER BY -col3) FROM a"},
+        {"SELECT +col3 FROM a"},
+        {"SELECT col3 FROM a ORDER BY +col3"},
+        {"SELECT -(col3 + col6) FROM a"},
+        {"SELECT col3 FROM a WHERE -col3 < 0"},
+        {"SELECT -col3, -col6 FROM a ORDER BY -col3"},
+        {"SELECT col3 - col6, -col3 FROM a"},
+        // LONG (col7)
+        {"SELECT -col7 FROM a"},
+        {"SELECT +col7 FROM a"},
+        {"SELECT -col7, col7 FROM a ORDER BY -col7"},
+        {"SELECT col7 FROM a WHERE -col7 < 0"},
+        {"SELECT -(col3 + col7) FROM a"},
+        // BIG_DECIMAL (col4)
+        {"SELECT -col4 FROM a"},
+        {"SELECT +col4 FROM a"},
+        {"SELECT col4 FROM a WHERE -col4 < 0"},
+        // double negation and compound
+        {"SELECT -(-col3) FROM a"},
+        {"SELECT -(-col7) FROM a"},
+        {"SELECT col3 - (-col6) FROM a"},
+        // GROUP BY with negation
+        {"SELECT -col3, COUNT(*) FROM a GROUP BY -col3"},
+        {"SELECT col1, COUNT(*) FROM a GROUP BY col1, -col3"},
+        // Aggregations with negation
+        {"SELECT SUM(-col3), MAX(-col3), MIN(-col3), AVG(-col3) FROM a"},
+        {"SELECT SUM(-col7), MAX(-col7), MIN(-col7), AVG(-col7) FROM a"},
+        {"SELECT SUM(-col4) FROM a"},
+        {"SELECT -SUM(col3), -MAX(col3), -MIN(col3), -AVG(col3) FROM a"},
+        {"SELECT -COUNT(*) FROM a"},
+        {"SELECT -COUNT(col3) FROM a"},
+        // HAVING with negation
+        {"SELECT col1, SUM(col3) FROM a GROUP BY col1 HAVING -SUM(col3) < 0"},
+        {"SELECT col1, SUM(col3) FROM a GROUP BY col1 HAVING SUM(-col3) > -100"},
+        // alias-then-orderby
+        {"SELECT -col3 AS neg FROM a ORDER BY neg"},
+        {"SELECT -col3 AS neg, col1 FROM a ORDER BY neg DESC"},
+        // CAST involving negation
+        {"SELECT CAST(-col3 AS DOUBLE) FROM a"},
+        {"SELECT CAST(-col7 AS BIGINT) FROM a"},
+        {"SELECT -CAST(col3 AS DOUBLE) FROM a"},
+        // JOIN with negation
+        {"SELECT a.col1 FROM a JOIN b ON a.col3 = -b.col3"},
+        {"SELECT a.col1, b.col1 FROM a JOIN b ON -a.col3 = b.col3"},
+        // window: PARTITION BY with negation
+        {"SELECT col1, RANK() OVER (PARTITION BY -col3 ORDER BY col6) FROM a"},
+        {"SELECT col1, ROW_NUMBER() OVER (PARTITION BY -col3 ORDER BY -col6) FROM a"},
+        // DISTINCT with negation
+        {"SELECT DISTINCT -col3 FROM a"},
+        {"SELECT COUNT(DISTINCT -col3) FROM a"},
+        // IN with negative literals
+        {"SELECT col3 FROM a WHERE col3 IN (-1, -2, -3)"},
+        {"SELECT col3 FROM a WHERE -col3 IN (-1, -2)"},
+        // negation in BETWEEN bounds
+        {"SELECT col3 FROM a WHERE col3 BETWEEN -10 AND 10"},
+        {"SELECT col3 FROM a WHERE -col3 BETWEEN -100 AND 0"},
+        // negation in subquery
+        {"SELECT col1 FROM a WHERE col3 > (SELECT AVG(-col3) FROM b)"},
+        // FLOAT (none in schema, skip) -- verify mixed double/big_decimal negation
+        {"SELECT CAST(-col3 AS DOUBLE) + col4 FROM a"},
+    };
   }
 
   @Test(dataProvider = "testQueryExceptionDataProvider")
@@ -103,7 +291,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
     //@formatter:off
     assertEquals(explain,
-      "Execution Plan\n"
+        "Execution Plan\n"
           + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
           + "  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
           + "    PinotLogicalExchange(distribution=[hash])\n"
@@ -217,7 +405,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
     //@formatter:off
     assertEquals(explain,
-    "Execution Plan\n"
+        "Execution Plan\n"
         + "PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL])\n"
         + "  PinotLogicalExchange(distribution=[hash[0]])\n"
         + "    PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($2)], aggType=[LEAF])\n"
@@ -687,6 +875,134 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     _queryEnvironment.planQuery(query);
   }
 
+  /**
+   * Tests that queries with ORDER BY / LIMIT use singleton worker for the intermediate sort stage.
+   */
+  @Test
+  public void testSingletonWorkerForLimitAndOrderByQueries() {
+    String[] queries =
+        new String[]{"SELECT * FROM a LIMIT 10", "SELECT * FROM a OFFSET 10", "SELECT * FROM a ORDER BY col1",
+            "SELECT * FROM a LIMIT 10 OFFSET 5", "SELECT * FROM a ORDER BY col1 LIMIT 10", "SELECT * FROM a ORDER BY "
+              + "col1 OFFSET 10", "SELECT * FROM a ORDER BY col1 LIMIT 10 OFFSET 5"};
+
+    for (String query : queries) {
+      DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+
+      // Find the intermediate stage (non-leaf, non-root)
+      DispatchablePlanFragment intermediateStage = findIntermediateStage(dispatchableSubPlan);
+      assertNotNull(intermediateStage, "Should have an intermediate stage");
+
+      // Should use singleton worker (1 server, 1 worker)
+      assertEquals(intermediateStage.getServerInstanceToWorkerIdMap().size(), 1,
+          "LIMIT / ORDER BY query should use singleton worker for intermediate stage");
+      assertEquals(intermediateStage.getWorkerMetadataList().size(), 1,
+          "LIMIT / ORDER BY query should use singleton worker for intermediate stage");
+    }
+  }
+
+  /**
+   * Helper method to find an intermediate stage (non-leaf, non-root).
+   */
+  private DispatchablePlanFragment findIntermediateStage(DispatchableSubPlan dispatchableSubPlan) {
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      int stageId = fragment.getPlanFragment().getFragmentId();
+      // Skip stage 0 (broker/root) and leaf stages (have table names)
+      if (stageId > 0 && fragment.getTableName() == null) {
+        return fragment;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
+   * correctness of unmatched row tracking. With multiple workers, the broadcast right table would be on each worker
+   * but each worker only sees a subset of left rows, leading to incorrect unmatched-right-rows output.
+   */
+  @Test
+  public void testFullOuterNonEquiJoinUsesSingletonWorker() {
+    String query = "SELECT * FROM a FULL OUTER JOIN b ON a.col3 > b.col3";
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+
+    DispatchablePlanFragment joinStage = findJoinStage(dispatchableSubPlan);
+    assertNotNull(joinStage, "Should have a join stage");
+
+    // FULL OUTER with non-equi conditions must use a singleton worker for correctness
+    assertEquals(joinStage.getWorkerMetadataList().size(), 1,
+        "FULL OUTER non-equi join should use singleton worker for join stage");
+  }
+
+  /**
+   * Tests that RIGHT JOIN with only non-equi conditions uses BROADCAST for the left side and RANDOM for the right
+   * side. This inverted distribution (compared to the default RANDOM left + BROADCAST right) ensures that each worker
+   * has the complete left table so it can correctly determine unmatched right rows for its local right partition.
+   */
+  @Test
+  public void testRightNonEquiJoinUsesBroadcastLeftRandomRight() {
+    String query = "SELECT * FROM a RIGHT JOIN b ON a.col3 > b.col3";
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+
+    JoinNode joinNode = findJoinNode(dispatchableSubPlan);
+    assertNotNull(joinNode, "Should have a join node");
+
+    MailboxReceiveNode leftInput = (MailboxReceiveNode) joinNode.getInputs().get(0);
+    MailboxReceiveNode rightInput = (MailboxReceiveNode) joinNode.getInputs().get(1);
+    assertEquals(leftInput.getDistributionType(), RelDistribution.Type.BROADCAST_DISTRIBUTED,
+        "LEFT side of RIGHT non-equi join should be BROADCAST");
+    assertEquals(rightInput.getDistributionType(), RelDistribution.Type.RANDOM_DISTRIBUTED,
+        "RIGHT side of RIGHT non-equi join should be RANDOM");
+  }
+
+  /**
+   * Finds the DispatchablePlanFragment containing a JoinNode (non-leaf, non-root stage).
+   */
+  private DispatchablePlanFragment findJoinStage(DispatchableSubPlan dispatchableSubPlan) {
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      int stageId = fragment.getPlanFragment().getFragmentId();
+      if (stageId > 0 && fragment.getTableName() == null) {
+        PlanNode node = fragment.getPlanFragment().getFragmentRoot();
+        if (containsNodeOfType(node, JoinNode.class)) {
+          return fragment;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Finds the JoinNode in the plan.
+   */
+  private JoinNode findJoinNode(DispatchableSubPlan dispatchableSubPlan) {
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      JoinNode joinNode = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(), JoinNode.class);
+      if (joinNode != null) {
+        return joinNode;
+      }
+    }
+    return null;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T extends PlanNode> T findNodeOfType(PlanNode node, Class<T> type) {
+    if (node == null) {
+      return null;
+    }
+    if (type.isInstance(node)) {
+      return (T) node;
+    }
+    for (PlanNode child : node.getInputs()) {
+      T result = findNodeOfType(child, type);
+      if (result != null) {
+        return result;
+      }
+    }
+    return null;
+  }
+
+  private static boolean containsNodeOfType(PlanNode node, Class<? extends PlanNode> type) {
+    return findNodeOfType(node, type) != null;
+  }
+
   // --------------------------------------------------------------------------
   // Test Utils.
   // --------------------------------------------------------------------------
@@ -726,57 +1042,57 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     //@formatter:off
     return new Object[][] {
         new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
-              "{\n"
-            + "  \"rels\": [\n"
-            + "    {\n"
-            + "      \"id\": \"0\",\n"
-            + "      \"relOp\": \"org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan\",\n"
-            + "      \"table\": [\n"
-            + "        \"default\",\n"
-            + "        \"a\"\n"
-            + "      ],\n"
-            + "      \"inputs\": [],\n"
-            + "      \"type\": \"PinotLogicalTableScan\"\n"
-            + "    },\n"
-            + "    {\n"
-            + "      \"id\": \"1\",\n"
-            + "      \"relOp\": \"LogicalProject\",\n"
-            + "      \"fields\": [\n"
-            + "        \"col1\",\n"
-            + "        \"col3\"\n"
-            + "      ],\n"
-            + "      \"exprs\": [\n"
-            + "        {\n"
-            + "          \"input\": 0,\n"
-            + "          \"name\": \"$0\"\n"
-            + "        },\n"
-            + "        {\n"
-            + "          \"input\": 2,\n"
-            + "          \"name\": \"$2\"\n"
-            + "        }\n"
-            + "      ],\n"
-            + "      \"type\": \"LogicalProject\"\n"
-            + "    }\n"
-            + "  ]\n"
-            + "}"},
+          "{\n"
+              + "  \"rels\": [\n"
+              + "    {\n"
+              + "      \"id\": \"0\",\n"
+              + "      \"relOp\": \"org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan\",\n"
+              + "      \"table\": [\n"
+              + "        \"default\",\n"
+              + "        \"a\"\n"
+              + "      ],\n"
+              + "      \"inputs\": [],\n"
+              + "      \"type\": \"PinotLogicalTableScan\"\n"
+              + "    },\n"
+              + "    {\n"
+              + "      \"id\": \"1\",\n"
+              + "      \"relOp\": \"LogicalProject\",\n"
+              + "      \"fields\": [\n"
+              + "        \"col1\",\n"
+              + "        \"col3\"\n"
+              + "      ],\n"
+              + "      \"exprs\": [\n"
+              + "        {\n"
+              + "          \"input\": 0,\n"
+              + "          \"name\": \"$0\"\n"
+              + "        },\n"
+              + "        {\n"
+              + "          \"input\": 2,\n"
+              + "          \"name\": \"$2\"\n"
+              + "        }\n"
+              + "      ],\n"
+              + "      \"type\": \"LogicalProject\"\n"
+              + "    }\n"
+              + "  ]\n"
+              + "}"},
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
-              "Execution Plan\n"
-            + "digraph {\n"
-            + "\"PinotLogicalExchange\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
-            + "\"PinotLogicalAggregat\\ne\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
-            + "\"PinotLogicalTableSca\\nn\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
-            + "}\n"
+          "Execution Plan\n"
+              + "digraph {\n"
+              + "\"PinotLogicalExchange\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
+              + "\"PinotLogicalAggregat\\ne\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
+              + "\"PinotLogicalTableSca\\nn\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
+              + "}\n"
         },
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
-              "Execution Plan\n"
-            + "LogicalProject(col1=[$0], col3=[$2])\n"
-            + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
-            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
-            + "      LogicalProject(col1=[$0])\n"
-            + "        PinotLogicalTableScan(table=[[default, a]])\n"
-            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
-            + "      LogicalProject(col1=[$0], col3=[$2])\n"
-            + "        PinotLogicalTableScan(table=[[default, b]])\n"
+          "Execution Plan\n"
+              + "LogicalProject(col1=[$0], col3=[$2])\n"
+              + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+              + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+              + "      LogicalProject(col1=[$0])\n"
+              + "        PinotLogicalTableScan(table=[[default, a]])\n"
+              + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+              + "      LogicalProject(col1=[$0], col3=[$2])\n"
+              + "        PinotLogicalTableScan(table=[[default, b]])\n"
         },
     };
     //@formatter:on

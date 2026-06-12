@@ -40,7 +40,7 @@ public class TimeSeriesOperatorUtils {
   }
 
   public static TimeSeriesBlock buildTimeSeriesBlock(TimeBuckets timeBuckets,
-      GroupByResultsBlock groupByResultsBlock) {
+      GroupByResultsBlock groupByResultsBlock, Map<String, String> responseMetadata) {
     if (groupByResultsBlock.getNumRows() == 0) {
       return new TimeSeriesBlock(timeBuckets, new HashMap<>());
     }
@@ -62,11 +62,11 @@ public class TimeSeriesOperatorUtils {
       timeSeriesList.add(seriesBuilder.buildWithTagOverrides(tagNames, tagValues));
       timeSeriesMap.put(seriesHash, timeSeriesList);
     }
-    return new TimeSeriesBlock(timeBuckets, timeSeriesMap);
+    return new TimeSeriesBlock(timeBuckets, timeSeriesMap, responseMetadata);
   }
 
   public static TimeSeriesBlock buildTimeSeriesBlock(TimeBuckets timeBuckets,
-      AggregationResultsBlock aggregationResultsBlock) {
+      AggregationResultsBlock aggregationResultsBlock, Map<String, String> responseMetadata) {
     if (aggregationResultsBlock.getResults() == null) {
       return new TimeSeriesBlock(timeBuckets, new HashMap<>());
     }
@@ -76,7 +76,7 @@ public class TimeSeriesOperatorUtils {
     timeSeriesList.add(seriesBuilder.buildWithTagOverrides(Collections.emptyList(), new Object[]{}));
     Map<Long, List<TimeSeries>> timeSeriesMap = new HashMap<>();
     timeSeriesMap.put(seriesHash, timeSeriesList);
-    return new TimeSeriesBlock(timeBuckets, timeSeriesMap);
+    return new TimeSeriesBlock(timeBuckets, timeSeriesMap, responseMetadata);
   }
 
   private static List<String> getTagNamesFromDataSchema(DataSchema dataSchema) {

@@ -71,7 +71,7 @@ public class VarLengthValueReaderWriterTest implements PinotBuffersAfterMethodCh
   public void testSingleValueDictionary()
       throws IOException {
     File dictionaryFile = new File(TEMP_DIR, "single");
-    String value = RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH);
+    String value = RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH);
     byte[] valueBytes = value.getBytes(UTF_8);
     try (VarLengthValueWriter writer = new VarLengthValueWriter(dictionaryFile, 1)) {
       writer.add(valueBytes);
@@ -83,6 +83,8 @@ public class VarLengthValueReaderWriterTest implements PinotBuffersAfterMethodCh
         byte[] buffer = new byte[MAX_STRING_LENGTH];
         assertEquals(reader.getUnpaddedString(0, MAX_STRING_LENGTH, buffer), value);
         assertEquals(reader.getBytes(0, MAX_STRING_LENGTH), valueBytes);
+        assertEquals(reader.getByteSize(0, MAX_STRING_LENGTH), valueBytes.length);
+        assertEquals(reader.getUnpaddedByteSize(0, MAX_STRING_LENGTH), valueBytes.length);
       }
     }
   }
@@ -94,7 +96,7 @@ public class VarLengthValueReaderWriterTest implements PinotBuffersAfterMethodCh
     String[] values = new String[NUM_VALUES];
     byte[][] valueBytesArray = new byte[NUM_VALUES][];
     for (int i = 0; i < NUM_VALUES; i++) {
-      String value = RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH);
+      String value = RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH);
       values[i] = value;
       valueBytesArray[i] = value.getBytes(UTF_8);
     }
@@ -111,6 +113,8 @@ public class VarLengthValueReaderWriterTest implements PinotBuffersAfterMethodCh
         for (int i = 0; i < NUM_VALUES; i++) {
           assertEquals(reader.getUnpaddedString(i, MAX_STRING_LENGTH, buffer), values[i]);
           assertEquals(reader.getBytes(i, MAX_STRING_LENGTH), valueBytesArray[i]);
+          assertEquals(reader.getByteSize(i, MAX_STRING_LENGTH), valueBytesArray[i].length);
+          assertEquals(reader.getUnpaddedByteSize(i, MAX_STRING_LENGTH), valueBytesArray[i].length);
         }
       }
     }

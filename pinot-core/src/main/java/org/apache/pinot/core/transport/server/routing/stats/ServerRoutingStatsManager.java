@@ -28,11 +28,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryExecutionContext.QueryType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,6 +55,7 @@ public class ServerRoutingStatsManager {
   private final BrokerMetrics _brokerMetrics;
   private volatile boolean _isEnabled;
   private ConcurrentHashMap<String, ServerRoutingStatsEntry> _serverQueryStatsMap;
+  private ConcurrentHashMap<String, ServerRoutingStatsEntry> _mseServerQueryStatsMap;
 
   // Main executor service for collecting and aggregating stats for all servers.
   private ExecutorService _executorService;
@@ -63,6 +68,8 @@ public class ServerRoutingStatsManager {
   private long _warmupDurationMs;
   private double _avgInitializationVal;
   private int _hybridScoreExponent;
+  private int _hybridScoreQueueFloor;
+  private boolean _enableStatsMetricExport;
 
   public ServerRoutingStatsManager(PinotConfiguration pinotConfig, BrokerMetrics brokerMetrics) {
     _config = pinotConfig;
@@ -89,6 +96,8 @@ public class ServerRoutingStatsManager {
         AdaptiveServerSelector.DEFAULT_AVG_INITIALIZATION_VAL);
     _hybridScoreExponent = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT,
         AdaptiveServerSelector.DEFAULT_HYBRID_SCORE_EXPONENT);
+    _hybridScoreQueueFloor = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR,
+        AdaptiveServerSelector.DEFAULT_HYBRID_SCORE_QUEUE_FLOOR);
 
     int threadPoolSize = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE,
         AdaptiveServerSelector.DEFAULT_STATS_MANAGER_THREADPOOL_SIZE);
@@ -99,6 +108,17 @@ public class ServerRoutingStatsManager {
     // Entries in this map are never deleted unless the broker process restarts. This is okay for now because the
     // number of servers will be finite and should not cause memory bloat.
     _serverQueryStatsMap = new ConcurrentHashMap<>();
+    _mseServerQueryStatsMap = new ConcurrentHashMap<>();
+
+    _enableStatsMetricExport = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT,
+        AdaptiveServerSelector.DEFAULT_ENABLE_STATS_METRIC_EXPORT);
+    if (_enableStatsMetricExport) {
+      long intervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
+          AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+      _periodicTaskExecutor.scheduleAtFixedRate(this::exportStatsAsMetrics, intervalMs, intervalMs,
+          TimeUnit.MILLISECONDS);
+      LOGGER.info("Adaptive server routing stats metric export enabled with interval {}ms.", intervalMs);
+    }
   }
 
   public boolean isEnabled() {
@@ -134,6 +154,29 @@ public class ServerRoutingStatsManager {
     return tpe.getCompletedTaskCount();
   }
 
+  private ConcurrentHashMap<String, ServerRoutingStatsEntry> getStatsMap(QueryType queryType) {
+    switch (queryType) {
+      case SSE:
+        return _serverQueryStatsMap;
+      case MSE:
+        return _mseServerQueryStatsMap;
+      default:
+        LOGGER.warn("Unsupported query type for adaptive server routing: {}; defaulting to SSE stats map", queryType);
+        return _serverQueryStatsMap;
+    }
+  }
+
+  /// Callers are expected to run on a thread with a {@link QueryThreadContext} set.
+  /// If absent, defaults to the SSE stats map with a warning.
+  private ConcurrentHashMap<String, ServerRoutingStatsEntry> getStatsMap() {
+    QueryThreadContext qtc = QueryThreadContext.getIfAvailable();
+    if (qtc == null) {
+      LOGGER.warn("QueryThreadContext is null; defaulting to SSE stats map");
+      return getStatsMap(QueryType.SSE);
+    }
+    return getStatsMap(qtc.getExecutionContext().getQueryType());
+  }
+
   /**
    * Called just before submitting a query to a server. Updates stats corresponding to query submission.
    */
@@ -142,20 +185,22 @@ public class ServerRoutingStatsManager {
       return;
     }
 
+    ConcurrentHashMap<String, ServerRoutingStatsEntry> statsMap = getStatsMap();
     _executorService.execute(() -> {
       try {
         recordQueueSizeMetrics();
-        updateStatsAfterQuerySubmission(serverInstanceId);
+        updateStatsAfterQuerySubmission(serverInstanceId, statsMap);
       } catch (Exception e) {
         LOGGER.error("Exception caught while updating stats. requestId={}, exception={}", requestId, e);
       }
     });
   }
 
-  private void updateStatsAfterQuerySubmission(String serverInstanceId) {
-    ServerRoutingStatsEntry stats = _serverQueryStatsMap.computeIfAbsent(serverInstanceId,
+  private void updateStatsAfterQuerySubmission(String serverInstanceId,
+      ConcurrentHashMap<String, ServerRoutingStatsEntry> statsMap) {
+    ServerRoutingStatsEntry stats = statsMap.computeIfAbsent(serverInstanceId,
         k -> new ServerRoutingStatsEntry(serverInstanceId, _alpha, _autoDecayWindowMs, _warmupDurationMs,
-            _avgInitializationVal, _hybridScoreExponent, _periodicTaskExecutor));
+            _avgInitializationVal, _hybridScoreExponent, _hybridScoreQueueFloor, _periodicTaskExecutor));
 
     try {
       stats.getServerWriteLock().lock();
@@ -173,19 +218,21 @@ public class ServerRoutingStatsManager {
       return;
     }
 
+    ConcurrentHashMap<String, ServerRoutingStatsEntry> statsMap = getStatsMap();
     _executorService.execute(() -> {
       try {
-        updateStatsUponResponseArrival(serverInstanceId, latency);
+        updateStatsUponResponseArrival(serverInstanceId, latency, statsMap);
       } catch (Exception e) {
         LOGGER.error("Exception caught while updating stats. requestId={}, exception={}", requestId, e);
       }
     });
   }
 
-  private void updateStatsUponResponseArrival(String serverInstanceId, long latencyMs) {
-    ServerRoutingStatsEntry stats = _serverQueryStatsMap.computeIfAbsent(serverInstanceId,
+  private void updateStatsUponResponseArrival(String serverInstanceId, long latencyMs,
+      ConcurrentHashMap<String, ServerRoutingStatsEntry> statsMap) {
+    ServerRoutingStatsEntry stats = statsMap.computeIfAbsent(serverInstanceId,
         k -> new ServerRoutingStatsEntry(serverInstanceId, _alpha, _autoDecayWindowMs, _warmupDurationMs,
-            _avgInitializationVal, _hybridScoreExponent, _periodicTaskExecutor));
+            _avgInitializationVal, _hybridScoreExponent, _hybridScoreQueueFloor, _periodicTaskExecutor));
 
     try {
       stats.getServerWriteLock().lock();
@@ -202,10 +249,18 @@ public class ServerRoutingStatsManager {
     return _serverQueryStatsMap;
   }
 
+  public Map<String, ServerRoutingStatsEntry> getServerRoutingStats(QueryType queryType) {
+    return getStatsMap(queryType);
+  }
+
   /**
    * Returns ServerRoutingStatsStr for debugging/logging.
    */
   public String getServerRoutingStatsStr() {
+    return getServerRoutingStatsStr(QueryType.SSE);
+  }
+
+  public String getServerRoutingStatsStr(QueryType queryType) {
     if (!_isEnabled) {
       return "";
     }
@@ -213,7 +268,7 @@ public class ServerRoutingStatsManager {
     StringBuilder stringBuilder =
         new StringBuilder("(Server=NumInFlightRequests,NumInFlightRequestsEMA,LatencyEMA," + "Score)");
 
-    for (Map.Entry<String, ServerRoutingStatsEntry> entry : _serverQueryStatsMap.entrySet()) {
+    for (Map.Entry<String, ServerRoutingStatsEntry> entry : getStatsMap(queryType).entrySet()) {
       String server = entry.getKey();
       Preconditions.checkState(entry.getValue() != null, "Server stats is null");
       ServerRoutingStatsEntry stats = entry.getValue();
@@ -259,7 +314,7 @@ public class ServerRoutingStatsManager {
       return response;
     }
 
-    for (Map.Entry<String, ServerRoutingStatsEntry> entry : _serverQueryStatsMap.entrySet()) {
+    for (Map.Entry<String, ServerRoutingStatsEntry> entry : getStatsMap().entrySet()) {
       String server = entry.getKey();
       Preconditions.checkState(entry.getValue() != null, "Server stats is null");
       ServerRoutingStatsEntry stats = entry.getValue();
@@ -282,7 +337,7 @@ public class ServerRoutingStatsManager {
       return null;
     }
 
-    ServerRoutingStatsEntry stats = _serverQueryStatsMap.get(server);
+    ServerRoutingStatsEntry stats = getStatsMap().get(server);
     if (stats == null) {
       return null;
     }
@@ -304,7 +359,7 @@ public class ServerRoutingStatsManager {
       return response;
     }
 
-    for (Map.Entry<String, ServerRoutingStatsEntry> entry : _serverQueryStatsMap.entrySet()) {
+    for (Map.Entry<String, ServerRoutingStatsEntry> entry : getStatsMap().entrySet()) {
       String server = entry.getKey();
       Preconditions.checkState(entry.getValue() != null, "Server stats is null");
       ServerRoutingStatsEntry stats = entry.getValue();
@@ -327,7 +382,7 @@ public class ServerRoutingStatsManager {
       return null;
     }
 
-    ServerRoutingStatsEntry stats = _serverQueryStatsMap.get(server);
+    ServerRoutingStatsEntry stats = getStatsMap().get(server);
     if (stats == null) {
       return null;
     }
@@ -350,7 +405,7 @@ public class ServerRoutingStatsManager {
       return response;
     }
 
-    for (Map.Entry<String, ServerRoutingStatsEntry> entry : _serverQueryStatsMap.entrySet()) {
+    for (Map.Entry<String, ServerRoutingStatsEntry> entry : getStatsMap().entrySet()) {
       String server = entry.getKey();
       Preconditions.checkState(entry.getValue() != null, "Server stats is null");
       ServerRoutingStatsEntry stats = entry.getValue();
@@ -373,7 +428,7 @@ public class ServerRoutingStatsManager {
       return null;
     }
 
-    ServerRoutingStatsEntry stats = _serverQueryStatsMap.get(server);
+    ServerRoutingStatsEntry stats = getStatsMap().get(server);
     if (stats == null) {
       return null;
     }
@@ -389,5 +444,52 @@ public class ServerRoutingStatsManager {
   private void recordQueueSizeMetrics() {
     int queueSize = getQueueSize();
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ROUTING_STATS_MANAGER_QUEUE_SIZE, queueSize);
+  }
+
+  private void exportStatsAsMetrics() {
+    try {
+      exportStatsForMap(_serverQueryStatsMap, "server.",
+          BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS,
+          BrokerGauge.ADAPTIVE_SERVER_LATENCY_EMA,
+          BrokerGauge.ADAPTIVE_SERVER_HYBRID_SCORE);
+      // TODO: Export MSE latency stats once we support it
+      exportStatsForMap(_mseServerQueryStatsMap, "server.",
+          BrokerGauge.ADAPTIVE_SERVER_MSE_NUM_IN_FLIGHT_REQUESTS,
+          null,
+          null);
+    } catch (Exception e) {
+      LOGGER.error("Exception caught while exporting routing stats as metrics.", e);
+    }
+  }
+
+  private void exportStatsForMap(ConcurrentHashMap<String, ServerRoutingStatsEntry> statsMap, String tagPrefix,
+      BrokerGauge numInFlightGauge, @Nullable BrokerGauge latencyEmaGauge,
+      @Nullable BrokerGauge hybridScoreGauge) {
+    for (Map.Entry<String, ServerRoutingStatsEntry> entry : statsMap.entrySet()) {
+      String serverInstanceId = entry.getKey();
+      ServerRoutingStatsEntry stats = entry.getValue();
+
+      int numInFlightRequests;
+      double latencyEma;
+      double hybridScore;
+
+      stats.getServerReadLock().lock();
+      try {
+        numInFlightRequests = stats.getNumInFlightRequests();
+        latencyEma = stats.getLatencyEMA();
+        hybridScore = stats.computeHybridScore();
+      } finally {
+        stats.getServerReadLock().unlock();
+      }
+
+      String tag = tagPrefix + serverInstanceId;
+      _brokerMetrics.setValueOfGlobalGauge(numInFlightGauge, tag, numInFlightRequests);
+      if (latencyEmaGauge != null) {
+        _brokerMetrics.setValueOfGlobalGauge(latencyEmaGauge, tag, (long) latencyEma);
+      }
+      if (hybridScoreGauge != null) {
+        _brokerMetrics.setValueOfGlobalGauge(hybridScoreGauge, tag, (long) hybridScore);
+      }
+    }
   }
 }

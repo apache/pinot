@@ -65,7 +65,9 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.exception.ConfigValidationException;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,8 +121,8 @@ public class PinotInstanceRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all live instances")
   @ApiResponses(value = {
-          @ApiResponse(code = 200, message = "Success"),
-          @ApiResponse(code = 500, message = "Internal error")
+    @ApiResponse(code = 200, message = "Success"),
+    @ApiResponse(code = 500, message = "Internal error")
   })
   public Instances getAllLiveInstances() {
     return new Instances(_pinotHelixResourceManager.getAllLiveInstances());
@@ -159,7 +161,11 @@ public class PinotInstanceRestletResource {
     if ("true".equalsIgnoreCase(queriesDisabled)) {
       response.put(CommonConstants.Helix.QUERIES_DISABLED, "true");
     }
-    response.put("systemResourceInfo", JsonUtils.objectToJsonNode(getSystemResourceInfo(instanceConfig)));
+    // Add shutdown in progress status
+    boolean shutdownInProgress = instanceConfig.getRecord().getBooleanField(
+        CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+    response.put(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, shutdownInProgress);
+    response.set("systemResourceInfo", JsonUtils.objectToJsonNode(getSystemResourceInfo(instanceConfig)));
     return response.toString();
   }
 
@@ -241,6 +247,8 @@ public class PinotInstanceRestletResource {
       return new SuccessResponse(response.getMessage());
     } catch (ClientErrorException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+    } catch (ConfigValidationException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to create instance: " + instanceId,
           Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -252,7 +260,12 @@ public class PinotInstanceRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Enable/disable an instance", notes = "Enable/disable an instance")
+  @ApiOperation(value = "Enable/disable/drain an instance or toggle query routing", notes =
+      "Enable/disable/drain an instance. "
+          + "DRAIN state is only applicable to minion instances and retags them from minion_untagged to "
+          + "minion_drained, preventing new task assignments while allowing existing tasks to complete. "
+          + "QUERIES_DISABLE / QUERIES_ENABLE are only applicable to server instances and control whether "
+          + "brokers route queries to the server.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 400, message = "Bad Request"),
@@ -260,9 +273,11 @@ public class PinotInstanceRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   public SuccessResponse toggleInstanceState(
-      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000 "
+          + "| Minion_hostname_9514")
       @PathParam("instanceName") String instanceName,
-      @ApiParam(value = "enable|disable", required = true) @QueryParam("state") String state) {
+      @ApiParam(value = "enable|disable|drain|queries_disable|queries_enable", required = true)
+      @QueryParam("state") String state) {
     if (!_pinotHelixResourceManager.instanceExists(instanceName)) {
       throw new ControllerApplicationException(LOGGER, "Instance '" + instanceName + "' does not exist",
           Response.Status.NOT_FOUND);
@@ -282,6 +297,40 @@ public class PinotInstanceRestletResource {
             "Failed to disable instance '" + instanceName + "': " + response.getMessage(),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
+    } else if (StateType.DRAIN.name().equalsIgnoreCase(state)) {
+      if (!InstanceTypeUtils.isMinion(instanceName)) {
+        throw new ControllerApplicationException(LOGGER,
+            "DRAIN state only applies to minion instances. Instance '" + instanceName + "' is not a minion.",
+            Response.Status.BAD_REQUEST);
+      }
+      PinotResourceManagerResponse response = _pinotHelixResourceManager.drainMinionInstance(instanceName);
+      if (!response.isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to drain minion instance '" + instanceName + "': " + response.getMessage(),
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
+    } else if (StateType.QUERIES_DISABLE.name().equalsIgnoreCase(state)
+        || StateType.QUERIES_ENABLE.name().equalsIgnoreCase(state)) {
+      // QUERIES_DISABLE / QUERIES_ENABLE only toggle the broker routing flag for a server instance.
+      // They do NOT change the participant's lifecycle (HELIX_ENABLED) -- the instance stays online
+      // and continues to serve queries that are already routed to it; the broker simply stops
+      // sending new queries.
+      if (!InstanceTypeUtils.isServer(instanceName)) {
+        throw new ControllerApplicationException(LOGGER,
+            "QUERIES_DISABLE/QUERIES_ENABLE only applies to server instances. Instance '" + instanceName
+                + "' is not a server.", Response.Status.BAD_REQUEST);
+      }
+      boolean disable = StateType.QUERIES_DISABLE.name().equalsIgnoreCase(state);
+      try {
+        _pinotHelixResourceManager.setQueriesDisabled(instanceName, disable);
+      } catch (IllegalArgumentException e) {
+        // Defensive: setQueriesDisabled's own Preconditions check throws IllegalArgumentException.
+        // The InstanceTypeUtils.isServer check above already filters this case, but if the underlying
+        // contract changes, surface a 400 rather than a 500.
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
+      }
+      return new SuccessResponse(
+          (disable ? "Disabled" : "Enabled") + " query routing for server instance '" + instanceName + "'");
     } else {
       throw new ControllerApplicationException(LOGGER, "Unknown state '" + state + "'", Response.Status.BAD_REQUEST);
     }
@@ -396,6 +445,8 @@ public class PinotInstanceRestletResource {
       return new SuccessResponse(response.getMessage());
     } catch (ClientErrorException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+    } catch (ConfigValidationException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to update instance: " + instanceName,
           Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -433,6 +484,8 @@ public class PinotInstanceRestletResource {
       return new SuccessResponse(response.getMessage());
     } catch (ClientErrorException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+    } catch (ConfigValidationException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to update instance: %s with tags: %s", instanceName, tags),

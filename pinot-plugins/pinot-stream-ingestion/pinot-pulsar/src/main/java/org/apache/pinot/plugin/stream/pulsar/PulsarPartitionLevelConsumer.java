@@ -29,6 +29,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Reader;
+import org.apache.pulsar.common.naming.TopicName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,8 +47,8 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     super(clientId, streamConfig);
     String topicName = _config.getPulsarTopicName();
     try {
-      List<String> partitions = _pulsarClient.getPartitionsForTopic(topicName).get();
-      _reader = _pulsarClient.newReader().topic(partitions.get(partition)).startMessageId(MessageId.earliest)
+      String partitionName = TopicName.getTopicPartitionNameString(topicName, partition);
+      _reader = _pulsarClient.newReader().topic(partitionName).startMessageId(MessageId.earliest)
           .startMessageIdInclusive().create();
     } catch (Exception e) {
       throw new RuntimeException(

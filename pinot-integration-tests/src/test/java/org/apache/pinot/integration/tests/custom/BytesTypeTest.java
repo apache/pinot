@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.function.scalar.DataTypeConversionFunctions;
 import org.apache.pinot.common.function.scalar.StringFunctions;
@@ -38,9 +37,8 @@ import org.testng.annotations.Test;
 
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
-
-  protected static final String DEFAULT_TABLE_NAME = "BytesTypeTest";
-  private static final String FIXED_HEX_STRIING_VALUE = "968a3c6a5eeb42168bae0e895034a26f";
+  private static final String DEFAULT_TABLE_NAME = "BytesTypeTest";
+  private static final String FIXED_HEX_STRING_VALUE = "968a3c6a5eeb42168bae0e895034a26f";
 
   private static final int NUM_TOTAL_DOCS = 1000;
   private static final String HEX_STR = "hexStr";
@@ -124,9 +122,8 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
 
     ));
 
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_TOTAL_DOCS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
         byte[] bytes = newRandomBytes(RANDOM.nextInt(100) * 2 + 2);
@@ -148,12 +145,12 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
         byte[] randomBytes = newRandomBytes();
         record.put(RANDOM_STR, new String(randomBytes));
         record.put(RANDOM_BYTES, ByteBuffer.wrap(randomBytes));
-        record.put(FIXED_STRING, FIXED_HEX_STRIING_VALUE);
-        record.put(FIXED_BYTES, ByteBuffer.wrap(DataTypeConversionFunctions.hexToBytes(FIXED_HEX_STRIING_VALUE)));
-        fileWriter.append(record);
+        record.put(FIXED_STRING, FIXED_HEX_STRING_VALUE);
+        record.put(FIXED_BYTES, ByteBuffer.wrap(DataTypeConversionFunctions.hexToBytes(FIXED_HEX_STRING_VALUE)));
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   private static String newRandomBase64String() {
@@ -283,7 +280,7 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
 
     // String predicate
     String query =
-        String.format("Select count(*) from %s WHERE %s = '%s'", getTableName(), FIXED_STRING, FIXED_HEX_STRIING_VALUE);
+        String.format("Select count(*) from %s WHERE %s = '%s'", getTableName(), FIXED_STRING, FIXED_HEX_STRING_VALUE);
     JsonNode pinotResponse = postQuery(query);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
@@ -293,7 +290,7 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Bytes predicate, convert literal string to bytes
     query =
         String.format("Select count(*) from %s WHERE %s = hexToBytes('%s')", getTableName(), FIXED_BYTES,
-            FIXED_HEX_STRIING_VALUE);
+            FIXED_HEX_STRING_VALUE);
     pinotResponse = postQuery(query);
     rows = pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
@@ -303,7 +300,7 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Bytes predicate, convert column to hex string to compare with a literal string
     query =
         String.format("Select count(*) from %s WHERE bytesToHex(%s) = '%s'", getTableName(), FIXED_BYTES,
-            FIXED_HEX_STRIING_VALUE);
+            FIXED_HEX_STRING_VALUE);
     pinotResponse = postQuery(query);
     rows = pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {

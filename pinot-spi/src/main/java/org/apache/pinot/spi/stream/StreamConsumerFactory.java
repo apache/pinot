@@ -54,6 +54,10 @@ public abstract class StreamConsumerFactory {
    */
   public abstract StreamMetadataProvider createStreamMetadataProvider(String clientId);
 
+  public StreamMetadataProvider createStreamMetadataProvider(String clientId, boolean concurrentAccessExpected) {
+    return createStreamMetadataProvider(clientId);
+  }
+
   public StreamPartitionMsgOffsetFactory createStreamMsgOffsetFactory() {
     return new LongMsgOffsetFactory();
   }

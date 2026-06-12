@@ -20,16 +20,23 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
+import org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator;
+import org.apache.pinot.core.operator.query.JsonIndexDistinctOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
+import org.apache.pinot.spi.config.table.FieldConfig;
 
 
 /**
@@ -67,6 +74,35 @@ public class DistinctPlanNode implements PlanNode {
           NullValueVectorReader nullValueReader = dataSource.getNullValueVector();
           if (nullValueReader == null || nullValueReader.getNullBitmap().isEmpty()) {
             return new DictionaryBasedDistinctOperator(dataSource, _queryContext);
+          }
+        }
+      }
+    }
+
+    // Use index-based distinct operators when opted in via query option
+    if (expressions.size() == 1 && QueryOptionsUtils.isUseIndexBasedDistinctOperator(_queryContext.getQueryOptions())) {
+      ExpressionContext expr = expressions.get(0);
+
+      // JSON index path
+      if (JsonIndexDistinctOperator.canUseJsonIndexDistinct(expr)) {
+        BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
+        return new JsonIndexDistinctOperator(_indexSegment, _queryContext, filterOperator);
+      }
+
+      // Inverted/sorted index path. For unsorted dictionaries the operator still avoids the scan/projection path,
+      // but ORDER BY pruning is disabled and ordering is maintained with the typed distinct table instead.
+      String column = expr.getIdentifier();
+      if (column != null) {
+        DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
+        InvertedIndexReader<?> invertedIndexReader = dataSource.getInvertedIndex();
+        if (dataSource.getDictionary() != null && invertedIndexReader != null) {
+          FieldConfig.IndexType indexType =
+              invertedIndexReader instanceof SortedIndexReader ? FieldConfig.IndexType.SORTED
+                  : FieldConfig.IndexType.INVERTED;
+          if (_queryContext.isIndexUseAllowed(column, indexType)) {
+            BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
+            return new InvertedIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator,
+                dataSource);
           }
         }
       }

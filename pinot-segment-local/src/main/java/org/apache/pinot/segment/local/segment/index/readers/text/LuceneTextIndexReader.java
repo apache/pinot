@@ -54,7 +54,6 @@ import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -131,8 +130,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
    */
   public LuceneTextIndexReader(String column, File indexDir, int numDocs,
       @Nullable Map<String, String> textIndexProperties) {
-    this(column, indexDir, numDocs,
-        new TextIndexConfigBuilder(FSTType.LUCENE).withProperties(textIndexProperties).build());
+    this(column, indexDir, numDocs, new TextIndexConfigBuilder().withProperties(textIndexProperties).build());
   }
 
   /**
@@ -177,7 +175,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
       }
       PinotDataBuffer docIdMappingBuffer = LuceneTextIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
       // Initialize docId translator
+      long startTime = System.currentTimeMillis();
       _docIdTranslator = createDocIdTranslator(docIdMappingBuffer, config, numDocs);
+      LOGGER.info("Time taken to create docIdTranslator for column {}: {} ms", column,
+          System.currentTimeMillis() - startTime);
       // Initialize analyzer and query parser
       _analyzer = TextIndexUtils.getAnalyzer(config);
       _queryParserClass = config.getLuceneQueryParserClass();
@@ -446,9 +447,15 @@ public class LuceneTextIndexReader implements TextIndexReader {
     }
 
     if (docIdMappingBuffer != null) {
-      return new DefaultDocIdTranslator(docIdMappingBuffer);
+      // Ensure the buffer is in little endian format as expected by DefaultDocIdTranslator
+      // Create a view with little endian byte order if the buffer is not already in little endian
+      PinotDataBuffer littleEndianBuffer = docIdMappingBuffer.order() == ByteOrder.LITTLE_ENDIAN
+          ? docIdMappingBuffer
+          : docIdMappingBuffer.view(0, docIdMappingBuffer.size(), ByteOrder.LITTLE_ENDIAN);
+      return new DefaultDocIdTranslator(littleEndianBuffer);
     }
 
+    LOGGER.info("building doc id mapping for text index column: {}", _column);
     // Create a new buffer and populate it
     int length = Integer.BYTES * numDocs;
     String desc = "Text index docId mapping buffer: " + _column;

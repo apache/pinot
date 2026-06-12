@@ -106,7 +106,7 @@ public class SegmentGenerationWithMultipleRecordsTest {
   private GenericRow getRandomArrayElement() {
     GenericRow element = new GenericRow();
     Random random = new Random();
-    element.putValue(SUB_COLUMN_1, RandomStringUtils.randomAlphabetic(4));
+    element.putValue(SUB_COLUMN_1, RandomStringUtils.secure().nextAlphabetic(4));
     element.putValue(SUB_COLUMN_2, random.nextLong());
     return element;
   }

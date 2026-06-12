@@ -18,21 +18,23 @@
  */
 package org.apache.pinot.server.predownload;
 
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -215,25 +217,31 @@ public class PredownloadSchedulerTest {
     _predownloadScheduler.getSegmentsInfo();
   }
 
-  public void loadSegmentsFromLocal() {
-    // Only segment 3 will be loaded
-    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
-    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
-    when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segmentDirectory.getDiskSizeBytes()).thenReturn(DISK_SIZE_BYTES);
-    when(segmentMetadata.getCrc()).thenReturn(String.valueOf(CRC));
+  public void loadSegmentsFromLocal()
+      throws Exception {
+    // Only segment 3 will be loaded — create a real creation.meta with matching CRC
+    File seg3Dir = Files.createTempDirectory("predownload-seg3-").toFile();
+    File creationMeta = new File(seg3Dir, "creation.meta");
+    try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(creationMeta))) {
+      dos.writeLong(CRC);
+      dos.writeLong(0L);
+    }
     when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(2)))).thenAnswer(
         invocation -> {
-          _predownloadSegmentInfoList.get(2).updateSegmentInfoFromLocal(segmentDirectory);
+          _predownloadSegmentInfoList.get(2).updateSegmentInfoFromLocal(seg3Dir);
           return true;
         });
     when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(0)))).thenReturn(false);
     when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(1)))).thenReturn(false);
 
-    _predownloadScheduler.loadSegmentsFromLocal();
-    assertEquals(_predownloadScheduler._failedSegments.size(), 1);
-    assertEquals(_predownloadScheduler._failedSegments.iterator().next(),
-        _predownloadSegmentInfoList.get(0).getSegmentName());
+    try {
+      _predownloadScheduler.loadSegmentsFromLocal();
+      assertEquals(_predownloadScheduler._failedSegments.size(), 1);
+      assertEquals(_predownloadScheduler._failedSegments.iterator().next(),
+          _predownloadSegmentInfoList.get(0).getSegmentName());
+    } finally {
+      FileUtils.deleteQuietly(seg3Dir);
+    }
   }
 
   public void downloadSegments()
@@ -270,6 +278,7 @@ public class PredownloadSchedulerTest {
             if (!untaredFile.exists() && !untaredFile.mkdirs()) {
               throw new IOException("Failed to create directory: " + untaredFile.getAbsolutePath());
             }
+            FileUtils.writeByteArrayToFile(new File(untaredFile, "dummy.idx"), new byte[]{1, 2, 3, 4, 5});
             return untaredFile;
           });
       try (MockedStatic<TarCompressionUtils> tarCompressionUtilsMockedStatic = mockStatic(TarCompressionUtils.class)) {
@@ -279,6 +288,7 @@ public class PredownloadSchedulerTest {
               if (!untaredFile.exists() && !untaredFile.mkdirs()) {
                 throw new IOException("Failed to create directory: " + untaredFile.getAbsolutePath());
               }
+              FileUtils.writeByteArrayToFile(new File(untaredFile, "dummy.idx"), new byte[]{1, 2, 3, 4, 5});
               return List.of(untaredFile);
             });
 
@@ -286,5 +296,63 @@ public class PredownloadSchedulerTest {
         assertEquals(reason, PredownloadCompletionReason.ALL_SEGMENTS_DOWNLOADED);
       }
     }
+  }
+
+  @Test
+  public void testPredownloadParallelismConfiguration() throws Exception {
+    // Test default parallelism (should use numProcessors * 3)
+    Map<String, Object> defaultProps = Map.of(
+        "pinot.server.instance.id", INSTANCE_ID,
+        "pinot.server.instance.dataDir", INSTANCE_DATA_DIR,
+        "pinot.server.instance.readMode", READ_MODE,
+        "pinot.cluster.name", CLUSTER_NAME,
+        "pinot.zk.server", ZK_ADDRESS
+    );
+    PropertiesConfiguration defaultConfig = new PropertiesConfiguration();
+    defaultProps.forEach((key, value) -> defaultConfig.setProperty(key, value));
+
+    PredownloadScheduler defaultScheduler = new PredownloadScheduler(defaultConfig);
+    ThreadPoolExecutor defaultExecutor = (ThreadPoolExecutor) defaultScheduler._executor;
+    int expectedDefaultThreads = Runtime.getRuntime().availableProcessors() * 3;
+    assertEquals(defaultExecutor.getCorePoolSize(), expectedDefaultThreads,
+        "Default parallelism should be numProcessors * 3");
+    defaultScheduler.stop();
+
+    // Test custom parallelism
+    int customParallelism = 10;
+    Map<String, Object> customProps = Map.of(
+        "pinot.server.instance.id", INSTANCE_ID,
+        "pinot.server.instance.dataDir", INSTANCE_DATA_DIR,
+        "pinot.server.instance.readMode", READ_MODE,
+        "pinot.cluster.name", CLUSTER_NAME,
+        "pinot.zk.server", ZK_ADDRESS,
+        "pinot.server.predownload.parallelism", String.valueOf(customParallelism)
+    );
+    PropertiesConfiguration customConfig = new PropertiesConfiguration();
+    customProps.forEach((key, value) -> customConfig.setProperty(key, value));
+
+    PredownloadScheduler customScheduler = new PredownloadScheduler(customConfig);
+    ThreadPoolExecutor customExecutor = (ThreadPoolExecutor) customScheduler._executor;
+    assertEquals(customExecutor.getCorePoolSize(), customParallelism,
+        "Custom parallelism should match configured value");
+    customScheduler.stop();
+
+    // Test zero/negative parallelism (should fall back to default)
+    Map<String, Object> zeroProps = Map.of(
+        "pinot.server.instance.id", INSTANCE_ID,
+        "pinot.server.instance.dataDir", INSTANCE_DATA_DIR,
+        "pinot.server.instance.readMode", READ_MODE,
+        "pinot.cluster.name", CLUSTER_NAME,
+        "pinot.zk.server", ZK_ADDRESS,
+        "pinot.server.predownload.parallelism", "0"
+    );
+    PropertiesConfiguration zeroConfig = new PropertiesConfiguration();
+    zeroProps.forEach((key, value) -> zeroConfig.setProperty(key, value));
+
+    PredownloadScheduler zeroScheduler = new PredownloadScheduler(zeroConfig);
+    ThreadPoolExecutor zeroExecutor = (ThreadPoolExecutor) zeroScheduler._executor;
+    assertEquals(zeroExecutor.getCorePoolSize(), expectedDefaultThreads,
+        "Zero parallelism should fall back to default");
+    zeroScheduler.stop();
   }
 }

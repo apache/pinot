@@ -30,6 +30,7 @@ import org.codehaus.jettison.json.JSONException;
 
 
 public class TPCHQueryGeneratorV2 {
+  private static final Random RANDOM = new Random();
   private static final Map<String, Table> TABLES_MAP = new HashMap<>();
   private static final List<String> TABLE_NAMES =
       List.of("nation", "region", "supplier", "customer", "part", "partsupp", "orders", "lineitem");
@@ -48,8 +49,7 @@ public class TPCHQueryGeneratorV2 {
   }
 
   private static Table getRandomTable() {
-    Random random = new Random();
-    int index = random.nextInt(TABLES_MAP.size());
+    int index = RANDOM.nextInt(TABLES_MAP.size());
     return TABLES_MAP.get(TABLE_NAMES.get(index));
   }
 
@@ -138,12 +138,11 @@ public class TPCHQueryGeneratorV2 {
   }
 
   private List<String> getRandomProjections(Table t1) {
-    Random random = new Random();
-    int numColumns = random.nextInt(t1.getColumns().size()) + 1;
+    int numColumns = RANDOM.nextInt(t1.getColumns().size()) + 1;
     List<String> selectedColumns = new ArrayList<>();
 
     while (selectedColumns.size() < numColumns) {
-      String columnName = t1.getColumns().get(random.nextInt(t1.getColumns().size())).getColumnName();
+      String columnName = t1.getColumns().get(RANDOM.nextInt(t1.getColumns().size())).getColumnName();
       if (!selectedColumns.contains(columnName)) {
         selectedColumns.add(columnName);
       }
@@ -155,12 +154,11 @@ public class TPCHQueryGeneratorV2 {
   private String generateInnerQueryForPredicate(Table t1, Column c) {
     QuerySkeleton innerQuery = new QuerySkeleton();
 
-    Random random = new Random();
     List<String> predicates = new ArrayList<>();
     innerQuery.addTable(t1.getTableName());
     // Limit to maximum of 1 join
-    if (random.nextBoolean()) {
-      RelatedTable relatedTable = t1.getRelatedTables().get(random.nextInt(t1.getRelatedTables().size()));
+    if (RANDOM.nextBoolean()) {
+      RelatedTable relatedTable = t1.getRelatedTables().get(RANDOM.nextInt(t1.getRelatedTables().size()));
       if (relatedTable != null) {
         innerQuery.addTable(relatedTable.getForeignTableName());
         predicates.add(relatedTable.getLocalTableKey() + "=" + relatedTable.getForeignTableKey());
@@ -169,7 +167,7 @@ public class TPCHQueryGeneratorV2 {
         predicates.addAll(inp);
       }
     }
-    String aggregation = c.getColumnType()._aggregations.get(random.nextInt(c.getColumnType()._aggregations.size()));
+    String aggregation = c.getColumnType()._aggregations.get(RANDOM.nextInt(c.getColumnType()._aggregations.size()));
     innerQuery.addProjection(aggregation + "(" + c.getColumnName() + ")");
 
     List<String> inp = getRandomPredicates(t1, false);
@@ -181,8 +179,7 @@ public class TPCHQueryGeneratorV2 {
   }
 
   private String getRandomValueForPredicate(Table t1, Column c, boolean useNextedQueries) {
-    Random random = new Random();
-    if (random.nextBoolean() && useNextedQueries && c.getColumnType()._aggregations.size() > 0) {
+    if (RANDOM.nextBoolean() && useNextedQueries && c.getColumnType()._aggregations.size() > 0) {
       // Use nested query for predicate
       String nestedQueries = generateInnerQueryForPredicate(t1, c);
       return "(" + nestedQueries + ")";
@@ -196,15 +193,14 @@ public class TPCHQueryGeneratorV2 {
   }
 
   private List<String> getRandomPredicates(Table t1, boolean useNestedQueries) {
-    Random random = new Random();
-    int predicateCount = random.nextInt(5) + 1;
+    int predicateCount = RANDOM.nextInt(5) + 1;
     List<String> predicates = new ArrayList<>();
     List<String> results = new ArrayList<>();
     while (predicates.size() < predicateCount) {
-      Column column = t1.getColumns().get(random.nextInt(t1.getColumns().size()));
+      Column column = t1.getColumns().get(RANDOM.nextInt(t1.getColumns().size()));
       predicates.add(column.getColumnName());
       ColumnType columnType = column.getColumnType();
-      String operator = columnType._operators.get(random.nextInt(columnType._operators.size()));
+      String operator = columnType._operators.get(RANDOM.nextInt(columnType._operators.size()));
       String value = getRandomValueForPredicate(t1, column, useNestedQueries);
       String predicateBuilder = column.getColumnName() + " " + operator + " " + value + " ";
       results.add(predicateBuilder);
@@ -218,17 +214,16 @@ public class TPCHQueryGeneratorV2 {
   }
 
   private List<String> getRandomOrderBys(Table t1) {
-    Random random = new Random();
-    int orderByCount = random.nextInt(2) + 1;
+    int orderByCount = RANDOM.nextInt(2) + 1;
     List<String> orderBys = new ArrayList<>();
     List<String> results = new ArrayList<>();
     while (orderBys.size() < orderByCount) {
-      Column column = t1.getColumns().get(random.nextInt(t1.getColumns().size()));
+      Column column = t1.getColumns().get(RANDOM.nextInt(t1.getColumns().size()));
       orderBys.add(column.getColumnName());
       String name = column.getColumnName();
       StringBuilder orderByBuilder = new StringBuilder();
       orderByBuilder.append(name).append(" ");
-      if (random.nextBoolean()) {
+      if (RANDOM.nextBoolean()) {
         orderByBuilder.append(" DESC ");
       }
       results.add(orderByBuilder.toString());
@@ -261,15 +256,14 @@ public class TPCHQueryGeneratorV2 {
     if (groupByCols.size() == 0) {
       return result;
     }
-    Random random = new Random();
     List<String> orderBys = new ArrayList<>();
-    int orderByCount = random.nextInt(groupByCols.size()) + 1;
+    int orderByCount = RANDOM.nextInt(groupByCols.size()) + 1;
     while (orderBys.size() < orderByCount) {
-      String column = groupByCols.get(random.nextInt(groupByCols.size()));
+      String column = groupByCols.get(RANDOM.nextInt(groupByCols.size()));
 
       if (groupByCols.contains(column)) {
         orderBys.add(column);
-        if (random.nextBoolean()) {
+        if (RANDOM.nextBoolean()) {
           result.add(column + " DESC");
         } else {
           result.add(column);
@@ -291,14 +285,13 @@ public class TPCHQueryGeneratorV2 {
       }
     }
 
-    Random random = new Random();
-    RelatedTable rt = t1.getRelatedTables().get(random.nextInt(t1.getRelatedTables().size()));
+    RelatedTable rt = t1.getRelatedTables().get(RANDOM.nextInt(t1.getRelatedTables().size()));
     Table t2 = TABLES_MAP.get(rt.getForeignTableName());
     getRandomProjections(t1).forEach(querySkeleton::addProjection);
     getRandomProjections(t2).forEach(querySkeleton::addProjection);
 
     String t2NameWithJoin =
-        t1.getTableName() + " " + JOIN_TYPES[random.nextInt(JOIN_TYPES.length)] + " " + t2.getTableName() + " ON "
+        t1.getTableName() + " " + JOIN_TYPES[RANDOM.nextInt(JOIN_TYPES.length)] + " " + t2.getTableName() + " ON "
             + rt.getLocalTableKey() + " = " + rt.getForeignTableKey() + " ";
     querySkeleton.addTable(t2NameWithJoin);
 
@@ -318,20 +311,19 @@ public class TPCHQueryGeneratorV2 {
   }
 
   private Pair<List<String>, List<String>> getGroupByAndAggregates(Table t1) {
-    Random random = new Random();
-    int numColumns = random.nextInt(t1.getColumns().size()) + 1;
+    int numColumns = RANDOM.nextInt(t1.getColumns().size()) + 1;
     List<String> selectedColumns = new ArrayList<>();
     List<String> groupByColumns = new ArrayList<>();
     List<String> resultProjections = new ArrayList<>();
 
     while (selectedColumns.size() < numColumns) {
-      Column column = t1.getColumns().get(random.nextInt(t1.getColumns().size()));
+      Column column = t1.getColumns().get(RANDOM.nextInt(t1.getColumns().size()));
       String columnName = column.getColumnName();
       if (!selectedColumns.contains(columnName)) {
-        if (random.nextBoolean() && column.getColumnType()._aggregations.size() > 0) {
+        if (RANDOM.nextBoolean() && column.getColumnType()._aggregations.size() > 0) {
           // Use as aggregation
           String aggregation =
-              column.getColumnType()._aggregations.get(random.nextInt(column.getColumnType()._aggregations.size()));
+              column.getColumnType()._aggregations.get(RANDOM.nextInt(column.getColumnType()._aggregations.size()));
           resultProjections.add(aggregation + "(" + columnName + ")");
         } else {
           // Use as group by
@@ -377,8 +369,7 @@ public class TPCHQueryGeneratorV2 {
       }
     }
 
-    Random random = new Random();
-    RelatedTable rt = t1.getRelatedTables().get(random.nextInt(t1.getRelatedTables().size()));
+    RelatedTable rt = t1.getRelatedTables().get(RANDOM.nextInt(t1.getRelatedTables().size()));
     Table t2 = TABLES_MAP.get(rt.getForeignTableName());
     Pair<List<String>, List<String>> groupByColumns = getGroupByAndAggregates(t1);
     groupByColumns.getLeft().forEach(querySkeleton::addProjection);
@@ -387,7 +378,7 @@ public class TPCHQueryGeneratorV2 {
     groupByColumnsT2.getLeft().forEach(querySkeleton::addProjection);
 
     String tName =
-        t1.getTableName() + "  " + JOIN_TYPES[random.nextInt(JOIN_TYPES.length)] + " " + t2.getTableName() + " ON "
+        t1.getTableName() + "  " + JOIN_TYPES[RANDOM.nextInt(JOIN_TYPES.length)] + " " + t2.getTableName() + " ON "
             + " " + rt.getLocalTableKey() + " = " + " " + rt.getForeignTableKey() + " ";
 
     querySkeleton.addTable(tName);
@@ -415,7 +406,6 @@ public class TPCHQueryGeneratorV2 {
     List<Table> tables = new ArrayList<>();
     Set<String> tableNames = new HashSet<>();
 
-    Random random = new Random();
 
     // Start off with a random table with related tables
     while (true) {
@@ -428,10 +418,10 @@ public class TPCHQueryGeneratorV2 {
     }
 
     // Add more tables
-    while (random.nextInt() % 8 != 0) {
-      int tableToAddIdx = random.nextInt(tables.size());
+    while (RANDOM.nextInt() % 8 != 0) {
+      int tableToAddIdx = RANDOM.nextInt(tables.size());
       RelatedTable relatedTable = tables.get(tableToAddIdx).getRelatedTables()
-          .get(random.nextInt(tables.get(tableToAddIdx).getRelatedTables().size()));
+          .get(RANDOM.nextInt(tables.get(tableToAddIdx).getRelatedTables().size()));
       if (!tableNames.contains(relatedTable.getForeignTableName())) {
         tableNames.add(relatedTable.getForeignTableName());
         tables.add(TPCHQueryGeneratorV2.TABLES_MAP.get(relatedTable.getForeignTableName()));
@@ -475,7 +465,6 @@ public class TPCHQueryGeneratorV2 {
     List<Table> tables = new ArrayList<>();
     Set<String> tableNames = new HashSet<>();
 
-    Random random = new Random();
 
     // Start off with a random table with related tables
     while (true) {
@@ -488,10 +477,10 @@ public class TPCHQueryGeneratorV2 {
     }
 
     // Add more tables
-    while (random.nextInt() % 8 != 0) {
-      int tableToAddIdx = random.nextInt(tables.size());
+    while (RANDOM.nextInt() % 8 != 0) {
+      int tableToAddIdx = RANDOM.nextInt(tables.size());
       RelatedTable relatedTable = tables.get(tableToAddIdx).getRelatedTables()
-          .get(random.nextInt(tables.get(tableToAddIdx).getRelatedTables().size()));
+          .get(RANDOM.nextInt(tables.get(tableToAddIdx).getRelatedTables().size()));
       if (!tableNames.contains(relatedTable.getForeignTableName())) {
         tableNames.add(relatedTable.getForeignTableName());
         tables.add(TPCHQueryGeneratorV2.TABLES_MAP.get(relatedTable.getForeignTableName()));
@@ -529,9 +518,8 @@ public class TPCHQueryGeneratorV2 {
   }
 
   public String generateRandomQuery() {
-    Random random = new Random();
-    int queryType = random.nextInt(6);
-    boolean includePredicates = random.nextBoolean();
+    int queryType = RANDOM.nextInt(6);
+    boolean includePredicates = RANDOM.nextBoolean();
     boolean includeOrderBy = true;
     switch (queryType) {
       case 0:

@@ -24,9 +24,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.metrics.PinotMeter;
+
 
 /**
- * Class containing all the metrics exposed by the Pinot broker.
+ * Class containing all the meters exposed by the Pinot broker.
  * This is implemented as a class rather than an enum to allow for dynamic addition of metrics for all QueryErrorCodes.
  */
 public class BrokerMeter implements AbstractMetrics.Meter {
@@ -34,6 +36,7 @@ public class BrokerMeter implements AbstractMetrics.Meter {
 
   public static final BrokerMeter UNCAUGHT_GET_EXCEPTIONS = create("UNCAUGHT_GET_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter UNCAUGHT_POST_EXCEPTIONS = create("UNCAUGHT_POST_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter BAD_REQUEST_EXCEPTIONS = create("BAD_REQUEST_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter WEB_APPLICATION_EXCEPTIONS = create("WEB_APPLICATION_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter HEALTHCHECK_BAD_CALLS = create("HEALTHCHECK_BAD_CALLS", "healthcheck", true);
   public static final BrokerMeter HEALTHCHECK_OK_CALLS = create("HEALTHCHECK_OK_CALLS", "healthcheck", true);
@@ -116,6 +119,10 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "QUERY_VALIDATION_EXCEPTIONS", "exceptions", false);
   // Query validation phase.
   public static final BrokerMeter UNKNOWN_COLUMN_EXCEPTIONS = create("UNKNOWN_COLUMN_EXCEPTIONS", "exceptions", false);
+  /// Materialized-view rewrite path: strategy bug or contract violation triggered the
+  /// defense-in-depth fallback to the base-table query path.  Non-zero values indicate a
+  /// strategy regression that must be investigated; the query itself still succeeded.
+  public static final BrokerMeter QUERY_REWRITE_EXCEPTIONS = create("QUERY_REWRITE_EXCEPTIONS", "exceptions", false);
   // Queries preempted by accountant
   public static final BrokerMeter QUERIES_KILLED = create("QUERIES_KILLED", "query", true);
   public static final BrokerMeter QUERIES_THROTTLED = create("QUERIES_THROTTLED", "query", true);
@@ -178,6 +185,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
 
   public static final BrokerMeter HELIX_ZOOKEEPER_RECONNECTS = create("HELIX_ZOOKEEPER_RECONNECTS", "reconnects", true);
 
+  public static final BrokerMeter MULTI_CLUSTER_BROKER_STARTUP_FAILURE = create(
+      "MULTI_CLUSTER_BROKER_STARTUP_FAILURE", "failureCount", true);
+
   public static final BrokerMeter REQUEST_DROPPED_DUE_TO_ACCESS_ERROR = create(
       "REQUEST_DROPPED_DUE_TO_ACCESS_ERROR", "requestsDropped", false);
 
@@ -202,6 +212,8 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "NETTY_CONNECTION_BYTES_SENT", "nettyConnection", true);
   public static final BrokerMeter NETTY_CONNECTION_BYTES_RECEIVED = create(
       "NETTY_CONNECTION_BYTES_RECEIVED", "nettyConnection", true);
+  public static final BrokerMeter NETTY_CONNECTION_SEND_REQUEST_FAILURES = create(
+      "NETTY_CONNECTION_SEND_REQUEST_FAILURES", "nettyConnection", true);
 
   public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
       "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);
@@ -232,6 +244,33 @@ public class BrokerMeter implements AbstractMetrics.Meter {
    * query.
    */
   public static final BrokerMeter WINDOW_COUNT = create("WINDOW_COUNT", "queries", true);
+
+  public static final BrokerMeter MSE_STAGES_STARTED = create("MSE_STAGES_STARTED", "stages", true);
+  public static final BrokerMeter MSE_STAGES_COMPLETED = create("MSE_STAGES_COMPLETED", "stages", true);
+  public static final BrokerMeter MSE_OPCHAINS_STARTED = create("MSE_OPCHAINS_STARTED", "opchains", true);
+  public static final BrokerMeter MSE_OPCHAINS_COMPLETED = create("MSE_OPCHAINS_COMPLETED", "opchains", true);
+
+  /**
+   * Number of MSE queries that used the {@code SubmitWithStream} bidi-RPC stats path (stream mode).
+   */
+  public static final BrokerMeter MSE_STREAM_STATS_QUERIES = create("MSE_STREAM_STATS_QUERIES", "queries", true);
+
+  /**
+   * Number of MSE stream-mode queries that returned with incomplete stats coverage (at least one stage had missing or
+   * merge-failed opchain reports). Operators can alert on this counter to detect persistent stats gaps.
+   */
+  public static final BrokerMeter MSE_STREAM_STATS_INCOMPLETE_COVERAGE =
+      create("MSE_STREAM_STATS_INCOMPLETE_COVERAGE", "queries", true);
+
+  /**
+   * Number of non-empty cancel broadcasts sent by stream-mode queries to their peer servers. A broadcast is
+   * triggered by the first peer error or by a broker-side processing exception; a single query can contribute more
+   * than one (e.g. a peer error followed by a recovery-path cancel), so this counts broadcasts rather than affected
+   * queries. At high QPS during a partial degradation this can amplify into a cancel storm, so operators can watch
+   * this counter to detect that condition.
+   */
+  public static final BrokerMeter MSE_STREAM_STATS_CANCEL_FANOUTS =
+      create("MSE_STREAM_STATS_CANCEL_FANOUTS", "broadcasts", true);
 
   /**
    * How many MSE queries have encountered segments with invalid partitions.
@@ -266,6 +305,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter GRPC_TRANSPORT_READY = create("GRPC_TRANSPORT_READY", "grpcTransport", true);
   public static final BrokerMeter GRPC_TRANSPORT_TERMINATED = create(
       "GRPC_TRANSPORT_TERMINATED", "grpcTransport", true);
+  // Workload related metrics
+  public static final BrokerMeter WORKLOAD_QUERIES = create("WORKLOAD_QUERIES", "queries", false);
+  public static final BrokerMeter WORKLOAD_BUDGET_EXCEEDED = create("WORKLOAD_QUERY_EXCEPTIONS", "exceptions", true);
 
   public static final BrokerMeter RLS_FILTERS_APPLIED = create("RLS_FILTERS_APPLIED", "queries", false);
 
@@ -274,6 +316,19 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter AUDIT_RESPONSE_FAILURES = create("AUDIT_RESPONSE_FAILURES", "failures", true);
   public static final BrokerMeter AUDIT_REQUEST_PAYLOAD_TRUNCATED = create("AUDIT_REQUEST_PAYLOAD_TRUNCATED",
       "count", true);
+
+  /**
+   * Total bytes of final query responses sent to clients.
+   * <p>
+   * This metric tracks the serialized JSON response size in bytes for all queries.
+   */
+  public static final BrokerMeter QUERY_RESPONSE_SIZE_BYTES = create("QUERY_RESPONSE_SIZE_BYTES", "bytes", true);
+
+  /**
+   * SLA-style per-query error classification metrics.
+   */
+  public static final BrokerMeter QUERY_CRITICAL_ERROR = create("QUERY_CRITICAL_ERROR", "queries", true);
+  public static final BrokerMeter QUERY_NON_CRITICAL_ERROR = create("QUERY_NON_CRITICAL_ERROR", "queries", true);
 
   private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
 
@@ -330,5 +385,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
 
   public static BrokerMeter getQueryErrorMeter(QueryErrorCode queryErrorCode) {
     return QUERY_ERROR_CODE_METER_MAP.get(queryErrorCode);
+  }
+
+  public PinotMeter getGlobalMeter() {
+    return BrokerMetrics.get().getMeteredValue(this);
   }
 }

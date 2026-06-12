@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.File;
 import java.util.List;
-import java.util.Random;
 import org.apache.pinot.integration.tests.window.utils.WindowFunnelUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
@@ -472,7 +471,7 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
   public void testFunnelMatchStepWithMultiThreadsReduce(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    int numThreadsExtractFinalResult = 2 + new Random().nextInt(10);
+    int numThreadsExtractFinalResult = 2 + RANDOM.nextInt(10);
     LOGGER.info("Running testFunnelMatchStepWithMultiThreadsReduce with numThreadsExtractFinalResult: {}",
         numThreadsExtractFinalResult);
     String query =

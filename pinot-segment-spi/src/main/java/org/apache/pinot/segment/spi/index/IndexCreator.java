@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.index;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 
 
@@ -61,4 +62,99 @@ public interface IndexCreator extends Closeable {
 
   void seal()
       throws IOException;
+
+  /**
+   * Primitive type additions for columnar processing optimization.
+   * These methods avoid boxing overhead when iterating over columnar data.
+   * Default implementation boxes the value for backward compatibility.
+   */
+
+  default void addInt(int value, int dictId)
+      throws IOException {
+    add(value, dictId);
+  }
+
+  default void addLong(long value, int dictId)
+      throws IOException {
+    add(value, dictId);
+  }
+
+  default void addFloat(float value, int dictId)
+      throws IOException {
+    add(value, dictId);
+  }
+
+  default void addDouble(double value, int dictId)
+      throws IOException {
+    add(value, dictId);
+  }
+
+  default void addBigDecimal(BigDecimal value, int dictId)
+      throws IOException {
+    add(value, dictId);
+  }
+
+  default void addString(String value, int dictId)
+      throws IOException {
+    add(value, dictId);
+  }
+
+  default void addBytes(byte[] value, int dictId)
+      throws IOException {
+    add(value, dictId);
+  }
+
+  // The default implementations box the values for backward compatibility.
+  // This is extremely inefficient because the implementations of add(Object[], int[]) method will end up
+  // unboxing them again to write to the index.
+  default void addIntMV(int[] values, @Nullable int[] dictIds)
+      throws IOException {
+    Integer[] boxedValues = new Integer[values.length];
+    for (int i = 0; i < values.length; i++) {
+      boxedValues[i] = values[i];
+    }
+    add(boxedValues, dictIds);
+  }
+
+  default void addLongMV(long[] values, @Nullable int[] dictIds)
+      throws IOException {
+    Long[] boxedValues = new Long[values.length];
+    for (int i = 0; i < values.length; i++) {
+      boxedValues[i] = values[i];
+    }
+    add(boxedValues, dictIds);
+  }
+
+  default void addFloatMV(float[] values, @Nullable int[] dictIds)
+      throws IOException {
+    Float[] boxedValues = new Float[values.length];
+    for (int i = 0; i < values.length; i++) {
+      boxedValues[i] = values[i];
+    }
+    add(boxedValues, dictIds);
+  }
+
+  default void addDoubleMV(double[] values, @Nullable int[] dictIds)
+      throws IOException {
+    Double[] boxedValues = new Double[values.length];
+    for (int i = 0; i < values.length; i++) {
+      boxedValues[i] = values[i];
+    }
+    add(boxedValues, dictIds);
+  }
+
+  default void addBigDecimalMV(BigDecimal[] values, @Nullable int[] dictIds)
+      throws IOException {
+    add(values, dictIds);
+  }
+
+  default void addStringMV(String[] values, @Nullable int[] dictIds)
+      throws IOException {
+    add(values, dictIds);
+  }
+
+  default void addBytesMV(byte[][] values, @Nullable int[] dictIds)
+      throws IOException {
+    add(values, dictIds);
+  }
 }

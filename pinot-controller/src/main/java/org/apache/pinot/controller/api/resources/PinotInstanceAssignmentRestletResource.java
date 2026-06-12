@@ -259,7 +259,7 @@ public class PinotInstanceAssignmentRestletResource {
     if (!InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
       InstancePartitions existingInstancePartitions =
           InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getHelixZkManager().getHelixPropertyStore(),
-              InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+              InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType));
       instancePartitionsMap.put(instancePartitionsType.toString(),
           new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
               existingInstancePartitions));
@@ -269,7 +269,7 @@ public class PinotInstanceAssignmentRestletResource {
         // generation for minimum difference
         InstancePartitions existingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
             _resourceManager.getHelixZkManager().getHelixPropertyStore(),
-            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType));
         String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
         // fetch the pre-configured instance partitions, the renaming part is irrelevant as we are not really
         // preserving this preConfigured, but only using it as a reference to generate the new instance partitions
@@ -313,7 +313,8 @@ public class PinotInstanceAssignmentRestletResource {
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
     try {
       LOGGER.info("Persisting instance partitions: {}", instancePartitions);
-      InstancePartitionsUtils.persistInstancePartitions(_resourceManager.getPropertyStore(), instancePartitions);
+      InstancePartitionsUtils.persistInstancePartitions(_resourceManager.getPropertyStore(), instancePartitions,
+          _resourceManager.getQueryWorkloadManager());
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions",
           Response.Status.INTERNAL_SERVER_ERROR, e);

@@ -19,6 +19,7 @@
 package org.apache.pinot.common.metrics;
 
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.PinotMeter;
 
 
 /**
@@ -55,6 +56,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
   STREAM_CONSUMER_CREATE_EXCEPTIONS("exceptions", false),
   REALTIME_ROWS_AHEAD_OF_ZK("rows", false),
+  REALTIME_UPSERT_INCONSISTENT_ROWS("rows", false),
   // number of times partition of a record did not match the partition of the stream
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
@@ -113,6 +115,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   READINESS_CHECK_OK_CALLS("readinessCheck", true),
   READINESS_CHECK_BAD_CALLS("readinessCheck", true),
   QUERIES_KILLED("query", true),
+  QUERIES_KILLED_SCAN("queriesKilledScan", true),
+  QUERIES_KILLED_SCAN_DRY_RUN("queriesKilledScanDryRun", true),
+  QUERIES_KILLED_SCAN_ERROR("queriesKilledScanError", true),
   QUERIES_THROTTLED("query", true),
   HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
   HEAP_PANIC_LEVEL_EXCEEDED("count", true),
@@ -121,6 +126,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+  NETTY_CONNECTION_SEND_RESPONSE_FAILURES("nettyConnection", true),
 
   // GRPC related metrics
   GRPC_QUERIES("grpcQueries", true),
@@ -138,6 +144,13 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RESPONSE_SER_MEM_ALLOCATED_BYTES("bytes", false),
   TOTAL_MEM_ALLOCATED_BYTES("bytes", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
+  /**
+   * Size of the initially serialized query response in bytes.
+   * Note: This may differ from the final response actually sent to the broker if the response
+   * is later replaced (for example, when exceeding the configured max response size).
+   */
+  QUERY_RESPONSE_SIZE("bytes", false,
+      "Size of the initially serialized query response in bytes (may differ from final response sent to broker)"),
 
   GRPC_MEMORY_REJECTIONS("rejections", true, "Number of grpc requests rejected due to memory pressure"),
 
@@ -240,8 +253,6 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    * Approximate heap bytes used by the mutable JSON index at the time of index close.
    */
   MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false),
-  // Workload Budget exceeded counter
-  WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", false, "Number of times workload budget exceeded"),
   INGESTION_DELAY_TRACKING_ERRORS("errors", false,
       "Indicates the count of errors encountered while tracking ingestion delay."),
   INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS("errors", false,
@@ -250,7 +261,32 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   TRANSFORMATION_ERROR_COUNT("rows", false),
   DROPPED_RECORD_COUNT("rows", false),
-  CORRUPTED_RECORD_COUNT("rows", false);
+  CORRUPTED_RECORD_COUNT("rows", false),
+  // Workload related metrics
+  WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", true, "Number of times workload budget exceeded"),
+  WORKLOAD_QUERIES("queries", false),
+
+  /// Number of multi-stage execution opchains started.
+  /// This is equal to the number of stages times the average parallelism
+  MSE_OPCHAINS_STARTED("opchains", true),
+  /// Number of multi-stage execution opchains completed.
+  /// This is equal to the number of stages times the average parallelism
+  MSE_OPCHAINS_COMPLETED("opchains", true),
+
+  /// Total execution time spent in multi-stage execution on CPU in milliseconds.
+  /// This is equal to the sum of the executionTimeMs reported by the root of all the opchains executed in the server.
+  MSE_CPU_EXECUTION_TIME_MS("milliseconds", true),
+  /// Total memory allocated in bytes for multi-stage execution.
+  /// This is equal to the sum of the allocatedMemoryBytes reported by all the opchains executed in the server.
+  MSE_MEMORY_ALLOCATED_BYTES("bytes", true),
+  /// Total number of rows emitted by multi-stage execution.
+  /// This is equal to the sum of the emittedRows reported by the root of all the opchains executed in the server.
+  MSE_EMITTED_ROWS("rows", true),
+
+  /// Number of MSE queries received by this server.
+  /// This metric is incremented once per query, even if the server is acting as a leaf, intermediate, or both.
+  MSE_QUERIES("queries", true,
+      "Number of MSE queries received by this server");
 
   private final String _meterName;
   private final String _unit;
@@ -291,5 +327,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   @Override
   public String getDescription() {
     return _description;
+  }
+
+  public PinotMeter getGlobalMeter() {
+    return ServerMetrics.get().getMeteredValue(this);
   }
 }

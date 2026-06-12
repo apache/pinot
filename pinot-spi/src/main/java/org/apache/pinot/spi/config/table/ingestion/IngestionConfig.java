@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -66,6 +67,9 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to skip any row which has error and continue during ingestion")
   private boolean _continueOnError;
 
+  @JsonPropertyDescription("Max consecutive failures allowed while fetching record from source.")
+  private int _maxConsecutiveRecordFetchFailuresAllowed;
+
   @JsonPropertyDescription(
       "Configs related to retry segment build on reduced size when previous build fails on Preconditions check")
   private boolean _retryOnSegmentBuildPrecheckFailure;
@@ -75,6 +79,10 @@ public class IngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Configs related to check time value for segment")
   private boolean _segmentTimeValueCheck = true;
+
+  @JsonPropertyDescription("Max exception logs per minute per exception class (0 to disable)")
+  private int _ingestionExceptionLogRateLimitPerMin =
+      CommonConstants.IngestionConfigs.DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN;
 
   @Deprecated
   public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
@@ -152,6 +160,14 @@ public class IngestionConfig extends BaseJsonConfig {
     return _segmentTimeValueCheck;
   }
 
+  public int getIngestionExceptionLogRateLimitPerMin() {
+    return _ingestionExceptionLogRateLimitPerMin;
+  }
+
+  public int getMaxConsecutiveRecordFetchFailuresAllowed() {
+    return _maxConsecutiveRecordFetchFailuresAllowed;
+  }
+
   public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {
     _batchIngestionConfig = batchIngestionConfig;
   }
@@ -199,5 +215,13 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setSegmentTimeValueCheck(boolean segmentTimeValueCheck) {
     _segmentTimeValueCheck = segmentTimeValueCheck;
+  }
+
+  public void setIngestionExceptionLogRateLimitPerMin(int ingestionExceptionLogRateLimitPerMin) {
+    _ingestionExceptionLogRateLimitPerMin = ingestionExceptionLogRateLimitPerMin;
+  }
+
+  public void setMaxConsecutiveRecordFetchFailuresAllowed(int maxConsecutiveRecordFetchFailuresAllowed) {
+    _maxConsecutiveRecordFetchFailuresAllowed = maxConsecutiveRecordFetchFailuresAllowed;
   }
 }

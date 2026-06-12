@@ -107,4 +107,10 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNode
     node.getInputs().forEach(input -> input.visit(this, context));
     return process(node, context);
   }
+
+  @Override
+  public T visitUnnest(UnnestNode node, C context) {
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
+  }
 }

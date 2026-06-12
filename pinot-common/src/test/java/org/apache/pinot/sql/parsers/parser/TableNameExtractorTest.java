@@ -181,6 +181,21 @@ public class TableNameExtractorTest {
   }
 
   @Test
+  public void testResolveTableNameWithCTESameNameAsTable() {
+    // Test when CTE has the same name as the table it references (shadowing case)
+    String cteQuery = "WITH users AS ("
+        + "  SELECT * FROM users WHERE active = true"
+        + ") "
+        + "SELECT * FROM users";
+
+    String[] tableNames = TableNameExtractor.resolveTableName(cteQuery);
+
+    assertNotNull(tableNames, "Table names should not be null");
+    assertEquals(tableNames.length, 1, "Should resolve exactly one table");
+    assertEquals(tableNames[0], "users", "Should resolve the actual table name when CTE has same name");
+  }
+
+  @Test
   public void testResolveTableNameWithSubqueryAlias() {
     // Test with subquery alias
     String subqueryQuery = "SELECT t.name FROM (SELECT * FROM users WHERE active = true) AS t "

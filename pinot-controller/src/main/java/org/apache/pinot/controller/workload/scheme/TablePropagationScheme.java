@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
-import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -100,18 +100,20 @@ public class TablePropagationScheme implements PropagationScheme {
 
   /**
    * Resolves the set of broker instances responsible for serving the given table name.
+   * Uses IdealState instead of ExternalView to ensure brokers that are temporarily offline
+   * (e.g., during restart) still receive workload configuration updates.
    *
    * Returns the first non-empty set of instances since the brokers are shared across all table types.
    */
   private Set<String> getBrokerInstances(String tableName) {
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
-    ExternalView brokerResource = HelixHelper.getExternalViewForResource(helixManager.getClusterManagmentTool(),
-        helixManager.getClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    // Using IdealState to include offline brokers (e.g. during rolling restart)
+    IdealState brokerIdealState = HelixHelper.getTableIdealState(helixManager,
+        CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     for (String tableWithType : expandToTablesWithType(tableName)) {
-      Set<String> instances = brokerResource.getStateMap(tableWithType) != null
-          ? brokerResource.getStateMap(tableWithType).keySet() : Collections.emptySet();
+      Set<String> instances = brokerIdealState.getInstanceSet(tableWithType);
       if (!instances.isEmpty()) {
-        return new HashSet<>(instances);
+        return instances;
       }
     }
     return Collections.emptySet();
@@ -123,8 +125,8 @@ public class TablePropagationScheme implements PropagationScheme {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableWithType);
       if (tableType == TableType.OFFLINE) {
         // We skip overrides since they are only applicable to REALTIME tables
-        String offlineKey = InstancePartitionsUtils.getInstancePartitionsName(tableWithType,
-            InstancePartitionsType.OFFLINE.toString());
+        String offlineKey =
+            InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.OFFLINE);
         Set<String> offlineInstances = getInstancesFromInstancePartitions(offlineKey);
         // Given we allow for entity without table type, it's possible to not find any OFFLINE instances if the
         // table is REALTIME only. However, we have a check above to ensure at least one table type resolves
@@ -159,10 +161,10 @@ public class TablePropagationScheme implements PropagationScheme {
    * If {@code type} is null, returns the union of CONSUMING and COMPLETED.
    */
   private Set<String> getRealtimeInstances(String tableWithType, @Nullable OverrideEntityType type) {
-    String consumingKey = InstancePartitionsUtils.getInstancePartitionsName(
-        tableWithType, InstancePartitionsType.CONSUMING.toString());
-    String completedKey = InstancePartitionsUtils.getInstancePartitionsName(
-        tableWithType, InstancePartitionsType.COMPLETED.toString());
+    String consumingKey =
+        InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.CONSUMING);
+    String completedKey =
+        InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.COMPLETED);
     if (type == OverrideEntityType.CONSUMING) {
       Set<String> instances = getInstancesFromInstancePartitions(consumingKey);
       return (instances == null) ? Collections.emptySet() : new HashSet<>(instances);

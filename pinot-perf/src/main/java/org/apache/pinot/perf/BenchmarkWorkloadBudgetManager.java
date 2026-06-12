@@ -19,9 +19,10 @@
 package org.apache.pinot.perf;
 
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.accounting.DefaultWorkloadBudgetManager;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Level;
@@ -60,10 +61,10 @@ public class BenchmarkWorkloadBudgetManager {
     @Setup(Level.Iteration)
     public void setup() {
       PinotConfiguration config = new PinotConfiguration();
-      config.setProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
-      config.setProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS, Long.MAX_VALUE);
+      config.setProperty(Accounting.Keys.WORKLOAD_ENABLE_COST_COLLECTION, true);
+      config.setProperty(Accounting.Keys.WORKLOAD_ENFORCEMENT_WINDOW_MS, Long.MAX_VALUE);
 
-      _manager = new WorkloadBudgetManager(config);
+      _manager = new DefaultWorkloadBudgetManager(config);
       _manager.addOrUpdateWorkload(WORKLOAD, Long.MAX_VALUE, Long.MAX_VALUE);
     }
 

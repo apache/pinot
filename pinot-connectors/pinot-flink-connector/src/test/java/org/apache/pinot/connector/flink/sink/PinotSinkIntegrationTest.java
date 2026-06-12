@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.connector.flink.sink;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,6 +31,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.Row;
+import org.apache.pinot.client.admin.SegmentAdminClient;
 import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -42,7 +41,6 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -116,8 +114,8 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     // Single-thread write
     StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
     execEnv.setParallelism(1);
-    DataStream<Row> srcDs = execEnv.fromCollection(_data).returns(_typeInfo);
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
+    DataStream<Row> srcDs = execEnv.fromData(_data, _typeInfo);
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
     execEnv.execute();
     verifySegments(1, 6);
 
@@ -126,24 +124,25 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     // Parallel write
     execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
     execEnv.setParallelism(2);
-    srcDs = execEnv.fromCollection(_data).returns(_typeInfo).keyBy(r -> r.getField(0));
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
+    srcDs = execEnv.fromData(_data, _typeInfo).keyBy(r -> r.getField(0));
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
     execEnv.execute();
     verifySegments(2, 6);
   }
 
   private void verifySegments(int numSegments, int numTotalDocs)
-      throws IOException {
-    JsonNode segments = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString()))).get(0)
-        .get("OFFLINE");
+      throws Exception {
+    SegmentAdminClient segmentClient = getOrCreateAdminClient().getSegmentClient();
+    List<String> segments = segmentClient.listSegments(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), false);
     assertEquals(segments.size(), numSegments);
     int actualNumTotalDocs = 0;
-    for (int i = 0; i < numSegments; i++) {
-      String segmentName = segments.get(i).asText();
-      actualNumTotalDocs += JsonUtils.stringToJsonNode(
-              sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(OFFLINE_TABLE_NAME, segmentName)))
-          .get("segment.total.docs").asInt();
+    for (String segmentName : segments) {
+      Object value = segmentClient.getSegmentMetadata(OFFLINE_TABLE_NAME, segmentName, null).get("segment.total.docs");
+      if (value instanceof Number) {
+        actualNumTotalDocs += ((Number) value).intValue();
+      } else if (value != null) {
+        actualNumTotalDocs += Integer.parseInt(value.toString());
+      }
     }
     assertEquals(actualNumTotalDocs, numTotalDocs);
   }

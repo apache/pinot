@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
 import org.apache.helix.model.ClusterConfig;
@@ -58,6 +60,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -75,6 +78,13 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamMetadata;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -88,6 +98,12 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
@@ -311,11 +327,79 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     resetBrokerTags();
   }
 
+  /**
+   * Verifies that when a new broker is added with the same tenant as a logical table,
+   * the broker resource ideal state is updated for the logical table partition (Issue #15751).
+   */
+  @Test
+  public void testUpdateBrokerResourceWithLogicalTable()
+      throws Exception {
+    untagBrokers();
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 2, 0, 0);
+    _helixResourceManager.createBrokerTenant(brokerTenant);
+
+    String brokerTag = TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME);
+    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
+    List<String> taggedBrokers = HelixHelper.getInstancesWithTag(instanceConfigs, brokerTag);
+    assertEquals(taggedBrokers.size(), 2);
+
+    // Add physical tables (offline + realtime) via manager with test tenants, then logical table
+    addDummySchema(RAW_TABLE_NAME);
+    TableConfig offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(offlineTableConfig.getTableName());
+    _helixResourceManager.addTable(offlineTableConfig);
+    waitForEVToDisappear(REALTIME_TABLE_NAME);
+    TableConfig realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    _helixResourceManager.addTable(realtimeTableConfig);
+    List<String> physicalTableNamesWithType = List.of(OFFLINE_TABLE_NAME, REALTIME_TABLE_NAME);
+    String logicalTableName = "test_logical_table";
+    addDummySchema(logicalTableName);
+    LogicalTableConfig logicalTableConfig =
+        ControllerTest.getDummyLogicalTableConfig(logicalTableName, physicalTableNamesWithType, BROKER_TENANT_NAME);
+    _helixResourceManager.addLogicalTableConfig(logicalTableConfig);
+
+    IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
+    assertTrue(brokerResource.getPartitionSet().contains(logicalTableName));
+    checkBrokerResourceForPartition(logicalTableName, taggedBrokers);
+
+    // Add a new broker instance with same tenant; verify add-broker path updates logical table partition
+    Instance newBrokerInstance =
+        new Instance("localhost", 3, InstanceType.BROKER, Collections.singletonList(brokerTag), null, 0, 0, 0, 0,
+            false);
+    assertTrue(_helixResourceManager.addInstance(newBrokerInstance, true).isSuccessful());
+    String newBrokerId = InstanceUtils.getHelixInstanceId(newBrokerInstance);
+    List<String> taggedBrokersAfterAdd = new ArrayList<>(taggedBrokers);
+    taggedBrokersAfterAdd.add(newBrokerId);
+
+    checkBrokerResourceForPartition(logicalTableName, taggedBrokersAfterAdd);
+
+    // Cleanup
+    _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
+    assertTrue(_helixResourceManager.dropInstance(newBrokerId).isSuccessful());
+    resetBrokerTags();
+  }
+
   private void checkBrokerResource(List<String> expectedBrokers) {
     IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
     assertEquals(brokerResource.getPartitionSet().size(), 1);
     Map<String, String> instanceStateMap = brokerResource.getInstanceStateMap(OFFLINE_TABLE_NAME);
     assertEquals(instanceStateMap.keySet(), new HashSet<>(expectedBrokers));
+  }
+
+  private void checkBrokerResourceForPartition(String partitionName, List<String> expectedBrokers) {
+    IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
+    assertTrue(brokerResource.getPartitionSet().contains(partitionName),
+        "Broker resource should contain partition: " + partitionName);
+    Map<String, String> instanceStateMap = brokerResource.getInstanceStateMap(partitionName);
+    assertEquals(instanceStateMap.keySet(), new HashSet<>(expectedBrokers),
+        "Broker set for partition " + partitionName + " should match expected");
   }
 
   @Test
@@ -1596,10 +1680,161 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(actualSet, new HashSet<>(Arrays.asList(expected)));
   }
 
+  @Test
+  public void testGetConsumerWatermarks()
+      throws Exception {
+    String rawTableName = "watermarksTable";
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+
+    // Test table not found
+    assertThrows(TableNotFoundException.class, () -> _helixResourceManager.getConsumerWatermarks(rawTableName));
+
+    // Setup table
+    addDummySchema(rawTableName);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    _helixResourceManager.addTable(tableConfig);
+
+    // Setup mocks
+    PinotLLCRealtimeSegmentManager mockSegmentManager = mock(PinotLLCRealtimeSegmentManager.class);
+    Field llcManagerField = PinotHelixResourceManager.class.getDeclaredField("_pinotLLCRealtimeSegmentManager");
+    llcManagerField.setAccessible(true);
+    PinotLLCRealtimeSegmentManager originalLlcManager =
+        (PinotLLCRealtimeSegmentManager) llcManagerField.get(_helixResourceManager);
+    llcManagerField.set(_helixResourceManager, mockSegmentManager);
+
+    Field helixAdminField = PinotHelixResourceManager.class.getDeclaredField("_helixAdmin");
+    helixAdminField.setAccessible(true);
+    HelixAdmin originalHelixAdmin = (HelixAdmin) helixAdminField.get(_helixResourceManager);
+    HelixAdmin spyHelixAdmin = spy(originalHelixAdmin);
+    helixAdminField.set(_helixResourceManager, spyHelixAdmin);
+
+    IdealState idealState = new IdealState(realtimeTableName);
+    doReturn(idealState).when(spyHelixAdmin).getResourceIdealState(any(), eq(realtimeTableName));
+
+    // Test happy path
+    PartitionGroupConsumptionStatus doneStatus = new PartitionGroupConsumptionStatus(0, 100,
+        new LongMsgOffset(123), new LongMsgOffset(456), "done");
+    PartitionGroupConsumptionStatus inProgressStatus =
+        new PartitionGroupConsumptionStatus(1, 200, new LongMsgOffset(789), null, "IN_PROGRESS");
+    when(mockSegmentManager.getPartitionGroupConsumptionStatusList(any(), any()))
+        .thenReturn(Arrays.asList(doneStatus, inProgressStatus));
+
+    WatermarkInductionResult waterMarkInductionResult = _helixResourceManager.getConsumerWatermarks(rawTableName);
+    assertEquals(waterMarkInductionResult.getWatermarks().size(), 2);
+    WatermarkInductionResult.Watermark doneWatermark = waterMarkInductionResult.getWatermarks().get(0);
+    assertEquals(doneWatermark.getPartitionGroupId(), 0);
+    assertEquals(doneWatermark.getSequenceNumber(), 101L);
+    assertEquals(doneWatermark.getOffset(), 456L);
+    WatermarkInductionResult.Watermark inProgressWatermark = waterMarkInductionResult.getWatermarks().get(1);
+    assertEquals(inProgressWatermark.getPartitionGroupId(), 1);
+    assertEquals(inProgressWatermark.getSequenceNumber(), 200L);
+    assertEquals(inProgressWatermark.getOffset(), 789L);
+
+    // recover the original values
+    helixAdminField.set(_helixResourceManager, originalHelixAdmin);
+    llcManagerField.set(_helixResourceManager, originalLlcManager);
+    // Cleanup
+    _helixResourceManager.deleteRealtimeTable(rawTableName);
+    deleteSchema(rawTableName);
+  }
+
+  /**
+   * Happy-path coverage for {@link PinotHelixResourceManager#multiWriteZK()}: pre-creates two
+   * segment ZK metadata znodes, atomically updates both via a single multi() transaction, then
+   * reads back through the property store and asserts the mutated fields round-tripped. Verifies
+   * the dedicated multi-write ZkClient is built correctly and the ZNRecord serialization /
+   * deserialization path matches what the rest of the controller uses.
+   */
+  @Test
+  public void testMultiWriteZkSegmentMetadataUpdates()
+      throws Exception {
+    String segName1 = "multiWriteZk_seg_1";
+    String segName2 = "multiWriteZk_seg_2";
+    SegmentZKMetadata seg1 = new SegmentZKMetadata(segName1);
+    seg1.setCrc(1L);
+    seg1.setTotalDocs(10L);
+    SegmentZKMetadata seg2 = new SegmentZKMetadata(segName2);
+    seg2.setCrc(2L);
+    seg2.setTotalDocs(20L);
+    assertTrue(ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, seg1));
+    assertTrue(ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, seg2));
+
+    // Mutate both and submit as a single atomic transaction.
+    seg1.setCrc(11L);
+    seg1.setTotalDocs(110L);
+    seg2.setCrc(22L);
+    seg2.setTotalDocs(220L);
+    String path1 = ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME, segName1);
+    String path2 = ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME, segName2);
+    _helixResourceManager.multiWriteZK()
+        .set(path1, seg1.toZNRecord())
+        .set(path2, seg2.toZNRecord())
+        .execute();
+
+    SegmentZKMetadata read1 = ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segName1);
+    SegmentZKMetadata read2 = ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segName2);
+    assertNotNull(read1);
+    assertNotNull(read2);
+    assertEquals(read1.getCrc(), 11L);
+    assertEquals(read1.getTotalDocs(), 110L);
+    assertEquals(read2.getCrc(), 22L);
+    assertEquals(read2.getTotalDocs(), 220L);
+
+    // Cleanup
+    assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segName1));
+    assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segName2));
+  }
+
   @AfterClass
   public void tearDown() {
     stopFakeInstances();
     stopController();
     stopZk();
+  }
+
+  @Test
+  public void testAddRealtimeTableWithConsumingMetadata()
+      throws Exception {
+    final String rawTableName = "testTable2";
+    final String realtimeTableName = rawTableName + "_REALTIME";
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    addDummySchema(rawTableName);
+
+    StreamConfig streamConfig = new StreamConfig(rawTableName + "_REALTIME",
+        FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap());
+    PartitionGroupMetadata metadata0 =
+        new PartitionGroupMetadata(0, mock(StreamPartitionMsgOffset.class), 5);
+    PartitionGroupMetadata metadata1 =
+        new PartitionGroupMetadata(1, mock(StreamPartitionMsgOffset.class), 10);
+    List<StreamMetadata> streamMetadataList = Collections.singletonList(
+        new StreamMetadata(streamConfig, 2, Arrays.asList(metadata0, metadata1)));
+
+    _helixResourceManager.addTable(tableConfig, streamMetadataList);
+
+    IdealState idealState = _helixResourceManager.getTableIdealState(realtimeTableName);
+    assertNotNull(idealState);
+    assertEquals(idealState.getPartitionSet().size(), 2);
+
+    for (String segmentName : idealState.getPartitionSet()) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      int partitionGroupId = llcSegmentName.getPartitionGroupId();
+      if (partitionGroupId == 0) {
+        assertEquals(llcSegmentName.getSequenceNumber(), 5);
+      } else if (partitionGroupId == 1) {
+        assertEquals(llcSegmentName.getSequenceNumber(), 10);
+      } else {
+        fail("Unexpected partition group id: " + partitionGroupId);
+      }
+    }
+
+    _helixResourceManager.deleteRealtimeTable(rawTableName);
+    deleteSchema(rawTableName);
   }
 }

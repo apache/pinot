@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -46,6 +48,9 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -120,6 +125,49 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
   }
 
+  @Override
+  public DataTable mergeDataTablesOnly(String tableName, DataSchema dataSchema,
+      Map<ServerRoutingInstance, DataTable> dataTableMap, DataTableReducerContext reducerContext,
+      BrokerMetrics brokerMetrics) {
+    // When servers are configured to return final aggregate state, the input DataTables hold final
+    // (not intermediate) values, so the merge-only contract — "produce an intermediate DataTable that
+    // can be re-merged via the normal reduce path" — cannot be honored.
+    if (_queryContext.isServerReturnFinalResult()) {
+      throw new UnsupportedOperationException(
+          "Merge-only reduction is not supported when servers return final aggregate results "
+              + "(server.returnFinalResult / isServerReturnFinalResult); input would be final-typed, "
+              + "not intermediate.");
+    }
+    dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(_queryContext, dataSchema);
+    try {
+      if (dataTableMap.isEmpty()) {
+        return DataTableBuilderFactory.getDataTableBuilder(dataSchema).build();
+      }
+      Collection<DataTable> dataTables = dataTableMap.values();
+      // Reuse the regular reduce's merge: builds the IndexedTable of group keys + intermediate agg state.
+      IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
+      DataTable mergedDataTable = buildIntermediateDataTable(dataSchema, indexedTable);
+      if (indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
+        mergedDataTable.getMetadata().put(MetadataKey.GROUPS_TRIMMED.getName(), "true");
+      }
+      if (anyNumGroupsLimitReached(dataTables)) {
+        mergedDataTable.getMetadata().put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+      }
+      return mergedDataTable;
+    } catch (IOException e) {
+      throw new RuntimeException("Caught IOException while building merged intermediate DataTable for group-by", e);
+    }
+  }
+
+  private static boolean anyNumGroupsLimitReached(Collection<DataTable> dataTables) {
+    for (DataTable dataTable : dataTables) {
+      if (Boolean.parseBoolean(dataTable.getMetadata().get(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Reduces group-by results into a [ResultTable] and set it into the [BrokerResponseNative].
   private void reduceResult(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       Collection<DataTable> dataTables, DataTableReducerContext reducerContext, String rawTableName,
@@ -163,7 +211,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
         for (int i = 0; i < numColumns; i++) {
           Object value = row[i];
           if (value != null) {
-            row[i] = columnDataTypes[i].convert(row[i]);
+            row[i] = columnDataTypes[i].convert(value);
           }
         }
         if (havingFilterHandler.isMatch(row)) {
@@ -179,7 +227,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
         for (int j = 0; j < numColumns; j++) {
           Object value = row[j];
           if (value != null) {
-            row[j] = columnDataTypes[j].convert(row[j]);
+            row[j] = columnDataTypes[j].convert(value);
           }
         }
         rows.add(row);
@@ -296,8 +344,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
                     case DOUBLE_ARRAY:
                       values[colId] = DoubleArrayList.wrap(dataTable.getDoubleArray(rowId, colId));
                       break;
+                    case BIG_DECIMAL_ARRAY:
+                      values[colId] = ObjectArrayList.wrap(dataTable.getBigDecimalArray(rowId, colId));
+                      break;
                     case STRING_ARRAY:
                       values[colId] = ObjectArrayList.wrap(dataTable.getStringArray(rowId, colId));
+                      break;
+                    case BYTES_ARRAY:
+                      values[colId] = ObjectArrayList.wrap(dataTable.getBytesArray(rowId, colId));
                       break;
                     case OBJECT:
                       CustomObject customObject = dataTable.getCustomObject(rowId, colId);
@@ -475,5 +529,75 @@ public class GroupByDataTableReducer implements DataTableReducer {
       default:
         throw new IllegalStateException("Illegal column data type in group key: " + columnDataType);
     }
+  }
+
+  /**
+   * Serializes the merged {@link IndexedTable} back into an intermediate {@link DataTable}, mirroring
+   * {@code GroupByResultsBlock#getDataTable()} so the output is byte-shape identical to a single
+   * server's intermediate group-by response. Group-key columns are written by stored type; OBJECT
+   * aggregate columns via {@link AggregationFunction#serializeIntermediateResult}. No limit / HAVING /
+   * post-aggregation / formatting is applied.
+   */
+  private DataTable buildIntermediateDataTable(DataSchema dataSchema, IndexedTable indexedTable)
+      throws IOException {
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    Iterator<Record> iterator = indexedTable.iterator();
+    if (_queryContext.isNullHandlingEnabled()) {
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[_numColumns];
+      Object[] nullPlaceholders = new Object[_numColumns];
+      for (int colId = 0; colId < _numColumns; colId++) {
+        nullBitmaps[colId] = new RoaringBitmap();
+        nullPlaceholders[colId] = storedColumnDataTypes[colId].getNullPlaceholder();
+      }
+      int rowId = 0;
+      while (iterator.hasNext()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId, "GroupByDataTableReducer#merge");
+        dataTableBuilder.startRow();
+        Object[] values = iterator.next().getValues();
+        for (int i = 0; i < _numColumns; i++) {
+          Object value = values[i];
+          if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
+            if (value == null) {
+              dataTableBuilder.setNull(i);
+            } else {
+              dataTableBuilder.setColumn(i,
+                  _aggregationFunctions[i - _numGroupByExpressions].serializeIntermediateResult(value));
+            }
+          } else {
+            if (value == null) {
+              value = nullPlaceholders[i];
+              nullBitmaps[i].add(rowId);
+            }
+            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
+          }
+        }
+        dataTableBuilder.finishRow();
+        rowId++;
+      }
+      for (RoaringBitmap nullBitmap : nullBitmaps) {
+        dataTableBuilder.setNullRowIds(nullBitmap);
+      }
+    } else {
+      int rowId = 0;
+      while (iterator.hasNext()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId++, "GroupByDataTableReducer#merge");
+        dataTableBuilder.startRow();
+        Object[] values = iterator.next().getValues();
+        for (int i = 0; i < _numColumns; i++) {
+          Object value = values[i];
+          if (value == null) {
+            dataTableBuilder.setNull(i);
+          } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
+            dataTableBuilder.setColumn(i,
+                _aggregationFunctions[i - _numGroupByExpressions].serializeIntermediateResult(value));
+          } else {
+            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
+          }
+        }
+        dataTableBuilder.finishRow();
+      }
+    }
+    return dataTableBuilder.build();
   }
 }

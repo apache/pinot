@@ -34,9 +34,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -95,8 +97,12 @@ public class PluginManager {
       put("org.apache.pinot.filesystem.LocalPinotFS", "org.apache.pinot.spi.filesystem.LocalPinotFS");
 
       // StreamConsumerFactory
+      // Old-style class names mapped to current plugin packages
+      // Rename the usage of kafka 2 to kafka 3
       put("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
+          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+      put("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
       put("org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory",
           "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
     }
@@ -121,6 +127,7 @@ public class PluginManager {
           put("avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig");
           put("csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig");
           put("protobuf", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig");
+          put("parquet", "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReaderConfig");
           put("thrift", "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig");
         }
       };
@@ -293,10 +300,19 @@ public class PluginManager {
 
         ClassRealm pinotRealm = _classWorld.getClassRealm(PINOT_REALMID);
 
-        // All packages to look up in pinot realm BEFORE itself
-        Stream<String> importedPinotPackages =
-            Stream.of("org.apache.pinot.spi"); // this works like a prefix, so ALL spi classes will be accessible
-        importedPinotPackages.forEach(p -> pluginRealm.importFrom(pinotRealm, p));
+        // All packages to look up in pinot realm BEFORE itself.
+        // Acts like a prefix so all classes in (and below) the listed package are accessible.
+        // Hardcoding the list here is cheap while it stays small. A cleaner long-term approach
+        // would have each SPI module self-declare its exports in a META-INF/pinot-realm-exports
+        // resource file (one package per line) and have PluginManager discover them at init time
+        // via ClassLoader.getResources() — that would eliminate the layering violation of
+        // pinot-spi naming packages from higher-level modules such as pinot-query-planner-spi.
+        // TODO: implement the self-declaring META-INF/pinot-realm-exports mechanism.
+        Stream.of(
+            "org.apache.pinot.spi",
+            "org.apache.pinot.query.planner.spi",     // RuleSetCustomizer SPI (pinot-query-planner-spi)
+            "org.apache.calcite.plan"                 // RelOptRule, used by RuleSetCustomizer.customize
+        ).forEach(p -> pluginRealm.importFrom(pinotRealm, p));
 
         // Additional importForm as specified by the plugin configuration
         config.getImportsFromPerRealm().forEach((r, ifs) -> {
@@ -469,6 +485,32 @@ public class PluginManager {
     return null;
   }
 
+  /// Returns the set of classloaders for all new-style plugins, in load order.
+  /// New-style plugins are those packaged with a `pinot-plugin.properties` file
+  /// and loaded into a dedicated [ClassRealm]. Legacy shaded plugins (loaded via
+  /// [PluginClassLoader]) are excluded — new SPIs should only target new-style plugins.
+  ///
+  /// Intended for `ServiceLoader` enumeration across plugin classloaders:
+  ///
+  /// ```java
+  /// for (ClassLoader cl : PluginManager.get().getPluginClassLoaders()) {
+  ///   for (MyService svc : ServiceLoader.load(MyService.class, cl)) { ... }
+  /// }
+  /// ```
+  ///
+  /// Call after all plugins have been loaded; classloaders added after this
+  /// call returns will not appear in the snapshot.
+  public synchronized Set<ClassLoader> getPluginClassLoaders() {
+    Set<ClassLoader> result = new LinkedHashSet<>();
+    for (ClassRealm realm : _classWorld.getRealms()) {
+      String id = realm.getId();
+      if (!PINOT_REALMID.equals(id) && !DEFAULT_PLUGIN_NAME.equals(id)) {
+        result.add(realm);
+      }
+    }
+    return Collections.unmodifiableSet(result);
+  }
+
   public static PluginManager get() {
     return PLUGIN_MANAGER;
   }
@@ -489,6 +531,18 @@ public class PluginManager {
     }
     if (recordReaderConfigClass != null) {
       INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP.put(inputFormat.toLowerCase(), recordReaderConfigClass);
+    }
+  }
+
+  // Register plugin class names when users try to deprecate old plugins/libraries.
+  public void registerBackwardCompatibleClassName(String oldClassName, String newClassName) {
+    String existingNewClassName = PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.put(oldClassName, newClassName);
+    if (existingNewClassName != null) {
+      LOGGER.warn("There is already a mapping for backward compatible class from old [{}] to [{}], override it to [{}]",
+          oldClassName, existingNewClassName, newClassName);
+    } else {
+      LOGGER.info("Registered backward compatible class name mapping from old [{}] to new [{}]", oldClassName,
+          newClassName);
     }
   }
 }

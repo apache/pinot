@@ -53,6 +53,7 @@ import org.apache.pinot.common.proto.Server.ServerRequest;
 import org.apache.pinot.common.proto.Server.ServerResponse;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.streaming.StreamingResponseUtils;
 import org.apache.pinot.core.query.executor.QueryExecutor;
@@ -185,13 +186,21 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
         SSLFactory sslFactory =
             RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
                 tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
-            .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
+        // Runtime visibility for Platform-FIPS-JDK deployments: log the actual JSSE provider/protocol once.
+        TlsUtils.warnIfNonJdkProviderConfigured("grpc.query.server", tlsConfig);
+        TlsUtils.logJsseDiagnosticsOnce("grpc.query.server", sslFactory, tlsConfig);
+        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get());
         sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
         if (tlsConfig.isClientAuthEnabled()) {
           sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
         }
-        return GrpcSslContexts.configure(sslContextBuilder).build();
+        if (tlsConfig.getSslProvider() != null) {
+          sslContextBuilder =
+              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(tlsConfig.getSslProvider()));
+        } else {
+          sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
+        }
+        return sslContextBuilder.build();
       } catch (Exception e) {
         throw new RuntimeException("Failed to build gRPC server SSL context", e);
       }

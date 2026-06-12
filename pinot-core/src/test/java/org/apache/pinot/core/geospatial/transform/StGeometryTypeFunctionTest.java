@@ -50,7 +50,7 @@ public class StGeometryTypeFunctionTest extends GeoFunctionTest {
 
   @Test
   public void testGeoJsonConversion()
-  throws Exception {
+      throws Exception {
     assertGeoType("{\n \"type\": \"Point\",\n \"coordinates\": [100.0, 0.0]\n }", "Point");
 
     assertGeoType("{\n"
@@ -141,7 +141,7 @@ public class StGeometryTypeFunctionTest extends GeoFunctionTest {
   }
 
   private void assertGeoType(String geoJson, String type)
-  throws Exception {
+      throws Exception {
     // assert geometry
     assertStringFunction(String.format("ST_GeometryType(ST_GeomFromGeoJSON(%s))", STRING_SV_COLUMN), new String[]{type},
         Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{geoJson})));

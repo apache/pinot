@@ -99,7 +99,7 @@ public class TimeSeriesQueryEnvironment {
       RequestContext requestContext, TimeSeriesLogicalPlanResult logicalPlan) {
     // Step-0: Add table type info to the logical plan.
     logicalPlan = new TimeSeriesLogicalPlanResult(TableScanVisitor.INSTANCE.addTableTypeInfoToPlan(
-      logicalPlan.getPlanNode()), logicalPlan.getTimeBuckets());
+      logicalPlan.getPlanNode(), requestContext), logicalPlan.getTimeBuckets());
     // Step-1: Assign segments to servers for each leaf node.
     TableScanVisitor.Context scanVisitorContext = TableScanVisitor.createContext(requestContext.getRequestId());
     TableScanVisitor.INSTANCE.assignSegmentsToPlan(logicalPlan.getPlanNode(), logicalPlan.getTimeBuckets(),

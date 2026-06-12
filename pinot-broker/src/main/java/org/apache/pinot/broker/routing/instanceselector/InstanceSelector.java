@@ -18,28 +18,28 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**
  * The instance selector selects server instances to serve the query based on the selected segments.
  */
 public interface InstanceSelector {
-  long NEW_SEGMENT_EXPIRATION_MILLIS = TimeUnit.MINUTES.toMillis(5);
-
-  static boolean isNewSegment(long creationTimeMs, long currentTimeMs) {
-    return isNewSegment(creationTimeMs, currentTimeMs, NEW_SEGMENT_EXPIRATION_MILLIS);
-  }
-
   static boolean isNewSegment(long creationTimeMs, long currentTimeMs, long newSegmentExpirationMillis) {
     return creationTimeMs > 0 && currentTimeMs - creationTimeMs <= newSegmentExpirationMillis;
   }
@@ -49,7 +49,9 @@ public interface InstanceSelector {
    * (segments with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
    * Should be called only once before calling other methods.
    */
-  void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap,
+  void init(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
+      InstanceSelectorConfig config, Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap,
       IdealState idealState, ExternalView externalView, Set<String> onlineSegments);
 
   /**

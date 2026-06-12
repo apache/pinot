@@ -38,6 +38,11 @@ public class PinotSqlAggFunction extends SqlAggFunction {
   }
 
   public PinotSqlAggFunction(String name, SqlReturnTypeInference returnTypeInference,
+      SqlOperandTypeChecker operandTypeChecker, SqlKind sqlKind) {
+    this(name, sqlKind, returnTypeInference, operandTypeChecker, SqlFunctionCategory.USER_DEFINED_FUNCTION);
+  }
+
+  public PinotSqlAggFunction(String name, SqlReturnTypeInference returnTypeInference,
       SqlOperandTypeChecker operandTypeChecker) {
     this(name, SqlKind.OTHER_FUNCTION, returnTypeInference, operandTypeChecker,
         SqlFunctionCategory.USER_DEFINED_FUNCTION);

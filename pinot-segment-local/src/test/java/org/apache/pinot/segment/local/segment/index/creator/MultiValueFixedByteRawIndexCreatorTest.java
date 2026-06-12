@@ -59,7 +59,8 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
   @DataProvider(name = "compressionTypes")
   public Object[][] compressionTypes() {
     return Arrays.stream(ChunkCompressionType.values())
-        .flatMap(ct -> IntStream.rangeClosed(2, 5).boxed().map(writerVersion -> new Object[]{ct, writerVersion}))
+        .filter(t -> t != ChunkCompressionType.DELTA && t != ChunkCompressionType.DELTADELTA)
+        .flatMap(ct -> IntStream.rangeClosed(2, 6).boxed().map(writerVersion -> new Object[]{ct, writerVersion}))
         .toArray(Object[][]::new);
   }
 

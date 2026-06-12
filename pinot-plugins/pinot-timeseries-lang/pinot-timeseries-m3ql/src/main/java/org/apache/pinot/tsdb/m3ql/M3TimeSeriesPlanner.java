@@ -166,6 +166,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
     if (request.getNumGroupsLimit() > 0) {
       queryOptions.put("numGroupsLimit", Integer.toString(request.getNumGroupsLimit()));
     }
+    queryOptions.putAll(request.getQueryOptions());
     return new LeafTimeSeriesPlanNode(planId, children, tableName, timeColumn, timeUnit, 0L, filter, valueExpr, aggInfo,
         groupByColumns, request.getLimit(), queryOptions);
   }

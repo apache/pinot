@@ -46,6 +46,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -321,6 +322,15 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitExplained(ExplainedNode node, ServerPlanRequestContext context) {
     throw new UnsupportedOperationException("Leaf stage should not visit ExplainedNode!");
+  }
+
+  @Override
+  public Void visitUnnest(UnnestNode node, ServerPlanRequestContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      // Unnest is not runnable on leaf, use its input as the boundary.
+      context.setLeafStageBoundaryNode(node.getInputs().get(0));
+    }
+    return null;
   }
 
   private boolean visit(PlanNode node, ServerPlanRequestContext context) {

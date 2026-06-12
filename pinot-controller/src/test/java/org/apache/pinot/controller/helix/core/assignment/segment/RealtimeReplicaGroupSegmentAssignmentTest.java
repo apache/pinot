@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,14 +28,16 @@ import java.util.TreeMap;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -86,7 +89,8 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setStreamConfigs(streamConfigs)
-            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
+            .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(),
+                new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
             .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1)).build();
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
 
@@ -335,19 +339,20 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
   public void testExplicitPartition() {
     // CONSUMING instances:
     // {
-    //   0_0=[instance_0], 1_0=[instance_1], 2_0=[instance_2],
-    //   0_1=[instance_3], 1_1=[instance_4], 2_1=[instance_5],
-    //   0_2=[instance_6], 1_2=[instance_7], 2_2=[instance_8]
+    //   0_0=[instance_0], 1_0=[instance_1], 2_0=[instance_2], 3_0=[instance_0],
+    //   0_1=[instance_3], 1_1=[instance_4], 2_1=[instance_5], 3_1=[instance_3],
+    //   0_2=[instance_6], 1_2=[instance_7], 2_2=[instance_8], 3_2=[instance_6]
     // }
     //        p0                p1                p2
     //        p3
     InstancePartitions consumingInstancePartitions = new InstancePartitions(CONSUMING_INSTANCE_PARTITIONS_NAME);
     int numConsumingInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
-    int consumingInstanceIdToAdd = 0;
     for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
-      for (int partitionId = 0; partitionId < numConsumingInstancesPerReplicaGroup; partitionId++) {
+      for (int partitionId = 0; partitionId < NUM_PARTITIONS; partitionId++) {
+        int instanceIndex = (partitionId % numConsumingInstancesPerReplicaGroup)
+            + replicaGroupId * numConsumingInstancesPerReplicaGroup;
         consumingInstancePartitions.setInstances(partitionId, replicaGroupId,
-            Collections.singletonList(CONSUMING_INSTANCES.get(consumingInstanceIdToAdd++)));
+            Collections.singletonList(CONSUMING_INSTANCES.get(instanceIndex)));
       }
     }
 
@@ -456,6 +461,393 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     // Add the new segment into the assignment as CONSUMING
     currentAssignment.put(_segments.get(segmentId),
         SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
+  }
+
+  /**
+   * Tests segment assignment for tables consuming subset partitions with non-contiguous partition IDs.
+   *
+   * <p><b>Key Invariant:</b> A table consuming subset partitions {0, 2, 5, 7} from an 8-partition topic
+   * should assign those partitions to the SAME instances as a full table consuming all 8 partitions.
+   *
+   * <p>This is achieved by using the TOTAL partition count (8) in the instance partitions map, so that
+   * RealtimeSegmentAssignment routes both subset and full tables identically via {@code partitionId % 8}.
+   *
+   * <p>This test verifies:
+   * <ul>
+   *   <li>Subset table assignment matches full table assignment for the same partition IDs</li>
+   *   <li>Non-contiguous partitions don't create hotspots</li>
+   *   <li>All consuming instances are utilized (no underutilization)</li>
+   * </ul>
+   */
+  @Test
+  public void testSubsetPartitionAssignment() {
+    // Subset partition IDs: non-contiguous selection from 8 total partitions
+    int[] subsetPartitionIds = {0, 2, 5, 7};
+    int totalKafkaPartitions = 8;
+    int numSegmentsPerPartition = 3;
+
+    // Create segments only for the subset partitions
+    List<String> subsetSegments = new ArrayList<>();
+    for (int partitionId : subsetPartitionIds) {
+      for (int seqNum = 0; seqNum < numSegmentsPerPartition; seqNum++) {
+        subsetSegments.add(new LLCSegmentName(RAW_TABLE_NAME, partitionId, seqNum,
+            System.currentTimeMillis()).getSegmentName());
+      }
+    }
+
+    // CONSUMING instances with explicit partitions based on TOTAL partition count (8):
+    // This is critical: instance map has 8 slots, not 4, even though only 4 partitions are consumed.
+    // {
+    //   0_0=[instance_0], 1_0=[instance_1], 2_0=[instance_2], 3_0=[instance_0],
+    //   4_0=[instance_1], 5_0=[instance_2], 6_0=[instance_0], 7_0=[instance_1],
+    //   0_1=[instance_3], 1_1=[instance_4], 2_1=[instance_5], 3_1=[instance_3],
+    //   4_1=[instance_4], 5_1=[instance_5], 6_1=[instance_3], 7_1=[instance_4],
+    //   0_2=[instance_6], 1_2=[instance_7], 2_2=[instance_8], 3_2=[instance_6],
+    //   4_2=[instance_7], 5_2=[instance_8], 6_2=[instance_6], 7_2=[instance_7]
+    // }
+    InstancePartitions consumingInstancePartitions = new InstancePartitions(CONSUMING_INSTANCE_PARTITIONS_NAME);
+    int numConsumingInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      for (int partitionId = 0; partitionId < totalKafkaPartitions; partitionId++) {
+        int instanceIndex = (partitionId % numConsumingInstancesPerReplicaGroup)
+            + replicaGroupId * numConsumingInstancesPerReplicaGroup;
+        consumingInstancePartitions.setInstances(partitionId, replicaGroupId,
+            Collections.singletonList(CONSUMING_INSTANCES.get(instanceIndex)));
+      }
+    }
+
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+        Map.of(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
+
+    // First, assign segments for a FULL table (all 8 partitions) to establish baseline
+    Map<String, Map<String, String>> fullTableAssignment = new TreeMap<>();
+    List<String> fullTableSegments = new ArrayList<>();
+    for (int partitionId = 0; partitionId < totalKafkaPartitions; partitionId++) {
+      for (int seqNum = 0; seqNum < numSegmentsPerPartition; seqNum++) {
+        fullTableSegments.add(new LLCSegmentName(RAW_TABLE_NAME, partitionId, seqNum,
+            System.currentTimeMillis()).getSegmentName());
+      }
+    }
+    for (String segmentName : fullTableSegments) {
+      List<String> instancesAssigned =
+          _segmentAssignment.assignSegment(segmentName, fullTableAssignment, instancePartitionsMap);
+      fullTableAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
+    }
+
+    // Now assign segments for SUBSET table (only partitions {0, 2, 5, 7})
+    Map<String, Map<String, String>> subsetTableAssignment = new TreeMap<>();
+    for (String segmentName : subsetSegments) {
+      List<String> instancesAssigned =
+          _segmentAssignment.assignSegment(segmentName, subsetTableAssignment, instancePartitionsMap);
+      assertEquals(instancesAssigned.size(), NUM_REPLICAS);
+
+      // Extract partition ID from segment name
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      int partitionId = llcSegmentName.getPartitionGroupId();
+
+      // Verify the partition ID is one of our subset partitions
+      boolean isSubsetPartition = false;
+      for (int subsetId : subsetPartitionIds) {
+        if (partitionId == subsetId) {
+          isSubsetPartition = true;
+          break;
+        }
+      }
+      assertTrue(isSubsetPartition, "Segment partition " + partitionId + " should be in subset");
+
+      // KEY VALIDATION: Subset table assignment should MATCH full table assignment for same partition
+      // This proves that subset tables use the same routing logic as full tables
+      Map<String, String> fullTableInstanceStateMap = fullTableAssignment.get(segmentName);
+      Map<String, String> subsetTableInstanceStateMap =
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING);
+
+      assertEquals(subsetTableInstanceStateMap.keySet(), fullTableInstanceStateMap.keySet(),
+          "Subset table partition " + partitionId + " should be assigned to the SAME instances as full table");
+
+      // Verify assignment uses partitionId % totalPartitions for routing
+      // Partition 0 → slot 0 → instance 0, 3, 6
+      // Partition 2 → slot 2 → instance 2, 5, 8
+      // Partition 5 → slot 5 → instance 2, 5, 8  (5 % 3 = 2)
+      // Partition 7 → slot 7 → instance 1, 4, 7  (7 % 3 = 1)
+      for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+        int expectedInstanceIndex = (partitionId % numConsumingInstancesPerReplicaGroup)
+            + replicaGroupId * numConsumingInstancesPerReplicaGroup;
+        String expectedInstance = CONSUMING_INSTANCES.get(expectedInstanceIndex);
+        assertEquals(instancesAssigned.get(replicaGroupId), expectedInstance,
+            "Partition " + partitionId + " in replica group " + replicaGroupId
+                + " should be assigned to instance " + expectedInstance);
+      }
+
+      subsetTableAssignment.put(segmentName, subsetTableInstanceStateMap);
+    }
+
+    // Verify that subset table uses the same instances as full table for each partition
+    for (String segmentName : subsetSegments) {
+      Map<String, String> subsetInstances = subsetTableAssignment.get(segmentName);
+      Map<String, String> fullInstances = fullTableAssignment.get(segmentName);
+      assertEquals(subsetInstances.keySet(), fullInstances.keySet(),
+          "Segment " + segmentName + " should have identical instance assignment in subset and full tables");
+    }
+
+    // Verify all subset partitions are distributed across different instances (no hotspot)
+    // With modulo-8 routing:
+    // Partition 0 → slot 0 → instances {0, 3, 6}
+    // Partition 2 → slot 2 → instances {2, 5, 8}
+    // Partition 5 → slot 5 → instances {2, 5, 8} (same as slot 2)
+    // Partition 7 → slot 7 → instances {1, 4, 7}
+    // Total unique instances: {0, 1, 2, 3, 4, 5, 6, 7, 8} = 9 instances
+    HashSet<String> usedInstances = new HashSet<>();
+    for (Map<String, String> instanceStateMap : subsetTableAssignment.values()) {
+      usedInstances.addAll(instanceStateMap.keySet());
+    }
+    // With correct modulo-8 routing, all 9 consuming instances should be used
+    assertEquals(usedInstances.size(), NUM_CONSUMING_INSTANCES,
+        "Subset partition assignment with modulo-8 routing should use all instances, found: " + usedInstances.size());
+
+    // Verify each subset partition uses distinct instance sets (within each replica group)
+    Map<Integer, HashSet<String>> partitionToInstancesRG0 = new TreeMap<>();
+    for (int partitionId : subsetPartitionIds) {
+      int instanceIndex = partitionId % numConsumingInstancesPerReplicaGroup;
+      HashSet<String> instances = new HashSet<>();
+      instances.add(CONSUMING_INSTANCES.get(instanceIndex)); // RG0
+      instances.add(CONSUMING_INSTANCES.get(instanceIndex + numConsumingInstancesPerReplicaGroup)); // RG1
+      instances.add(CONSUMING_INSTANCES.get(instanceIndex + 2 * numConsumingInstancesPerReplicaGroup)); // RG2
+      partitionToInstancesRG0.put(partitionId, instances);
+    }
+
+    // Partitions 0 and 7 should NOT share the same instance set
+    // (This would happen if we incorrectly used subset size = 4 for routing)
+    HashSet<String> partition0Instances = partitionToInstancesRG0.get(0);
+    HashSet<String> partition7Instances = partitionToInstancesRG0.get(7);
+    assertTrue(!partition0Instances.equals(partition7Instances),
+        "Partitions 0 and 7 should map to different instance sets to avoid hotspots");
+  }
+
+  /**
+   * Regression for imported COMPLETED instance partitions during rebalance.
+   *
+   * <p><b>Prod scenario:</b> Table B imports Table A's CONSUMING and COMPLETED instance partitions via
+   * {@code instancePartitionsMap} (no {@code instanceAssignmentConfigMap} for COMPLETED). During rebalance,
+   * {@link org.apache.pinot.controller.helix.core.rebalance.TableRebalancer#getInstancePartitionsMap} only
+   * loads COMPLETED IPs when {@link InstanceAssignmentConfigUtils#shouldRelocateCompletedSegments} returns true.
+   *
+   * <p><b>Bug:</b> {@code shouldRelocateCompletedSegments} ignored {@code instancePartitionsMap}, so rebalance
+   * passed only CONSUMING IPs to segment assignment and completed segments stayed on one server per partition.
+   *
+   * <p>This test mirrors {@code TableRebalancer}: the rebalance {@code instancePartitionsMap} is built from
+   * {@code shouldRelocateCompletedSegments(tableConfig)}, not by always passing COMPLETED IPs directly.
+   */
+  @Test
+  public void testImportedInstancePartitionsWithMultipleServersPerPartition() {
+    int numReplicas = 2;
+    int numReplicaGroups = numReplicas;
+    int numServers = 64;
+    int numInstancePartitions = 8;
+    int numServersPerPartitionPerRG = numServers / numReplicaGroups / numInstancePartitions; // 4
+    int numStreamPartitions = 8; // exact prod case: 1:1 mapping with instance partitions
+    int numSegmentsPerPartition = 20; // 19 completed + 1 consuming per stream partition
+    String serverPrefix = "Server_";
+
+    List<String> allServers = SegmentAssignmentTestUtils.getNameList(serverPrefix, numServers);
+
+    // Table B: imports CONSUMING/COMPLETED IPs from Table A; no instanceAssignmentConfigMap for COMPLETED.
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    Map<InstancePartitionsType, String> importedInstancePartitions = new HashMap<>();
+    importedInstancePartitions.put(InstancePartitionsType.CONSUMING, "sourceTable_CONSUMING");
+    importedInstancePartitions.put(InstancePartitionsType.COMPLETED, "sourceTable_COMPLETED");
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(numReplicas)
+            .setStreamConfigs(streamConfigs)
+            .setInstancePartitionsMap(importedInstancePartitions)
+            .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(),
+                new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
+            .build();
+    assertTrue(InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig),
+        "Imported COMPLETED instance partitions must trigger completed-segment relocation during rebalance");
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
+
+    // Both CONSUMING and COMPLETED instance partitions use the same 64 servers
+    // (imported from the same source table). 8 explicit partitions, 2 RGs, 4 servers per partition.
+    InstancePartitions consumingInstancePartitions = new InstancePartitions(CONSUMING_INSTANCE_PARTITIONS_NAME);
+    InstancePartitions completedInstancePartitions = new InstancePartitions(COMPLETED_INSTANCE_PARTITIONS_NAME);
+    for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+      for (int partitionId = 0; partitionId < numInstancePartitions; partitionId++) {
+        List<String> serversInPartition = new ArrayList<>(numServersPerPartitionPerRG);
+        int baseIndex = replicaGroupId * (numServers / numReplicaGroups)
+            + partitionId * numServersPerPartitionPerRG;
+        for (int i = 0; i < numServersPerPartitionPerRG; i++) {
+          serversInPartition.add(allServers.get(baseIndex + i));
+        }
+        consumingInstancePartitions.setInstances(partitionId, replicaGroupId, serversInPartition);
+        completedInstancePartitions.setInstances(partitionId, replicaGroupId,
+            new ArrayList<>(serversInPartition));
+      }
+    }
+
+    // Create segments: 8 stream partitions × 20 segments each = 160 total
+    List<String> segments = new ArrayList<>();
+    for (int partitionId = 0; partitionId < numStreamPartitions; partitionId++) {
+      for (int seqNum = 0; seqNum < numSegmentsPerPartition; seqNum++) {
+        segments.add(new LLCSegmentName(RAW_TABLE_NAME, partitionId, seqNum,
+            System.currentTimeMillis()).getSegmentName());
+      }
+    }
+
+    // Build currentAssignment: all segments initially pinned to first server in each partition
+    // (simulates the state produced by the buggy path where COMPLETED IPs were not loaded).
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    for (int partitionId = 0; partitionId < numStreamPartitions; partitionId++) {
+      for (int seqNum = 0; seqNum < numSegmentsPerPartition; seqNum++) {
+        String segmentName = segments.get(partitionId * numSegmentsPerPartition + seqNum);
+        int instancePartitionId = partitionId % numInstancePartitions;
+        List<String> instancesForSegment = new ArrayList<>(numReplicaGroups);
+        for (int rg = 0; rg < numReplicaGroups; rg++) {
+          instancesForSegment.add(
+              consumingInstancePartitions.getInstances(instancePartitionId, rg).get(0));
+        }
+        boolean isConsuming = (seqNum == numSegmentsPerPartition - 1);
+        String state = isConsuming ? SegmentStateModel.CONSUMING : SegmentStateModel.ONLINE;
+        currentAssignment.put(segmentName,
+            SegmentAssignmentUtils.getInstanceStateMap(instancesForSegment, state));
+      }
+    }
+
+    // Mirror TableRebalancer.getInstancePartitionsMap(): CONSUMING always; COMPLETED only when relocation applies.
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+        buildRebalanceInstancePartitionsMap(tableConfig, consumingInstancePartitions, completedInstancePartitions);
+
+    // Simulate pre-fix rebalance: only CONSUMING IPs in the map (COMPLETED omitted even though import is configured).
+    // Completed segments stay pinned to one server per stream partition.
+    Map<InstancePartitionsType, InstancePartitions> consumingOnlyPartitionsMap = new TreeMap<>();
+    consumingOnlyPartitionsMap.put(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setIncludeConsuming(true);
+    Map<String, Map<String, String>> consumingOnlyAssignment =
+        segmentAssignment.rebalanceTable(currentAssignment, consumingOnlyPartitionsMap, null, null,
+            rebalanceConfig);
+    int expectedCompletedSegmentServerCountWhenCompletedIpsOmitted = numStreamPartitions * numReplicaGroups;
+    assertEquals(countServersWithCompletedSegments(consumingOnlyAssignment),
+        expectedCompletedSegmentServerCountWhenCompletedIpsOmitted,
+        "Without COMPLETED instance partitions (buggy rebalance path), completed segments should stay on "
+            + expectedCompletedSegmentServerCountWhenCompletedIpsOmitted + " servers");
+
+    assertTrue(instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED),
+        "Rebalance must include COMPLETED instance partitions when imported via instancePartitionsMap");
+    Map<String, Map<String, String>> newAssignment =
+        segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, null, null, rebalanceConfig);
+
+    // COMPLETED segments should be distributed across all 64 servers
+    HashSet<String> completedServers = collectServersWithCompletedSegments(newAssignment);
+    assertEquals(completedServers.size(), numServers,
+        "All " + numServers + " servers should have COMPLETED segments, but only "
+            + completedServers.size() + " were used.");
+
+    // Verify per-partition spread for COMPLETED segments
+    for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+      for (int instPartId = 0; instPartId < numInstancePartitions; instPartId++) {
+        List<String> partitionServers = completedInstancePartitions.getInstances(instPartId, replicaGroupId);
+        HashSet<String> usedInPartition = new HashSet<>();
+        for (String server : partitionServers) {
+          if (completedServers.contains(server)) {
+            usedInPartition.add(server);
+          }
+        }
+        assertEquals(usedInPartition.size(), numServersPerPartitionPerRG,
+            "COMPLETED: instance partition " + instPartId + " in RG " + replicaGroupId + " should use all "
+                + numServersPerPartitionPerRG + " servers, but only " + usedInPartition.size() + " were used");
+      }
+    }
+
+    // Verify per-stream-partition coverage: for each stream partition, the set of servers across all
+    // of its completed segments should equal the full set of servers in that instance partition (per RG).
+    for (int partitionId = 0; partitionId < numStreamPartitions; partitionId++) {
+      int instancePartitionId = partitionId % numInstancePartitions;
+      for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+        List<String> expectedServers = completedInstancePartitions.getInstances(instancePartitionId, replicaGroupId);
+        HashSet<String> actualServers = new HashSet<>();
+        for (int seqNum = 0; seqNum < numSegmentsPerPartition - 1; seqNum++) {
+          String segmentName = segments.get(partitionId * numSegmentsPerPartition + seqNum);
+          Map<String, String> instanceStateMap = newAssignment.get(segmentName);
+          for (String server : instanceStateMap.keySet()) {
+            if (expectedServers.contains(server)) {
+              actualServers.add(server);
+            }
+          }
+        }
+        assertEquals(actualServers, new HashSet<>(expectedServers),
+            "Stream partition " + partitionId + " in RG " + replicaGroupId
+                + " should have completed segments on all " + numServersPerPartitionPerRG
+                + " servers in instance partition " + instancePartitionId
+                + ", but only used: " + actualServers);
+      }
+    }
+
+    // --- Bootstrap variant ---
+    RebalanceConfig bootstrapConfig = new RebalanceConfig();
+    bootstrapConfig.setIncludeConsuming(true);
+    bootstrapConfig.setBootstrap(true);
+    Map<String, Map<String, String>> bootstrapAssignment =
+        segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, null, null, bootstrapConfig);
+
+    HashSet<String> bootstrapCompletedServers = collectServersWithCompletedSegments(bootstrapAssignment);
+    assertEquals(bootstrapCompletedServers.size(), numServers,
+        "Bootstrap: all " + numServers + " servers should have COMPLETED segments, but only "
+            + bootstrapCompletedServers.size() + " were used.");
+
+    // Same per-stream-partition check for bootstrap
+    for (int partitionId = 0; partitionId < numStreamPartitions; partitionId++) {
+      int instancePartitionId = partitionId % numInstancePartitions;
+      for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+        List<String> expectedServers = completedInstancePartitions.getInstances(instancePartitionId, replicaGroupId);
+        HashSet<String> actualServers = new HashSet<>();
+        for (int seqNum = 0; seqNum < numSegmentsPerPartition - 1; seqNum++) {
+          String segmentName = segments.get(partitionId * numSegmentsPerPartition + seqNum);
+          Map<String, String> instanceStateMap = bootstrapAssignment.get(segmentName);
+          for (String server : instanceStateMap.keySet()) {
+            if (expectedServers.contains(server)) {
+              actualServers.add(server);
+            }
+          }
+        }
+        assertEquals(actualServers, new HashSet<>(expectedServers),
+            "Bootstrap: stream partition " + partitionId + " in RG " + replicaGroupId
+                + " should have completed segments on all " + numServersPerPartitionPerRG
+                + " servers in instance partition " + instancePartitionId
+                + ", but only used: " + actualServers);
+      }
+    }
+  }
+
+  /**
+   * Builds the instance-partitions map the same way as
+   * {@link org.apache.pinot.controller.helix.core.rebalance.TableRebalancer#getInstancePartitionsMap}.
+   */
+  private static Map<InstancePartitionsType, InstancePartitions> buildRebalanceInstancePartitionsMap(
+      TableConfig tableConfig, InstancePartitions consumingInstancePartitions,
+      InstancePartitions completedInstancePartitions) {
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
+    instancePartitionsMap.put(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
+    if (InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
+      instancePartitionsMap.put(InstancePartitionsType.COMPLETED, completedInstancePartitions);
+    }
+    return instancePartitionsMap;
+  }
+
+  private static HashSet<String> collectServersWithCompletedSegments(
+      Map<String, Map<String, String>> assignment) {
+    HashSet<String> completedServers = new HashSet<>();
+    for (Map.Entry<String, Map<String, String>> entry : assignment.entrySet()) {
+      if (entry.getValue().containsValue(SegmentStateModel.ONLINE)) {
+        completedServers.addAll(entry.getValue().keySet());
+      }
+    }
+    return completedServers;
+  }
+
+  private static int countServersWithCompletedSegments(Map<String, Map<String, String>> assignment) {
+    return collectServersWithCompletedSegments(assignment).size();
   }
 
   private HelixManager createHelixManager() {

@@ -21,12 +21,11 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -60,13 +59,17 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   private final AsyncHttpClient _httpClient;
   private final String _extraOptionStr;
   private final boolean _useMultistageEngine;
+  private static final SslContextProvider SSL_CONTEXT_PROVIDER = SslContextProviderFactory.create();
 
   public JsonAsyncHttpPinotClientTransport() {
     _brokerReadTimeout = 60000;
     _headers = new HashMap<>();
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;
-    _httpClient = Dsl.asyncHttpClient(Dsl.config().setRequestTimeout(Duration.ofMillis(_brokerReadTimeout)));
+    Builder builder = Dsl.config();
+    SSL_CONTEXT_PROVIDER.configure(builder, null, TlsProtocols.defaultProtocols(false));
+    _httpClient =
+        Dsl.asyncHttpClient(builder.setRequestTimeout(Duration.ofMillis(_brokerReadTimeout)).build());
     _useMultistageEngine = false;
   }
 
@@ -80,16 +83,12 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     _useMultistageEngine = useMultistageEngine;
 
     Builder builder = Dsl.config();
-    if (sslContext != null) {
-      builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
-    }
-
+    SSL_CONTEXT_PROVIDER.configure(builder, sslContext, tlsProtocols);
     builder.setRequestTimeout(Duration.ofMillis(_brokerReadTimeout))
         .setReadTimeout(Duration.ofMillis(connectionTimeouts.getReadTimeoutMs()))
         .setConnectTimeout(Duration.ofMillis(connectionTimeouts.getConnectTimeoutMs()))
         .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId))
-        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
+        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId));
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
@@ -118,8 +117,10 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       if (_headers != null) {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
       }
-      LOGGER.debug("Sending query {} to {}", query, url);
-      return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
+      String correlationId = UUID.randomUUID().toString();
+      LOGGER.debug("Sending query {} to {} with correlationId {}", query, url, correlationId);
+      return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8")
+          .addHeader("X-Correlation-Id", correlationId).setBody(json.toString())
           .execute().toCompletableFuture().thenApply(httpResponse -> {
             LOGGER.debug("Completed query, HTTP status is {}", httpResponse.getStatusCode());
 

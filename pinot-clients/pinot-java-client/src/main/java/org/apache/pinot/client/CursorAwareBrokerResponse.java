@@ -19,6 +19,7 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import javax.annotation.Nullable;
 
 /**
  * Extended BrokerResponse with cursor-specific fields for cursor pagination queries.
@@ -64,47 +65,58 @@ public class CursorAwareBrokerResponse extends BrokerResponse {
 
 
   // Cursor-specific field getters
+  @Nullable
   public Long getOffset() {
     return _offset;
   }
 
+  @Nullable
   public Integer getNumRows() {
     return _numRows;
   }
 
+  @Nullable
   public Long getNumRowsResultSet() {
     return _numRowsResultSet;
   }
 
+  @Nullable
   public Long getCursorResultWriteTimeMs() {
     return _cursorResultWriteTimeMs;
   }
 
+  @Nullable
   public Long getSubmissionTimeMs() {
     return _submissionTimeMs;
   }
 
+  @Nullable
   public Long getExpirationTimeMs() {
     return _expirationTimeMs;
   }
 
+  @Nullable
   public String getBrokerHost() {
     return _brokerHost;
   }
 
+  @Nullable
   public Integer getBrokerPort() {
     return _brokerPort;
   }
 
+  @Nullable
   public Long getBytesWritten() {
     return _bytesWritten;
   }
 
+  @Nullable
   public Long getCursorFetchTimeMs() {
     return _cursorFetchTimeMs;
   }
 
   // Helper methods for extracting values from JsonNode with null checks
+  @Nullable
   private static Long getLongOrNull(JsonNode node, String fieldName) {
     if (node == null) {
       return null;
@@ -113,6 +125,7 @@ public class CursorAwareBrokerResponse extends BrokerResponse {
     return (valueNode != null && !valueNode.isNull()) ? valueNode.asLong() : null;
   }
 
+  @Nullable
   private static Integer getIntOrNull(JsonNode node, String fieldName) {
     if (node == null) {
       return null;
@@ -121,6 +134,7 @@ public class CursorAwareBrokerResponse extends BrokerResponse {
     return (valueNode != null && !valueNode.isNull()) ? valueNode.asInt() : null;
   }
 
+  @Nullable
   private static String getTextOrNull(JsonNode node, String fieldName) {
     if (node == null) {
       return null;

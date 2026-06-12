@@ -68,6 +68,8 @@ public interface RequestContext {
 
   void setQuery(String pql);
 
+  void setQueryFingerprint(QueryFingerprint queryFingerprint);
+
   void setTableName(String tableName);
 
   void setTableNames(List<String> tableNames);
@@ -97,6 +99,8 @@ public interface RequestContext {
   int getErrorCode();
 
   String getQuery();
+
+  QueryFingerprint getQueryFingerprint();
 
   String getTableName();
 

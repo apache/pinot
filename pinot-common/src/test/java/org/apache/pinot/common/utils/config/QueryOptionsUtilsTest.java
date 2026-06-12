@@ -29,6 +29,9 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -41,10 +44,10 @@ public class QueryOptionsUtilsTest {
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
           GROUP_TRIM_THRESHOLD);
   private static final List<String> INT_KEYS = new ArrayList<>() {{
-    addAll(POSITIVE_INT_KEYS);
-    addAll(NON_NEGATIVE_INT_KEYS);
-    addAll(UNBOUNDED_INT_KEYS);
-  }};
+      addAll(POSITIVE_INT_KEYS);
+      addAll(NON_NEGATIVE_INT_KEYS);
+      addAll(UNBOUNDED_INT_KEYS);
+    }};
   private static final List<String> POSITIVE_LONG_KEYS =
       List.of(TIMEOUT_MS, MAX_SERVER_RESPONSE_SIZE_BYTES, MAX_QUERY_RESPONSE_SIZE_BYTES);
 
@@ -59,6 +62,38 @@ public class QueryOptionsUtilsTest {
     // Then:
     assertEquals(resolved.get(ENABLE_NULL_HANDLING), "true");
     assertEquals(resolved.get(USE_MULTISTAGE_ENGINE), "false");
+  }
+
+  @Test
+  public void shouldResolveSamplerOptionCaseInsensitively() {
+    Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("SAMPLER", "firstOnly"));
+
+    assertEquals(resolved.get(TABLE_SAMPLER), "firstOnly");
+  }
+
+  @Test
+  public void materializedViewRewriteDefaultsToEnabled() {
+    // Absent option and null map both default to enabled (back-compat with pre-option behavior).
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(null));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(new HashMap<>()));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "true")));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "TRUE")));
+    // Anything that is not "true" disables (explicit false, case variants, and any non-true value).
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "false")));
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "FALSE")));
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "1")));
+  }
+
+  @Test
+  public void shouldExtractTableSamplerOption() {
+    assertEquals(QueryOptionsUtils.getTableSampler(Map.of(TABLE_SAMPLER, "firstOnly")), "firstOnly");
+    assertNull(QueryOptionsUtils.getTableSampler(Map.of()));
+    assertNull(QueryOptionsUtils.getTableSampler(null));
   }
 
   @Test
@@ -154,6 +189,116 @@ public class QueryOptionsUtilsTest {
         } catch (IllegalArgumentException ise) {
           assertEquals(ise.getMessage(), key + " must be a number between 1 and 2^63-1, got: " + value);
         }
+      }
+    }
+  }
+
+  @Test
+  public void testGetQueryHashWithValue() {
+    Map<String, String> queryOptions = Map.of(QUERY_HASH, "abc123def456");
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "abc123def456");
+  }
+
+  @Test
+  public void testGetQueryHashWithEmptyString() {
+    Map<String, String> queryOptions = Map.of(QUERY_HASH, "");
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "");
+  }
+
+  @Test
+  public void testGetQueryHashWithoutValue() {
+    Map<String, String> queryOptions = new HashMap<>();
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "");
+  }
+
+  // --- Vector search query option tests ---
+
+  @Test
+  public void testVectorNprobeValid() {
+    assertEquals(QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "8")), Integer.valueOf(8));
+    assertEquals(QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "1")), Integer.valueOf(1));
+    assertEquals(QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "128")), Integer.valueOf(128));
+  }
+
+  @Test
+  public void testVectorNprobeNull() {
+    assertNull(QueryOptionsUtils.getVectorNprobe(Map.of()));
+    assertNull(QueryOptionsUtils.getVectorNprobe(new HashMap<>()));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorNprobeZero() {
+    QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "0"));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorNprobeNegative() {
+    QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "-1"));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorNprobeNonNumeric() {
+    QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "abc"));
+  }
+
+  @Test
+  public void testVectorExactRerank() {
+    org.testng.Assert.assertTrue(QueryOptionsUtils.isVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "true")));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "false")));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isVectorExactRerank(Map.of()));
+    assertEquals(QueryOptionsUtils.getVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "true")), Boolean.TRUE);
+    assertEquals(QueryOptionsUtils.getVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "false")), Boolean.FALSE);
+    assertNull(QueryOptionsUtils.getVectorExactRerank(Map.of()));
+  }
+
+  @Test
+  public void testVectorMaxCandidatesValid() {
+    assertEquals(QueryOptionsUtils.getVectorMaxCandidates(Map.of(VECTOR_MAX_CANDIDATES, "100")),
+        Integer.valueOf(100));
+    assertEquals(QueryOptionsUtils.getVectorMaxCandidates(Map.of(VECTOR_MAX_CANDIDATES, "1")),
+        Integer.valueOf(1));
+  }
+
+  @Test
+  public void testVectorMaxCandidatesNull() {
+    assertNull(QueryOptionsUtils.getVectorMaxCandidates(Map.of()));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorMaxCandidatesZero() {
+    QueryOptionsUtils.getVectorMaxCandidates(Map.of(VECTOR_MAX_CANDIDATES, "0"));
+  }
+
+  @Test
+  public void testVectorNprobeCaseInsensitiveResolution() {
+    Map<String, String> opts = Map.of("VECTORNPROBE", "16");
+    Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(opts);
+    assertEquals(QueryOptionsUtils.getVectorNprobe(resolved), Integer.valueOf(16));
+  }
+
+  @Test
+  public void testInvertedIndexDistinctCostRatioValid() {
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "0")), Double.valueOf(0));
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "2.5")), Double.valueOf(2.5));
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, " 3.5 ")), Double.valueOf(3.5));
+    assertNull(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(Map.of()));
+  }
+
+  @Test
+  public void testInvertedIndexDistinctCostRatioRejectsNonFiniteValues() {
+    for (String value : new String[]{"NaN", "Infinity", "-Infinity", "-1", "invalid"}) {
+      try {
+        QueryOptionsUtils.getInvertedIndexDistinctCostRatio(Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, value));
+        fail();
+      } catch (IllegalArgumentException e) {
+        assertEquals(e.getMessage(),
+            INVERTED_INDEX_DISTINCT_COST_RATIO + " must be a non-negative number, got: " + value);
       }
     }
   }

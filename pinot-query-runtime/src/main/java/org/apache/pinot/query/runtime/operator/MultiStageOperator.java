@@ -27,10 +27,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseMetrics;
+import org.apache.pinot.common.metrics.MseTimer;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -71,7 +72,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
    */
   protected abstract Logger logger();
 
-  public abstract Type getOperatorType();
+  public abstract OperatorTypeDescriptor getOperatorType();
 
   public abstract void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs);
 
@@ -177,7 +178,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         .orElse(MultiStageQueryStats.emptyStats(_context.getStageId()));
   }
 
-  protected abstract StatMap<?> copyStatMaps();
+  public abstract StatMap<?> copyStatMaps();
 
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
@@ -236,10 +237,13 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
    * <p>
    * This is mostly used in the context of stats collection, where we use this enum in the serialization form in order
    * to identify the type of the stats in an efficient way.
-   * DO NOT change the order of the enum values, as the ordinal is used in serialization.
+   * <p>
+   * IMPORTANT: Each enum entry has an explicit {@code id} used for serialization. When adding new operator types,
+   * always append them at the end and assign the next available ID. Never reuse or change existing IDs as this
+   * would break backward compatibility with older versions.
    */
-  public enum Type {
-    AGGREGATE(AggregateOperator.StatKey.class) {
+  public enum Type implements OperatorTypeDescriptor {
+    AGGREGATE(0, AggregateOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -248,15 +252,16 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
         response.mergeNumGroupsWarningLimitReached(
             stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED));
+        response.mergeNumGroups(stats.getLong(AggregateOperator.StatKey.NUM_GROUPS));
         response.mergeMaxRowsInOperator(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
       }
 
       /// So far this keys do not need to be modified from here because they are incremented in a per-worker basis:
       /// ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED
       /// ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED
-      /// public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics);
+      /// public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics);
     },
-    FILTER(FilterOperator.StatKey.class) {
+    FILTER(1, FilterOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -264,29 +269,30 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeMaxRowsInOperator(stats.getLong(FilterOperator.StatKey.EMITTED_ROWS));
       }
     },
-    HASH_JOIN(HashJoinOperator.StatKey.class) {
+    HASH_JOIN(2, HashJoinOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(HashJoinOperator.StatKey.EMITTED_ROWS));
         response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
+        response.mergeMaxRowsInJoin(stats.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN));
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
-        super.updateServerMetrics(map, serverMetrics);
+      public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
+        super.updateMseMetrics(map, mseMetrics);
         @SuppressWarnings("unchecked")
         StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
         boolean maxRowsInJoinReached = stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED);
         if (maxRowsInJoinReached) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.HASH_JOIN_TIMES_MAX_ROWS_REACHED, 1);
+          mseMetrics.addMeteredGlobalValue(MseMeter.HASH_JOIN_TIMES_MAX_ROWS_REACHED, 1);
         }
-        serverMetrics.addTimedValue(ServerTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS,
+        mseMetrics.addTimedValue(MseTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS,
             stats.getLong(HashJoinOperator.StatKey.TIME_BUILDING_HASH_TABLE_MS), TimeUnit.MILLISECONDS);
       }
     },
-    INTERSECT(SetOperator.StatKey.class) {
+    INTERSECT(3, SetOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -294,7 +300,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
-    LEAF(LeafOperator.StatKey.class) {
+    LEAF(4, LeafOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -308,13 +314,13 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.addBrokerStats(brokerStats);
       }
     },
-    LITERAL(LiteralValueOperator.StatKey.class) {
+    LITERAL(5, LiteralValueOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         // Do nothing
       }
     },
-    MAILBOX_RECEIVE(BaseMailboxReceiveOperator.StatKey.class) {
+    MAILBOX_RECEIVE(6, BaseMailboxReceiveOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -323,27 +329,27 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
-        super.updateServerMetrics(map, serverMetrics);
+      public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
+        super.updateMseMetrics(map, mseMetrics);
         @SuppressWarnings("unchecked")
         StatMap<BaseMailboxReceiveOperator.StatKey> stats = (StatMap<BaseMailboxReceiveOperator.StatKey>) map;
 
-        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_IN_MEMORY_MESSAGES,
+        mseMetrics.addMeteredGlobalValue(MseMeter.IN_MEMORY_MESSAGES,
             stats.getInt(BaseMailboxReceiveOperator.StatKey.IN_MEMORY_MESSAGES));
-        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_RAW_MESSAGES,
+        mseMetrics.addMeteredGlobalValue(MseMeter.RAW_MESSAGES,
             stats.getInt(BaseMailboxReceiveOperator.StatKey.RAW_MESSAGES));
-        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_RAW_BYTES,
+        mseMetrics.addMeteredGlobalValue(MseMeter.RAW_BYTES,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DESERIALIZED_BYTES));
 
-        serverMetrics.addTimedValue(ServerTimer.MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS,
+        mseMetrics.addTimedValue(MseTimer.DESERIALIZATION_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DESERIALIZATION_TIME_MS), TimeUnit.MILLISECONDS);
-        serverMetrics.addTimedValue(ServerTimer.RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS,
+        mseMetrics.addTimedValue(MseTimer.RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DOWNSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
-        serverMetrics.addTimedValue(ServerTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS,
+        mseMetrics.addTimedValue(MseTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.UPSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
       }
     },
-    MAILBOX_SEND(MailboxSendOperator.StatKey.class) {
+    MAILBOX_SEND(7, MailboxSendOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -352,14 +358,14 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+      public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
         @SuppressWarnings("unchecked")
         StatMap<MailboxSendOperator.StatKey> stats = (StatMap<MailboxSendOperator.StatKey>) map;
-        serverMetrics.addTimedValue(ServerTimer.MULTI_STAGE_SERIALIZATION_CPU_TIME_MS,
+        mseMetrics.addTimedValue(MseTimer.SERIALIZATION_CPU_TIME_MS,
             stats.getLong(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS), TimeUnit.MILLISECONDS);
       }
     },
-    MINUS(SetOperator.StatKey.class) {
+    MINUS(8, SetOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -367,7 +373,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
-    PIPELINE_BREAKER(PipelineBreakerOperator.StatKey.class) {
+    PIPELINE_BREAKER(9, PipelineBreakerOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -375,7 +381,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeMaxRowsInOperator(stats.getLong(PipelineBreakerOperator.StatKey.EMITTED_ROWS));
       }
     },
-    SORT_OR_LIMIT(SortOperator.StatKey.class) {
+    SORT_OR_LIMIT(10, SortOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -383,7 +389,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeMaxRowsInOperator(stats.getLong(SortOperator.StatKey.EMITTED_ROWS));
       }
     },
-    TRANSFORM(TransformOperator.StatKey.class) {
+    TRANSFORM(11, TransformOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -391,7 +397,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeMaxRowsInOperator(stats.getLong(TransformOperator.StatKey.EMITTED_ROWS));
       }
     },
-    UNION(SetOperator.StatKey.class) {
+    UNION(12, SetOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -399,7 +405,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
-    WINDOW(WindowAggregateOperator.StatKey.class) {
+    WINDOW(13, WindowAggregateOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -407,30 +413,81 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeMaxRowsInOperator(stats.getLong(WindowAggregateOperator.StatKey.EMITTED_ROWS));
         response.mergeMaxRowsInWindowReached(
             stats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED));
+        response.mergeMaxRowsInWindow(stats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW));
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+      public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
         @SuppressWarnings("unchecked")
         StatMap<WindowAggregateOperator.StatKey> stats = (StatMap<WindowAggregateOperator.StatKey>) map;
         if (stats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED)) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
+          mseMetrics.addMeteredGlobalValue(MseMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
         }
       }
     },
-    LOOKUP_JOIN(LookupJoinOperator.StatKey.class) {
+    LOOKUP_JOIN(14, LookupJoinOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<LookupJoinOperator.StatKey> stats = (StatMap<LookupJoinOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(LookupJoinOperator.StatKey.EMITTED_ROWS));
       }
+    },
+    UNNEST(15, UnnestOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<UnnestOperator.StatKey> stats = (StatMap<UnnestOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(UnnestOperator.StatKey.EMITTED_ROWS));
+      }
     };
 
+    // When adding new operator types, update MAX_ID if the new ID exceeds the current max
+    private static final int MAX_ID = 15;
+    private static final Type[] ID_TO_TYPE = new Type[MAX_ID + 1];
+
+    static {
+      for (Type type : values()) {
+        int id = type._id;
+        if (id < 0 || id > Byte.MAX_VALUE) {
+          throw new IllegalStateException("Operator type id must fit in a signed byte (0-127), but " + type
+              + " has id " + id);
+        }
+        Preconditions.checkArgument(id <= MAX_ID,
+            "Operator type id %s exceeds MAX_ID %s. Please update MAX_ID.", id, MAX_ID);
+        Preconditions.checkArgument(ID_TO_TYPE[id] == null,
+            "Duplicate id %s for types %s and %s", id, ID_TO_TYPE[id], type);
+        ID_TO_TYPE[id] = type;
+      }
+    }
+
+    private final int _id;
     private final Class _statKeyClass;
 
-    Type(Class<? extends StatMap.Key> statKeyClass) {
+    Type(int id, Class<? extends StatMap.Key> statKeyClass) {
+      _id = id;
       _statKeyClass = statKeyClass;
+    }
+
+    /**
+     * Returns the stable ID used for serialization.
+     * <p>
+     * This ID is guaranteed to remain constant across versions, unlike {@link #ordinal()} which can change
+     * if enum entries are reordered.
+     */
+    public int getId() {
+      return _id;
+    }
+
+    /**
+     * Returns the Type for the given serialization ID, or null if no such type exists.
+     */
+    @Nullable
+    public static Type fromId(int id) {
+      if (id >= 0 && id < ID_TO_TYPE.length) {
+        return ID_TO_TYPE[id];
+      }
+      return null;
     }
 
     /**
@@ -451,7 +508,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
      */
     public abstract void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map);
 
-    public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+    public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
       // Do nothing by default
     }
   }

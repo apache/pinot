@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,11 +47,13 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.impl.SegmentDeletionEventDetails;
+import org.apache.pinot.materializedview.consistency.MaterializedViewConsistencyManager;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -93,6 +96,7 @@ public class SegmentDeletionManager {
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final long _defaultDeletedSegmentsRetentionMs;
+  private volatile MaterializedViewConsistencyManager _materializedViewConsistencyManager;
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
@@ -114,6 +118,49 @@ public class SegmentDeletionManager {
 
   public void stop() {
     _executorService.shutdownNow();
+  }
+
+  public void registerMaterializedViewConsistencyManager(
+      MaterializedViewConsistencyManager materializedViewConsistencyManager) {
+    _materializedViewConsistencyManager = materializedViewConsistencyManager;
+  }
+
+  protected void notifyMaterializedViewConsistencyManager(String tableName, List<String> segmentsToDelete) {
+    MaterializedViewConsistencyManager mgr = _materializedViewConsistencyManager;
+    if (mgr == null || segmentsToDelete.isEmpty()) {
+      return;
+    }
+    try {
+      long minStart = Long.MAX_VALUE;
+      long maxEnd = Long.MIN_VALUE;
+      boolean sawSegmentWithoutTime = false;
+      for (String segmentId : segmentsToDelete) {
+        SegmentZKMetadata meta = ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableName, segmentId);
+        if (meta != null) {
+          long startMs = meta.getStartTimeMs();
+          long endMs = meta.getEndTimeMs();
+          if (startMs >= 0 && endMs >= 0) {
+            minStart = Math.min(minStart, startMs);
+            maxEnd = Math.max(maxEnd, endMs);
+          } else {
+            sawSegmentWithoutTime = true;
+          }
+        }
+      }
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      if (sawSegmentWithoutTime) {
+        // At least one deleted segment lacked time-range metadata. To avoid leaking stale
+        // VALID partitions in any dependent MV, signal a full-range invalidation. The
+        // consistency manager's BUCKET_MISSING_MARK_CAP bounds blast radius for long-history MVs.
+        LOGGER.warn("Base table {} segment deletion includes segments without startTime/endTime; "
+            + "treating as full-range MV invalidation.", tableName);
+        mgr.onBaseTableFullInvalidation(rawTableName);
+      } else if (minStart != Long.MAX_VALUE && maxEnd != Long.MIN_VALUE) {
+        mgr.onBaseTableDataChange(rawTableName, minStart, maxEnd);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Failed to notify MV consistency manager for segment deletion on table: {}", tableName, e);
+    }
   }
 
   public void deleteSegments(String tableName, Collection<String> segmentIds) {
@@ -141,17 +188,51 @@ public class SegmentDeletionManager {
 
   protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, Collection<String> segmentIds,
       Long deletedSegmentsRetentionMs, long deletionDelay) {
-    // Check if segment got removed from ExternalView or IdealState
+    List<String> segmentsToDelete = filterSegmentsToDelete(tableName, segmentIds);
+    if (segmentsToDelete == null) {
+      // ExternalView or IdealState was unavailable; skip the whole batch
+      return;
+    }
+
+    Set<String> deletedSegments = new HashSet<>();
+    if (!segmentsToDelete.isEmpty()) {
+      // Capture segment time ranges before ZK metadata is removed (for MV dirty marking)
+      notifyMaterializedViewConsistencyManager(tableName, segmentsToDelete);
+
+      // Notify all active listeners here
+      PinotSegmentLifecycleEventListenerManager.getInstance()
+          .notifyListeners(new SegmentDeletionEventDetails(tableName, segmentsToDelete));
+
+      deletedSegments = deleteSegmentsFromPropertyStore(tableName, segmentsToDelete);
+
+      // Best effort remove segments from deep store.
+      // If this fails (e.g. controller crashes, deep store unavailable), future runs of RetentionManager
+      // will attempt to delete orphan deep store entries. Check getSegmentsToDeleteFromDeepstore()
+      removeSegmentsFromStoreInBatch(tableName, deletedSegments, deletedSegmentsRetentionMs);
+    }
+
+    Set<String> segmentsToRetryLater = new HashSet<>(segmentIds);
+    segmentsToRetryLater.removeAll(deletedSegments);
+
+    LOGGER.info("Deleted {} segments from table {}:{}", deletedSegments.size(), tableName,
+        deletedSegments.size() <= 5 ? deletedSegments : "");
+
+    if (!segmentsToRetryLater.isEmpty()) {
+      rescheduleRetry(tableName, segmentsToRetryLater, deletedSegmentsRetentionMs, deletionDelay);
+    }
+  }
+
+  /// Check if segment got removed from ExternalView or IdealState
+  /// Returns `null` when the ExternalView or IdealState is unavailable
+  protected List<String> filterSegmentsToDelete(String tableName, Collection<String> segmentIds) {
     ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
     if (externalView == null || idealState == null) {
       LOGGER.warn("Resource: {} is not set up in idealState or ExternalView, won't do anything", tableName);
-      return;
+      return null;
     }
 
-    List<String> segmentsToDelete = new ArrayList<>(segmentIds.size()); // Has the segments that will be deleted
-    Set<String> segmentsToRetryLater = new HashSet<>(segmentIds.size());  // List of segments that we need to retry
-
+    List<String> segmentsToDelete = new ArrayList<>(segmentIds.size());
     try {
       for (String segmentId : segmentIds) {
         Map<String, String> segmentToInstancesMapFromExternalView = externalView.getStateMap(segmentId);
@@ -159,60 +240,60 @@ public class SegmentDeletionManager {
         if ((segmentToInstancesMapFromExternalView == null || segmentToInstancesMapFromExternalView.isEmpty()) && (
             segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.isEmpty())) {
           segmentsToDelete.add(segmentId);
-        } else {
-          segmentsToRetryLater.add(segmentId);
         }
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while checking helix states for table: {}", tableName, e);
       segmentsToDelete.clear();
       segmentsToDelete.addAll(segmentIds);
-      segmentsToRetryLater.clear();
     }
-
-    if (!segmentsToDelete.isEmpty()) {
-      List<String> propStorePathList = new ArrayList<>(segmentsToDelete.size());
-      for (String segmentId : segmentsToDelete) {
-        String segmentPropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId);
-        propStorePathList.add(segmentPropertyStorePath);
-      }
-
-      // Notify all active listeners here
-      PinotSegmentLifecycleEventListenerManager.getInstance()
-          .notifyListeners(new SegmentDeletionEventDetails(tableName, segmentsToDelete));
-
-      boolean[] deleteSuccessful = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
-      List<String> propStoreFailedSegs = new ArrayList<>(segmentsToDelete.size());
-      for (int i = 0; i < deleteSuccessful.length; i++) {
-        final String segmentId = segmentsToDelete.get(i);
-        if (!deleteSuccessful[i]) {
-          // remove API can fail because the prop store entry did not exist, so check first.
-          if (_propertyStore.exists(propStorePathList.get(i), AccessOption.PERSISTENT)) {
-            LOGGER.info("Could not delete {} from propertystore", propStorePathList.get(i));
-            segmentsToRetryLater.add(segmentId);
-            propStoreFailedSegs.add(segmentId);
-          }
-        }
-      }
-      segmentsToDelete.removeAll(propStoreFailedSegs);
-
-      // TODO: If removing segments from deep store fails (e.g. controller crashes, deep store unavailable), these
-      //       segments will become orphans and not easy to track because their ZK metadata are already deleted.
-      //       Consider removing segments from deep store before cleaning up the ZK metadata.
-      removeSegmentsFromStoreInBatch(tableName, segmentsToDelete, deletedSegmentsRetentionMs);
-    }
-
-    LOGGER.info("Deleted {} segments from table {}:{}", segmentsToDelete.size(), tableName,
-        segmentsToDelete.size() <= 5 ? segmentsToDelete : "");
-
-    if (!segmentsToRetryLater.isEmpty()) {
-      long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
-      LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
-      deleteSegmentsWithDelay(tableName, segmentsToRetryLater, deletedSegmentsRetentionMs, effectiveDeletionDelay);
-    }
+    return segmentsToDelete;
   }
 
-  public void removeSegmentsFromStoreInBatch(String tableNameWithType, List<String> segments,
+  /// Removes the property-store znodes for the given segments
+  /// Returns the set of segments that were successfully deleted.
+  protected Set<String> deleteSegmentsFromPropertyStore(String tableName, List<String> segmentsToDelete) {
+    // Use a LinkedHashSet so deep-store deletion preserves the input order (deterministic) rather
+    // than HashSet bucket order, while keeping the Set semantics callers rely on.
+    Set<String> deletedSegments = new LinkedHashSet<>(segmentsToDelete.size());
+    List<String> propStorePathList = new ArrayList<>(segmentsToDelete.size());
+    for (String segmentId : segmentsToDelete) {
+      String segmentPropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId);
+      propStorePathList.add(segmentPropertyStorePath);
+    }
+
+    boolean[] deleteSuccessful = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
+    for (int i = 0; i < deleteSuccessful.length; i++) {
+      final String segmentId = segmentsToDelete.get(i);
+      if (deleteSuccessful[i]) {
+        deletedSegments.add(segmentId);
+      } else {
+        // The batch remove API takes a non-recursive ZK path: it cannot delete a znode that has
+        // accumulated children. Fall back to the single-path remove API, which falls back to a
+        // recursive delete on the same NotEmpty failure. Skip when the znode is already gone
+        // (the batch call may have failed simply because the entry did not exist).
+        String segmentPath = propStorePathList.get(i);
+        if (_propertyStore.exists(segmentPath, AccessOption.PERSISTENT)
+            && !_propertyStore.remove(segmentPath, AccessOption.PERSISTENT)) {
+          LOGGER.info("Could not delete {} from propertystore", segmentPath);
+        } else {
+          deletedSegments.add(segmentId);
+        }
+      }
+    }
+    return deletedSegments;
+  }
+
+  /// Reschedules the segments that could not be deleted this pass, applying the exponential back-off
+  /// (capped at [#MAX_DELETION_DELAY_SECONDS]). No-op when there is nothing to retry.
+  protected void rescheduleRetry(String tableName, Collection<String> segmentsToRetryLater,
+      Long deletedSegmentsRetentionMs, long deletionDelay) {
+    long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
+    LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
+    deleteSegmentsWithDelay(tableName, segmentsToRetryLater, deletedSegmentsRetentionMs, effectiveDeletionDelay);
+  }
+
+  public void removeSegmentsFromStoreInBatch(String tableNameWithType, Collection<String> segments,
       @Nullable Long deletedSegmentsRetentionMs) {
     if (_dataDir == null) {
       LOGGER.info("dataDir is not configured, won't delete segment from disk for table: {}", tableNameWithType);

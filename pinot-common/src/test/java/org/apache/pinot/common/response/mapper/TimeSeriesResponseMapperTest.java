@@ -65,7 +65,7 @@ public class TimeSeriesResponseMapperTest {
   @Test
   public void toBrokerResponseWithException() {
     BrokerResponseNativeV2 resp = (BrokerResponseNativeV2) TimeSeriesResponseMapper.toBrokerResponse(
-      new QueryException(QueryErrorCode.INTERNAL, "time series exception"));
+        new QueryException(QueryErrorCode.INTERNAL, "time series exception"));
     List<QueryProcessingException> exceptions = resp.getExceptions();
     assertEquals(exceptions.size(), 1);
     assertEquals(exceptions.get(0).getErrorCode(), QueryErrorCode.INTERNAL.getId());
@@ -97,21 +97,21 @@ public class TimeSeriesResponseMapperTest {
     when(_block.getTimeBuckets()).thenReturn(_timeBuckets);
     // first series decides tag columns: region, host
     TimeSeries s1 = new TimeSeries(
-      "id1",
-      null,
-      _timeBuckets,
-      new Double[]{1.0, 2.0},
-      Arrays.asList("region", "host"),
-      new Object[]{"us-west", "h1"}
+        "id1",
+        null,
+        _timeBuckets,
+        new Double[]{1.0, 2.0},
+        Arrays.asList("region", "host"),
+        new Object[]{"us-west", "h1"}
     );
     // another list under same metric with different extra tag "zone"
     TimeSeries s2 = new TimeSeries(
-      "id2",
-      null,
-      _timeBuckets,
-      new Double[]{3.0, 4.5}, // mixed types: Integer and String
-      Arrays.asList("region", "zone"),
-      new Object[]{"us-west", "z1"}
+        "id2",
+        null,
+        _timeBuckets,
+        new Double[]{3.0, 4.5}, // mixed types: Integer and String
+        Arrays.asList("region", "zone"),
+        new Object[]{"us-west", "z1"}
     );
 
     Map<Long, List<TimeSeries>> seriesMap = new LinkedHashMap<>();

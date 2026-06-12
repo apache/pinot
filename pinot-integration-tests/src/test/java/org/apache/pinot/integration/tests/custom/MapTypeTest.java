@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -46,7 +45,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
 
   // Default settings
   protected static final String DEFAULT_TABLE_NAME = "MapTypeTest";
-  private static final int NUM_DOCS = 1000;
+  private static final int NUM_DOCS_PER_SEGMENT = 1000;
   private static final String STRING_KEY_MAP_FIELD_NAME = "stringKeyMap";
   private static final String INT_KEY_MAP_FIELD_NAME = "intKeyMap";
   private static final String STRING_KEY_MAP_STR_FIELD_NAME = "stringKeyMapStr";
@@ -55,7 +54,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
 
   @Override
   protected long getCountStarResult() {
-    return NUM_DOCS;
+    return (long) NUM_DOCS_PER_SEGMENT * getNumAvroFiles();
   }
 
   @Override
@@ -99,24 +98,23 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
             new org.apache.avro.Schema.Field(INT_KEY_MAP_FIELD_NAME, intKeyMapAvroSchema, null, null));
     avroSchema.setFields(fields);
 
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      for (int i = 0; i < NUM_DOCS; i++) {
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      for (int i = 0; i < NUM_DOCS_PER_SEGMENT; i++) {
         Map<String, Integer> stringKeyMap = new HashMap<>();
         stringKeyMap.put("k1", i);
-        stringKeyMap.put("k2", NUM_DOCS + i);
+        stringKeyMap.put("k2", NUM_DOCS_PER_SEGMENT + i);
         Map<Integer, String> intKeyMap = new HashMap<>();
         intKeyMap.put(95, Integer.toString(i));
-        intKeyMap.put(717, Integer.toString(NUM_DOCS + i));
+        intKeyMap.put(717, Integer.toString(NUM_DOCS_PER_SEGMENT + i));
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(STRING_KEY_MAP_FIELD_NAME, stringKeyMap);
         record.put(INT_KEY_MAP_FIELD_NAME, intKeyMap);
-        fileWriter.append(record);
+        for (DataFileWriter<GenericData.Record> writer : avroFilesAndWriters.getWriters()) {
+          writer.append(record);
+        }
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-
-    return List.of(avroFile);
   }
 
   protected int getSelectionDefaultDocCount() {
@@ -134,7 +132,8 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).textValue(), String.format("{\"k1\":%d,\"k2\":%d}", i, NUM_DOCS + i));
+      assertEquals(rows.get(i).get(0).textValue(), String.format("{\"k1\":%d,\"k2\":%d}", i % NUM_DOCS_PER_SEGMENT,
+          NUM_DOCS_PER_SEGMENT + i % NUM_DOCS_PER_SEGMENT));
     }
     query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k1', 'INT') FROM " + getTableName();
     pinotResponse = postQuery(query);
@@ -142,7 +141,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).intValue(), i);
+      assertEquals(rows.get(i).get(0).intValue(), i % NUM_DOCS_PER_SEGMENT);
     }
     query = "SELECT jsonExtractScalar(intKeyMapStr, '$.95', 'INT') FROM " + getTableName();
     pinotResponse = postQuery(query);
@@ -150,7 +149,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).intValue(), i);
+      assertEquals(rows.get(i).get(0).intValue(), i % NUM_DOCS_PER_SEGMENT);
     }
 
     // Selection order-by
@@ -161,7 +160,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).intValue(), NUM_DOCS + i);
+      assertEquals(rows.get(i).get(0).intValue(), NUM_DOCS_PER_SEGMENT + i / getNumAvroFiles());
     }
     query = "SELECT jsonExtractScalar(intKeyMapStr, '$.717', 'INT') FROM " + getTableName()
         + " ORDER BY jsonExtractScalar(intKeyMapStr, '$.95', 'INT')";
@@ -170,7 +169,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).intValue(), NUM_DOCS + i);
+      assertEquals(rows.get(i).get(0).intValue(), NUM_DOCS_PER_SEGMENT + i / getNumAvroFiles());
     }
 
     // Aggregation only
@@ -178,12 +177,12 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     JsonNode aggregationResult = pinotResponse.get("resultTable").get("rows").get(0).get(0);
-    assertEquals(aggregationResult.intValue(), NUM_DOCS - 1);
+    assertEquals(aggregationResult.intValue(), NUM_DOCS_PER_SEGMENT - 1);
     query = "SELECT MAX(jsonExtractScalar(intKeyMapStr, '$.95', 'INT')) FROM " + getTableName();
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     aggregationResult = pinotResponse.get("resultTable").get("rows").get(0).get(0);
-    assertEquals(aggregationResult.intValue(), NUM_DOCS - 1);
+    assertEquals(aggregationResult.intValue(), NUM_DOCS_PER_SEGMENT - 1);
 
     // Aggregation group-by
     query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k1', 'INT') AS key, "
@@ -192,10 +191,11 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), getSelectionDefaultDocCount());
-    for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
+    int expectedReturnRows = Math.min(getSelectionDefaultDocCount(), NUM_DOCS_PER_SEGMENT);
+    assertEquals(rows.size(), expectedReturnRows);
+    for (int i = 0; i < expectedReturnRows; i++) {
       assertEquals(rows.get(i).get(0).intValue(), i);
-      assertEquals(rows.get(i).get(1).intValue(), NUM_DOCS + i);
+      assertEquals(rows.get(i).get(1).intValue(), NUM_DOCS_PER_SEGMENT + i);
     }
     query = "SELECT jsonExtractScalar(intKeyMapStr, '$.95', 'INT') AS key, "
         + "MIN(jsonExtractScalar(intKeyMapStr, '$.717', 'INT')) AS value FROM " + getTableName()
@@ -203,10 +203,10 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), getSelectionDefaultDocCount());
-    for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
+    assertEquals(rows.size(), expectedReturnRows);
+    for (int i = 0; i < expectedReturnRows; i++) {
       assertEquals(rows.get(i).get(0).intValue(), i);
-      assertEquals(rows.get(i).get(1).intValue(), NUM_DOCS + i);
+      assertEquals(rows.get(i).get(1).intValue(), NUM_DOCS_PER_SEGMENT + i);
     }
 
     // Filter
@@ -215,15 +215,15 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).intValue(), NUM_DOCS + 25);
+    assertEquals(rows.size(), getNumAvroFiles());
+    assertEquals(rows.get(0).get(0).intValue(), NUM_DOCS_PER_SEGMENT + 25);
     query = "SELECT jsonExtractScalar(intKeyMapStr, '$.717', 'INT') FROM " + getTableName()
         + " WHERE jsonExtractScalar(intKeyMapStr, '$.95', 'INT') = 25";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).intValue(), NUM_DOCS + 25);
+    assertEquals(rows.size(), getNumAvroFiles());
+    assertEquals(rows.get(0).get(0).intValue(), NUM_DOCS_PER_SEGMENT + 25);
 
     // Select non-existing key (illegal query)
     query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k3', 'INT') FROM " + getTableName();
@@ -253,7 +253,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).intValue(), i);
+      assertEquals(rows.get(i).get(0).intValue(), i % NUM_DOCS_PER_SEGMENT);
     }
     query = "SELECT mapValue(intKeyMap__KEYS, 95, intKeyMap__VALUES) FROM " + getTableName();
     pinotResponse = postQuery(query);
@@ -261,7 +261,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).intValue(), i);
+      assertEquals(rows.get(i).get(0).intValue(), i % NUM_DOCS_PER_SEGMENT);
     }
 
     // Selection order-by
@@ -272,7 +272,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).intValue(), NUM_DOCS + i);
+      assertEquals(rows.get(i).get(0).intValue(), NUM_DOCS_PER_SEGMENT + i / getNumAvroFiles());
     }
     query = "SELECT mapValue(intKeyMap__KEYS, 717, intKeyMap__VALUES) FROM " + getTableName()
         + " ORDER BY mapValue(intKeyMap__KEYS, 95, intKeyMap__VALUES)";
@@ -281,7 +281,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).intValue(), NUM_DOCS + i);
+      assertEquals(rows.get(i).get(0).intValue(), NUM_DOCS_PER_SEGMENT + i / getNumAvroFiles());
     }
 
     // Aggregation only
@@ -289,12 +289,12 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     JsonNode aggregationResult = pinotResponse.get("resultTable").get("rows").get(0).get(0);
-    assertEquals(aggregationResult.intValue(), NUM_DOCS - 1);
+    assertEquals(aggregationResult.intValue(), NUM_DOCS_PER_SEGMENT - 1);
     query = "SELECT MAX(mapValue(intKeyMap__KEYS, 95, intKeyMap__VALUES)) FROM " + getTableName();
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     aggregationResult = pinotResponse.get("resultTable").get("rows").get(0).get(0);
-    assertEquals(aggregationResult.intValue(), NUM_DOCS - 1);
+    assertEquals(aggregationResult.intValue(), NUM_DOCS_PER_SEGMENT - 1);
 
     // Aggregation group-by
     query = "SELECT mapValue(stringKeyMap__KEYS, 'k1', stringKeyMap__VALUES) AS key, "
@@ -303,10 +303,11 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), getSelectionDefaultDocCount());
-    for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
+    int expectedReturnRows = Math.min(getSelectionDefaultDocCount(), NUM_DOCS_PER_SEGMENT);
+    assertEquals(rows.size(), expectedReturnRows);
+    for (int i = 0; i < expectedReturnRows; i++) {
       assertEquals(rows.get(i).get(0).intValue(), i);
-      assertEquals(rows.get(i).get(1).intValue(), NUM_DOCS + i);
+      assertEquals(rows.get(i).get(1).intValue(), NUM_DOCS_PER_SEGMENT + i);
     }
     query = "SELECT mapValue(intKeyMap__KEYS, 95, intKeyMap__VALUES) AS key, "
         + "MIN(mapValue(intKeyMap__KEYS, 717, intKeyMap__VALUES)) AS value FROM " + getTableName()
@@ -314,10 +315,10 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), getSelectionDefaultDocCount());
-    for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
+    assertEquals(rows.size(), expectedReturnRows);
+    for (int i = 0; i < expectedReturnRows; i++) {
       assertEquals(rows.get(i).get(0).intValue(), i);
-      assertEquals(rows.get(i).get(1).intValue(), NUM_DOCS + i);
+      assertEquals(rows.get(i).get(1).intValue(), NUM_DOCS_PER_SEGMENT + i);
     }
 
     // Filter
@@ -326,15 +327,15 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).intValue(), NUM_DOCS + 25);
+    assertEquals(rows.size(), getNumAvroFiles());
+    assertEquals(rows.get(0).get(0).intValue(), NUM_DOCS_PER_SEGMENT + 25);
     query = "SELECT mapValue(intKeyMap__KEYS, 717, intKeyMap__VALUES) FROM " + getTableName()
         + " WHERE mapValue(intKeyMap__KEYS, 95, intKeyMap__VALUES) = 25";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).intValue(), NUM_DOCS + 25);
+    assertEquals(rows.size(), getNumAvroFiles());
+    assertEquals(rows.get(0).get(0).intValue(), NUM_DOCS_PER_SEGMENT + 25);
 
     // Filter on non-existing key
     query = "SELECT mapValue(stringKeyMap__KEYS, 'k2', stringKeyMap__VALUES) FROM " + getTableName()
@@ -414,6 +415,6 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
   @Override
   protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
     super.setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    _setSelectionDefaultDocCount = useMultiStageQueryEngine ? 1000 : 10;
+    _setSelectionDefaultDocCount = useMultiStageQueryEngine ? NUM_DOCS_PER_SEGMENT * getNumAvroFiles() : 10;
   }
 }

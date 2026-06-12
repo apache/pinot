@@ -162,8 +162,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
-
-    waitForDocsLoaded(600_000L, true, tableWithMetadataPush);
+    waitForAllDocsLoaded(tableWithMetadataPush, 600_000L);
 
     _taskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();

@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
@@ -73,15 +74,17 @@ public class FileIngestionHelper {
   private final URI _controllerUri;
   private final File _ingestionDir;
   private final AuthProvider _authProvider;
+  private final boolean _allowLocalFileSystemInUri;
 
   public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap,
-      URI controllerUri, File ingestionDir, AuthProvider authProvider) {
+      URI controllerUri, File ingestionDir, AuthProvider authProvider, boolean allowLocalFileSystemInUri) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfigMap = batchConfigMap;
     _controllerUri = controllerUri;
     _ingestionDir = ingestionDir;
     _authProvider = authProvider;
+    _allowLocalFileSystemInUri = allowLocalFileSystemInUri;
   }
 
   /**
@@ -94,7 +97,7 @@ public class FileIngestionHelper {
     // 2. append a random string to avoid using the same working directory when multiple tasks are running in parallel
     File workingDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(_ingestionDir,
         String.format("%s_%s_%d_%s", WORKING_DIR_PREFIX, tableNameWithType, System.currentTimeMillis(),
-            RandomStringUtils.random(10, true, false)), "Invalid table name: %S", tableNameWithType);
+            RandomStringUtils.secure().next(10, true, false)), "Invalid table name: %S", tableNameWithType);
     LOGGER.info("Starting ingestion of {} payload to table: {} using working dir: {}", payload._payloadType,
         tableNameWithType, workingDir.getAbsolutePath());
 
@@ -112,7 +115,7 @@ public class FileIngestionHelper {
       File inputFile = new File(inputDir, String.format(
           "%s.%s", DATA_FILE_PREFIX, _batchConfigMap.get(BatchConfigProperties.INPUT_FORMAT).toLowerCase()));
       if (payload._payloadType == PayloadType.URI) {
-        copyURIToLocal(_batchConfigMap, payload._uri, inputFile);
+        copyURIToLocal(_batchConfigMap, payload._uri, inputFile, _allowLocalFileSystemInUri);
         LOGGER.info("Copied from URI: {} to local file: {}", payload._uri, inputFile.getAbsolutePath());
       } else {
         copyMultipartToLocal(payload._multiPart, inputFile);
@@ -176,12 +179,46 @@ public class FileIngestionHelper {
    */
   public static void copyURIToLocal(Map<String, String> batchConfigMap, URI sourceFileURI, File destFile)
       throws Exception {
+    copyURIToLocal(batchConfigMap, sourceFileURI, destFile, true);
+  }
+
+  public static void copyURIToLocal(Map<String, String> batchConfigMap, URI sourceFileURI, File destFile,
+      boolean allowLocalFileSystem)
+      throws Exception {
     String sourceFileURIScheme = sourceFileURI.getScheme();
+    Preconditions.checkArgument(allowLocalFileSystem || StringUtils.isNotBlank(sourceFileURIScheme),
+        "Source URI must include a scheme: %s", sourceFileURI);
+    Preconditions.checkArgument(allowLocalFileSystem
+            || !PinotFSFactory.LOCAL_PINOT_FS_SCHEME.equalsIgnoreCase(sourceFileURIScheme),
+        "Local filesystem URIs are not allowed for /ingestFromURI: %s", sourceFileURI);
     if (!PinotFSFactory.isSchemeSupported(sourceFileURIScheme)) {
-      PinotFSFactory.register(sourceFileURIScheme, batchConfigMap.get(BatchConfigProperties.INPUT_FS_CLASS),
-          IngestionConfigUtils.getInputFsProps(batchConfigMap));
+      String inputFsClassName = batchConfigMap.get(BatchConfigProperties.INPUT_FS_CLASS);
+      Preconditions.checkArgument(StringUtils.isNotBlank(inputFsClassName),
+          "Must provide %s for unsupported scheme: %s", BatchConfigProperties.INPUT_FS_CLASS, sourceFileURIScheme);
+      Preconditions.checkArgument(allowLocalFileSystem || !isLocalPinotFSClassName(inputFsClassName),
+          "Local filesystem implementation is not allowed for /ingestFromURI: %s", inputFsClassName);
+      try {
+        PinotFSFactory.register(sourceFileURIScheme, inputFsClassName,
+            IngestionConfigUtils.getInputFsProps(batchConfigMap));
+      } catch (RuntimeException e) {
+        throw new IllegalArgumentException(
+            String.format("Invalid %s for /ingestFromURI: %s", BatchConfigProperties.INPUT_FS_CLASS,
+                inputFsClassName), e);
+      }
     }
+    Preconditions.checkArgument(allowLocalFileSystem
+            || !PinotFSFactory.isSchemeRegisteredWith(sourceFileURIScheme, LocalPinotFS.class),
+        "Local filesystem implementation is not allowed for /ingestFromURI: %s", sourceFileURIScheme);
     PinotFSFactory.create(sourceFileURIScheme).copyToLocalFile(sourceFileURI, destFile);
+  }
+
+  private static boolean isLocalPinotFSClassName(String className) {
+    String rawClassName = className;
+    int pluginSeparatorIndex = className.indexOf(':');
+    if (pluginSeparatorIndex >= 0) {
+      rawClassName = className.substring(pluginSeparatorIndex + 1);
+    }
+    return LocalPinotFS.class.getName().equals(PluginManager.loadClassWithBackwardCompatibleCheck(rawClassName));
   }
 
   /**

@@ -50,24 +50,26 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
-import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
+import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
+import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
 import org.apache.pinot.common.catalog.PinotCatalogReader;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.context.PlannerContext;
@@ -87,9 +89,13 @@ import org.apache.pinot.query.planner.physical.v2.PRelNodeTreeValidator;
 import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.physical.v2.RelToPRelConverter;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.rules.PinotRuleSet;
+import org.apache.pinot.query.planner.spi.Phase;
+import org.apache.pinot.query.planner.spi.RuleSetCustomizer;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -143,8 +149,14 @@ public class QueryEnvironment {
   private final HepProgram _optProgram;
   private final Config _envConfig;
   private final PinotCatalog _catalog;
+  private final Set<String> _defaultDisabledPlannerRules;
+  private final MultiClusterRoutingContext _multiClusterRoutingContext;
 
   public QueryEnvironment(Config config) {
+    this(config, null);
+  }
+
+  public QueryEnvironment(Config config, MultiClusterRoutingContext multiClusterRoutingContext) {
     _envConfig = config;
     String database = config.getDatabase();
     _catalog = new PinotCatalog(config.getTableCache(), database);
@@ -157,8 +169,10 @@ public class QueryEnvironment {
         .build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
+    _defaultDisabledPlannerRules = _envConfig.defaultDisabledPlannerRules();
     // default optProgram with no skip rule options and no use rule options
-    _optProgram = getOptProgram(Set.of(), Set.of());
+    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules);
+    _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -195,12 +209,15 @@ public class QueryEnvironment {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
       if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(skipRuleSet, useRuleSet);
+        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules);
       }
     }
-    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions(),
+    int sortExchangeCopyLimit = QueryOptionsUtils.getSortExchangeCopyThreshold(options,
+        _envConfig.defaultSortExchangeCopyLimit());
+    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(options,
         _envConfig.defaultUsePhysicalOptimizer());
-    HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer, useRuleSet);
+    HepProgram traitProgram = getTraitProgram(
+        workerManager, _envConfig, usePhysicalOptimizer, useRuleSet, sortExchangeCopyLimit);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
@@ -216,7 +233,8 @@ public class QueryEnvironment {
           workerManager.getInstanceId(), sqlNodeAndOptions.getOptions(),
           _envConfig.defaultUseLiteMode(), _envConfig.defaultRunInBroker(), _envConfig.defaultUseBrokerPruning(),
           _envConfig.defaultLiteModeLeafStageLimit(), _envConfig.defaultHashFunction(),
-          _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit(), _envConfig.defaultLiteModeEnableJoins());
+          _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit(), _envConfig.defaultLiteModeEnableJoins(),
+          _multiClusterRoutingContext);
     }
     return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
@@ -399,6 +417,7 @@ public class QueryEnvironment {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
       }
       validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
+      validated.accept(new RowExpressionValidationVisitor());
       return validated;
     } catch (QueryException e) {
       throw e;
@@ -436,8 +455,11 @@ public class QueryEnvironment {
       try {
         // NOTE: DO NOT use converter.decorrelate(sqlNode, rootNode) because the converted type check can fail. This is
         //       probably a bug in Calcite.
+        // NOTE: Use PinotRelDecorrelator instead of RelDecorrelator.decorrelateQuery because Calcite still has a strict
+        //       post-decorrelation type assertion (CALCITE-7379) that fails for some Pinot correlated-subquery shapes
+        //       when decorrelation changes output-field nullability.
         RelBuilder relBuilder = PinotRuleUtils.PINOT_REL_FACTORY.create(cluster, null);
-        rootNode = RelDecorrelator.decorrelateQuery(rootNode, relBuilder);
+        rootNode = PinotRelDecorrelator.decorrelateQuery(rootNode, relBuilder);
       } catch (Throwable e) {
         throw new RuntimeException("Failed to decorrelate query:\n" + RelOptUtil.toString(rootNode), e);
       }
@@ -501,7 +523,7 @@ public class QueryEnvironment {
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
-    return pinotDispatchPlanner.createDispatchableSubPlan(plan);
+    return pinotDispatchPlanner.createDispatchableSubPlan(plan, _multiClusterRoutingContext);
   }
 
   // --------------------------------------------------------------------------
@@ -516,23 +538,29 @@ public class QueryEnvironment {
    * - In the third phase, the logical plan is prune with PRUNE_RULES.
    *
    * @param skipRuleSet parsed skipped rule name set from query options
+   * @param useRuleSet parsed use rule set from query options
+   * @param defaultDisabledRuleSet parsed default disabled rule set from broker config
    * @return HepProgram that performs logical transformations
    */
-  private static HepProgram getOptProgram(Set<String> skipRuleSet, Set<String> useRuleSet) {
+  private static HepProgram getOptProgram(PinotRuleSet ruleSet, Set<String> skipRuleSet, Set<String> useRuleSet,
+      Set<String> defaultDisabledRuleSet) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
     hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
 
     // ----
-    // Rules are disabled if its corresponding value is set to false in ruleFlags
-    // construct filtered BASIC_RULES, FILTER_PUSHDOWN_RULES, PROJECT_PUSHDOWN_RULES, PRUNE_RULES
-    List<RelOptRule> basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, skipRuleSet, useRuleSet);
+    // Rules are disabled if its corresponding value is set to false in ruleFlags.
+    // Sources come from PinotRuleSet (after every RuleSetCustomizer ran); per-query
+    // skip/use options are then applied by filterRuleList on a fresh copy.
+    List<RelOptRule> basicRules =
+        filterRuleList(ruleSet.rulesFor(Phase.BASIC), skipRuleSet, useRuleSet, defaultDisabledRuleSet);
     List<RelOptRule> filterPushdownRules =
-        filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, skipRuleSet, useRuleSet);
+        filterRuleList(ruleSet.rulesFor(Phase.FILTER_PUSHDOWN), skipRuleSet, useRuleSet, defaultDisabledRuleSet);
     List<RelOptRule> projectPushdownRules =
-        filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet, useRuleSet);
-    List<RelOptRule> pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet, useRuleSet);
+        filterRuleList(ruleSet.rulesFor(Phase.PROJECT_PUSHDOWN), skipRuleSet, useRuleSet, defaultDisabledRuleSet);
+    List<RelOptRule> pruneRules =
+        filterRuleList(ruleSet.rulesFor(Phase.PRUNE), skipRuleSet, useRuleSet, defaultDisabledRuleSet);
 
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
@@ -565,14 +593,16 @@ public class QueryEnvironment {
    *
    * @param rules static list of rules
    * @param skipRuleSet skip rule set from options
+   * @param useRuleSet use rule set from options
+   * @param defaultDisabledRuleSet default disabled rule set from config
    * @return filtered list of rules
    */
   private static List<RelOptRule> filterRuleList(List<RelOptRule> rules, Set<String> skipRuleSet,
-      Set<String> useRuleSet) {
+      Set<String> useRuleSet, Set<String> defaultDisabledRuleSet) {
     List<RelOptRule> filteredRules = new ArrayList<>();
     for (RelOptRule relOptRule : rules) {
       String ruleName = relOptRule.toString();
-      if (isRuleSkipped(ruleName, skipRuleSet, useRuleSet)) {
+      if (isRuleSkipped(ruleName, skipRuleSet, useRuleSet, defaultDisabledRuleSet)) {
         continue;
       }
       filteredRules.add(relOptRule);
@@ -581,26 +611,31 @@ public class QueryEnvironment {
   }
 
   /**
-   * Returns whether a rule is skipped.
-   * A rule is disabled if it is in both skipRuleSet and useRuleSet
+   * Returns whether a rule should be skipped.
+   * A rule is disabled if it is in both skipRuleSet and useRuleSet.
    *
    * @param ruleName description of the rule
-   * @param skipRuleSet query skipSet
-   * @return false if corresponding key is not in skipMap or the value is "false", else true
+   * @param skipRuleSet rules to be skipped, this takes precedence over {@code useRuleSet}.
+   * @param useRuleSet rules to be used.
+   * @param defaultDisabledRuleSet rules disabled by default. Any rule in this set will still be applied if it's also
+   *                              present in {@code useRuleSet}.
+   * @return true if rule should be skipped
    */
-  private static boolean isRuleSkipped(String ruleName, Set<String> skipRuleSet, Set<String> useRuleSet) {
+  private static boolean isRuleSkipped(String ruleName, Set<String> skipRuleSet, Set<String> useRuleSet,
+      Set<String> defaultDisabledRuleSet) {
     if (skipRuleSet.contains(ruleName)) {
       return true;
     }
-    if (CommonConstants.Broker.DEFAULT_DISABLED_RULES.contains(ruleName)) {
+    if (defaultDisabledRuleSet.contains(ruleName)) {
       return !useRuleSet.contains(ruleName);
     }
     return false;
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,
-      boolean usePhysicalOptimizer, Set<String> useRuleSet) {
+      boolean usePhysicalOptimizer, Set<String> useRuleSet, int sortExchangeCopyLimit) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
+    PinotRuleSet ruleSet = config.getRuleSet();
 
     // Set the match order as BOTTOM_UP.
     hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
@@ -608,24 +643,37 @@ public class QueryEnvironment {
     // ----
     // Run pinot specific rules that should run after all other rules, using 1 HepInstruction per rule.
     if (!usePhysicalOptimizer) {
-      for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES) {
+      // POST_LOGICAL list comes from PinotRuleSet; we copy it because we may need to
+      // swap every PinotSortExchangeCopyRule with one configured for the per-query
+      // (or broker-config) sortExchangeCopyLimit if it differs from the rule's default.
+      List<RelOptRule> postLogical = new ArrayList<>(ruleSet.rulesFor(Phase.POST_LOGICAL));
+      if (sortExchangeCopyLimit != PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY.config.getFetchLimitThreshold()) {
+        PinotSortExchangeCopyRule overridden = ImmutablePinotSortExchangeCopyRule.Config.builder()
+            .from(PinotSortExchangeCopyRule.Config.DEFAULT)
+            .fetchLimitThreshold(sortExchangeCopyLimit)
+            .build()
+            .toRule();
+        postLogical.replaceAll(r -> r instanceof PinotSortExchangeCopyRule ? overridden : r);
+      }
+      for (RelOptRule relOptRule : postLogical) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }
       }
-      if (!isRuleSkipped(CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN, Set.of(), useRuleSet)) {
-        // push filter and project above join to enrichedJoin, does not work with physical optimizer
+      if (!isRuleSkipped(CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN, Set.of(), useRuleSet,
+          config.defaultDisabledPlannerRules())) {
         hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
       }
     } else {
-      for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES_V2) {
+      for (RelOptRule relOptRule : ruleSet.rulesFor(Phase.POST_LOGICAL_PHYSICAL_OPT)) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }
       }
     }
     if (!usePhysicalOptimizer) {
-      // apply RelDistribution trait to all nodes
+      // apply RelDistribution trait to all nodes — these rules depend on the
+      // per-query WorkerManager, so they stay outside PinotRuleSet.
       if (workerManager != null) {
         hepProgramBuilder.addRuleInstance(PinotImplicitTableHintRule.withWorkerManager(workerManager));
       }
@@ -666,6 +714,17 @@ public class QueryEnvironment {
      */
     @Nullable
     TableCache getTableCache();
+
+    /**
+     * The multi-stage planner's per-phase Calcite rule lists. Defaults to the
+     * process-wide singleton built from {@link java.util.ServiceLoader}-discovered
+     * {@link RuleSetCustomizer}s, so per-query {@link Config} instances do not
+     * repeat discovery work.
+     */
+    @Value.Default
+    default PinotRuleSet getRuleSet() {
+      return PinotRuleSet.defaultInstance();
+    }
 
     @Value.Default
     default boolean isNullHandlingEnabled() {
@@ -758,7 +817,7 @@ public class QueryEnvironment {
     }
 
     /**
-     * Whether to use broker pruning by default.
+     * Whether to use broker pruning by default on the physical optimizer path.
      *
      * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
      * This default value can be always overridden at query level by the query option
@@ -767,6 +826,18 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultUseBrokerPruning() {
       return CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING;
+    }
+
+    /**
+     * Whether to use broker pruning by default on the logical planner (non-physical-optimizer) path.
+     *
+     * Separated from {@link #defaultUseBrokerPruning()} so the two planner paths can be rolled out independently.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_BROKER_PRUNING}.
+     */
+    @Value.Default
+    default boolean defaultLogicalPlannerUseBrokerPruning() {
+      return CommonConstants.Broker.DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING;
     }
 
     /**
@@ -804,13 +875,21 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION;
     }
 
-      /**
-       * Whether to enable joins when using MSE Lite mode.
-       */
-      @Value.Default
-      default boolean defaultLiteModeEnableJoins() {
-        return CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS;
-      }
+    /**
+     * Whether to enable joins when using MSE Lite mode.
+     */
+    @Value.Default
+    default boolean defaultLiteModeEnableJoins() {
+      return CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS;
+    }
+
+    /**
+     * Returns the list of planner rules that are disabled by default.
+     */
+    @Value.Default
+    default Set<String> defaultDisabledPlannerRules() {
+      return CommonConstants.Broker.DEFAULT_DISABLED_RULES;
+    }
 
     /**
      * Returns the worker manager.
@@ -820,6 +899,12 @@ public class QueryEnvironment {
      */
     @Nullable
     WorkerManager getWorkerManager();
+
+    /// See [CommonConstants.Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
+    @Value.Default
+    default int defaultSortExchangeCopyLimit() {
+      return PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY.config.getFetchLimitThreshold();
+    }
   }
 
   /// A query that have been parsed, validates, transformed into a [RelNode] and optimized with Calcite.

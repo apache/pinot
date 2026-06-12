@@ -26,6 +26,9 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +75,22 @@ public class LuceneTextIndexCombined {
    */
   public static void combineLuceneIndexFiles(File luceneIndexDir, String outputFilePath)
       throws IOException {
+    combineLuceneIndexFiles(luceneIndexDir, outputFilePath, null, null);
+  }
+
+  /**
+   * Combines all files from a Lucene text index directory into a single file.
+   * Also collects the docIdMapping file from the segment directory if present.
+   *
+   * @param luceneIndexDir the Lucene index directory to combine
+   * @param outputFilePath the output file path to write the combined data
+   * @param segmentIndexDir the segment index directory (optional, used to find docIdMapping file)
+   * @param column the column name (optional, used to find docIdMapping file)
+   * @throws IOException if any file operations fail
+   */
+  public static void combineLuceneIndexFiles(File luceneIndexDir, String outputFilePath,
+      @Nullable File segmentIndexDir, @Nullable String column)
+      throws IOException {
     if (!luceneIndexDir.exists() || !luceneIndexDir.isDirectory()) {
       throw new IllegalArgumentException(
           "Lucene index directory does not exist or is not a directory: " + luceneIndexDir);
@@ -80,7 +99,7 @@ public class LuceneTextIndexCombined {
     LOGGER.info("Combining Lucene text index files from directory: {}", luceneIndexDir.getAbsolutePath());
 
     // Step 1: Collect all files and calculate total size
-    Map<String, FileInfo> fileInfoMap = collectFiles(luceneIndexDir);
+    Map<String, FileInfo> fileInfoMap = collectFiles(luceneIndexDir, segmentIndexDir, column);
     int fileCount = fileInfoMap.size();
 
     if (fileCount == 0) {
@@ -115,11 +134,18 @@ public class LuceneTextIndexCombined {
 
   /**
    * Collects all files from the Lucene index directory and their metadata.
+   * Also collects the docIdMapping file from the segment directory if present.
+   *
+   * @param luceneIndexDir the Lucene index directory
+   * @param segmentIndexDir the segment index directory (optional, used to find docIdMapping file)
+   * @param column the column name (optional, used to find docIdMapping file)
    */
-  private static Map<String, FileInfo> collectFiles(File luceneIndexDir)
+  private static Map<String, FileInfo> collectFiles(File luceneIndexDir, @Nullable File segmentIndexDir,
+      @Nullable String column)
       throws IOException {
     Map<String, FileInfo> fileInfoMap = new TreeMap<>(); // Use TreeMap for consistent ordering
 
+    // Collect files from the Lucene index directory
     File[] files = luceneIndexDir.listFiles();
     if (files != null) {
       for (File file : files) {
@@ -129,6 +155,19 @@ public class LuceneTextIndexCombined {
 
           fileInfoMap.put(fileName, new FileInfo(file, fileName, fileSize));
         }
+      }
+    }
+
+    // Collect the docIdMapping file from the segment directory if it exists
+    if (segmentIndexDir != null && column != null) {
+      File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir);
+      File docIdMappingFile = new File(segmentDir,
+          column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+      if (docIdMappingFile.exists() && docIdMappingFile.isFile()) {
+        String mappingFileName = docIdMappingFile.getName();
+        long mappingFileSize = docIdMappingFile.length();
+        fileInfoMap.put(mappingFileName, new FileInfo(docIdMappingFile, mappingFileName, mappingFileSize));
+        LOGGER.info("Including docIdMapping file: {} ({} bytes)", mappingFileName, mappingFileSize);
       }
     }
 

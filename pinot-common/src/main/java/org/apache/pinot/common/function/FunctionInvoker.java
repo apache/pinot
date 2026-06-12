@@ -25,7 +25,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /**
@@ -111,10 +111,9 @@ public class FunctionInvoker {
       }
 
       PinotDataType parameterType = _parameterTypes[i];
-      PinotDataType argumentType = FunctionUtils.getArgumentType(argumentClass);
-      Preconditions.checkArgument(parameterType != null && argumentType != null,
+      Preconditions.checkArgument(parameterType != null,
           "Cannot convert value from class: %s to class: %s", argumentClass, parameterClass);
-      arguments[i] = parameterType.convert(argument, argumentType);
+      arguments[i] = parameterType.convert(argument, FunctionUtils.getArgumentType(argument));
     }
   }
 

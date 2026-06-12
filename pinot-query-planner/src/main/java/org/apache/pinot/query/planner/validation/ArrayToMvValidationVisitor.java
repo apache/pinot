@@ -34,6 +34,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -162,6 +163,12 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitExplained(ExplainedNode node, Boolean isIntermediateStage) {
     node.getInputs().forEach(input -> input.visit(this, isIntermediateStage));
+    return null;
+  }
+
+  @Override
+  public Void visitUnnest(UnnestNode node, Boolean isIntermediateStage) {
+    node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
   }
 

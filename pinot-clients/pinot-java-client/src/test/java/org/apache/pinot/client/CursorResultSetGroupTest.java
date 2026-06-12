@@ -87,4 +87,4 @@ public class CursorResultSetGroupTest {
     Assert.assertEquals(cursorResultSetGroup.getPageSize(), 20);
     Assert.assertEquals(cursorResultSetGroup.getNumRowsResultSet(), Long.valueOf(500));
   }
-  }
+}

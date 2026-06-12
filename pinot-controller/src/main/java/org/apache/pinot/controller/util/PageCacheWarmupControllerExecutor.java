@@ -181,7 +181,7 @@ public class PageCacheWarmupControllerExecutor {
               }
             })
             .toArray(CompletableFuture[]::new))
-        .join();
+              .join();
         } catch (Exception e) {
           throw new CompletionException(e);
         }

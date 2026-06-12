@@ -134,6 +134,35 @@ public class DistinctCountCPCSketchValueAggregatorTest {
   }
 
   @Test
+  public void initialShouldHandleEmptyByteArray() {
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    // Empty byte array is the default null value for BYTES columns in Pinot
+    byte[] emptyBytes = new byte[0];
+    CpcSketch result = toSketch(agg.getInitialAggregatedValue(emptyBytes));
+    assertEquals(result.getEstimate(), 0.0);
+  }
+
+  @Test
+  public void initialShouldHandleMultiValueWithEmptyByteArrays() {
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    CpcSketch input = new CpcSketch();
+    input.update("hello");
+    byte[][] bytes = {new byte[0], agg.serializeAggregatedValue(input), new byte[0]};
+    CpcSketch result = toSketch(agg.getInitialAggregatedValue(bytes));
+    assertEquals(Math.round(result.getEstimate()), 1);
+  }
+
+  @Test
+  public void applyRawValueShouldHandleEmptyByteArray() {
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    CpcSketch input = new CpcSketch();
+    input.update("hello");
+    // Applying an empty byte array should not change the sketch
+    CpcSketch result = toSketch(agg.applyRawValue(input, new byte[0]));
+    assertEquals(Math.round(result.getEstimate()), 1);
+  }
+
+  @Test
   public void getInitialValueShouldSupportDifferentTypes() {
     DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     assertEquals(toSketch(agg.getInitialAggregatedValue(12345)).getEstimate(), 1.0);

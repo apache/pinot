@@ -18,45 +18,26 @@
  */
 package org.apache.pinot.plugin.inputformat.parquet;
 
-import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.avro.Schema;
-import org.apache.parquet.schema.PrimitiveType;
+import org.apache.avro.generic.GenericFixed;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
-import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
+/// The type matrix is inherited from [AvroRecordExtractor]; the only override is the INT96 timestamp
+/// (which parquet-avro surfaces as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) → `Timestamp`
+/// (or `Long` epoch nanos when `extractRawTimeValues` is `true`) via [ParquetUtils#convertInt96ToEpochNanos].
 public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
+  private static final int INT96_BYTE_SIZE = 12;
+  private static final String INT96_DOC = "INT96 represented as byte[12]";
 
   @Override
-  public void init(@Nullable Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
-   super.init(fields, recordExtractorConfig);
-  }
-
-  @Override
-  protected Object transformValue(Object value, Schema.Field field) {
-    return handleDeprecatedTypes(convert(value), field);
-  }
-
-  Object handleDeprecatedTypes(Object value, Schema.Field field) {
-    Schema.Type avroColumnType = field.schema().getType();
-    if (avroColumnType == org.apache.avro.Schema.Type.UNION) {
-      org.apache.avro.Schema nonNullSchema = null;
-      for (org.apache.avro.Schema childFieldSchema : field.schema().getTypes()) {
-        if (childFieldSchema.getType() != org.apache.avro.Schema.Type.NULL) {
-          if (nonNullSchema == null) {
-            nonNullSchema = childFieldSchema;
-          } else {
-            throw new IllegalStateException("More than one non-null schema in UNION schema");
-          }
-        }
-      }
-
-      //INT96 is deprecated. We convert to long as we do in the native parquet extractor.
-      if (nonNullSchema.getName().equals(PrimitiveType.PrimitiveTypeName.INT96.name())) {
-       return ParquetNativeRecordExtractor.convertInt96ToLong((byte[]) value);
-      }
+  protected Object convertSingleValue(Schema schema, Object value) {
+    if (schema.getType() == Schema.Type.FIXED && schema.getFixedSize() == INT96_BYTE_SIZE
+        && INT96_DOC.equals(schema.getDoc())) {
+      long nanos = ParquetUtils.convertInt96ToEpochNanos(((GenericFixed) value).bytes());
+      return _extractRawTimeValues ? nanos : TimestampUtils.fromNanosSinceEpoch(nanos);
     }
-    return value;
+    return super.convertSingleValue(schema, value);
   }
 }

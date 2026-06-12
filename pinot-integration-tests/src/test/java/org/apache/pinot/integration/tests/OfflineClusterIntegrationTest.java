@@ -32,6 +32,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,14 +55,17 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -181,13 +185,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   protected int getNumServers() {
     return NUM_SERVERS;
-  }
-
-  /// Create inverted index when generating the segment to ensure the index ordering won't change when re-assembling
-  /// them, so that the table size is consistent.
-  @Override
-  protected boolean isCreateInvertedIndexDuringSegmentGeneration() {
-    return true;
   }
 
   @Override
@@ -322,7 +319,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
-      throws IOException {
+      throws Exception {
     // Try to refresh all the segments again with force download from the controller URI.
     String reloadJob = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, forceDownload);
     TestUtils.waitForCondition(aVoid -> {
@@ -354,17 +351,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testInvalidTableConfig() {
+  public void testInvalidTableConfig()
+      throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("badTable").build();
     ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
     // Remove a mandatory field
     tableConfigJson.remove(TableConfig.VALIDATION_CONFIG_KEY);
     try {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfigJson.toString());
+      getOrCreateAdminClient().getTableClient().createTable(tableConfigJson.toString(), null);
       fail();
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Should get response code 400 (BAD_REQUEST)
-      assertTrue(e.getMessage().contains("Got error status code: 400"));
+      assertTrue(e.getMessage().contains("400"));
     }
   }
 
@@ -481,7 +479,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         TableNameBuilder.extractRawTableName(offlineTableName));
     parameters.add(tableNameParameter);
 
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getOrCreateAdminClient().getSegmentUploadUrl());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       // Refresh non-existing segment
       File segmentTarFile = segmentTarFiles[0];
@@ -641,6 +639,47 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void addRangeIndex()
       throws Exception {
     addRangeIndex(true);
+  }
+
+  /**
+   * SELECT DISTINCT on an inverted-indexed column. InvertedIndexDistinctOperator is used when
+   * opted in via query option. Verifies correctness with and without filter.
+   * Origin already has an inverted index by default (see DEFAULT_INVERTED_INDEX_COLUMNS).
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctWithInvertedIndex(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Without filter — uses DictionaryBasedDistinctOperator (no filter + dictionary means the
+    // dictionary-only path runs first in DistinctPlanNode, before the index-based check).
+    // Establishes baseline of all distinct values so the filtered result can be verified as a subset.
+    String query =
+        "SELECT DISTINCT Origin FROM mytable ORDER BY Origin LIMIT 10000 "
+            + "OPTION(useIndexBasedDistinctOperator=true)";
+    JsonNode response = postQuery(query);
+    assertEquals(response.get("exceptions").size(), 0);
+    Set<String> values = extractDistinctValuesFromResponse(response);
+    assertFalse(values.isEmpty(), "DISTINCT on inverted-indexed column should return values");
+
+    // With filter
+    String filteredQuery =
+        "SELECT DISTINCT Origin FROM mytable WHERE Carrier = 'AA' ORDER BY Origin LIMIT 10000 "
+            + "OPTION(useIndexBasedDistinctOperator=true)";
+    JsonNode filteredResponse = postQuery(filteredQuery);
+    assertEquals(filteredResponse.get("exceptions").size(), 0);
+    Set<String> filteredValues = extractDistinctValuesFromResponse(filteredResponse);
+    assertFalse(filteredValues.isEmpty(), "DISTINCT with filter on inverted-indexed column should return values");
+    assertTrue(values.containsAll(filteredValues), "Filtered values should be a subset of unfiltered values");
+  }
+
+  private static Set<String> extractDistinctValuesFromResponse(JsonNode response) {
+    Set<String> values = new HashSet<>();
+    JsonNode rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      values.add(rows.get(i).get(0).asText());
+    }
+    return values;
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -832,7 +871,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "hsomething, something, something and wise");
 
-    // Test occurence
+    // Test occurrence
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
@@ -950,7 +989,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "hsomething, something, something and wise");
 
-    // Test occurence
+    // Test occurrence
     sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
@@ -1489,10 +1528,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // TODO: Support it
     resetForwardIndex(dictionarySize, forwardIndexSize);
 
-    // Convert 'DestCityName' to v2 raw index
+    // Convert 'DestCityName' to v6 raw index (delta-encoded chunk header)
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigs);
-    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(2).build();
+    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withRawIndexWriterVersion(6)
+        .build();
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     FieldConfig fieldConfig =
@@ -1503,11 +1544,36 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     columnIndexSize = getColumnIndexSize(column);
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
+    double v6RawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
+    // V6 delta-encoded header should produce a smaller index than V4 due to better compression
+    assertTrue(v6RawIndexSize < v4rawIndexSize,
+        "V6 (" + v6RawIndexSize + ") should be < V4 (" + v4rawIndexSize + ")");
+
+    resetForwardIndex(dictionarySize, forwardIndexSize);
+
+    // Convert 'DestCityName' to v2 raw index by modifying existing FieldConfig
+    fieldConfigs = tableConfig.getFieldConfigList();
+    assertNotNull(fieldConfigs);
+    forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withRawIndexWriterVersion(2)
+        .build();
+    indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forwardIndexConfig.toJsonNode());
+    fieldConfig =
+        new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+    fieldConfigs.set(fieldConfigs.size() - 1, fieldConfig);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
+    columnIndexSize = getColumnIndexSize(column);
+    assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
     double v2RawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
     assertTrue(v2RawIndexSize > v4rawIndexSize);
 
     // Convert 'DestCityName' to SNAPPY compression
-    forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.SNAPPY).build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(CompressionCodec.SNAPPY)
+        .build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
         new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
@@ -1530,7 +1596,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v4SnappyRawIndexSize);
 
     // Adding 'LZ4' compression explicitly should trigger the conversion
-    forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.LZ4).build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(CompressionCodec.LZ4)
+        .build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
         new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
@@ -1882,8 +1950,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Trigger reload and verify column count
     reloadAllSegments(TEST_EXTRA_COLUMNS_QUERY, false, numTotalDocs);
-    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    String segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 104);
@@ -1891,41 +1960,41 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 104);
 
     // Verify the index sizes
-    JsonNode columnIndexSizeMap = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(),
-                List.of("DivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDsString",
-                    "NewAddedRawDerivedStringDimension", "NewAddedRawDerivedMVIntDimension",
-                    "NewAddedDerivedNullString"))))
-        .get("columnIndexSizeMap");
+    TableMetadataInfo aggregateMetadata = getOrCreateAdminClient().getTableClient()
+        .getAggregateMetadata(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()),
+            String.join(",", List.of("DivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDs",
+                "NewAddedDerivedDivAirportSeqIDsString", "NewAddedRawDerivedStringDimension",
+                "NewAddedRawDerivedMVIntDimension", "NewAddedDerivedNullString")));
+    Map<String, Map<String, Double>> columnIndexSizeMap = aggregateMetadata.getColumnIndexSizeMap();
     assertEquals(columnIndexSizeMap.size(), 6);
-    JsonNode originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");
-    JsonNode derivedColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDs");
-    JsonNode derivedStringColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDsString");
-    JsonNode derivedRawStringColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedStringDimension");
-    JsonNode derivedRawMVIntColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedMVIntDimension");
-    JsonNode derivedNullStringColumnIndex = columnIndexSizeMap.get("NewAddedDerivedNullString");
+    Map<String, Double> originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");
+    Map<String, Double> derivedColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDs");
+    Map<String, Double> derivedStringColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDsString");
+    Map<String, Double> derivedRawStringColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedStringDimension");
+    Map<String, Double> derivedRawMVIntColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedMVIntDimension");
+    Map<String, Double> derivedNullStringColumnIndex = columnIndexSizeMap.get("NewAddedDerivedNullString");
 
     // Derived int column should have the same dictionary size as the original column
-    double originalColumnDictionarySize = originalColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble();
-    assertEquals(derivedColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble(), originalColumnDictionarySize);
+    double originalColumnDictionarySize = originalColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID);
+    assertEquals(derivedColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID), originalColumnDictionarySize);
 
     // Derived string column should have larger dictionary size than the original column
     assertTrue(
-        derivedStringColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble() > originalColumnDictionarySize);
+        derivedStringColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID) > originalColumnDictionarySize);
 
     // Both derived columns should have smaller forward index size than the original column because of compression
-    double derivedColumnForwardIndexSize = derivedColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(derivedColumnForwardIndexSize < originalColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble());
-    assertEquals(derivedStringColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble(),
+    double derivedColumnForwardIndexSize = derivedColumnIndexSizes.get(StandardIndexes.FORWARD_ID);
+    assertTrue(derivedColumnForwardIndexSize < originalColumnIndexSizes.get(StandardIndexes.FORWARD_ID));
+    assertEquals(derivedStringColumnIndexSizes.get(StandardIndexes.FORWARD_ID),
         derivedColumnForwardIndexSize);
 
-    assertTrue(derivedRawStringColumnIndex.has(StandardIndexes.FORWARD_ID));
-    assertFalse(derivedRawStringColumnIndex.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(derivedRawStringColumnIndex.containsKey(StandardIndexes.FORWARD_ID));
+    assertFalse(derivedRawStringColumnIndex.containsKey(StandardIndexes.DICTIONARY_ID));
 
-    assertTrue(derivedRawMVIntColumnIndex.has(StandardIndexes.FORWARD_ID));
-    assertFalse(derivedRawMVIntColumnIndex.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(derivedRawMVIntColumnIndex.containsKey(StandardIndexes.FORWARD_ID));
+    assertFalse(derivedRawMVIntColumnIndex.containsKey(StandardIndexes.DICTIONARY_ID));
 
-    assertTrue(derivedNullStringColumnIndex.has(StandardIndexes.NULL_VALUE_VECTOR_ID));
+    assertTrue(derivedNullStringColumnIndex.containsKey(StandardIndexes.NULL_VALUE_VECTOR_ID));
 
     testNewAddedColumns();
     testRegexpLikeOnNewAddedColumns();
@@ -1950,8 +2019,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Trigger reload and verify column count
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
-    segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 75);
@@ -2226,7 +2296,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Add expression override
     TableConfig tableConfig = createOfflineTableConfig();
     tableConfig.setQueryConfig(
-        new QueryConfig(null, null, null, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), null, null));
+        new QueryConfig(null, null, null, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), null,
+            null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -2275,8 +2346,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Trigger reload and verify column count doesn't change in query but changes in segment metadata
     reloadAllSegments(TEST_REGULAR_COLUMNS_QUERY, false, numTotalDocs);
     assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 79);
-    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    String segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 81);
@@ -2294,8 +2366,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     reloadAllSegments(TEST_REGULAR_COLUMNS_QUERY, false, numTotalDocs);
     assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 79);
-    segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 79);
@@ -2955,8 +3028,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(query);
   }
 
-  // these tests actually checks a calcite limitation.
-  // Once it is fixed in calcite, we should merge this tests with testQueryRepetedColumnsV1
+  // The repeated-column ORDER BY case below still hits a Calcite limitation in the multi-stage engine: the ORDER BY
+  // reference to a column that appears twice in the SELECT list is rejected as ambiguous, so it is asserted
+  // separately from the single-stage variant (V1). As of Calcite 1.42 the repeated GROUP BY case is now accepted
+  // (the planner de-duplicates the repeated grouping key), matching V1.
   @Test
   public void testQueryWithRepeatedColumnsV2()
       throws Exception {
@@ -2965,7 +3040,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testQuery(query);
 
-    //test repeated columns in selection query with order by
+    //test repeated columns in selection query with order by (ambiguous reference, rejected by the MSE validator)
     query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' order by ArrTime";
     testQueryError(query, QueryErrorCode.QUERY_VALIDATION);
 
@@ -2973,10 +3048,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     query = "SELECT COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testQuery(query);
 
-    //test repeated columns in agg group by query
+    //test repeated columns in agg group by query (Calcite 1.42 de-duplicates the repeated grouping key)
     query = "SELECT ArrTime, ArrTime, COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
         + "GROUP BY ArrTime, ArrTime";
-    testQueryError(query, QueryErrorCode.QUERY_VALIDATION);
+    testQuery(query);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -3100,18 +3175,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void testInstanceDecommission()
       throws Exception {
     // Fetch all instances
-    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-    JsonNode instanceList = response.get("instances");
+    List<String> instanceList = getOrCreateAdminClient().getInstanceClient().listInstances();
     int numInstances = instanceList.size();
     // The total number of instances is equal to the sum of num brokers, num servers and 1 controller.
     assertEquals(numInstances, getNumBrokers() + getNumServers() + 1);
 
     // Try to delete a server that does not exist
-    String deleteInstanceRequest = _controllerRequestURLBuilder.forInstance("potato");
     try {
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance("potato");
       fail("Delete should have returned a failure status (404)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 404 status code
     }
 
@@ -3119,7 +3192,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String serverName = null;
     String brokerName = null;
     for (int i = 0; i < numInstances; i++) {
-      String instanceId = instanceList.get(i).asText();
+      String instanceId = instanceList.get(i);
       InstanceType instanceType = InstanceTypeUtils.getInstanceType(instanceId);
       if (instanceType == InstanceType.SERVER) {
         serverName = instanceId;
@@ -3129,11 +3202,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Try to delete a live server
-    deleteInstanceRequest = _controllerRequestURLBuilder.forInstance(serverName);
     try {
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance(serverName);
       fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 409 status code
     }
 
@@ -3142,9 +3214,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Try to delete a server whose information is still on the ideal state
     try {
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance(serverName);
       fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 409 status code
     }
 
@@ -3152,15 +3224,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     dropOfflineTable(getTableName());
 
     // Now, delete server should work
-    response = JsonUtils.stringToJsonNode(sendDeleteRequest(deleteInstanceRequest));
-    assertTrue(response.has("status"));
+    String deleteResponse = getOrCreateAdminClient().getInstanceClient().dropInstance(serverName);
+    assertNotNull(deleteResponse);
 
     // Try to delete a broker whose information is still live
     try {
-      deleteInstanceRequest = _controllerRequestURLBuilder.forInstance(brokerName);
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance(brokerName);
       fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 409 status code
     }
 
@@ -3500,7 +3571,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // needed because both OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest run this test
     // case with different number of documents in the segment.
     response1 = response1.replaceAll("docs:[0-9]+", "docs:*")
-        .replaceAll("Time: \\d+\\.\\d+", "Time:*");
+        .replaceAll("Time: \\d+\\.\\d+(?:[eE][-+]?\\d+)?", "Time:*");
 
     JsonNode response1Json = JsonUtils.stringToJsonNode(response1);
     assertEquals(response1Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");
@@ -3525,6 +3596,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: SortRemove -> Time:*\n"
         + "Rule: AggregateProjectMerge -> Time:*\n"
+        + "Rule: AggregateProjectPullUpConstants -> Time:*\n"
+        + "Rule: ProjectAggregateMerge -> Time:*\n"
+        + "Rule: SortRemoveConstantKeys -> Time:*\n"
         + "Rule: EvaluateProjectLiteral -> Time:*\n"
         + "Rule: AggregateRemove -> Time:*\n");
 
@@ -3533,7 +3607,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // language=sql
     String query2 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM mytable WHERE FlightNum < 0";
     String response2 = postQuery(query2).get("resultTable").toString()
-        .replaceAll("Time: \\d+\\.\\d+", "Time: *");
+        .replaceAll("Time: \\d+\\.\\d+(?:[eE][-+]?\\d+)?", "Time: *");
 
     JsonNode response2Json = JsonUtils.stringToJsonNode(response2);
     assertEquals(response2Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");
@@ -3745,8 +3819,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testIndexMetadataAPI()
       throws Exception {
     TableIndexMetadataResponse tableIndexMetadataResponse =
-        JsonUtils.stringToObject(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/indexes?type=OFFLINE"),
-            TableIndexMetadataResponse.class);
+        getOrCreateAdminClient().getTableClient().getTableIndexes(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()));
 
     getInvertedIndexColumns().forEach(column -> {
       Assert.assertEquals(
@@ -3775,45 +3849,54 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   public void testAggregateMetadataAPI()
-      throws IOException {
-    JsonNode oneSVColumnResponse = JsonUtils.stringToJsonNode(
-        sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DestCityMarketID"));
+      throws Exception {
+    JsonNode oneSVColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "DestCityMarketID"));
     // DestCityMarketID is a SV column
     validateMetadataResponse(oneSVColumnResponse, 1, 0);
 
-    JsonNode oneMVColumnResponse = JsonUtils.stringToJsonNode(
-        sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DivLongestGTimes"));
+    JsonNode oneMVColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "DivLongestGTimes"));
     // DivLongestGTimes is a MV column
     validateMetadataResponse(oneMVColumnResponse, 1, 1);
 
-    JsonNode threeSVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
-        + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
+    JsonNode threeSVColumnsResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()),
+            "DivActualElapsedTime,CRSElapsedTime,OriginStateName"));
     validateMetadataResponse(threeSVColumnsResponse, 3, 0);
 
-    JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
-        + "/tables/mytable/metadata?columns=DivLongestGTimes&columns=DivWheelsOns&columns=DivAirports"));
+    JsonNode threeMVColumnsResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()),
+            "DivLongestGTimes,DivWheelsOns,DivAirports"));
     validateMetadataResponse(threeMVColumnsResponse, 3, 3);
 
-    JsonNode zeroColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata"));
+    JsonNode zeroColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), null));
     validateMetadataResponse(zeroColumnResponse, 0, 0);
 
-    JsonNode starColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=*"));
+    JsonNode starColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "*"));
     validateMetadataResponse(starColumnResponse, 83, 10);
 
-    JsonNode starEncodedColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=%2A"));
+    JsonNode starEncodedColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "*"));
     validateMetadataResponse(starEncodedColumnResponse, 83, 10);
 
-    JsonNode starWithExtraColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "CRSElapsedTime&columns=*&columns=OriginStateName"));
+    JsonNode starWithExtraColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "CRSElapsedTime,*,OriginStateName"));
     validateMetadataResponse(starWithExtraColumnResponse, 83, 10);
 
-    JsonNode starWithExtraEncodedColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
+    JsonNode starWithExtraEncodedColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "CRSElapsedTime,*,OriginStateName"));
     validateMetadataResponse(starWithExtraEncodedColumnResponse, 83, 10);
   }
 
@@ -4277,6 +4360,49 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
+  /**
+   * Test SQL string literal escaping behavior.
+   *
+   * In SQL, single quotes within string literals are escaped by doubling them:
+   * - 'It''s' represents the string "It's" (2 quotes = 1 quote in result)
+   *
+   * The Calcite parser handles this escaping correctly. This test disables the legacy SSE behavior of double escaping
+   * quotes. With the legacy behavior disabled, both SSE and MSE have the same standard behavior.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStringLiteralEscaping(boolean useMultiStageQueryEngine)
+      throws Exception {
+    RequestUtils.setUseLegacyLiteralUnescaping(false);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test 1: Simple escaped quote (2 quotes in SQL = 1 quote in result)
+    // SQL: 'It''s a test' should result in "It's a test"
+    String query = "SELECT 'It''s a test' FROM mytable LIMIT 1";
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "It's a test");
+
+    // Test 2: String literal in WHERE clause with comparison
+    // Query for carriers where we compare against a literal with escaped quotes
+    // Note: No carrier has quotes in its name, so we just verify the query doesn't error
+    query = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'doesn''t exist'";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asLong(), 0); // No matches expected
+
+    // Test 3: Multiple escaped quotes in same query
+    query = "SELECT 'He said ''''hello'''' and ''goodbye''' FROM mytable LIMIT 1";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "He said ''hello'' and 'goodbye'");
+  }
+
   private void reloadAndWait(String tableNameWithType, @Nullable String segmentName) throws Exception {
     String response = (segmentName != null)
         ? reloadOfflineSegment(tableNameWithType, segmentName, true)
@@ -4333,4 +4459,78 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAnyValueFunctionality(boolean useMultiStageQueryEngine) throws Exception {
+    // Test 1: Basic ANY_VALUE functionality with GROUP BY
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT Carrier, ANY_VALUE(Origin), COUNT(*) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 5";
+    JsonNode response = postQuery(query);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Should have results");
+
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      assertNotNull(row.get(0).asText(), "Carrier should not be null");
+      assertNotNull(row.get(1).asText(), "ANY_VALUE(Origin) should not be null");
+      assertTrue(row.get(2).asInt() > 0, "COUNT should be greater than 0");
+    }
+
+    // Test 2: ANY_VALUE without GROUP BY - should return single values
+    query = "SELECT ANY_VALUE(Carrier), ANY_VALUE(Origin), COUNT(*) FROM mytable";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1, "Should have 1 row without GROUP BY");
+
+    JsonNode row = rows.get(0);
+    assertNotNull(row.get(0).asText(), "ANY_VALUE(Carrier) should not be null");
+    assertNotNull(row.get(1).asText(), "ANY_VALUE(Origin) should not be null");
+    assertTrue(row.get(2).asInt() > 0, "COUNT should be greater than 0");
+
+    // Test 3: ANY_VALUE with multiple GROUP BY columns
+    query = "SELECT Carrier, Origin, ANY_VALUE(Dest), COUNT(*) FROM mytable"
+        + " GROUP BY Carrier, Origin ORDER BY Carrier, Origin LIMIT 10";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Should have results for multiple GROUP BY");
+
+    for (int i = 0; i < rows.size(); i++) {
+      row = rows.get(i);
+      assertNotNull(row.get(0).asText(), "Carrier should not be null");
+      assertNotNull(row.get(1).asText(), "Origin should not be null");
+      assertNotNull(row.get(2).asText(), "ANY_VALUE(Dest) should not be null");
+      assertTrue(row.get(3).asInt() > 0, "COUNT should be greater than 0");
+    }
+
+    // Test 4: ANY_VALUE with different data types
+    query = "SELECT ANY_VALUE(Carrier) as StringValue, ANY_VALUE(AirlineID) as IntValue,"
+        + " ANY_VALUE(FlightNum) as IntValue2, ANY_VALUE(ArrDelay) as DoubleValue FROM mytable";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1, "Should have 1 row for data types test");
+
+    row = rows.get(0);
+    assertNotNull(row.get(0).asText(), "String ANY_VALUE should not be null");
+    assertTrue(row.get(1).asInt() >= 0, "Int ANY_VALUE should be valid");
+    assertTrue(row.get(2).asInt() >= 0, "Int ANY_VALUE should be valid");
+    // ArrDelay can be negative, so just check it's a valid number
+    assertNotNull(row.get(3), "Double ANY_VALUE should not be null");
+
+    // Test 5: ANY_VALUE in complex query with multiple aggregations
+    query = "SELECT Origin, ANY_VALUE(Carrier) as SampleCarrier, ANY_VALUE(Dest) as SampleDest,"
+        + " COUNT(*) as FlightCount, AVG(ArrDelay) as AvgDelay FROM mytable"
+        + " GROUP BY Origin ORDER BY FlightCount DESC LIMIT 5";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Should have results for complex query");
+
+    for (int i = 0; i < rows.size(); i++) {
+      row = rows.get(i);
+      assertNotNull(row.get(0).asText(), "Origin should not be null");
+      assertNotNull(row.get(1).asText(), "ANY_VALUE(Carrier) should not be null");
+      assertNotNull(row.get(2).asText(), "ANY_VALUE(Dest) should not be null");
+      assertTrue(row.get(3).asInt() > 0, "FlightCount should be positive");
+      // AvgDelay can be negative, so just verify it's a number
+      assertNotNull(row.get(4), "AvgDelay should not be null");
+    }
+  }
 }

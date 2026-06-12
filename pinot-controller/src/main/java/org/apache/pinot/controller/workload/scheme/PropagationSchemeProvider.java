@@ -22,21 +22,21 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 
 public class PropagationSchemeProvider {
 
-    private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
 
-    public PropagationSchemeProvider(PinotHelixResourceManager pinotHelixResourceManager) {
-        _pinotHelixResourceManager = pinotHelixResourceManager;
-    }
+  public PropagationSchemeProvider(PinotHelixResourceManager pinotHelixResourceManager) {
+    _pinotHelixResourceManager = pinotHelixResourceManager;
+  }
 
-    public PropagationScheme getPropagationScheme(
+  public PropagationScheme getPropagationScheme(
             org.apache.pinot.spi.config.workload.PropagationScheme.Type schemeType) {
-        switch (schemeType) {
-        case TABLE:
-            return new TablePropagationScheme(_pinotHelixResourceManager);
-        case TENANT:
-            return new TenantPropagationScheme(_pinotHelixResourceManager);
-        default:
-            return new DefaultPropagationScheme(_pinotHelixResourceManager);
-        }
+    switch (schemeType) {
+      case TABLE:
+        return new TablePropagationScheme(_pinotHelixResourceManager);
+      case TENANT:
+        return new TenantPropagationScheme(_pinotHelixResourceManager);
+      default:
+        return new DefaultPropagationScheme(_pinotHelixResourceManager);
     }
+  }
 }

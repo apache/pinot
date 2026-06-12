@@ -186,7 +186,7 @@ public class OpChainTest {
     }
 
     @Override
-    protected StatMap<?> copyStatMaps() {
+    public StatMap<LiteralValueOperator.StatKey> copyStatMaps() {
       return new StatMap<>(_statMap);
     }
 

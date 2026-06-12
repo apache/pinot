@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -34,6 +35,7 @@ import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -64,6 +66,7 @@ public enum AggregationFunctionType {
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
   LASTWITHTIME("lastWithTime", ReturnTypes.ARG0,
@@ -79,8 +82,10 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTOFFHEAP("distinctCountOffHeap", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
       SqlTypeName.INTEGER),
-  DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.NUMERIC, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  DISTINCTAVG("distinctAvg", ReturnTypes.DOUBLE, OperandTypes.NUMERIC, SqlTypeName.OTHER),
+  DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
+      SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  DISTINCTAVG("distinctAvg", ReturnTypes.DOUBLE, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
+      SqlTypeName.OTHER),
   DISTINCTCOUNTBITMAP("distinctCountBitmap", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER,
       SqlTypeName.INTEGER),
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount", ReturnTypes.BIGINT, OperandTypes.ANY),
@@ -163,8 +168,9 @@ public enum AggregationFunctionType {
   STUNION("STUnion", ReturnTypes.VARBINARY, OperandTypes.BINARY, SqlTypeName.OTHER),
 
   // boolean aggregate functions
-  BOOLAND("boolAnd", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.INTEGER),
-  BOOLOR("boolOr", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.INTEGER),
+  // Intermediate result type is BOOLEAN, serialized through its stored type (INT).
+  BOOLAND("boolAnd", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.BOOLEAN),
+  BOOLOR("boolOr", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.BOOLEAN),
 
   // ExprMin and ExprMax
   // TODO: revisit support for ExprMin/Max count in V2, particularly plug query rewriter in the right place
@@ -253,6 +259,7 @@ public enum AggregationFunctionType {
   private final SqlReturnTypeInference _intermediateReturnTypeInference;
   // Override final result type if it is not the same as standard return type of the function.
   private final SqlReturnTypeInference _finalReturnTypeInference;
+  private final SqlKind _sqlKind;
 
   AggregationFunctionType(String name) {
     this(name, null, null, (SqlReturnTypeInference) null, null);
@@ -286,11 +293,21 @@ public enum AggregationFunctionType {
       @Nullable SqlOperandTypeChecker operandTypeChecker,
       @Nullable SqlReturnTypeInference intermediateReturnTypeInference,
       @Nullable SqlReturnTypeInference finalReturnTypeInference) {
+    this(name, returnTypeInference, operandTypeChecker, intermediateReturnTypeInference, finalReturnTypeInference,
+        null);
+  }
+
+  AggregationFunctionType(String name, @Nullable SqlReturnTypeInference returnTypeInference,
+      @Nullable SqlOperandTypeChecker operandTypeChecker,
+      @Nullable SqlReturnTypeInference intermediateReturnTypeInference,
+      @Nullable SqlReturnTypeInference finalReturnTypeInference,
+      @Nullable SqlKind sqlKind) {
     _name = name;
     _returnTypeInference = returnTypeInference;
     _operandTypeChecker = operandTypeChecker;
     _intermediateReturnTypeInference = intermediateReturnTypeInference;
     _finalReturnTypeInference = finalReturnTypeInference;
+    _sqlKind = sqlKind;
   }
 
   public String getName() {
@@ -317,6 +334,11 @@ public enum AggregationFunctionType {
     return _finalReturnTypeInference;
   }
 
+  @Nullable
+  public SqlKind getSqlKind() {
+    return _sqlKind;
+  }
+
   public static boolean isAggregationFunction(String functionName) {
     if (NAMES.contains(functionName)) {
       return true;
@@ -334,7 +356,7 @@ public enum AggregationFunctionType {
   }
 
   public static String getNormalizedAggregationFunctionName(String functionName) {
-    return StringUtils.remove(StringUtils.remove(functionName, '_').toUpperCase(), "$");
+    return Strings.CS.remove(StringUtils.remove(functionName, '_').toUpperCase(), "$");
   }
 
   /**
@@ -418,9 +440,9 @@ public enum AggregationFunctionType {
     }
   }
 
-  // Used for aggregation functions that always return BIGINT. The "IfEmpty" logic ensures that the return type is
-  // nullable for pure aggregation queries (no group-by) and filtered aggregation queries. Return values can be null
-  // if there are no matching rows (even if the operand type is not nullable).
+  /// Used for aggregation functions that always return BIGINT. The "IfEmpty" logic ensures that the return type is
+  /// nullable for pure aggregation queries (no group-by) and filtered aggregation queries. Return values can be null
+  /// if there are no matching rows (even if the operand type is not nullable).
   private static class BigintNullableIfEmpty implements SqlReturnTypeInference {
     @Override
     public RelDataType inferReturnType(SqlOperatorBinding opBinding) {

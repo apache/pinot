@@ -21,6 +21,7 @@ package org.apache.pinot.server.api.resources;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -32,11 +33,10 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -88,9 +88,13 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -110,8 +114,12 @@ import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.PageCacheWarmupRequest;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -245,26 +253,20 @@ public class TablesResource {
           }
           for (String column : columnSet) {
             ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
-            int columnLength = 0;
-            DataType storedDataType = columnMetadata.getDataType().getStoredType();
-            if (storedDataType.isFixedWidth()) {
-              // For type of fixed width: INT, LONG, FLOAT, DOUBLE, BOOLEAN (stored as INT), TIMESTAMP (stored as LONG),
-              // set the columnLength as the fixed width.
-              columnLength = storedDataType.size();
-            } else if (columnMetadata.hasDictionary()) {
-              // For type of variable width (String, Bytes), if it's stored using dictionary encoding, set the
-              // columnLength as the max length in dictionary.
-              columnLength = columnMetadata.getColumnMaxLength();
-            } else if (storedDataType == DataType.STRING || storedDataType == DataType.BYTES) {
-              // For type of variable width (String, Bytes), if it's stored using raw bytes, set the columnLength as
-              // the length of the max value.
-              if (columnMetadata.getMaxValue() != null) {
-                String maxValueString = (String) columnMetadata.getMaxValue();
-                columnLength = maxValueString.getBytes(StandardCharsets.UTF_8).length;
+            int columnLength = columnMetadata.getLengthOfLongestElement();
+            if (columnLength < 0) {
+              // For raw STRING/BYTES/BIG_DECIMAL column, set the columnLength as the length of the max value.
+              Comparable<?> maxValue = columnMetadata.getMaxValue();
+              if (maxValue instanceof String) {
+                columnLength = Utf8.encodedLength((String) maxValue);
+              } else if (maxValue instanceof ByteArray) {
+                columnLength = ((ByteArray) maxValue).length();
+              } else if (maxValue instanceof BigDecimal) {
+                columnLength = BigDecimalUtils.byteSize((BigDecimal) maxValue);
+              } else {
+                // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
+                columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
               }
-            } else {
-              // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
-              columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
             }
             int columnCardinality = columnMetadata.getCardinality();
             columnLengthMap.merge(column, (double) columnLength, Double::sum);
@@ -296,23 +298,19 @@ public class TablesResource {
       }
     }
 
-    // fetch partition to primary key count for realtime tables that have upsert enabled
-    Map<Integer, Long> upsertPartitionToPrimaryKeyCountMap = new HashMap<>();
-    if (tableDataManager instanceof RealtimeTableDataManager) {
-      RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
-      upsertPartitionToPrimaryKeyCountMap = realtimeTableDataManager.getUpsertPartitionToPrimaryKeyCount();
-    }
+    // fetch partition to primary key count for tables that have upsert or dedup enabled
+    Map<Integer, Long> partitionToPrimaryKeyCountMap = tableDataManager.getPartitionToPrimaryKeyCount();
 
-    // construct upsertPartitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
-    Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap = new HashMap<>();
-    upsertPartitionToPrimaryKeyCountMap.forEach(
-        (partition, primaryKeyCount) -> upsertPartitionToServerPrimaryKeyCountMap.put(partition,
+    // construct partitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
+    Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
+    partitionToPrimaryKeyCountMap.forEach(
+        (partition, primaryKeyCount) -> partitionToServerPrimaryKeyCountMap.put(partition,
             Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
 
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
             totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
-            upsertPartitionToServerPrimaryKeyCountMap);
+            partitionToServerPrimaryKeyCountMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
@@ -475,10 +473,10 @@ public class TablesResource {
     }
   }
 
-  // TODO Add access control similar to PinotSegmentUploadDownloadRestletResource for segment download.
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DOWNLOAD_SEGMENT)
   @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
   public Response downloadSegment(
       @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE")
@@ -905,7 +903,7 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url,"
       + "crc and other segment metadata",
-      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc "
+      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc, data crc "
           + "and other segment metadata")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -952,8 +950,11 @@ public class TablesResource {
     try {
       segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
       String downloadUrl = uploadSegment(segmentTarFile, realtimeTableNameWithType, segmentName, timeoutMs);
-      return new TableLLCSegmentUploadResponse(segmentName,
-          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()), downloadUrl);
+      return new TableLLCSegmentUploadResponse(
+          segmentName,
+          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()),
+          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getDataCrc()),
+          downloadUrl);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
@@ -1107,11 +1108,17 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          Map<String, ConsumerPartitionState> partitionStateMap =
-              realtimeSegmentDataManager.getConsumerPartitionState();
+          StreamMetadataProvider streamMetadataProvider =
+              ((RealtimeTableDataManager) (tableDataManager)).getStreamMetadataProvider(realtimeSegmentDataManager);
+          StreamPartitionMsgOffset latestMsgOffset =
+              RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(realtimeSegmentDataManager, streamMetadataProvider);
+          Map<String, ConsumerPartitionState> partitionIdToStateMap =
+              realtimeSegmentDataManager.getConsumerPartitionState(latestMsgOffset);
           Map<String, String> recordsLagMap = new HashMap<>();
           Map<String, String> availabilityLagMsMap = new HashMap<>();
-          realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
+          Map<String, PartitionLagState> partitionToLagState =
+              streamMetadataProvider.getCurrentPartitionLagState(partitionIdToStateMap);
+          partitionToLagState.forEach((k, v) -> {
             recordsLagMap.put(k, v.getRecordsLag());
             availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
           });
@@ -1120,15 +1127,12 @@ public class TablesResource {
           segmentConsumerInfoList.add(new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
               realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(), partitiionToOffsetMap,
-              new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionStateMap.entrySet().stream()
+              new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionIdToStateMap.entrySet()
+                  .stream()
                   .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())),
                   recordsLagMap, availabilityLagMsMap)));
         }
       }
-    } catch (ConcurrentModificationException e) {
-      LOGGER.warn("Multi-threaded access is unsafe for KafkaConsumer, caught exception when fetching stream offset",
-          e);
-      return segmentConsumerInfoList;
     } catch (Exception e) {
       throw new WebApplicationException("Caught exception when getting consumer info for table: " + realtimeTableName);
     } finally {

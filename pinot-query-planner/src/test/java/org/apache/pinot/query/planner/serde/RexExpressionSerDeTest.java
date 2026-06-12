@@ -85,7 +85,8 @@ public class RexExpressionSerDeTest {
 
   @Test
   public void testStringLiteral() {
-    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.STRING, RandomStringUtils.random(RANDOM.nextInt(10))));
+    verifyLiteralSerDe(
+        new RexExpression.Literal(ColumnDataType.STRING, RandomStringUtils.secure().next(RANDOM.nextInt(10))));
   }
 
   @Test
@@ -153,7 +154,7 @@ public class RexExpressionSerDeTest {
   public void testStringArrayLiteral() {
     String[] values = new String[RANDOM.nextInt(10)];
     for (int i = 0; i < values.length; i++) {
-      values[i] = RandomStringUtils.random(RANDOM.nextInt(10));
+      values[i] = RandomStringUtils.secure().next(RANDOM.nextInt(10));
     }
     verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.STRING_ARRAY, values));
   }

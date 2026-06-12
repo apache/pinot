@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -59,8 +58,9 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
-      JsonNode message = JsonUtils.bytesToJsonNode(payload, offset, length);
-      return _jsonRecordExtractor.extract(JsonUtils.jsonNodeToMap(message), destination);
+      // Parse directly to Map, avoiding intermediate JsonNode representation for better performance
+      Map<String, Object> jsonMap = JsonUtils.bytesToMap(payload, offset, length);
+      return _jsonRecordExtractor.extract(jsonMap, destination);
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while decoding JSON record with payload: " + new String(payload, offset, length), e);

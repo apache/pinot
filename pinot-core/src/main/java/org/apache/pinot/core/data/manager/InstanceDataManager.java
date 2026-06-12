@@ -30,7 +30,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -51,7 +51,8 @@ public interface InstanceDataManager {
    * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.instance'
    */
   void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, ServerReloadJobStatusCache reloadJobStatusCache)
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
+      ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception;
 
   /**
@@ -190,6 +191,14 @@ public interface InstanceDataManager {
    * Immediately stop consumption and start committing the consuming segments.
    */
   void forceCommit(String tableNameWithType, Set<String> segmentNames);
+
+  /**
+   * Installs a supplier that gates consuming-segment ingestion. While the supplier returns {@code false}, newly created
+   * realtime consumers wait at the entry of their consumer thread before pulling any data. The supplier is consulted
+   * per consumer; once it returns {@code true} for a given consumer, that consumer should proceed and should
+   * not be gated again. Implementations default to a no-op so subclasses opt in explicitly.
+   */
+  void setSupplierOfIsServerReadyToConsumeData(BooleanSupplier isServerReadyToConsumeData);
 
   /**
    * Enables the installation of a method to determine if a server is ready to server queries.

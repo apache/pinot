@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-plugins</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-stream-ingestion</artifactId>
   <packaging>pom</packaging>
@@ -37,8 +37,8 @@
 
   <modules>
     <module>pinot-kafka-base</module>
-    <module>pinot-kafka-2.0</module>
     <module>pinot-kafka-3.0</module>
+    <module>pinot-kafka-4.0</module>
     <module>pinot-kinesis</module>
     <module>pinot-pulsar</module>
   </modules>

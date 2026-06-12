@@ -99,6 +99,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   REALTIME_INGESTION_DELAY_MS("milliseconds", false,
       "The difference of the current timestamp and the timestamp present in the last consumed message record."),
   END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
+  REALTIME_INGESTION_DELAY_REPORTING_STATUS("boolean", false,
+      "Binary indicator (1 or 0) for whether ingestion delay data is available for a partition."),
   REALTIME_CONSUMER_DIR_USAGE("bytes", true),
   SEGMENT_DOWNLOAD_SPEED("bytes", true),
   PREDOWNLOAD_SPEED("bytes", true),
@@ -123,6 +125,10 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   MAILBOX_SERVER_CACHE_SIZE_NORMAL("bytes", true),
   MAILBOX_SERVER_THREADLOCALCACHE("bytes", true),
   MAILBOX_SERVER_CHUNK_SIZE("bytes", true),
+
+  // MailboxService gRPC client (outbound to peer mailboxes) memory metrics
+  MAILBOX_CLIENT_USED_DIRECT_MEMORY("bytes", true),
+  MAILBOX_CLIENT_USED_HEAP_MEMORY("bytes", true),
 
   /// Exports the max amount of direct memory that can be allocated by Netty
   /// It is basically an adaptor for io.netty.util.internal.PlatformDependent.maxDirectMemory()
@@ -153,7 +159,9 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
 
   // ThrottleOnCriticalHeapUsageExecutor metrics
   THROTTLE_EXECUTOR_QUEUE_SIZE("count", true,
-      "Current number of tasks in the throttle executor queue");
+      "Current number of tasks in the throttle executor queue"),
+  // Workload config fetch status: 1 = success, 0 = failure
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true);
 
   private final String _gaugeName;
   private final String _unit;

@@ -21,7 +21,6 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminValidationException;
 import org.apache.pinot.controller.api.resources.InstanceTagUpdateRequest;
 import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -39,7 +40,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -50,6 +50,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /**
@@ -57,65 +58,68 @@ import static org.testng.Assert.assertTrue;
  */
 public class PinotInstanceRestletResourceTest extends ControllerTest {
 
-  private ControllerRequestURLBuilder _urlBuilder = null;
-
   @BeforeClass
   public void setUp()
       throws Exception {
     DEFAULT_INSTANCE.setupSharedStateAndValidate();
-    _urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
   }
 
   @Test
   public void testInstanceListingAndCreation()
       throws Exception {
-    String listInstancesUrl = _urlBuilder.forInstanceList();
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
     int expectedNumInstances =
         1 + DEFAULT_NUM_BROKER_INSTANCES + DEFAULT_NUM_SERVER_INSTANCES + DEFAULT_NUM_MINION_INSTANCES;
-    checkNumInstances(listInstancesUrl, expectedNumInstances);
+    checkNumInstances(adminClient, expectedNumInstances);
 
     // Create untagged broker and server instances
-    String createInstanceUrl = _urlBuilder.forInstanceCreate();
     Instance brokerInstance1 = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null, 0, 0, 0, 0, false);
-    sendPostRequest(createInstanceUrl, brokerInstance1.toJsonString());
+    adminClient.getInstanceClient().createInstance(brokerInstance1.toJsonString());
     Instance serverInstance1 =
         new Instance("1.2.3.4", 2345, InstanceType.SERVER, null, null, 8090, 8091, 8092, 8093, false);
-    sendPostRequest(createInstanceUrl, serverInstance1.toJsonString());
+    adminClient.getInstanceClient().createInstance(serverInstance1.toJsonString());
 
     // Check that we have added two more instances
-    checkNumInstances(listInstancesUrl, expectedNumInstances + 2);
+    checkNumInstances(adminClient, expectedNumInstances + 2);
 
     // Create broker and server instances with tags and pools
     Instance brokerInstance2 =
         new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null, 0, 0, 0, 0,
             false);
-    sendPostRequest(createInstanceUrl, brokerInstance2.toJsonString());
+    adminClient.getInstanceClient().createInstance(brokerInstance2.toJsonString());
     Map<String, Integer> serverPools = new TreeMap<>();
     serverPools.put("tag_OFFLINE", 0);
     serverPools.put("tag_REALTIME", 1);
     Instance serverInstance2 =
         new Instance("2.3.4.5", 2345, InstanceType.SERVER, Arrays.asList("tag_OFFLINE", "tag_REALTIME"), serverPools,
             18090, 18091, 18092, 18093, false);
-    sendPostRequest(createInstanceUrl, serverInstance2.toJsonString());
+    adminClient.getInstanceClient().createInstance(serverInstance2.toJsonString());
 
     // Check that we have added four instances so far
-    checkNumInstances(listInstancesUrl, expectedNumInstances + 4);
+    checkNumInstances(adminClient, expectedNumInstances + 4);
 
     // Create duplicate broker and server instances should fail
-    assertThrows(IOException.class, () -> sendPostRequest(createInstanceUrl, brokerInstance1.toJsonString()));
-    assertThrows(IOException.class, () -> sendPostRequest(createInstanceUrl, serverInstance1.toJsonString()));
-    assertThrows(IOException.class, () -> sendPostRequest(createInstanceUrl, brokerInstance2.toJsonString()));
-    assertThrows(IOException.class, () -> sendPostRequest(createInstanceUrl, serverInstance2.toJsonString()));
+    assertThrows(Exception.class,
+        () -> adminClient.getInstanceClient().createInstance(brokerInstance1.toJsonString()));
+    assertThrows(Exception.class,
+        () -> adminClient.getInstanceClient().createInstance(serverInstance1.toJsonString()));
+    assertThrows(Exception.class,
+        () -> adminClient.getInstanceClient().createInstance(brokerInstance2.toJsonString()));
+    assertThrows(Exception.class,
+        () -> adminClient.getInstanceClient().createInstance(serverInstance2.toJsonString()));
 
     // Check that number of instances did not change.
-    checkNumInstances(listInstancesUrl, expectedNumInstances + 4);
+    checkNumInstances(adminClient, expectedNumInstances + 4);
 
     // Check that the instances are properly created
-    checkInstanceInfo("Broker_1.2.3.4_1234", "1.2.3.4", 1234, new String[0], null, -1, -1, -1, -1, false);
-    checkInstanceInfo("Server_1.2.3.4_2345", "1.2.3.4", 2345, new String[0], null, 8090, 8091, 8092, 8093, false);
-    checkInstanceInfo("Broker_2.3.4.5_1234", "2.3.4.5", 1234, new String[]{"tag_BROKER"}, null, -1, -1, -1, -1, false);
-    checkInstanceInfo("Server_2.3.4.5_2345", "2.3.4.5", 2345, new String[]{"tag_OFFLINE", "tag_REALTIME"}, serverPools,
-        18090, 18091, 18092, 18093, false);
+    checkInstanceInfo(adminClient, "Broker_1.2.3.4_1234", "1.2.3.4", 1234, new String[0], null, -1, -1, -1, -1,
+        false);
+    checkInstanceInfo(adminClient, "Server_1.2.3.4_2345", "1.2.3.4", 2345, new String[0], null, 8090, 8091, 8092, 8093,
+        false);
+    checkInstanceInfo(adminClient, "Broker_2.3.4.5_1234", "2.3.4.5", 1234, new String[]{"tag_BROKER"}, null, -1, -1,
+        -1, -1, false);
+    checkInstanceInfo(adminClient, "Server_2.3.4.5_2345", "2.3.4.5", 2345,
+        new String[]{"tag_OFFLINE", "tag_REALTIME"}, serverPools, 18090, 18091, 18092, 18093, false);
 
     // Test PUT instance API
     String newBrokerTag = "new-broker-tag";
@@ -123,60 +127,53 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
         new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null, 0, 0, 0, 0,
             false);
     String brokerInstanceId = "Broker_1.2.3.4_1234";
-    String brokerInstanceUrl = _urlBuilder.forInstance(brokerInstanceId);
-    sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
+    adminClient.getInstanceClient().updateInstance(brokerInstanceId, newBrokerInstance.toJsonString());
     String newServerTag = "new-server-tag";
     Instance newServerInstance =
         new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null, 28090, 28091,
             28092, 28093, true);
     String serverInstanceId = "Server_1.2.3.4_2345";
-    String serverInstanceUrl = _urlBuilder.forInstance(serverInstanceId);
-    sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
+    adminClient.getInstanceClient().updateInstance(serverInstanceId, newServerInstance.toJsonString());
 
-    checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{newBrokerTag}, null, -1, -1, -1, -1, false);
-    checkInstanceInfo(serverInstanceId, "1.2.3.4", 2345, new String[]{newServerTag}, null, 28090, 28091, 28092, 28093,
-        true);
+    checkInstanceInfo(adminClient, brokerInstanceId, "1.2.3.4", 1234, new String[]{newBrokerTag}, null, -1, -1, -1,
+        -1, false);
+    checkInstanceInfo(adminClient, serverInstanceId, "1.2.3.4", 2345, new String[]{newServerTag}, null, 28090, 28091,
+        28092, 28093, true);
 
     // Test Instance updateTags API
-    String brokerInstanceUpdateTagsUrl =
-        _urlBuilder.forInstanceUpdateTags(brokerInstanceId, Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
-    sendPutRequest(brokerInstanceUpdateTagsUrl);
-    String serverInstanceUpdateTagsUrl = _urlBuilder.forInstanceUpdateTags(serverInstanceId,
-        Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
-    sendPutRequest(serverInstanceUpdateTagsUrl);
-    checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null, -1, -1, -1,
-        -1, false);
-    checkInstanceInfo(serverInstanceId, "1.2.3.4", 2345,
+    adminClient.getInstanceClient()
+        .updateInstanceTags(brokerInstanceId, Lists.newArrayList("tag_BROKER", "newTag_BROKER"), false);
+    adminClient.getInstanceClient()
+        .updateInstanceTags(serverInstanceId, Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"),
+            false);
+    checkInstanceInfo(adminClient, brokerInstanceId, "1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"},
+        null, -1, -1, -1, -1, false);
+    checkInstanceInfo(adminClient, serverInstanceId, "1.2.3.4", 2345,
         new String[]{"tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"}, null, 28090, 28091, 28092, 28093, true);
 
     // Test DELETE instance API
-    sendDeleteRequest(_urlBuilder.forInstance("Broker_1.2.3.4_1234"));
-    sendDeleteRequest(_urlBuilder.forInstance("Server_1.2.3.4_2345"));
-    sendDeleteRequest(_urlBuilder.forInstance("Broker_2.3.4.5_1234"));
-    sendDeleteRequest(_urlBuilder.forInstance("Server_2.3.4.5_2345"));
-    checkNumInstances(listInstancesUrl, expectedNumInstances);
+    adminClient.getInstanceClient().dropInstance("Broker_1.2.3.4_1234");
+    adminClient.getInstanceClient().dropInstance("Server_1.2.3.4_2345");
+    adminClient.getInstanceClient().dropInstance("Broker_2.3.4.5_1234");
+    adminClient.getInstanceClient().dropInstance("Server_2.3.4.5_2345");
+    checkNumInstances(adminClient, expectedNumInstances);
   }
 
-  private void checkNumInstances(String listInstancesUrl, int expectedNumInstances)
+  private void checkNumInstances(PinotAdminClient adminClient, int expectedNumInstances)
       throws Exception {
-    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(listInstancesUrl));
-    JsonNode instances = response.get("instances");
+    List<String> instances = adminClient.getInstanceClient().listInstances();
     assertEquals(instances.size(), expectedNumInstances);
-    int numControllers = 0;
-    for (int i = 0; i < expectedNumInstances; i++) {
-      if (instances.get(i).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE)) {
-        numControllers++;
-      }
-    }
+    long numControllers =
+        instances.stream().filter(name -> name.startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE)).count();
     assertEquals(numControllers, 1);
   }
 
-  private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags,
+  private void checkInstanceInfo(PinotAdminClient adminClient, String instanceName, String hostName, int port,
+      String[] tags,
       @Nullable Map<String, Integer> pools, int grpcPort, int adminPort, int queryServicePort, int queryMailboxPort,
       boolean queriesDisabled)
       throws Exception {
-    JsonNode response = JsonUtils.stringToJsonNode(
-        ControllerTest.sendGetRequest(_urlBuilder.forInstance(instanceName)));
+    JsonNode response = JsonUtils.stringToJsonNode(adminClient.getInstanceClient().getInstance(instanceName));
     assertEquals(response.get("instanceName").asText(), instanceName);
     assertEquals(response.get("hostName").asText(), hostName);
     assertTrue(response.get("enabled").asBoolean());
@@ -208,7 +205,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
   @Test
   public void instanceRetagHappyPathTest()
-      throws IOException {
+      throws Exception {
     Map<String, List<String>> currentInstanceTagsMap = getCurrentInstanceTagsMap();
     List<InstanceTagUpdateRequest> request = new ArrayList<>();
     currentInstanceTagsMap.forEach((instance, tags) -> {
@@ -221,7 +218,8 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       }
     });
     List<OperationValidationResponse> response = Arrays.asList(new ObjectMapper().readValue(
-        sendPostRequest(_urlBuilder.forUpdateTagsValidation(), JsonUtils.objectToString(request)),
+        DEFAULT_INSTANCE.getOrCreateAdminClient().getInstanceClient()
+            .validateInstanceTagUpdates(JsonUtils.objectToString(request)),
         OperationValidationResponse[].class));
     assertNotNull(response);
     response.forEach(item -> assertTrue(item.isSafe()));
@@ -248,7 +246,8 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       }
     });
     List<OperationValidationResponse> response = Arrays.asList(new ObjectMapper().readValue(
-        sendPostRequest(_urlBuilder.forUpdateTagsValidation(), JsonUtils.objectToString(request)),
+        DEFAULT_INSTANCE.getOrCreateAdminClient().getInstanceClient()
+            .validateInstanceTagUpdates(JsonUtils.objectToString(request)),
         OperationValidationResponse[].class));
     assertNotNull(response);
 
@@ -274,26 +273,281 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
   }
 
   private Map<String, List<String>> getCurrentInstanceTagsMap()
-      throws IOException {
-    String listInstancesUrl = _urlBuilder.forInstanceList();
-    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(listInstancesUrl));
-    JsonNode instances = response.get("instances");
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+    List<String> instances = adminClient.getInstanceClient().listInstances();
     Map<String, List<String>> map = new HashMap<>(instances.size());
-    for (int i = 0; i < instances.size(); i++) {
-      String instance = instances.get(i).asText();
-      map.put(instance, getInstanceTags(instance));
+    for (String instance : instances) {
+      map.put(instance, getInstanceTags(adminClient, instance));
     }
     return map;
   }
 
-  private List<String> getInstanceTags(String instance)
-      throws IOException {
-    String getInstancesUrl = _urlBuilder.forInstance(instance);
-    List<String> tags = new ArrayList<>();
-    for (JsonNode tag : JsonUtils.stringToJsonNode(sendGetRequest(getInstancesUrl)).get("tags")) {
-      tags.add(tag.asText());
+  private List<String> getInstanceTags(PinotAdminClient adminClient, String instance)
+      throws Exception {
+    return adminClient.getInstanceClient().getInstanceTags(instance);
+  }
+
+  @Test
+  public void testDrainMinionInstance()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+    // Create a minion instance with minion_untagged tag
+    Instance minionInstance =
+        new Instance("minion1.test.com", 9514, InstanceType.MINION,
+            Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE),
+            null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(minionInstance.toJsonString());
+    String minionInstanceId = "Minion_minion1.test.com_9514";
+
+    // Verify the minion was created with minion_untagged tag
+    checkInstanceInfo(adminClient, minionInstanceId, "minion1.test.com", 9514,
+        new String[]{Helix.UNTAGGED_MINION_INSTANCE}, null, -1, -1, -1, -1, false);
+
+    // Drain the minion instance
+    adminClient.getInstanceClient().updateInstanceState(minionInstanceId, "DRAIN");
+
+    // Verify the minion now has minion_drained tag instead of minion_untagged
+    JsonNode response = JsonUtils.stringToJsonNode(adminClient.getInstanceClient().getInstance(minionInstanceId));
+    assertEquals(response.get("instanceName").asText(), minionInstanceId);
+    JsonNode tags = response.get("tags");
+    assertEquals(tags.size(), 1);
+    assertEquals(tags.get(0).asText(), Helix.DRAINED_MINION_INSTANCE);
+
+    // Cleanup - delete the minion instance
+    adminClient.getInstanceClient().dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testDrainMinionInstanceWithCustomTags()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+    // Create a minion instance with custom tags - should succeed and replace ALL tags
+    List<String> tags = Arrays.asList(Helix.UNTAGGED_MINION_INSTANCE, "custom_tag1", "custom_tag2");
+    Instance minionInstance =
+        new Instance("minion2.test.com", 9515, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(minionInstance.toJsonString());
+    String minionInstanceId = "Minion_minion2.test.com_9515";
+
+    // Drain the minion instance - should succeed
+    adminClient.getInstanceClient().updateInstanceState(minionInstanceId, "DRAIN");
+
+    // Verify ALL tags were replaced with just minion_drained
+    JsonNode response = JsonUtils.stringToJsonNode(adminClient.getInstanceClient().getInstance(minionInstanceId));
+    JsonNode responseTags = response.get("tags");
+    assertEquals(responseTags.size(), 1);
+    assertEquals(responseTags.get(0).asText(), Helix.DRAINED_MINION_INSTANCE);
+
+    // Cleanup
+    adminClient.getInstanceClient().dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testDrainMinionInstanceWithOnlyCustomTag()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+    // Create a minion instance with only custom tag - should succeed and replace it
+    List<String> tags = Arrays.asList("custom_tag");
+    Instance minionInstance =
+        new Instance("minion3.test.com", 9516, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(minionInstance.toJsonString());
+    String minionInstanceId = "Minion_minion3.test.com_9516";
+
+    // Drain the minion instance - should succeed
+    adminClient.getInstanceClient().updateInstanceState(minionInstanceId, "DRAIN");
+
+    // Verify tag was replaced with minion_drained
+    JsonNode response = JsonUtils.stringToJsonNode(adminClient.getInstanceClient().getInstance(minionInstanceId));
+    JsonNode responseTags = response.get("tags");
+    assertEquals(responseTags.size(), 1);
+    assertEquals(responseTags.get(0).asText(), Helix.DRAINED_MINION_INSTANCE);
+
+    // Cleanup
+    adminClient.getInstanceClient().dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testDrainMinionInstanceAlreadyDrainedFails()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+    // Create a minion instance that's already drained - should fail to drain again
+    List<String> tags = Arrays.asList(Helix.DRAINED_MINION_INSTANCE);
+    Instance minionInstance =
+        new Instance("minion4.test.com", 9517, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(minionInstance.toJsonString());
+    String minionInstanceId = "Minion_minion4.test.com_9517";
+
+    // Attempt to drain the already drained minion instance - should fail
+    assertThrows(Exception.class,
+        () -> adminClient.getInstanceClient().updateInstanceState(minionInstanceId, "DRAIN"));
+
+    // Cleanup
+    adminClient.getInstanceClient().dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testDrainNonMinionInstanceFails()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+    // Try to drain a broker instance (should fail)
+    String brokerInstanceId = "Broker_localhost_1234";
+    Instance brokerInstance =
+        new Instance("localhost", 1234, InstanceType.BROKER, Collections.singletonList("broker_tag"), null, 0, 0, 0, 0,
+            false);
+    adminClient.getInstanceClient().createInstance(brokerInstance.toJsonString());
+
+    // Attempt to drain the broker - should fail with 400 Bad Request
+    assertThrows(Exception.class,
+        () -> adminClient.getInstanceClient().updateInstanceState(brokerInstanceId, "DRAIN"));
+
+    // Cleanup
+    adminClient.getInstanceClient().dropInstance(brokerInstanceId);
+  }
+
+  @Test
+  public void testDrainNonExistentMinionFails()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+    // Try to drain a non-existent minion instance
+    String nonExistentMinionId = "Minion_nonexistent_9999";
+
+    // Should fail with 404 Not Found
+    assertThrows(Exception.class,
+        () -> adminClient.getInstanceClient().updateInstanceState(nonExistentMinionId, "DRAIN"));
+  }
+
+  @Test
+  public void testDrainMinionWithEmptyTags()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+    // Create a minion instance with no tags
+    Instance minionInstance =
+        new Instance("minion5.test.com", 9518, InstanceType.MINION, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(minionInstance.toJsonString());
+    String minionInstanceId = "Minion_minion5.test.com_9518";
+
+    // Drain the minion instance
+    adminClient.getInstanceClient().updateInstanceState(minionInstanceId, "DRAIN");
+
+    // Verify minion_drained tag was added
+    JsonNode response = JsonUtils.stringToJsonNode(adminClient.getInstanceClient().getInstance(minionInstanceId));
+    JsonNode responseTags = response.get("tags");
+    assertEquals(responseTags.size(), 1);
+    assertEquals(responseTags.get(0).asText(), Helix.DRAINED_MINION_INSTANCE);
+
+    // Cleanup
+    adminClient.getInstanceClient().dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testQueriesDisableOnServerInstance()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    Instance serverInstance =
+        new Instance("queryroute.test.com", 20000, InstanceType.SERVER, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(serverInstance.toJsonString());
+    String instanceId = "Server_queryroute.test.com_20000";
+    try {
+      // Queries routed by default
+      checkInstanceInfo(adminClient, instanceId, "queryroute.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, false);
+
+      // Disable query routing via toggleInstanceState
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_DISABLE");
+      checkInstanceInfo(adminClient, instanceId, "queryroute.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, true);
+
+      // Re-enable query routing via toggleInstanceState
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_ENABLE");
+      checkInstanceInfo(adminClient, instanceId, "queryroute.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, false);
+    } finally {
+      adminClient.getInstanceClient().dropInstance(instanceId);
     }
-    return tags;
+  }
+
+  @Test
+  public void testUpdateInstancePreservesQueriesDisabled()
+      throws Exception {
+    // Regression test: a generic PUT /instances/{name} with the request body's queriesDisabled defaulted
+    // to false must NOT clobber an operationally-set queriesDisabled=true (operator workflow:
+    //   1. operator calls QUERIES_DISABLE to remove server from broker routing,
+    //   2. some automation later updates host/tags/ports via PUT /instances/{name},
+    //   3. server must remain out of routing).
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    Instance serverInstance =
+        new Instance("preserve.test.com", 20000, InstanceType.SERVER, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(serverInstance.toJsonString());
+    String instanceId = "Server_preserve.test.com_20000";
+    try {
+      // Set queriesDisabled=true via the dedicated state API.
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_DISABLE");
+      checkInstanceInfo(adminClient, instanceId, "preserve.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, true);
+
+      // PUT /instances/{name} with a request body where queriesDisabled defaults to false (legacy operator path).
+      Instance updateBody =
+          new Instance("preserve.test.com", 20000, InstanceType.SERVER, null, null, 0, 0, 0, 0, false);
+      adminClient.getInstanceClient().updateInstance(instanceId, updateBody.toJsonString());
+
+      // queriesDisabled must still be true (operational flag preserved).
+      checkInstanceInfo(adminClient, instanceId, "preserve.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, true);
+
+      // Operator can still clear the flag via the dedicated state API.
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_ENABLE");
+      checkInstanceInfo(adminClient, instanceId, "preserve.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, false);
+    } finally {
+      adminClient.getInstanceClient().dropInstance(instanceId);
+    }
+  }
+
+  @Test
+  public void testQueriesDisableOnNonServerInstanceFails()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    // Broker instance
+    Instance brokerInstance =
+        new Instance("queryroute-broker.test.com", 30000, InstanceType.BROKER, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(brokerInstance.toJsonString());
+    String brokerId = "Broker_queryroute-broker.test.com_30000";
+    try {
+      // Expect HTTP 400 BAD_REQUEST surfaced as PinotAdminValidationException; verify the message
+      // identifies the failing precondition so a future regression that throws a generic 500 fails this test.
+      PinotAdminValidationException ex = expectThrows(PinotAdminValidationException.class,
+          () -> adminClient.getInstanceClient().updateInstanceState(brokerId, "QUERIES_DISABLE"));
+      assertTrue(ex.getMessage().contains("status: 400"),
+          "Expected HTTP 400 BAD_REQUEST, got: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains("only applies to server instances"),
+          "Expected message to mention server-only precondition, got: " + ex.getMessage());
+    } finally {
+      adminClient.getInstanceClient().dropInstance(brokerId);
+    }
+  }
+
+  @Test
+  public void testQueriesDisableOnMinionInstanceFails()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    Instance minionInstance =
+        new Instance("queryroute-minion.test.com", 9520, InstanceType.MINION, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(minionInstance.toJsonString());
+    String minionId = "Minion_queryroute-minion.test.com_9520";
+    try {
+      PinotAdminValidationException ex = expectThrows(PinotAdminValidationException.class,
+          () -> adminClient.getInstanceClient().updateInstanceState(minionId, "QUERIES_DISABLE"));
+      assertTrue(ex.getMessage().contains("status: 400"),
+          "Expected HTTP 400 BAD_REQUEST, got: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains("only applies to server instances"),
+          "Expected message to mention server-only precondition, got: " + ex.getMessage());
+    } finally {
+      adminClient.getInstanceClient().dropInstance(minionId);
+    }
   }
 
   @AfterClass

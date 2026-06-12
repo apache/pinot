@@ -18,18 +18,27 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 public class PinotDispatchPlanner {
@@ -52,7 +61,7 @@ public class PinotDispatchPlanner {
    * Entry point for attaching dispatch metadata to a {@link SubPlan}.
    * @param subPlan the entrypoint of the sub plan.
    */
-  public DispatchableSubPlan createDispatchableSubPlan(SubPlan subPlan) {
+  public DispatchableSubPlan createDispatchableSubPlan(SubPlan subPlan, MultiClusterRoutingContext routingContext) {
     // perform physical plan conversion and assign workers to each stage.
     // metadata may come directly from Calcite's RelNode which has not resolved actual table names (taking
     // case-sensitivity into account) yet, so we need to ensure table names are resolved while creating the subplan.
@@ -62,7 +71,7 @@ public class PinotDispatchPlanner {
     PlanFragment rootFragment = subPlan.getSubPlanRoot();
     PlanNode rootNode = rootFragment.getFragmentRoot();
     // 1. start by visiting the sub plan fragment root.
-    rootNode.visit(new DispatchablePlanVisitor(_tableCache), context);
+    rootNode.visit(new DispatchablePlanVisitor(_tableCache, routingContext), context);
     // 2. add a special stage for the global mailbox receive, this runs on the dispatcher.
     context.getDispatchablePlanStageRootMap().put(0, rootNode);
     // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
@@ -119,10 +128,93 @@ public class PinotDispatchPlanner {
 
   private static DispatchableSubPlan finalizeDispatchableSubPlan(PlanFragment subPlanRoot,
       DispatchablePlanContext dispatchablePlanContext) {
+    // TODO: Physical Optimizer path does not track empty leaf stages. To support short-circuit,
+    //  check if all leaf TableScanMetadata have empty workerIdToSegmentsMap.
+    boolean allLeafStagesEmpty = dispatchablePlanContext.isAllNonReplicatedLeafStagesEmpty();
+    if (allLeafStagesEmpty && hasNonEmptyReplicatedLeaf(dispatchablePlanContext.getDispatchablePlanMetadataMap())) {
+      allLeafStagesEmpty = false;
+    }
+    Map<Integer, DispatchablePlanFragment> fragmentMap =
+        dispatchablePlanContext.constructDispatchablePlanFragmentMap(subPlanRoot);
+    if (allLeafStagesEmpty) {
+      rewriteReduceStageForEmptyLeaves(fragmentMap);
+      // Drop orphan stages so EXPLAIN PLAN and stats consumers don't see unreferenced entries.
+      fragmentMap.keySet().retainAll(Set.of(0));
+    }
     return new DispatchableSubPlan(dispatchablePlanContext.getResultFields(),
-        dispatchablePlanContext.constructDispatchablePlanFragmentMap(subPlanRoot),
+        fragmentMap,
         dispatchablePlanContext.getTableNames(),
-        populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()));
+        populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()),
+        dispatchablePlanContext.getNumSegmentsPrunedByBroker(),
+        allLeafStagesEmpty);
+  }
+
+  static boolean hasNonEmptyReplicatedLeaf(Map<Integer, DispatchablePlanMetadata> metadataMap) {
+    for (DispatchablePlanMetadata metadata : metadataMap.values()) {
+      Map<String, List<String>> replicatedSegments = metadata.getReplicatedSegments();
+      if (replicatedSegments == null) {
+        continue;
+      }
+      for (List<String> segments : replicatedSegments.values()) {
+        if (segments != null && !segments.isEmpty()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  public static void rewriteReduceStageForEmptyLeaves(Map<Integer, DispatchablePlanFragment> fragmentMap) {
+    DispatchablePlanFragment reduceStage = fragmentMap.get(0);
+    List<WorkerMetadata> workerMetadataList = reduceStage.getWorkerMetadataList();
+    if (workerMetadataList.isEmpty()) {
+      return;
+    }
+    PlanNode inlinedRoot = inlineAllLeafStagesEmptyInputs(reduceStage.getPlanFragment().getFragmentRoot());
+    if (inlinedRoot != reduceStage.getPlanFragment().getFragmentRoot()) {
+      // Inlined nodes originally belonged to leaf stages (ID 1, 2, etc.) but now execute within
+      // the broker reduce stage (ID 0). PlanFragment's constructor asserts that the root's stageId
+      // matches the fragmentId, so we must update all node IDs before wrapping in a new fragment.
+      setStageIdRecursively(inlinedRoot, 0);
+      reduceStage = DispatchablePlanFragment.copyWithRoot(reduceStage, inlinedRoot);
+      fragmentMap.put(0, reduceStage);
+    }
+    WorkerMetadata workerMetadata = workerMetadataList.get(0);
+    reduceStage.setWorkerMetadataList(List.of(
+        new WorkerMetadata(workerMetadata.getWorkerId(), Map.of(), workerMetadata.getCustomProperties())));
+  }
+
+  private static PlanNode inlineAllLeafStagesEmptyInputs(PlanNode node) {
+    if (node instanceof TableScanNode) {
+      return new ValueNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), List.of(), List.of());
+    }
+    if (node instanceof MailboxReceiveNode) {
+      MailboxReceiveNode mailboxReceiveNode = (MailboxReceiveNode) node;
+      MailboxSendNode sender = mailboxReceiveNode.getSender();
+      List<PlanNode> senderInputs = sender.getInputs();
+      Preconditions.checkState(!senderInputs.isEmpty(),
+          "MailboxSendNode (stageId=%s) has no inputs", sender.getStageId());
+      return inlineAllLeafStagesEmptyInputs(senderInputs.get(0));
+    }
+    List<PlanNode> inputs = node.getInputs();
+    if (inputs.isEmpty()) {
+      return node;
+    }
+    boolean changed = false;
+    List<PlanNode> inlinedInputs = new ArrayList<>(inputs.size());
+    for (PlanNode input : inputs) {
+      PlanNode inlinedInput = inlineAllLeafStagesEmptyInputs(input);
+      inlinedInputs.add(inlinedInput);
+      changed |= inlinedInput != input;
+    }
+    return changed ? node.withInputs(inlinedInputs) : node;
+  }
+
+  private static void setStageIdRecursively(PlanNode node, int stageId) {
+    node.setStageId(stageId);
+    for (PlanNode input : node.getInputs()) {
+      setStageIdRecursively(input, stageId);
+    }
   }
 
   private static Map<String, Set<String>> populateTableUnavailableSegments(

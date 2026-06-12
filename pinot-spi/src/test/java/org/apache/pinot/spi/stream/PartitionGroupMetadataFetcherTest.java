@@ -27,10 +27,7 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -70,7 +67,10 @@ public class PartitionGroupMetadataFetcherTest {
 
       // Verify
       Assert.assertTrue(result);
-      Assert.assertEquals(fetcher.getPartitionGroupMetadataList().size(), 1);
+      List<StreamMetadata> streamMetadataList = fetcher.getStreamMetadataList();
+      Assert.assertEquals(streamMetadataList.size(), 1);
+      Assert.assertEquals(streamMetadataList.get(0).getNumPartitions(), 1);
+      Assert.assertEquals(streamMetadataList.get(0).getPartitionGroupMetadataList().size(), 1);
       Assert.assertNull(fetcher.getException());
     }
   }
@@ -85,6 +85,7 @@ public class PartitionGroupMetadataFetcherTest {
     List<PartitionGroupConsumptionStatus> statusList = Collections.emptyList();
 
     StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    when(metadataProvider.fetchPartitionCount(anyLong())).thenReturn(1);
     when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
         any(List.class), anyInt(), anyBoolean()))
         .thenThrow(new TransientConsumerException(new RuntimeException("Transient error")));
@@ -143,12 +144,18 @@ public class PartitionGroupMetadataFetcherTest {
 
       // Verify
       Assert.assertTrue(result);
-      Assert.assertEquals(fetcher.getPartitionGroupMetadataList().size(), 4);
+      List<StreamMetadata> streamMetadataList = fetcher.getStreamMetadataList();
+      Assert.assertEquals(streamMetadataList.size(), 2);
       Assert.assertNull(fetcher.getException());
 
+      Assert.assertEquals(streamMetadataList.get(0).getNumPartitions(), 2);
+      Assert.assertEquals(streamMetadataList.get(0).getPartitionGroupMetadataList().size(), 2);
+      Assert.assertEquals(streamMetadataList.get(1).getNumPartitions(), 2);
+      Assert.assertEquals(streamMetadataList.get(1).getPartitionGroupMetadataList().size(), 2);
+
       // Verify the correct partition group IDs: 0, 1, 10000, 10001
-      List<PartitionGroupMetadata> resultMetadata = fetcher.getPartitionGroupMetadataList();
-      List<Integer> partitionIds = resultMetadata.stream()
+      List<Integer> partitionIds = streamMetadataList.stream()
+          .flatMap(sm -> sm.getPartitionGroupMetadataList().stream())
           .map(PartitionGroupMetadata::getPartitionGroupId)
           .sorted()
           .collect(Collectors.toList());
@@ -174,6 +181,7 @@ public class PartitionGroupMetadataFetcherTest {
     PartitionGroupMetadata mockedMetadata2 = new PartitionGroupMetadata(1, mock(StreamPartitionMsgOffset.class));
 
     StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    when(metadataProvider.fetchPartitionCount(anyLong())).thenReturn(3);
     when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
         any(List.class), anyInt(), anyBoolean()))
         .thenReturn(Arrays.asList(mockedMetadata1, mockedMetadata2));
@@ -186,24 +194,303 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Arrays.asList(1), false);
+          streamConfigs, statusList, List.of(1), false);
 
       // Execute
       Boolean result = fetcher.call();
 
-      // Verify
+      // Verify - 2 streams active (topic1 at index 0, topic3 at index 2; topic2 at index 1 is paused)
       Assert.assertTrue(result);
-      Assert.assertEquals(fetcher.getPartitionGroupMetadataList().size(), 4);
+      List<StreamMetadata> streamMetadataList = fetcher.getStreamMetadataList();
+      Assert.assertEquals(streamMetadataList.size(), 2);
       Assert.assertNull(fetcher.getException());
 
       // Verify the correct partition group IDs
-      List<PartitionGroupMetadata> resultMetadata = fetcher.getPartitionGroupMetadataList();
-      List<Integer> partitionIds = resultMetadata.stream()
+      List<Integer> partitionIds = streamMetadataList.stream()
+          .flatMap(sm -> sm.getPartitionGroupMetadataList().stream())
           .map(PartitionGroupMetadata::getPartitionGroupId)
           .sorted()
           .collect(Collectors.toList());
 
       Assert.assertEquals(partitionIds, Arrays.asList(0, 1, 20000, 20001));
+    }
+  }
+
+  @Test
+  public void testDeprecatedGetPartitionGroupMetadataListFlatMaps()
+      throws Exception {
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
+    List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
+
+    PartitionGroupConsumptionStatus status1 = new PartitionGroupConsumptionStatus(0, 0, null, null, "IN_PROGRESS");
+    List<PartitionGroupConsumptionStatus> statusList = Collections.singletonList(status1);
+
+    StreamPartitionMsgOffset offset = mock(StreamPartitionMsgOffset.class);
+    PartitionGroupMetadata m1 = new PartitionGroupMetadata(0, offset);
+    PartitionGroupMetadata m2 = new PartitionGroupMetadata(1, offset);
+
+    StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    when(metadataProvider.fetchPartitionCount(anyLong())).thenReturn(2);
+    when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt(), anyBoolean())).thenReturn(Arrays.asList(m1, m2));
+
+    StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+    when(factory.createStreamMetadataProvider(anyString())).thenReturn(metadataProvider);
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedProvider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
+
+      PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
+          streamConfigs, statusList, Collections.emptyList(), false);
+      fetcher.call();
+
+      // Deprecated method should flat-map across all streams
+      List<PartitionGroupMetadata> flatList = fetcher.getPartitionGroupMetadataList();
+      Assert.assertEquals(flatList.size(), 4); // 2 per stream * 2 streams
+    }
+  }
+
+  @Test
+  public void testExceptionResetOnRetry()
+      throws Exception {
+    StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", false);
+    List<StreamConfig> streamConfigs = Collections.singletonList(streamConfig);
+
+    StreamPartitionMsgOffset offset = mock(StreamPartitionMsgOffset.class);
+    PartitionGroupMetadata metadata = new PartitionGroupMetadata(0, offset);
+
+    StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    when(metadataProvider.fetchPartitionCount(anyLong())).thenReturn(1);
+    // First call: transient failure; second call: success
+    when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt(), anyBoolean()))
+        .thenThrow(new TransientConsumerException(new RuntimeException("Transient")))
+        .thenReturn(Collections.singletonList(metadata));
+
+    StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+    when(factory.createStreamMetadataProvider(anyString())).thenReturn(metadataProvider);
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedProvider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
+
+      PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
+          streamConfigs, Collections.emptyList(), Collections.emptyList(), false);
+
+      // First call fails
+      Boolean result1 = fetcher.call();
+      Assert.assertFalse(result1);
+      Assert.assertNotNull(fetcher.getException());
+
+      // Second call succeeds - exception should be reset
+      Boolean result2 = fetcher.call();
+      Assert.assertTrue(result2);
+      Assert.assertNull(fetcher.getException());
+      Assert.assertEquals(fetcher.getStreamMetadataList().size(), 1);
+    }
+  }
+
+  @Test
+  public void testSequenceNumberPreservedInMultiStreamRemap()
+      throws Exception {
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
+    List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
+
+    List<PartitionGroupConsumptionStatus> statusList = Collections.emptyList();
+
+    StreamPartitionMsgOffset offset = mock(StreamPartitionMsgOffset.class);
+    PartitionGroupMetadata m1 = new PartitionGroupMetadata(0, offset, 7);
+    PartitionGroupMetadata m2 = new PartitionGroupMetadata(1, offset, 3);
+
+    StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    when(metadataProvider.fetchPartitionCount(anyLong())).thenReturn(2);
+    when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt(), anyBoolean())).thenReturn(Arrays.asList(m1, m2));
+
+    StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+    when(factory.createStreamMetadataProvider(anyString())).thenReturn(metadataProvider);
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedProvider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
+
+      PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
+          streamConfigs, statusList, Collections.emptyList(), false);
+      fetcher.call();
+
+      List<StreamMetadata> streamMetadataList = fetcher.getStreamMetadataList();
+      Assert.assertEquals(streamMetadataList.size(), 2);
+
+      // Second stream's partitions should have remapped IDs but preserved sequence numbers
+      List<PartitionGroupMetadata> stream1Partitions = streamMetadataList.get(1).getPartitionGroupMetadataList();
+      Assert.assertEquals(stream1Partitions.get(0).getPartitionGroupId(), 10000);
+      Assert.assertEquals(stream1Partitions.get(0).getSequenceNumber(), 7);
+      Assert.assertEquals(stream1Partitions.get(1).getPartitionGroupId(), 10001);
+      Assert.assertEquals(stream1Partitions.get(1).getSequenceNumber(), 3);
+    }
+  }
+
+  @Test
+  public void testGetStreamMetadataListReturnsUnmodifiable()
+      throws Exception {
+    StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", false);
+    List<StreamConfig> streamConfigs = Collections.singletonList(streamConfig);
+
+    PartitionGroupMetadata metadata = new PartitionGroupMetadata(0, mock(StreamPartitionMsgOffset.class));
+    StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    when(metadataProvider.fetchPartitionCount(anyLong())).thenReturn(1);
+    when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt(), anyBoolean())).thenReturn(Collections.singletonList(metadata));
+
+    StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+    when(factory.createStreamMetadataProvider(anyString())).thenReturn(metadataProvider);
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedProvider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
+
+      PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
+          streamConfigs, Collections.emptyList(), Collections.emptyList(), false);
+      fetcher.call();
+
+      try {
+        fetcher.getStreamMetadataList().add(
+            new StreamMetadata(streamConfig, 1, Collections.emptyList()));
+        Assert.fail("Expected UnsupportedOperationException");
+      } catch (UnsupportedOperationException e) {
+        // expected
+      }
+    }
+  }
+
+  /**
+   * When one topic in a multi-topic table is inaccessible (e.g. deleted from Kafka), the fetcher must
+   * continue fetching metadata for the remaining topics and return partial results rather than re-throwing
+   * and killing ingestion for all healthy topics.
+   */
+  @Test
+  public void testFetchMultipleStreamsOneTopicPermanentFailure()
+      throws Exception {
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table_REALTIME", false);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2-deleted", "test-table_REALTIME", false);
+    List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
+
+    StreamPartitionMsgOffset offset = mock(StreamPartitionMsgOffset.class);
+    PartitionGroupMetadata metadata = new PartitionGroupMetadata(0, offset);
+
+    // topic1 succeeds, topic2 throws a permanent (non-transient) exception
+    StreamMetadataProvider goodProvider = mock(StreamMetadataProvider.class);
+    when(goodProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt(), anyBoolean())).thenReturn(Collections.singletonList(metadata));
+
+    StreamMetadataProvider badProvider = mock(StreamMetadataProvider.class);
+    when(badProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt(), anyBoolean()))
+        .thenThrow(new PermanentConsumerException(new RuntimeException("Topic does not exist")));
+
+    StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+    when(factory.createStreamMetadataProvider(anyString()))
+        .thenReturn(goodProvider)   // called for topic1
+        .thenReturn(badProvider);   // called for topic2
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedProvider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
+
+      PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
+          streamConfigs, Collections.emptyList(), Collections.emptyList(), false);
+
+      Boolean result = fetcher.call();
+
+      // Fetch succeeds overall — only topic1's metadata is returned, topic2 is silently skipped
+      Assert.assertTrue(result);
+      Assert.assertEquals(fetcher.getStreamMetadataList().size(), 1);
+      Assert.assertEquals(fetcher.getStreamMetadataList().get(0).getNumPartitions(), 1);
+      Assert.assertNull(fetcher.getException());
+    }
+  }
+
+  @Test
+  public void testFetchMultipleStreamsFailedTopicDoesNotBlockOthersOnRetry()
+      throws Exception {
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table_REALTIME", false);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table_REALTIME", false);
+    List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
+
+    StreamPartitionMsgOffset offset = mock(StreamPartitionMsgOffset.class);
+    PartitionGroupMetadata metadata = new PartitionGroupMetadata(0, offset);
+
+    // First call: topic2 throws. Second call: both succeed.
+    StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    when(provider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt(), anyBoolean()))
+        .thenReturn(Collections.singletonList(metadata))           // topic1 first call
+        .thenThrow(new PermanentConsumerException(new RuntimeException("Topic does not exist")))   // topic2 first call
+        .thenReturn(Collections.singletonList(metadata))           // topic1 second call
+        .thenReturn(Collections.singletonList(metadata));          // topic2 second call
+
+    StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+    when(factory.createStreamMetadataProvider(anyString())).thenReturn(provider);
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedProvider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
+
+      PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
+          streamConfigs, Collections.emptyList(), Collections.emptyList(), false);
+
+      // First call: topic2 fails — only topic1's metadata returned, no exception
+      Boolean result1 = fetcher.call();
+      Assert.assertTrue(result1);
+      Assert.assertEquals(fetcher.getStreamMetadataList().size(), 1);
+      Assert.assertNull(fetcher.getException());
+
+      // Second call: both succeed
+      Boolean result2 = fetcher.call();
+      Assert.assertTrue(result2);
+      Assert.assertEquals(fetcher.getStreamMetadataList().size(), 2);
+    }
+  }
+
+  @Test
+  public void testFetchMultipleStreamsNonPermanentExceptionStillPropagates()
+      throws Exception {
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table_REALTIME", false);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table_REALTIME", false);
+    List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
+
+    StreamMetadataProvider goodProvider = mock(StreamMetadataProvider.class);
+    when(goodProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt(), anyBoolean()))
+        .thenReturn(Collections.singletonList(new PartitionGroupMetadata(0, mock(StreamPartitionMsgOffset.class))));
+
+    // Generic RuntimeException (not PermanentConsumerException) — auth error, NPE, etc.
+    StreamMetadataProvider badProvider = mock(StreamMetadataProvider.class);
+    when(badProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt(), anyBoolean()))
+        .thenThrow(new RuntimeException("Auth failure"));
+
+    StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+    when(factory.createStreamMetadataProvider(anyString()))
+        .thenReturn(goodProvider)
+        .thenReturn(badProvider);
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedProvider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
+
+      PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
+          streamConfigs, Collections.emptyList(), Collections.emptyList(), false);
+
+      try {
+        fetcher.call();
+        Assert.fail("Expected RuntimeException to propagate");
+      } catch (RuntimeException e) {
+        Assert.assertEquals(e.getMessage(), "Auth failure");
+      }
     }
   }
 

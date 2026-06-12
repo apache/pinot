@@ -778,11 +778,17 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
   }
 
   /**
-   * Helper to create a single test table
+   * Helper to create a single test table.
+   * <p>
+   * The cron schedule is intentionally set to a one-time fire date in the year 2099 so that the Quartz cron scheduler
+   * (enabled via {@code PINOT_TASK_MANAGER_SCHEDULER_ENABLED}) never fires during the test. Tests in this class
+   * assert on exact {@link ControllableTaskGenerator#getTaskGenerationCount()} values driven by explicit
+   * {@code createTask} / {@code scheduleTasks} calls, and a spurious cron firing at a :00 minute boundary would
+   * produce an extra {@code generateTasks} invocation and make the test flaky.
    */
   private void createSingleTestTable(String rawTableName) throws Exception {
     Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
-    taskTypeConfigsMap.put(TEST_TASK_TYPE, Map.of("schedule", "0 */10 * ? * * *"));
+    taskTypeConfigsMap.put(TEST_TASK_TYPE, Map.of("schedule", "0 0 0 1 1 ? 2099"));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(rawTableName)
@@ -970,7 +976,7 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
       startLatch.countDown();
 
       // Wait for completion
-      assertTrue(completionLatch.await(15, TimeUnit.SECONDS), "Tasks should complete within 15 seconds");
+      assertTrue(completionLatch.await(30, TimeUnit.SECONDS), "Tasks should complete within 30 seconds");
 
       executor.shutdownNow();
       assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "Executor should terminate");

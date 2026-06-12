@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
+import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -26,9 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  * Utility class for creating column statistics collectors.
  */
 public final class StatsCollectorUtil {
-
   private StatsCollectorUtil() {
-    // Utility class
   }
 
   /**
@@ -40,7 +41,13 @@ public final class StatsCollectorUtil {
    * @return AbstractColumnStatisticsCollector for the column
    */
   public static AbstractColumnStatisticsCollector createStatsCollector(String columnName, FieldSpec fieldSpec,
-      StatsCollectorConfig statsCollectorConfig) {
+      FieldIndexConfigs indexConfig, StatsCollectorConfig statsCollectorConfig) {
+    boolean dictionaryEnabled = indexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();
+    if (!dictionaryEnabled && fieldSpec.getDataType().getStoredType() != FieldSpec.DataType.MAP) {
+      if (ClusterConfigForTable.useOptimizedNoDictCollector(statsCollectorConfig.getTableConfig())) {
+        return new NoDictColumnStatisticsCollector(columnName, statsCollectorConfig);
+      }
+    }
     switch (fieldSpec.getDataType().getStoredType()) {
       case INT:
         return new IntColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
@@ -55,7 +62,7 @@ public final class StatsCollectorUtil {
       case STRING:
         return new StringColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       case BYTES:
-        return new BytesColumnPredIndexStatsCollector(columnName, statsCollectorConfig);
+        return new BytesColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       case MAP:
         return new MapColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       default:

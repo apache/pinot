@@ -62,6 +62,11 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     _responseStore = responseStore;
   }
 
+  @Nullable
+  public MultiStageBrokerRequestHandler getMultiStageBrokerRequestHandler() {
+    return _multiStageBrokerRequestHandler;
+  }
+
   @Override
   public void start() {
     _singleStageBrokerRequestHandler.start();
@@ -136,6 +141,15 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   }
 
   @Override
+  public BrokerResponse handleExplainTimeSeriesRequest(String lang, String rawQueryParamString,
+      Map<String, String> queryParams) {
+    if (_timeSeriesRequestHandler != null) {
+      return _timeSeriesRequestHandler.handleExplainTimeSeriesRequest(lang, rawQueryParamString, queryParams);
+    }
+    throw new QueryException(QueryErrorCode.INTERNAL, "Time series query engine not enabled.");
+  }
+
+  @Override
   public Map<Long, String> getRunningQueries() {
     // Both engines share the same request ID generator, so the query will have unique IDs across the two engines.
     Map<Long, String> queries = new HashMap<>(_singleStageBrokerRequestHandler.getRunningQueries());
@@ -151,7 +165,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       throws Exception {
     if (_multiStageBrokerRequestHandler != null && _multiStageBrokerRequestHandler.cancelQuery(
         queryId, timeoutMs, executor, connMgr, serverResponses)) {
-        return true;
+      return true;
     }
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }

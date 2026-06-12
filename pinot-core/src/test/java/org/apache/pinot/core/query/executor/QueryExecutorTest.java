@@ -235,7 +235,7 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = execute(queryRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets,
-        (AggregationResultsBlock) instanceResponse.getResultsBlock());
+        (AggregationResultsBlock) instanceResponse.getResultsBlock(), instanceResponse.getResponseMetadata());
     assertEquals(timeSeriesBlock.getSeriesMap().size(), 1);
     assertNull(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getDoubleValues()[0]);
     assertEquals(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getDoubleValues()[1], 29885544.0);
@@ -251,7 +251,8 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = execute(queryRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof GroupByResultsBlock);
     GroupByResultsBlock resultsBlock = (GroupByResultsBlock) instanceResponse.getResultsBlock();
-    TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets, resultsBlock);
+    TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets, resultsBlock,
+        instanceResponse.getResponseMetadata());
     assertEquals(5, timeSeriesBlock.getSeriesMap().size());
     // For any city, say "New York", the max order item count should be 4
     boolean foundNewYork = false;
@@ -280,7 +281,7 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = execute(queryRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof GroupByResultsBlock);
     TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets,
-        (GroupByResultsBlock) instanceResponse.getResultsBlock());
+        (GroupByResultsBlock) instanceResponse.getResultsBlock(), instanceResponse.getResponseMetadata());
     assertEquals(5, timeSeriesBlock.getSeriesMap().size());
     // For any city, say "Chicago", the min order item count should be 0
     boolean foundChicago = false;

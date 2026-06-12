@@ -33,7 +33,6 @@ import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -59,20 +58,14 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
   private static final String TEXT_COLUMN_NULL_NAME = "nullable_skills";
   private static final String TEXT_COLUMN_NAME = "skills";
   private static final String TEXT_COLUMN_NAME_CASE_SENSITIVE = "skills_case_sensitive";
-  private static final String TEXT_COLUMN_NAME_NATIVE = "skills_native";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
   private static final int NUM_SKILLS = 28;
   private static final int NUM_MATCHING_SKILLS = 4;
   private static final int NUM_RECORDS = NUM_SKILLS * 1000;
   private static final int NUM_MATCHING_RECORDS = NUM_MATCHING_SKILLS * 1000;
-  private static final int NUM_MATCHING_RECORDS_NATIVE = 7000;
 
   private static final String TEST_TEXT_COLUMN_QUERY =
       "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(skills, '\"machine learning\" AND spark')";
-
-  private static final String TEST_TEXT_COLUMN_QUERY_NATIVE =
-      "SELECT COUNT(*) FROM %s WHERE TEXT_CONTAINS(skills_native, 'm.*') AND TEXT_CONTAINS(skills_native, "
-          + "'spark')";
 
   @Override
   public String getTimeColumnName() {
@@ -124,25 +117,7 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     FieldConfig textColumnCaseSensitiveFieldConfig =
         new FieldConfig(TEXT_COLUMN_NAME_CASE_SENSITIVE, FieldConfig.EncodingType.RAW, null, null, null, null,
             textColumnCaseSensitiveIndexes, null, null);
-
-    ObjectNode textColumnNativeIndexes;
-    try {
-      textColumnNativeIndexes = (ObjectNode) OBJECT_MAPPER.readTree(
-          "{"
-              + "  \"text\": "
-              + "  {"
-              + "    \"fst\": \"NATIVE\""
-              + "  }"
-              + "}"
-      );
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-    FieldConfig textColumnNativeFieldConfig =
-        new FieldConfig(TEXT_COLUMN_NAME_NATIVE, FieldConfig.EncodingType.RAW, null, null, null, null,
-            textColumnNativeIndexes, null, null);
-    return Arrays.asList(nullableTextConfig, textColumnFieldConfig, textColumnCaseSensitiveFieldConfig,
-        textColumnNativeFieldConfig);
+    return Arrays.asList(nullableTextConfig, textColumnFieldConfig, textColumnCaseSensitiveFieldConfig);
   }
 
   @Override
@@ -161,7 +136,6 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
         })
         .addSingleValueDimension(TEXT_COLUMN_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TEXT_COLUMN_NAME_CASE_SENSITIVE, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(TEXT_COLUMN_NAME_NATIVE, FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
   }
 
@@ -185,7 +159,6 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     }
     assertEquals(skills.size(), NUM_SKILLS);
 
-    File avroFile = new File(_tempDir, "data.avro");
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(Arrays.asList(
         new Field(TEXT_COLUMN_NULL_NAME, createUnion(create(Type.NULL), create(Type.STRING)), null, null),
@@ -193,23 +166,20 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
             create(Type.STRING), null, null),
         new Field(TEXT_COLUMN_NAME_CASE_SENSITIVE,
             create(Type.STRING), null, null),
-        new Field(TEXT_COLUMN_NAME_NATIVE,
-            create(Type.STRING), null, null),
         new Field(TIME_COLUMN_NAME,
             create(Type.LONG), null, null)));
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_RECORDS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(TEXT_COLUMN_NULL_NAME, i % 2 == 0 ? null : skills.get(i % NUM_SKILLS));
         record.put(TEXT_COLUMN_NAME, skills.get(i % NUM_SKILLS));
         record.put(TEXT_COLUMN_NAME_CASE_SENSITIVE, skills.get(i % NUM_SKILLS));
-        record.put(TEXT_COLUMN_NAME_NATIVE, skills.get(i % NUM_SKILLS));
         record.put(TIME_COLUMN_NAME, System.currentTimeMillis());
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   @Override
@@ -255,23 +225,6 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
         return false;
       }
     }, 10_000L, "Failed to reach expected number of matching records");
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testTextSearchCountQueryNative(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    // Keep posting queries until all records are consumed
-    long previousResult = 0;
-    while (getCurrentCountStarResult() < NUM_RECORDS) {
-      long result = getTextColumnQueryResult(String.format(TEST_TEXT_COLUMN_QUERY_NATIVE, getTableName()));
-      assertTrue(result >= previousResult);
-      previousResult = result;
-      Thread.sleep(100);
-    }
-
-    assertEquals(getTextColumnQueryResult(String.format(TEST_TEXT_COLUMN_QUERY_NATIVE, getTableName())),
-        NUM_MATCHING_RECORDS_NATIVE);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

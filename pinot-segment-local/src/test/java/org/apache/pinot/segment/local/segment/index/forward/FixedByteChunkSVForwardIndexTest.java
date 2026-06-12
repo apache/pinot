@@ -56,6 +56,7 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
   @DataProvider(name = "combinations")
   public static Object[][] combinations() {
     return Arrays.stream(ChunkCompressionType.values())
+        .filter(t -> t != ChunkCompressionType.DELTA && t != ChunkCompressionType.DELTADELTA)
         .flatMap(chunkCompressionType -> IntStream.of(2, 3, 4)
             .mapToObj(version -> new Object[]{chunkCompressionType, version}))
         .toArray(Object[][]::new);

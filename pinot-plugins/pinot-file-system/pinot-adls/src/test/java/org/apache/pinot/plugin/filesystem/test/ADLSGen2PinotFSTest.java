@@ -31,6 +31,7 @@ import com.azure.storage.file.datalake.models.PathItem;
 import com.azure.storage.file.datalake.models.PathProperties;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -47,6 +48,7 @@ import org.apache.pinot.plugin.filesystem.ADLSGen2PinotFS;
 import org.apache.pinot.plugin.filesystem.AzurePinotFSUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -139,6 +141,34 @@ public class ADLSGen2PinotFSTest {
 
     // Verify that the filesystem client was set properly
     assertTrue(sasTokenFS != null);
+  }
+
+  @Test
+  public void testChecksumEnabledWithMd5DisabledFails() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("authenticationType", "SAS_TOKEN");
+    pinotConfiguration.setProperty("sasToken", "sp=rwdl&se=2025-12-31T23:59:59Z&sv=2022-11-02&sr=c&sig=test");
+    pinotConfiguration.setProperty("accountName", "testaccount");
+    pinotConfiguration.setProperty("fileSystemName", "testcontainer");
+    pinotConfiguration.setProperty("enableChecksum", "true");
+
+    ADLSGen2PinotFS adlsGen2PinotFs = new ADLSGen2PinotFS() {
+      @Override
+      public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient,
+          String fileSystemName) {
+        return _mockFileSystemClient;
+      }
+    };
+
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      IllegalStateException exception =
+          expectThrows(IllegalStateException.class, () -> adlsGen2PinotFs.init(pinotConfiguration));
+      assertTrue(exception.getMessage().contains("pinot.md5.disabled"));
+      assertTrue(exception.getMessage().contains("enableChecksum"));
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
   }
 
   @Test(expectedExceptions = NullPointerException.class)
@@ -575,6 +605,103 @@ public class ADLSGen2PinotFSTest {
       // Cleanup
       FileUtils.deleteQuietly(tempFile);
     }
+  }
+
+  @Test
+  public void testOpenFileNotFound() {
+    when(_mockFileSystemClient.getFileClient(any())).thenReturn(_mockFileClient);
+    when(_mockFileClient.openInputStream()).thenThrow(_mockDataLakeStorageException);
+    when(_mockDataLakeStorageException.getStatusCode()).thenReturn(404);
+
+    expectThrows(FileNotFoundException.class, () -> _adlsGen2PinotFsUnderTest.open(_mockURI));
+
+    verify(_mockFileSystemClient).getFileClient(any());
+    verify(_mockFileClient).openInputStream();
+    verify(_mockDataLakeStorageException).getStatusCode();
+  }
+
+  @Test
+  public void testLastModifiedFileNotFound()
+      throws IOException {
+    when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
+    when(_mockDirectoryClient.getProperties()).thenThrow(_mockDataLakeStorageException);
+    when(_mockDataLakeStorageException.getStatusCode()).thenReturn(404);
+
+    long actual = _adlsGen2PinotFsUnderTest.lastModified(_mockURI);
+    assertEquals(actual, 0L);
+
+    verify(_mockFileSystemClient).getDirectoryClient(any());
+    verify(_mockDirectoryClient).getProperties();
+    verify(_mockDataLakeStorageException).getStatusCode();
+  }
+
+  @Test
+  public void testLastModifiedNullDateTime()
+      throws IOException {
+    when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
+    when(_mockDirectoryClient.getProperties()).thenReturn(_mockPathProperties);
+    when(_mockPathProperties.getLastModified()).thenReturn(null);
+
+    long actual = _adlsGen2PinotFsUnderTest.lastModified(_mockURI);
+    assertEquals(actual, 0L);
+
+    verify(_mockFileSystemClient).getDirectoryClient(any());
+    verify(_mockDirectoryClient).getProperties();
+    verify(_mockPathProperties).getLastModified();
+  }
+
+  @Test
+  public void testIsDirectoryNullMetadata()
+      throws IOException {
+    when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
+    when(_mockDirectoryClient.getProperties()).thenReturn(_mockPathProperties);
+    when(_mockPathProperties.getMetadata()).thenReturn(null);
+
+    boolean actual = _adlsGen2PinotFsUnderTest.isDirectory(_mockURI);
+    assertFalse(actual);
+
+    verify(_mockFileSystemClient).getDirectoryClient(any());
+    verify(_mockDirectoryClient).getProperties();
+    verify(_mockPathProperties).getMetadata();
+  }
+
+  @Test
+  public void testListFilesWithMetadataNullLastModified()
+      throws IOException {
+    when(_mockFileSystemClient.listPaths(any(), any())).thenReturn(_mockPagedIterable);
+    when(_mockPagedIterable.stream()).thenReturn(Stream.of(_mockPathItem));
+    when(_mockPathItem.getName()).thenReturn("foo");
+    when(_mockPathItem.isDirectory()).thenReturn(false);
+    when(_mockPathItem.getContentLength()).thenReturn(1024L);
+    when(_mockPathItem.getLastModified()).thenReturn(null);
+
+    List<FileMetadata> actual = _adlsGen2PinotFsUnderTest.listFilesWithMetadata(_mockURI, true);
+    FileMetadata fm = actual.get(0);
+    assertEquals(fm.getFilePath(), "/foo");
+    assertEquals(fm.getLastModifiedTime(), 0L);
+
+    verify(_mockFileSystemClient).listPaths(any(), any());
+    verify(_mockPagedIterable).stream();
+    verify(_mockPathItem).getName();
+    verify(_mockPathItem).isDirectory();
+    verify(_mockPathItem).getContentLength();
+    verify(_mockPathItem).getLastModified();
+  }
+
+  @Test
+  public void testTouchFileNotFound()
+      throws IOException {
+    when(_mockFileSystemClient.getFileClient(any())).thenReturn(_mockFileClient);
+    when(_mockFileClient.getProperties()).thenThrow(_mockDataLakeStorageException);
+    when(_mockDataLakeStorageException.getStatusCode()).thenReturn(404);
+
+    boolean actual = _adlsGen2PinotFsUnderTest.touch(_mockURI);
+    assertTrue(actual);
+
+    verify(_mockFileSystemClient).getFileClient(any());
+    verify(_mockFileClient).getProperties();
+    verify(_mockDataLakeStorageException).getStatusCode();
+    verify(_mockFileSystemClient).createFile(any());
   }
 
   @Test

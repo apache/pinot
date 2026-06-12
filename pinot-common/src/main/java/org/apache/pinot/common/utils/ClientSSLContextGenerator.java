@@ -24,9 +24,11 @@ import java.io.IOException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import javax.net.ssl.KeyManager;
@@ -46,12 +48,19 @@ public class ClientSSLContextGenerator {
   private static final String CONFIG_OF_CLIENT_PKCS12_FILE = "client.pkcs12.file";
   private static final String CONFIG_OF_CLIENT_PKCS12_PASSWORD = "client.pkcs12.password";
   private static final String CONFIG_OF_ENABLE_SERVER_VERIFICATION = "server.enable-verification";
-  private static final String SECURITY_ALGORITHM = "TLS";
+  private static final String CONFIG_OF_SSL_PROTOCOL = "ssl.protocol";
+  private static final String CONFIG_OF_KEYSTORE_TYPE = "client.keystore.type";
+  private static final String CONFIG_OF_KEY_MANAGER_ALGORITHM = "ssl.keymanager.algorithm";
+  private static final String CONFIG_OF_TRUST_MANAGER_ALGORITHM = "ssl.trustmanager.algorithm";
+  private static final String DEFAULT_SECURITY_ALGORITHM = "TLSv1.2";
   private static final String CERTIFICATE_TYPE = "X509";
   private static final String KEYSTORE_TYPE = "PKCS12";
-  private static final String KEYMANAGER_FACTORY_ALGORITHM = "SunX509";
   private static final Logger LOGGER = LoggerFactory.getLogger(ClientSSLContextGenerator.class);
 
+  private final String _sslProtocol;
+  private final String _keyStoreType;
+  private final String _keyManagerAlgorithm;
+  private final String _trustManagerAlgorithm;
   private final String _serverCACertFile;
   private final String _keyStoreFile;
   private final String _keyStorePassword;
@@ -70,8 +79,14 @@ public class ClientSSLContextGenerator {
     _keyStoreFile = sslConfig.getProperty(CONFIG_OF_CLIENT_PKCS12_FILE);
     _keyStorePassword = sslConfig.getProperty(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
     if ((_keyStorePassword == null && _keyStoreFile != null) || (_keyStorePassword != null && _keyStoreFile == null)) {
-      throw new IllegalArgumentException("Invalid configuration of keystore file and passowrd");
+      throw new IllegalArgumentException("Invalid configuration of keystore file and password");
     }
+    _sslProtocol = sslConfig.getProperty(CONFIG_OF_SSL_PROTOCOL, DEFAULT_SECURITY_ALGORITHM);
+    _keyStoreType = sslConfig.getProperty(CONFIG_OF_KEYSTORE_TYPE, KEYSTORE_TYPE);
+    _keyManagerAlgorithm = sslConfig.getProperty(CONFIG_OF_KEY_MANAGER_ALGORITHM,
+        KeyManagerFactory.getDefaultAlgorithm());
+    _trustManagerAlgorithm = sslConfig.getProperty(CONFIG_OF_TRUST_MANAGER_ALGORITHM,
+        TrustManagerFactory.getDefaultAlgorithm());
   }
 
   public SSLContext generate() {
@@ -80,7 +95,7 @@ public class ClientSSLContextGenerator {
       TrustManager[] trustManagers = setupTrustManagers();
       KeyManager[] keyManagers = setupKeyManagers();
 
-      sslContext = SSLContext.getInstance(SECURITY_ALGORITHM);
+      sslContext = SSLContext.getInstance(_sslProtocol);
       sslContext.init(keyManagers, trustManagers, null);
     } catch (Exception e) {
       LOGGER.error("Exception when generating SSLContext", e);
@@ -95,24 +110,29 @@ public class ClientSSLContextGenerator {
     // trustStore.
     if (_serverCACertFile != null) {
       LOGGER.info("Initializing trust store from {}", _serverCACertFile);
-      FileInputStream is = new FileInputStream(new File(_serverCACertFile));
       KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
       trustStore.load(null);
-      CertificateFactory certificateFactory = CertificateFactory.getInstance(CERTIFICATE_TYPE);
-      int i = 0;
-      while (is.available() > 0) {
-        X509Certificate cert = (X509Certificate) certificateFactory.generateCertificate(is);
-        LOGGER.info("Read certificate serial number {} by issuer {} ", cert.getSerialNumber().toString(16),
-            cert.getIssuerDN().toString());
+      try (FileInputStream is = new FileInputStream(new File(_serverCACertFile))) {
+        CertificateFactory certificateFactory = CertificateFactory.getInstance(CERTIFICATE_TYPE);
+        Collection<? extends Certificate> certificates = certificateFactory.generateCertificates(is);
+        int i = 0;
+        for (Certificate certificate : certificates) {
+          if (!(certificate instanceof X509Certificate)) {
+            continue;
+          }
+          X509Certificate cert = (X509Certificate) certificate;
+          LOGGER.info("Read certificate serial number {} by issuer {} ", cert.getSerialNumber().toString(16),
+              cert.getIssuerDN().toString());
 
-        String serverKey = "https-server-" + i;
-        trustStore.setCertificateEntry(serverKey, cert);
-        i++;
+          String serverKey = "https-server-" + i;
+          trustStore.setCertificateEntry(serverKey, cert);
+          i++;
+        }
       }
 
-      TrustManagerFactory tmf = TrustManagerFactory.getInstance(CERTIFICATE_TYPE);
+      TrustManagerFactory tmf = TrustManagerFactory.getInstance(_trustManagerAlgorithm);
       tmf.init(trustStore);
-      LOGGER.info("Successfully initialized trust store");
+      LOGGER.info("Successfully initialized trust store using {}", _trustManagerAlgorithm);
       return tmf.getTrustManagers();
     }
     // Server verification disabled. Trust all servers
@@ -142,10 +162,12 @@ public class ClientSSLContextGenerator {
       return null;
     }
     try {
-      KeyStore keyStore = KeyStore.getInstance(KEYSTORE_TYPE);
-      LOGGER.info("Setting up keystore with file {}", _keyStoreFile);
-      keyStore.load(new FileInputStream(new File(_keyStoreFile)), _keyStorePassword.toCharArray());
-      KeyManagerFactory kmf = KeyManagerFactory.getInstance(KEYMANAGER_FACTORY_ALGORITHM);
+      KeyStore keyStore = KeyStore.getInstance(_keyStoreType);
+      LOGGER.info("Setting up keystore with file {} and type {}", _keyStoreFile, _keyStoreType);
+      try (FileInputStream keyStoreStream = new FileInputStream(new File(_keyStoreFile))) {
+        keyStore.load(keyStoreStream, _keyStorePassword.toCharArray());
+      }
+      KeyManagerFactory kmf = KeyManagerFactory.getInstance(_keyManagerAlgorithm);
       kmf.init(keyStore, _keyStorePassword.toCharArray());
       LOGGER.info("Successfully initialized keystore");
       return kmf.getKeyManagers();

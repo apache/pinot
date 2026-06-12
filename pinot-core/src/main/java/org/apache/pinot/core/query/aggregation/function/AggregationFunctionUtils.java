@@ -23,6 +23,8 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +43,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -54,6 +57,7 @@ import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -154,9 +158,50 @@ public class AggregationFunctionUtils {
         return dataTable.getDouble(rowId, colId);
       case STRING:
         return dataTable.getString(rowId, colId);
+      case FLOAT:
+        return dataTable.getFloat(rowId, colId);
+      case BIG_DECIMAL:
+        return dataTable.getBigDecimal(rowId, colId);
+      case BYTES:
+        return dataTable.getBytes(rowId, colId);
       case OBJECT:
         CustomObject customObject = dataTable.getCustomObject(rowId, colId);
         return customObject != null ? aggregationFunction.deserializeIntermediateResult(customObject) : null;
+      default:
+        throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);
+    }
+  }
+
+  /**
+   * Writes a non-OBJECT intermediate result into the {@link DataTableBuilder} at the given column.
+   * Counterpart of {@link #getIntermediateResult}. OBJECT columns are handled by the caller via
+   * {@link AggregationFunction#serializeIntermediateResult}, since they need the aggregation function.
+   */
+  public static void setIntermediateResult(DataTableBuilder dataTableBuilder, ColumnDataType columnDataType, int colId,
+      Object result)
+      throws IOException {
+    switch (columnDataType) {
+      case INT:
+        dataTableBuilder.setColumn(colId, (int) result);
+        break;
+      case LONG:
+        dataTableBuilder.setColumn(colId, (long) result);
+        break;
+      case FLOAT:
+        dataTableBuilder.setColumn(colId, (float) result);
+        break;
+      case DOUBLE:
+        dataTableBuilder.setColumn(colId, (double) result);
+        break;
+      case BIG_DECIMAL:
+        dataTableBuilder.setColumn(colId, (BigDecimal) result);
+        break;
+      case STRING:
+        dataTableBuilder.setColumn(colId, result.toString());
+        break;
+      case BYTES:
+        dataTableBuilder.setColumn(colId, (ByteArray) result);
+        break;
       default:
         throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);
     }
@@ -189,8 +234,12 @@ public class AggregationFunctionUtils {
         return FloatArrayList.wrap(dataTable.getFloatArray(rowId, colId));
       case DOUBLE_ARRAY:
         return DoubleArrayList.wrap(dataTable.getDoubleArray(rowId, colId));
+      case BIG_DECIMAL_ARRAY:
+        return ObjectArrayList.wrap(dataTable.getBigDecimalArray(rowId, colId));
       case STRING_ARRAY:
         return ObjectArrayList.wrap(dataTable.getStringArray(rowId, colId));
+      case BYTES_ARRAY:
+        return ObjectArrayList.wrap(dataTable.getBytesArray(rowId, colId));
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
     }
@@ -230,6 +279,8 @@ public class AggregationFunctionUtils {
         return dataTable.getFloatArray(rowId, colId);
       case DOUBLE_ARRAY:
         return dataTable.getDoubleArray(rowId, colId);
+      case BIG_DECIMAL_ARRAY:
+        return dataTable.getBigDecimalArray(rowId, colId);
       case BOOLEAN_ARRAY: {
         int[] intValues = dataTable.getIntArray(rowId, colId);
         int numValues = intValues.length;
@@ -250,6 +301,8 @@ public class AggregationFunctionUtils {
       }
       case STRING_ARRAY:
         return dataTable.getStringArray(rowId, colId);
+      case BYTES_ARRAY:
+        return dataTable.getBytesArray(rowId, colId);
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
     }

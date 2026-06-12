@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests.custom;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -37,7 +36,6 @@ import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -53,7 +51,7 @@ import org.testng.annotations.Test;
 import static org.apache.avro.Schema.create;
 import static org.apache.avro.Schema.createArray;
 import static org.apache.avro.Schema.createUnion;
-import static org.apache.pinot.integration.tests.GroupByOptionsIntegrationTest.toResultStr;
+import static org.apache.pinot.integration.tests.custom.GroupByOptionsTest.toResultStr;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -77,18 +75,12 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
   private static final String TEXT_COL_CASE_SENSITIVE = "skills_case_sensitive";
   private static final String TEXT_COL_MV = "skills_mv";
   private static final String TEXT_COL_CASE_SENSITIVE_MV = "skills_case_sensitive_mv";
-  private static final String TEXT_COL_NATIVE = "skills_native";
   private static final String TIME_COL = "millisSinceEpoch";
 
   private static final int NUM_SKILLS = 28;
   private static final int NUM_MATCHING_SKILLS = 4;
   protected static final int NUM_RECORDS = NUM_SKILLS * 1000;
   private static final int NUM_MATCHING_RECORDS = NUM_MATCHING_SKILLS * 1000;
-  private static final int NUM_MATCHING_RECORDS_NATIVE = 7000;
-
-  private static final String TEST_TEXT_COLUMN_QUERY_NATIVE =
-      "SELECT COUNT(*) FROM %s WHERE TEXT_CONTAINS(skills_native, 'm.*') AND TEXT_CONTAINS(skills_native, "
-          + "'spark')";
 
   private static final List<String> TEXT_COLUMNS =
       List.of(NULLABLE_TEXT_COL, NULLABLE_TEXT_COL_MV, TEXT_COL, TEXT_COL_CASE_SENSITIVE, TEXT_COL_MV,
@@ -104,12 +96,6 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
   @Override
   protected String getSortedColumn() {
     return null;
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getInvertedIndexColumns() {
-    return Collections.singletonList(TEXT_COL_NATIVE);
   }
 
   @Override
@@ -143,17 +129,6 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
-    ObjectNode nativeIndex;
-    try {
-      nativeIndex = (ObjectNode) OBJECT_MAPPER.readTree("{ \"text\": { \"fst\": \"NATIVE\" } }");
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-    FieldConfig nativeCol =
-        new FieldConfig.Builder(TEXT_COL_NATIVE).withEncodingType(FieldConfig.EncodingType.DICTIONARY)
-            .withIndexes(nativeIndex)
-            .build();
-
     ForwardIndexConfig fwdCfg = ForwardIndexConfig.getDisabled();
     ObjectNode indexes = JsonUtils.newObjectNode();
     if (!isRealtimeTable()) { // we can't disable forward index for realtime table
@@ -175,8 +150,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
             .build(),
         new FieldConfig.Builder(DICT_TEXT_COL_MV).withEncodingType(FieldConfig.EncodingType.DICTIONARY).build(),
         new FieldConfig.Builder(DICT_TEXT_COL_CASE_SENSITIVE_MV).withEncodingType(FieldConfig.EncodingType.DICTIONARY)
-            .build(),
-        nativeCol);
+            .build());
   }
 
   @Override
@@ -206,7 +180,6 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         .addSingleValueDimension(DICT_TEXT_COL_CASE_SENSITIVE, FieldSpec.DataType.STRING)
         .addMultiValueDimension(DICT_TEXT_COL_MV, FieldSpec.DataType.STRING)
         .addMultiValueDimension(DICT_TEXT_COL_CASE_SENSITIVE_MV, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(TEXT_COL_NATIVE, FieldSpec.DataType.STRING)
         .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
   }
 
@@ -230,7 +203,6 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     }
     assertEquals(skills.size(), NUM_SKILLS);
 
-    File avroFile = new File(_tempDir, "data.avro");
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(Arrays.asList(
         new Field(NULLABLE_TEXT_COL, createUnion(create(Type.NULL), create(Type.STRING)), null, null),
@@ -243,13 +215,12 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         new Field(DICT_TEXT_COL_CASE_SENSITIVE, create(Type.STRING), null, null),
         new Field(DICT_TEXT_COL_MV, createArray(create(Type.STRING)), null, null),
         new Field(DICT_TEXT_COL_CASE_SENSITIVE_MV, createArray(create(Type.STRING)), null, null),
-        new Field(TEXT_COL_NATIVE, create(Type.STRING), null, null),
         new Field(TIME_COL, create(Type.LONG), null, null)));
 
     List<String> valueList = List.of("value");
 
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_RECORDS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(NULLABLE_TEXT_COL, (i & 1) == 1 ? null : "value");
@@ -262,12 +233,11 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         record.put(DICT_TEXT_COL_CASE_SENSITIVE, skills.get(i % NUM_SKILLS));
         record.put(DICT_TEXT_COL_MV, List.of(skills.get(i % NUM_SKILLS), "" + i));
         record.put(DICT_TEXT_COL_CASE_SENSITIVE_MV, List.of(skills.get(i % NUM_SKILLS), "" + i));
-        record.put(TEXT_COL_NATIVE, skills.get(i % NUM_SKILLS));
         record.put(TIME_COL, System.currentTimeMillis());
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   @Override
@@ -362,23 +332,6 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         return false;
       }
     }, 10_000L, "Failed to reach expected number of matching records");
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testTextSearchCountQueryNative(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    // Keep posting queries until all records are consumed
-    long previousResult = 0;
-    while (getCurrentCountStarResult() < NUM_RECORDS) {
-      long result = getQueryResult(String.format(TEST_TEXT_COLUMN_QUERY_NATIVE, getTableName()));
-      org.testng.Assert.assertTrue(result >= previousResult);
-      previousResult = result;
-      Thread.sleep(100);
-    }
-
-    assertEquals(getQueryResult(String.format(TEST_TEXT_COLUMN_QUERY_NATIVE, getTableName())),
-        NUM_MATCHING_RECORDS_NATIVE);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

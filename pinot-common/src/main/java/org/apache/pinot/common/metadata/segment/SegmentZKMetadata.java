@@ -39,6 +39,7 @@ public class SegmentZKMetadata implements ZKMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentZKMetadata.class);
   private static final String SEGMENT_NAME_KEY = "segmentName";
   private static final String SIMPLE_FIELDS_KEY = "simpleFields";
+  private static final String CUSTOM_MAP_KEY = "customMap";
   private static final String NULL = "null";
 
   private final ZNRecord _znRecord;
@@ -172,6 +173,30 @@ public class SegmentZKMetadata implements ZKMetadata {
 
   public void setCrc(long crc) {
     setNonNegativeValue(Segment.CRC, crc);
+  }
+
+  public long getDataCrc() {
+    return _znRecord.getLongField(Segment.DATA_CRC, -1);
+  }
+
+  public void setDataCrc(long dataCrc) {
+    setNonNegativeValue(Segment.DATA_CRC, dataCrc);
+  }
+
+  public boolean isUseDataCrc() {
+    String useDataCrcString = _simpleFields.get(Segment.USE_DATA_CRC);
+    return Boolean.parseBoolean(useDataCrcString);
+  }
+
+  // useDataCrc is set for consuming segments in realtime table
+  // that signal replica server to use Data CRC when available for doing any replacement
+  // of segments
+  public void setUseDataCrc(boolean useDataCrc) {
+    if (useDataCrc) {
+      _simpleFields.put(Segment.USE_DATA_CRC, "true");
+    } else {
+      _simpleFields.remove(Segment.USE_DATA_CRC);
+    }
   }
 
   public String getTier() {
@@ -394,6 +419,10 @@ public class SegmentZKMetadata implements ZKMetadata {
     ObjectNode objectNode = JsonUtils.newObjectNode();
     objectNode.put(SEGMENT_NAME_KEY, getSegmentName());
     objectNode.set(SIMPLE_FIELDS_KEY, JsonUtils.objectToJsonNode(_simpleFields));
+    Map<String, String> customMap = getCustomMap();
+    if (MapUtils.isNotEmpty(customMap)) {
+      objectNode.set(CUSTOM_MAP_KEY, JsonUtils.objectToJsonNode(customMap));
+    }
     return objectNode.toString();
   }
 
@@ -406,6 +435,12 @@ public class SegmentZKMetadata implements ZKMetadata {
     });
     ZNRecord znRecord = new ZNRecord(segmentName);
     znRecord.setSimpleFields(simpleFields);
+    JsonNode customMapJsonNode = jsonNode.get(CUSTOM_MAP_KEY);
+    if (customMapJsonNode != null && !customMapJsonNode.isNull()) {
+      Map<String, String> customMap = JsonUtils.jsonNodeToObject(customMapJsonNode, new TypeReference<>() {
+      });
+      znRecord.setMapField(Segment.CUSTOM_MAP, customMap);
+    }
     return new SegmentZKMetadata(znRecord);
   }
 

@@ -22,18 +22,18 @@ public interface CursorResponse extends BrokerResponse {
 
   void setBrokerHost(String brokerHost);
 
-    /**
-     * get hostname of the processing broker
-     * @return String containing the hostname
-     */
+  /**
+   * Return the hostname of the processing broker.
+   * @return String containing the hostname
+   */
   String getBrokerHost();
 
   void setBrokerPort(int brokerPort);
 
-    /**
-     * get port of the processing broker
-     * @return int containing the port.
-     */
+  /**
+   * Return the port of the processing broker.
+   * @return int containing the port.
+   */
   int getBrokerPort();
 
   /**

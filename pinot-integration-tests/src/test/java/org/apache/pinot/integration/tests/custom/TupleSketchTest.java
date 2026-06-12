@@ -23,10 +23,8 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.List;
-import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.datasketches.tuple.Intersection;
 import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSketch;
@@ -289,21 +287,18 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
         new org.apache.avro.Schema.Field(MET_TUPLE_SKETCH_BYTES, org.apache.avro.Schema.create(
             org.apache.avro.Schema.Type.BYTES), null, null)));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      Random random = new Random();
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
-        record.put(ID, random.nextInt(10));
+        record.put(ID, RANDOM.nextInt(10));
         record.put(MET_TUPLE_SKETCH_BYTES, ByteBuffer.wrap(getRandomRawValue()));
         // add avro record to file
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   private byte[] getRandomRawValue() {

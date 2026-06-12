@@ -20,13 +20,11 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class PercentileKLLMVAggregationFunction extends PercentileKLLAggregationFunction {
@@ -39,75 +37,19 @@ public class PercentileKLLMVAggregationFunction extends PercentileKLLAggregation
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet valueSet = blockValSetMap.get(_expression);
-    DataType valueType = valueSet.getValueType();
-    KllDoublesSketch sketch = getOrCreateSketch(aggregationResultHolder);
-
-    if (valueType == DataType.BYTES) {
-      // Assuming the column contains serialized data sketches
-      KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-      for (int i = 0; i < length; i++) {
-        sketch.merge(deserializedSketches[i]);
-      }
-    } else {
-      double[][] values = valueSet.getDoubleValuesMV();
-      for (int i = 0; i < length; i++) {
-        for (double val : values[i]) {
-          sketch.update(val);
-        }
-      }
-    }
+    aggregateMV(length, aggregationResultHolder, valueSet, getOrCreateSketch(aggregationResultHolder));
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet valueSet = blockValSetMap.get(_expression);
-    DataType valueType = valueSet.getValueType();
-
-    if (valueType == DataType.BYTES) {
-      // serialized sketch
-      KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-      for (int i = 0; i < length; i++) {
-        KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
-        sketch.merge(deserializedSketches[i]);
-      }
-    } else {
-      double[][] values = valueSet.getDoubleValuesMV();
-      for (int i = 0; i < length; i++) {
-        KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
-        for (double val : values[i]) {
-          sketch.update(val);
-        }
-      }
-    }
+    aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap.get(_expression));
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet valueSet = blockValSetMap.get(_expression);
-    DataType valueType = valueSet.getValueType();
-
-    if (valueType == DataType.BYTES) {
-      // serialized sketch
-      KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          KllDoublesSketch sketch = this.getOrCreateSketch(groupByResultHolder, groupKey);
-          sketch.merge(deserializedSketches[i]);
-        }
-      }
-    } else {
-      double[][] values = valueSet.getDoubleValuesMV();
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
-          for (double val : values[i]) {
-            sketch.update(val);
-          }
-        }
-      }
-    }
+    aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap.get(_expression));
   }
 
   @Override

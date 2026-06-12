@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
@@ -64,8 +63,7 @@ public class LagValueWindowFunction extends ValueWindowFunction {
         if (srcDataType != destDataType) {
           // Convert the default value to the same data type as the input column
           // (e.g. convert INT to LONG, FLOAT to DOUBLE, etc.
-          defaultValue = PinotDataType.getPinotDataTypeForExecution(destDataType)
-              .convert(defaultValue, PinotDataType.getPinotDataTypeForExecution(srcDataType));
+          defaultValue = destDataType.toPinotDataType().convert(defaultValue, srcDataType.toPinotDataType());
         }
       }
     }
@@ -78,7 +76,10 @@ public class LagValueWindowFunction extends ValueWindowFunction {
     int numRows = rows.size();
     Object[] result = new Object[numRows];
     if (_defaultValue != null) {
-      Arrays.fill(result, 0, _offset, _defaultValue);
+      // We only fill up to the minimum of _offset and numRows to handle the case
+      // where the offset is larger than the result size.
+      int fillTo = Math.min(_offset, numRows);
+      Arrays.fill(result, 0, fillTo, _defaultValue);
     }
     for (int i = _offset; i < numRows; i++) {
       result[i] = extractValueFromRow(rows.get(i - _offset));

@@ -25,11 +25,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /**
  * Dictionary of a single float value.
  */
-public class ConstantValueFloatDictionary extends BaseImmutableDictionary {
+public class ConstantValueFloatDictionary extends BaseConstantValueDictionary {
   private final float _value;
 
   public ConstantValueFloatDictionary(float value) {
-    super(1);
     _value = value;
   }
 

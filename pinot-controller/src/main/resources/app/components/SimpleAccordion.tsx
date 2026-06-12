@@ -68,6 +68,11 @@ const useStyles = makeStyles((theme: Theme) =>
       display: 'flex',
       alignItems: 'center',
       gap: theme.spacing(1),
+      flex: 1,
+      minWidth: 0,
+      '& > div': {
+        width: '100%',
+      },
     },
     additionalControlsContainer: {
       marginLeft: 'auto',

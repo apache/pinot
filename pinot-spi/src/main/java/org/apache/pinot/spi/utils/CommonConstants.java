@@ -20,8 +20,8 @@ package org.apache.pinot.spi.utils;
 
 import java.io.File;
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -36,6 +36,7 @@ public class CommonConstants {
   public static final String DEFAULT_FAILURE_DOMAIN = "No such domain";
 
   public static final String PREFIX_OF_SSL_SUBSET = "ssl";
+  public static final String CONFIG_OF_SSL_USE_RENEWABLE_CONTEXT = "ssl.use.renewable.context";
   public static final String HTTP_PROTOCOL = "http";
   public static final String HTTPS_PROTOCOL = "https";
 
@@ -62,6 +63,7 @@ public class CommonConstants {
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
+  public static final String CONFIG_OF_PINOT_MD5_DISABLED = "pinot.md5.disabled";
   @Deprecated
   public static final String DEFAULT_PINOT_INSECURE_MODE = "false";
 
@@ -158,6 +160,9 @@ public class CommonConstants {
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_MINION_INSTANCE = "minion_untagged";
+    public static final String DRAINED_MINION_INSTANCE = "minion_drained";
+
+    public static final String PREVIOUS_TAGS = "previousTags";
 
     public static class StateModel {
       public static class SegmentStateModel {
@@ -250,6 +255,9 @@ public class CommonConstants {
     @Deprecated(since = "1.5.0", forRemoval = true)
     public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
 
+    public static final String CONFIG_OF_REMOTE_CLUSTER_NAMES = "pinot.remote.cluster.names";
+    public static final String CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS = "pinot.remote.zk.server.%s";
+
     public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";
     public static final String CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS = "pinot.broker.startable.class";
     public static final String CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS = "pinot.server.startable.class";
@@ -270,6 +278,14 @@ public class CommonConstants {
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR =
         "pinot.beta.multistage.engine.max.server.query.threads.hardlimit.factor";
     public static final String DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR = "4";
+
+    /// Cluster-config knob that selects how the multi-stage engine emits metrics.
+    /// Read at startup by server and broker; mode changes require a restart to take effect.
+    /// Valid values: {@code SERVER} (default; forward to {@code pinot.server.*}), {@code MSE}
+    /// (emit only {@code pinot.mse.*}), {@code DUAL} (emit both). See
+    /// {@code org.apache.pinot.common.metrics.MseMetricsMode}.
+    public static final String CONFIG_OF_MSE_METRICS_MODE = "pinot.metrics.mse.mode";
+    public static final String DEFAULT_MSE_METRICS_MODE = "SERVER";
 
     // Preprocess throttle configs
     public static final String CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM =
@@ -316,13 +332,29 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
+    // SQL parsing
+    public static final String CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING =
+        "pinot.query.sse.parsing.legacy.literal.unescaping";
+    // Usee legacy mode by default for backward compatibility. Will be changed in a future release.
+    public static final boolean DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING = true;
   }
 
   public static class Broker {
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
+    /**
+     * Config prefix for the broker-side MaterializedViewHandler.  Implementation class is
+     * loaded from {@code pinot.broker.materialized.view.handler.class}; other settings sit
+     * under the same prefix and are passed through to the handler's {@code init}. Default
+     * implementation: {@code DefaultMaterializedViewHandler}.
+     */
+    public static final String MATERIALIZED_VIEW_HANDLER_CONFIG_PREFIX = "pinot.broker.materialized.view.handler";
     public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
     public static final String EVENT_LISTENER_CONFIG_PREFIX = "pinot.broker.event.listener";
+    // Prefix for table sampler configs:
+    // - pinot.broker.table.sampler.annotation.packages=<comma-separated packages>
+    public static final String TABLE_SAMPLER_CONFIG_PREFIX = "pinot.broker.table.sampler";
     public static final String CONFIG_OF_METRICS_NAME_PREFIX = "pinot.broker.metrics.prefix";
     public static final String DEFAULT_METRICS_NAME_PREFIX = "pinot.broker.";
 
@@ -350,11 +382,23 @@ public class CommonConstants {
         "pinot.broker.query.log.logBeforeProcessing";
     public static final boolean DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING = true;
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
+    /**
+     * When true, the broker initializes the materialized view metadata cache and query rewrite
+     * engine.  When false (default), MV rewrite is disabled regardless of per-MV
+     * {@code rewriteEnabled} setting.
+     */
+    public static final String CONFIG_OF_BROKER_QUERY_ENABLE_MATERIALIZED_VIEW_REWRITE =
+        "pinot.broker.query.enable.materialized.view.rewrite";
+    public static final boolean DEFAULT_BROKER_QUERY_ENABLE_MATERIALIZED_VIEW_REWRITE = false;
     /// Provide broker level default for query option [Request.QueryOptionKey#REGEX_DICT_SIZE_THRESHOLD]
     public static final String CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD =
         "pinot.broker.query.regex.dict.size.threshold";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final boolean DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION = true;
+    public static final String CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING =
+        "pinot.broker.enable.query.fingerprinting";
+    public static final boolean DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING = false;
+    public static final String DEFAULT_QUERY_HASH = "";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
@@ -365,6 +409,11 @@ public class CommonConstants {
     public static final long DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS = 100L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_INSTANCE_TAGS = "pinot.broker.instance.tags";
+    // When enabled, brokers must have pinot.broker.instance.tags configured to start.
+    // Prevents misconfigured brokers from joining multi-tenant clusters without tenant tags.
+    public static final String CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS =
+        "pinot.broker.enforce.instance.tags";
+    public static final boolean DEFAULT_BROKER_ENFORCE_INSTANCE_TAGS = false;
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Comma separated list of packages that contains javax service resources.
@@ -476,11 +525,21 @@ public class CommonConstants {
     public static final int DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
         Runtime.getRuntime().availableProcessors();
 
-      // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
-      // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
-      public static final String CONFIG_OF_IGNORE_MISSING_SEGMENTS =
-          "pinot.broker.query.ignore.missing.segments";
-      public static final boolean DEFAULT_IGNORE_MISSING_SEGMENTS = false;
+    // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
+    // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
+    public static final String CONFIG_OF_IGNORE_MISSING_SEGMENTS =
+        "pinot.broker.query.ignore.missing.segments";
+    public static final boolean DEFAULT_IGNORE_MISSING_SEGMENTS = false;
+
+    /**
+     * Default flush threshold for the streaming group-by leaf-stage operator on MSE. When positive, the broker
+     * injects this value as the `streamingGroupByFlushThreshold` query option for MSE queries that do not already
+     * specify it, opting the cluster into the streaming group-by behavior by default. Setting the query option
+     * explicitly (including to `0` to disable) always wins over the broker default.
+     */
+    public static final String CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD =
+        "pinot.broker.mse.streaming.group.by.flush.threshold";
+    public static final int DEFAULT_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD = -1;
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -498,6 +557,21 @@ public class CommonConstants {
     public static final String CONFIG_OF_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE =
         "pinot.broker.mse.use.leaf.server.for.intermediate.stage";
     public static final boolean DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE = false;
+
+    /// Cluster-level default for stream-mode stats reporting. When {@code true} the broker opens a
+    /// {@code SubmitWithStream} bidi RPC for every multi-stage query instead of the legacy unary Submit, enabling
+    /// reliable per-operator stats delivery even on the error path. Individual queries may override this default
+    /// via the {@link Request.QueryOptionKey#STREAM_STATS} query option. Requires all servers to
+    /// implement the {@code SubmitWithStream} RPC; enabling it on a mixed-version cluster will cause query failures.
+    public static final String CONFIG_OF_STREAM_STATS = "pinot.broker.mse.stream.stats";
+    public static final boolean DEFAULT_STREAM_STATS = false;
+
+    /// Best-effort wait window (ms) the broker spends draining out-of-band per-stage stats after the result mailbox
+    /// has finished, in stream-stats mode. Bounded by the query's remaining deadline. A larger value yields more
+    /// complete stats when some stage is slow to report, at the cost of up to this much added latency on a query
+    /// whose results are already in hand. Applies only to the {@code SubmitWithStream} stats path.
+    public static final String CONFIG_OF_STREAM_STATS_DRAIN_MS = "pinot.broker.mse.stream.stats.drain.ms";
+    public static final long DEFAULT_STREAM_STATS_DRAIN_MS = 50L;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
@@ -548,11 +622,20 @@ public class CommonConstants {
     public static final boolean DEFAULT_RUN_IN_BROKER = true;
 
     /**
-     * Whether to use broker pruning by default.
+     * Whether to use broker pruning by default on the physical optimizer path.
      * This value can always be overridden by {@link Request.QueryOptionKey#USE_BROKER_PRUNING} query option
      */
     public static final String CONFIG_OF_USE_BROKER_PRUNING = "pinot.broker.multistage.use.broker.pruning";
     public static final boolean DEFAULT_USE_BROKER_PRUNING = true;
+
+    /**
+     * Whether to use broker pruning by default on the logical planner (non-physical-optimizer) path.
+     * This value can always be overridden by {@link Request.QueryOptionKey#USE_BROKER_PRUNING} query option.
+     * Separated from {@link #CONFIG_OF_USE_BROKER_PRUNING} so the two paths can be rolled out independently.
+     */
+    public static final String CONFIG_OF_LOGICAL_PLANNER_USE_BROKER_PRUNING =
+        "pinot.broker.multistage.logical.planner.use.broker.pruning";
+    public static final boolean DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING = false;
 
     /**
      * Default server stage limit for lite mode queries.
@@ -595,9 +678,24 @@ public class CommonConstants {
     // keep the variable to pass the compability test
     @Deprecated
     public static final int FALLBACK_REPLICA_GROUP_ID = -1;
+    // Admin API port for broker, to be used admin operations.
+    public static final String CONFIG_OF_BROKER_ADMIN_API_PORT = "pinot.broker.adminapi.port";
 
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
         "pinot.broker.query.enable.auto.rewrite.aggregation.type";
+
+    /// Config for sort exchange copy threshold in multi-stage engine.
+    ///
+    /// When there is an `order by X limit Y` clause in the query, during the distributed execution
+    /// we have to perform a sort exchange to gather the top Y rows from all the workers.
+    /// This can be optimized by having each upstream send only the top Y rows to the downstream.
+    ///
+    /// We only apply this optimization when Y is small smaller than the value of this property.
+    /// The default value is a heuristic value which may change from Pinot version to version.
+    public static final String CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD =
+        "pinot.broker.multistage.sort.exchange.copy.threshold";
+    // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
+    public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
 
     public static class Request {
       public static final String SQL = "sql";
@@ -610,16 +708,53 @@ public class CommonConstants {
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
+        /**
+         * Broker-internal marker set on the rewritten server-side PinotQuery after a FULL_REWRITE
+         * materialized-view rewrite. Read by BrokerReduceService to distinguish MV-rewritten
+         * queries from gapfill / future federated paths without relying on a brittle structural
+         * heuristic (different table names on user vs. server BrokerRequest).
+         * Not a user-facing option.
+         */
+        public static final String MATERIALIZED_VIEW_REWRITE = "materializedViewRewrite";
+        /// User-facing per-query switch. Default `true`. When set to `false`, the broker
+        /// skips all materialized-view rewrite for this query and routes to the base table. Safe to
+        /// expose: disabling only forgoes an optimization and never changes results. Distinct from
+        /// the broker-internal [#MATERIALIZED_VIEW_REWRITE] marker (which is stripped from
+        /// user input); this option is honored from user input. The MV minion executor additionally
+        /// forces it to `false` for its materialization query by passing it as gRPC request
+        /// metadata, which the broker applies as an override after parsing (see BrokerGrpcServer) —
+        /// so the materialization query is never rewritten back onto an MV even if its (user-authored)
+        /// SQL sets this option.
+        public static final String ENABLE_MATERIALIZED_VIEW_REWRITE = "enableMaterializedViewRewrite";
         public static final String EXTRA_PASSIVE_TIMEOUT_MS = "extraPassiveTimeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
         public static final String USE_STAR_TREE = "useStarTree";
+        /**
+         * When true, use index-based distinct operators when applicable. This enables both
+         * JsonIndexDistinctOperator (for JSON columns) and InvertedIndexDistinctOperator
+         * (for dictionary + inverted index columns with cost heuristic).
+         */
+        public static final String USE_INDEX_BASED_DISTINCT_OPERATOR = "useIndexBasedDistinctOperator";
+        /**
+         * Cost ratio for the inverted-index-based distinct heuristic. The inverted index path is chosen when
+         * dictionaryCardinality * costRatio <= filteredDocCount. Default is cardinality-dependent:
+         * 30 for dictCard <= 1K, 10 for dictCard <= 10K, 6 for dictCard > 10K.
+         */
+        public static final String INVERTED_INDEX_DISTINCT_COST_RATIO = "invertedIndexDistinctCostRatio";
+        /// When true, `JsonIndexDistinctOperator` skips missing-path handling — it does not add a 4-arg default
+        /// value, does not add null (even when `nullHandling` is enabled), and does not throw `Illegal Json Path`.
+        /// The result is purely the distinct values produced by the JSON-index lookup (filtered by the optional
+        /// 5-arg `jsonFilterExpression` and intersected with the `WHERE`-clause filter).
+        public static final String JSON_INDEX_DISTINCT_SKIP_MISSING_PATH = "jsonIndexDistinctSkipMissingPath";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
         public static final String ROUTING_OPTIONS = "routingOptions";
+        public static final String TABLE_SAMPLER = "sampler";
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String COLLECT_GC_STATS = "collectGCStats";
+        public static final String QUERY_HASH = "queryHash";
 
         // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
         // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When
@@ -664,6 +799,9 @@ public class CommonConstants {
         /** Number of threads used in the final reduce at broker level. */
         public static final String CHUNK_SIZE_EXTRACT_FINAL_RESULT = "chunkSizeExtractFinalResult";
 
+        /// Flush threshold for streaming group-by on MSE leaf stages.
+        public static final String STREAMING_GROUP_BY_FLUSH_THRESHOLD = "streamingGroupByFlushThreshold";
+
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
@@ -674,6 +812,21 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+        /**
+         * When set to true, the broker uses the long-lived {@code SubmitWithStream} bidi RPC to dispatch the query,
+         * receiving stage stats out-of-band as {@code OpChainComplete} messages instead of via mailbox EOS. The
+         * broker awaits stats completion as soon as the receiving mailbox finishes (early completion), bounded by
+         * the query's remaining timeout.
+         *
+         * <p>When unset / false, the legacy unary {@code Submit} path is used and stats travel via mailbox EOS.
+         *
+         * <p><b>Mixed-version note.</b> All servers in the cluster must support {@code SubmitWithStream} when this
+         * option is enabled. Operators are responsible for setting it only after the entire fleet has been upgraded
+         * — there is no automatic fallback to the unary path. If any server returns {@code UNIMPLEMENTED} (or any
+         * other transport error) during dispatch, the broker cancels the query and surfaces the error to the
+         * client.
+         */
+        public static final String STREAM_STATS = "streamStats";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *
@@ -748,6 +901,15 @@ public class CommonConstants {
         public static final String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
         public static final String JOIN_OVERFLOW_MODE = "joinOverflowMode";
 
+        // Early terminate DISTINCT queries based on wall-clock execution time on server
+        public static final String MAX_EXECUTION_TIME_MS_IN_DISTINCT = "maxExecutionTimeMsInDistinct";
+
+        // Handle DISTINCT early termination
+        // Early terminate after scanning this many rows, regardless of whether the DISTINCT limit is satisfied.
+        public static final String MAX_ROWS_IN_DISTINCT = "maxRowsInDistinct";
+        // Early terminate after seeing no new distinct keys for this many scanned rows.
+        public static final String MAX_ROWS_WITHOUT_CHANGE_IN_DISTINCT = "maxRowsWithoutChangeInDistinct";
+
         // Handle WINDOW Overflow
         public static final String MAX_ROWS_IN_WINDOW = "maxRowsInWindow";
         public static final String WINDOW_OVERFLOW_MODE = "windowOverflowMode";
@@ -819,10 +981,9 @@ public class CommonConstants {
         // Server stage limit for lite mode queries.
         public static final String LITE_MODE_LEAF_STAGE_LIMIT = "liteModeLeafStageLimit";
         public static final String LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT = "liteModeLeafStageFanOutAdjustedLimit";
-        // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
-        // new MSE query optimizer.
-        // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
-        //   a table config to enable broker pruning (it is disabled by default).
+        // Used by the MSE engine to enable broker-side segment pruning during routing. The physical optimizer
+        // path defaults to DEFAULT_USE_BROKER_PRUNING (true); the logical planner path defaults to
+        // DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING (false). Both can be overridden per-query.
         public static final String USE_BROKER_PRUNING = "useBrokerPruning";
         // When lite mode is enabled, if this flag is set, we will run all the non-leaf stage operators within the
         // broker itself. That way, the MSE queries will model the scatter gather pattern used by the V1 Engine.
@@ -843,6 +1004,43 @@ public class CommonConstants {
         // MAX(stringCol) -> MAXSTRING(stringCol)
         // SUM(intCol) -> SUMINT(intCol)
         public static final String AUTO_REWRITE_AGGREGATION_TYPE = "autoRewriteAggregationType";
+        // When enabled, allows multi cluster/federated queries to be executed.
+        public static final String ENABLE_MULTI_CLUSTER_ROUTING = "enableMultiClusterRouting";
+
+        /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
+        public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
+
+        // Vector search query options
+
+        /** Number of inverted-list probes for IVF-based vector indexes. Higher values improve recall
+         *  at the cost of latency. Only relevant when the segment's vector index uses IVF_FLAT or IVF_PQ. */
+        public static final String VECTOR_NPROBE = "vectorNprobe";
+
+        /** When true, ANN results are re-scored using exact distance from the forward index and
+         *  re-sorted before returning top-K. Improves accuracy at the cost of latency. */
+        public static final String VECTOR_EXACT_RERANK = "vectorExactRerank";
+
+        /** Maximum number of ANN candidates to retrieve before applying exact rerank or final
+         *  top-K selection. Defaults to topK * 10 if not set. */
+        public static final String VECTOR_MAX_CANDIDATES = "vectorMaxCandidates";
+
+        /** Distance threshold for vector search. When set, only results within this distance are
+         *  returned. The threshold is compared against the raw distance value from the configured
+         *  distance function: EUCLIDEAN/L2 uses squared L2 (sum of squared diffs, no sqrt),
+         *  COSINE uses 1 - cosine_similarity, INNER_PRODUCT/DOT_PRODUCT uses negated dot product. */
+        public static final String VECTOR_DISTANCE_THRESHOLD = "vectorDistanceThreshold";
+
+        /** efSearch parameter for HNSW vector indexes. Higher values improve recall at the cost
+         *  of latency by allowing the graph search to visit more candidates. */
+        public static final String VECTOR_EF_SEARCH = "vectorEfSearch";
+
+        /** Controls whether HNSW uses relative-distance competitive checks during traversal.
+         *  Defaults to true. Setting false disables score-threshold pruning. */
+        public static final String VECTOR_USE_RELATIVE_DISTANCE = "vectorUseRelativeDistance";
+
+        /** Controls whether HNSW uses a bounded top-K collector queue. Defaults to true.
+         *  Setting false uses an unbounded per-query collector and requires vectorEfSearch. */
+        public static final String VECTOR_USE_BOUNDED_QUEUE = "vectorUseBoundedQueue";
       }
 
       public static class QueryOptionValue {
@@ -877,6 +1075,7 @@ public class CommonConstants {
       public static final String AGGREGATE_REMOVE = "AggregateRemove";
       public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
       public static final String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregate";
+      public static final String AGGREGATE_UNION_TRANSPOSE = "AggregateUnionTranspose";
       public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
       public static final String AGGREGATE_FUNCTION_REWRITE = "AggregateFunctionRewrite";
       public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
@@ -898,6 +1097,14 @@ public class CommonConstants {
       public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
       public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
       public static final String JOIN_TO_ENRICHED_JOIN = "JoinToEnrichedJoin";
+      public static final String AGGREGATE_PROJECT_PULL_UP_CONSTANTS = "AggregateProjectPullUpConstants";
+      public static final String LIMIT_MERGE = "LimitMerge";
+      public static final String SORT_REMOVE_CONSTANT_KEYS = "SortRemoveConstantKeys";
+      // Default-off — firing in BASIC_RULES disrupts ProjectToSemiJoinRule pattern matching on
+      // partition-hinted IN (SELECT) queries. See PinotQueryRuleSets for full rationale.
+      public static final String SORT_PROJECT_TRANSPOSE = "SortProjectTranspose";
+      public static final String UNION_MERGE = "UnionMerge";
+      public static final String PROJECT_AGGREGATE_MERGE = "ProjectAggregateMerge";
     }
 
     /**
@@ -914,8 +1121,14 @@ public class CommonConstants {
         PlannerRuleNames.SORT_JOIN_COPY,
         PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
         PlannerRuleNames.JOIN_TO_ENRICHED_JOIN,
-        PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE
+        PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE,
+        // Stock Calcite rule kept opt-in via usePlannerRules — see SORT_PROJECT_TRANSPOSE javadoc
+        // above for the rationale (firing in BASIC_RULES disrupts ProjectToSemiJoinRule on
+        // partition-hinted IN(SELECT) queries, breaking colocated broadcast semi-joins).
+        PlannerRuleNames.SORT_PROJECT_TRANSPOSE
     );
+
+    public static final String CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES = "pinot.broker.mse.planner.disabled.rules";
 
     public static class FailureDetector {
       public enum Type {
@@ -1021,12 +1234,25 @@ public class CommonConstants {
       // Parameters related to Hybrid score.
       public static final String CONFIG_OF_HYBRID_SCORE_EXPONENT = CONFIG_PREFIX + ".hybrid.score.exponent";
       public static final int DEFAULT_HYBRID_SCORE_EXPONENT = 3;
+      public static final String CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR =
+          CONFIG_PREFIX + ".hybrid.score.queue.size.floor";
+      public static final int DEFAULT_HYBRID_SCORE_QUEUE_FLOOR = 0;
 
       // Threadpool size of ServerRoutingStatsManager. This controls the number of threads available to update routing
       // stats for servers upon query submission and response arrival.
       public static final String CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE =
           CONFIG_PREFIX + ".stats.manager.threadpool.size";
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
+
+      // Determines whether routing stats are exported as broker metrics (gauges) on a periodic basis.
+      public static final String CONFIG_OF_ENABLE_STATS_METRIC_EXPORT =
+          CONFIG_PREFIX + ".enable.stats.metric.export";
+      public static final boolean DEFAULT_ENABLE_STATS_METRIC_EXPORT = false;
+
+      // Interval in milliseconds at which routing stats are exported as broker metrics.
+      public static final String CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS =
+          CONFIG_PREFIX + ".stats.metric.export.interval.ms";
+      public static final long DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS = 10 * 1000;
     }
 
     public static class Grpc {
@@ -1048,6 +1274,9 @@ public class CommonConstants {
     public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA =
         "pinot.broker.use.mse.to.fill.empty.response.schema";
     public static final boolean DEFAULT_USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = false;
+
+    public static final String USE_HTTP_STATUS_FOR_ERRORS_HEADER =
+        "Pinot-Use-Http-Status-For-Errors";
   }
 
   public static class Server {
@@ -1141,6 +1370,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_EXECUTION_THREADS =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS;
     public static final int DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS = -1;  // Use number of CPU cores
+    public static final String DEFAULT_EXECUTION_THREADS = "default.execution.threads";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_DEFAULT_EXECUTION_THREADS =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + DEFAULT_EXECUTION_THREADS;
+    public static final int DEFAULT_QUERY_EXECUTOR_DEFAULT_EXECUTION_THREADS = -1;  // Not set; fall back to max
 
     // OOM protection: heap usage throttle configuration
     public static final String CONFIG_OF_HEAP_USAGE_THROTTLE_QUEUE_MAX_SIZE =
@@ -1463,6 +1696,10 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
     public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
 
+    // Predownload related configs
+    public static final String CONFIG_OF_PREDOWNLOAD_PARALLELISM = "pinot.server.predownload.parallelism";
+    public static final int DEFAULT_PREDOWNLOAD_PARALLELISM = -1; // Use numProcessors * 3 as default
+
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
 
     // Environment Provider Configs
@@ -1584,6 +1821,149 @@ public class CommonConstants {
     public static final String DEFAULT_ALLOW_DOWNLOAD_FROM_SERVER = "false";
   }
 
+  /**
+   * Materializes pre-aggregated data into an OFFLINE table based on a user-defined SQL query.
+   * The generator computes a time window and appends it to the SQL; the executor queries the
+   * base table via the broker, builds segments from the results, and uploads them to the MV
+   * table.
+   *
+   * <p>Supports three task modes: {@code APPEND} (new time windows), {@code OVERWRITE}
+   * (re-materialize stale partitions), and {@code DELETE} (remove expired partitions).
+   *
+   * <p>User-facing config keys: {@code definedSQL}, {@code bucketTimePeriod},
+   * {@code bufferTimePeriod} (optional), {@code maxNumRecordsPerSegment} (optional, default
+   * {@link #DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT}).
+   */
+  public static class MaterializedViewTask {
+    public static final String TASK_TYPE = "MaterializedViewTask";
+
+    /**
+     * Prefix for the gRPC client config the minion uses to query the broker when materializing
+     * the MV.  Set keys under this prefix (e.g. {@code pinot.minion.materializedview.broker.grpc.
+     * usePlainText=false}, {@code .tls.keystore.path=...}) to enable TLS, raise the max inbound
+     * message size, or tune keepalive.  Without these, the gRPC client connects in plaintext with
+     * defaults — fine for local quickstarts but wrong for any TLS-enabled production cluster.
+     *
+     * <p>Note: per-request auth metadata (Bearer tokens, etc.) is unaffected by this prefix; it
+     * is sourced per task from the task's {@code AuthProvider} and forwarded as gRPC metadata.
+     */
+    public static final String MINION_BROKER_GRPC_CONFIG_PREFIX = "pinot.minion.materializedview.broker.grpc";
+
+    public static final String DEFINED_SQL_KEY = "definedSQL";
+    public static final String BUCKET_TIME_PERIOD_KEY = "bucketTimePeriod";
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+    public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+
+    public static final String WINDOW_START_MS_KEY = "windowStartMs";
+    public static final String WINDOW_END_MS_KEY = "windowEndMs";
+    public static final String SOURCE_TABLE_NAME_KEY = "sourceTableName";
+    public static final String PARTITION_FINGERPRINTS_KEY = "partitionFingerprints";
+
+    /**
+     * Generator-populated copy of the user's declared {@code LIMIT} value from {@code definedSQL}.
+     * Passed through to the executor so it can detect result-set truncation (when the query
+     * actually returned {@code LIMIT}-many rows, the window is almost certainly incomplete and
+     * must not be marked VALID / advance the runtime watermark).
+     */
+    public static final String EFFECTIVE_LIMIT_KEY = "effectiveLimit";
+
+    public static final String TASK_MODE_KEY = "taskMode";
+    public static final String TASK_MODE_APPEND = "APPEND";
+    public static final String TASK_MODE_OVERWRITE = "OVERWRITE";
+    public static final String TASK_MODE_DELETE = "DELETE";
+
+    public static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
+
+    /**
+     * Maximum number of APPEND task windows to schedule in a single generator cycle.
+     * Increase this to back-fill historical data faster. Default 4 lets a typical onboarding
+     * back-fill complete in roughly {@code N/4} scheduling cycles instead of {@code N} for a
+     * single-task-per-cycle setup, while keeping minion-pool contention bounded.
+     */
+    public static final String MAX_TASKS_PER_BATCH_KEY = "maxTasksPerBatch";
+    public static final int DEFAULT_MAX_TASKS_PER_BATCH = 4;
+
+    /**
+     * Per-MV staleness SLO.  Broker excludes the MV from rewrite when
+     * {@code (now - watermarkMs) > stalenessThresholdMs}, falling back to the base table.
+     * Operators set this to bound the maximum age of MV-served data.  Default {@code 0} means
+     * "no SLO check" (broker uses any MV with a non-zero watermark).
+     */
+    public static final String STALENESS_THRESHOLD_MS_KEY = "stalenessThresholdMs";
+    public static final long DEFAULT_STALENESS_THRESHOLD_MS = 0L;
+
+    /**
+     * Hard upper bound on the user-facing {@code maxTasksPerBatch} config - values above this
+     * are rejected at table-create time. Distinct from the internal scheduler-loop iteration
+     * cap (which can be larger because it covers historical-VALID skip work, not just slot
+     * count).
+     */
+    public static final int MAX_TASKS_PER_BATCH_USER_CAP = 1_000;
+
+    /**
+     * Auto-injected {@code LIMIT} value used when {@code definedSQL} omits an explicit LIMIT.
+     *
+     * <p>Without this, the broker would silently apply its cluster-wide default query limit
+     * (see {@code pinot.broker.default.query.limit}, default 10) to MV-generation queries and
+     * truncate every window to that many rows - the executor's saturation gate cannot detect
+     * such truncation because it never sees the broker's silent override.
+     */
+    public static final int DEFAULT_MATERIALIZED_VIEW_QUERY_LIMIT = 1_000_000;
+
+    /**
+     * Hard upper bound on any user-declared LIMIT in {@code definedSQL}. Capped at
+     * {@code 100_000_000} so a single window cannot OOM the executor - the executor must
+     * accumulate all returned rows in memory before the saturation gate can detect truncation.
+     * Operators with legitimately larger windows must split via narrower {@code bucketTimePeriod}
+     * or filters in {@code definedSQL}.
+     */
+    public static final int MAX_MATERIALIZED_VIEW_QUERY_LIMIT = 100_000_000;
+
+    // -------------------------------------------------------------------------
+    //  Cluster-config keys that override the compile-time defaults above.
+    //
+    //  All keys are read live from Helix CLUSTER scope on each consumer-site
+    //  call — no controller / minion restart is required for a value change
+    //  to take effect.  When a key is unset, malformed, or non-positive, the
+    //  compile-time default applies.
+    //
+    //  Use `pinot-admin.sh ClusterConfig` or the controller REST endpoint
+    //  /cluster/configs to set / update / unset these.
+    // -------------------------------------------------------------------------
+
+    /// Cluster-config key. Overrides {@link #DEFAULT_MATERIALIZED_VIEW_QUERY_LIMIT}.
+    public static final String CLUSTER_CONFIG_KEY_DEFAULT_QUERY_LIMIT =
+        "pinot.materialized.view.query.default.limit";
+
+    /// Cluster-config key. Overrides {@link #MAX_MATERIALIZED_VIEW_QUERY_LIMIT}.
+    public static final String CLUSTER_CONFIG_KEY_MAX_QUERY_LIMIT =
+        "pinot.materialized.view.query.max.limit";
+
+    /// Cluster-config key. Overrides {@link #MAX_TASKS_PER_BATCH_USER_CAP}.
+    public static final String CLUSTER_CONFIG_KEY_MAX_TASKS_PER_BATCH_CAP =
+        "pinot.materialized.view.scheduler.max.tasks.per.batch.cap";
+
+    /// Cluster-config key. Overrides the scheduler's internal batch-loop iteration cap.
+    public static final String CLUSTER_CONFIG_KEY_MAX_BATCH_LOOP_ITERATIONS =
+        "pinot.materialized.view.scheduler.max.batch.loop.iterations";
+
+    /// Cluster-config key. Overrides the executor's runtime-znode CAS retry budget.
+    public static final String CLUSTER_CONFIG_KEY_MAX_RUNTIME_UPDATE_ATTEMPTS =
+        "pinot.materialized.view.executor.runtime.update.max.attempts";
+
+    /// Cluster-config key. Overrides the consistency manager's debounce window (ms).
+    public static final String CLUSTER_CONFIG_KEY_CONSISTENCY_DEBOUNCE_MS =
+        "pinot.materialized.view.consistency.debounce.ms";
+
+    /// Cluster-config key. Overrides the interval (ms) of the consistency manager's periodic
+    /// VALID-empty re-evaluation sweep.  The sweep re-marks in-coverage `VALID-empty` buckets
+    /// STALE when their source window has regained segments, so a DELETE-backfill that raced the
+    /// commit guard self-heals without waiting for a fresh base-table change.  Non-positive values
+    /// fall back to the compile-time default.
+    public static final String CLUSTER_CONFIG_KEY_CONSISTENCY_EMPTY_SWEEP_INTERVAL_MS =
+        "pinot.materialized.view.consistency.empty.sweep.interval.ms";
+  }
+
   public static class ControllerJob {
     /**
      * Controller job ZK props
@@ -1602,115 +1982,218 @@ public class CommonConstants {
      */
     public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "segmentName";
     public static final String SEGMENT_RELOAD_JOB_INSTANCE_NAME = "instanceName";
+    public static final String SEGMENT_RELOAD_JOB_INSTANCE_TO_SEGMENTS_MAP = "instanceToSegmentsMap";
     // Force commit job ZK props
     public static final String CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST = "segmentsForceCommitted";
     public static final String CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST = "segmentsYetToBeCommitted";
     public static final String NUM_CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED = "numberOfSegmentsYetToBeCommitted";
   }
 
-  // prefix for scheduler related features, e.g. query accountant
+  // Prefix for query scheduler related features
   public static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
 
   public static class Accounting {
-    public static final String CONFIG_OF_FACTORY_NAME = "accounting.factory.name";
+    /// Shared prefix for accounting configs. Values under this prefix applies to both brokers and servers.
+    public static final String COMMON_PREFIX = "pinot.query.scheduler.accounting";
+    /// Broker-specific accounting config prefix. Values under this prefix override values under [#COMMON_PREFIX] on the
+    /// broker.
+    public static final String BROKER_PREFIX = "pinot.broker.query.accounting";
+    /// Server-specific accounting config prefix. Values under this prefix override values under [#COMMON_PREFIX] on the
+    /// server.
+    public static final String SERVER_PREFIX = "pinot.server.query.accounting";
 
-    public static final String CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = "accounting.enable.thread.cpu.sampling";
-    public static final Boolean DEFAULT_ENABLE_THREAD_CPU_SAMPLING = false;
+    /// Config keys within the accounting scope (i.e. the suffix after one of [#COMMON_PREFIX], [#BROKER_PREFIX], or
+    /// [#SERVER_PREFIX]). Use these when reading from a config subsetted to the accounting scope.
+    public static class Keys {
+      public static final String FACTORY_NAME = "factory.name";
+      public static final String ENABLE_THREAD_CPU_SAMPLING = "enable.thread.cpu.sampling";
+      public static final String ENABLE_THREAD_MEMORY_SAMPLING = "enable.thread.memory.sampling";
+      public static final String OOM_PROTECTION_KILLING_QUERY = "oom.enable.killing.query";
+      public static final String PUBLISHING_JVM_USAGE = "publishing.jvm.heap.usage";
+      public static final String CPU_TIME_BASED_KILLING_ENABLED = "cpu.time.based.killing.enabled";
+      public static final String CPU_TIME_BASED_KILLING_THRESHOLD_MS = "cpu.time.based.killing.threshold.ms";
+      public static final String PANIC_LEVEL_HEAP_USAGE_RATIO = "oom.panic.heap.usage.ratio";
+      public static final String CRITICAL_LEVEL_HEAP_USAGE_RATIO = "oom.critical.heap.usage.ratio";
+      public static final String ALARMING_LEVEL_HEAP_USAGE_RATIO = "oom.alarming.usage.ratio";
+      public static final String HEAP_USAGE_PUBLISHING_PERIOD_MS = "heap.usage.publishing.period.ms";
+      public static final String SLEEP_TIME_MS = "sleep.ms";
+      public static final String SLEEP_TIME_DENOMINATOR = "sleep.time.denominator";
+      public static final String MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO = "min.memory.footprint.to.kill.ratio";
+      public static final String QUERY_KILLED_METRIC_ENABLED = "query.killed.metric.enabled";
+      public static final String OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS = "oom.pre.query.kill.pause.duration.ms";
+      public static final String OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE = "oom.panic.allow.pre.query.kill.pause";
 
-    public static final String CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING = "accounting.enable.thread.memory.sampling";
-    public static final Boolean DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING = false;
+      /// QUERY WORKLOAD ISOLATION Configs
+      ///
+      /// This is a set of configs to enable query workload isolation. Queries are classified into workload based on the
+      /// QueryOption - WORKLOAD_NAME. The CPU and Memory cost for a workload are set globally in ZK. The CPU and memory
+      /// costs are for a certain time duration, called "enforcementWindow". The workload cost is split into smaller
+      /// cost for each instance involved in executing queries of the workload.
+      ///
+      /// At each instance (broker,server), there are two parts to workload isolation:
+      /// 1. Workload Cost Collection
+      /// 2. Workload Cost Enforcement
+      ///
+      /// Workload Cost collection happens at various stages of query execution. On server, the resource costs
+      /// associated with pruning, planning and execution are collected. On broker, the resource costs associated with
+      /// compilation & reduce are collected. WorkloadBudgetManager maintains the budget and usage for each workload in
+      /// the instance.
+      ///
+      /// Workload Enforcement enforces the budget for a workload if the resource usages are exceeded. The queries in
+      /// the workload are killed until the enforcementWindow is refreshed.
+      ///
+      /// More details in the [Design Doc](https://tinyurl.com/2p9vuzbd)
+      ///
+      /// Pre-req configs for enabling Query Workload Isolation:
+      ///  - CommonConstants.Accounting.Keys.FACTORY_NAME = ResourceUsageAccountantFactory
+      ///  - CommonConstants.Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING = true
+      ///  - CommonConstants.Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING = true
+      ///  - CommonConstants.Accounting.Keys.ENABLE_THREAD_SAMPLING_MSE = true
+      ///  - Instance Config: enableThreadCpuTimeMeasurement = true
+      ///  - Instance Config: enableThreadAllocatedBytesMeasurement = true
+      public static final String WORKLOAD_ENABLE_COST_COLLECTION = "workload.enable.cost.collection";
+      public static final String WORKLOAD_ENABLE_COST_ENFORCEMENT = "workload.enable.cost.enforcement";
+      public static final String WORKLOAD_ENFORCEMENT_WINDOW_MS = "workload.enforcement.window.ms";
+      public static final String WORKLOAD_SLEEP_TIME_MS = "workload.sleep.time.ms";
+      public static final String SECONDARY_WORKLOAD_NAME = "secondary.workload.name";
+      public static final String SECONDARY_WORKLOAD_CPU_PERCENTAGE = "secondary.workload.cpu.percentage";
+    }
 
-    public static final String CONFIG_OF_OOM_PROTECTION_KILLING_QUERY = "accounting.oom.enable.killing.query";
+    public static final boolean DEFAULT_ENABLE_THREAD_CPU_SAMPLING = false;
+    public static final boolean DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING = false;
     public static final boolean DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY = false;
-
-    public static final String CONFIG_OF_PUBLISHING_JVM_USAGE = "accounting.publishing.jvm.heap.usage";
     public static final boolean DEFAULT_PUBLISHING_JVM_USAGE = false;
-
-    public static final String CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED = "accounting.cpu.time.based.killing.enabled";
     public static final boolean DEFAULT_CPU_TIME_BASED_KILLING_ENABLED = false;
+    public static final int DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS = 30_000;
+    public static final float DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
+    public static final float DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO = 0.96f;
+    public static final float DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO = 0.75f;
+    public static final int DEFAULT_HEAP_USAGE_PUBLISH_PERIOD = 5000;
+    public static final int DEFAULT_SLEEP_TIME_MS = 30;
+    public static final int DEFAULT_SLEEP_TIME_DENOMINATOR = 3;
+    public static final double DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO = 0.025;
+    public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
+    public static final long DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS = -1;
+    public static final boolean DEFAULT_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED = false;
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION = false;
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT = false;
+    public static final long DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS = 60_000L;
+    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 100;
+    public static final String DEFAULT_WORKLOAD_NAME = "default";
+    public static final String DEFAULT_SECONDARY_WORKLOAD_NAME = "defaultSecondary";
+    public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 0.0;
 
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_FACTORY_NAME = "accounting.factory.name";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = "accounting.enable.thread.cpu.sampling";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING = "accounting.enable.thread.memory.sampling";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_OOM_PROTECTION_KILLING_QUERY = "accounting.oom.enable.killing.query";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_PUBLISHING_JVM_USAGE = "accounting.publishing.jvm.heap.usage";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED = "accounting.cpu.time.based.killing.enabled";
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS =
         "accounting.cpu.time.based.killing.threshold.ms";
-    public static final int DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS = 30_000;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.panic.heap.usage.ratio";
-    public static final float DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.critical.heap.usage.ratio";
-    public static final float DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO = 0.96f;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.alarming.usage.ratio";
-    public static final float DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO = 0.75f;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD_MS = "accounting.heap.usage.publishing.period.ms";
-    public static final int DEFAULT_HEAP_USAGE_PUBLISH_PERIOD = 5000;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SLEEP_TIME_MS = "accounting.sleep.ms";
-    public static final int DEFAULT_SLEEP_TIME_MS = 30;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SLEEP_TIME_DENOMINATOR = "accounting.sleep.time.denominator";
-    public static final int DEFAULT_SLEEP_TIME_DENOMINATOR = 3;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO =
         "accounting.min.memory.footprint.to.kill.ratio";
-    public static final double DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO = 0.025;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
-    public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
-
-    /**
-     * QUERY WORKLOAD ISOLATION Configs
-     *
-     * This is a set of configs to enable query workload isolation. Queries are classified into workload based on the
-     * QueryOption - WORKLOAD_NAME. The CPU and Memory cost for a workload are set globally in ZK. The CPU and memory
-     * costs are for a certain time duration, called "enforcementWindow". The workload cost is split into smaller cost
-     * for each instance involved in executing queries of the workload.
-     *
-     *
-     * At each instance (broker,server), there are two parts to workload isolation:
-     * 1. Workload Cost Collection
-     * 2. Workload Cost Enforcement
-     *
-     *
-     * Workload Cost collection happens at various stages of query execution. On server, the resource costs associated
-     * with pruning, planning and execution are collected. On broker, the resource costs associated with compilation &
-     * reduce are collected. WorkloadBudgetManager maintains the budget and usage for each workload in the instance.
-     * Workload Enforcement enforces the budget for a workload if the resource usages are exceeded. The queries in the
-     * workload are killed until the enforcementWindow is refreshed.
-     *
-     * More details in https://tinyurl.com/2p9vuzbd
-     *
-     * Pre-req configs for enabling Query Workload Isolation:
-     *  - CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME  = ResourceUsageAccountantFactory
-     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = true
-     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING = true
-     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE = true
-     *  - Instance Config: enableThreadCpuTimeMeasurement = true
-     *  - Instance Config: enableThreadAllocatedBytesMeasurement = true
-     */
-
-    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION =
-        "accounting.workload.enable.cost.collection";
-    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION = false;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS =
+        "accounting.oom.pre.query.kill.pause.duration.ms";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE =
+        "accounting.oom.panic.allow.pre.query.kill.pause";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION = "accounting.workload.enable.cost.collection";
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT =
         "accounting.workload.enable.cost.enforcement";
-    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT = false;
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS = "accounting.workload.enforcement.window.ms";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS = "accounting.workload.sleep.time.ms";
 
-    public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS =
-        "accounting.workload.enforcement.window.ms";
-    public static final long DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS = 60_000L;
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_EMISSION =
+        "accounting.workload.enable.cost.emission";
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_EMISSION = false;
 
-    public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS =
-        "accounting.workload.sleep.time.ms";
-    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
-
-    public static final String DEFAULT_WORKLOAD_NAME = "default";
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";
-    public static final String DEFAULT_SECONDARY_WORKLOAD_NAME = "defaultSecondary";
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
         "accounting.secondary.workload.cpu.percentage";
-    public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 0.0;
+    public static final String CONFIG_OF_WORKLOAD_BUDGET_MANAGER_TYPE_NAME =
+        "accounting.workload.budget.manager.factory.name";
+    public static final String DEFAULT_WORKLOAD_BUDGET_MANAGER_TYPE_NAME = "default";
+
+    // Scan-based query killing
+    public enum ScanKillingMode {
+      DISABLED("disabled"),
+      LOG_ONLY("logOnly"),
+      ENFORCE("enforce");
+
+      private final String _configValue;
+
+      ScanKillingMode(String configValue) {
+        _configValue = configValue;
+      }
+
+      public String getConfigValue() {
+        return _configValue;
+      }
+
+      /**
+       * Parses a config string into a {@link ScanKillingMode}. Case-insensitive.
+       * Returns {@code null} if the value is not recognized.
+       */
+      public static ScanKillingMode fromConfigValue(String value) {
+        if (value == null) {
+          return null;
+        }
+        for (ScanKillingMode mode : values()) {
+          if (mode._configValue.equalsIgnoreCase(value)) {
+            return mode;
+          }
+        }
+        return null;
+      }
+    }
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MODE = "accounting.scan.based.killing.mode";
+    public static final ScanKillingMode DEFAULT_SCAN_BASED_KILLING_MODE = ScanKillingMode.DISABLED;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME =
+        "accounting.scan.based.killing.strategy.factory.class.name";
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER =
+        "accounting.scan.based.killing.max.entries.scanned.in.filter";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER = Long.MAX_VALUE;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED =
+        "accounting.scan.based.killing.max.docs.scanned";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_DOCS_SCANNED = Long.MAX_VALUE;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER =
+        "accounting.scan.based.killing.max.entries.scanned.post.filter";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER = Long.MAX_VALUE;
   }
 
   public static class ExecutorService {
@@ -1781,6 +2264,8 @@ public class CommonConstants {
     public static final String INDEX_VERSION = "segment.index.version";
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
+    public static final String DATA_CRC = "segment.data.crc";
+    public static final String USE_DATA_CRC = "segment.use.data.crc";
     public static final String TIER = "segment.tier";
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String PUSH_TIME = "segment.push.time";
@@ -1807,7 +2292,9 @@ public class CommonConstants {
 
     public static class AssignmentStrategy {
       public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "balanced";
+      public static final String ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY = "roundrobin";
       public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "replicagroup";
+      public static final String ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "roundrobinreplicagroup";
       public static final String DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY = "allservers";
     }
 
@@ -1946,6 +2433,139 @@ public class CommonConstants {
     public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
 
+    /// Whether the sender side of every `GrpcSendingMailbox` respects gRPC client-side flow control by waiting
+    /// on [io.grpc.stub.ClientCallStreamObserver#isReady] before pushing each chunk.
+    ///
+    /// Default `false` — the gate is **opt-in**. When `false`, the sender pushes unconditionally and the
+    /// behaviour is identical to the pre-PR-#18519 unbounded path. Set to `true` to engage the
+    /// `isReady()`-gated wait that bounds the gRPC client allocator against the `OutOfDirectMemoryError`
+    /// failure mode described in #18519. Operators who hit that OOM (slow consumer / large fan-out / skewed
+    /// shuffle) should flip this on.
+    ///
+    /// Also used as an A/B knob for benchmarks (see `BenchmarkGrpcMailboxSend`).
+    public static final String KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED =
+        "pinot.query.runner.grpc.sender.backpressure.enabled";
+    public static final boolean DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED = false;
+
+    /// Per-stream HTTP/2 flow control window, in bytes. The receiver advertises this value to the sender as
+    /// the number of bytes it will accept before requiring a `WINDOW_UPDATE` frame. Wider windows let the
+    /// sender push a whole `MseBlock` without [io.grpc.stub.ClientCallStreamObserver#isReady] flipping
+    /// mid-block. Applied via `NettyServerBuilder.flowControlWindow` in `GrpcMailboxServer`.
+    ///
+    /// This is per HTTP/2 stream, so total inbound buffering at the receiver scales as
+    /// `value × #concurrent streams to this server`. Concretely:
+    /// `Peak receiver direct memory ≈ flowControlWindow × #concurrent_incoming_streams.`
+    ///
+    /// This value is the **per-stalled-stream receiver-side direct-memory exposure**, not just a throughput
+    /// knob: when an inbound stream's receiver application queue stalls (e.g. the downstream operator is slow
+    /// to drain via [org.apache.pinot.query.mailbox.channel.MailboxContentObserver#onNext]), the wire can
+    /// still buffer up to `flowControlWindow` bytes of data on that stream before the HTTP/2 peer stops
+    /// sending.
+    ///
+    /// This is a direct-memory bound, not just a throughput knob: operators must size it against
+    /// `-XX:MaxDirectMemorySize` given the expected concurrent inbound stream count.
+    ///
+    /// Receiver-side counterpart to [#KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES] (the sender-side
+    /// outbound queue cap). The two are aligned at the same default by design — they cap roughly the
+    /// same conceptual thing (one peer's worth of in-flight bytes) from the two ends of the wire — but
+    /// kept as separate keys so operators can tune them independently for asymmetric workloads.
+    public static final String KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES =
+        "pinot.query.runner.grpc.flow.control.window.bytes";
+    public static final int DEFAULT_GRPC_FLOW_CONTROL_WINDOW_BYTES = 64 * 1024 * 1024;
+
+    /// Netty per-channel WriteQueue high watermark, in bytes. Applied via
+    /// `ChannelOption.WRITE_BUFFER_WATER_MARK` on the sender's `NettyChannelBuilder`. When the channel's
+    /// outbound queue exceeds this value, `Channel.isWritable()` flips to `false` and gRPC's
+    /// [io.grpc.stub.ClientCallStreamObserver#isReady] returns `false` until the queue drops below the low
+    /// watermark.
+    ///
+    /// This is a per-channel (per `host:port`) setting, shared across all streams to that peer. The
+    /// sender's direct-memory footprint is therefore bounded by `value × #peers`, not by
+    /// `value × #streams`. Concretely:
+    /// `Peak sender direct memory ≈ writeBufferHighWaterMark × #peers (one channel per peer, shared across
+    /// streams to that peer).`
+    ///
+    /// This is a direct-memory bound, not just a throughput knob: operators must size it against
+    /// `-XX:MaxDirectMemorySize` given the expected per-query peer fan-out and the number of concurrent
+    /// queries. Pairs with [#KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES].
+    ///
+    /// Sender-side counterpart to [#KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES] (the receiver-side inbound
+    /// window). The two are aligned at the same default by design, sized together to bound one peer's
+    /// worth of in-flight bytes from each end of the wire.
+    public static final String KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES =
+        "pinot.query.runner.grpc.write.buffer.high.water.mark.bytes";
+    public static final int DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES = 64 * 1024 * 1024;
+
+    /// Netty per-channel WriteQueue low watermark, in bytes. Once the WriteQueue has exceeded the high
+    /// watermark (see [#KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES] and the
+    /// `writeBufferHighWaterMark × #peers` direct-memory formula documented there), it must drop below this
+    /// value before `Channel.isWritable()` flips back to `true`. Conventionally set to ~50% of the high
+    /// watermark.
+    ///
+    /// The gap `(high − low)` is the drain hysteresis the channel must clear before becoming writable
+    /// again: setting `low` too close to `high` makes the channel flap writable/unwritable on every
+    /// small drain; setting it too low forces the sender to wait longer between writable windows. The
+    /// low watermark itself does not change the peak direct-memory bound — that is set by the high
+    /// watermark — but it controls how aggressively the channel reopens once back-pressure has engaged.
+    public static final String KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES =
+        "pinot.query.runner.grpc.write.buffer.low.water.mark.bytes";
+    public static final int DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES = 32 * 1024 * 1024;
+
+    /// Number of inbound gRPC messages the receiver will accept in flight per stream, before requiring the
+    /// application to consume one (via [org.apache.pinot.query.mailbox.channel.MailboxContentObserver#onNext]
+    /// returning). Implemented by disabling gRPC's default auto-inbound-flow-control on the server side and
+    /// calling [io.grpc.stub.ServerCallStreamObserver#request] explicitly. Only takes effect when
+    /// [#KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED] is `true` (off by default).
+    ///
+    /// Default `1`, which mirrors gRPC's auto-inbound-flow-control behaviour (one message in flight). Even
+    /// when [#KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED] is flipped on, this conservative default
+    /// keeps the in-flight window at one message until the operator explicitly widens it.
+    ///
+    /// Larger values let the sender pipeline more messages without waiting for per-message round trips,
+    /// which is the primary throughput knob for small / medium MSE blocks. Memory exposure on the receiver
+    /// is still bounded by the HTTP/2 stream window (see [#KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES]), so this
+    /// credit count is effectively a per-stream message-count limit on top of the byte-count limit.
+    /// Whichever fires first applies.
+    ///
+    /// ## Cancel-propagation tradeoff
+    ///
+    /// Higher credit values widen the in-flight window, which improves throughput for small/medium blocks
+    /// but also **widens worst-case cancel-propagation latency** when the receiver's application queue
+    /// (capacity 5 by default) is stuck. The sender's
+    /// [org.apache.pinot.query.mailbox.GrpcSendingMailbox#cancel] pushes an error EOS **in-band** on the
+    /// same gRPC stream as data; when the receiver's dispatch thread is parked in `_notFull.await`, that
+    /// EOS sits behind every inbound message that already made it past flow control. Worst-case cancel
+    /// latency is bounded by `min(credit messages, flowControlWindow bytes)` worth of buffered inbound that
+    /// has to drain before the EOS reaches the application.
+    ///
+    /// Note that this hang surface is **pre-existing** — the in-band EOS path can stall even with gRPC's
+    /// auto-inbound default of 1 in-flight message if the receiver's application queue is permanently
+    /// stuck (e.g. the consumer is gone). The credit value just controls how much worse the latency gets
+    /// before the hang surfaces. See https://github.com/apache/pinot/issues/18541 for the proper
+    /// out-of-band cancel work.
+    public static final String KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT =
+        "pinot.query.runner.grpc.inbound.message.credit";
+    public static final int DEFAULT_GRPC_INBOUND_MESSAGE_CREDIT = 1;
+
+    /// Whether the receiver overrides gRPC's auto-inbound-flow-control on the mailbox stream and prefetches
+    /// [#KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT] messages of credit up-front, then replenishes one credit
+    /// before each `onNext` does the (possibly blocking) hand-off to the application queue.
+    ///
+    /// Default `false` — the manual-flow-control path is **opt-in**. When `false` (default), the receiver
+    /// leaves gRPC's auto-inbound in place (only 1 message in flight at a time, post-`onNext`-return credit
+    /// replenishment), which is the pre-PR-#18519 behaviour. Set to `true` to engage the manual prefetch +
+    /// pre-`offerRaw` credit replenishment introduced in #18519, which is the primary throughput knob for
+    /// small/medium MSE blocks.
+    ///
+    /// Cancel-propagation latency is bounded more tightly when this is `false`, but the worst case (a stuck
+    /// receiver dispatch thread) is still possible because the sender's cancel travels in-band; see
+    /// https://github.com/apache/pinot/issues/18541.
+    ///
+    /// This is an independent opt-in from [#KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED]; the two control
+    /// different sides of the mailbox path.
+    public static final String KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED =
+        "pinot.query.runner.grpc.manual.inbound.flow.control.enabled";
+    public static final boolean DEFAULT_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED = false;
 
     /**
      * Configuration for channel idle timeout in seconds.
@@ -1983,16 +2603,28 @@ public class CommonConstants {
     /// - "SAFE": MSE will only send stats if all instances in the cluster are running 1.4.0 or later.
     /// - "ALWAYS": MSE will always send stats, regardless of the version of the instances in the cluster.
     /// - "NEVER": MSE will never send stats.
-    ///
-    /// The reason for this flag that versions 1.3.0 and lower have two undesired behaviors:
-    /// 1. Some queries using intersection generate incorrect stats
-    /// 2. When stats from other nodes are sent but are different from expected, the query fails.
-    ///
-    /// In 1.4.0 the first issue is solved and instead of failing when unexpected stats are received, the query
-    /// continues without children stats. But if a query involves servers in versions 1.3.0 and 1.4.0, the one
-    /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
-    public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
+    public static final String DEFAULT_SEND_STATS_MODE = "ALWAYS";
+
+    /// Per-request metadata key that overrides the cluster-level send-stats decision for the duration of a single
+    /// query. Set automatically by the {@code SubmitWithStream} bidi RPC handler on the server: when stats travel
+    /// out-of-band on the bidi stream there is no point in also paying the cost of serializing them onto the mailbox
+    /// path, so the mailbox-side {@code sendStats} flag is forced to {@code false} for that request.
+    ///
+    /// This is **not** a user-facing option — it exists purely as a server-internal channel from the
+    /// {@code SubmitWithStream} handler down to {@code QueryRunner.processQueryBlocking}. Brokers do not set it.
+    public static final String KEY_OF_STATS_REPORTING_MODE = "pinot.query.mse.statsReportingMode";
+    /// Value indicating the new bidi-stream stats reporting path is in use; mailbox-side stats are suppressed.
+    public static final String STATS_REPORTING_MODE_STREAM = "stream";
+    /// Value indicating today's legacy mailbox-piggyback stats reporting path. Equivalent to leaving the key unset.
+    public static final String STATS_REPORTING_MODE_LEGACY = "legacy";
+
+    /// Used to indicate whether MSE pipeline breaker stats should be included in the stageStats field.
+    /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. In 1.5.0 they were
+    /// not included by default but could be included by setting this flag to false (upper or lower case). Starting
+    /// from 1.6.0, they are included by default and can be excluded by setting this flag to true (upper or lower case).
+    public static final String KEY_OF_SKIP_PIPELINE_BREAKER_STATS = "pinot.query.mse.skip.pipeline.breaker.stats";
+    public static final boolean DEFAULT_SKIP_PIPELINE_BREAKER_STATS = false;
 
     /// Used to indicate that MSE stats should be logged at INFO level for successful queries.
     ///
@@ -2048,6 +2680,51 @@ public class CommonConstants {
     /// TODO: This is used by the broker. Consider renaming it.
     public static final String KEY_OF_CANCEL_TIMEOUT_MS = "pinot.server.query.cancel.timeout.ms";
     public static final long DEFAULT_OF_CANCEL_TIMEOUT_MS = 1000;
+
+    /// gRPC keep-alive time for broker dispatch channels, in milliseconds. Values &gt; 0 enable keep-alive pings so
+    /// that a silently unreachable server (e.g. kernel-dead node, one-way network partition) transitions the dispatch
+    /// channel out of `READY`, which in turn lets the broker's FailureDetector exclude it from routing.
+    ///
+    /// Defaults are chosen to be safe against Netty's default gRPC server enforcement
+    /// (`permitKeepAliveTime` = 5 minutes, `permitKeepAliveWithoutCalls` = false); operators may tune these down for
+    /// faster silent-peer detection once the server side has been configured to permit a higher ping rate.
+    public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS =
+        "pinot.query.multistage.dispatch.channel.keep.alive.time.ms";
+    public static final int DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS = 300_000;
+
+    /// gRPC keep-alive timeout for broker dispatch channels, in milliseconds. Only applies when keep-alive is enabled.
+    public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_MS =
+        "pinot.query.multistage.dispatch.channel.keep.alive.timeout.ms";
+    public static final int DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_MS = 30_000;
+
+    /// Whether to send gRPC keep-alive pings on dispatch channels even when there are no active calls. Default is
+    /// `false` because Netty's default gRPC server rejects pings-without-calls with `GOAWAY (ENHANCE_YOUR_CALM)`.
+    public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS =
+        "pinot.query.multistage.dispatch.channel.keep.alive.without.calls";
+    public static final boolean DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS = false;
+
+    /// Minimum interval, in milliseconds, between client gRPC keep-alive pings that the MSE
+    /// [org.apache.pinot.query.service.server.QueryServer] will accept. Pings arriving more frequently than this are
+    /// counted as "bad pings"; once the server's internal threshold is exceeded it sends `GOAWAY(ENHANCE_YOUR_CALM)`
+    /// with `too_many_pings` debug data and closes the connection.
+    ///
+    /// Defaults to 5 minutes to match Netty's gRPC server default. Operators tuning down the broker dispatch
+    /// `keepAliveTime` (see [#KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS]) for faster silent-peer detection MUST set
+    /// this to a value less than or equal to the configured client keep-alive time, otherwise the server will tear
+    /// down the dispatch channel. A non-positive value leaves Netty's gRPC server default (currently 5 minutes) in
+    /// place.
+    public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS =
+        "pinot.query.multistage.query.server.permit.keep.alive.time.ms";
+    public static final int DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS = 300_000;
+
+    /// Whether the MSE [org.apache.pinot.query.service.server.QueryServer] permits client gRPC keep-alive pings when
+    /// there are no active RPCs on the connection. Defaults to `false` to match Netty's gRPC server default. Must be
+    /// set to `true` if brokers configure
+    /// [#KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS] to `true`, otherwise the server will close idle channels
+    /// with `GOAWAY(ENHANCE_YOUR_CALM)`.
+    public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS =
+        "pinot.query.multistage.query.server.permit.keep.alive.without.calls";
+    public static final boolean DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
   }
 
   public static class NullValuePlaceHolder {
@@ -2063,9 +2740,11 @@ public class CommonConstants {
     public static final long[] LONG_ARRAY = new long[0];
     public static final float[] FLOAT_ARRAY = new float[0];
     public static final double[] DOUBLE_ARRAY = new double[0];
+    public static final BigDecimal[] BIG_DECIMAL_ARRAY = new BigDecimal[0];
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
-    public static final Object MAP = Collections.emptyMap();
+    public static final ByteArray[] INTERNAL_BYTES_ARRAY = new ByteArray[0];
+    public static final Object MAP = Map.of();
   }
 
   public static class CursorConfigs {
@@ -2078,11 +2757,12 @@ public class CommonConstants {
     public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
     public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".expiration";
 
+    // Read once at broker startup; changes require broker restart to take effect.
     public static final String RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD =
-        "controller.cluster.response.store.cleaner.frequencyPeriod";
+        PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".cleaner.frequencyPeriod";
     public static final String DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD = "1h";
     public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
-        "controller.cluster.response.store.cleaner.initialDelay";
+        PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".cleaner.initialDelay";
   }
 
   public static class ForwardIndexConfigs {
@@ -2099,6 +2779,10 @@ public class CommonConstants {
         "pinot.field.spec.default.json.max.length.exceed.strategy";
     public static final String CONFIG_OF_DEFAULT_JSON_MAX_LENGTH =
         "pinot.field.spec.default.json.max.length";
+  }
+
+  public static class IngestionConfigs {
+    public static final int DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN = 5;
   }
 
   /**
@@ -2120,5 +2804,21 @@ public class CommonConstants {
     public static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/TABLE/";
     public static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
     public static final String SCHEMA_PATH_PREFIX = "/SCHEMAS/";
+  }
+
+  /**
+   * Constants for cluster config change listeners.
+   */
+  public static class ConfigChangeListenerConstants {
+    /**
+     * Cluster config key to control how to handle inconsistency during consuming segment commit
+     * for upsert/dedup tables (partial upsert or dropOutOfOrderRecord=true with consistency mode).
+     *
+     * Supported values:
+     * - RESTRICTED: Force commit is disabled for tables with inconsistent state table configurations
+     * - PROTECTED: Force commit is enabled with metadata reversion on inconsistencies
+     * - UNSAFE: Force commit is enabled without metadata reversion (Can lead to inconsistencies)
+     */
+    public static final String CONSUMING_SEGMENT_CONSISTENCY_MODE = "pinot.server.consuming.segment.consistency.mode";
   }
 }

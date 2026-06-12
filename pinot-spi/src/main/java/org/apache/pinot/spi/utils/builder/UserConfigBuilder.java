@@ -24,53 +24,53 @@ import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
 
+
 public class UserConfigBuilder {
+  private ComponentType _componentType;
+  private String _username;
+  private String _password;
+  private RoleType _roleType;
+  private List<String> _tableList;
+  private List<String> _excludeTableList;
+  private List<AccessType> _permissionList;
 
-    private ComponentType _componentType;
-    private String _username;
-    private String _password;
-    private RoleType _roleType;
-    private List<String> _tableList;
-    private List<String> _excludeTableList;
-    private List<AccessType> _permissionList;
+  public UserConfigBuilder setComponentType(ComponentType componentType) {
+    _componentType = componentType;
+    return this;
+  }
 
-    public UserConfigBuilder setComponentType(ComponentType componentType) {
-        _componentType = componentType;
-        return this;
-    }
+  public UserConfigBuilder setUsername(String username) {
+    _username = username;
+    return this;
+  }
 
-    public UserConfigBuilder setUsername(String username) {
-        _username = username;
-        return this;
-    }
+  public UserConfigBuilder setPassword(String password) {
+    _password = password;
+    return this;
+  }
 
-    public UserConfigBuilder setPassword(String password) {
-        _password = password;
-        return this;
-    }
+  public UserConfigBuilder setRoleType(RoleType roleType) {
+    _roleType = roleType;
+    return this;
+  }
 
-    public UserConfigBuilder setRoleType(RoleType roleType) {
-        _roleType = roleType;
-        return this;
-    }
+  public UserConfigBuilder setTableList(List<String> tableList) {
+    _tableList = tableList;
+    return this;
+  }
 
-    public UserConfigBuilder setTableList(List<String> tableList) {
-        _tableList = tableList;
-        return this;
-    }
+  public UserConfigBuilder setExcludeTableList(List<String> excludeTableList) {
+    _excludeTableList = excludeTableList;
+    return this;
+  }
 
-    public UserConfigBuilder setExcludeTableList(List<String> excludeTableList) {
-        _excludeTableList = excludeTableList;
-        return this;
-    }
+  public UserConfigBuilder setPermissionList(List<AccessType> permissionList) {
+    _permissionList = permissionList;
+    return this;
+  }
 
-    public UserConfigBuilder setPermissionList(List<AccessType> permissionList) {
-        _permissionList = permissionList;
-        return this;
-    }
-
-    public UserConfig build() {
-        return new UserConfig(_username, _password, _componentType.toString(), _roleType.toString(), _tableList,
-            _excludeTableList, _permissionList);
-    }
+  public UserConfig build() {
+    return new UserConfig(_username, _password, _componentType.toString(), _roleType.toString(), _tableList,
+        _excludeTableList, _permissionList);
+  }
 }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -52,39 +51,18 @@ public class PercentileMVAggregationFunction extends PercentileAggregationFuncti
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    DoubleArrayList valueList = getValueList(aggregationResultHolder);
-    for (int i = 0; i < length; i++) {
-      for (double value : valuesArray[i]) {
-        valueList.add(value);
-      }
-    }
+    aggregateMV(length, aggregationResultHolder, blockValSetMap.get(_expression));
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-      for (double value : valuesArray[i]) {
-        valueList.add(value);
-      }
-    }
+    aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap.get(_expression));
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
-        for (double value : values) {
-          valueList.add(value);
-        }
-      }
-    }
+    aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap.get(_expression));
   }
 }

@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.utils.BrokerSelectorUtils;
 import org.apache.pinot.client.utils.ConnectionUtils;
@@ -128,7 +129,13 @@ public class BrokerCache {
         .setConnectTimeout(Duration.ofMillis(connectTimeoutMs))
         .setHandshakeTimeout(handshakeTimeoutMs)
         .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua_broker_cache", appId))
-        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
+        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]))
+        // Reuse a JVM-wide Netty I/O thread pool and timer across all BrokerCache instances so
+        // that the periodic broker refresh does not multiply Netty threads by the number of
+        // client connections. AHC will not shut these down on close() because they are externally
+        // supplied (see ChannelManager#allowReleaseEventLoopGroup / AHC#allowStopNettyTimer).
+        .setEventLoopGroup(PinotClientNettyResources.eventLoopGroup())
+        .setNettyTimer(PinotClientNettyResources.timer());
 
     _client = Dsl.asyncHttpClient(builder.build());
     ControllerRequestURLBuilder controllerRequestURLBuilder =
@@ -211,6 +218,7 @@ public class BrokerCache {
     _brokerData = getBrokerData(responses);
   }
 
+  @Nullable
   public String getBroker(String... tableNames) {
     // If tableNames is not-null, filter out nulls
     tableNames = tableNames == null ? tableNames

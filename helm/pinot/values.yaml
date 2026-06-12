@@ -28,12 +28,10 @@ image:
   #   - `latest` tag is always available and points to the nightly pinot master branch build
   #   - `release-x.y.z` or `x.y.z` tags are available for each release, e.g. release-1.0.0, release-0.12.1, 1.0.0, 0.12.1, etc.
   #
-  # Default JDK comes with Amazon Corretto 11, here are also images with different JDKs:
-  #   - Amazon Corretto 11, e.g. `latest-11`, `1.0.0-11`, `latest-11-amazoncorretto`, `1.0.0-11-amazoncorretto`
-  #   - Amazon Corretto 17, e.g. `latest-17-amazoncorretto`, `1.0.0-17-amazoncorretto`
-  #   - MS OpenJDK 11, e.g. `latest-11-ms-openjdk`, `1.0.0-11-ms-openjdk`
-  #   - MS OpenJDK 17, e.g. `latest-17-ms-openjdk`, `1.0.0-17-ms-openjdk`
-  #   - OpenJDK 21, e.g. `latest-21-openjdk`, `1.0.0-21-openjdk`
+  # Default JDK comes with Amazon Corretto 21, here are also images with supported JDK 21 variants:
+  #   - Amazon Corretto 21, e.g. `latest`, `latest-21`, `1.0.0-21`, `latest-21-amazoncorretto`,
+  #     `1.0.0-21-amazoncorretto`
+  #   - MS OpenJDK 21, e.g. `latest-21-ms-openjdk`, `1.0.0-21-ms-openjdk`
   tag: latest # 1.0.0, 0.12.1, latest
   pullPolicy: Always # Use IfNotPresent when you pinged a version of image tag
 
@@ -150,7 +148,7 @@ controller:
   pluginsDir: /opt/pinot/plugins
 
   pdb:
-    enabled: false 
+    enabled: false
     minAvailable: ""
     maxUnavailable: 50%
 
@@ -445,7 +443,7 @@ server:
   pluginsDir: /opt/pinot/plugins
 
   pdb:
-    enabled: false 
+    enabled: false
     minAvailable: ""
     maxUnavailable: 1
 
@@ -631,6 +629,11 @@ minion:
     configs: |-
       pinot.set.instance.id.to.hostname=true
 
+  # In a PodDisruptionBudget, only one of minAvailable or maxUnavailable may be set.
+  # By default we use maxUnavailable; override this section if you prefer minAvailable.
+  pdb:
+    enabled: false
+    maxUnavailable: 1
 
 # ------------------------------------------------------------------------------
 # Pinot Minion Stateless:
@@ -699,7 +702,7 @@ minionStateless:
       # - containerPort: 1234
       #   protocol: PROTOCOL
       #   name: extra-port
-      
+
   resources:
     requests:
       memory: "1.25Gi"
@@ -736,6 +739,12 @@ minionStateless:
     configs: |-
       pinot.set.instance.id.to.hostname=true
 
+  # In a PodDisruptionBudget, only one of minAvailable or maxUnavailable may be set.
+  # By default we use maxUnavailable; override this section if you prefer minAvailable.
+  pdb:
+    enabled: false
+    maxUnavailable: 1
+
 # ------------------------------------------------------------------------------
 # Zookeeper:
 # NOTE: IN PRODUCTION USE CASES, IT's BEST TO USE ZOOKEEPER K8S OPERATOR
@@ -743,17 +752,20 @@ minionStateless:
 # ------------------------------------------------------------------------------
 
 zookeeper:
-  ## If true, install the Zookeeper chart alongside Pinot
-  ## ref: https://github.com/bitnami/charts/tree/master/bitnami/zookeeper
+  ## If true, install the ZooKeeper StatefulSet alongside Pinot
+  ## Uses the official Apache ZooKeeper Docker image
+  ## ref: https://hub.docker.com/_/zookeeper
   enabled: true
 
-  ## If the Zookeeper Chart is disabled a URL override is required to connect
+  ## If ZooKeeper is disabled a URL override is required to connect
   urlOverride: "my-zookeeper:2181/my-pinot"
 
-  ## Zookeeper port
+  ## ZooKeeper ports
   port: 2181
+  followerPort: 2888
+  electionPort: 3888
 
-  ## Configure Zookeeper resource requests and limits
+  ## Configure ZooKeeper resource requests and limits
   ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
   resources:
     requests:
@@ -773,31 +785,61 @@ zookeeper:
     snapRetainCount: 5
 
   ## Size (in MB) for the Java Heap options (Xmx and Xms)
-  ## This env var is ignored if Xmx an Xms are configured via `zookeeper.jvmFlags`
   heapSize: "1024"
 
-  ## Extra JVM Flags for Zookeeper
+  ## Extra JVM Flags for ZooKeeper
   jvmFlags: "-Djute.maxbuffer=4000000"
+
+  ## ZooKeeper configuration parameters
+  tickTime: 2000
+  initLimit: 10
+  syncLimit: 5
+  maxClientCnxns: 60
+
+  ## Whitelist of 4-letter-word commands
+  fourLetterWordsWhitelist: "srvr,mntr,ruok,conf"
+
+  ## ZooKeeper AdminServer configuration
+  adminServer:
+    enabled: false
+    port: 8080
+
+  ## Probes configuration
+  probes:
+    livenessEnabled: true
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+    readinessEnabled: true
+    readiness:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
 
   persistence:
     enabled: true
+    accessMode: "ReadWriteOnce"
     storageClass: ""
     #storageClass: "ssd"
 
-    ## The amount of PV storage allocated to each Zookeeper pod in the statefulset
+    ## The amount of PV storage allocated to each ZooKeeper pod
     size: "8Gi"
 
-  ## Specify a Zookeeper imagePullPolicy
-  ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
-  image:
-    registry: "docker.io"
-    repository: "bitnamilegacy/zookeeper"
-    tag: "3.9.3-debian-12-r22"
-    pullPolicy: "IfNotPresent"
+    ## Fine-grained data/datalog sizing (defaults to size above)
+    data:
+      size: "8Gi"
+    datalog:
+      size: "8Gi"
 
-  global:
-    security:
-      allowInsecureImages: true
+  ## ZooKeeper Docker image (official Apache ZooKeeper image)
+  ## ref: https://hub.docker.com/_/zookeeper
+  image:
+    repository: "zookeeper"
+    tag: "3.9.3"
+    pullPolicy: "IfNotPresent"
 
   ## Pod scheduling preferences (by default keep pods within a release on separate nodes).
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
@@ -809,3 +851,21 @@ zookeeper:
   #       labelSelector:
   #         matchLabels:
   #           release: zookeeper
+
+  ## Node selector for ZooKeeper pods
+  nodeSelector: {}
+
+  ## Tolerations for ZooKeeper pods
+  tolerations: []
+
+  ## Pod annotations
+  podAnnotations: {}
+
+  ## Pod security context
+  podSecurityContext: {}
+
+  ## Container security context
+  containerSecurityContext: {}
+
+  ## Extra environment variables
+  extraEnv: []

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +34,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.join.JoinedRowView;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -212,6 +212,8 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       // Row based overflow check.
       if (rows.size() + numRows > _maxRowsInJoin) {
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
+          // Record stat before we throw so it propagates to query response
+          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numRows + rows.size());
           throwForJoinRowLimitExceeded(
               "Cannot build in memory hash table for join operator, reached number of rows limit: " + _maxRowsInJoin);
         } else {
@@ -236,6 +238,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     } else {
       _isRightTableBuilt = true;
       finishBuildingRightTable();
+      _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numRows);
     }
 
     _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
@@ -330,7 +333,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   @Override
-  protected StatMap<?> copyStatMaps() {
+  public StatMap<StatKey> copyStatMaps() {
     return new StatMap<>(_statMap);
   }
 
@@ -343,6 +346,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   protected boolean isMaxRowsLimitReached(int numJoinedRows) {
     if (numJoinedRows == _maxRowsInJoin) {
       if (_joinOverflowMode == JoinOverFlowMode.THROW) {
+        _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numJoinedRows);
         throwForJoinRowLimitExceeded(
             "Cannot process join, reached number of rows limit: " + _maxRowsInJoin);
       } else {
@@ -350,6 +354,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
         logger().info("Terminating join operator early as the maximum number of rows limit was reached: {}",
             _maxRowsInJoin);
         earlyTerminateLeftInput();
+        _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numJoinedRows);
         _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
         return true;
       }
@@ -391,6 +396,16 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
      */
     TIME_BUILDING_HASH_TABLE_MS(StatMap.Type.LONG),
     /**
+     * The max number of rows seen in the join. Recorded during right table build (normal and overflow paths)
+     * and at the joined-output limit check in {@link #isMaxRowsLimitReached}.
+     */
+    MAX_ROWS_IN_JOIN(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    },
+    /**
      * Allocated memory in bytes for this operator or its children in the same stage.
      */
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
@@ -408,106 +423,6 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     @Override
     public StatMap.Type getType() {
       return _type;
-    }
-  }
-
-  /**
-   * This util class is a view over the left and right row joined together.
-   * Currently, this is used for filtering and input of projection. So if the joined
-   * tuple doesn't pass the predicate, the join result is not materialized into {@code Object[]}.
-   */
-  protected abstract static class JoinedRowView extends AbstractList<Object> implements List<Object> {
-    protected final int _leftSize;
-    protected final int _size;
-
-    protected JoinedRowView(int resultColumnSize, int leftSize) {
-      _leftSize = leftSize;
-      _size = resultColumnSize;
-    }
-
-    private static final class BothNotNullView extends JoinedRowView {
-      private final Object[] _leftRow;
-      private final Object[] _rightRow;
-
-      private BothNotNullView(Object[] leftRow, Object[] rightRow, int resultColumnSize, int leftSize) {
-        super(resultColumnSize, leftSize);
-        _leftRow = leftRow;
-        _rightRow = rightRow;
-      }
-
-      @Override
-      public Object get(int i) {
-        return i < _leftSize ? _leftRow[i] : _rightRow[i - _leftSize];
-      }
-
-      @Override
-      public Object[] toArray() {
-        Object[] resultRow = new Object[_size];
-        System.arraycopy(_leftRow, 0, resultRow, 0, _leftSize);
-        System.arraycopy(_rightRow, 0, resultRow, _leftSize, _rightRow.length);
-        return resultRow;
-      }
-    }
-
-    private static final class RightNotNullView extends JoinedRowView {
-      private final Object[] _rightRow;
-
-      public RightNotNullView(Object[] rightRow, int resultColumnSize, int leftSize) {
-        super(resultColumnSize, leftSize);
-        _rightRow = rightRow;
-      }
-
-      @Override
-      public Object get(int i) {
-        return i < _leftSize ? null : _rightRow[i - _leftSize];
-      }
-
-      @Override
-      public Object[] toArray() {
-        Object[] resultRow = new Object[_size];
-        System.arraycopy(_rightRow, 0, resultRow, _leftSize, _rightRow.length);
-        return resultRow;
-      }
-    }
-
-    private static final class LeftNotNullView extends JoinedRowView {
-      private final Object[] _leftRow;
-
-      public LeftNotNullView(Object[] leftRow, int resultColumnSize, int leftSize) {
-        super(resultColumnSize, leftSize);
-        _leftRow = leftRow;
-      }
-
-      @Override
-      public Object get(int i) {
-        return i < _leftSize ? _leftRow[i] : null;
-      }
-
-      @Override
-      public Object[] toArray() {
-        Object[] resultRow = new Object[_size];
-        System.arraycopy(_leftRow, 0, resultRow, 0, _leftSize);
-        return resultRow;
-      }
-    }
-
-    public static JoinedRowView of(@Nullable Object[] leftRow, @Nullable Object[] rightRow, int resultColumnSize,
-        int leftSize) {
-      if (leftRow == null && rightRow == null) {
-        throw new IllegalStateException("both left and right side of join are null");
-      }
-      if (leftRow == null) {
-        return new RightNotNullView(rightRow, resultColumnSize, leftSize);
-      }
-      if (rightRow == null) {
-        return new LeftNotNullView(leftRow, resultColumnSize, leftSize);
-      }
-      return new BothNotNullView(leftRow, rightRow, resultColumnSize, leftSize);
-    }
-
-    @Override
-    public int size() {
-      return _size;
     }
   }
 }

@@ -168,12 +168,22 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
 
   ResultExtractionStrategy<DictIdsWrapper, List<Long>> bitmapPartitionedResultExtractionStrategy() {
     final MergeStrategy<List<RoaringBitmap>> bitmapMergeStrategy = bitmapMergeStrategy();
-    return dictIdsWrapper -> bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps));
+    return dictIdsWrapper -> {
+      if (dictIdsWrapper == null) {
+        return Collections.nCopies(_numSteps, 0L);
+      }
+      return bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps));
+    };
   }
 
   ResultExtractionStrategy<UpdateSketch[], List<Long>> thetaSketchPartitionedResultExtractionStrategy() {
     final MergeStrategy<List<Sketch>> thetaSketchMergeStrategy = thetaSketchMergeStrategy();
-    return sketches -> thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches));
+    return sketches -> {
+      if (sketches == null) {
+        return Collections.nCopies(_numSteps, 0L);
+      }
+      return thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches));
+    };
   }
 
   enum Option {

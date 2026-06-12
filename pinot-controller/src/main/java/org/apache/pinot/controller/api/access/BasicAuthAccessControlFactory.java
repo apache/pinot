@@ -26,8 +26,10 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -53,7 +55,8 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
 
   @Override
   public void init(PinotConfiguration configuration) {
-    _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
+    _accessControl = new BasicAuthAccessControl(
+        BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }
 
   @Override
@@ -90,6 +93,11 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
       return true;
     }
 
+    @Override
+    public boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType) {
+      return getPrincipal(httpHeaders).isPresent();
+    }
+
     private Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
       if (headers == null) {
         return Optional.empty();
@@ -100,7 +108,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
         return Optional.empty();
       }
 
-      return authHeaders.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+      return authHeaders.stream().map(BasicAuthTokenUtils::normalizeBase64Token)
           .map(_token2principal::get)
           .filter(Objects::nonNull).findFirst();
     }

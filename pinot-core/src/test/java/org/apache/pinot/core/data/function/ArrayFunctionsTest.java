@@ -22,7 +22,7 @@ import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
+import org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -54,6 +54,7 @@ public class ArrayFunctionsTest {
     GenericRow row = new GenericRow();
     row.putValue("intArray", new int[]{3, 2, 10, 6, 1, 12});
     row.putValue("integerArray", new Integer[]{3, 2, 10, 6, 1, 12});
+    row.putValue("longArray", new long[]{3L, 2L, 10L, 6L, 1L, 12L});
     row.putValue("stringArray", new String[]{"3", "2", "10", "6", "1", "12"});
     row.putValue("stringArrayWithNulls", new String[]{"3", "2", "10", "6", "1", "12", "", null});
 
@@ -128,6 +129,9 @@ public class ArrayFunctionsTest {
         .add(new Object[]{"array_slice_int(intArray, 1, 2)", Collections.singletonList("intArray"), row, new int[]{2}});
     inputs.add(new Object[]{
         "array_slice_int(integerArray, 1, 2)", Collections.singletonList("integerArray"), row, new int[]{2}
+    });
+    inputs.add(new Object[]{
+        "array_slice_long(longArray, 1, 3)", Collections.singletonList("longArray"), row, new long[]{2L, 10L}
     });
     inputs.add(new Object[]{
         "array_slice_string(stringArray, 1, 2)", Collections.singletonList("stringArray"), row, new String[]{"2"}

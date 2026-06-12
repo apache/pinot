@@ -119,6 +119,11 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
   }
 
   @Override
+  public void putBigDecimalMV(BigDecimal[] values) {
+    putBytes(ArraySerDeUtils.serializeBigDecimalArray(values));
+  }
+
+  @Override
   public void putStringMV(String[] values) {
     putBytes(ArraySerDeUtils.serializeStringArray(values));
   }

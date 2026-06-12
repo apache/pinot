@@ -21,6 +21,7 @@ package org.apache.pinot.common.response.broker;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +39,8 @@ import org.apache.pinot.common.response.ProcessingException;
  */
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "maxRowsInJoinReached", "maxRowsInWindowReached", "timeUsedMs", "stageStats",
+    "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons", "maxRowsInJoinReached",
+    "maxRowsInJoin", "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats", "streamStatsCoverage",
     "maxRowsInOperator", "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
@@ -59,12 +61,21 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private ResultTable _resultTable;
   private int _numRowsResultSet;
   private boolean _maxRowsInJoinReached;
+  private long _maxRowsInJoin;
   private boolean _maxRowsInWindowReached;
+  private long _maxRowsInWindow;
   private long _timeUsedMs;
   /**
    * Statistics for each stage of the query execution.
    */
   private ObjectNode _stageStats;
+  /**
+   * Stream-mode stats coverage, populated only when the query used {@code SubmitWithStream}. An array indexed by stage
+   * id; each element is an object with {@code responded}, {@code mergeFailed}, and {@code missing} counters, or
+   * {@code null} for stages that have no coverage info (e.g. stage 0 which runs broker-local).
+   */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private ArrayNode _streamStatsCoverage;
   /**
    * The max number of rows seen at runtime.
    * <p>
@@ -109,7 +120,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public boolean isPartialResult() {
-    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached();
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
+        || isMaxRowsInJoinReached();
   }
 
   @Override
@@ -143,6 +155,14 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _brokerStats.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
   }
 
+  public long getNumGroups() {
+    return _brokerStats.getLong(StatKey.NUM_GROUPS);
+  }
+
+  public void mergeNumGroups(long numGroups) {
+    _brokerStats.merge(StatKey.NUM_GROUPS, numGroups);
+  }
+
   @Override
   public boolean isNumGroupsWarningLimitReached() {
     return _brokerStats.getBoolean(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED);
@@ -150,6 +170,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
     _brokerStats.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, numGroupsWarningLimitReached);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  public List<String> getEarlyTerminationReasons() {
+    return List.copyOf(_brokerStats.getStringSet(StatKey.EARLY_TERMINATION_REASONS));
   }
 
   @Override
@@ -161,6 +186,14 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _maxRowsInJoinReached |= maxRowsInJoinReached;
   }
 
+  public long getMaxRowsInJoin() {
+    return _maxRowsInJoin;
+  }
+
+  public void mergeMaxRowsInJoin(long maxRowsInJoin) {
+    _maxRowsInJoin = Math.max(_maxRowsInJoin, maxRowsInJoin);
+  }
+
   @Override
   public boolean isMaxRowsInWindowReached() {
     return _maxRowsInWindowReached;
@@ -168,6 +201,14 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeMaxRowsInWindowReached(boolean maxRowsInWindowReached) {
     _maxRowsInWindowReached |= maxRowsInWindowReached;
+  }
+
+  public long getMaxRowsInWindow() {
+    return _maxRowsInWindow;
+  }
+
+  public void mergeMaxRowsInWindow(long maxRowsInWindow) {
+    _maxRowsInWindow = Math.max(_maxRowsInWindow, maxRowsInWindow);
   }
 
   /**
@@ -179,6 +220,19 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void setStageStats(ObjectNode stageStats) {
     _stageStats = stageStats;
+  }
+
+  /**
+   * Returns the stream-mode stats coverage, or {@code null} when the query ran in legacy mode. Array indexed by stage
+   * id; elements may be {@code null} for stages with no coverage (e.g. stage 0).
+   */
+  @Nullable
+  public ArrayNode getStreamStatsCoverage() {
+    return _streamStatsCoverage;
+  }
+
+  public void setStreamStatsCoverage(ArrayNode streamStatsCoverage) {
+    _streamStatsCoverage = streamStatsCoverage;
   }
 
   /**
@@ -306,7 +360,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   @Override
   public long getNumSegmentsPrunedByBroker() {
-    return 0;
+    return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PRUNED_BY_BROKER);
   }
 
   @Override
@@ -447,13 +501,21 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
         return StatMap.Key.minPositive(value1, value2);
       }
     },
+    NUM_SEGMENTS_PRUNED_BY_BROKER(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_SERVER(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
-    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_GROUPS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    },
+    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET);
 
     private final StatMap.Type _type;
 

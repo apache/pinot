@@ -298,7 +298,7 @@ public class DictionaryIndexTypeTest {
           fieldConfig.getIndexes().get(StandardIndexes.dictionary().getPrettyName()),
           DictionaryIndexConfig.class);
       assertNotNull(config);
-      assertTrue(config.getUseVarLengthDictionary());
+      assertTrue(config.isUseVarLengthDictionary());
       postConversionAsserts();
     }
 
@@ -311,6 +311,149 @@ public class DictionaryIndexTypeTest {
       convertToUpdatedFormat();
       FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
       Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithRawEncodingAndNoDictionaryColumns()
+        throws IOException {
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimInt\","
+          + "\"encodingType\": \"RAW\","
+          + "\"indexes\": {"
+          + "  \"forward\": {"
+          + "    \"compressionCodec\": \"ZSTANDARD\""
+          + "  }"
+          + "}"
+          + "}");
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+
+      convertToUpdatedFormat();
+
+      final FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
+      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertNotNull(fieldConfig.getIndexes());
+      assertTrue(fieldConfig.getIndexes().isObject());
+      assertNotNull(fieldConfig.getIndexes().get("forward"));
+
+      final long dimIntCount = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimInt"))
+          .count();
+      Assert.assertEquals(dimIntCount, 1L);
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithRawEncodingAndNoDictionaryColumnsMultipleCols()
+        throws IOException {
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimInt\","
+          + "\"encodingType\": \"RAW\","
+          + "\"indexes\": {"
+          + "  \"forward\": {\"compressionCodec\": \"ZSTANDARD\"}"
+          + "}"
+          + "}");
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimStr\","
+          + "\"encodingType\": \"RAW\","
+          + "\"indexes\": {"
+          + "  \"forward\": {\"compressionCodec\": \"LZ4\"}"
+          + "}"
+          + "}");
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\", \"dimStr\"]", _stringListTypeRef));
+
+      convertToUpdatedFormat();
+
+      final FieldConfig dimInt = getFieldConfigByColumn("dimInt");
+      final FieldConfig dimStr = getFieldConfigByColumn("dimStr");
+      Assert.assertEquals(dimInt.getEncodingType(), FieldConfig.EncodingType.RAW);
+      Assert.assertEquals(dimStr.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertNotNull(dimInt.getIndexes().get("forward"));
+      assertNotNull(dimStr.getIndexes().get("forward"));
+
+      for (final String col : new String[]{"dimInt", "dimStr"}) {
+        final long count = _tableConfig.getFieldConfigList().stream()
+            .filter(fc -> fc.getName().equals(col))
+            .count();
+        Assert.assertEquals(count, 1L, "Duplicate FieldConfig for " + col);
+      }
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithRawEncodingNoDictionaryColumnsPartialOverlap()
+        throws IOException {
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimInt\","
+          + "\"encodingType\": \"RAW\","
+          + "\"indexes\": {"
+          + "  \"forward\": {\"compressionCodec\": \"ZSTANDARD\"}"
+          + "}"
+          + "}");
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\", \"dimStr\"]", _stringListTypeRef));
+
+      convertToUpdatedFormat();
+
+      final FieldConfig dimInt = getFieldConfigByColumn("dimInt");
+      Assert.assertEquals(dimInt.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertNotNull(dimInt.getIndexes().get("forward"));
+
+      final FieldConfig dimStr = getFieldConfigByColumn("dimStr");
+      Assert.assertEquals(dimStr.getEncodingType(), FieldConfig.EncodingType.RAW);
+
+      for (final String col : new String[]{"dimInt", "dimStr"}) {
+        final long count = _tableConfig.getFieldConfigList().stream()
+            .filter(fc -> fc.getName().equals(col))
+            .count();
+        Assert.assertEquals(count, 1L, "Duplicate FieldConfig for " + col);
+      }
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithRawEncodingNoDictionaryColumnsAndNoIndexes()
+        throws IOException {
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimInt\","
+          + "\"encodingType\": \"RAW\""
+          + "}");
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+
+      convertToUpdatedFormat();
+
+      final FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
+      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+
+      final long count = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimInt"))
+          .count();
+      Assert.assertEquals(count, 1L);
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithNonRawEncodingAndNoDictionaryColumns()
+        throws IOException {
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimInt\","
+          + "\"encodingType\": \"DICTIONARY\""
+          + "}");
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+
+      convertToUpdatedFormat();
+
+      final FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
+      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+
+      final long count = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimInt"))
+          .count();
+      Assert.assertEquals(count, 1L);
       postConversionAsserts();
     }
 
@@ -391,5 +534,34 @@ public class DictionaryIndexTypeTest {
     IndexConfig indexConfig = new IndexConfig(false);
     fieldIndexConfigs = new FieldIndexConfigs.Builder().add(StandardIndexes.inverted(), indexConfig).build();
     assertTrue(DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, null, metric, fieldIndexConfigs, 5, 20));
+  }
+
+  @Test
+  public void testIsDictionaryRequiredDetectsInvertedIndex() {
+    FieldSpec fieldSpec = new DimensionFieldSpec("rawCol", FieldSpec.DataType.STRING, true);
+    FieldIndexConfigs withInverted = new FieldIndexConfigs.Builder()
+        .add(StandardIndexes.inverted(), IndexConfig.ENABLED)
+        .build();
+    assertTrue(DictionaryIndexConfig.requiresDictionary(fieldSpec, withInverted),
+        "Inverted index should require dictionary");
+
+    FieldIndexConfigs withoutInverted = new FieldIndexConfigs.Builder().build();
+    assertFalse(DictionaryIndexConfig.requiresDictionary(fieldSpec, withoutInverted),
+        "No dictionary-requiring index configured");
+  }
+
+  @Test
+  public void testGetIndexTypesWithDictionaryRequiredReturnsFstAndInverted() {
+    FieldSpec fieldSpec = new DimensionFieldSpec("rawCol", FieldSpec.DataType.STRING, true);
+    FieldIndexConfigs withBoth = new FieldIndexConfigs.Builder()
+        .add(StandardIndexes.inverted(), IndexConfig.ENABLED)
+        .add(StandardIndexes.fst(), new org.apache.pinot.segment.spi.index.FstIndexConfig())
+        .build();
+    java.util.List<IndexType<?, ?, ?>> required =
+        DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(fieldSpec, withBoth);
+    assertTrue(required.stream().anyMatch(t -> t.getId().equals(StandardIndexes.INVERTED_ID)),
+        "Inverted index should be in the required list");
+    assertTrue(required.stream().anyMatch(t -> t.getId().equals(StandardIndexes.FST_ID)),
+        "FST index should be in the required list");
   }
 }

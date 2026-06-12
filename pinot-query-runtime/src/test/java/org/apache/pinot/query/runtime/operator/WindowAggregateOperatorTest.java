@@ -50,6 +50,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -137,6 +138,10 @@ public class WindowAggregateOperatorTest {
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 1, 1.0});
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+    StatMap<WindowAggregateOperator.StatKey> windowStats =
+        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
+    assertEquals(windowStats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 1,
+        "Max rows in window should equal number of input rows");
   }
 
   @Test
@@ -305,7 +310,7 @@ public class WindowAggregateOperatorTest {
     // Then:
     verifyResultRows(resultRows, keys,
         Map.of(1, List.of(new Object[]{1, "foo", 1L, 1L}, new Object[]{1, "foo", 1L, 1L}, new Object[]{
-                1, "numb", 3L, 2L
+          1, "numb", 3L, 2L
             }), 2, List.of(new Object[]{2, "bar", 1L, 1L}, new Object[]{2, "foo", 2L, 2L}, new Object[]{
                 2, "foo", 2L, 2L
             }, new Object[]{2, "the", 4L, 3L}), 3,
@@ -498,6 +503,10 @@ public class WindowAggregateOperatorTest {
     assertTrue(block.isError(), "expected ERROR block from window overflow");
     assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED)
         .contains("reach number of rows limit"));
+    StatMap<WindowAggregateOperator.StatKey> windowStats =
+        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
+    assertEquals(windowStats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 2,
+        "Max rows in window should be recorded even on THROW");
   }
 
   @Test
@@ -533,6 +542,8 @@ public class WindowAggregateOperatorTest {
         OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
     assertTrue(windowStats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED),
         "Max rows in window should be reached");
+    assertEquals(windowStats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 1,
+        "Max rows in window value should match the number of cached rows");
   }
 
   @Test
@@ -633,6 +644,63 @@ public class WindowAggregateOperatorTest {
         3, List.of(
             new Object[]{3, "and", 100, 200},
             new Object[]{3, "true", 100, 3})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLeadLagWindowFunctionWithOffsetGreaterThanNumberOfRows() {
+    // Given: Test with offset much larger than partition size to verify overflow handling
+    // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, "alpha")
+        .addRow(1, "beta")
+        .addRow(1, "gamma")
+        .addRow(2, "bar")
+        .addRow(2, "foo")
+        .addRow(3, "single")
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(
+            new String[]{"group", "arg", "lead_no_default", "lag_no_default", "lead_with_default", "lag_with_default"},
+            new ColumnDataType[]{INT, STRING, INT, INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        // LEAD with offset 1000, no default value - should return null
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1000))),
+        // LAG with offset 1000, no default value - should return null
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1000))),
+        // LEAD with offset Integer.MAX_VALUE and default value 9999
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, Integer.MAX_VALUE),
+                new RexExpression.Literal(ColumnDataType.INT, 9999))),
+        // LAG with offset Integer.MAX_VALUE and default value 8888
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, Integer.MAX_VALUE),
+                new RexExpression.Literal(ColumnDataType.INT, 8888))));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then: All rows should return null or default value since offset exceeds partition size
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, "alpha", null, null, 9999, 8888},
+            new Object[]{1, "beta", null, null, 9999, 8888},
+            new Object[]{1, "gamma", null, null, 9999, 8888}),
+        2, List.of(
+            new Object[]{2, "bar", null, null, 9999, 8888},
+            new Object[]{2, "foo", null, null, 9999, 8888}),
+        3, List.<Object[]>of(
+            new Object[]{3, "single", null, null, 9999, 8888})
     ));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
@@ -2928,6 +2996,63 @@ public class WindowAggregateOperatorTest {
         () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
             Integer.MAX_VALUE, 5, input));
     assertEquals(e.getMessage(), "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+  }
+
+  @Test
+  public void testShouldRecordMaxRowsInWindowWhenInputFitsExactlyAtLimit() {
+    // Given: 1 input row, limit = 1 — fits exactly, no overflow
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(new Object[]{2, 1})
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
+    List<Integer> keys = List.of(0);
+    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.WINDOW_HINT_OPTIONS,
+        Map.of(PinotHintOptions.WindowHintOptions.WINDOW_OVERFLOW_MODE, "BREAK",
+            PinotHintOptions.WindowHintOptions.MAX_ROWS_IN_WINDOW, "1")));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, Integer.MAX_VALUE, nodeHint, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    assertEquals(resultRows.size(), 1);
+    assertTrue(operator.nextBlock().isSuccess());
+    StatMap<WindowAggregateOperator.StatKey> windowStats =
+        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
+    assertFalse(windowStats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED),
+        "Max rows in window should not be reached when input fits exactly at limit");
+    assertEquals(windowStats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 1,
+        "Max rows in window should equal number of input rows");
+  }
+
+  @Test
+  public void testShouldRecordZeroMaxRowsInWindowWhenInputIsEmpty() {
+    // Given: 0 input rows (just EOS)
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
+    List<Integer> keys = List.of(0);
+    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
+
+    // When:
+    MseBlock block = operator.nextBlock();
+
+    // Then:
+    assertTrue(block.isEos());
+    StatMap<WindowAggregateOperator.StatKey> windowStats =
+        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
+    assertEquals(windowStats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 0,
+        "Max rows in window should be 0 when input is empty");
   }
 
   private WindowAggregateOperator getOperator(DataSchema inputSchema, DataSchema resultSchema, List<Integer> keys,

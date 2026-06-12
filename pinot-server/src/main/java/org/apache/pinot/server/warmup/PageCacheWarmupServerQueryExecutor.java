@@ -127,8 +127,8 @@ public class PageCacheWarmupServerQueryExecutor {
           continue;
         }
         double warmupQps = warmupConfig.getQpsLimitOnRestart() != null
-          ? warmupConfig.getQpsLimitOnRestart()
-          : Math.max(getQpsPerReplica(tableConfig), 1);
+            ? warmupConfig.getQpsLimitOnRestart()
+            : Math.max(getQpsPerReplica(tableConfig), 1);
         warmupTable(tableNameWithType, warmupConfig, null, null, warmupQps);
       } catch (Exception e) {
         String errorMessage = String.format("PageCache warmup failed on restart for table: %s", tableNameWithType);

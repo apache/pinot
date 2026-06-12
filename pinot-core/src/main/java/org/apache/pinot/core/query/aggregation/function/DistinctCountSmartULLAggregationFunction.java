@@ -97,7 +97,7 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       if (blockValSet.isSingleValue()) {
@@ -351,6 +351,9 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
 
   @Override
   public Integer extractFinalResult(Object intermediateResult) {
+    if (intermediateResult == null) {
+      return 0;
+    }
     if (intermediateResult instanceof UltraLogLog) {
       return (int) Math.round(((UltraLogLog) intermediateResult).getDistinctCountEstimate());
     } else {

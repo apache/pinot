@@ -74,7 +74,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, store dictionary ids into a RoaringBitmap
-    if (blockValSet.getDictionary() != null) {
+    if (blockValSet.isDictionaryEncoded()) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       RoaringBitmap bitmap = aggregationResultHolder.getResult();
       if (bitmap == null) {
@@ -165,7 +165,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, store dictionary ids into a RoaringBitmap
-    if (blockValSet.getDictionary() != null) {
+    if (blockValSet.isDictionaryEncoded()) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         setIntValueForGroup(groupByResultHolder, groupKeyArray[i], dictIds[i]);
@@ -224,7 +224,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, store dictionary ids into a RoaringBitmap
-    if (blockValSet.getDictionary() != null) {
+    if (blockValSet.isDictionaryEncoded()) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         int dictId = dictIds[i];
@@ -324,8 +324,8 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
   }
 
   @Override
-  public Long extractFinalResult(Long intermediateResult) {
-    return intermediateResult;
+  public Long extractFinalResult(@Nullable Long intermediateResult) {
+    return intermediateResult == null ? 0L : intermediateResult;
   }
 
   @Override

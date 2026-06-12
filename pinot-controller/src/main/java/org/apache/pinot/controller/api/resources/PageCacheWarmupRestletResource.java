@@ -116,8 +116,8 @@ public class PageCacheWarmupRestletResource {
       @ApiParam(value = "Custom query file name (optional)") @QueryParam("queryFileName") String queryFileNameParam) {
     try {
       String queryFileName = (queryFileNameParam == null || queryFileNameParam.isEmpty())
-        ? DEFAULT_QUERY_FILE_NAME
-        : queryFileNameParam;
+          ? DEFAULT_QUERY_FILE_NAME
+          : queryFileNameParam;
       validateInput(tableName, tableType, queryFileNameParam);
       LOGGER.info("Fetching warmup queries for tableName: {}, tableType: {}", tableName, tableType);
       File tableDir = new File(_pageCacheWarmupDataDir, tableName + "_" + tableType);
@@ -193,8 +193,8 @@ public class PageCacheWarmupRestletResource {
 
     try {
       String queryFileName = (queryFileNameParam == null || queryFileNameParam.isEmpty())
-        ? DEFAULT_QUERY_FILE_NAME
-        : queryFileNameParam;
+          ? DEFAULT_QUERY_FILE_NAME
+          : queryFileNameParam;
       validateInput(tableName, tableType, queryFileName);
       List<String> queries = JsonUtils.stringToObject(requestString, new TypeReference<>() { });
       if (queries == null || queries.isEmpty()) {
@@ -272,8 +272,8 @@ public class PageCacheWarmupRestletResource {
       @ApiParam(value = "Custom query file name (optional)") @QueryParam("queryFileName") String queryFileNameParam) {
     try {
       String queryFileName = (queryFileNameParam == null || queryFileNameParam.isEmpty())
-        ? DEFAULT_QUERY_FILE_NAME
-        : queryFileNameParam;
+          ? DEFAULT_QUERY_FILE_NAME
+          : queryFileNameParam;
       validateInput(tableName, tableType, queryFileName);
 
       LOGGER.info("Deleting warmup queries for tableName: {}, tableType: {}", tableName, tableType);

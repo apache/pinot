@@ -24,7 +24,6 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -107,8 +106,18 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-    // catch direct memory oom here
-    if (cause instanceof OutOfMemoryError && StringUtils.containsIgnoreCase(cause.getMessage(), "direct buffer")) {
+    /*
+     * Catch all OutOfMemoryError, not just direct memory OOM.
+     * Why instanceof OutOfMemoryError (not OutOfDirectMemoryError or string check):
+     * 1. Only direct memory OOM reaches this handler — frame decoder is upstream and uses
+     *    PooledByteBufAllocator(preferDirect=true). Heap OOM from DataTableHandler (downstream)
+     *    never propagates backwards in Netty's exception chain.
+     * 2. instanceof OutOfDirectMemoryError would miss JVM-thrown "Direct buffer memory" errors
+     *    (plain OutOfMemoryError, not Netty's subclass).
+     * 3. String matching on the message is fragile — Netty says "direct memory", JVM says
+     *    "Direct buffer memory". A mismatch here caused prod issues (hours of stuck channels).
+     */
+    if (cause instanceof OutOfMemoryError) {
       // only one thread can get here and do the shutdown
       if (DIRECT_OOM_SHUTTING_DOWN.compareAndSet(false, true)) {
         try {

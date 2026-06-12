@@ -87,12 +87,12 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
 
   @Override
   public int getDriverMajorVersion() {
-    return Integer.parseInt(DRIVER_VERSION.split(".")[0]);
+    return Integer.parseInt(DRIVER_VERSION.split("\\.")[0]);
   }
 
   @Override
   public int getDriverMinorVersion() {
-    return Integer.parseInt(DRIVER_VERSION.split(".")[1]);
+    return Integer.parseInt(DRIVER_VERSION.split("\\.")[1]);
   }
 
   @Override

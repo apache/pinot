@@ -31,6 +31,8 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskCount;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskStatusSummary;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TasksByStatus;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
@@ -71,7 +73,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
       PinotHelixTaskResourceManager helixTaskResourceManager, LeadControllerManager leadControllerManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     super(TASK_NAME, controllerConf.getTaskMetricsEmitterFrequencyInSeconds(),
-        controllerConf.getPeriodicTaskInitialDelayInSeconds());
+        controllerConf.getPeriodicTaskInitialDelayInSeconds(), controllerConf.getTaskMetricsEmitterCronExpression());
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _helixTaskResourceManager = helixTaskResourceManager;
     _controllerMetrics = controllerMetrics;
@@ -105,6 +107,8 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
     for (String taskType : taskTypes) {
       TaskCount taskTypeAccumulatedCount = new TaskCount();
       Map<String, TaskCount> tableAccumulatedCount = new HashMap<>();
+      Map<String, Long> tableMaxWaitTimeMs = new HashMap<>();
+      Map<String, Long> tableMaxRunningTimeMs = new HashMap<>();
       try {
         // Capture the current execution timestamp for this task type collection cycle
         long currentExecutionTimestamp = System.currentTimeMillis();
@@ -113,45 +117,41 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
         long previousExecutionTimestamp = _previousExecutionTimestamps.computeIfAbsent(taskType,
             k -> currentExecutionTimestamp - _taskMetricsEmitterFrequencyMs);
 
-        // Get currently in-progress tasks (for metrics)
-        Set<String> currentInProgressTasks = _helixTaskResourceManager.getTasksInProgress(taskType);
-
         // Get tasks that were in-progress during the previous collection cycle
         Set<String> previouslyInProgressTasks =
             _previousInProgressTasks.getOrDefault(taskType, Collections.emptySet());
 
-        // Get all tasks including those that started after the previous execution timestamp
-        // This combines in-progress tasks and short-lived tasks that started and completed between cycles
-        // in a single Helix call, avoiding duplicate getWorkflowConfig/getWorkflowContext calls
-        Set<String> tasksIncludingShortLived = _helixTaskResourceManager.getTasksInProgressAndRecent(
-            taskType, previousExecutionTimestamp);
+        // Get in-progress tasks and all tasks to report (including short-lived) in a single Helix call
+        TasksByStatus taskResult = _helixTaskResourceManager.getTasksByStatus(taskType, previousExecutionTimestamp);
+        Set<String> currentInProgressTasks = taskResult.getInProgressTasks();
+        Set<String> recentTasks = taskResult.getRecentTasks();
 
         // Start with all tasks that need reporting (in-progress + short-lived)
-        Set<String> tasksToReport = new HashSet<>(tasksIncludingShortLived);
-
-        // Include tasks that were in-progress previously but are no longer in-progress
-        // These tasks completed between collection cycles and need their final metrics reported
-        for (String taskName : previouslyInProgressTasks) {
-          if (!tasksIncludingShortLived.contains(taskName)) {
-            LOGGER.debug("Including task {} that completed between collection cycles for taskType: {}",
-                taskName, taskType);
-            tasksToReport.add(taskName);
-          }
-        }
+        Set<String> tasksToReport = new HashSet<>(previouslyInProgressTasks);
+        tasksToReport.addAll(currentInProgressTasks);
+        tasksToReport.addAll(recentTasks);
 
         final int numRunningTasks = currentInProgressTasks.size();
 
         // Process all tasks that need metrics reported
         for (String task : tasksToReport) {
           try {
-            Map<String, TaskCount> tableTaskCount = _helixTaskResourceManager.getTableTaskCount(task);
-            tableTaskCount.forEach((tableNameWithType, taskCount) -> {
+            Map<String, TaskStatusSummary> tableTaskStatusSummary =
+                _helixTaskResourceManager.getTableTaskStatusSummary(task);
+            tableTaskStatusSummary.forEach((tableNameWithType, taskStatusSummary) -> {
+              TaskCount taskCount = taskStatusSummary.getTaskCount();
               taskTypeAccumulatedCount.accumulate(taskCount);
               tableAccumulatedCount.compute(tableNameWithType, (name, count) -> {
                 if (count == null) {
                   count = new TaskCount();
                 }
                 count.accumulate(taskCount);
+                taskStatusSummary.getSubtaskWaitingTimes().values().forEach(subtaskWaitingTime -> {
+                  tableMaxWaitTimeMs.merge(tableNameWithType, subtaskWaitingTime, Math::max);
+                });
+                taskStatusSummary.getSubtaskRunningTimes().values().forEach(subtaskRunningTime -> {
+                  tableMaxRunningTimeMs.merge(tableNameWithType, subtaskRunningTime, Math::max);
+                });
                 return count;
               });
             });
@@ -207,6 +207,16 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
           tablePercent = tableTotal != 0 ? taskCount.getError() * 100 / tableTotal : 0;
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
               ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR, tablePercent);
+        });
+
+        // Emit 0 for tables with no waiting/running subtasks so the gauge (and alert) self-resolves
+        tableAccumulatedCount.keySet().forEach(tableNameWithType -> {
+          _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
+              ControllerGauge.MAX_SUBTASK_WAIT_TIME_MS,
+              tableMaxWaitTimeMs.getOrDefault(tableNameWithType, 0L));
+          _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
+              ControllerGauge.MAX_SUBTASK_RUNNING_TIME_MS,
+              tableMaxRunningTimeMs.getOrDefault(tableNameWithType, 0L));
         });
 
         if (_preReportedTables.containsKey(taskType)) {
@@ -284,6 +294,8 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE);
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType,
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
+      _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.MAX_SUBTASK_WAIT_TIME_MS);
+      _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.MAX_SUBTASK_RUNNING_TIME_MS);
     });
   }
 }

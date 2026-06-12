@@ -27,9 +27,19 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 /**
- * Config for vector index. Since this is generic configs for vector index, the only common fields are version,
- * vectorIndexType, vectorDimension, distance function. All the other configs are specific to the index type should
- * be put in properties.
+ * Config for vector index.
+ *
+ * <p>This is the backend-neutral configuration for all vector index types. Common fields include
+ * {@code vectorIndexType}, {@code vectorDimension}, {@code vectorDistanceFunction}, and {@code version}.
+ * All backend-specific configuration (e.g., HNSW maxCon/beamWidth, IVF_FLAT nlist/trainSampleSize)
+ * is stored in the {@code properties} map.</p>
+ *
+ * <p>The {@code vectorIndexType} field determines which backend is used. If absent or null, it defaults
+ * to {@code HNSW} for backward compatibility. Use {@link #resolveBackendType()} to safely resolve the
+ * backend type with this default applied.</p>
+ *
+ * @see VectorBackendType
+ * @see VectorIndexConfigValidator
  */
 public class VectorIndexConfig extends IndexConfig {
   public static final VectorIndexConfig DISABLED = new VectorIndexConfig(true);
@@ -58,8 +68,6 @@ public class VectorIndexConfig extends IndexConfig {
   public VectorIndexConfig(@Nullable Map<String, String> properties) {
     super(false);
     Preconditions.checkArgument(properties != null, "Properties must not be null");
-    Preconditions.checkArgument(properties.containsKey(VECTOR_INDEX_TYPE),
-        "Properties must contain vector index type");
     _vectorIndexType = properties.get(VECTOR_INDEX_TYPE);
     Preconditions.checkArgument(properties.containsKey(VECTOR_DIMENSION),
         "Properties must contain vector dimension");
@@ -131,13 +139,30 @@ public class VectorIndexConfig extends IndexConfig {
     return this;
   }
 
+  /**
+   * Resolves the {@link VectorBackendType} for this config. If {@code vectorIndexType} is null or empty,
+   * defaults to {@link VectorBackendType#HNSW} for backward compatibility.
+   *
+   * @return the resolved backend type
+   * @throws IllegalArgumentException if vectorIndexType is set to an unrecognized value
+   */
+  public VectorBackendType resolveBackendType() {
+    return VectorIndexConfigValidator.resolveBackendType(this);
+  }
+
   public String toString() {
     return "VectorIndexConfig{" + "_vectorIndexType='" + _vectorIndexType + "', _vectorDimension="
         + _vectorDimension + ", _version=" + _version + ", _vectorDistanceFunction="
         + _vectorDistanceFunction + ", _properties=" + _properties + '}';
   }
 
+  /**
+   * Distance functions supported by vector indexes.
+   *
+   * <p>Note: {@code L2} is an alias for {@code EUCLIDEAN}. Both refer to Euclidean (L2) distance.
+   * Existing configs using {@code EUCLIDEAN} continue to work unchanged.</p>
+   */
   public enum VectorDistanceFunction {
-    COSINE, INNER_PRODUCT, EUCLIDEAN, DOT_PRODUCT;
+    COSINE, INNER_PRODUCT, EUCLIDEAN, DOT_PRODUCT, L2;
   }
 }

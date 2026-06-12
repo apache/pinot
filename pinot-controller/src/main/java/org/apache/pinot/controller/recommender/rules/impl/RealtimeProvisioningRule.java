@@ -19,8 +19,9 @@
 
 package org.apache.pinot.controller.recommender.rules.impl;
 
-import com.google.common.io.Files;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -84,7 +85,12 @@ public class RealtimeProvisioningRule extends AbstractRule {
     int[] numHosts = _params.getNumHosts();
     int[] numHours = _params.getNumHours();
 
-    File workingDir = Files.createTempDir();
+    File workingDir;
+    try {
+      workingDir = Files.createTempDirectory("pinot-recommender-").toFile();
+    } catch (IOException e) {
+      throw new InvalidInputException("Failed to create temp directory for recommender", e);
+    }
     MemoryEstimator memoryEstimator =
         new MemoryEstimator(tableConfig, _input.getSchema(), _input.getSchemaWithMetadata(),
             _params.getNumRowsInGeneratedSegment(), ingestionRatePerPartition, maxUsableHostMemoryByte, retentionHours,

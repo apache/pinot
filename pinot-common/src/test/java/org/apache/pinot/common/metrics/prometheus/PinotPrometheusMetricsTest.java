@@ -21,10 +21,9 @@ package org.apache.pinot.common.metrics.prometheus;
 import com.google.common.base.Objects;
 import com.google.common.io.Resources;
 import io.prometheus.jmx.JmxCollector;
-import io.prometheus.jmx.common.http.HTTPServerFactory;
-import io.prometheus.jmx.shaded.io.prometheus.client.CollectorRegistry;
-import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
-import io.prometheus.jmx.shaded.io.prometheus.client.hotspot.DefaultExports;
+import io.prometheus.jmx.JmxCollector.Mode;
+import io.prometheus.metrics.exporter.httpserver.HTTPServer;
+import io.prometheus.metrics.model.registry.PrometheusRegistry;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -41,6 +40,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
@@ -112,8 +112,10 @@ public abstract class PinotPrometheusMetricsTest {
    * JVM. In this case however, we've got tests using four different config files (server.yml, broker.yml,
    * controller.yml and minion.yml). Loading the same agent in the same JVM multiple times isn't allowed, we are copying
    * the agent's code to some degree and starting up the HTTP servers manually. For impl, see:
-   * <a href="https://github.com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216">...</a>
-   * /jmx_prometheus_javaagent/src/main/java/io/prometheus/jmx/JavaAgent.java#L48
+   * <a href="https://github.com/prometheus/jmx_exporter/blob/main/jmx_prometheus_javaagent/src/main/java/io/
+   * prometheus/jmx/JavaAgent.java">...</a>
+   *
+   * Updated for JMX Exporter 1.5.0 which uses new prometheus-metrics library instead of the legacy client.
    *
    * @return the corresponding HTTP server on a random unoccupied port
    */
@@ -121,11 +123,14 @@ public abstract class PinotPrometheusMetricsTest {
     String args = String.format("%s:%s", 0, getConfigFile());
     try {
       JMXExporterConfig config = parseExporterConfig(args, "0.0.0.0");
-      CollectorRegistry registry = new CollectorRegistry();
-      JmxCollector jmxCollector = new JmxCollector(new File(config._file), JmxCollector.Mode.AGENT);
+      PrometheusRegistry registry = new PrometheusRegistry();
+      JmxCollector jmxCollector = new JmxCollector(new File(config._file), Mode.AGENT);
       jmxCollector.register(registry);
-      DefaultExports.register(registry);
-      return (new HTTPServerFactory()).createHTTPServer(config._socket, registry, true, new File(config._file));
+      return HTTPServer.builder()
+          .port(config._port)
+          .hostname(config._host)
+          .registry(registry)
+          .buildAndStart();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -251,9 +256,9 @@ public abstract class PinotPrometheusMetricsTest {
   protected abstract String getConfigFile();
 
   /*
-  Implementation copied from: https://github
-  .com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216/jmx_prometheus_javaagent/src/main/java
-  /io/prometheus/jmx/JavaAgent.java#L88
+  Implementation copied from:
+  https://github.com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216
+  /jmx_prometheus_javaagent/src/main/java/io/prometheus/jmx/JavaAgent.java#L88
    */
   private static JMXExporterConfig parseExporterConfig(String args, String ifc) {
     Pattern pattern = Pattern.compile("^(?:((?:[\\w.-]+)|(?:\\[.+])):)?(\\d{1,5}):(.+)");
@@ -460,8 +465,8 @@ public abstract class PinotPrometheusMetricsTest {
     }
 
     private boolean metricNamesAreSimilar(PromMetric that) {
-      String processedMetricNameThis = StringUtils.remove(_metricName, "_");
-      String processedMetricNameThat = StringUtils.remove(that._metricName, "_");
+      String processedMetricNameThis = Strings.CS.remove(_metricName, "_");
+      String processedMetricNameThat = Strings.CS.remove(that._metricName, "_");
       return StringUtils.equalsIgnoreCase(processedMetricNameThis, processedMetricNameThat);
     }
 
