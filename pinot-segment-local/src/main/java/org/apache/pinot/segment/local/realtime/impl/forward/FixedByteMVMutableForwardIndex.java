@@ -262,6 +262,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
     FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
+    length = Math.min(length, dictIdBuffer.length);
     for (int i = 0; i < length; i++) {
       dictIdBuffer[i] = dataReader.getInt(startIndex + i, 0);
     }
@@ -301,6 +302,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
     FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
+    length = Math.min(length, valueBuffer.length);
     for (int i = 0; i < length; i++) {
       valueBuffer[i] = dataReader.getLong(startIndex + i, 0);
     }
@@ -330,6 +332,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
     FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
+    length = Math.min(length, valueBuffer.length);
     for (int i = 0; i < length; i++) {
       valueBuffer[i] = dataReader.getFloat(startIndex + i, 0);
     }
@@ -359,6 +362,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
     FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
+    length = Math.min(length, valueBuffer.length);
     for (int i = 0; i < length; i++) {
       valueBuffer[i] = dataReader.getDouble(startIndex + i, 0);
     }
