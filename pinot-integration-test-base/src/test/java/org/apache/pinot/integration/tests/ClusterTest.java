@@ -226,7 +226,14 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void configureIntegrationBrokerResponseMode(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE, true);
+    // Only set the property when streaming is explicitly requested. When false we skip the
+    // setProperty call so the broker starts with its production default (false), giving the
+    // base test classes real coverage of the non-streaming (eager) path.  The six
+    // *LazyBrokerIntegrationTest subclasses override useStreamingBrokerResponse() to return
+    // true, which is the only path that should enable this flag.
+    if (useStreamingBrokerResponse()) {
+      brokerConf.setProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE, true);
+    }
   }
 
   protected void startBroker()
