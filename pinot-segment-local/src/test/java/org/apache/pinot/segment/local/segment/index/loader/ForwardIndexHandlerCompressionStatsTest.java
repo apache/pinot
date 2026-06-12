@@ -359,9 +359,15 @@ public class ForwardIndexHandlerCompressionStatsTest {
   }
 
   @Test
-  public void testCodecNotPersistedWhenCompressionStatsDisabled()
+  public void testCodecNotUpdatedWhenCompressionStatsDisabled()
       throws Exception {
-    // When compressionStatsEnabled=false, codec change should NOT persist codec in metadata
+    // The initial segment was built with compressionStatsEnabled=true and SNAPPY codec,
+    // so RAW_INT_COL already has "SNAPPY" in metadata.
+    // When we change to LZ4 with compressionStatsEnabled=false, the handler should NOT
+    // overwrite the metadata — the old "SNAPPY" value remains unchanged.
+    String codecBefore = new SegmentMetadataImpl(INDEX_DIR)
+        .getColumnMetadataFor(RAW_INT_COL).getCompressionCodec();
+
     _fieldConfigMap.put(RAW_INT_COL,
         new FieldConfig(RAW_INT_COL, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.LZ4, null));
 
@@ -381,12 +387,12 @@ public class ForwardIndexHandlerCompressionStatsTest {
       handler.postUpdateIndicesCleanup(writer);
     }
 
-    // Compression codec should NOT be persisted when stats are disabled
+    // The codec in metadata should be unchanged — the handler did not update it
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(INDEX_DIR);
     ColumnMetadata colMeta = metadata.getColumnMetadataFor(RAW_INT_COL);
     assertFalse(colMeta.hasDictionary());
-    assertNull(colMeta.getCompressionCodec(),
-        "Compression codec should NOT be persisted when compressionStatsEnabled=false");
+    assertEquals(colMeta.getCompressionCodec(), codecBefore,
+        "Codec metadata should be unchanged when compressionStatsEnabled=false (new codec not written)");
   }
 
   @Test
