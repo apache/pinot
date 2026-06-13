@@ -26,6 +26,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -54,10 +55,17 @@ public class PostAggregationHandler implements ValueExtractorFactory {
     assert _filteredAggregationsIndexMap != null;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     if (groupByExpressions != null) {
-      _numGroupByExpressions = groupByExpressions.size();
+      int numGroupByExpressions = groupByExpressions.size();
+      // Aggregations begin after the key columns, which for grouping-set queries include the synthetic $groupingId.
+      _numGroupByExpressions = queryContext.getNumGroupByKeyColumns();
       _groupByExpressionIndexMap = new HashMap<>();
-      for (int i = 0; i < _numGroupByExpressions; i++) {
+      for (int i = 0; i < numGroupByExpressions; i++) {
         _groupByExpressionIndexMap.put(groupByExpressions.get(i), i);
+      }
+      // Register the synthetic $groupingId column (index N) so GROUPING() / GROUPING_ID() arguments resolve to it.
+      if (queryContext.isGroupingSetsQuery()) {
+        _groupByExpressionIndexMap.put(
+            ExpressionContext.forIdentifier(GroupingSets.GROUPING_ID_COLUMN), numGroupByExpressions);
       }
     } else {
       _numGroupByExpressions = 0;

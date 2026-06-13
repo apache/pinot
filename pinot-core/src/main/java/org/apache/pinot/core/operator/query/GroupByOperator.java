@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -77,7 +78,10 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = _groupByExpressions.length;
     int numAggregationFunctions = _aggregationFunctions.length;
-    int numColumns = numGroupByExpressions + numAggregationFunctions;
+    // Grouping-set queries carry an extra synthetic $groupingId key column after the group-by columns.
+    boolean groupingSets = queryContext.isGroupingSetsQuery();
+    int numKeyColumns = groupingSets ? numGroupByExpressions + 1 : numGroupByExpressions;
+    int numColumns = numKeyColumns + numAggregationFunctions;
     String[] columnNames = new String[numColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
 
@@ -89,10 +93,16 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
           _projectOperator.getResultColumnContext(groupByExpression).getDataType());
     }
 
+    // Synthetic $groupingId key column holding each row's grouping-set bitmask (powers GROUPING / GROUPING_ID).
+    if (groupingSets) {
+      columnNames[numGroupByExpressions] = GroupingSets.GROUPING_ID_COLUMN;
+      columnDataTypes[numGroupByExpressions] = DataSchema.ColumnDataType.INT;
+    }
+
     // Extract column names and data types for aggregation functions
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      int index = numGroupByExpressions + i;
+      int index = numKeyColumns + i;
       columnNames[index] = aggregationFunction.getResultColumnName();
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
     }

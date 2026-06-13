@@ -32,6 +32,10 @@ struct PinotQuery {
   11: optional map<string, string> queryOptions;
   12: optional bool explain;
   13: optional map<Expression, Expression> expressionOverrideHints;
+  // Grouping-set bitmasks over `groupByList` (the union of all grouping-set columns).
+  // Bit i (counting from the most-significant per SQL convention) set => column i participates in that set.
+  // Absent/empty => a single full grouping set (ordinary GROUP BY).
+  14: optional list<i32> groupingSetsMasks;
 }
 
 struct DataSource {

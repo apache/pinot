@@ -92,7 +92,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       // isDictionaryEncoded() flag rather than gating on dictionary nullness alone.
       hasNoDictionaryGroupByExpression |= !columnContext.isDictionaryEncoded();
     }
-    _hasMVGroupByExpression = hasMVGroupByExpression;
+    // Grouping-set queries route every row through the multi-valued path: a row maps to one group per grouping set.
+    _hasMVGroupByExpression = hasMVGroupByExpression || queryContext.isGroupingSetsQuery();
 
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
@@ -103,6 +104,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
     if (groupKeyGenerator != null) {
       _groupKeyGenerator = groupKeyGenerator;
+    } else if (queryContext.isGroupingSetsQuery()) {
+      _groupKeyGenerator = new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions,
+          queryContext.getGroupingSets(), numGroupsLimit, _nullHandlingEnabled);
     } else {
       if (hasNoDictionaryGroupByExpression || _nullHandlingEnabled) {
         if (groupByExpressions.length == 1) {

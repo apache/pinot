@@ -90,7 +90,8 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
     _waitingRecords = new AtomicReference<>();
     Comparator<Record> recordKeyComparator =
         OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
-            queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
+            queryContext.getGroupByExpressions(),
+            queryContext.isNullHandlingEnabled() || queryContext.isGroupingSetsQuery());
     _sortedRecordsMerger =
         GroupByUtils.getSortedReduceMerger(queryContext, queryContext.getLimit(), recordKeyComparator);
   }

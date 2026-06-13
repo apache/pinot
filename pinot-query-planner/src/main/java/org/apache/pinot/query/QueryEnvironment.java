@@ -56,6 +56,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.GroupingSetsExpander;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
@@ -387,6 +388,9 @@ public class QueryEnvironment {
   private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
+    // Expand GROUP BY ROLLUP / CUBE / GROUPING SETS into a UNION ALL of ordinary aggregates before optimization, since
+    // the multi-stage engine has no native grouping-set support.
+    relation = relation.withRel(relation.rel.accept(new GroupingSetsExpander()));
     RelNode optimized = optimize(relation, plannerContext);
     if (plannerContext.isUsePhysicalOptimizer()) {
       Preconditions.checkNotNull(plannerContext.getPhysicalPlannerContext(), "Physical planner context is null");

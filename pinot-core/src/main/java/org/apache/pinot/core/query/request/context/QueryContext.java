@@ -98,6 +98,11 @@ public class QueryContext {
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
   private boolean _hasFilteredAggregations;
   private Set<String> _columns;
+  // Grouping-set participation masks (one per set) over the group-by columns, or null for an ordinary GROUP BY. When
+  // set, the result schema carries an extra synthetic $groupingId key column after the group-by columns.
+  // See org.apache.pinot.common.request.context.GroupingSets.
+  @Nullable
+  private int[] _groupingSets;
 
   // Other properties to be shared across all the segments
   // Latest table schema at query time
@@ -244,6 +249,33 @@ public class QueryContext {
   @Nullable
   public List<ExpressionContext> getGroupByExpressions() {
     return _groupByExpressions;
+  }
+
+  /**
+   * Returns the grouping-set participation masks (one per set, each a bitmask over the group-by columns), or
+   * {@code null} for an ordinary GROUP BY. See {@link org.apache.pinot.common.request.context.GroupingSets}.
+   */
+  @Nullable
+  public int[] getGroupingSets() {
+    return _groupingSets;
+  }
+
+  void setGroupingSets(@Nullable int[] groupingSets) {
+    _groupingSets = groupingSets;
+  }
+
+  /** Whether this is a GROUP BY ROLLUP / CUBE / GROUPING SETS query (i.e. has more than one grouping set). */
+  public boolean isGroupingSetsQuery() {
+    return _groupingSets != null;
+  }
+
+  /**
+   * Number of leading key columns in the group-by result schema: the group-by columns, plus the synthetic
+   * {@code $groupingId} column for grouping-set queries.
+   */
+  public int getNumGroupByKeyColumns() {
+    int numGroupByExpressions = _groupByExpressions != null ? _groupByExpressions.size() : 0;
+    return isGroupingSetsQuery() ? numGroupByExpressions + 1 : numGroupByExpressions;
   }
 
   /**
@@ -630,6 +662,7 @@ public class QueryContext {
     private List<String> _aliasList;
     private FilterContext _filter;
     private List<ExpressionContext> _groupByExpressions;
+    private int[] _groupingSets;
     private FilterContext _havingFilter;
     private List<OrderByExpressionContext> _orderByExpressions;
     private int _limit;
@@ -675,6 +708,11 @@ public class QueryContext {
 
     public Builder setGroupByExpressions(List<ExpressionContext> groupByExpressions) {
       _groupByExpressions = groupByExpressions;
+      return this;
+    }
+
+    public Builder setGroupingSets(@Nullable int[] groupingSets) {
+      _groupingSets = groupingSets;
       return this;
     }
 
@@ -732,6 +770,7 @@ public class QueryContext {
           new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList,
               _filter, _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
               _expressionOverrideHints, _explain);
+      queryContext.setGroupingSets(_groupingSets);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
       queryContext.setServerReturnFinalResultKeyUnpartitioned(

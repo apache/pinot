@@ -114,6 +114,13 @@ public class QueryContextConverterUtils {
       }
     }
 
+    // Grouping sets (ROLLUP / CUBE / GROUPING SETS): participation masks over the group-by columns, one per set.
+    int[] groupingSets = null;
+    List<Integer> groupingSetsMasks = pinotQuery.getGroupingSetsMasks();
+    if (CollectionUtils.isNotEmpty(groupingSetsMasks)) {
+      groupingSets = groupingSetsMasks.stream().mapToInt(Integer::intValue).toArray();
+    }
+
     // ORDER BY
     List<OrderByExpressionContext> orderByExpressions = null;
     List<Expression> orderByList = pinotQuery.getOrderByList();
@@ -174,6 +181,7 @@ public class QueryContextConverterUtils {
         .setAliasList(aliasList)
         .setFilter(filter)
         .setGroupByExpressions(groupByExpressions)
+        .setGroupingSets(groupingSets)
         .setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter)
         .setLimit(pinotQuery.getLimit())
