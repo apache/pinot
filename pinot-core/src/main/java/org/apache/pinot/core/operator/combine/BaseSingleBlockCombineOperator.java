@@ -57,8 +57,14 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   /// @inheritDoc
   ///
   /// Handles exceptions here so that execution stats can be attached.
+  /// When only a single task is needed and the subclass uses the default ResultsBlockMerger (not null), segments are
+  /// processed directly on the calling thread to avoid the overhead of thread submission, Phaser synchronization,
+  /// BlockingQueue polling, and atomic operations.
   @Override
   protected BaseResultsBlock getNextBlock() {
+    if (_numTasks == 1 && _resultsBlockMerger != null) {
+      return getNextBlockSingleThread();
+    }
     try {
       startProcess();
       return checkTerminateExceptionAndAttachExecutionStats(mergeResults());
@@ -67,6 +73,62 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
     } finally {
       stopProcess();
     }
+  }
+
+  /// Processes all segments sequentially on the calling thread when only one task is needed.
+  /// Avoids all concurrency overhead: no ExecutorService submission, no Phaser, no BlockingQueue, no atomics.
+  /// Respects the query deadline: if the timeout is exceeded before a segment operator is invoked, a timeout
+  /// results block is returned immediately rather than blocking indefinitely on a stalled operator.
+  ///
+  /// Note: we do NOT separately accumulate _totalWorkerThreadCpuTimeNs / _totalWorkerThreadMemAllocatedBytes here.
+  /// This method runs on the calling (main) thread, which InstanceResponseOperator already measures via its own
+  /// ThreadResourceSnapshot as mainThreadCpuTimeNs. Double-counting the same thread's CPU time would cause
+  /// calSystemActivitiesCpuTimeNs to produce a negative value (clamped to 0), breaking resource usage stats.
+  @SuppressWarnings("unchecked")
+  private BaseResultsBlock getNextBlockSingleThread() {
+    T mergedBlock = null;
+    long endTimeMs = _queryContext.getEndTimeMs();
+    for (int i = 0; i < _numOperators; i++) {
+      // Check timeout before invoking each segment operator so we respect the query deadline
+      // even if a segment operator blocks for a long time (mirrors mergeResults() timeout logic).
+      if (System.currentTimeMillis() >= endTimeMs) {
+        return attachExecutionStats(getTimeoutResultsBlock(i));
+      }
+      Operator operator = _operators.get(i);
+      T resultsBlock;
+      try {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
+        }
+        resultsBlock = (T) operator.nextBlock();
+      } catch (RuntimeException e) {
+        // wrapOperatorException either returns the exception (for EarlyTerminationException) or throws a new
+        // QueryException. Either way we catch it here and convert to an error block, mirroring the multi-thread path
+        // where onProcessSegmentsException handles all operator exceptions.
+        try {
+          throw wrapOperatorException(operator, e);
+        } catch (Exception wrapped) {
+          return createExceptionResultsBlockAndAttachExecutionStats(wrapped, "processing segments");
+        }
+      } finally {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).release();
+        }
+      }
+      if (resultsBlock.getErrorMessages() != null) {
+        // Propagate segment-level error immediately
+        return attachExecutionStats(resultsBlock);
+      }
+      if (mergedBlock == null) {
+        mergedBlock = resultsBlock;
+      } else {
+        _resultsBlockMerger.mergeResultsBlocks(mergedBlock, resultsBlock);
+      }
+      if (_resultsBlockMerger.isQuerySatisfied(mergedBlock)) {
+        break;
+      }
+    }
+    return checkTerminateExceptionAndAttachExecutionStats(mergedBlock);
   }
 
   @Override
