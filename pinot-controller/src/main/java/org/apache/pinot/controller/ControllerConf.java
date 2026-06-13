@@ -122,6 +122,10 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtime.offsetAutoReset.backfill.cronExpression";
     public static final String REALTIME_OFFSET_AUTO_RESET_BACKFILL_INITIAL_DELAY_IN_SECONDS =
         "controller.realtime.offsetAutoReset.backfill.initialDelayInSeconds";
+    public static final String MAX_CONCURRENT_BACKFILLS_PER_CONTROLLER =
+        "controller.realtime.offsetAutoReset.maxConcurrentBackfillsPerController";
+    public static final String MAX_BACKFILL_COLLISIONS_BEFORE_AUTO_PAUSE =
+        "controller.realtime.offsetAutoReset.maxBackfillCollisionsBeforeAutoPause";
     public static final String BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD =
         "controller.broker.resource.validation.frequencyPeriod";
     public static final String BROKER_RESOURCE_VALIDATION_CRON_EXPRESSION =
@@ -1391,6 +1395,14 @@ public class ControllerConf extends PinotConfiguration {
   public long getRealtimeOffsetAutoResetBackfillInitialDelaySeconds() {
     return getProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_BACKFILL_INITIAL_DELAY_IN_SECONDS,
         getPeriodicTaskInitialDelayInSeconds());
+  }
+
+  public int getMaxConcurrentBackfillsPerController() {
+    return getProperty(ControllerPeriodicTasksConf.MAX_CONCURRENT_BACKFILLS_PER_CONTROLLER, -1);
+  }
+
+  public int getMaxBackfillCollisionsBeforeAutoPause() {
+    return getProperty(ControllerPeriodicTasksConf.MAX_BACKFILL_COLLISIONS_BEFORE_AUTO_PAUSE, 3);
   }
 
   public boolean isDeepStoreRetryUploadLLCSegmentEnabled() {
