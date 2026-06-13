@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,13 +36,11 @@ import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.HttpVersion;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
-import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.PropertyKey;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
@@ -56,7 +53,6 @@ import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
-import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
@@ -70,7 +66,6 @@ public class QueryWorkloadConfigUtils {
   private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(QueryWorkloadConfigUtils.class);
   private static final HttpClient HTTP_CLIENT = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG,
       TlsUtils.getSslContext());
-  private static final Random RANDOM = new Random();
   private static final int DEFAULT_HTTP_TIMEOUT_MS = 30_000;
   // Single-threaded executor for background workload config fetching to avoid blocking main thread
   private static final ExecutorService WORKLOAD_CONFIG_EXECUTOR = Executors.newSingleThreadExecutor(
@@ -120,55 +115,6 @@ public class QueryWorkloadConfigUtils {
 
 
   /**
-   * Gets a random controller URL by dynamically discovering all live controller instances from Helix.
-   * This distributes load across all available controllers instead of always hitting the lead controller.
-   *
-   * @param helixManager The Helix manager to use for dynamic discovery
-   * @return controller URL or null if not available
-   */
-  public static String getControllerUrl(HelixManager helixManager) {
-    try {
-      HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
-      PropertyKey.Builder keyBuilder = helixDataAccessor.keyBuilder();
-
-      // Get all live instances first (this is a single ZK call)
-      List<String> liveInstances = helixDataAccessor.getChildNames(keyBuilder.liveInstances());
-      if (liveInstances == null || liveInstances.isEmpty()) {
-        LOGGER.warn("No live instances found in Helix");
-        return null;
-      }
-
-      // Filter for live controller instances only
-      List<String> liveControllerInstances = new ArrayList<>();
-      for (String instanceName : liveInstances) {
-        if (InstanceTypeUtils.isController(instanceName)) {
-          liveControllerInstances.add(instanceName);
-        }
-      }
-
-      if (liveControllerInstances.isEmpty()) {
-        LOGGER.warn("No live controller instances found in Helix");
-        return null;
-      }
-
-      String selectedInstance = liveControllerInstances.get(RANDOM.nextInt(liveControllerInstances.size()));
-      ExtraInstanceConfig extraInstanceConfig = new ExtraInstanceConfig(
-          helixDataAccessor.getProperty(keyBuilder.instanceConfig(selectedInstance)));
-      String baseUrl = extraInstanceConfig.getComponentUrl();
-      if (baseUrl == null) {
-        LOGGER.warn("Unable to extract the base URL from controller instance config: {}", selectedInstance);
-        return null;
-      }
-      LOGGER.info("Dynamically discovered controller URL from Helix (randomly selected from {} controllers): {}",
-          liveControllerInstances.size(), baseUrl);
-      return baseUrl;
-    } catch (Exception e) {
-      LOGGER.warn("Failed to dynamically discover controller URL from Helix", e);
-      return null;
-    }
-  }
-
-  /**
    * Fetches and updates the query workload budgets that this instance should use.
    * This method is called by the instance at startup. It runs asynchronously in a background thread
    * to avoid blocking the main thread.
@@ -188,7 +134,7 @@ public class QueryWorkloadConfigUtils {
               + "Skipping fetching workload budgets.", instanceId);
           return;
         }
-        String controllerUrl = getControllerUrl(helixManager);
+        String controllerUrl = HelixHelper.getControllerUrl(helixManager);
         if (controllerUrl == null) {
           LOGGER.warn("Controller URL could not be determined for instance: {}", instanceId);
           return;

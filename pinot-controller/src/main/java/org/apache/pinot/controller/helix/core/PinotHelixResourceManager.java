@@ -160,6 +160,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
+import org.apache.pinot.controller.util.PageCacheWarmupControllerExecutor;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
@@ -257,6 +258,7 @@ public class PinotHelixResourceManager {
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
   private QueryWorkloadManager _queryWorkloadManager;
+  private final PageCacheWarmupControllerExecutor _pageCacheWarmupControllerExecutor;
   // Dedicated ZkClient for transactional multi-path writes (atomic ZK multi()). Lazily built on
   // first multiWriteZK call. A dedicated session is used because Helix 1.3.2 does not expose
   // multi() on BaseDataAccessor, and the underlying ZkClient inside ZKHelixManager is not publicly
@@ -292,6 +294,7 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
+    _pageCacheWarmupControllerExecutor = new PageCacheWarmupControllerExecutor(this, controllerConf);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -360,6 +363,7 @@ public class PinotHelixResourceManager {
    */
   public synchronized void stop() {
     _segmentDeletionManager.stop();
+    _pageCacheWarmupControllerExecutor.shutdown();
     ZkClient zkClient = _zkClient;
     if (zkClient != null) {
       _zkClient = null;
@@ -4918,7 +4922,7 @@ public class PinotHelixResourceManager {
    */
   protected void preSegmentReplaceUpdateRouting(String tableNameWithType, List<String> segmentsTo,
       List<String> segmentsFrom) {
-    // No-op by default
+    _pageCacheWarmupControllerExecutor.triggerPageCacheWarmup(tableNameWithType, segmentsTo);
   }
 
   /**
