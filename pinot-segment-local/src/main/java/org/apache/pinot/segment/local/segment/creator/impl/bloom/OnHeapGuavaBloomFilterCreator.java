@@ -44,11 +44,12 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapGuavaBloomFilterCreator.class);
 
   public static final int TYPE_VALUE = 1;
-  public static final int VERSION = 1;
+  public static final int VERSION = 2;
 
   private final File _bloomFilterFile;
   private final BloomFilter<String> _bloomFilter;
   private final FieldSpec.DataType _dataType;
+  private final double _fpp;
 
   // TODO: This method is here for compatibility reasons, should be removed in future PRs
   //  exit_criteria: Not needed in Apache Pinot once #10184 is merged
@@ -63,14 +64,10 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
     _dataType = dataType;
     _bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
     // Calculate the actual fpp with regards to the max size for the bloom filter
-    double fpp = bloomFilterConfig.getFpp();
-    int maxSizeInBytes = bloomFilterConfig.getMaxSizeInBytes();
-    if (maxSizeInBytes > 0) {
-      double minFpp = GuavaBloomFilterReaderUtils.computeFPP(maxSizeInBytes, cardinality);
-      fpp = Math.max(fpp, minFpp);
-    }
-    LOGGER.info("Creating bloom filter with cardinality: {}, fpp: {}", cardinality, fpp);
-    _bloomFilter = BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8), cardinality, fpp);
+    _fpp = GuavaBloomFilterReaderUtils.computeFPP(bloomFilterConfig.getFpp(),
+        bloomFilterConfig.getMaxSizeInBytes(), cardinality);
+    LOGGER.info("Creating bloom filter with cardinality: {}, fpp: {}", cardinality, _fpp);
+    _bloomFilter = BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8), cardinality, _fpp);
   }
 
   @Override
@@ -89,6 +86,8 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
     try (DataOutputStream out = new DataOutputStream(new FileOutputStream(_bloomFilterFile))) {
       out.writeInt(TYPE_VALUE);
       out.writeInt(VERSION);
+      // Store the FPP value in the header
+      out.writeDouble(_fpp);
       _bloomFilter.writeTo(out);
     }
   }
