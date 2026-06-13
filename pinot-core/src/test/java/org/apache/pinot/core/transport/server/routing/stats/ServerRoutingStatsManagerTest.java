@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -454,6 +455,137 @@ public class ServerRoutingStatsManagerTest {
     double fastScore = managerMultiServer.fetchHybridScoreForServer("fastServer");
     double slowScore = managerMultiServer.fetchHybridScoreForServer("slowServer");
     assertTrue(fastScore < slowScore, "Idle servers should be ranked by latency");
+  }
+
+  @Test
+  public void testStatsMetricExportDynamicToggle() throws InterruptedException {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    // Start with metric export disabled.
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT, false);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, 50L);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+    manager.recordStatsForQuerySubmission(requestId++, "dynamicToggleServer");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "dynamicToggleServer", 100);
+    waitForStatsUpdate(manager, requestId);
+
+    String numInFlightKey = BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS.getGaugeName() + "."
+        + "server.dynamicToggleServer";
+
+    // Confirm no metrics while disabled.
+    Thread.sleep(200);
+    assertNull(_brokerMetrics.getGaugeValue(numInFlightKey));
+
+    // Enable via cluster config change and verify metrics are now exported.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT, "true"));
+
+    TestUtils.waitForCondition(aVoid -> _brokerMetrics.getGaugeValue(numInFlightKey) != null,
+        50L, 5000, "Timed out waiting for metrics after dynamic enable");
+
+    // Disable again and verify the gauges are removed from the registry.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT, "false"));
+
+    assertNull(_brokerMetrics.getGaugeValue(numInFlightKey));
+  }
+
+  @Test
+  public void testStatsMetricExportIntervalDynamicUpdate() throws InterruptedException {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT, true);
+    // Start with a very long interval so the task won't fire during the test.
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, 100000L);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+    manager.recordStatsForQuerySubmission(requestId++, "intervalUpdateServer");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "intervalUpdateServer", 100);
+    waitForStatsUpdate(manager, requestId);
+
+    String numInFlightKey = BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS.getGaugeName()
+        + ".server.intervalUpdateServer";
+
+    // No export yet — interval is too long.
+    Thread.sleep(200);
+    assertNull(_brokerMetrics.getGaugeValue(numInFlightKey));
+
+    // Shorten the interval via cluster config change and verify metrics are now exported.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, "50"));
+
+    TestUtils.waitForCondition(aVoid -> _brokerMetrics.getGaugeValue(numInFlightKey) != null,
+        50L, 5000, "Timed out waiting for metrics after interval update");
+  }
+
+  @Test
+  public void testStatsMetricExportIntervalDynamicUpdateIgnoresBadValues() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, 100000L);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    long intervalBefore = manager.getStatsMetricExportIntervalMs();
+
+    // Non-numeric value: must be silently ignored without throwing.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, "abc"));
+    assertEquals(manager.getStatsMetricExportIntervalMs(), intervalBefore,
+        "Interval must not change on non-numeric config value");
+
+    // Zero: must be silently ignored.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, "0"));
+    assertEquals(manager.getStatsMetricExportIntervalMs(), intervalBefore,
+        "Interval must not change on zero config value");
+
+    // Negative value: must be silently ignored.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, "-1"));
+    assertEquals(manager.getStatsMetricExportIntervalMs(), intervalBefore,
+        "Interval must not change on negative config value");
+
+    // Key removed from cluster config — must fall back to the static broker config value (100000L).
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
+        Collections.emptyMap());
+    assertEquals(manager.getStatsMetricExportIntervalMs(), 100000L,
+        "Interval must revert to static config when cluster key is removed");
+
+    manager.shutDown();
   }
 
   @Test
