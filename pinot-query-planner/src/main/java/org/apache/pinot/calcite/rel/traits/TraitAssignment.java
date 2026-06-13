@@ -137,6 +137,23 @@ public class TraitAssignment {
     if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
       return join;
     }
+    // Case-1b: Broadcast-right join — broadcast the right input to all workers; left is hash/random-distributed.
+    // Not supported for RIGHT/FULL outer joins: would produce duplicate null-extended rows.
+    if (PinotHintOptions.JoinHintOptions.useBroadcastRightJoinStrategy(join)) {
+      JoinRelType joinType = join.getJoinType();
+      Preconditions.checkArgument(joinType != JoinRelType.RIGHT && joinType != JoinRelType.FULL,
+          "broadcast_right join hint is not supported for RIGHT or FULL OUTER joins");
+      JoinInfo broadcastJoinInfo = join.analyzeCondition();
+      RelDistribution leftDistribution = broadcastJoinInfo.leftKeys.isEmpty()
+          ? RelDistributions.RANDOM_DISTRIBUTED : RelDistributions.hash(broadcastJoinInfo.leftKeys);
+      RelNode leftInput = join.getInput(0);
+      RelTraitSet leftTraitSet = leftInput.getTraitSet().plus(leftDistribution);
+      leftInput = leftInput.copy(leftTraitSet, leftInput.getInputs());
+      RelNode rightInput = join.getInput(1);
+      RelTraitSet rightTraitSet = rightInput.getTraitSet().plus(RelDistributions.BROADCAST_DISTRIBUTED);
+      rightInput = rightInput.copy(rightTraitSet, rightInput.getInputs());
+      return join.copy(join.getTraitSet(), List.of(leftInput, rightInput));
+    }
     // Case-2: Handle dynamic filter for semi joins.
     JoinInfo joinInfo = join.analyzeCondition();
     /* if (join.isSemiJoin() && joinInfo.nonEquiConditions.isEmpty() && joinInfo.leftKeys.size() == 1) {

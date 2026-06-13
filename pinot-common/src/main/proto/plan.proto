@@ -94,6 +94,7 @@ enum JoinStrategy {
   HASH = 0;
   LOOKUP = 1;
   AS_OF = 2;
+  BROADCAST_RIGHT = 3;
 }
 
 message JoinNode {
