@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
@@ -63,5 +64,25 @@ public interface ColumnMetadata extends ColumnShape {
   @Deprecated(since = "1.6.0", forRemoval = true)
   default int getColumnMaxLength() {
     return getLengthOfLongestElement();
+  }
+
+  /**
+   * Returns the uncompressed forward index size in bytes, or {@link #UNAVAILABLE} if not available.
+   */
+  default long getUncompressedForwardIndexSizeBytes() {
+    return UNAVAILABLE;
+  }
+
+  /**
+   * Returns the compression codec used for this column's forward index, or null if not available.
+   */
+  @Nullable
+  default String getCompressionCodec() {
+    return null;
+  }
+
+  /// Raw ingest byte count for dict-encoded columns written at seal time. Returns {@link #UNAVAILABLE} if not present.
+  default long getDictColumnRawIngestSizeBytes() {
+    return UNAVAILABLE;
   }
 }

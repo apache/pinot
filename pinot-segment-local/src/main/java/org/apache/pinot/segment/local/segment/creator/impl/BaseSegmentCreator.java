@@ -48,11 +48,13 @@ import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVe
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -199,6 +201,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         .withMutableSegmentCompacted(_config.isMutableSegmentCompacted())
         .withMutableToImmutableDocIdMap(_config.getMutableToImmutableDocIdMap())
         .withContinueOnError(_config.isContinueOnError())
+        .withCompressionStatsEnabled(_config.isCompressionStatsEnabled())
         .build();
   }
 
@@ -553,6 +556,59 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
           columnIndexCreators.getIndexConfigs().getConfig(StandardIndexes.forward());
       addColumnMetadataInfo(properties, column, columnStatistics, _totalDocs, _schema.getFieldSpecFor(column),
           hasDictionary, dictionaryElementSize, fwdConfig.getEncodingType(), false);
+    }
+
+    // Persist compression stats if enabled
+    if (_config.isCompressionStatsEnabled()) {
+      Map<String, FieldIndexConfigs> indexConfigs = _config.getIndexConfigsByColName();
+      for (Map.Entry<String, ColumnIndexCreators> entry : _colIndexes.entrySet()) {
+        String column = entry.getKey();
+        ColumnIndexCreators colCreators = entry.getValue();
+        ForwardIndexCreator fwdCreator = colCreators.getForwardIndexCreator();
+        if (fwdCreator != null && !fwdCreator.isDictionaryEncoded()) {
+          long uncompressedSize = fwdCreator.getUncompressedSize();
+          if (uncompressedSize > 0) {
+            properties.setProperty(
+                V1Constants.MetadataKeys.Column.getKeyFor(column,
+                    V1Constants.MetadataKeys.Column.FORWARD_INDEX_UNCOMPRESSED_SIZE),
+                String.valueOf(uncompressedSize));
+          }
+          FieldIndexConfigs fieldIndexConfigs = indexConfigs.get(column);
+          if (fieldIndexConfigs != null) {
+            ForwardIndexConfig fwdConfig = fieldIndexConfigs.getConfig(StandardIndexes.forward());
+            FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+            ChunkCompressionType compressionType = ForwardIndexType.resolveCompressionType(
+                fwdConfig, fieldSpec != null ? fieldSpec.getFieldType() : null);
+            if (compressionType != null) {
+              properties.setProperty(
+                  V1Constants.MetadataKeys.Column.getKeyFor(column,
+                      V1Constants.MetadataKeys.Column.FORWARD_INDEX_COMPRESSION_CODEC),
+                  compressionType.name());
+            }
+          }
+        } else if (fwdCreator != null) {
+          // Dictionary-encoded column: write raw ingest size
+          SegmentDictionaryCreator dictCreator = colCreators.getDictionaryCreator();
+          if (dictCreator != null) {
+            long rawIngestBytes;
+            FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+            DataType storedType = fieldSpec != null ? fieldSpec.getDataType().getStoredType() : null;
+            if (storedType != null && storedType.isFixedWidth()) {
+              // Fixed-width: compute from totalDocs * type size
+              rawIngestBytes = (long) _totalDocs * storedType.size();
+            } else {
+              // Variable-width: accumulated in SegmentDictionaryCreator during indexing
+              rawIngestBytes = dictCreator.getTotalRawIngestBytes();
+            }
+            if (rawIngestBytes > 0) {
+              properties.setProperty(
+                  V1Constants.MetadataKeys.Column.getKeyFor(column,
+                      V1Constants.MetadataKeys.Column.DICT_COLUMN_RAW_INGEST_SIZE),
+                  String.valueOf(rawIngestBytes));
+            }
+          }
+        }
+      }
     }
 
     SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();

@@ -20,8 +20,11 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 
 /**
@@ -46,6 +49,9 @@ public class TableMetadataInfo {
   // JSON property name kept as "upsertPartitionToServerPrimaryKeyCountMap" to avoid silent data loss during rolling
   // upgrades where servers and controllers may temporarily run different versions of this class.
   private final Map<Integer, Map<String, Long>> _partitionToServerPrimaryKeyCountMap;
+  private final List<ColumnCompressionStatsInfo> _columnCompressionStats;
+  private final CompressionStatsSummary _compressionStats;
+  private final StorageBreakdownInfo _storageBreakdown;
 
   @JsonCreator
   public TableMetadataInfo(@JsonProperty("tableName") String tableName,
@@ -55,7 +61,11 @@ public class TableMetadataInfo {
       @JsonProperty("maxNumMultiValuesMap") Map<String, Double> maxNumMultiValuesMap,
       @JsonProperty("columnIndexSizeMap") Map<String, Map<String, Double>> columnIndexSizeMap,
       @JsonProperty("upsertPartitionToServerPrimaryKeyCountMap")
-      Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap) {
+      Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap,
+      @JsonProperty("columnCompressionStats") @Nullable
+      List<ColumnCompressionStatsInfo> columnCompressionStats,
+      @JsonProperty("compressionStats") @Nullable CompressionStatsSummary compressionStats,
+      @JsonProperty("storageBreakdown") @Nullable StorageBreakdownInfo storageBreakdown) {
     _tableName = tableName;
     _diskSizeInBytes = sizeInBytes;
     _numSegments = numSegments;
@@ -65,6 +75,32 @@ public class TableMetadataInfo {
     _maxNumMultiValuesMap = maxNumMultiValuesMap;
     _columnIndexSizeMap = columnIndexSizeMap;
     _partitionToServerPrimaryKeyCountMap = partitionToServerPrimaryKeyCountMap;
+    _columnCompressionStats = columnCompressionStats;
+    _compressionStats = compressionStats;
+    _storageBreakdown = storageBreakdown;
+  }
+
+  /**
+   * Constructor for callers that provide columnCompressionStats but not compressionStats/storageBreakdown.
+   */
+  public TableMetadataInfo(String tableName, long sizeInBytes, long numSegments, long numRows,
+      Map<String, Double> columnLengthMap, Map<String, Double> columnCardinalityMap,
+      Map<String, Double> maxNumMultiValuesMap, Map<String, Map<String, Double>> columnIndexSizeMap,
+      Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap,
+      @Nullable List<ColumnCompressionStatsInfo> columnCompressionStats) {
+    this(tableName, sizeInBytes, numSegments, numRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap,
+        columnIndexSizeMap, partitionToServerPrimaryKeyCountMap, columnCompressionStats, null, null);
+  }
+
+  /**
+   * Backwards-compatible constructor for callers that don't provide any compression/storage fields.
+   */
+  public TableMetadataInfo(String tableName, long sizeInBytes, long numSegments, long numRows,
+      Map<String, Double> columnLengthMap, Map<String, Double> columnCardinalityMap,
+      Map<String, Double> maxNumMultiValuesMap, Map<String, Map<String, Double>> columnIndexSizeMap,
+      Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap) {
+    this(tableName, sizeInBytes, numSegments, numRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap,
+        columnIndexSizeMap, partitionToServerPrimaryKeyCountMap, null, null, null);
   }
 
   public String getTableName() {
@@ -102,5 +138,23 @@ public class TableMetadataInfo {
   @JsonProperty("upsertPartitionToServerPrimaryKeyCountMap")
   public Map<Integer, Map<String, Long>> getPartitionToServerPrimaryKeyCountMap() {
     return _partitionToServerPrimaryKeyCountMap;
+  }
+
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public List<ColumnCompressionStatsInfo> getColumnCompressionStats() {
+    return _columnCompressionStats;
+  }
+
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public CompressionStatsSummary getCompressionStats() {
+    return _compressionStats;
+  }
+
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public StorageBreakdownInfo getStorageBreakdown() {
+    return _storageBreakdown;
   }
 }

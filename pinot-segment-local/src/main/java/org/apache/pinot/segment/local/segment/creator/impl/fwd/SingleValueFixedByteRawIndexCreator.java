@@ -114,4 +114,14 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
       throws IOException {
     _indexWriter.close();
   }
+
+  @Override
+  public long getUncompressedSize() {
+    return _indexWriter.getUncompressedSize();
+  }
+
+  @Override
+  public void setTrackUncompressedSize(boolean trackUncompressedSize) {
+    _indexWriter.setTrackUncompressedSize(trackUncompressedSize);
+  }
 }

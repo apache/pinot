@@ -43,6 +43,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreInd
 import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -597,11 +598,25 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     segmentWriter.removeIndex(column, StandardIndexes.forward());
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
 
+    // Persist the new compression codec in metadata.properties (only when compression stats are enabled)
+    if (_tableConfig.getIndexingConfig().isCompressionStatsEnabled()) {
+      ForwardIndexConfig newConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      ChunkCompressionType compressionType =
+          ForwardIndexType.resolveCompressionType(newConfig, columnMetadata.getFieldSpec().getFieldType());
+      if (compressionType != null) {
+        Map<String, String> metadataProperties = new HashMap<>();
+        metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), compressionType.name());
+        SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+      }
+    }
+
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
 
     LOGGER.info("Created forward index for segment: {}, column: {}", segmentName, column);
   }
+
+
 
   private void forwardIndexRewriteHelper(String column, ColumnMetadata existingColumnMetadata,
       ForwardIndexReader<?> reader, ForwardIndexCreator creator, int numDocs,
@@ -984,6 +999,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT),
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
+    // Clear stale compression stats that were set when the column was raw-encoded
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), null);
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_UNCOMPRESSED_SIZE), null);
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
@@ -1098,7 +1116,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
 
     LOGGER.info("Creating raw forward index for segment={} and column={}", segmentName, column);
-    rewriteDictToRawForwardIndex(existingColMetadata, segmentWriter, indexDir);
+    long uncompressedSize = rewriteDictToRawForwardIndex(existingColMetadata, segmentWriter, indexDir);
 
     // Remove dictionary and forward index
     segmentWriter.removeIndex(column, StandardIndexes.forward());
@@ -1114,6 +1132,18 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // TODO: See https://github.com/apache/pinot/pull/16921 for details
     // TODO: Remove the property after 1.6.0 release
     // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), null);
+    if (_tableConfig.getIndexingConfig().isCompressionStatsEnabled()) {
+      ForwardIndexConfig fwdConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      ChunkCompressionType compressionType =
+          ForwardIndexType.resolveCompressionType(fwdConfig, existingColMetadata.getFieldSpec().getFieldType());
+      if (compressionType != null) {
+        metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), compressionType.name());
+      }
+      if (uncompressedSize > 0) {
+        metadataProperties.put(getKeyFor(column, FORWARD_INDEX_UNCOMPRESSED_SIZE),
+            String.valueOf(uncompressedSize));
+      }
+    }
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // Remove range index, inverted index and FST index.
@@ -1166,7 +1196,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     LOGGER.info("Converted forward index to raw (dictionary kept) for segment: {}, column: {}", segmentName, column);
   }
 
-  private void rewriteDictToRawForwardIndex(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter,
+  /**
+   * Rewrites a dictionary-encoded forward index as a raw forward index.
+   * @return the uncompressed size of the new raw forward index, or 0 if not tracked
+   */
+  private long rewriteDictToRawForwardIndex(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter,
       File indexDir)
       throws Exception {
     String column = columnMetadata.getColumnName();
@@ -1174,11 +1208,14 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     try (ForwardIndexReader<?> forwardIndex = StandardIndexes.forward().getReaderFactory()
         .createIndexReader(segmentWriter, indexConfigs, columnMetadata);
         Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
-      IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).build();
+      IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata)
+          .withCompressionStatsEnabled(_tableConfig.getIndexingConfig().isCompressionStatsEnabled())
+          .build();
       ForwardIndexConfig config = indexConfigs.getConfig(StandardIndexes.forward());
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         forwardIndexRewriteHelper(column, columnMetadata, forwardIndex, creator, columnMetadata.getTotalDocs(), null,
             dictionary);
+        return creator.getUncompressedSize();
       }
     }
   }

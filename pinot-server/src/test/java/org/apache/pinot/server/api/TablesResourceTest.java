@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +32,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
@@ -38,19 +41,28 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
@@ -759,6 +771,105 @@ public class TablesResourceTest extends BaseResourceTest {
     response =
         _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/segments/UNKNOWN_SEGMENT").request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+  }
+
+  @Test
+  public void testGetTableMetadataCompressionStatsDisabled()
+      throws Exception {
+    String tableMetadataPath = "/tables/" + OFFLINE_TABLE_NAME + "/metadata";
+
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath)
+        .queryParam("columns", "column1")
+        .queryParam("columns", "column2")
+        .request()
+        .get(String.class));
+    TableMetadataInfo metadataInfo = JsonUtils.jsonNodeToObject(jsonResponse, TableMetadataInfo.class);
+
+    Assert.assertNotNull(metadataInfo);
+    Assert.assertNull(metadataInfo.getColumnCompressionStats(),
+        "columnCompressionStats should be null when compressionStatsEnabled is false");
+    Assert.assertNull(metadataInfo.getCompressionStats(),
+        "compressionStats should be null when compressionStatsEnabled is false");
+  }
+
+  @Test
+  public void testGetTableMetadataMixedDictRawCodec()
+      throws Exception {
+    // Regression test: when a table has mixed-age segments (some dict, some raw for the same column),
+    // the reported codec must be "MIXED" and codecBreakdown must be present.
+    String mixedTableName = "mixedDictRaw_OFFLINE";
+    List<ImmutableSegment> mixedSegments = new ArrayList<>();
+
+    // Segment 1: dict-encoded (default config — no noDictionaryColumns), produces CODEC_DICT_ENCODED
+    File tableDataDir = new File(TEMP_DIR, mixedTableName);
+    SegmentGeneratorConfig dictConfig =
+        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, tableDataDir, mixedTableName);
+    dictConfig.setSegmentNamePostfix("dict");
+    SegmentIndexCreationDriverImpl dictDriver = new SegmentIndexCreationDriverImpl();
+    dictDriver.init(dictConfig);
+    dictDriver.build();
+    ImmutableSegment dictSegment = ImmutableSegmentLoader.load(
+        new File(tableDataDir, dictDriver.getSegmentName()),
+        ReadMode.mmap);
+    mixedSegments.add(dictSegment);
+
+    // Segment 2: raw-encoded for column1 and column2
+    IndexingConfig rawIndexingConfig = new IndexingConfig();
+    rawIndexingConfig.setNoDictionaryColumns(Arrays.asList("column1", "column2"));
+    rawIndexingConfig.setCompressionStatsEnabled(true);
+    TableConfig rawTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(mixedTableName).build();
+    rawTableConfig.setIndexingConfig(rawIndexingConfig);
+    Schema rawSchema = SegmentTestUtils.extractSchemaFromAvroWithoutTime(_avroFile);
+    SegmentGeneratorConfig rawConfig =
+        SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, tableDataDir, mixedTableName,
+            rawTableConfig, rawSchema);
+    rawConfig.setSegmentNamePostfix("raw");
+    SegmentIndexCreationDriverImpl rawDriver = new SegmentIndexCreationDriverImpl();
+    rawDriver.init(rawConfig);
+    rawDriver.build();
+    ImmutableSegment rawSegment = ImmutableSegmentLoader.load(
+        new File(tableDataDir, rawDriver.getSegmentName()),
+        ReadMode.mmap);
+    mixedSegments.add(rawSegment);
+
+    // Register the table with compressionStatsEnabled=true
+    addTable(mixedTableName);
+    IndexingConfig tableIndexingConfig = new IndexingConfig();
+    tableIndexingConfig.setCompressionStatsEnabled(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(mixedTableName).build();
+    tableConfig.setIndexingConfig(tableIndexingConfig);
+    _tableDataManagerMap.get(mixedTableName).updateCachedTableConfigAndSchema(tableConfig, null);
+    for (ImmutableSegment seg : mixedSegments) {
+      _tableDataManagerMap.get(mixedTableName).addSegment(seg);
+    }
+
+    try {
+      JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget
+          .path("/tables/" + mixedTableName + "/metadata")
+          .queryParam("columns", "column1")
+          .queryParam("columns", "column2")
+          .request()
+          .get(String.class));
+      TableMetadataInfo metadataInfo = JsonUtils.jsonNodeToObject(jsonResponse, TableMetadataInfo.class);
+
+      Assert.assertNotNull(metadataInfo);
+      List<ColumnCompressionStatsInfo> ccs = metadataInfo.getColumnCompressionStats();
+      Assert.assertNotNull(ccs, "columnCompressionStats should be present when flag=ON and segments have stats");
+      for (ColumnCompressionStatsInfo colStats : ccs) {
+        if ("column1".equals(colStats.getColumn()) || "column2".equals(colStats.getColumn())) {
+          Assert.assertEquals(colStats.getCodec(), "MIXED",
+              "column " + colStats.getColumn() + " should report codec=MIXED when dict and raw segments coexist");
+          Assert.assertNotNull(colStats.getCodecBreakdown(),
+              "column " + colStats.getColumn() + " should have codecBreakdown when codec=MIXED");
+        }
+      }
+    } finally {
+      for (ImmutableSegment seg : mixedSegments) {
+        seg.offload();
+        seg.destroy();
+      }
+      _tableDataManagerMap.remove(mixedTableName);
+    }
   }
 
   // Override to use data with delete records

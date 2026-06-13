@@ -134,6 +134,16 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
     _indexWriter.close();
   }
 
+  @Override
+  public long getUncompressedSize() {
+    return _indexWriter.getUncompressedSize();
+  }
+
+  @Override
+  public void setTrackUncompressedSize(boolean trackUncompressedSize) {
+    _indexWriter.setTrackUncompressedSize(trackUncompressedSize);
+  }
+
   /**
    * The actual content in an MV array is prepended with 2 prefixes:
    * 1. elementLengthStoragePrefixInBytes - bytes required to store the length of each element in the largest array

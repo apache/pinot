@@ -19,6 +19,7 @@
 package org.apache.pinot.server.api;
 
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.testng.Assert;
@@ -82,5 +83,20 @@ public class TableSizeResourceTest extends BaseResourceTest {
     Assert.assertEquals(tableSizeInfo.getSegments().get(0).getSegmentName(), segment.getSegmentName());
     Assert.assertEquals(tableSizeInfo.getSegments().get(0).getDiskSizeInBytes(), segment.getSegmentSizeBytes());
     Assert.assertEquals(tableSizeInfo.getDiskSizeInBytes(), segment.getSegmentSizeBytes());
+  }
+
+  @Test
+  public void testTableSizeDetailedCompressionStatsDisabled() {
+    String path = "/tables/" + OFFLINE_TABLE_NAME + "/size";
+    TableSizeInfo tableSizeInfo = _webTarget.path(path).request().get(TableSizeInfo.class);
+
+    Assert.assertNotNull(tableSizeInfo);
+    Assert.assertTrue(tableSizeInfo.getDiskSizeInBytes() > 0);
+
+    Assert.assertNotNull(tableSizeInfo.getSegments());
+    for (SegmentSizeInfo segmentSizeInfo : tableSizeInfo.getSegments()) {
+      Assert.assertNotNull(segmentSizeInfo.getSegmentName());
+      Assert.assertNull(segmentSizeInfo.getColumnCompressionStats());
+    }
   }
 }

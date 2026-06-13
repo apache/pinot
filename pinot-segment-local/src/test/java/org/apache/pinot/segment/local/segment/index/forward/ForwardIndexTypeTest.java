@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -494,5 +495,73 @@ public class ForwardIndexTypeTest {
   public void testStandardIndex() {
     assertSame(StandardIndexes.forward(), StandardIndexes.forward(), "Standard index should use the same as "
         + "the ForwardIndexType static instance");
+  }
+
+  @Test
+  public void testResolveCompressionType() {
+    // CLP codec → PASS_THROUGH
+    ForwardIndexConfig clpConfig =
+        new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+            .withCompressionCodec(FieldConfig.CompressionCodec.CLP)
+            .build();
+    Assert.assertEquals(ForwardIndexType.resolveCompressionType(clpConfig, FieldSpec.FieldType.DIMENSION),
+        ChunkCompressionType.PASS_THROUGH, "CLP codec should resolve to PASS_THROUGH");
+
+    // CLPV2 codec → ZSTANDARD
+    ForwardIndexConfig clpv2Config =
+        new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+            .withCompressionCodec(FieldConfig.CompressionCodec.CLPV2)
+            .build();
+    Assert.assertEquals(ForwardIndexType.resolveCompressionType(clpv2Config, FieldSpec.FieldType.DIMENSION),
+        ChunkCompressionType.ZSTANDARD, "CLPV2 codec should resolve to ZSTANDARD");
+
+    // CLPV2_ZSTD codec → ZSTANDARD
+    ForwardIndexConfig clpv2ZstdConfig =
+        new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+            .withCompressionCodec(FieldConfig.CompressionCodec.CLPV2_ZSTD)
+            .build();
+    Assert.assertEquals(ForwardIndexType.resolveCompressionType(clpv2ZstdConfig, FieldSpec.FieldType.DIMENSION),
+        ChunkCompressionType.ZSTANDARD, "CLPV2_ZSTD codec should resolve to ZSTANDARD");
+
+    // CLPV2_LZ4 codec → LZ4
+    ForwardIndexConfig clpv2Lz4Config =
+        new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+            .withCompressionCodec(FieldConfig.CompressionCodec.CLPV2_LZ4)
+            .build();
+    Assert.assertEquals(ForwardIndexType.resolveCompressionType(clpv2Lz4Config, FieldSpec.FieldType.DIMENSION),
+        ChunkCompressionType.LZ4, "CLPV2_LZ4 codec should resolve to LZ4");
+
+    // Regular non-CLP codec (SNAPPY) → uses fwdConfig.getChunkCompressionType()
+    ForwardIndexConfig snappyConfig =
+        new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+            .withCompressionCodec(FieldConfig.CompressionCodec.SNAPPY)
+            .build();
+    Assert.assertEquals(ForwardIndexType.resolveCompressionType(snappyConfig, FieldSpec.FieldType.DIMENSION),
+        ChunkCompressionType.SNAPPY, "SNAPPY codec should resolve to SNAPPY via getChunkCompressionType()");
+
+    // Regular non-CLP codec (ZSTANDARD) → uses fwdConfig.getChunkCompressionType()
+    ForwardIndexConfig zstdConfig =
+        new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+            .withCompressionCodec(FieldConfig.CompressionCodec.ZSTANDARD)
+            .build();
+    Assert.assertEquals(ForwardIndexType.resolveCompressionType(zstdConfig, FieldSpec.FieldType.DIMENSION),
+        ChunkCompressionType.ZSTANDARD, "ZSTANDARD codec should resolve to ZSTANDARD via getChunkCompressionType()");
+
+    // No codec, no chunk compression type, fieldType=DIMENSION → falls back to getDefaultCompressionType (LZ4)
+    ForwardIndexConfig noneConfig =
+        new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+            .build();
+    Assert.assertEquals(ForwardIndexType.resolveCompressionType(noneConfig, FieldSpec.FieldType.DIMENSION),
+        ChunkCompressionType.LZ4,
+        "No codec/compression with DIMENSION fieldType should fall back to LZ4 default");
+
+    // No codec, no chunk compression type, fieldType=METRIC → falls back to getDefaultCompressionType (PASS_THROUGH)
+    Assert.assertEquals(ForwardIndexType.resolveCompressionType(noneConfig, FieldSpec.FieldType.METRIC),
+        ChunkCompressionType.PASS_THROUGH,
+        "No codec/compression with METRIC fieldType should fall back to PASS_THROUGH default");
+
+    // No codec, no chunk compression type, null fieldType → returns null
+    Assert.assertNull(ForwardIndexType.resolveCompressionType(noneConfig, null),
+        "No codec/compression with null fieldType should return null");
   }
 }

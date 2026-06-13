@@ -198,7 +198,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private void updateTableSizeMetrics(String tableNameWithType)
       throws InvalidConfigException {
-    _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS, true);
+    _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS, true, false);
   }
 
   /**
@@ -500,6 +500,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private void removeMetricsForTable(String tableNameWithType) {
     LOGGER.info("Removing metrics from {} given it is not a table known by Helix", tableNameWithType);
+    // Remove tier-suffixed gauges that use composite keys (tableName.tierKey)
+    _tableSizeReader.clearTierMetrics(tableNameWithType);
     for (ControllerGauge metric : ControllerGauge.values()) {
       if (!metric.isGlobal()) {
         _controllerMetrics.removeTableGauge(tableNameWithType, metric);

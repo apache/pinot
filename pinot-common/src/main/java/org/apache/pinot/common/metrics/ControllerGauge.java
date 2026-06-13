@@ -116,6 +116,18 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Percentage of segments we failed to get size for
   TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false),
 
+  // Forward index compression ratio scaled by 100 (e.g., 4.5x ratio → 450). Divide by 100 to get actual ratio.
+  TABLE_COMPRESSION_RATIO_PERCENT("TableCompressionRatioPercent", false),
+
+  // Raw (uncompressed) forward index size per replica
+  TABLE_RAW_FORWARD_INDEX_SIZE_PER_REPLICA("TableRawForwardIndexSizePerReplica", false),
+
+  // Compressed forward index size per replica
+  TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA("TableCompressedForwardIndexSizePerReplica", false),
+
+  // Size per replica broken down by storage tier
+  TABLE_TIERED_STORAGE_SIZE("TableTieredStorageSize", false),
+
   // Number of scheduled Cron jobs
   CRON_SCHEDULER_JOB_SCHEDULED("cronSchedulerJobScheduled", false),
 

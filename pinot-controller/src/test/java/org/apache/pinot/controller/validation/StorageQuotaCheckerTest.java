@@ -207,6 +207,6 @@ public class StorageQuotaCheckerTest {
     tableSizeResult._estimatedSizeInBytes = tableSizeInBytes;
     tableSizeResult._segments = Collections.emptyMap();
     tableSizeResult._missingSegments = numMissingSegments;
-    when(_tableSizeReader.getTableSubtypeSize(tableName, 1000, true)).thenReturn(tableSizeResult);
+    when(_tableSizeReader.getTableSubtypeSize(tableName, 1000, true, false)).thenReturn(tableSizeResult);
   }
 }

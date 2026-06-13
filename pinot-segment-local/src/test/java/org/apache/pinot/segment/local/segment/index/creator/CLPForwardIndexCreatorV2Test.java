@@ -173,4 +173,46 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
     File indexFile = new File(TEMP_DIR, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     return indexFile.length();
   }
+
+  @Test
+  public void testGetUncompressedSizeAfterWriting()
+      throws IOException {
+    try (CLPMutableForwardIndexV2 mutable = new CLPMutableForwardIndexV2(COLUMN_NAME, _memoryManager)) {
+      for (int i = 0; i < _logMessages.size(); i++) {
+        mutable.setString(i, _logMessages.get(i));
+      }
+      TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
+      CLPForwardIndexCreatorV2 creator =
+          new CLPForwardIndexCreatorV2(TEMP_DIR, mutable, ChunkCompressionType.ZSTANDARD);
+      creator.setTrackUncompressedSize(true);
+      for (int i = 0; i < _logMessages.size(); i++) {
+        creator.putString(mutable.getString(i));
+      }
+      creator.seal();
+      creator.close();
+      Assert.assertTrue(creator.getUncompressedSize() > 0,
+          "getUncompressedSize() should be > 0 after writing with tracking enabled");
+    }
+  }
+
+  @Test
+  public void testGetUncompressedSizeDisabledReturnsZero()
+      throws IOException {
+    try (CLPMutableForwardIndexV2 mutable = new CLPMutableForwardIndexV2(COLUMN_NAME, _memoryManager)) {
+      for (int i = 0; i < _logMessages.size(); i++) {
+        mutable.setString(i, _logMessages.get(i));
+      }
+      TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
+      CLPForwardIndexCreatorV2 creator =
+          new CLPForwardIndexCreatorV2(TEMP_DIR, mutable, ChunkCompressionType.ZSTANDARD);
+      creator.setTrackUncompressedSize(false);
+      for (int i = 0; i < _logMessages.size(); i++) {
+        creator.putString(mutable.getString(i));
+      }
+      creator.seal();
+      creator.close();
+      Assert.assertEquals(creator.getUncompressedSize(), 0L,
+          "getUncompressedSize() should be 0 when tracking is disabled");
+    }
+  }
 }
