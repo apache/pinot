@@ -40,13 +40,11 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.sql.SqlLiteral;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
@@ -65,12 +63,9 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class PRelToPlanNodeConverter {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PRelToPlanNodeConverter.class);
   private static final int DEFAULT_STAGE_ID = -1;
 
   private PRelToPlanNodeConverter() {
@@ -282,115 +277,11 @@ public class PRelToPlanNodeConverter {
       String[] columnNames = recordType.getFieldNames().toArray(new String[]{});
       ColumnDataType[] columnDataTypes = new ColumnDataType[columnNames.length];
       for (int i = 0; i < columnNames.length; i++) {
-        columnDataTypes[i] = convertToColumnDataType(recordType.getFieldList().get(i).getType());
+        columnDataTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(recordType.getFieldList().get(i).getType());
       }
       return new DataSchema(columnNames, columnDataTypes);
     } else {
       throw new IllegalArgumentException("Unsupported RelDataType: " + rowType);
-    }
-  }
-
-  public static ColumnDataType convertToColumnDataType(RelDataType relDataType) {
-    SqlTypeName sqlTypeName = relDataType.getSqlTypeName();
-    if (sqlTypeName == SqlTypeName.NULL) {
-      return ColumnDataType.UNKNOWN;
-    }
-    boolean isArray = (sqlTypeName == SqlTypeName.ARRAY);
-    if (isArray) {
-      assert relDataType.getComponentType() != null;
-      relDataType = relDataType.getComponentType();
-      sqlTypeName = relDataType.getSqlTypeName();
-    }
-    switch (sqlTypeName) {
-      case BOOLEAN:
-        return isArray ? ColumnDataType.BOOLEAN_ARRAY : ColumnDataType.BOOLEAN;
-      case TINYINT:
-      case SMALLINT:
-      case INTEGER:
-      // Calcite 1.41+ (CALCITE-1466) parses unsigned integer types under BABEL conformance. Pinot has no unsigned
-      // storage, so map each to the narrowest signed type that holds its full range: UTINYINT (0..2^8-1) and
-      // USMALLINT (0..2^16-1) fit in INT; UINTEGER (0..2^32-1) needs LONG (a signed INT would wrap values above 2^31).
-      // Kept in sync with RelToPlanNodeConverter.convertToColumnDataType.
-      case UTINYINT:
-      case USMALLINT:
-        return isArray ? ColumnDataType.INT_ARRAY : ColumnDataType.INT;
-      case BIGINT:
-      case UINTEGER:
-        return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
-      // UBIGINT (0..2^64-1) has no signed Pinot type wide enough to hold its full range; mapping it to LONG would
-      // silently wrap values above Long.MAX_VALUE (a wrong result), so reject it at planning instead. CALCITE-1466.
-      // Kept in sync with RelToPlanNodeConverter.convertToColumnDataType.
-      case UBIGINT:
-        throw new IllegalArgumentException(
-            "Unsigned BIGINT (BIGINT UNSIGNED) is not supported: Pinot has no type that can represent the full "
-                + "unsigned 64-bit range. CAST to BIGINT or DECIMAL instead.");
-      case DECIMAL:
-        return resolveDecimal(relDataType, isArray);
-      case FLOAT:
-      case REAL:
-        return isArray ? ColumnDataType.FLOAT_ARRAY : ColumnDataType.FLOAT;
-      case DOUBLE:
-        return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
-      case DATE:
-      case TIME:
-      case TIMESTAMP:
-        return isArray ? ColumnDataType.TIMESTAMP_ARRAY : ColumnDataType.TIMESTAMP;
-      case CHAR:
-      case VARCHAR:
-        return isArray ? ColumnDataType.STRING_ARRAY : ColumnDataType.STRING;
-      case BINARY:
-      case VARBINARY:
-        return isArray ? ColumnDataType.BYTES_ARRAY : ColumnDataType.BYTES;
-      case MAP:
-        return ColumnDataType.MAP;
-      case OTHER:
-      case ANY:
-        return ColumnDataType.OBJECT;
-      default:
-        if (relDataType.getComponentType() != null) {
-          throw new IllegalArgumentException("Unsupported collection type: " + relDataType);
-        }
-        LOGGER.warn("Unexpected SQL type: {}, use OBJECT instead", sqlTypeName);
-        return ColumnDataType.OBJECT;
-    }
-  }
-
-  /**
-   * Calcite uses DEMICAL type to infer data type hoisting and infer arithmetic result types. down casting this back to
-   * the proper primitive type for Pinot.
-   * TODO: Revisit this method:
-   *  - Currently we are converting exact value to approximate value
-   *  - Integer can only cover all values with precision 9; Long can only cover all values with precision 18
-   *
-   * {@link RequestUtils#getLiteralExpression(SqlLiteral)}
-   * @param relDataType the DECIMAL rel data type.
-   * @param isArray
-   * @return proper {@link ColumnDataType}.
-   * @see {@link org.apache.calcite.rel.type.RelDataTypeFactoryImpl#decimalOf}.
-   */
-  private static ColumnDataType resolveDecimal(RelDataType relDataType, boolean isArray) {
-    int precision = relDataType.getPrecision();
-    int scale = relDataType.getScale();
-    if (scale == 0) {
-      if (precision <= 10) {
-        return isArray ? ColumnDataType.INT_ARRAY : ColumnDataType.INT;
-      } else if (precision <= 38) {
-        return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
-      } else {
-        // TODO: Modify it to return ColumnDataType.BIG_DECIMAL_ARRAY after `1.6.0` release
-        //       BIG_DECIMAL_ARRAY support is added in `1.6.0`
-        return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
-      }
-    } else {
-      // NOTE: Do not use FLOAT to represent DECIMAL to be consistent with single-stage engine behavior.
-      //       See {@link RequestUtils#getLiteralExpression(SqlLiteral)}.
-      if (precision <= 30) {
-        return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
-      } else {
-        // TODO: Modify it to return ColumnDataType.BIG_DECIMAL_ARRAY after `1.6.0` release
-        //       BIG_DECIMAL_ARRAY support is added in `1.6.0`
-        return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
-      }
     }
   }
 
