@@ -106,9 +106,14 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
         // architectural gap (apache/pinot#18629).
         PinotDataType destDataType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
         try {
-          for (int i = 0; i < _totalDocCount; i++) {
+          // Consume the column sequentially (rewind + next) rather than by random getValue(docId).
+          // The sequential, rewindable contract is the one every columnar source can satisfy cheaply —
+          // including lazy / streaming readers that cannot serve random docId access without
+          // materializing the whole column. The index-write path already consumes this way.
+          columnReader.rewind();
+          while (columnReader.hasNext()) {
             statsCollector.collect(
-                ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, columnReader.getValue(i)));
+                ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, columnReader.next()));
           }
         } catch (IOException e) {
           throw new RuntimeException("Caught exception collecting stats for column: " + columnName, e);
