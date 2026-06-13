@@ -44,6 +44,7 @@ public class AuthZkBasicQuickstart extends Quickstart {
     Map<String, Object> properties = new HashMap<>(super.getConfigOverrides());
 
     // controller
+    properties.put("auth.provider.type", "static");
     properties.put("pinot.controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
     properties.put("controller.admin.access.control.factory.class",
         "org.apache.pinot.controller.api.access.ZkBasicAuthAccessControlFactory");
@@ -55,10 +56,12 @@ public class AuthZkBasicQuickstart extends Quickstart {
         "org.apache.pinot.broker.broker.ZkBasicAuthAccessControlFactory");
 
     // server
+      properties.put("auth.provider.type", "static");
     properties.put("pinot.server.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
     properties.put("pinot.server.segment.uploader.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
     // minion
+      properties.put("auth.provider.type", "static");
     properties.put("segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
     properties.put("task.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
