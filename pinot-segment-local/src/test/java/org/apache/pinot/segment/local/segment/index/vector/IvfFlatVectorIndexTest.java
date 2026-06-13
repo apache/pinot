@@ -836,7 +836,7 @@ public class IvfFlatVectorIndexTest {
     properties.put("nlist", String.valueOf(nlist));
     properties.put("trainingSeed", String.valueOf(TEST_SEED));
     properties.put("quantizer", quantizerType.name());
-    return new VectorIndexConfig(false, "IVF_FLAT", dimension, 1, distanceFunction, properties);
+    return new VectorIndexConfig(Boolean.FALSE, "IVF_FLAT", dimension, 1, distanceFunction, properties);
   }
 
   private float[][] generateRandomVectors(int numVectors, int dimension, long seed) {

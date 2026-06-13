@@ -163,8 +163,13 @@ public class DictionaryIndexType
       allColumns.addAll(varLengthDictionaryColumns);
       Map<String, DictionaryIndexConfig> dictionaryIndexConfigMap = Maps.newHashMapWithExpectedSize(allColumns.size());
       for (String column : allColumns) {
-        dictionaryIndexConfigMap.put(column, new DictionaryIndexConfig(onHeapDictionaryColumns.contains(column),
-            varLengthDictionaryColumns.contains(column)));
+        // Pass `null` rather than `false` for the absent flag: under the wrapper-based contract,
+        // null = "not explicitly configured" (slim form omits the key) while false = "user said
+        // false." A column that appears only in onHeapDictionaryColumns has not been configured
+        // for useVarLengthDictionary at all, so null is the faithful translation.
+        Boolean onHeap = onHeapDictionaryColumns.contains(column) ? Boolean.TRUE : null;
+        Boolean useVarLength = varLengthDictionaryColumns.contains(column) ? Boolean.TRUE : null;
+        dictionaryIndexConfigMap.put(column, new DictionaryIndexConfig(onHeap, useVarLength));
       }
       return dictionaryIndexConfigMap;
     };

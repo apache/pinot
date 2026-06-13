@@ -91,7 +91,8 @@ public class H3IndexConfigTest {
     H3IndexConfig initialConf = new H3IndexConfig(new H3IndexResolution(Lists.newArrayList(5, 6, 13)));
 
     String confAsJson = JsonUtils.objectToString(initialConf);
-    Assert.assertEquals(confAsJson, "{\"disabled\":false,\"resolution\":[5,6,13]}");
+    // Slim serialization: disabled=false (the default) is omitted; only non-default fields are emitted.
+    Assert.assertEquals(confAsJson, "{\"resolution\":[5,6,13]}");
 
     H3IndexConfig readConf = JsonUtils.stringToObject(confAsJson, H3IndexConfig.class);
     Assert.assertEquals(readConf, initialConf, "Unexpected configuration after serialization and deserialization");

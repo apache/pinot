@@ -21,6 +21,8 @@ package org.apache.pinot.segment.spi.index;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
@@ -81,7 +83,7 @@ public class ForwardIndexConfig extends IndexConfig {
   private final EncodingType _encodingType;
   @Nullable
   private final CompressionCodec _compressionCodec;
-  private final boolean _deriveNumDocsPerChunk;
+  private final Boolean _deriveNumDocsPerChunk;
   private final int _rawIndexWriterVersion;
   private final String _targetMaxChunkSize;
   private final int _targetMaxChunkSizeBytes;
@@ -111,7 +113,7 @@ public class ForwardIndexConfig extends IndexConfig {
     // Builder(EncodingType) and pass an explicit value, typically from FieldConfig.getEncodingType().
     _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
     _compressionCodec = getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType);
-    _deriveNumDocsPerChunk = Boolean.TRUE.equals(deriveNumDocsPerChunk);
+    _deriveNumDocsPerChunk = deriveNumDocsPerChunk;
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? _defaultRawIndexWriterVersion : rawIndexWriterVersion;
     _targetMaxChunkSize = targetMaxChunkSize == null ? _defaultTargetMaxChunkSize : targetMaxChunkSize;
     _targetMaxChunkSizeBytes =
@@ -208,7 +210,7 @@ public class ForwardIndexConfig extends IndexConfig {
   }
 
   public boolean isDeriveNumDocsPerChunk() {
-    return _deriveNumDocsPerChunk;
+    return Boolean.TRUE.equals(_deriveNumDocsPerChunk);
   }
 
   public int getRawIndexWriterVersion() {
@@ -250,6 +252,39 @@ public class ForwardIndexConfig extends IndexConfig {
     return _encodingType;
   }
 
+  /// Curated slim serializer. See [IndexConfig#toJsonObject()] for the rationale.
+  ///
+  /// `compressionCodec` and `deriveNumDocsPerChunk` are emitted only when explicitly configured (non-null).
+  ///
+  /// The three cluster-tunable fields `rawIndexWriterVersion`, `targetMaxChunkSize`, and `targetDocsPerChunk`
+  /// follow a *snapshot model*: the constructor coerces null to the live JVM-static default
+  /// ([#_defaultRawIndexWriterVersion], [#_defaultTargetMaxChunkSize], [#_defaultTargetDocsPerChunk]) at init
+  /// time. The fields are therefore always non-null after construction and are always emitted via the standard
+  /// `if (_x != null)` rule. This preserves the pre-PR contract that `ServiceStartableUtils.initForwardIndexConfig`
+  /// users observed (snapshot at construction, stable for object lifetime), and keeps the ZK shape stable across
+  /// nodes whose JVM-local statics differ (rolling upgrades, mismatched instance configs).
+  ///
+  /// Deprecated input keys `chunkCompressionType` and `dictIdCompressionType` are intentionally not emitted —
+  /// their getters were already `@JsonIgnore`, so the slim form matches prior behavior. Same for `configs`.
+  @Override
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = super.toJsonObject();
+    node.put("encodingType", _encodingType.name());
+    if (_compressionCodec != null) {
+      node.put("compressionCodec", _compressionCodec.name());
+    }
+    if (_deriveNumDocsPerChunk != null) {
+      node.put("deriveNumDocsPerChunk", _deriveNumDocsPerChunk);
+    }
+    // Cluster-tunable trio — fields are snapshot-coerced at init time, so they are always non-null and always
+    // emitted (see Javadoc above).
+    node.put("rawIndexWriterVersion", _rawIndexWriterVersion);
+    node.put("targetMaxChunkSize", _targetMaxChunkSize);
+    node.put("targetDocsPerChunk", _targetDocsPerChunk);
+    return node;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -262,9 +297,11 @@ public class ForwardIndexConfig extends IndexConfig {
       return false;
     }
     ForwardIndexConfig that = (ForwardIndexConfig) o;
-    return _compressionCodec == that._compressionCodec && _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
-        && _rawIndexWriterVersion == that._rawIndexWriterVersion && Objects.equals(_targetMaxChunkSize,
-        that._targetMaxChunkSize) && _targetDocsPerChunk == that._targetDocsPerChunk
+    return _compressionCodec == that._compressionCodec
+        && Objects.equals(_deriveNumDocsPerChunk, that._deriveNumDocsPerChunk)
+        && _rawIndexWriterVersion == that._rawIndexWriterVersion
+        && Objects.equals(_targetMaxChunkSize, that._targetMaxChunkSize)
+        && _targetDocsPerChunk == that._targetDocsPerChunk
         && _encodingType == that._encodingType;
   }
 
@@ -279,7 +316,7 @@ public class ForwardIndexConfig extends IndexConfig {
     private final EncodingType _encodingType;
     @Nullable
     private CompressionCodec _compressionCodec;
-    private boolean _deriveNumDocsPerChunk = false;
+    private Boolean _deriveNumDocsPerChunk;
     private int _rawIndexWriterVersion = _defaultRawIndexWriterVersion;
     private String _targetMaxChunkSize = _defaultTargetMaxChunkSize;
     private int _targetDocsPerChunk = _defaultTargetDocsPerChunk;

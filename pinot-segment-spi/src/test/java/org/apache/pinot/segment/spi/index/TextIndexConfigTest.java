@@ -210,14 +210,16 @@ public class TextIndexConfigTest {
     assertTrue(originalConfig.getLuceneAnalyzerClassArgs().isEmpty());
     assertTrue(originalConfig.getLuceneAnalyzerClassArgTypes().isEmpty());
 
-    // Serialize to JSON - this produces the problematic format with empty arrays
+    // Serialize to JSON. Under slim serialization, empty list defaults are omitted entirely,
+    // which is strictly safer than the pre-existing "[]" output that previously triggered the
+    // "Cannot deserialize String from Array" bug. The round-trip below still verifies semantic
+    // equivalence; we just no longer assert on the legacy "[]" wire shape.
     final String serialized = JsonUtils.objectToString(originalConfig);
 
-    // Verify serialized JSON contains the array format that was causing the bug
-    assertTrue(serialized.contains("\"luceneAnalyzerClassArgs\":[]"),
-        "Serialized JSON should contain luceneAnalyzerClassArgs as empty array");
-    assertTrue(serialized.contains("\"luceneAnalyzerClassArgTypes\":[]"),
-        "Serialized JSON should contain luceneAnalyzerClassArgTypes as empty array");
+    assertFalse(serialized.contains("\"luceneAnalyzerClassArgs\":[]"),
+        "Slim serialization must omit empty luceneAnalyzerClassArgs, not emit '[]': " + serialized);
+    assertFalse(serialized.contains("\"luceneAnalyzerClassArgTypes\":[]"),
+        "Slim serialization must omit empty luceneAnalyzerClassArgTypes, not emit '[]': " + serialized);
 
     // Deserialize back
     final TextIndexConfig deserializedConfig = JsonUtils.stringToObject(serialized, TextIndexConfig.class);

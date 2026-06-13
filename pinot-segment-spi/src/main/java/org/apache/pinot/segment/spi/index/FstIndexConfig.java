@@ -21,6 +21,8 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
 
@@ -35,5 +37,13 @@ public class FstIndexConfig extends IndexConfig {
   @JsonCreator
   public FstIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled) {
     super(disabled);
+  }
+
+  /// Curated slim serializer. `FstIndexConfig` adds no fields beyond `disabled`, so the override is for
+  /// symmetry and direct test traceability — it inherits the base behavior.
+  @Override
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    return super.toJsonObject();
   }
 }

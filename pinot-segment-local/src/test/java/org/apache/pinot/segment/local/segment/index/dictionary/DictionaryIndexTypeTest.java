@@ -136,7 +136,8 @@ public class DictionaryIndexTypeTest {
         throws IOException {
       _tableConfig.getIndexingConfig()
           .setVarLengthDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
-      assertEquals(new DictionaryIndexConfig(false, true, null));
+      // Conversion now passes null for absent flags (see DictionaryIndexType#getFromIndexingConfig).
+      assertEquals(new DictionaryIndexConfig(null, true, null));
     }
 
     @Test
@@ -187,7 +188,8 @@ public class DictionaryIndexTypeTest {
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(true, false, null));
+      // Only onHeap explicitly set; useVarLengthDictionary is not configured (null).
+      assertEquals(new DictionaryIndexConfig(true, null));
     }
 
     @Test
@@ -205,7 +207,7 @@ public class DictionaryIndexTypeTest {
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(true, false, new Intern(1000)));
+      assertEquals(new DictionaryIndexConfig(true, null, new Intern(1000)));
     }
 
     @Test
@@ -254,7 +256,8 @@ public class DictionaryIndexTypeTest {
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(false, false, null));
+      // Empty `{}` produces a config with all-null wrapper fields.
+      assertEquals(DictionaryIndexConfig.DEFAULT);
     }
 
     @Test
@@ -269,7 +272,9 @@ public class DictionaryIndexTypeTest {
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(false, true, null));
+      // Only useVarLengthDictionary explicitly set; onHeap is not configured (null).
+      // Cast disambiguates the (Boolean, Boolean) ctor from (DictionaryIndexConfig, boolean).
+      assertEquals(new DictionaryIndexConfig((Boolean) null, true));
     }
 
     @Test

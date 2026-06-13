@@ -20,9 +20,13 @@ package org.apache.pinot.segment.local.segment.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.vector.VectorIndexType;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,6 +36,20 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 public class VectorIndexTest {
+  @Test
+  public void testEmptyPropertiesSurviveRoundTripForRuntimeDefaults()
+      throws Exception {
+    VectorIndexConfig original = new VectorIndexConfig(Boolean.FALSE, "HNSW", 128, 1,
+        VectorIndexConfig.VectorDistanceFunction.COSINE, Map.of());
+    String serialized = JsonUtils.objectToString(original);
+    VectorIndexConfig roundTripped = JsonUtils.stringToObject(serialized, VectorIndexConfig.class);
+
+    assertNotNull(roundTripped.getProperties());
+    assertTrue(roundTripped.getProperties().isEmpty());
+    // Regression guard: this used to NPE when properties became null after round-trip.
+    assertNotNull(VectorIndexUtils.getIndexWriterConfig(roundTripped));
+  }
+
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     @Test
@@ -58,11 +76,12 @@ public class VectorIndexTest {
           .filter(fc -> fc.getName().equals("studentID")).collect(Collectors.toList()).get(0);
       JsonNode indexConfig = fieldConfig.getIndexes().get(VectorIndexType.INDEX_DISPLAY_NAME);
       assertNotNull(indexConfig);
-      assertFalse(indexConfig.get("disabled").asBoolean());
+      // Slim serialization: disabled=false (default) is omitted from the JSON entirely.
+      assertNull(indexConfig.get("disabled"));
       assertTrue(fieldConfig.getIndexTypes().isEmpty());
       assertNull(fieldConfig.getProperties());
       Assert.assertEquals(indexConfig.toString(),
-          "{\"disabled\":false,\"vectorIndexType\":\"HNSW\",\"vectorDimension\":1536,"
+          "{\"vectorIndexType\":\"HNSW\",\"vectorDimension\":1536,"
               + "\"version\":1,\"vectorDistanceFunction\":\"COSINE\",\"properties\":{\"vectorIndexType\":"
               + "\"HNSW\",\"vectorDimension\":\"1536\",\"vectorDistanceFunction\":\"COSINE\",\"version\":\"1\"}}");
     }

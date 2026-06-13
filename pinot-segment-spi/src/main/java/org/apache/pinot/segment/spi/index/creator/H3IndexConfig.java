@@ -20,6 +20,8 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class H3IndexConfig extends IndexConfig {
@@ -66,6 +69,19 @@ public class H3IndexConfig extends IndexConfig {
 
   public H3IndexResolution getResolution() {
     return _resolution;
+  }
+
+  /// Curated slim serializer. See [IndexConfig#toJsonObject()] for the rationale.
+  ///
+  /// The JSON key is `"resolution"` (singular) — matches the `@JsonProperty` on the `@JsonCreator` parameter.
+  @Override
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = super.toJsonObject();
+    if (_resolution != null) {
+      node.set("resolution", JsonUtils.objectToJsonNode(_resolution));
+    }
+    return node;
   }
 
   @Override

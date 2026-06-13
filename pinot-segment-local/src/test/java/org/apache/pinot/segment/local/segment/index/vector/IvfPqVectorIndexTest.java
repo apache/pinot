@@ -448,7 +448,7 @@ public class IvfPqVectorIndexTest {
     properties.put("nlist", "2");
     properties.put("pqNbits", "4");
     properties.put("trainSampleSize", "8");
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 4, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", 4, 1,
         VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, properties);
     try (IvfPqVectorIndexCreator ignored = new IvfPqVectorIndexCreator(COLUMN_NAME, _tempDir, config)) {
       Assert.fail("Expected missing pqM validation to fail");
@@ -732,7 +732,7 @@ public class IvfPqVectorIndexTest {
     properties.put("pqNbits", String.valueOf(pqNbits));
     properties.put("trainSampleSize", String.valueOf(trainSampleSize));
     properties.put("trainingSeed", String.valueOf(trainingSeed));
-    return new VectorIndexConfig(false, "IVF_PQ", dimension, 1, distanceFunction, properties);
+    return new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", dimension, 1, distanceFunction, properties);
   }
 
   private void assertSupportedPqNbitsSearchPath(VectorIndexConfig.VectorDistanceFunction distanceFunction)

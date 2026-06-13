@@ -373,7 +373,7 @@ public final class BenchmarkVectorFeatureWorkloads {
     properties.put("nprobe", String.valueOf(NPROBE));
     properties.put("trainingSeed", String.valueOf(SEED));
     properties.put("quantizer", quantizerType.name());
-    return new VectorIndexConfig(false, backendType, dimension, 1, distanceFunction, properties);
+    return new VectorIndexConfig(Boolean.FALSE, backendType, dimension, 1, distanceFunction, properties);
   }
 
   private static VectorIndexConfig createMutableHnswConfig(int dimension, int numDocs,
@@ -384,7 +384,7 @@ public final class BenchmarkVectorFeatureWorkloads {
     properties.put("vectorDistanceFunction", distanceFunction.name());
     properties.put("commitDocs", String.valueOf(Math.max(1, numDocs)));
     properties.put("commitIntervalMs", String.valueOf(Long.MAX_VALUE));
-    return new VectorIndexConfig(false, "HNSW", dimension, 1, distanceFunction, properties);
+    return new VectorIndexConfig(Boolean.FALSE, "HNSW", dimension, 1, distanceFunction, properties);
   }
 
   private static long[] measureLatencies(float[][] queries, SearchAction action)

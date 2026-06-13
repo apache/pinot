@@ -603,7 +603,7 @@ public class VectorSimilarityFilterOperatorTest {
 
   private VectorIndexConfig createVectorIndexConfig(String backendType,
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
-    return new VectorIndexConfig(false, backendType, 2, 1, distanceFunction,
+    return new VectorIndexConfig(Boolean.FALSE, backendType, 2, 1, distanceFunction,
         Map.of("nlist", "4", "pqM", "2", "pqNbits", "8", "trainSampleSize", "16"));
   }
 }

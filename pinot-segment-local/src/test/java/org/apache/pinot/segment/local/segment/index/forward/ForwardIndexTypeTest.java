@@ -143,7 +143,6 @@ public class ForwardIndexTypeTest {
       assertEquals(
           new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
               .withCompressionType(ChunkCompressionType.SNAPPY)
-              .withDeriveNumDocsPerChunk(false)
               .build()
       );
     }
@@ -163,7 +162,6 @@ public class ForwardIndexTypeTest {
       assertEquals(
           new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
               .withCompressionType(ChunkCompressionType.SNAPPY)
-              .withDeriveNumDocsPerChunk(false)
               .build()
       );
     }
@@ -227,7 +225,6 @@ public class ForwardIndexTypeTest {
                 .withCompressionCodec(compression == null ? null : FieldConfig.CompressionCodec.valueOf(compression))
                 .withCompressionType(expectedChunkCompression)
                 .withDictIdCompressionType(expectedDictCompression)
-                .withDeriveNumDocsPerChunk(false)
                 .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
                 .build()
       );
@@ -268,7 +265,6 @@ public class ForwardIndexTypeTest {
 
       assertEquals(new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
           .withCompressionType(null)
-          .withDeriveNumDocsPerChunk(false)
           .withRawIndexWriterVersion(3)
           .build());
     }

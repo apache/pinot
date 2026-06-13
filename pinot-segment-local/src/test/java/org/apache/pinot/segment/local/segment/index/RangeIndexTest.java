@@ -47,7 +47,10 @@ public class RangeIndexTest {
           .filter(fc -> fc.getName().equals("dimInt")).collect(Collectors.toList()).get(0);
       JsonNode indexConfig = fieldConfig.getIndexes().get(RangeIndexType.INDEX_DISPLAY_NAME);
       assertNotNull(indexConfig);
-      assertEquals(RangeIndexConfig.DEFAULT.getVersion(), indexConfig.get("version").asInt());
+      // Slim serialization: the conversion code constructs RangeIndexConfig with an explicit
+      // version, which the wrapper-based contract preserves through round-trip even when it
+      // matches today's default — distinguishing "user set" from "not set."
+      assertEquals(RangeIndexConfig.DEFAULT_VERSION, indexConfig.get("version").asInt());
       assertTrue(fieldConfig.getIndexTypes().isEmpty());
       assertNull(fieldConfig.getProperties());
     }

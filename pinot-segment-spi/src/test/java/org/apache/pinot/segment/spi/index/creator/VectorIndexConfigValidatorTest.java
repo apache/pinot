@@ -53,7 +53,7 @@ public class VectorIndexConfigValidatorTest {
 
   @Test
   public void testBackwardCompatEmptyVectorIndexTypeDefaultsToHnsw() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "", 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     assertEquals(VectorIndexConfigValidator.resolveBackendType(config), VectorBackendType.HNSW);
   }
@@ -110,7 +110,7 @@ public class VectorIndexConfigValidatorTest {
   @Test
   public void testValidHnswConfigMinimal() {
     // Minimal config: only required fields
-    VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "HNSW", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     VectorIndexConfigValidator.validate(config);
   }
@@ -150,7 +150,7 @@ public class VectorIndexConfigValidatorTest {
 
   @Test
   public void testValidIvfFlatConfigMinimal() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_FLAT", 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_FLAT", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     VectorIndexConfigValidator.validate(config);
   }
@@ -371,7 +371,7 @@ public class VectorIndexConfigValidatorTest {
   @Test(expectedExceptions = IllegalArgumentException.class,
       expectedExceptionsMessageRegExp = ".*vectorDimension must be a positive integer.*")
   public void testRejectZeroDimension() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 0, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "HNSW", 0, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     VectorIndexConfigValidator.validate(config);
   }
@@ -379,7 +379,7 @@ public class VectorIndexConfigValidatorTest {
   @Test(expectedExceptions = IllegalArgumentException.class,
       expectedExceptionsMessageRegExp = ".*vectorDimension must be a positive integer.*")
   public void testRejectNegativeDimension() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", -5, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "HNSW", -5, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     VectorIndexConfigValidator.validate(config);
   }
@@ -387,7 +387,7 @@ public class VectorIndexConfigValidatorTest {
   @Test(expectedExceptions = IllegalArgumentException.class,
       expectedExceptionsMessageRegExp = ".*vectorDistanceFunction is required.*")
   public void testRejectNullDistanceFunction() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 768, 1, null, null);
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "HNSW", 768, 1, null, null);
     VectorIndexConfigValidator.validate(config);
   }
 
@@ -516,21 +516,21 @@ public class VectorIndexConfigValidatorTest {
   @Test
   public void testAllDistanceFunctions() {
     for (VectorIndexConfig.VectorDistanceFunction df : VectorIndexConfig.VectorDistanceFunction.values()) {
-      VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 768, 1, df, null);
+      VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "HNSW", 768, 1, df, null);
       VectorIndexConfigValidator.validate(config);
     }
   }
 
   @Test
   public void testL2DistanceFunctionForIvfFlat() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_FLAT", 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_FLAT", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.L2, null);
     VectorIndexConfigValidator.validate(config);
   }
 
   @Test
   public void testL2DistanceFunctionForIvfPq() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.L2,
         Map.of("nlist", "128", "pqM", "32", "pqNbits", "8", "trainSampleSize", "10000"));
     VectorIndexConfigValidator.validate(config);
@@ -553,43 +553,43 @@ public class VectorIndexConfigValidatorTest {
 
   @Test
   public void testResolveBackendTypeExplicitHnsw() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "HNSW", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     assertEquals(config.resolveBackendType(), VectorBackendType.HNSW);
   }
 
   @Test
   public void testResolveBackendTypeExplicitIvfFlat() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_FLAT", 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_FLAT", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     assertEquals(config.resolveBackendType(), VectorBackendType.IVF_FLAT);
   }
 
   @Test
   public void testResolveBackendTypeExplicitIvfPq() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     assertEquals(config.resolveBackendType(), VectorBackendType.IVF_PQ);
   }
 
   @Test
   public void testResolveBackendTypeCaseInsensitive() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "hnsw", 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "hnsw", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     assertEquals(config.resolveBackendType(), VectorBackendType.HNSW);
 
-    VectorIndexConfig config2 = new VectorIndexConfig(false, "ivf_flat", 768, 1,
+    VectorIndexConfig config2 = new VectorIndexConfig(Boolean.FALSE, "ivf_flat", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     assertEquals(config2.resolveBackendType(), VectorBackendType.IVF_FLAT);
 
-    VectorIndexConfig config3 = new VectorIndexConfig(false, "ivf_pq", 768, 1,
+    VectorIndexConfig config3 = new VectorIndexConfig(Boolean.FALSE, "ivf_pq", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     assertEquals(config3.resolveBackendType(), VectorBackendType.IVF_PQ);
   }
 
   @Test
   public void testResolveBackendTypeNullDefaultsToHnsw() {
-    VectorIndexConfig config = new VectorIndexConfig(false, null, 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, null, 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     assertEquals(config.resolveBackendType(), VectorBackendType.HNSW);
   }
@@ -597,7 +597,7 @@ public class VectorIndexConfigValidatorTest {
   @Test(expectedExceptions = IllegalArgumentException.class,
       expectedExceptionsMessageRegExp = ".*Unknown vector backend type.*FAISS.*")
   public void testResolveBackendTypeUnknown() {
-    VectorIndexConfig config = new VectorIndexConfig(false, "FAISS", 768, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "FAISS", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     config.resolveBackendType();
   }
@@ -748,7 +748,7 @@ public class VectorIndexConfigValidatorTest {
     assert trainSampleSize >= nlist : "trainSampleSize must be >= nlist";
 
     // Verify the defaults pass validation
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 128, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", 128, 1,
         VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, defaults);
     VectorIndexConfigValidator.validate(config);
   }
@@ -760,7 +760,7 @@ public class VectorIndexConfigValidatorTest {
     assert 512 % pqM == 0 : "pqM must evenly divide dimension=512";
     assert pqM <= 64 : "pqM should be <= dim/8 for dim=512";
 
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 512, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", 512, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, defaults);
     VectorIndexConfigValidator.validate(config);
   }
@@ -773,7 +773,7 @@ public class VectorIndexConfigValidatorTest {
     assert 7 % pqM == 0 : "pqM must evenly divide dimension=7";
     assertEquals(pqM, 1, "For prime dimension=7, pqM should fall back to 1");
 
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 7, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", 7, 1,
         VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, defaults);
     VectorIndexConfigValidator.validate(config);
   }

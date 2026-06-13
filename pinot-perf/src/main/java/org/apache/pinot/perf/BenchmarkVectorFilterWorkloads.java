@@ -403,7 +403,7 @@ public final class BenchmarkVectorFilterWorkloads {
     properties.put("nprobe", String.valueOf(NPROBE));
     properties.put("trainingSeed", String.valueOf(SEED));
     properties.put("quantizer", quantizerType.name());
-    return new VectorIndexConfig(false, backendType, dimension, 1, distanceFunction, properties);
+    return new VectorIndexConfig(Boolean.FALSE, backendType, dimension, 1, distanceFunction, properties);
   }
 
   private static int[] filteredExactTopK(float[][] corpus, float[] query, int topK,
