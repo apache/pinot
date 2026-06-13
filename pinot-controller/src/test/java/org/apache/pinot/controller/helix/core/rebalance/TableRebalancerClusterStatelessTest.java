@@ -33,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
@@ -65,6 +66,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -2452,6 +2454,108 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertFalse(moving.contains("segment1"));
     assertFalse(moving.contains("segment3"));
     assertFalse(moving.contains("segment4"));
+  }
+
+  /// Tests that a best-efforts rebalance does not drop the replicas actually serving the segments when the
+  /// ExternalView cannot converge because the target servers cannot load the segments (e.g. down or restarting):
+  /// the segments keep their current assignment and the rebalance fails (to be retried later) instead of making the
+  /// segments unavailable. This simulates relocating all the segments to a disjoint set of servers (e.g. moving them
+  /// to another tier or tenant) while the target servers are down.
+  @Test
+  public void testBestEffortsRebalanceDoesNotDropServingReplicas()
+      throws Exception {
+    int numServers = 2;
+    String initialServerPrefix = "bestEfforts_initialServer_";
+    String newServerPrefix = "bestEfforts_newServer_";
+    for (int i = 0; i < numServers; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(initialServerPrefix + i, true);
+    }
+
+    String rawTableName = "bestEffortsTestTable";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    addDummySchema(rawTableName);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(numServers).build();
+    _helixResourceManager.addTable(tableConfig);
+    int numSegments = 4;
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(offlineTableName,
+          SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName, SEGMENT_NAME_PREFIX + i), null);
+    }
+    Map<String, Map<String, String>> initialAssignment =
+        _helixResourceManager.getTableIdealState(offlineTableName).getRecord().getMapFields();
+    // Wait for the ExternalView to converge to the initial assignment
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(), offlineTableName);
+      return externalView != null && externalView.getRecord().getMapFields().equals(initialAssignment);
+    }, 60_000L, "Failed to converge the ExternalView to the initial assignment");
+
+    // Add new servers with stopped participants (they cannot load segments), and untag the initial servers so that
+    // the target assignment moves all the segments to the new servers
+    for (int i = 0; i < numServers; i++) {
+      String instanceId = newServerPrefix + i;
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+      stopFakeInstance(instanceId);
+    }
+    for (int i = 0; i < numServers; i++) {
+      _helixAdmin.removeInstanceTag(getHelixClusterName(), initialServerPrefix + i,
+          TagNameUtils.getOfflineTagForTenant(null));
+    }
+
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setBestEfforts(true);
+    rebalanceConfig.setExternalViewCheckIntervalInMs(100L);
+    rebalanceConfig.setExternalViewStabilizationTimeoutInMs(2_000L);
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+
+    // The rebalance should fail without dropping the initial servers (the only ones actually serving the segments)
+    // from the IdealState, so every segment should still have at least one serving replica
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
+    assertTrue(rebalanceResult.getDescription().contains("cannot make progress"), rebalanceResult.getDescription());
+    Map<String, Map<String, String>> currentAssignment =
+        _helixResourceManager.getTableIdealState(offlineTableName).getRecord().getMapFields();
+    ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(), offlineTableName);
+    assertNotNull(externalView);
+    Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+    for (int i = 0; i < numSegments; i++) {
+      String segmentName = SEGMENT_NAME_PREFIX + i;
+      Map<String, String> instanceStateMap = currentAssignment.get(segmentName);
+      assertNotNull(instanceStateMap);
+      Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segmentName);
+      assertNotNull(externalViewInstanceStateMap);
+      boolean hasServingReplica = false;
+      for (Map.Entry<String, String> instanceStateEntry : externalViewInstanceStateMap.entrySet()) {
+        if (ONLINE.equals(instanceStateEntry.getValue()) && instanceStateMap.containsKey(
+            instanceStateEntry.getKey())) {
+          hasServingReplica = true;
+          break;
+        }
+      }
+      assertTrue(hasServingReplica, "Segment: " + segmentName + " does not have any serving replica");
+    }
+
+    // Restart the new servers and rebalance again, the rebalance should succeed and all the segments should be moved
+    // to the new servers
+    for (int i = 0; i < numServers; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(newServerPrefix + i, true);
+    }
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    Map<String, Map<String, String>> finalAssignment =
+        _helixResourceManager.getTableIdealState(offlineTableName).getRecord().getMapFields();
+    for (Map<String, String> instanceStateMap : finalAssignment.values()) {
+      for (String instance : instanceStateMap.keySet()) {
+        assertTrue(instance.startsWith(newServerPrefix), "Found segment not moved to the new servers: " + instance);
+      }
+    }
+
+    // Clean up
+    _helixResourceManager.deleteOfflineTable(rawTableName);
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance(initialServerPrefix + i);
+      stopAndDropFakeInstance(newServerPrefix + i);
+    }
   }
 
   @AfterClass
