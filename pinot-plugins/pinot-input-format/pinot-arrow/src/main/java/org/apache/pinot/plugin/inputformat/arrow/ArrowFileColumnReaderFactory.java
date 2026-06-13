@@ -44,14 +44,26 @@ import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
  * and {@link org.apache.arrow.memory.BufferAllocator} themselves should use
  * {@link ArrowColumnReaderFactory} directly.
  *
- * <p>Columns in the target schema that are absent from the Arrow file are reported via
- * {@link #getAvailableColumns()}, and {@link #getColumnReader(String)} returns {@code null} for
- * them; schema-evolution defaults are the columnar build driver's responsibility.
+ * <p>{@link #getAvailableColumns()} reports the columns actually present in the Arrow source. A
+ * target-schema column that is NOT present is absent from that set, and {@link
+ * #getColumnReader(String)} returns {@code null} for it; supplying schema-evolution defaults for
+ * such columns is the columnar build driver's responsibility.
+ *
+ * <p><b>Dictionary-encoded columns are supported</b> (dictionary encoding is the standard Arrow
+ * representation for low-cardinality strings): the shared {@link ArrowAccumulators} decodes each
+ * batch against the bound dictionary via {@code DictionaryEncoder.decode} — mirroring the row-major
+ * {@link ArrowRecordExtractor} — and accumulates the decoded logical values, so the produced segment
+ * matches the row-major path for the same file.
  *
  * <p>This class is not thread-safe. For very large inputs the per-column accumulators materialise
  * the full column set in the Arrow allocator; partition upstream so each factory instance handles
  * one shard.
+ *
+ * <p>{@code @SuppressWarnings("serial")}: {@link ColumnReaderFactory} extends {@link
+ * java.io.Serializable} by SPI contract, but this factory holds non-serializable Arrow handles and
+ * is never actually serialized — it exists only for the duration of a columnar segment build.
  */
+@SuppressWarnings("serial")
 public class ArrowFileColumnReaderFactory implements ColumnReaderFactory {
 
   /// Default allocator limit when no `configs` override is supplied. Matches
@@ -59,6 +71,10 @@ public class ArrowFileColumnReaderFactory implements ColumnReaderFactory {
   /// memory ceiling whether they pick the row-major or column-major reader path.
   public static final String CONFIG_ALLOCATOR_LIMIT = "arrowAllocatorLimit";
   public static final long DEFAULT_ALLOCATOR_LIMIT = ArrowRecordReaderConfig.DEFAULT_ALLOCATOR_LIMIT;
+
+  /// Config key (mirrors {@link ArrowRecordExtractorConfig#EXTRACT_RAW_TIME_VALUES} on the row-major
+  /// path): when `true`, temporal columns surface raw epoch values rather than canonical JDK types.
+  public static final String CONFIG_EXTRACT_RAW_TIME_VALUES = ArrowRecordExtractorConfig.EXTRACT_RAW_TIME_VALUES;
 
   private final File _dataFile;
 
@@ -103,17 +119,32 @@ public class ArrowFileColumnReaderFactory implements ColumnReaderFactory {
   public void init(Schema targetSchema, @Nullable Set<String> colsToRead, Map<String, String> configs)
       throws IOException {
     long allocatorLimit = parseAllocatorLimit(configs);
-    _allocator = new RootAllocator(allocatorLimit);
-    _fileInputStream = new FileInputStream(_dataFile);
-    _arrowFileReader = new ArrowFileReader(_fileInputStream.getChannel(), _allocator);
+    boolean extractRawTimeValues =
+        configs != null && Boolean.parseBoolean(configs.get(CONFIG_EXTRACT_RAW_TIME_VALUES));
+    try {
+      _allocator = new RootAllocator(allocatorLimit);
+      _fileInputStream = new FileInputStream(_dataFile);
+      _arrowFileReader = new ArrowFileReader(_fileInputStream.getChannel(), _allocator);
 
-    ArrowAccumulators.Result built =
-        ArrowAccumulators.populate(_arrowFileReader, _allocator, targetSchema, colsToRead);
-    _accumulatorVectors = built.getAccumulators();
-    _columnReaders = built.getReaders();
-    _availableColumnNames = built.getAvailableColumns();
+      ArrowAccumulators.Result built = ArrowAccumulators.populate(_arrowFileReader, _allocator, targetSchema,
+          colsToRead, extractRawTimeValues);
+      _accumulatorVectors = built.getAccumulators();
+      _columnReaders = built.getReaders();
+      _availableColumnNames = built.getAvailableColumns();
 
-    _initialized = true;
+      _initialized = true;
+    } catch (RuntimeException | IOException e) {
+      // init() opens the allocator, file stream, and reader before populate() runs. If anything
+      // throws part-way, release whatever was opened — callers typically do not close a factory
+      // whose init() failed, so without this the file handle, ArrowFileReader, and RootAllocator
+      // would leak. close() is null-safe over the partially-assigned fields.
+      try {
+        close();
+      } catch (IOException closeFailure) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
   }
 
   private long parseAllocatorLimit(Map<String, String> configs) {

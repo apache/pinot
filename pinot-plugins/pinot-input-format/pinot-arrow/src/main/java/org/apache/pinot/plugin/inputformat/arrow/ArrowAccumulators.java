@@ -29,7 +29,11 @@ import javax.annotation.Nullable;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.dictionary.Dictionary;
+import org.apache.arrow.vector.dictionary.DictionaryEncoder;
 import org.apache.arrow.vector.ipc.ArrowReader;
+import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.util.VectorAppender;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -38,7 +42,7 @@ import org.apache.pinot.spi.data.readers.ColumnReader;
 
 /**
  * Package-private helper shared by {@link ArrowColumnReaderFactory} and
- * {@link InMemoryArrowColumnReaderFactory}: walks every record batch in an {@link ArrowReader},
+ * {@link ArrowFileColumnReaderFactory}: walks every record batch in an {@link ArrowReader},
  * concatenates each wanted column's values into a per-column accumulator {@link FieldVector} via
  * Arrow's {@link VectorAppender}, and produces one {@link ArrowColumnReader} per accumulator.
  *
@@ -52,63 +56,99 @@ final class ArrowAccumulators {
   }
 
   static Result populate(ArrowReader reader, BufferAllocator allocator, Schema targetSchema,
-      @Nullable Set<String> colsToRead)
+      @Nullable Set<String> colsToRead, boolean extractRawTimeValues)
       throws IOException {
     Set<String> wantedColumns = computeWantedColumns(targetSchema, colsToRead);
 
     VectorSchemaRoot perBatchRoot = reader.getVectorSchemaRoot();
     Set<String> availableColumns = Collections.unmodifiableSet(collectAvailableNames(perBatchRoot));
+    // Bound dictionaries, resolved up front (available once the reader's schema/footer is read, before
+    // any record batch). Used to decode dictionary-encoded columns per batch, mirroring the row-major
+    // ArrowRecordExtractor (setReader + prepareBatch); empty when no column is dictionary-encoded.
+    Map<Long, Dictionary> dictionaries = reader.getDictionaryVectors();
 
+    // A half-built collection of Closeables must be unwound by whoever is mid-construction, because
+    // nobody else has a reference yet — populate() only hands ownership to the factory via the
+    // returned Result. So if anything throws after the first allocateNew() (a missing dictionary, a
+    // loadNextBatch IO error, or a VectorAppender failure), release the already-allocated off-heap
+    // accumulators here before propagating; otherwise the factory's _accumulatorVectors stays null and
+    // its close() can't free them, and the allocator close trips.
     Map<String, FieldVector> accumulators = new LinkedHashMap<>();
-    Map<String, VectorAppender> appenders = new LinkedHashMap<>();
-    for (FieldVector source : perBatchRoot.getFieldVectors()) {
-      String name = source.getField().getName();
-      if (!wantedColumns.isEmpty() && !wantedColumns.contains(name)) {
-        continue;
-      }
-      // Dictionary-encoded columns surface as their index type (e.g. Int32) rather than the
-      // decoded logical type. Reject loudly so we don't silently produce a wrong segment. The
-      // row-major ArrowRecordExtractor decodes via DictionaryEncoder.decode; adding the same
-      // here is left as a follow-up once a real use case appears.
-      Preconditions.checkArgument(source.getField().getDictionary() == null,
-          "Dictionary-encoded Arrow column '%s' is not supported by Arrow column-major build. "
-              + "Use ArrowRecordReader (row-major) for files containing dictionary-encoded columns.",
-          name);
-      FieldVector accumulator = source.getField().createVector(allocator);
-      // Pre-allocate buffers so VectorAppender can read offsets / validity from them on the
-      // first append (otherwise BaseVariableWidthVector visits IOOBE on an empty offset buffer).
-      accumulator.allocateNew();
-      accumulators.put(name, accumulator);
-      appenders.put(name, new VectorAppender(accumulator));
-    }
-
-    // Walk every record batch and bulk-append each wanted column into its accumulator via
-    // Arrow's VectorAppender (Visitor-based; grows offset / data buffers once per batch and
-    // bulk-copies, rather than per-row copyValueSafe). Single-batch and multi-batch inputs go
-    // through the same code path — VectorAppender handles either correctly.
-    boolean anyBatchSeen = false;
-    while (reader.loadNextBatch()) {
-      if (perBatchRoot.getRowCount() == 0) {
-        continue;
-      }
-      anyBatchSeen = true;
+    try {
+      Map<String, VectorAppender> appenders = new LinkedHashMap<>();
       for (FieldVector source : perBatchRoot.getFieldVectors()) {
-        VectorAppender appender = appenders.get(source.getField().getName());
-        if (appender != null) {
-          source.accept(appender, null);
+        String name = source.getField().getName();
+        if (!wantedColumns.isEmpty() && !wantedColumns.contains(name)) {
+          continue;
+        }
+        // Dictionary-encoded columns (the standard Arrow representation for low-cardinality strings)
+        // surface as their index type (e.g. Int32) rather than the decoded logical type. The
+        // accumulator therefore holds the DECODED logical values, typed from the bound dictionary's
+        // value vector; each batch is decoded via DictionaryEncoder.decode before append, mirroring the
+        // row-major ArrowRecordExtractor. Non-dictionary columns accumulate the source type directly.
+        DictionaryEncoding encoding = source.getField().getDictionary();
+        FieldVector accumulator;
+        if (encoding == null) {
+          accumulator = source.getField().createVector(allocator);
+        } else {
+          Dictionary dictionary = dictionaries.get(encoding.getId());
+          Preconditions.checkArgument(dictionary != null,
+              "Arrow column '%s' is dictionary-encoded (dictionary id %s) but no matching dictionary is "
+                  + "present in the source", name, encoding.getId());
+          Field valueField = dictionary.getVector().getField();
+          accumulator = new Field(name, valueField.getFieldType(), valueField.getChildren())
+              .createVector(allocator);
+        }
+        // Pre-allocate buffers so VectorAppender can read offsets / validity from them on the
+        // first append (otherwise BaseVariableWidthVector visits IOOBE on an empty offset buffer).
+        accumulator.allocateNew();
+        accumulators.put(name, accumulator);
+        appenders.put(name, new VectorAppender(accumulator));
+      }
+
+      // Walk every record batch and bulk-append each wanted column into its accumulator via
+      // Arrow's VectorAppender (Visitor-based; grows offset / data buffers once per batch and
+      // bulk-copies, rather than per-row copyValueSafe). Single-batch and multi-batch inputs go
+      // through the same code path — VectorAppender handles either correctly. An input with no
+      // non-empty batches yields zero-doc accumulators, mirroring the row-major path's handling of
+      // an empty source (a zero-doc segment) rather than throwing.
+      while (reader.loadNextBatch()) {
+        if (perBatchRoot.getRowCount() == 0) {
+          continue;
+        }
+        for (FieldVector source : perBatchRoot.getFieldVectors()) {
+          VectorAppender appender = appenders.get(source.getField().getName());
+          if (appender == null) {
+            continue;
+          }
+          DictionaryEncoding encoding = source.getField().getDictionary();
+          if (encoding == null) {
+            source.accept(appender, null);
+          } else {
+            // Decode this batch's indices into logical values, append, then release the transient
+            // decoded copy (the accumulator retains its own values via the appender's bulk-copy).
+            try (FieldVector decoded =
+                (FieldVector) DictionaryEncoder.decode(source, dictionaries.get(encoding.getId()))) {
+              decoded.accept(appender, null);
+            }
+          }
         }
       }
-    }
-    if (!anyBatchSeen) {
-      throw new IOException("Arrow source contains no non-empty record batches");
-    }
 
-    Map<String, ColumnReader> readers = new LinkedHashMap<>();
-    for (Map.Entry<String, FieldVector> entry : accumulators.entrySet()) {
-      readers.put(entry.getKey(), new ArrowColumnReader(entry.getKey(), entry.getValue()));
-    }
+      Map<String, ColumnReader> readers = new LinkedHashMap<>();
+      for (Map.Entry<String, FieldVector> entry : accumulators.entrySet()) {
+        readers.put(entry.getKey(),
+            new ArrowColumnReader(entry.getKey(), entry.getValue(), extractRawTimeValues));
+      }
 
-    return new Result(accumulators, readers, availableColumns);
+      return new Result(accumulators, readers, availableColumns);
+    } catch (RuntimeException | IOException e) {
+      IOException closeFailure = closeAll(accumulators);
+      if (closeFailure != null) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
   }
 
   private static Set<String> computeWantedColumns(Schema targetSchema, @Nullable Set<String> colsToRead) {

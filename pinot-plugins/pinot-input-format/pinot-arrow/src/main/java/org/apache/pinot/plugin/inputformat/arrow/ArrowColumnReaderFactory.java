@@ -48,8 +48,17 @@ import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
  * ArrowFileColumnReaderFactory}.
  *
  * <p>This class is not thread-safe.
+ *
+ * <p>{@code @SuppressWarnings("serial")}: {@link ColumnReaderFactory} extends {@link
+ * java.io.Serializable} by SPI contract, but this factory holds non-serializable Arrow handles and
+ * is never actually serialized — it exists only for the duration of a columnar segment build.
  */
+@SuppressWarnings("serial")
 public class ArrowColumnReaderFactory implements ColumnReaderFactory {
+
+  /// Config key (mirrors {@link ArrowRecordExtractorConfig#EXTRACT_RAW_TIME_VALUES} on the row-major
+  /// path): when `true`, temporal columns surface raw epoch values rather than canonical JDK types.
+  public static final String CONFIG_EXTRACT_RAW_TIME_VALUES = ArrowRecordExtractorConfig.EXTRACT_RAW_TIME_VALUES;
 
   private final ArrowReader _reader;
   private final BufferAllocator _allocator;
@@ -88,14 +97,16 @@ public class ArrowColumnReaderFactory implements ColumnReaderFactory {
   /**
    * Initialise the factory. {@code colsToRead == null} or an empty set both mean "read all
    * non-virtual columns from {@code targetSchema} that the Arrow source actually contains"; pass a
-   * non-empty set to restrict to a subset. The {@code configs} map is ignored — allocator sizing
-   * is the caller's responsibility for this factory.
+   * non-empty set to restrict to a subset. Allocator sizing is the caller's responsibility for this
+   * factory; the only honored {@code configs} key is {@link #CONFIG_EXTRACT_RAW_TIME_VALUES}.
    */
   @Override
   public void init(Schema targetSchema, @Nullable Set<String> colsToRead, Map<String, String> configs)
       throws IOException {
+    boolean extractRawTimeValues =
+        configs != null && Boolean.parseBoolean(configs.get(CONFIG_EXTRACT_RAW_TIME_VALUES));
     ArrowAccumulators.Result built =
-        ArrowAccumulators.populate(_reader, _allocator, targetSchema, colsToRead);
+        ArrowAccumulators.populate(_reader, _allocator, targetSchema, colsToRead, extractRawTimeValues);
     _accumulatorVectors = built.getAccumulators();
     _columnReaders = built.getReaders();
     _availableColumnNames = built.getAvailableColumns();
