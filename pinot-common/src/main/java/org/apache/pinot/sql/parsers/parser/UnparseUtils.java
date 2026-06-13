@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.sql.parsers.parser;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlWriter;
+import org.apache.calcite.sql.parser.SqlParserPos;
 
 
 /**
@@ -62,5 +66,18 @@ class UnparseUtils {
     }
     _writer.keyword(")");
     return this;
+  }
+
+  static SqlIdentifier combineIdentifiers(SqlIdentifier left, SqlIdentifier right) {
+    List<String> names = new ArrayList<>(left.names);
+    names.addAll(right.names);
+    List<SqlParserPos> componentPositions = new ArrayList<>(names.size());
+    for (int i = 0; i < left.names.size(); i++) {
+      componentPositions.add(left.getComponentParserPosition(i));
+    }
+    for (int i = 0; i < right.names.size(); i++) {
+      componentPositions.add(right.getComponentParserPosition(i));
+    }
+    return new SqlIdentifier(names, null, left.getParserPosition().plus(right.getParserPosition()), componentPositions);
   }
 }
