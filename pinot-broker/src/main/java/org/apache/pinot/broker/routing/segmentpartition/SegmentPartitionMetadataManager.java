@@ -44,14 +44,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code PartitionDataManager} manages partitions of a table. It manages
- *   1. all the online segments associated with the partition and their allocated servers
- *   2. all the replica of a specific segment.
- * It provides API to query
- *   1. For each partition ID, what are the servers that contains ALL segments belong to this partition ID.
- *   2. For each server, what are all the partition IDs and list of segments of those partition IDs on this server.
- */
+/// The `PartitionDataManager` manages partitions of a table. It manages
+///   1. all the online segments associated with the partition and their allocated servers
+///   2. all the replica of a specific segment.
+/// It provides API to query
+///   1. For each partition ID, what are the servers that contains ALL segments belong to this partition ID.
+///   2. For each server, what are all the partition IDs and list of segments of those partition IDs on this server.
+///
+/// When computing the fully replicated servers for a partition, segments that have not been fully replicated per
+/// their latest ideal assignment (newly pushed segments, new consuming segments, or segments uploaded under a new
+/// name to replace other segments) are excluded from the partition info until all their replicas become available,
+/// so that they don't reduce the fully replicated servers while loading. This protection is bounded by the configured
+/// new segment expiration time since the ideal assignment of the segment last changed; after that the segment is
+/// treated as a regular segment, so that a replica failing to load doesn't exclude the segment from being served
+/// forever. Segments without any available replica are also excluded because they cannot be served regardless of the
+/// server picked, and are reported via [TablePartitionReplicatedServersInfo#getUnavailableSegments()].
 public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionMetadataManager.class);
   private static final int INVALID_PARTITION_ID = -1;
@@ -84,12 +91,14 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   @Override
   public void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,
       List<ZNRecord> znRecords) {
+    long currentTimeMs = System.currentTimeMillis();
     int numSegments = onlineSegments.size();
     for (int i = 0; i < numSegments; i++) {
       String segment = onlineSegments.get(i);
       ZNRecord znRecord = znRecords.get(i);
-      SegmentInfo segmentInfo = new SegmentInfo(getPartitionId(segment, znRecord), getCreationTimeMs(znRecord),
-          getOnlineServers(externalView, segment));
+      SegmentInfo segmentInfo = new SegmentInfo(getPartitionId(segment, znRecord), getCreationTimeMs(znRecord));
+      segmentInfo.updateServers(getOnlineServers(externalView, segment), idealState.getInstanceStateMap(segment),
+          currentTimeMs);
       _segmentInfoMap.put(segment, segmentInfo);
     }
     computeAllTablePartitionInfo();
@@ -125,6 +134,10 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     return SegmentUtils.getSegmentCreationTimeMs(new SegmentZKMetadata(znRecord));
   }
 
+  private static boolean isServingState(String instanceState) {
+    return instanceState.equals(SegmentStateModel.ONLINE) || instanceState.equals(SegmentStateModel.CONSUMING);
+  }
+
   private static List<String> getOnlineServers(ExternalView externalView, String segment) {
     Map<String, String> instanceStateMap = externalView.getStateMap(segment);
     if (instanceStateMap == null) {
@@ -132,8 +145,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     }
     List<String> onlineServers = new ArrayList<>(instanceStateMap.size());
     for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
-      String instanceState = entry.getValue();
-      if (instanceState.equals(SegmentStateModel.ONLINE) || instanceState.equals(SegmentStateModel.CONSUMING)) {
+      if (isServingState(entry.getValue())) {
         onlineServers.add(entry.getKey());
       }
     }
@@ -148,23 +160,21 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     for (int i = 0; i < numSegments; i++) {
       String segment = pulledSegments.get(i);
       ZNRecord znRecord = znRecords.get(i);
-      SegmentInfo segmentInfo = new SegmentInfo(getPartitionId(segment, znRecord), getCreationTimeMs(znRecord),
-          getOnlineServers(externalView, segment));
-      _segmentInfoMap.put(segment, segmentInfo);
+      _segmentInfoMap.put(segment, new SegmentInfo(getPartitionId(segment, znRecord), getCreationTimeMs(znRecord)));
     }
-    // Update online servers for all online segments
+    // Update online servers and replication state for all online segments
+    long currentTimeMs = System.currentTimeMillis();
     for (String segment : onlineSegments) {
       SegmentInfo segmentInfo = _segmentInfoMap.get(segment);
       if (segmentInfo == null) {
         // NOTE: This should not happen, but we still handle it gracefully by adding an invalid SegmentInfo
         LOGGER.error("Failed to find segment info for segment: {} in table: {} while handling assignment change",
             segment, _tableNameWithType);
-        segmentInfo =
-            new SegmentInfo(INVALID_PARTITION_ID, INVALID_CREATION_TIME_MS, getOnlineServers(externalView, segment));
+        segmentInfo = new SegmentInfo(INVALID_PARTITION_ID, INVALID_CREATION_TIME_MS);
         _segmentInfoMap.put(segment, segmentInfo);
-      } else {
-        segmentInfo._onlineServers = getOnlineServers(externalView, segment);
       }
+      segmentInfo.updateServers(getOnlineServers(externalView, segment), idealState.getInstanceStateMap(segment),
+          currentTimeMs);
     }
     _segmentInfoMap.keySet().retainAll(onlineSegments);
     computeAllTablePartitionInfo();
@@ -179,7 +189,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       // NOTE: This should not happen, but we still handle it gracefully by adding an invalid SegmentInfo
       LOGGER.error("Failed to find segment info for segment: {} in table: {} while handling segment refresh", segment,
           _tableNameWithType);
-      segmentInfo = new SegmentInfo(partitionId, pushTimeMs, Collections.emptyList());
+      segmentInfo = new SegmentInfo(partitionId, pushTimeMs);
       _segmentInfoMap.put(segment, segmentInfo);
     } else {
       segmentInfo._partitionId = partitionId;
@@ -206,7 +216,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     List<String> segmentsWithInvalidPartition = new ArrayList<>();
     List<Pair<String, Integer>> unavailableSegments = new ArrayList<>();
     List<Triple<String, Integer, Integer>> segmentsReducingFullyReplicatedServers = new ArrayList<>();
-    List<Map.Entry<String, SegmentInfo>> newSegmentInfoEntries = new ArrayList<>();
+    List<Map.Entry<String, SegmentInfo>> pendingSegmentInfoEntries = new ArrayList<>();
     long currentTimeMs = System.currentTimeMillis();
     for (Map.Entry<String, SegmentInfo> entry : _segmentInfoMap.entrySet()) {
       String segment = entry.getKey();
@@ -216,24 +226,18 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
         segmentsWithInvalidPartition.add(segment);
         continue;
       }
-      // Process new segments in the end
-      if (InstanceSelector.isNewSegment(segmentInfo._creationTimeMs, currentTimeMs, _newSegmentExpirationMs)) {
-        newSegmentInfoEntries.add(entry);
+      // Process pending (not fully replicated yet) segments in the end
+      if (isPendingSegment(segmentInfo, currentTimeMs)) {
+        pendingSegmentInfoEntries.add(entry);
         continue;
       }
       List<String> onlineServers = segmentInfo._onlineServers;
       PartitionInfo partitionInfo = partitionInfoMap[partitionId];
       if (onlineServers.isEmpty()) {
+        // The segment has no available replica, thus it cannot be served regardless of the server picked. Exclude it
+        // from the partition info instead of clearing the fully replicated servers, which would fail all the queries
+        // on the partition without making the segment available.
         unavailableSegments.add(Pair.of(segment, partitionId));
-        if (partitionInfo == null) {
-          List<String> segments = new ArrayList<>();
-          segments.add(segment);
-          partitionInfo = new PartitionInfo(new HashSet<>(), segments);
-          partitionInfoMap[partitionId] = partitionInfo;
-        } else {
-          partitionInfo._fullyReplicatedServers.clear();
-          partitionInfo._segments.add(segment);
-        }
       } else {
         if (partitionInfo == null) {
           Set<String> fullyReplicatedServers = new HashSet<>(onlineServers);
@@ -267,18 +271,18 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
           numSegments, numSegments <= 10 ? segmentsReducingFullyReplicatedServers
               : segmentsReducingFullyReplicatedServers.subList(0, 10) + "...", _tableNameWithType);
     }
-    // Process new segments
-    if (!newSegmentInfoEntries.isEmpty()) {
-      List<String> excludedNewSegments = new ArrayList<>();
-      for (Map.Entry<String, SegmentInfo> entry : newSegmentInfoEntries) {
+    // Process pending segments
+    if (!pendingSegmentInfoEntries.isEmpty()) {
+      List<String> excludedPendingSegments = new ArrayList<>();
+      for (Map.Entry<String, SegmentInfo> entry : pendingSegmentInfoEntries) {
         String segment = entry.getKey();
         SegmentInfo segmentInfo = entry.getValue();
         int partitionId = segmentInfo._partitionId;
         List<String> onlineServers = segmentInfo._onlineServers;
         PartitionInfo partitionInfo = partitionInfoMap[partitionId];
         if (partitionInfo == null) {
-          // If the new segment is the first segment of a partition, treat it as regular segment if it has available
-          // replicas
+          // If the pending segment is the first segment of a partition, treat it as regular segment if it has
+          // available replicas
           if (!onlineServers.isEmpty()) {
             Set<String> fullyReplicatedServers = new HashSet<>(onlineServers);
             List<String> segments = new ArrayList<>();
@@ -286,30 +290,57 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
             partitionInfo = new PartitionInfo(fullyReplicatedServers, segments);
             partitionInfoMap[partitionId] = partitionInfo;
           } else {
-            excludedNewSegments.add(segment);
+            excludedPendingSegments.add(segment);
           }
         } else {
-          // If the new segment is not the first segment of a partition, add it only if it won't reduce the fully
-          // replicated servers. It is common that a new created segment (newly pushed, or a new consuming segment)
-          // doesn't have all the replicas available yet, and we want to exclude it from the partition info until all
-          // the replicas are available.
+          // If the pending segment is not the first segment of a partition, add it only if it won't reduce the fully
+          // replicated servers. It is common that a segment not fully replicated yet (newly pushed, a new consuming
+          // segment, or a segment uploaded under a new name to replace other segments) doesn't have all the replicas
+          // available, and we want to exclude it from the partition info until all the replicas are available.
           //noinspection SlowListContainsAll
           if (onlineServers.containsAll(partitionInfo._fullyReplicatedServers)) {
             partitionInfo._segments.add(segment);
           } else {
-            excludedNewSegments.add(segment);
+            excludedPendingSegments.add(segment);
           }
         }
       }
-      if (!excludedNewSegments.isEmpty()) {
-        int numSegments = excludedNewSegments.size();
-        LOGGER.info("Excluded {} new segments: {}... without all replicas available in table: {}", numSegments,
-            numSegments <= 10 ? excludedNewSegments : excludedNewSegments.subList(0, 10) + "...", _tableNameWithType);
+      if (!excludedPendingSegments.isEmpty()) {
+        int numSegments = excludedPendingSegments.size();
+        LOGGER.info("Excluded {} pending segments: {}... without all replicas available in table: {}", numSegments,
+            numSegments <= 10 ? excludedPendingSegments : excludedPendingSegments.subList(0, 10) + "...",
+            _tableNameWithType);
+      }
+    }
+    List<String> unavailableSegmentNames;
+    if (unavailableSegments.isEmpty()) {
+      unavailableSegmentNames = List.of();
+    } else {
+      unavailableSegmentNames = new ArrayList<>(unavailableSegments.size());
+      for (Pair<String, Integer> unavailableSegment : unavailableSegments) {
+        unavailableSegmentNames.add(unavailableSegment.getLeft());
       }
     }
     _tablePartitionReplicatedServersInfo =
         new TablePartitionReplicatedServersInfo(_tableNameWithType, _partitionColumn, _partitionFunctionName,
-            _numPartitions, partitionInfoMap, segmentsWithInvalidPartition);
+            _numPartitions, partitionInfoMap, segmentsWithInvalidPartition, unavailableSegmentNames);
+  }
+
+  /// Returns whether the segment is pending, i.e. it has not been fully replicated per its latest ideal assignment.
+  /// Pending segments (newly pushed segments, new consuming segments, or segments uploaded under a new name to
+  /// replace other segments) are excluded from the partition info if they would reduce the fully replicated servers,
+  /// until all their replicas become available. The pending state is bounded by the configured new segment expiration
+  /// time since the ideal assignment of the segment last changed, so that a replica failing to load doesn't exclude
+  /// the segment from being served forever. When the target servers cannot be determined from the ideal state, fall
+  /// back to the time based check on the segment creation time.
+  private boolean isPendingSegment(SegmentInfo segmentInfo, long currentTimeMs) {
+    if (segmentInfo._fullyReplicatedOnce) {
+      return false;
+    }
+    if (segmentInfo._numTargetServers > 0) {
+      return currentTimeMs - segmentInfo._targetServersUpdateTimeMs <= _newSegmentExpirationMs;
+    }
+    return InstanceSelector.isNewSegment(segmentInfo._creationTimeMs, currentTimeMs, _newSegmentExpirationMs);
   }
 
   private void computeTablePartitionInfo() {
@@ -346,12 +377,55 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private static class SegmentInfo {
     int _partitionId;
     long _creationTimeMs;
-    List<String> _onlineServers;
+    List<String> _onlineServers = Collections.emptyList();
+    /// Number of target servers (servers with ONLINE/CONSUMING state in the ideal state). The target servers are
+    /// tracked as count and order-independent hash instead of the full server set to reduce the memory footprint.
+    int _numTargetServers;
+    /// Order-independent hash of the target servers, used together with the count to detect ideal assignment changes.
+    /// A hash collision can only delay the reset of the replication state, which is benign.
+    int _targetServersHash;
+    /// Time when the target servers were last changed, used to bound how long the segment can stay pending
+    long _targetServersUpdateTimeMs;
+    /// Whether the segment has been observed fully replicated (online servers covering the target servers from the
+    /// ideal state) at least once since its target servers last changed. Once fully replicated, losing a replica
+    /// reduces the fully replicated servers of the partition (queries are routed to the remaining replicas); before
+    /// that, the segment is excluded from the partition info to not reduce the fully replicated servers while its
+    /// replicas are still loading.
+    boolean _fullyReplicatedOnce;
 
-    SegmentInfo(int partitionId, long creationTimeMs, List<String> onlineServers) {
+    SegmentInfo(int partitionId, long creationTimeMs) {
       _partitionId = partitionId;
       _creationTimeMs = creationTimeMs;
+    }
+
+    void updateServers(List<String> onlineServers, @Nullable Map<String, String> targetInstanceStateMap,
+        long currentTimeMs) {
       _onlineServers = onlineServers;
+      int numTargetServers = 0;
+      int targetServersHash = 0;
+      boolean coversTargetServers = true;
+      if (targetInstanceStateMap != null) {
+        for (Map.Entry<String, String> entry : targetInstanceStateMap.entrySet()) {
+          if (isServingState(entry.getValue())) {
+            String server = entry.getKey();
+            numTargetServers++;
+            targetServersHash += server.hashCode();
+            if (coversTargetServers && !onlineServers.contains(server)) {
+              coversTargetServers = false;
+            }
+          }
+        }
+      }
+      // Recompute the replication state when the ideal assignment changes (e.g. rebalance)
+      if (numTargetServers != _numTargetServers || targetServersHash != _targetServersHash) {
+        _numTargetServers = numTargetServers;
+        _targetServersHash = targetServersHash;
+        _targetServersUpdateTimeMs = currentTimeMs;
+        _fullyReplicatedOnce = false;
+      }
+      if (!_fullyReplicatedOnce && numTargetServers > 0 && coversTargetServers) {
+        _fullyReplicatedOnce = true;
+      }
     }
   }
 }
