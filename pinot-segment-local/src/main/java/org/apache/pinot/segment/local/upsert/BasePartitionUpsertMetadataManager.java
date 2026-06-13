@@ -1221,6 +1221,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     trackUpdatedSegmentsSinceLastSnapshot(segment);
   }
 
+  protected void emitUpsertMetrics(RecordInfo recordInfo, boolean isNewKey) {
+    if (recordInfo.isDeleteRecord()) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_KEYS_DELETED, 1L);
+    } else if (isNewKey) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_KEYS_INSERTED, 1L);
+    } else {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_KEYS_UPDATED, 1L);
+    }
+  }
+
   protected void trackUpdatedSegmentsSinceLastSnapshot(IndexSegment segment) {
     if (_enableSnapshot && segment instanceof ImmutableSegment) {
       _updatedSegmentsSinceLastSnapshot.add(segment);

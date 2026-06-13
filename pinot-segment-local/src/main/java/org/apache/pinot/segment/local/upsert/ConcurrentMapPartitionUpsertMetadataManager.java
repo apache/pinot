@@ -398,6 +398,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
               }
+              emitUpsertMetrics(recordInfo, false);
               return newRecordLocation;
             } else {
               // Out-of-order record
@@ -408,6 +409,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           } else {
             // New primary key
             addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
+            emitUpsertMetrics(recordInfo, true);
             return new RecordLocation(segment, newDocId, newComparisonValue);
           }
         });
