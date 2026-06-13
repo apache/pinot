@@ -25,17 +25,21 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
+import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.TimeStampMilliVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
+import org.apache.arrow.vector.types.TimeUnit;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
@@ -50,6 +54,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
@@ -132,6 +137,128 @@ public class ArrowColumnarBuildIntegrationTest {
     File columnarSegmentDir = buildSegmentInMemoryColumnar(streamBytes, "inMemColumnar");
 
     assertSegmentMetadataEquivalence(rowMajorSegmentDir, columnarSegmentDir);
+  }
+
+  /**
+   * BOOLEAN and TIMESTAMP columns exercise the column-major type-normalization path: the Arrow source
+   * surfaces {@code Boolean} / {@code Timestamp} (or {@code LocalDateTime}) values that must be coerced
+   * to the stored {@code INT} / {@code LONG} to match what the row-major {@code DataTypeTransformer}
+   * produces. Before normalization the column-major build crashed on these types (the typed stats
+   * collectors / index creators cast-failed on the source Java type). Asserts both per-column metadata
+   * and per-docId record values match the row-major segment built from the same file.
+   */
+  @Test
+  public void testTypeNormalizationRowMajorVsColumnar()
+      throws Exception {
+    File arrowFile = writeTypedArrowFileFixture("typed-equivalence.arrow");
+    org.apache.pinot.spi.data.Schema schema = typedPinotSchema();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+
+    File rowMajorDir = _tempDir.resolve("rm-typed").toFile();
+    try (ArrowRecordReader reader = new ArrowRecordReader()) {
+      reader.init(arrowFile, null, null);
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+      config.setOutDir(rowMajorDir.getAbsolutePath());
+      config.setSegmentName("rmTyped");
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, reader);
+      driver.build();
+    }
+
+    File columnarDir = _tempDir.resolve("col-typed").toFile();
+    try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(arrowFile)) {
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+      config.setOutDir(columnarDir.getAbsolutePath());
+      config.setSegmentName("colTyped");
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, factory);
+      driver.build();
+    }
+
+    File rowMajorSeg = new File(rowMajorDir, "rmTyped");
+    File columnarSeg = new File(columnarDir, "colTyped");
+    assertSegmentMetadataEquivalence(rowMajorSeg, columnarSeg);
+    assertPerDocRecordEquivalence(rowMajorSeg, columnarSeg,
+        new String[]{"intCol", "boolCol", "tsCol", "stringCol"});
+  }
+
+  private void assertPerDocRecordEquivalence(File segDirA, File segDirB, String[] columns)
+      throws Exception {
+    IndexSegment segA = ImmutableSegmentLoader.load(segDirA, ReadMode.heap);
+    IndexSegment segB = ImmutableSegmentLoader.load(segDirB, ReadMode.heap);
+    try {
+      int numDocs = segA.getSegmentMetadata().getTotalDocs();
+      assertEquals(segB.getSegmentMetadata().getTotalDocs(), numDocs, "doc count mismatch");
+      GenericRow rowA = new GenericRow();
+      GenericRow rowB = new GenericRow();
+      for (int docId = 0; docId < numDocs; docId++) {
+        rowA.clear();
+        rowB.clear();
+        segA.getRecord(docId, rowA);
+        segB.getRecord(docId, rowB);
+        for (String column : columns) {
+          assertEquals(rowB.getValue(column), rowA.getValue(column),
+              "value mismatch on column " + column + " at docId " + docId);
+        }
+      }
+    } finally {
+      segA.destroy();
+      segB.destroy();
+    }
+  }
+
+  private org.apache.pinot.spi.data.Schema typedPinotSchema() {
+    org.apache.pinot.spi.data.Schema schema = new org.apache.pinot.spi.data.Schema();
+    schema.setSchemaName(TABLE_NAME);
+    schema.addField(new DimensionFieldSpec("intCol", DataType.INT, true));
+    schema.addField(new DimensionFieldSpec("boolCol", DataType.BOOLEAN, true));
+    schema.addField(new DimensionFieldSpec("tsCol", DataType.TIMESTAMP, true));
+    schema.addField(new DimensionFieldSpec("stringCol", DataType.STRING, true));
+    return schema;
+  }
+
+  private File writeTypedArrowFileFixture(String fileName)
+      throws IOException {
+    Field intField = new Field("intCol", FieldType.nullable(new ArrowType.Int(32, true)), null);
+    Field boolField = new Field("boolCol", FieldType.nullable(new ArrowType.Bool()), null);
+    Field tsField =
+        new Field("tsCol", FieldType.nullable(new ArrowType.Timestamp(TimeUnit.MILLISECOND, null)), null);
+    Field stringField = new Field("stringCol", FieldType.nullable(new ArrowType.Utf8()), null);
+    Schema arrowSchema = new Schema(Arrays.asList(intField, boolField, tsField, stringField));
+
+    File out = _tempDir.resolve(fileName).toFile();
+    try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+        VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, allocator);
+        FileOutputStream fos = new FileOutputStream(out);
+        FileChannel channel = fos.getChannel();
+        ArrowFileWriter writer = new ArrowFileWriter(root, null, channel)) {
+      IntVector intVec = (IntVector) root.getVector("intCol");
+      BitVector boolVec = (BitVector) root.getVector("boolCol");
+      TimeStampMilliVector tsVec = (TimeStampMilliVector) root.getVector("tsCol");
+      VarCharVector stringVec = (VarCharVector) root.getVector("stringCol");
+
+      intVec.allocateNew(ROW_COUNT);
+      boolVec.allocateNew(ROW_COUNT);
+      tsVec.allocateNew(ROW_COUNT);
+      stringVec.allocateNew(ROW_COUNT * 8, ROW_COUNT);
+
+      for (int i = 0; i < ROW_COUNT; i++) {
+        intVec.set(i, i);
+        boolVec.set(i, i % 2);                     // alternating false/true -> stored INT 0/1
+        tsVec.set(i, 1_700_000_000_000L + i);      // epoch millis
+        stringVec.set(i, ("row_" + i).getBytes(StandardCharsets.UTF_8));
+      }
+      intVec.setValueCount(ROW_COUNT);
+      boolVec.setValueCount(ROW_COUNT);
+      tsVec.setValueCount(ROW_COUNT);
+      stringVec.setValueCount(ROW_COUNT);
+      root.setRowCount(ROW_COUNT);
+
+      writer.start();
+      writer.writeBatch();
+      writer.end();
+    }
+    return out;
   }
 
   private void assertSegmentMetadataEquivalence(File rowMajorSegmentDir, File columnarSegmentDir)
@@ -279,7 +406,7 @@ public class ArrowColumnarBuildIntegrationTest {
     for (int i = 0; i < ROW_COUNT; i++) {
       intVec.set(i, i);
       longVec.set(i, (long) i * 1000);
-      stringVec.set(i, ("row_" + i).getBytes());
+      stringVec.set(i, ("row_" + i).getBytes(StandardCharsets.UTF_8));
     }
     intVec.setValueCount(ROW_COUNT);
     longVec.setValueCount(ROW_COUNT);

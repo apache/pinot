@@ -66,28 +66,58 @@ import org.apache.pinot.spi.data.readers.MultiValueResult;
  * {@code Object[]} for List variants, {@code LocalDate} / {@code LocalTime} /
  * {@code Timestamp} for temporal types.
  *
+ * <p><b>BitVector caveat:</b> Arrow's {@link FieldVector#getObject} returns a {@code Boolean}
+ * for a {@link BitVector}, but Pinot stores booleans as {@code INT} (0/1). The generic
+ * {@link #getValue(int)} therefore special-cases {@code BitVector} to return an {@code Integer}
+ * 0/1, keeping it consistent with {@link #getInt(int)} and the advertised INT mapping above
+ * rather than surfacing the shared converter's {@code Boolean}.
+ *
+ * <p>{@code @SuppressWarnings("serial")}: {@link ColumnReader} extends {@link java.io.Serializable}
+ * by SPI contract, but this reader holds a non-serializable Arrow {@link FieldVector} and is never
+ * actually serialized — it lives only for the duration of a columnar segment build. The suppression
+ * silences the missing-{@code serialVersionUID} warning; matches the Pinot convention used by other
+ * incidentally-{@code Serializable} build-time helpers.
+ *
  * <p>This class is not thread-safe.
  */
+@SuppressWarnings("serial")
 public class ArrowColumnReader implements ColumnReader {
 
   private final String _columnName;
   private final FieldVector _vector;
   private final int _totalDocs;
   private final boolean _isSingleValue;
+  private final boolean _extractRawTimeValues;
 
   private int _nextDocId;
+
+  /**
+   * Construct an ArrowColumnReader for the given vector, surfacing converted (non-raw) temporal
+   * values — equivalent to {@link #ArrowColumnReader(String, FieldVector, boolean)} with
+   * {@code extractRawTimeValues = false}.
+   *
+   * @param columnName Pinot column name
+   * @param vector Arrow field vector backing this column
+   */
+  public ArrowColumnReader(String columnName, FieldVector vector) {
+    this(columnName, vector, false);
+  }
 
   /**
    * Construct an ArrowColumnReader for the given vector.
    *
    * @param columnName Pinot column name
    * @param vector Arrow field vector backing this column
+   * @param extractRawTimeValues when {@code true}, temporal columns surface their raw epoch values
+   *        via the generic {@link #getValue(int)} path rather than canonical JDK temporal types,
+   *        mirroring {@code ArrowRecordExtractorConfig.EXTRACT_RAW_TIME_VALUES} on the row-major path
    */
-  public ArrowColumnReader(String columnName, FieldVector vector) {
+  public ArrowColumnReader(String columnName, FieldVector vector, boolean extractRawTimeValues) {
     _columnName = columnName;
     _vector = vector;
     _totalDocs = vector.getValueCount();
     _isSingleValue = !(vector instanceof ListVector);
+    _extractRawTimeValues = extractRawTimeValues;
     _nextDocId = 0;
   }
 
@@ -100,6 +130,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Nullable
   public Object next()
       throws IOException {
+    requireHasNext();
     Object value = getValue(_nextDocId);
     _nextDocId++;
     return value;
@@ -108,12 +139,14 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public boolean isNextNull()
       throws IOException {
+    requireHasNext();
     return _vector.isNull(_nextDocId);
   }
 
   @Override
   public void skipNext()
       throws IOException {
+    requireHasNext();
     _nextDocId++;
   }
 
@@ -124,42 +157,44 @@ public class ArrowColumnReader implements ColumnReader {
 
   @Override
   public boolean isInt() {
-    return _isSingleValue && (_vector instanceof IntVector || _vector instanceof BitVector);
+    FieldVector elementVector = elementVector();
+    return elementVector instanceof IntVector || elementVector instanceof BitVector;
   }
 
   @Override
   public boolean isLong() {
-    return _isSingleValue && _vector instanceof BigIntVector;
+    return elementVector() instanceof BigIntVector;
   }
 
   @Override
   public boolean isFloat() {
-    return _isSingleValue && _vector instanceof Float4Vector;
+    return elementVector() instanceof Float4Vector;
   }
 
   @Override
   public boolean isDouble() {
-    return _isSingleValue && _vector instanceof Float8Vector;
+    return elementVector() instanceof Float8Vector;
   }
 
   @Override
   public boolean isBigDecimal() {
-    return _isSingleValue && _vector instanceof DecimalVector;
+    return elementVector() instanceof DecimalVector;
   }
 
   @Override
   public boolean isString() {
-    return _isSingleValue && _vector instanceof VarCharVector;
+    return elementVector() instanceof VarCharVector;
   }
 
   @Override
   public boolean isBytes() {
-    return _isSingleValue && _vector instanceof VarBinaryVector;
+    return elementVector() instanceof VarBinaryVector;
   }
 
   @Override
   public int nextInt()
       throws IOException {
+    requireHasNext();
     int value = getInt(_nextDocId);
     _nextDocId++;
     return value;
@@ -168,6 +203,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public long nextLong()
       throws IOException {
+    requireHasNext();
     long value = getLong(_nextDocId);
     _nextDocId++;
     return value;
@@ -176,6 +212,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public float nextFloat()
       throws IOException {
+    requireHasNext();
     float value = getFloat(_nextDocId);
     _nextDocId++;
     return value;
@@ -184,6 +221,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public double nextDouble()
       throws IOException {
+    requireHasNext();
     double value = getDouble(_nextDocId);
     _nextDocId++;
     return value;
@@ -192,6 +230,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public BigDecimal nextBigDecimal()
       throws IOException {
+    requireHasNext();
     BigDecimal value = getBigDecimal(_nextDocId);
     _nextDocId++;
     return value;
@@ -200,6 +239,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public String nextString()
       throws IOException {
+    requireHasNext();
     String value = getString(_nextDocId);
     _nextDocId++;
     return value;
@@ -208,6 +248,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public byte[] nextBytes()
       throws IOException {
+    requireHasNext();
     byte[] value = getBytes(_nextDocId);
     _nextDocId++;
     return value;
@@ -216,6 +257,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public MultiValueResult<int[]> nextIntMV()
       throws IOException {
+    requireHasNext();
     MultiValueResult<int[]> result = getIntMV(_nextDocId);
     _nextDocId++;
     return result;
@@ -224,6 +266,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public MultiValueResult<long[]> nextLongMV()
       throws IOException {
+    requireHasNext();
     MultiValueResult<long[]> result = getLongMV(_nextDocId);
     _nextDocId++;
     return result;
@@ -232,6 +275,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public MultiValueResult<float[]> nextFloatMV()
       throws IOException {
+    requireHasNext();
     MultiValueResult<float[]> result = getFloatMV(_nextDocId);
     _nextDocId++;
     return result;
@@ -240,6 +284,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public MultiValueResult<double[]> nextDoubleMV()
       throws IOException {
+    requireHasNext();
     MultiValueResult<double[]> result = getDoubleMV(_nextDocId);
     _nextDocId++;
     return result;
@@ -248,6 +293,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public BigDecimal[] nextBigDecimalMV()
       throws IOException {
+    requireHasNext();
     BigDecimal[] result = getBigDecimalMV(_nextDocId);
     _nextDocId++;
     return result;
@@ -256,6 +302,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public String[] nextStringMV()
       throws IOException {
+    requireHasNext();
     String[] result = getStringMV(_nextDocId);
     _nextDocId++;
     return result;
@@ -264,6 +311,7 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public byte[][] nextBytesMV()
       throws IOException {
+    requireHasNext();
     byte[][] result = getBytesMV(_nextDocId);
     _nextDocId++;
     return result;
@@ -369,6 +417,12 @@ public class ArrowColumnReader implements ColumnReader {
   public Object getValue(int docId)
       throws IOException {
     checkBounds(docId);
+    // BitVector maps to Pinot INT (0/1). The shared converter would surface a Boolean via
+    // FieldVector.getObject, so special-case it here to stay consistent with getInt() and the
+    // advertised INT mapping. See the "BitVector caveat" in the class Javadoc.
+    if (_vector instanceof BitVector) {
+      return _vector.isNull(docId) ? null : ((BitVector) _vector).get(docId);
+    }
     Object value = _vector.getObject(docId);
     if (value == null) {
       return null;
@@ -377,7 +431,7 @@ public class ArrowColumnReader implements ColumnReader {
     // ArrowRecordExtractor. Returns canonical JDK types: String for Utf8 / LargeUtf8 (unwrapped
     // from Arrow's Text), Object[] for List variants (with recursive element conversion),
     // LocalDate / LocalTime / Timestamp for temporal types, etc.
-    return ArrowToPinotTypeConverter.toPinotValue(_vector.getField(), value, false);
+    return ArrowToPinotTypeConverter.toPinotValue(_vector.getField(), value, _extractRawTimeValues);
   }
 
   @Override
@@ -410,11 +464,15 @@ public class ArrowColumnReader implements ColumnReader {
     checkBounds(docId);
     requireListVector();
     ListVector list = (ListVector) _vector;
+    FieldVector dataVector = list.getDataVector();
+    if (!(dataVector instanceof DecimalVector)) {
+      throw typeMismatch("BIG_DECIMAL_MV");
+    }
     int start = list.getElementStartIndex(docId);
     int end = list.getElementEndIndex(docId);
     int length = end - start;
     BigDecimal[] out = new BigDecimal[length];
-    DecimalVector elements = (DecimalVector) list.getDataVector();
+    DecimalVector elements = (DecimalVector) dataVector;
     for (int i = 0; i < length; i++) {
       out[i] = elements.isNull(start + i) ? null : elements.getObject(start + i);
     }
@@ -427,11 +485,15 @@ public class ArrowColumnReader implements ColumnReader {
     checkBounds(docId);
     requireListVector();
     ListVector list = (ListVector) _vector;
+    FieldVector dataVector = list.getDataVector();
+    if (!(dataVector instanceof VarCharVector)) {
+      throw typeMismatch("STRING_MV");
+    }
     int start = list.getElementStartIndex(docId);
     int end = list.getElementEndIndex(docId);
     int length = end - start;
     String[] out = new String[length];
-    VarCharVector elements = (VarCharVector) list.getDataVector();
+    VarCharVector elements = (VarCharVector) dataVector;
     for (int i = 0; i < length; i++) {
       if (elements.isNull(start + i)) {
         out[i] = null;
@@ -449,11 +511,15 @@ public class ArrowColumnReader implements ColumnReader {
     checkBounds(docId);
     requireListVector();
     ListVector list = (ListVector) _vector;
+    FieldVector dataVector = list.getDataVector();
+    if (!(dataVector instanceof VarBinaryVector)) {
+      throw typeMismatch("BYTES_MV");
+    }
     int start = list.getElementStartIndex(docId);
     int end = list.getElementEndIndex(docId);
     int length = end - start;
     byte[][] out = new byte[length][];
-    VarBinaryVector elements = (VarBinaryVector) list.getDataVector();
+    VarBinaryVector elements = (VarBinaryVector) dataVector;
     for (int i = 0; i < length; i++) {
       out[i] = elements.isNull(start + i) ? null : elements.get(start + i);
     }
@@ -562,6 +628,23 @@ public class ArrowColumnReader implements ColumnReader {
       throw new IOException("Unsupported primitive MV array type: " + arrayClass.getName());
     }
     return MultiValueResult.of((T) array, nulls);
+  }
+
+  /**
+   * The vector whose Arrow type determines the {@code isXxx()} predicates: the backing vector
+   * itself for single-value columns, or the {@link ListVector} element (data) vector for
+   * multi-value columns. Per the {@link ColumnReader} contract, {@code isInt()} / {@code isLong()} /
+   * ... report the element type regardless of single- vs multi-value, so a caller that also checks
+   * {@link #isSingleValue()} knows whether to use {@code nextInt()} or {@code nextIntMV()}.
+   */
+  private FieldVector elementVector() {
+    return _isSingleValue ? _vector : ((ListVector) _vector).getDataVector();
+  }
+
+  private void requireHasNext() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
   }
 
   private void requireListVector()

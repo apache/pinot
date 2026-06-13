@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.segment.local.segment.creator.impl.ColumnarValueNormalizer;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -33,6 +34,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /**
@@ -94,9 +96,19 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
                 statsCollectorConfig);
         ColumnReader columnReader = columnReaders.get(columnName);
         Preconditions.checkState(columnReader != null, "Failed to find column reader for column: %s", columnName);
+        // The column-major driver runs with no transform pipeline, so each value must be normalized the
+        // way the row-major NullValueTransformer + DataTypeTransformer would: substitute the column
+        // default for nulls and coerce to the column's stored type (e.g. Boolean -> Integer for a
+        // BOOLEAN column stored as INT, Timestamp -> Long for TIMESTAMP). Without it a non-segment
+        // source (e.g. Arrow) feeds nulls / source-typed values into the typed collectors' established
+        // collect(Object) cast convention and NPEs / ClassCastExceptions. Shared with the index-write
+        // path via ColumnarValueNormalizer. Closes the "null/type handling in buildColumnar()"
+        // architectural gap (apache/pinot#18629).
+        PinotDataType destDataType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
         try {
           for (int i = 0; i < _totalDocCount; i++) {
-            statsCollector.collect(columnReader.getValue(i));
+            statsCollector.collect(
+                ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, columnReader.getValue(i)));
           }
         } catch (IOException e) {
           throw new RuntimeException("Caught exception collecting stats for column: " + columnName, e);

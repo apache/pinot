@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -59,7 +60,7 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * Unit tests for {@link ArrowColumnReaderFactory} and {@link ArrowColumnReader}.
+ * Unit tests for {@link ArrowFileColumnReaderFactory} and {@link ArrowColumnReader}.
  *
  * <p>Each test materialises a small Arrow IPC file on disk with a known fixture and verifies
  * that the factory can read it back column-by-column using all three documented patterns:
@@ -351,11 +352,11 @@ public class ArrowFileColumnReaderFactoryTest {
           } else {
             intVec.set(i, i * 10);
             longVec.set(i, (long) i * 100);
-            stringVec.set(i, ("s_" + i).getBytes());
+            stringVec.set(i, ("s_" + i).getBytes(StandardCharsets.UTF_8));
           }
           floatVec.set(i, i + 0.5f);
           doubleVec.set(i, i + 0.25);
-          bytesVec.set(i, ("b_" + i).getBytes());
+          bytesVec.set(i, ("b_" + i).getBytes(StandardCharsets.UTF_8));
         }
         intVec.setValueCount(ROWS);
         longVec.setValueCount(ROWS);
@@ -416,7 +417,7 @@ public class ArrowFileColumnReaderFactoryTest {
         listVec.allocateNew();
         UnionListWriter writer = listVec.getWriter();
 
-        writer.startList();
+        // Canonical Arrow list-writer pattern: setPosition(row) -> startList -> writes -> endList.
         writer.setPosition(0);
         writer.startList();
         writer.integer().writeInt(1);
