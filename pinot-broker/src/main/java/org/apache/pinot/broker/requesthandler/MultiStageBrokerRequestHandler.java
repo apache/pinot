@@ -230,9 +230,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         _config.containsKey(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES) ? Set.copyOf(
             _config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()))
             : CommonConstants.Broker.DEFAULT_DISABLED_RULES;
-    _enableQueryFingerprinting = _config.getProperty(
+    boolean fingerprintingConfigured = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
         CommonConstants.Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
+    boolean redactionNeedsFingerprinting =
+        _queryLogger.getSqlRedactionMode() == QueryLogger.SqlRedactionMode.LITERAL_VALUES;
+    if (redactionNeedsFingerprinting && !fingerprintingConfigured) {
+      LOGGER.warn("SQL redaction mode 'literal_values' requires query fingerprinting. "
+          + "Enabling query fingerprinting automatically.");
+    }
+    _enableQueryFingerprinting = fingerprintingConfigured || redactionNeedsFingerprinting;
     int streamingGroupByFlushThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD,
         CommonConstants.Broker.DEFAULT_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD);
@@ -393,20 +400,22 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponse handleRequestThrowing(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws QueryException, WebApplicationException {
-    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query);
-
+    QueryFingerprint queryFingerprint = null;
     String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
     if (_enableQueryFingerprinting) {
       try {
-        QueryFingerprint queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+        queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
         if (queryFingerprint != null) {
           queryHash = queryFingerprint.getQueryHash();
           requestContext.setQueryFingerprint(queryFingerprint);
         }
       } catch (Exception e) {
-        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId, query, e.getMessage());
+        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId,
+            _queryLogger.redactQuery(query), e.getMessage());
       }
     }
+
+    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query, queryFingerprint);
 
     String cid = extractClientRequestId(sqlNodeAndOptions);
     if (cid == null) {
@@ -682,7 +691,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Validate QPS quota
     if (hasExceededQPSQuota(query.getDatabase(), tableNames, requestContext)) {
-      String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
+      String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId,
+          _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
       return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
     }
 
@@ -695,14 +705,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // these requests.
       if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, timer.getRemainingTimeMs(),
           TimeUnit.MILLISECONDS)) {
-        LOGGER.warn("Timed out waiting to execute request {}: {}", requestId, query);
+        LOGGER.warn("Timed out waiting to execute request {}: {}", requestId,
+            _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
         requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
         return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
       }
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
           _queryThrottler.currentQueryServerThreads());
     } catch (InterruptedException e) {
-      LOGGER.warn("Interrupt received while waiting to execute request {}: {}", requestId, query);
+      LOGGER.warn("Interrupt received while waiting to execute request {}: {}", requestId,
+          _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
       requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
       return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
     }
@@ -726,7 +738,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         } catch (Throwable t) {
           QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
           String consolidatedMessage = ExceptionUtils.consolidateExceptionTraces(t);
-          LOGGER.error("Caught exception reducing all-leaf-empty request {}: {}, {}", requestId, query,
+          LOGGER.error("Caught exception reducing all-leaf-empty request {}: {}, {}", requestId,
+              _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()),
               consolidatedMessage);
           requestContext.setErrorCode(queryErrorCode);
           return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
@@ -748,7 +761,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         } catch (Throwable t) {
           QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
           String consolidatedMessage = ExceptionUtils.consolidateExceptionTraces(t);
-          LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
+          LOGGER.error("Caught exception executing request {}: {}, {}", requestId,
+              _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()),
+              consolidatedMessage);
           requestContext.setErrorCode(queryErrorCode);
           return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
         } finally {
@@ -768,7 +783,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           for (String table : tableNames) {
             _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
           }
-          LOGGER.warn("Timed out executing request {}: {}", requestId, query);
+          LOGGER.warn("Timed out executing request {}: {}", requestId,
+              _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
         }
         requestContext.setErrorCode(errorCode);
       } else {
@@ -888,17 +904,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return queryPlanResultFuture.get(timer.getRemainingTimeMs(), TimeUnit.MILLISECONDS);
     } catch (TimeoutException e) {
       String errorMsg = "Timed out while planning query";
-      LOGGER.warn(errorMsg + " {}", query, e);
+      LOGGER.warn(errorMsg + " {}", _queryLogger.redactQuery(query), e);
       queryPlanResultFuture.cancel(true);
       throw QueryErrorCode.BROKER_TIMEOUT.asException(errorMsg);
     } catch (InterruptedException e) {
-      LOGGER.warn("Interrupt received while planning query {}: {}", requestId, query);
+      LOGGER.warn("Interrupt received while planning query {}: {}", requestId, _queryLogger.redactQuery(query));
       throw QueryErrorCode.INTERNAL.asException("Interrupted while planning query");
     } catch (ExecutionException e) {
       if (e.getCause() instanceof QueryException) {
         throw (QueryException) e.getCause();
       } else {
-        LOGGER.warn("Error while planning query {}: {}", query, e.getCause());
+        LOGGER.warn("Error while planning query {}: {}", _queryLogger.redactQuery(query), e.getCause());
         throw QueryErrorCode.INTERNAL.asException("Error while planning query", e.getCause());
       }
     }
