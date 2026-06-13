@@ -2725,6 +2725,9 @@ public class CommonConstants {
     public static final String STRING = "";
     public static final byte[] BYTES = new byte[0];
     public static final ByteArray INTERNAL_BYTES = new ByteArray(BYTES);
+    public static final byte[] UUID_BYTES = UuidUtils.nullUuidBytes();
+    // INTERNAL_UUID_BYTES is a shared read-only sentinel. Do not mutate the array returned by getBytes().
+    public static final ByteArray INTERNAL_UUID_BYTES = new ByteArray(UUID_BYTES);
     public static final int[] INT_ARRAY = new int[0];
     public static final long[] LONG_ARRAY = new long[0];
     public static final float[] FLOAT_ARRAY = new float[0];

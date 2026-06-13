@@ -360,7 +360,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     }
     String column = context.getFieldSpec().getName();
     String segmentName = context.getSegmentName();
-    FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+    FieldSpec.DataType dataType = context.getFieldSpec().getDataType();
+    FieldSpec.DataType storedType = dataType.getStoredType();
     int fixedLengthBytes = context.getFixedLengthBytes();
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
     if (!context.hasDictionary()) {
@@ -398,13 +399,15 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         }
       } else {
         // TODO: Add support for variable width (bytes, string, big decimal) MV RAW column types
-        assert storedType.isFixedWidth();
+        Preconditions.checkState(dataType.isFixedWidth(), "Unsupported stored type: %s for no-dictionary MV column: %s",
+            storedType, column);
         String allocationContext =
             IndexUtil.buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
                 V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
         return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
-            context.getCapacity(), storedType.size(), context.getMemoryManager(), allocationContext, false, storedType);
+            context.getCapacity(), dataType.size(), context.getMemoryManager(), allocationContext, false, storedType,
+            dataType);
       }
     } else {
       if (isSingleValue) {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -95,6 +97,14 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "BYTES":
         case "VARBINARY":
           _resultMetadata = sourceSV ? BYTES_SV_NO_DICTIONARY_METADATA : BYTES_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "UUID":
+          Preconditions.checkState(sourceSV, "Cannot cast from MV to UUID");
+          _resultMetadata = UUID_SV_NO_DICTIONARY_METADATA;
+          break;
+        case "UUID_ARRAY":
+          Preconditions.checkState(!sourceSV, "Cannot cast from SV to UUID_ARRAY");
+          _resultMetadata = UUID_MV_NO_DICTIONARY_METADATA;
           break;
         case "INT_ARRAY":
         case "INTEGER_ARRAY":
@@ -300,11 +310,89 @@ public class CastTransformFunction extends BaseTransformFunction {
           byte[][] bytesValues = transformToBytesValuesSV(valueBlock);
           ArrayCopyUtils.copy(bytesValues, _stringValuesSV, length);
           break;
+        case UUID:
+          byte[][] uuidValues = transformToBytesValuesSV(valueBlock);
+          for (int i = 0; i < length; i++) {
+            _stringValuesSV[i] = UuidUtils.toString(uuidValues[i]);
+          }
+          break;
         default:
           throw new IllegalStateException(String.format("Cannot cast from SV %s to STRING", resultDataType));
       }
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+    DataType resultDataType = _resultMetadata.getDataType();
+    if (resultDataType != DataType.UUID) {
+      if (resultDataType.getStoredType() == DataType.BYTES) {
+        return _transformFunction.transformToBytesValuesSV(valueBlock);
+      }
+      return super.transformToBytesValuesSV(valueBlock);
+    }
+
+    int length = valueBlock.getNumDocs();
+    initBytesValuesSV(length);
+    switch (_sourceDataType.getStoredType()) {
+      case STRING:
+        String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
+        for (int i = 0; i < length; i++) {
+          _bytesValuesSV[i] = UuidUtils.toBytes(stringValues[i]);
+        }
+        return _bytesValuesSV;
+      case BYTES:
+        byte[][] bytesValues = _transformFunction.transformToBytesValuesSV(valueBlock);
+        for (int i = 0; i < length; i++) {
+          _bytesValuesSV[i] = UuidUtils.toBytes(bytesValues[i]);
+        }
+        return _bytesValuesSV;
+      default:
+        throw new IllegalStateException(String.format("Cannot cast from SV %s to UUID", _sourceDataType));
+    }
+  }
+
+  @Override
+  public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
+    DataType resultDataType = _resultMetadata.getDataType();
+    if (resultDataType != DataType.UUID) {
+      if (resultDataType.getStoredType() == DataType.BYTES) {
+        return _transformFunction.transformToBytesValuesMV(valueBlock);
+      }
+      return super.transformToBytesValuesMV(valueBlock);
+    }
+
+    int length = valueBlock.getNumDocs();
+    initBytesValuesMV(length);
+    switch (_sourceDataType.getStoredType()) {
+      case STRING:
+        String[][] stringValuesMV = _transformFunction.transformToStringValuesMV(valueBlock);
+        for (int i = 0; i < length; i++) {
+          String[] stringValues = stringValuesMV[i];
+          int numValues = stringValues.length;
+          byte[][] uuidValues = new byte[numValues][];
+          for (int j = 0; j < numValues; j++) {
+            uuidValues[j] = UuidUtils.toBytes(stringValues[j]);
+          }
+          _bytesValuesMV[i] = uuidValues;
+        }
+        return _bytesValuesMV;
+      case BYTES:
+        byte[][][] bytesValuesMV = _transformFunction.transformToBytesValuesMV(valueBlock);
+        for (int i = 0; i < length; i++) {
+          byte[][] bytesValues = bytesValuesMV[i];
+          int numValues = bytesValues.length;
+          byte[][] uuidValues = new byte[numValues][];
+          for (int j = 0; j < numValues; j++) {
+            uuidValues[j] = UuidUtils.toBytes(bytesValues[j]);
+          }
+          _bytesValuesMV[i] = uuidValues;
+        }
+        return _bytesValuesMV;
+      default:
+        throw new IllegalStateException(String.format("Cannot cast from MV %s to UUID", _sourceDataType));
+    }
   }
 
   @Override
@@ -457,6 +545,18 @@ public class CastTransformFunction extends BaseTransformFunction {
         case TIMESTAMP:
           longValuesMV = transformToTimestampValuesMV(valueBlock);
           ArrayCopyUtils.copyFromTimestamp(longValuesMV, _stringValuesMV, length);
+          break;
+        case UUID:
+          byte[][][] uuidValuesMV = transformToBytesValuesMV(valueBlock);
+          for (int i = 0; i < length; i++) {
+            byte[][] uuidValues = uuidValuesMV[i];
+            int numValues = uuidValues.length;
+            String[] stringValues = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              stringValues[j] = UuidUtils.toString(uuidValues[j]);
+            }
+            _stringValuesMV[i] = stringValues;
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot cast from MV %s to STRING", resultDataType));

@@ -164,6 +164,18 @@ public class GenericRowDeserializer {
               multiValue[j] = new String(stringBytes, UTF_8);
             }
             break;
+          case BYTES:
+            // Used by MV UUID (storedType=BYTES). Mirrors the writer in GenericRowSerializer:
+            // each element is length-prefixed.
+            for (int j = 0; j < numValues; j++) {
+              int numBytes = _dataBuffer.getInt(offset);
+              offset += Integer.BYTES;
+              byte[] elementBytes = new byte[numBytes];
+              _dataBuffer.copyTo(offset, elementBytes);
+              offset += numBytes;
+              multiValue[j] = elementBytes;
+            }
+            break;
           default:
             throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[i]);
         }
@@ -359,6 +371,26 @@ public class GenericRowDeserializer {
               byte[] stringBytes2 = new byte[numBytes2];
               _dataBuffer.copyTo(offset2, stringBytes2);
               int result = new String(stringBytes1, UTF_8).compareTo(new String(stringBytes2, UTF_8));
+              if (result != 0) {
+                return result;
+              }
+              offset1 += numBytes1;
+              offset2 += numBytes2;
+            }
+            break;
+          case BYTES:
+            // Used by MV UUID (storedType=BYTES). Element-wise unsigned byte compare matches the SV BYTES
+            // ordering above.
+            for (int j = 0; j < numValues; j++) {
+              int numBytes1 = _dataBuffer.getInt(offset1);
+              offset1 += Integer.BYTES;
+              byte[] elementBytes1 = new byte[numBytes1];
+              _dataBuffer.copyTo(offset1, elementBytes1);
+              int numBytes2 = _dataBuffer.getInt(offset2);
+              offset2 += Integer.BYTES;
+              byte[] elementBytes2 = new byte[numBytes2];
+              _dataBuffer.copyTo(offset2, elementBytes2);
+              int result = ByteArray.compare(elementBytes1, elementBytes2);
               if (result != 0) {
                 return result;
               }

@@ -25,7 +25,10 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.Test;
 
@@ -154,5 +157,22 @@ public class FunctionUtilsTest {
     assertEquals(FunctionUtils.getColumnDataType(Object.class), ColumnDataType.OBJECT);
     // Unknown class
     assertNull(FunctionUtils.getColumnDataType(LocalDate.class));
+  }
+
+  @Test
+  public void testUUIDMappings() {
+    assertEquals(FunctionUtils.getParameterType(UUID.class), PinotDataType.UUID);
+    assertEquals(FunctionUtils.getArgumentType(UUID.randomUUID()), PinotDataType.UUID);
+    assertEquals(FunctionUtils.getDataType(UUID.class), DataType.UUID);
+    assertEquals(FunctionUtils.getDataType(UUID[].class), DataType.UUID);
+    assertEquals(FunctionUtils.getColumnDataType(UUID.class), ColumnDataType.UUID);
+    assertEquals(FunctionUtils.getRelDataType(new JavaTypeFactoryImpl(), UUID.class).getSqlTypeName(),
+        SqlTypeName.UUID);
+    assertEquals(FunctionUtils.getParameterType(UUID[].class), PinotDataType.UUID_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new UUID[]{UUID.randomUUID()}), PinotDataType.UUID_ARRAY);
+    assertEquals(FunctionUtils.getDataType(UUID[].class), DataType.UUID);
+    assertEquals(FunctionUtils.getColumnDataType(UUID[].class), ColumnDataType.UUID_ARRAY);
+    assertEquals(FunctionUtils.getRelDataType(new JavaTypeFactoryImpl(), UUID[].class).getComponentType()
+        .getSqlTypeName(), SqlTypeName.UUID);
   }
 }
