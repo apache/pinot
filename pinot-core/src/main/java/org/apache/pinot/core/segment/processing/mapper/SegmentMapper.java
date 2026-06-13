@@ -73,6 +73,7 @@ public class SegmentMapper {
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
   private final int _numSortFields;
+  private final boolean _includeOriginalTimeField;
   private final TransformPipeline _transformPipeline;
   private final TimeHandler _timeHandler;
   private final Partitioner[] _partitioners;
@@ -109,8 +110,9 @@ public class SegmentMapper {
 
     TableConfig tableConfig = processorConfig.getTableConfig();
     Schema schema = processorConfig.getSchema();
+    _includeOriginalTimeField = processorConfig.requiresOriginalTimeOrdering();
     Pair<List<FieldSpec>, Integer> pair = SegmentProcessorUtils.getFieldSpecs(schema, processorConfig.getMergeType(),
-        tableConfig.getIndexingConfig().getSortedColumn());
+        tableConfig.getIndexingConfig().getSortedColumn(), _includeOriginalTimeField);
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();
     _includeNullFields =
@@ -274,7 +276,8 @@ public class SegmentMapper {
     if (fileManager == null) {
       File partitionOutputDir = new File(_mapperOutputDir, partition);
       FileUtils.forceMkdir(partitionOutputDir);
-      fileManager = new GenericRowFileManager(partitionOutputDir, _fieldSpecs, _includeNullFields, _numSortFields);
+      fileManager = new GenericRowFileManager(partitionOutputDir, _fieldSpecs, _includeNullFields, _numSortFields,
+          _includeOriginalTimeField);
       _partitionToFileManagerMap.put(partition, fileManager);
     }
 
