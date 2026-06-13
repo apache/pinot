@@ -29,6 +29,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
@@ -105,6 +106,8 @@ final class BatchedArrowFileSource implements Closeable {
       }
       _batchStartDoc[_blocks.size()] = total;
       _totalDocs = total;
+      // The footer pass above left the last batch resident; record it so the first columnVector()
+      // call can skip a reload when it targets that batch.
       _loadedBatchIdx = _blocks.isEmpty() ? -1 : _blocks.size() - 1;
       initialized = true;
     } finally {
@@ -161,14 +164,10 @@ final class BatchedArrowFileSource implements Closeable {
    */
   Field effectiveField(String columnName) {
     FieldVector source = _root.getVector(columnName);
-    DictionaryEncoding encoding = source.getField().getDictionary();
-    if (encoding == null) {
+    Dictionary dictionary = resolveDictionary(source);
+    if (dictionary == null) {
       return source.getField();
     }
-    Dictionary dictionary = _dictionaries.get(encoding.getId());
-    Preconditions.checkArgument(dictionary != null,
-        "Arrow column '%s' is dictionary-encoded (dictionary id %s) but no matching dictionary is present",
-        columnName, encoding.getId());
     Field valueField = dictionary.getVector().getField();
     return new Field(columnName, valueField.getFieldType(), valueField.getChildren());
   }
@@ -185,18 +184,31 @@ final class BatchedArrowFileSource implements Closeable {
       return cached;
     }
     FieldVector source = _root.getVector(columnName);
-    DictionaryEncoding encoding = source.getField().getDictionary();
-    if (encoding == null) {
+    Dictionary dictionary = resolveDictionary(source);
+    if (dictionary == null) {
       // Raw vector owned by the VectorSchemaRoot; refilled in place on the next loadRecordBatch.
       return source;
+    }
+    FieldVector decoded = (FieldVector) DictionaryEncoder.decode(source, dictionary);
+    _decodedCache.put(columnName, decoded);
+    return decoded;
+  }
+
+  /**
+   * The bound dictionary for {@code source} if it is dictionary-encoded, or {@code null} otherwise.
+   * Throws if the column is dictionary-encoded but its dictionary is missing from the source.
+   */
+  @Nullable
+  private Dictionary resolveDictionary(FieldVector source) {
+    DictionaryEncoding encoding = source.getField().getDictionary();
+    if (encoding == null) {
+      return null;
     }
     Dictionary dictionary = _dictionaries.get(encoding.getId());
     Preconditions.checkArgument(dictionary != null,
         "Arrow column '%s' is dictionary-encoded (dictionary id %s) but no matching dictionary is present",
-        columnName, encoding.getId());
-    FieldVector decoded = (FieldVector) DictionaryEncoder.decode(source, dictionary);
-    _decodedCache.put(columnName, decoded);
-    return decoded;
+        source.getField().getName(), encoding.getId());
+    return dictionary;
   }
 
   private void ensureBatchLoaded(int batchIdx)

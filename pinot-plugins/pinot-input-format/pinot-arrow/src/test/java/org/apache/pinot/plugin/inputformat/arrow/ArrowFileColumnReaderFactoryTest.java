@@ -25,6 +25,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -33,6 +34,7 @@ import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.Float4Vector;
 import org.apache.arrow.vector.Float8Vector;
 import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.TimeStampMilliVector;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
@@ -40,6 +42,7 @@ import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.complex.impl.UnionListWriter;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
+import org.apache.arrow.vector.types.TimeUnit;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
@@ -236,6 +239,99 @@ public class ArrowFileColumnReaderFactoryTest {
 
       MultiValueResult<int[]> doc2 = reader.getIntMV(2);
       assertEquals(doc2.getValues().length, 0);
+    }
+  }
+
+  /**
+   * Type predicates on a multi-value reader reflect the list's <i>element</i> type, not the
+   * {@code ListVector} itself — so an INT multi-value column reports {@code isInt()} (and is not
+   * single-value), letting the build pick the right typed {@code getXxxMV} accessor.
+   */
+  @Test
+  public void testMultiValueColumnTypePredicates()
+      throws IOException {
+    File arrowFile = writeMultiValueIntFixture("mv-predicates.arrow");
+    org.apache.pinot.spi.data.Schema schema = new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+        .setSchemaName("mv")
+        .addMultiValueDimension("intArr", FieldSpec.DataType.INT)
+        .build();
+
+    try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(arrowFile)) {
+      factory.init(schema);
+      ColumnReader reader = factory.getColumnReader("intArr");
+      assertNotNull(reader);
+      assertFalse(reader.isSingleValue());
+      assertTrue(reader.isInt(), "INT element type should report isInt()");
+      assertFalse(reader.isLong());
+      assertFalse(reader.isString());
+      assertFalse(reader.isBytes());
+    }
+  }
+
+  /**
+   * A wrong-type accessor must fail with {@link IOException} (the reader's {@code typeMismatch}
+   * contract), not return garbage or throw an opaque cast error: calling a STRING accessor on an INT
+   * column, a scalar accessor mismatch, and a multi-value accessor on a single-value column.
+   */
+  @Test
+  public void testTypeMismatchAccessorsThrow()
+      throws IOException {
+    File arrowFile = writePrimitiveFixture("type-mismatch.arrow");
+    org.apache.pinot.spi.data.Schema schema = primitiveSchema();
+
+    try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(arrowFile)) {
+      factory.init(schema);
+      ColumnReader intReader = factory.getColumnReader("intCol");
+      ColumnReader stringReader = factory.getColumnReader("stringCol");
+
+      // Wrong scalar type on a non-null doc (doc 0 is populated for both columns).
+      assertThrows(IOException.class, () -> intReader.getString(0));
+      assertThrows(IOException.class, () -> intReader.getLong(0));
+      assertThrows(IOException.class, () -> stringReader.getInt(0));
+      // Multi-value accessor on a single-value column (no ListVector to read).
+      assertThrows(IOException.class, () -> intReader.getIntMV(0));
+    }
+  }
+
+  /**
+   * {@code CONFIG_EXTRACT_RAW_TIME_VALUES} must flow through the factory to each column reader,
+   * mirroring the row-major {@code ArrowRecordExtractorConfig.EXTRACT_RAW_TIME_VALUES}: with it set, a
+   * TIMESTAMP column surfaces the raw epoch {@code long}; without it (the default), it surfaces a
+   * canonical {@link Timestamp}. Same fixture, two factories — proves the flag flips the behavior.
+   */
+  @Test
+  public void testExtractRawTimeValuesSurfacesRawEpoch()
+      throws IOException {
+    long[] epochMillis = {0L, 1_000L, 1_718_265_600_000L};
+    File arrowFile = writeTimestampFixture("timestamps.arrow", epochMillis);
+    org.apache.pinot.spi.data.Schema schema = new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+        .setSchemaName("ts")
+        .addSingleValueDimension("tsCol", FieldSpec.DataType.TIMESTAMP)
+        .build();
+
+    // Raw mode: surfaces the raw epoch long.
+    try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(arrowFile)) {
+      factory.init(schema, null,
+          Map.of(ArrowFileColumnReaderFactory.CONFIG_EXTRACT_RAW_TIME_VALUES, "true"));
+      ColumnReader reader = factory.getColumnReader("tsCol");
+      assertNotNull(reader);
+      for (int i = 0; i < epochMillis.length; i++) {
+        Object value = reader.getValue(i);
+        assertTrue(value instanceof Long, "raw mode should surface a Long epoch, got " + value);
+        assertEquals(((Long) value).longValue(), epochMillis[i]);
+      }
+    }
+
+    // Default mode: surfaces a java.sql.Timestamp carrying the same instant.
+    try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(arrowFile)) {
+      factory.init(schema);
+      ColumnReader reader = factory.getColumnReader("tsCol");
+      assertNotNull(reader);
+      for (int i = 0; i < epochMillis.length; i++) {
+        Object value = reader.getValue(i);
+        assertTrue(value instanceof Timestamp, "default mode should surface a Timestamp, got " + value);
+        assertEquals(((Timestamp) value).getTime(), epochMillis[i]);
+      }
     }
   }
 
@@ -577,6 +673,30 @@ public class ArrowFileColumnReaderFactoryTest {
 
         listVec.setValueCount(3);
         root.setRowCount(3);
+
+        writeIpc(out, root);
+      }
+    }
+    return out;
+  }
+
+  private File writeTimestampFixture(String fileName, long[] epochMillis)
+      throws IOException {
+    File out = _tempDir.resolve(fileName).toFile();
+    try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE)) {
+      // No-timezone Timestamp vector in millisecond units (matches Pinot's TIMESTAMP storage unit).
+      Field tsField =
+          new Field("tsCol", FieldType.nullable(new ArrowType.Timestamp(TimeUnit.MILLISECOND, null)), null);
+      Schema schema = new Schema(Collections.singletonList(tsField));
+
+      try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
+        TimeStampMilliVector tsVec = (TimeStampMilliVector) root.getVector("tsCol");
+        tsVec.allocateNew(epochMillis.length);
+        for (int i = 0; i < epochMillis.length; i++) {
+          tsVec.set(i, epochMillis[i]);
+        }
+        tsVec.setValueCount(epochMillis.length);
+        root.setRowCount(epochMillis.length);
 
         writeIpc(out, root);
       }

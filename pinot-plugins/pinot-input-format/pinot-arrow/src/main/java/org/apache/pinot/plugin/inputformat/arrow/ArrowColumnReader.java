@@ -72,11 +72,9 @@ import org.apache.pinot.spi.data.readers.MultiValueResult;
  * 0/1, keeping it consistent with {@link #getInt(int)} and the advertised INT mapping above
  * rather than surfacing the shared converter's {@code Boolean}.
  *
- * <p>{@code @SuppressWarnings("serial")}: {@link ColumnReader} extends {@link java.io.Serializable}
- * by SPI contract, but this reader holds a non-serializable Arrow {@link FieldVector} and is never
- * actually serialized — it lives only for the duration of a columnar segment build. The suppression
- * silences the missing-{@code serialVersionUID} warning; matches the Pinot convention used by other
- * incidentally-{@code Serializable} build-time helpers.
+ * <p>{@code @SuppressWarnings("serial")}: {@link ColumnReader} is {@link java.io.Serializable} by SPI
+ * contract, but this reader holds non-serializable Arrow state and is never serialized — it lives
+ * only for the duration of a columnar segment build.
  *
  * <p>This class is not thread-safe.
  */
@@ -414,12 +412,11 @@ public class ArrowColumnReader implements ColumnReader {
   }
 
   @Override
+  @Nullable
   public Object getValue(int docId)
       throws IOException {
     checkBounds(docId);
-    // BitVector maps to Pinot INT (0/1). The shared converter would surface a Boolean via
-    // FieldVector.getObject, so special-case it here to stay consistent with getInt() and the
-    // advertised INT mapping. See the "BitVector caveat" in the class Javadoc.
+    // BitVector -> INT (0/1); see the BitVector caveat in the class Javadoc.
     if (_vector instanceof BitVector) {
       return _vector.isNull(docId) ? null : ((BitVector) _vector).get(docId);
     }
@@ -437,25 +434,101 @@ public class ArrowColumnReader implements ColumnReader {
   @Override
   public MultiValueResult<int[]> getIntMV(int docId)
       throws IOException {
-    return readPrimitiveMV(docId, int[].class);
+    checkBounds(docId);
+    requireListVector();
+    ListVector list = (ListVector) _vector;
+    FieldVector elements = list.getDataVector();
+    int start = list.getElementStartIndex(docId);
+    int length = list.getElementEndIndex(docId) - start;
+    BitSet nulls = elementNulls(elements, start, length);
+    int[] values = new int[length];
+    if (elements instanceof IntVector) {
+      IntVector iv = (IntVector) elements;
+      for (int i = 0; i < length; i++) {
+        if (notNull(nulls, i)) {
+          values[i] = iv.get(start + i);
+        }
+      }
+    } else if (elements instanceof BitVector) {
+      BitVector bv = (BitVector) elements;
+      for (int i = 0; i < length; i++) {
+        if (notNull(nulls, i)) {
+          values[i] = bv.get(start + i);
+        }
+      }
+    } else {
+      throw typeMismatch("INT_MV");
+    }
+    return MultiValueResult.of(values, nulls);
   }
 
   @Override
   public MultiValueResult<long[]> getLongMV(int docId)
       throws IOException {
-    return readPrimitiveMV(docId, long[].class);
+    checkBounds(docId);
+    requireListVector();
+    ListVector list = (ListVector) _vector;
+    FieldVector elements = list.getDataVector();
+    if (!(elements instanceof BigIntVector)) {
+      throw typeMismatch("LONG_MV");
+    }
+    BigIntVector lv = (BigIntVector) elements;
+    int start = list.getElementStartIndex(docId);
+    int length = list.getElementEndIndex(docId) - start;
+    BitSet nulls = elementNulls(elements, start, length);
+    long[] values = new long[length];
+    for (int i = 0; i < length; i++) {
+      if (notNull(nulls, i)) {
+        values[i] = lv.get(start + i);
+      }
+    }
+    return MultiValueResult.of(values, nulls);
   }
 
   @Override
   public MultiValueResult<float[]> getFloatMV(int docId)
       throws IOException {
-    return readPrimitiveMV(docId, float[].class);
+    checkBounds(docId);
+    requireListVector();
+    ListVector list = (ListVector) _vector;
+    FieldVector elements = list.getDataVector();
+    if (!(elements instanceof Float4Vector)) {
+      throw typeMismatch("FLOAT_MV");
+    }
+    Float4Vector fv = (Float4Vector) elements;
+    int start = list.getElementStartIndex(docId);
+    int length = list.getElementEndIndex(docId) - start;
+    BitSet nulls = elementNulls(elements, start, length);
+    float[] values = new float[length];
+    for (int i = 0; i < length; i++) {
+      if (notNull(nulls, i)) {
+        values[i] = fv.get(start + i);
+      }
+    }
+    return MultiValueResult.of(values, nulls);
   }
 
   @Override
   public MultiValueResult<double[]> getDoubleMV(int docId)
       throws IOException {
-    return readPrimitiveMV(docId, double[].class);
+    checkBounds(docId);
+    requireListVector();
+    ListVector list = (ListVector) _vector;
+    FieldVector elements = list.getDataVector();
+    if (!(elements instanceof Float8Vector)) {
+      throw typeMismatch("DOUBLE_MV");
+    }
+    Float8Vector dv = (Float8Vector) elements;
+    int start = list.getElementStartIndex(docId);
+    int length = list.getElementEndIndex(docId) - start;
+    BitSet nulls = elementNulls(elements, start, length);
+    double[] values = new double[length];
+    for (int i = 0; i < length; i++) {
+      if (notNull(nulls, i)) {
+        values[i] = dv.get(start + i);
+      }
+    }
+    return MultiValueResult.of(values, nulls);
   }
 
   @Override
@@ -527,107 +600,28 @@ public class ArrowColumnReader implements ColumnReader {
   }
 
   /**
-   * Read a primitive multi-value from a {@link ListVector}, populating a fresh array and a
-   * nulls BitSet for element-level validity.
+   * Scan element-level validity for the list slice {@code [start, start + length)} of
+   * {@code elements}, returning a BitSet whose set bits mark null elements, or {@code null} when no
+   * element is null (the common case, so callers skip the per-element check). The returned index
+   * space is element-local: bit {@code i} corresponds to element {@code start + i}.
    */
-  @SuppressWarnings("unchecked")
-  private <T> MultiValueResult<T> readPrimitiveMV(int docId, Class<T> arrayClass)
-      throws IOException {
-    checkBounds(docId);
-    requireListVector();
-    ListVector list = (ListVector) _vector;
-    int start = list.getElementStartIndex(docId);
-    int end = list.getElementEndIndex(docId);
-    int length = end - start;
-    FieldVector elements = list.getDataVector();
+  @Nullable
+  private static BitSet elementNulls(FieldVector elements, int start, int length) {
     BitSet nulls = null;
-
-    Object array;
-    if (arrayClass == int[].class) {
-      int[] values = new int[length];
-      if (elements instanceof IntVector) {
-        IntVector iv = (IntVector) elements;
-        for (int i = 0; i < length; i++) {
-          if (iv.isNull(start + i)) {
-            if (nulls == null) {
-              nulls = new BitSet(length);
-            }
-            nulls.set(i);
-          } else {
-            values[i] = iv.get(start + i);
-          }
+    for (int i = 0; i < length; i++) {
+      if (elements.isNull(start + i)) {
+        if (nulls == null) {
+          nulls = new BitSet(length);
         }
-      } else if (elements instanceof BitVector) {
-        BitVector bv = (BitVector) elements;
-        for (int i = 0; i < length; i++) {
-          if (bv.isNull(start + i)) {
-            if (nulls == null) {
-              nulls = new BitSet(length);
-            }
-            nulls.set(i);
-          } else {
-            values[i] = bv.get(start + i);
-          }
-        }
-      } else {
-        throw typeMismatch("INT_MV");
+        nulls.set(i);
       }
-      array = values;
-    } else if (arrayClass == long[].class) {
-      long[] values = new long[length];
-      if (!(elements instanceof BigIntVector)) {
-        throw typeMismatch("LONG_MV");
-      }
-      BigIntVector lv = (BigIntVector) elements;
-      for (int i = 0; i < length; i++) {
-        if (lv.isNull(start + i)) {
-          if (nulls == null) {
-            nulls = new BitSet(length);
-          }
-          nulls.set(i);
-        } else {
-          values[i] = lv.get(start + i);
-        }
-      }
-      array = values;
-    } else if (arrayClass == float[].class) {
-      float[] values = new float[length];
-      if (!(elements instanceof Float4Vector)) {
-        throw typeMismatch("FLOAT_MV");
-      }
-      Float4Vector fv = (Float4Vector) elements;
-      for (int i = 0; i < length; i++) {
-        if (fv.isNull(start + i)) {
-          if (nulls == null) {
-            nulls = new BitSet(length);
-          }
-          nulls.set(i);
-        } else {
-          values[i] = fv.get(start + i);
-        }
-      }
-      array = values;
-    } else if (arrayClass == double[].class) {
-      double[] values = new double[length];
-      if (!(elements instanceof Float8Vector)) {
-        throw typeMismatch("DOUBLE_MV");
-      }
-      Float8Vector dv = (Float8Vector) elements;
-      for (int i = 0; i < length; i++) {
-        if (dv.isNull(start + i)) {
-          if (nulls == null) {
-            nulls = new BitSet(length);
-          }
-          nulls.set(i);
-        } else {
-          values[i] = dv.get(start + i);
-        }
-      }
-      array = values;
-    } else {
-      throw new IOException("Unsupported primitive MV array type: " + arrayClass.getName());
     }
-    return MultiValueResult.of((T) array, nulls);
+    return nulls;
+  }
+
+  /** True when element {@code i} is not null, given the {@link #elementNulls} BitSet (possibly null). */
+  private static boolean notNull(@Nullable BitSet nulls, int i) {
+    return nulls == null || !nulls.get(i);
   }
 
   /**

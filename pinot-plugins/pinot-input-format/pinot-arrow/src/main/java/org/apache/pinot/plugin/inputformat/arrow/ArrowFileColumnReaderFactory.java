@@ -21,12 +21,10 @@ package org.apache.pinot.plugin.inputformat.arrow;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
@@ -40,31 +38,23 @@ import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
  * and a private allocator sized by {@link #CONFIG_ALLOCATOR_LIMIT}, all wrapped in a
  * {@link BatchedArrowFileSource}, and closes them on {@link #close}.
  *
- * <p><b>Memory model — one record batch resident.</b> The file is read <b>one record batch at a
- * time</b> through the seekable {@code ArrowFileReader}; the per-column {@link
- * BatchedArrowColumnReader}s created here share a single batch cursor, so peak resident memory is the
- * largest record batch rather than the whole materialised column set. That is the same model as the
- * row-major {@link ArrowRecordReader}, and the batch size is a write-time, producer-chosen property.
- * The trade-off is read amplification: consuming each column to completion re-loads every batch, so a
- * column-major build over an {@code N}-column, multi-batch file performs {@code N x} batch loads —
- * the accepted cost of Arrow's horizontal record-batch layout. A pathological single oversized batch
- * is bounded by {@link #CONFIG_ALLOCATOR_LIMIT}: the build throws a catchable Arrow
- * {@code OutOfMemoryException} at the ceiling rather than exhausting the heap.
+ * <p><b>Memory model — one record batch resident.</b> See {@link BatchedArrowFileSource} for the
+ * batch-bounded reading model and its read-amplification trade-off; the per-column {@link
+ * BatchedArrowColumnReader}s created here share that source's single batch cursor. A pathological
+ * single oversized batch is bounded by {@link #CONFIG_ALLOCATOR_LIMIT}, which throws a catchable
+ * Arrow {@code OutOfMemoryException} at the ceiling rather than exhausting the heap.
  *
  * <p>{@link #getAvailableColumns()} reports the columns actually present in the Arrow source. A
  * target-schema column that is NOT present is absent from that set, and {@link
  * #getColumnReader(String)} returns {@code null} for it; supplying schema-evolution defaults for such
  * columns is the columnar build driver's responsibility.
  *
- * <p><b>Dictionary-encoded columns are supported</b> (the standard Arrow representation for
- * low-cardinality strings): each batch is decoded against the bound dictionary via
- * {@code DictionaryEncoder.decode}, mirroring the row-major {@link ArrowRecordExtractor}, so the
- * produced segment matches the row-major path for the same file.
+ * <p>Dictionary-encoded columns are supported; see {@link BatchedArrowFileSource} for how each batch
+ * is decoded against its bound dictionary.
  *
  * <p>This class is not thread-safe. {@code @SuppressWarnings("serial")}: {@link ColumnReaderFactory}
- * extends {@link java.io.Serializable} by SPI contract, but this factory holds non-serializable Arrow
- * handles and is never actually serialized — it exists only for the duration of a columnar segment
- * build.
+ * is {@link java.io.Serializable} by SPI contract, but this factory holds non-serializable Arrow
+ * handles and is never serialized.
  */
 @SuppressWarnings("serial")
 public class ArrowFileColumnReaderFactory implements ColumnReaderFactory {
@@ -127,7 +117,7 @@ public class ArrowFileColumnReaderFactory implements ColumnReaderFactory {
     try {
       _source = new BatchedArrowFileSource(_dataFile, allocatorLimit, extractRawTimeValues);
       _availableColumnNames = _source.getAvailableColumns();
-      Set<String> wantedColumns = computeWantedColumns(targetSchema, colsToRead);
+      Set<String> wantedColumns = ArrowAccumulators.computeWantedColumns(targetSchema, colsToRead);
       Map<String, ColumnReader> readers = new LinkedHashMap<>();
       for (String name : _availableColumnNames) {
         if (wantedColumns.isEmpty() || wantedColumns.contains(name)) {
@@ -147,19 +137,6 @@ public class ArrowFileColumnReaderFactory implements ColumnReaderFactory {
       }
       throw e;
     }
-  }
-
-  private Set<String> computeWantedColumns(Schema targetSchema, @Nullable Set<String> colsToRead) {
-    if (colsToRead != null && !colsToRead.isEmpty()) {
-      return new HashSet<>(colsToRead);
-    }
-    Set<String> wanted = new HashSet<>();
-    for (FieldSpec fieldSpec : targetSchema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        wanted.add(fieldSpec.getName());
-      }
-    }
-    return wanted;
   }
 
   private long parseAllocatorLimit(Map<String, String> configs) {

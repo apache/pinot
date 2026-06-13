@@ -49,9 +49,8 @@ import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
  *
  * <p>This class is not thread-safe.
  *
- * <p>{@code @SuppressWarnings("serial")}: {@link ColumnReaderFactory} extends {@link
- * java.io.Serializable} by SPI contract, but this factory holds non-serializable Arrow handles and
- * is never actually serialized — it exists only for the duration of a columnar segment build.
+ * <p>{@code @SuppressWarnings("serial")}: {@link ColumnReaderFactory} is {@link java.io.Serializable}
+ * by SPI contract, but this factory holds non-serializable Arrow handles and is never serialized.
  */
 @SuppressWarnings("serial")
 public class ArrowColumnReaderFactory implements ColumnReaderFactory {

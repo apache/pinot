@@ -67,12 +67,9 @@ final class ArrowAccumulators {
     // ArrowRecordExtractor (setReader + prepareBatch); empty when no column is dictionary-encoded.
     Map<Long, Dictionary> dictionaries = reader.getDictionaryVectors();
 
-    // A half-built collection of Closeables must be unwound by whoever is mid-construction, because
-    // nobody else has a reference yet — populate() only hands ownership to the factory via the
-    // returned Result. So if anything throws after the first allocateNew() (a missing dictionary, a
-    // loadNextBatch IO error, or a VectorAppender failure), release the already-allocated off-heap
-    // accumulators here before propagating; otherwise the factory's _accumulatorVectors stays null and
-    // its close() can't free them, and the allocator close trips.
+    // Nothing else holds these accumulators until we return the Result, so on any failure after the
+    // first allocateNew() we must release them here (see the catch below); otherwise the off-heap
+    // vectors leak and the allocator's own close() trips on the outstanding allocation.
     Map<String, FieldVector> accumulators = new LinkedHashMap<>();
     try {
       Map<String, VectorAppender> appenders = new LinkedHashMap<>();
@@ -151,7 +148,12 @@ final class ArrowAccumulators {
     }
   }
 
-  private static Set<String> computeWantedColumns(Schema targetSchema, @Nullable Set<String> colsToRead) {
+  /**
+   * Resolve the set of columns to read: an explicit non-empty {@code colsToRead}, otherwise every
+   * non-virtual column in {@code targetSchema}. Shared by both columnar factories (materialized and
+   * file-backed) so the selection rule lives in one place.
+   */
+  static Set<String> computeWantedColumns(Schema targetSchema, @Nullable Set<String> colsToRead) {
     if (colsToRead != null && !colsToRead.isEmpty()) {
       return new HashSet<>(colsToRead);
     }

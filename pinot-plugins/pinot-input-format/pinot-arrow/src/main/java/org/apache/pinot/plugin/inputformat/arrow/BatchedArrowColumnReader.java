@@ -40,14 +40,12 @@ import org.apache.pinot.spi.data.readers.MultiValueResult;
  * (decoded) Arrow {@link Field}, so they need no batch load. The column-major segment build consumes
  * each column to completion sequentially (rewind + next), one column at a time.
  *
- * <p>The per-batch delegate is rebuilt whenever this reader advances to a new batch <i>or the shared
- * source has been moved to a different batch by another reader</i> — the delegate wraps the source's
- * current-batch vector (raw vectors are refilled in place across loads, decoded dictionary vectors
- * are released on the next load), so a delegate from a no-longer-resident batch would read
- * overwritten or freed memory. With that guard, interleaving readers is correct (it just re-loads
- * batches); the build never interleaves.
+ * <p>The per-batch delegate is invalidated when the shared source moves to another batch (whether
+ * this reader advanced it or a different one did); {@link #delegate(int)} documents why and rebuilds
+ * it. Interleaving readers therefore stays correct (it just re-loads batches); the build never
+ * interleaves.
  *
- * <p>This class is not thread-safe. {@code @SuppressWarnings("serial")}: {@link ColumnReader} extends
+ * <p>This class is not thread-safe. {@code @SuppressWarnings("serial")}: {@link ColumnReader} is
  * {@link java.io.Serializable} by SPI contract, but this reader holds non-serializable Arrow state
  * and is never serialized.
  */
