@@ -207,6 +207,9 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     List<Pair<String, Integer>> unavailableSegments = new ArrayList<>();
     List<Triple<String, Integer, Integer>> segmentsReducingFullyReplicatedServers = new ArrayList<>();
     List<Map.Entry<String, SegmentInfo>> newSegmentInfoEntries = new ArrayList<>();
+    // Transiently-unavailable (no online replica) segments, grouped by partition. Attached to their PartitionInfo at
+    // the end so that a single unavailable segment doesn't clear the partition's fully replicated servers.
+    Map<Integer, List<String>> unavailableSegmentsByPartition = new HashMap<>();
     long currentTimeMs = System.currentTimeMillis();
     for (Map.Entry<String, SegmentInfo> entry : _segmentInfoMap.entrySet()) {
       String segment = entry.getKey();
@@ -224,16 +227,13 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       List<String> onlineServers = segmentInfo._onlineServers;
       PartitionInfo partitionInfo = partitionInfoMap[partitionId];
       if (onlineServers.isEmpty()) {
+        // A non-new segment with no online replica is transiently unavailable (e.g. during rebalance, LLC commit, or
+        // server restart). Record it as unavailable for the partition, but do NOT add it to the routable segment list
+        // and do NOT clear the fully replicated servers: a single unavailable segment must not make the whole
+        // partition unroutable. Best-effort colocated routing surfaces these segments as a non-fatal warning, while
+        // strict routing fails the query when a partition has any unavailable segment.
         unavailableSegments.add(Pair.of(segment, partitionId));
-        if (partitionInfo == null) {
-          List<String> segments = new ArrayList<>();
-          segments.add(segment);
-          partitionInfo = new PartitionInfo(new HashSet<>(), segments);
-          partitionInfoMap[partitionId] = partitionInfo;
-        } else {
-          partitionInfo._fullyReplicatedServers.clear();
-          partitionInfo._segments.add(segment);
-        }
+        unavailableSegmentsByPartition.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segment);
       } else {
         if (partitionInfo == null) {
           Set<String> fullyReplicatedServers = new HashSet<>(onlineServers);
@@ -305,6 +305,22 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
         int numSegments = excludedNewSegments.size();
         LOGGER.info("Excluded {} new segments: {}... without all replicas available in table: {}", numSegments,
             numSegments <= 10 ? excludedNewSegments : excludedNewSegments.subList(0, 10) + "...", _tableNameWithType);
+      }
+    }
+    // Attach transiently-unavailable segments to their partitions so that best-effort routing can surface them. A
+    // partition that still has at least one available segment keeps its fully replicated servers; a partition whose
+    // segments are ALL unavailable gets a PartitionInfo with no fully replicated servers and no routable segments
+    // (rather than being left null), so routing consumers handle it consistently: strict mode fails with an informative
+    // error and best-effort mode reports the unavailable segments. Such a fully-unavailable partition still cannot be
+    // colocated-routed (no server holds its data), so the query fails in both modes, but never silently.
+    for (Map.Entry<Integer, List<String>> entry : unavailableSegmentsByPartition.entrySet()) {
+      int partitionId = entry.getKey();
+      PartitionInfo partitionInfo = partitionInfoMap[partitionId];
+      if (partitionInfo != null) {
+        partitionInfo._unavailableSegments.addAll(entry.getValue());
+      } else {
+        partitionInfoMap[partitionId] =
+            new PartitionInfo(new HashSet<>(), new ArrayList<>(), new ArrayList<>(entry.getValue()));
       }
     }
     _tablePartitionReplicatedServersInfo =

@@ -544,6 +544,15 @@ public class CommonConstants {
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
     public static final boolean DEFAULT_INFER_PARTITION_HINT = false;
+    // Whether colocated (partition-based) join routing tolerates partitions with transiently-unavailable segments by
+    // default. When false (default), a partition missing any segment fails the query (all-or-nothing) to guarantee
+    // complete results. When true, the available segments are still routed and the unavailable ones are surfaced as a
+    // non-fatal warning, matching single-stage routing semantics. Useful when frequent segment state transitions
+    // (e.g. rebalance, LLC commit, server restart) would otherwise fail colocated-join queries.
+    // This value can always be overridden by the COLOCATED_JOIN_BEST_EFFORT query option.
+    public static final String CONFIG_OF_COLOCATED_JOIN_BEST_EFFORT =
+        "pinot.broker.multistage.colocated.join.best.effort";
+    public static final boolean DEFAULT_COLOCATED_JOIN_BEST_EFFORT = false;
 
     /**
      * Whether to use spools in multistage query engine by default.
@@ -808,6 +817,10 @@ public class CommonConstants {
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
+        // Per-query override of CONFIG_OF_COLOCATED_JOIN_BEST_EFFORT. When true, colocated (partition-based) join
+        // routing tolerates partitions with transiently-unavailable segments: it routes the available segments and
+        // surfaces the unavailable ones as a non-fatal warning instead of failing the whole query.
+        public static final String COLOCATED_JOIN_BEST_EFFORT = "colocatedJoinBestEffort";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
