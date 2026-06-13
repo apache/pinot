@@ -102,9 +102,16 @@ public final class IngestionConfigUtils {
     return new StreamConfig(tableConfig.getTableName(), getFirstStreamConfigMap(tableConfig));
   }
 
-  /// Returns `true` if the table contains multiple streams.
+  /// Returns {@code true} if the table has multiple streams configured.
+  /// Safe to call for any table type: returns {@code false} for OFFLINE tables and REALTIME tables that lack stream
+  /// configs.
   public static boolean hasMultipleStreams(TableConfig tableConfig) {
-    return getStreamConfigMaps(tableConfig).size() > 1;
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null || ingestionConfig.getStreamIngestionConfig() == null) {
+      return false;
+    }
+    List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
+    return streamConfigMaps != null && streamConfigMaps.size() > 1;
   }
 
   /**
@@ -117,6 +124,7 @@ public final class IngestionConfigUtils {
   }
 
   /// Returns the stream partition id from the Pinot segment partition id.
+  /// Returns {@code partitionId} unchanged for tables without multiple streams.
   public static int getStreamPartitionIdFromPinotPartitionId(TableConfig tableConfig, int partitionId) {
     return hasMultipleStreams(tableConfig) ? getStreamPartitionIdFromPinotPartitionId(partitionId) : partitionId;
   }
