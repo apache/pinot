@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -606,5 +608,83 @@ public class TableConfigSerDeUtilsTest {
     assertEquals(dedupConfig.getHashFunction(), HashFunction.MD5);
     assertEquals(dedupConfig.getMetadataTTL(), 10);
     assertEquals(dedupConfig.getDedupTimeColumn(), "dedupTimeColumn");
+  }
+
+  /**
+   * Confirms that {@code toRawJsonNode} preserves keys that are stripped by the deserialize/re-serialize round-trip
+   * (e.g. {@code @JsonIgnore} or {@code @JsonInclude(NON_DEFAULT)} getters). The deprecation diff in
+   * {@code DeprecatedTableConfigValidationUtils} relies on this.
+   */
+  @Test
+  public void testToRawJsonNodePreservesStrippedKeys() {
+    ZNRecord znRecord = new ZNRecord("myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.TABLE_NAME_KEY, "myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.TABLE_TYPE_KEY, "OFFLINE");
+    // The fieldConfigList stored in ZK carries the legacy 'indexType' key alongside the modern 'indexTypes'.
+    znRecord.setSimpleField(TableConfig.FIELD_CONFIG_LIST_KEY,
+        "[{\"name\":\"c1\",\"indexType\":\"INVERTED\",\"indexTypes\":[\"INVERTED\"]}]");
+
+    JsonNode raw = TableConfigSerDeUtils.toRawJsonNode(znRecord);
+    assertNotNull(raw);
+    JsonNode legacy = raw.get(TableConfig.FIELD_CONFIG_LIST_KEY);
+    assertNotNull(legacy);
+    assertTrue(legacy.isArray());
+    assertEquals(legacy.get(0).get("indexType").asText(), "INVERTED");
+  }
+
+  @Test
+  public void testToRawJsonNodeHandlesNull() {
+    assertNull(TableConfigSerDeUtils.toRawJsonNode(null));
+  }
+
+  /// `ZNRecord.getSimpleFields()` is a regular `HashMap<String, String>` that permits null values. The deprecation
+  /// diff path on `PinotTableRestletResource.updateTableConfig` reads the stored ZNRecord through this method, so
+  /// a null simpleField value must not NPE inside `looksLikeJsonContainer`.
+  @Test
+  public void testToRawJsonNodeHandlesNullSimpleFieldValue() {
+    ZNRecord znRecord = new ZNRecord("myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.TABLE_NAME_KEY, "myTable_OFFLINE");
+    znRecord.getSimpleFields().put("someLegacyField", null);
+    JsonNode raw = TableConfigSerDeUtils.toRawJsonNode(znRecord);
+    assertNotNull(raw);
+    assertTrue(raw.has("someLegacyField"));
+    assertTrue(raw.get("someLegacyField").isNull());
+  }
+
+  /// A stored simpleField whose value looks like a JSON container (`{...}` / `[...]`) but is malformed must not
+  /// take down the read — falls back to a text node and emits a WARN log so operators see the corruption.
+  /// Downstream diffs will treat the path as text rather than structured, which is the documented contract.
+  @Test
+  public void testToRawJsonNodeFallsBackToTextOnMalformedJsonContainer() {
+    ZNRecord znRecord = new ZNRecord("myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.TABLE_NAME_KEY, "myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.INDEXING_CONFIG_KEY, "{\"unclosed\": ");
+    JsonNode raw = TableConfigSerDeUtils.toRawJsonNode(znRecord);
+    assertNotNull(raw);
+    JsonNode indexingNode = raw.get(TableConfig.INDEXING_CONFIG_KEY);
+    assertNotNull(indexingNode);
+    assertTrue(indexingNode.isTextual(),
+        "Malformed JSON container must fall back to a text node so downstream code does not NPE");
+    assertEquals(indexingNode.asText(), "{\"unclosed\": ");
+  }
+
+  /// Primitive-shaped simpleField values that happen to look like JSON primitives (`"123"`, `"true"`, `"null"`)
+  /// MUST be preserved as text — the heuristic-sniff in `looksLikeJsonContainer` only triggers on `{`/`[` first
+  /// chars, so these values bypass the JSON-parse path entirely.
+  @Test
+  public void testToRawJsonNodePreservesTextValuesThatLookLikeJsonPrimitives() {
+    ZNRecord znRecord = new ZNRecord("myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.TABLE_NAME_KEY, "myTable_OFFLINE");
+    znRecord.setSimpleField("intLikeKey", "123");
+    znRecord.setSimpleField("boolLikeKey", "true");
+    znRecord.setSimpleField("nullLikeKey", "null");
+    JsonNode raw = TableConfigSerDeUtils.toRawJsonNode(znRecord);
+    assertNotNull(raw);
+    assertEquals(raw.get("intLikeKey").asText(), "123");
+    assertTrue(raw.get("intLikeKey").isTextual(), "JSON-like primitive must stay text, not be coerced to IntNode");
+    assertEquals(raw.get("boolLikeKey").asText(), "true");
+    assertTrue(raw.get("boolLikeKey").isTextual());
+    assertEquals(raw.get("nullLikeKey").asText(), "null");
+    assertTrue(raw.get("nullLikeKey").isTextual());
   }
 }

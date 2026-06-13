@@ -31,14 +31,19 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.TaskState;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.client.admin.LogicalTableAdminClient;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.client.admin.TableAdminClient;
 import org.apache.pinot.client.admin.TaskAdminClient;
 import org.apache.pinot.client.admin.ZookeeperAdminClient;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.utils.config.DeprecatedTableConfigValidationUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -67,6 +72,7 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.apache.zookeeper.data.Stat;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -84,12 +90,18 @@ import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
-/**
- * Test for table creation
- */
+/// Test for table creation.
 public class PinotTableRestletResourceTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = "testOfflineTable";
   private static final String REALTIME_TABLE_NAME = "testRealtimeTable";
+  private static final String STREAM_CONFIGS_DEPRECATION_WARNING =
+      "'tableIndexConfig.streamConfigs' is deprecated since 0.7.1. Use "
+          + "'ingestionConfig.streamIngestionConfig.streamConfigMaps' instead.";
+  // TableConfigBuilder defaults _segmentPushType to "APPEND" (preserved for programmatic-caller back-compat),
+  // so every realtime config built via the builder also emits this deprecation warning.
+  private static final String SEGMENT_PUSH_TYPE_DEPRECATION_WARNING =
+      "'segmentsConfig.segmentPushType' is deprecated since 0.8.0. Use "
+          + "'ingestionConfig.batchIngestionConfig.segmentIngestionType' instead.";
   private final TableConfigBuilder _offlineBuilder = getOfflineTableBuilder(OFFLINE_TABLE_NAME);
   private final TableConfigBuilder _realtimeBuilder = getRealtimeTableBuilder(REALTIME_TABLE_NAME);
 
@@ -132,6 +144,39 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     } catch (Exception e) {
       throw unwrapAsIOException(e);
     }
+  }
+
+  /// Asserts that a successful realtime-table create response carries both the segmentPushType and streamConfigs
+  /// deprecation warnings, the expected status, and no unrecognized properties. The deprecation warnings are
+  /// compared as a SET because the discovery walk order is `Class.getMethods()`-dependent and not guaranteed
+  /// stable across JVM versions or future TableConfig refactors.
+  private static void assertSuccessfulRealtimeTableCreationResponse(String actualJson, String tableNameWithType) {
+    assertSuccessfulTableCreationResponse(actualJson, tableNameWithType,
+        Set.of(SEGMENT_PUSH_TYPE_DEPRECATION_WARNING, STREAM_CONFIGS_DEPRECATION_WARNING));
+  }
+
+  private static void assertSuccessfulOfflineTableCreationResponse(String actualJson, String tableNameWithType) {
+    assertSuccessfulTableCreationResponse(actualJson, tableNameWithType,
+        Set.of(SEGMENT_PUSH_TYPE_DEPRECATION_WARNING));
+  }
+
+  private static void assertSuccessfulTableCreationResponse(String actualJson, String tableNameWithType,
+      Set<String> expectedWarnings) {
+    JsonNode parsed;
+    try {
+      parsed = JsonUtils.stringToJsonNode(actualJson);
+    } catch (IOException e) {
+      throw new AssertionError("response is not valid JSON: " + actualJson, e);
+    }
+    assertEquals(parsed.path("status").asText(), "Table " + tableNameWithType + " successfully added",
+        "unexpected status in " + actualJson);
+    assertTrue(parsed.path("unrecognizedProperties").isObject()
+            && parsed.path("unrecognizedProperties").isEmpty(),
+        "expected empty unrecognizedProperties in " + actualJson);
+    Set<String> actualWarnings = new java.util.HashSet<>();
+    parsed.path("deprecationWarnings").forEach(n -> actualWarnings.add(n.asText()));
+    assertEquals(actualWarnings, expectedWarnings,
+        "deprecationWarnings set mismatch in " + actualJson);
   }
 
   private String updateTable(String tableName, String tableConfigJson)
@@ -355,6 +400,91 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   @Test
+  public void testReportsDeprecatedConfigOnCreateAndOnUpdateAsWarning()
+      throws Exception {
+    // Soft-launch policy: deprecated keys are reported via the deprecationWarnings field on the success
+    // response, not rejected with a 400.
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).build();
+    ObjectNode createTableJson = (ObjectNode) JsonUtils.stringToJsonNode(offlineTableConfig.toJsonString());
+    createTableJson.with("segmentsConfig").put("replicasPerPartition", "APPEND");
+
+    JsonNode createResponse = JsonUtils.stringToJsonNode(createTable(createTableJson.toString()));
+    JsonNode createWarnings = createResponse.path("deprecationWarnings");
+    assertTrue(createWarnings.isArray() && createWarnings.size() > 0,
+        "expected deprecationWarnings on create response: " + createResponse);
+    assertTrue(createWarnings.toString().contains("segmentsConfig.replicasPerPartition"),
+        createWarnings.toString());
+
+    // Update that introduces a previously-absent deprecated property: also reported as a warning.
+    String rawTableName = "deprecated_update_table";
+    DEFAULT_INSTANCE.addDummySchema(rawTableName);
+    TableConfig existingTableConfig = getOfflineTableBuilder(rawTableName).build();
+    createTable(existingTableConfig.toJsonString());
+
+    ObjectNode updateTableJson = (ObjectNode) JsonUtils.stringToJsonNode(existingTableConfig.toJsonString());
+    updateTableJson.with("segmentsConfig").put("replicasPerPartition", "APPEND");
+    JsonNode updateResponse = JsonUtils.stringToJsonNode(
+        updateTable(existingTableConfig.getTableName(), updateTableJson.toString()));
+    JsonNode updateWarnings = updateResponse.path("deprecationWarnings");
+    assertTrue(updateWarnings.isArray() && updateWarnings.size() > 0,
+        "expected deprecationWarnings on update response: " + updateResponse);
+    assertTrue(updateWarnings.toString().contains("segmentsConfig.replicasPerPartition"),
+        updateWarnings.toString());
+  }
+
+  @Test
+  public void testUpdateMissingTableReports404NotDeprecationError()
+      throws Exception {
+    // PUT to a missing table whose body contains a deprecated key must report 404 (table does not exist) rather
+    // than a misleading 400 about a deprecated property — the existence check runs before the deprecation diff.
+    String rawTableName = "missing_update_with_legacy_key";
+    DEFAULT_INSTANCE.addDummySchema(rawTableName);
+    TableConfig tableConfig = getOfflineTableBuilder(rawTableName).build();
+    ObjectNode updateTableJson = (ObjectNode) JsonUtils.stringToJsonNode(tableConfig.toJsonString());
+    updateTableJson.with("segmentsConfig").put("replicasPerPartition", "APPEND");
+    IOException e = expectThrows(IOException.class,
+        () -> updateTable(tableConfig.getTableName(), updateTableJson.toString()));
+    String message = e.getMessage() != null ? e.getMessage() : "";
+    // The admin client wraps the server response into the IOException message. Parse the embedded JSON body and
+    // assert structurally on the `code` field rather than grepping multiple substring formats.
+    int braceStart = message.indexOf('{');
+    int braceEnd = message.lastIndexOf('}');
+    assertTrue(braceStart >= 0 && braceEnd > braceStart, "Expected JSON body embedded in error, got: " + message);
+    JsonNode errorBody = JsonUtils.stringToJsonNode(message.substring(braceStart, braceEnd + 1));
+    assertEquals(errorBody.path("code").asInt(), 404,
+        "Expected 404 status code on missing-table PUT, got body: " + errorBody);
+    assertTrue(errorBody.path("error").asText().contains("does not exist"),
+        "Expected 'does not exist' to take precedence over deprecation, got: " + errorBody);
+    assertTrue(!errorBody.path("error").asText().contains("Newly introduced deprecated"),
+        "404 must take precedence over deprecation diff, got: " + errorBody);
+  }
+
+  @Test
+  public void testUpdateAllowsUnchangedLegacyDeprecatedConfig()
+      throws Exception {
+    // Simulate a table whose stored config already contains a deprecated property (e.g. created on an older
+    // version). On update, re-submitting the same legacy value must NOT trigger validation; only newly introduced
+    // or value-changed deprecated paths are flagged.
+    String rawTableName = "deprecated_legacy_table";
+    DEFAULT_INSTANCE.addDummySchema(rawTableName);
+    TableConfig existingTableConfig = getOfflineTableBuilder(rawTableName).build();
+    createTable(existingTableConfig.toJsonString());
+
+    // Inject a deprecated value directly into ZK to mimic a pre-existing legacy config.
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    TableConfig stored = DEFAULT_INSTANCE.getHelixResourceManager().getTableConfig(tableNameWithType);
+    stored.getValidationConfig().setReplicasPerPartition("3");
+    DEFAULT_INSTANCE.getHelixResourceManager().setExistingTableConfig(stored);
+
+    // Re-submit the same legacy value. The diff against the stored config means this is treated as unchanged and
+    // should pass.
+    ObjectNode updateTableJson = (ObjectNode) JsonUtils.stringToJsonNode(stored.toJsonString());
+    JsonNode response = JsonUtils.stringToJsonNode(
+        updateTable(existingTableConfig.getTableName(), updateTableJson.toString()));
+    assertEquals(response.get("status").asText(), "Table config updated for " + existingTableConfig.getTableName());
+  }
+
+  @Test
   public void testTableCronSchedule()
       throws IOException {
     String rawTableName = "test_table_cron_schedule";
@@ -377,8 +507,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
             Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *")))).build();
     try {
       String response = createTable(tableConfig.toJsonString());
-      assertEquals(response,
-          "{\"unrecognizedProperties\":{},\"status\":\"Table test_table_cron_schedule_OFFLINE successfully added\"}");
+      assertSuccessfulOfflineTableCreationResponse(response, "test_table_cron_schedule_OFFLINE");
     } catch (IOException e) {
       // Expected 400 Bad Request
       fail("This is a valid table config with cron schedule");
@@ -664,8 +793,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema("table0");
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("table0").build();
     String creationResponse = createTable(realtimeTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table0_REALTIME successfully added\"}");
+    assertSuccessfulRealtimeTableCreationResponse(creationResponse, "table0_REALTIME");
 
     // Delete realtime table using REALTIME suffix.
     String deleteResponse = sendDeleteRequest(
@@ -675,8 +803,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Case 2: Create an offline table and delete it directly w/o using query param.
     TableConfig offlineTableConfig = _offlineBuilder.setTableName("table0").build();
     creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table0_OFFLINE successfully added\"}");
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "table0_OFFLINE");
 
     // Delete offline table using OFFLINE suffix.
     deleteResponse =
@@ -687,13 +814,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema("table1");
     TableConfig rtConfig1 = _realtimeBuilder.setTableName("table1").build();
     creationResponse = createTable(rtConfig1.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table1_REALTIME successfully added\"}");
+    assertSuccessfulRealtimeTableCreationResponse(creationResponse, "table1_REALTIME");
 
     TableConfig offlineConfig1 = _offlineBuilder.setTableName("table1").build();
     creationResponse = createTable(offlineConfig1.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table1_OFFLINE successfully added\"}");
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "table1_OFFLINE");
 
     deleteResponse =
         sendDeleteRequest(StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "table1"));
@@ -703,13 +828,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema("table2");
     TableConfig rtConfig2 = _realtimeBuilder.setTableName("table2").build();
     creationResponse = createTable(rtConfig2.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table2_REALTIME successfully added\"}");
+    assertSuccessfulRealtimeTableCreationResponse(creationResponse, "table2_REALTIME");
 
     TableConfig offlineConfig2 = _offlineBuilder.setTableName("table2").build();
     creationResponse = createTable(offlineConfig2.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table2_OFFLINE successfully added\"}");
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "table2_OFFLINE");
 
     // The conflict between param type and table name suffix causes no table being deleted.
     try {
@@ -741,13 +864,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema("table3");
     TableConfig rtConfig3 = _realtimeBuilder.setTableName("table3").build();
     creationResponse = createTable(rtConfig3.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table3_REALTIME successfully added\"}");
+    assertSuccessfulRealtimeTableCreationResponse(creationResponse, "table3_REALTIME");
 
     TableConfig offlineConfig3 = _offlineBuilder.setTableName("table3").build();
     creationResponse = createTable(offlineConfig3.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table3_OFFLINE successfully added\"}");
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "table3_OFFLINE");
 
     deleteResponse = deleteTable("table3_REALTIME", "realtime");
     assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_REALTIME] deleted\"}");
@@ -811,14 +932,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName(tableName).build();
     String creationResponse = createTable(realtimeTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table testTable_REALTIME successfully added\"}");
+    assertSuccessfulRealtimeTableCreationResponse(creationResponse, "testTable_REALTIME");
 
     // Create a valid OFFLINE table
     TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName).build();
     creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table testTable_OFFLINE successfully added\"}");
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "testTable_OFFLINE");
 
     // Case 1: Check table state with specifying tableType as realtime should return 1 [enabled]
     String realtimeStateResponse = sendGetRequest(
@@ -902,9 +1021,15 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     ((ObjectNode) jsonNode).put("illegalKey2", internalObj);
 
     String creationResponse = createTable(jsonNode.toString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{\"/illegalKey1\":1,\"/illegalKey2/illegalKey3\":2},\"status\":\"Table "
-            + "valid_table_name_extra_props_REALTIME successfully added\"}");
+    JsonNode parsedCreate = JsonUtils.stringToJsonNode(creationResponse);
+    assertEquals(parsedCreate.path("status").asText(),
+        "Table valid_table_name_extra_props_REALTIME successfully added");
+    assertEquals(parsedCreate.path("unrecognizedProperties").get("/illegalKey1").asInt(), 1);
+    assertEquals(parsedCreate.path("unrecognizedProperties").get("/illegalKey2/illegalKey3").asInt(), 2);
+    Set<String> creationWarnings = new java.util.HashSet<>();
+    parsedCreate.path("deprecationWarnings").forEach(n -> creationWarnings.add(n.asText()));
+    assertEquals(creationWarnings,
+        Set.of(SEGMENT_PUSH_TYPE_DEPRECATION_WARNING, STREAM_CONFIGS_DEPRECATION_WARNING));
 
     // update table with unrecognizedProperties
     String updateResponse =
@@ -922,24 +1047,23 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         "unrecognizedProperties\":{\"/illegalKey1\":1," + "\"/illegalKey2/illegalKey3\":2}}"));
   }
 
-  /**
-   * Validates the behavior of the system when creating or updating tables with invalid replication factors.
-   * This method tests both REALTIME and OFFLINE table configurations.
-   *
-   * The method performs the following steps:
-   * 1. Attempts to create a REALTIME table with an invalid replication factor of 5, which exceeds the number of
-   *  available instances. The creation is expected to fail, and the test verifies that the exception message
-   *  contains the expected error.
-   * 2. Attempts to create an OFFLINE table with the same invalid replication factor. The creation is expected to
-   *  fail, and the test verifies that the exception message contains the expected error.
-   * 3. Creates REALTIME and OFFLINE tables with a valid replication factor of 1 to establish a baseline for further
-   * testing. These creations are expected to succeed.
-   * 4. Attempts to update the replication factor of the previously created REALTIME and OFFLINE tables to the
-   * invalid value of 5. These updates are expected to fail, and the test verifies that the appropriate error
-   * messages are returned.
-   *
-   * @throws Exception if any error occurs during the validation process
-   */
+  /// Validates the behavior of the system when creating or updating tables with invalid replication factors. This
+  /// method tests both REALTIME and OFFLINE table configurations.
+  ///
+  /// The method performs the following steps:
+  ///
+  /// 1. Attempts to create a REALTIME table with an invalid replication factor of 5, which exceeds the number of
+  ///    available instances. The creation is expected to fail, and the test verifies that the exception message
+  ///    contains the expected error.
+  /// 2. Attempts to create an OFFLINE table with the same invalid replication factor. The creation is expected to
+  ///    fail, and the test verifies that the exception message contains the expected error.
+  /// 3. Creates REALTIME and OFFLINE tables with a valid replication factor of 1 to establish a baseline for further
+  ///    testing. These creations are expected to succeed.
+  /// 4. Attempts to update the replication factor of the previously created REALTIME and OFFLINE tables to the
+  ///    invalid value of 5. These updates are expected to fail, and the test verifies that the appropriate error
+  ///    messages are returned.
+  ///
+  /// @throws Exception if any error occurs during the validation process
   @Test
   public void validateInvalidTableReplication()
       throws Exception {
@@ -955,20 +1079,19 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     validateTableUpdateReplicationToInvalidValue(rawTableName, TableType.OFFLINE);
   }
 
-  /**
-   * Validates the behavior of the system when creating or updating tables with invalid replica group configurations.
-   * This method tests the REALTIME table configuration.
-   *
-   * The method performs the following steps:
-   * 1. Attempts to create a REALTIME table with an invalid replica group configuration. The creation is expected to
-   * fail, and the test verifies that the exception message contains the expected error.
-   * 2. Creates a new REALTIME table with a valid replica group configuration to establish a baseline for further
-   * testing. This creation is expected to succeed.
-   * 3. Attempts to update the replica group configuration of the previously created REALTIME table to an invalid
-   * value. The update is expected to fail, and the test verifies that the appropriate error message is returned.
-   *
-   * @throws Exception if any error occurs during the validation process
-   */
+  /// Validates the behavior of the system when creating or updating tables with invalid replica group configurations.
+  /// This method tests the REALTIME table configuration.
+  ///
+  /// The method performs the following steps:
+  ///
+  /// 1. Attempts to create a REALTIME table with an invalid replica group configuration. The creation is expected to
+  ///    fail, and the test verifies that the exception message contains the expected error.
+  /// 2. Creates a new REALTIME table with a valid replica group configuration to establish a baseline for further
+  ///    testing. This creation is expected to succeed.
+  /// 3. Attempts to update the replica group configuration of the previously created REALTIME table to an invalid
+  ///    value. The update is expected to fail, and the test verifies that the appropriate error message is returned.
+  ///
+  /// @throws Exception if any error occurs during the validation process
   @Test
   public void validateInvalidReplicaGroupConfig()
       throws Exception {
@@ -1032,8 +1155,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
     TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName).build();
     String creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table testTable_OFFLINE successfully added\"}");
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "testTable_OFFLINE");
 
     // create logical table with above physical table
     String logicalTableName = "testTable_LOGICAL";
@@ -1080,9 +1202,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     assertTrue(msg.contains("Table nonExistentTable_REALTIME does not exist"), msg);
   }
 
-  /**
-   * Updating existing REALTIME table with invalid replication factor should throw exception.
-   */
+  /// Updating existing REALTIME table with invalid replication factor should throw exception.
   private void validateTableUpdateReplicationToInvalidValue(String rawTableName, TableType tableType) {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
     TableConfig tableConfig = (tableType == TableType.REALTIME
@@ -1114,9 +1234,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
   }
 
-  /**
-   * When table is created with invalid replication factor, it should throw exception.
-   */
+  /// When table is created with invalid replication factor, it should throw exception.
   private void validateTableCreationWithInvalidReplication(String rawTableName, TableType tableType)
       throws IOException {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
@@ -1142,7 +1260,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     constraints.add("constraints1");
     InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
     InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1, numReplicaGroups, numInstancesPerReplicaGroup, 1, 1, true,
+        new InstanceReplicaGroupPartitionConfig(true, 1, numReplicaGroups, numInstancesPerReplicaGroup, 1, 1, false,
             null);
     return new InstanceAssignmentConfig(instanceTagPoolConfig, instanceConstraintConfig,
         instanceReplicaGroupPartitionConfig,
@@ -1162,8 +1280,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     String tableNameWithType = offlineTableConfig.getTableName();
     String creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table " + tableNameWithType + " successfully added\"}");
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, tableNameWithType);
 
     String idealStatePath = "/ControllerTest/IDEALSTATES/" + tableNameWithType;
     zookeeperClient().delete(idealStatePath);
@@ -1194,8 +1311,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Should succeed when no dangling tasks exist
     String creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table testTableTasksValidation_OFFLINE successfully added\"}");
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "testTableTasksValidation_OFFLINE");
 
     // Clean up
     deleteTable(tableName);
@@ -1260,8 +1376,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Should succeed when task config is null
     String creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse, "{\"unrecognizedProperties\":{},"
-        + "\"status\":\"Table testTableTasksValidationNullConfig_OFFLINE successfully added\"}");
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "testTableTasksValidationNullConfig_OFFLINE");
 
     // Clean up
     deleteTable(tableName);
@@ -1415,8 +1530,125 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   @AfterMethod
   public void cleanUp()
       throws IOException {
+    // Defensive: clear any deprecation-validator rule override that an ERROR-path test may have set. The
+    // override is a static volatile field consumed by every REST request through the validator; a test that
+    // fails between setRulesOverrideForTesting and clearRulesOverrideForTesting would otherwise poison every
+    // subsequent test in this class (and any other test class running in the same JVM). The owning tests
+    // already wrap their override in a try/finally; this is belt-and-braces.
+    DeprecatedTableConfigValidationUtils.clearRulesOverrideForTesting();
     // Delete all tables after each test
     DEFAULT_INSTANCE.cleanup();
+  }
+
+  /// End-to-end REST coverage of the validator's ERROR-path. Under SOFT_LAUNCH_WARNING_ONLY, no in-tree
+  /// annotation can produce an ERROR severity (every parseable `since` resolves to WARNING; unparseable values
+  /// are locked out by `testEveryRuleHasParseableSince`). To exercise the throw branch through the real Jersey
+  /// stack, this test injects a synthetic ERROR-severity rule via
+  /// `DeprecatedTableConfigValidationUtils.setRulesOverrideForTesting`, POSTs a table whose JSON triggers the
+  /// rule, and asserts the REST surface returns 400 with the deprecation error message. Documented as
+  /// pre-condition #4 in `DeprecatedTableConfigValidationUtils.SOFT_LAUNCH_WARNING_ONLY` Javadoc.
+  @Test
+  public void testErrorSeverityRuleRejectsCreateAs400()
+      throws Exception {
+    String tableName = "errorSeverityRuleTable";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    // Synthetic ERROR rule that fires on the literal path "ingestionConfig.batchIngestionConfig.batchType" — a
+    // location no current @DeprecatedConfig annotation owns, so this override does not collide with the real
+    // rule set.
+    DeprecatedTableConfigValidationUtils.setRulesOverrideForTesting(java.util.List.of(
+        DeprecatedTableConfigValidationUtils.makeRuleForTesting(
+            java.util.List.of("ingestionConfig", "batchIngestionConfig", "batchType"),
+            "Synthetic ERROR rule for end-to-end test coverage of validateOnCreate's throw branch.",
+            "0.1.0", DeprecatedTableConfigValidationUtils.Severity.ERROR)));
+    try {
+      ObjectNode tableConfigJson = (ObjectNode) JsonUtils.objectToJsonNode(
+          _offlineBuilder.setTableName(tableName).build());
+      ObjectNode ingestionConfig = JsonUtils.newObjectNode();
+      ObjectNode batchIngestionConfig = JsonUtils.newObjectNode();
+      batchIngestionConfig.put("batchType", "s3");
+      ingestionConfig.set("batchIngestionConfig", batchIngestionConfig);
+      tableConfigJson.set("ingestionConfig", ingestionConfig);
+
+      try {
+        createTable(tableConfigJson.toString());
+        fail("Expected HTTP 400 BAD_REQUEST when synthetic ERROR rule fires on create");
+      } catch (IOException e) {
+        assertTrue(e.getMessage().contains("400") || e.getMessage().contains("Bad Request"),
+            "Expected 400-class response; got: " + e.getMessage());
+        assertTrue(e.getMessage().contains("batchIngestionConfig.batchType"),
+            "Error message should name the offending path; got: " + e.getMessage());
+      }
+    } finally {
+      DeprecatedTableConfigValidationUtils.clearRulesOverrideForTesting();
+    }
+  }
+
+  /// Post-flip rehearsal: simulates `SOFT_LAUNCH_WARNING_ONLY=false` semantics end-to-end using a synthetic ERROR
+  /// rule. Verifies the two non-obvious post-flip cases that operators must rely on at promotion time:
+  /// 1. A PUT that re-submits an UNCHANGED legacy value on an existing table must succeed (the diff sees no
+  ///    change, so the ERROR severity does not fire). Without this, every PUT to every existing table that
+  ///    holds a legacy field becomes un-acceptable the moment the flag flips.
+  /// 2. A PUT that INTRODUCES a deprecated field on an existing table must be rejected as 400 (the diff sees a
+  ///    new write to a deprecated path).
+  @Test
+  public void testErrorSeverityRuleAllowsUnchangedLegacyValueOnUpdate()
+      throws Exception {
+    String tableName = "errorPathUpdateRehearsalTable";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+
+    // Phase 1: create the table with a non-deprecated config. No ERROR rule active yet — passes cleanly.
+    String creationResponse = createTable(_offlineBuilder.setTableName(tableName).build().toJsonString());
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, tableNameWithType);
+
+    // Phase 2: stamp a "legacy" field into the stored ZNRecord directly so the diff sees a value the validator
+    // will subsequently flag as ERROR. We use ingestionConfig.batchIngestionConfig.batchType because no real
+    // annotation owns it (collision-free with the in-tree rule set).
+    ZkHelixPropertyStore<ZNRecord> propertyStore =
+        DEFAULT_INSTANCE.getControllerStarter().getHelixResourceManager().getPropertyStore();
+    Stat stat = new Stat();
+    ZNRecord storedRecord = ZKMetadataProvider.getTableConfigZNRecord(propertyStore, tableNameWithType, stat);
+    assertNotNull(storedRecord, "stored ZNRecord must exist after create");
+    JsonNode currentTableJson = TableConfigSerDeUtils.toRawJsonNode(storedRecord);
+    ObjectNode stampedTableJson = (ObjectNode) currentTableJson.deepCopy();
+    ObjectNode stampedIngestion = JsonUtils.newObjectNode();
+    ObjectNode stampedBatch = JsonUtils.newObjectNode();
+    stampedBatch.put("batchType", "s3");
+    stampedIngestion.set("batchIngestionConfig", stampedBatch);
+    stampedTableJson.set("ingestionConfig", stampedIngestion);
+    // Round-trip through TableConfig to refresh the stored ZNRecord with the new path.
+    org.apache.pinot.spi.config.table.TableConfig stampedTableConfig = JsonUtils.jsonNodeToObject(stampedTableJson,
+        org.apache.pinot.spi.config.table.TableConfig.class);
+    DEFAULT_INSTANCE.getControllerStarter().getHelixResourceManager()
+        .setExistingTableConfig(stampedTableConfig);
+
+    DeprecatedTableConfigValidationUtils.setRulesOverrideForTesting(java.util.List.of(
+        DeprecatedTableConfigValidationUtils.makeRuleForTesting(
+            java.util.List.of("ingestionConfig", "batchIngestionConfig", "batchType"),
+            "Synthetic ERROR rule for post-flip rehearsal.", "0.1.0",
+            DeprecatedTableConfigValidationUtils.Severity.ERROR)));
+    try {
+      // Case 1: PUT the same body the stored config already holds. The diff sees no change → no ERROR fired,
+      // even under post-flip ERROR severity. This is the operability guarantee the promotion PR depends on.
+      String unchangedResubmit = updateTable(tableName, stampedTableConfig.toJsonString());
+      assertTrue(unchangedResubmit.contains("updated"),
+          "Unchanged re-submission of legacy field must succeed under ERROR severity. Got: " + unchangedResubmit);
+
+      // Case 2: PUT a body that INTRODUCES a different value at the same deprecated path. The diff sees a value
+      // change → ERROR fires → 400.
+      ObjectNode changedJson = (ObjectNode) JsonUtils.objectToJsonNode(stampedTableConfig);
+      ((ObjectNode) ((ObjectNode) changedJson.get("ingestionConfig")).get("batchIngestionConfig"))
+          .put("batchType", "hdfs");
+      try {
+        updateTable(tableName, changedJson.toString());
+        fail("Expected HTTP 400 when changing a value at an ERROR-classified deprecated path");
+      } catch (IOException e) {
+        assertTrue(e.getMessage().contains("400") || e.getMessage().contains("Bad Request"),
+            "Expected 400-class response on changed value; got: " + e.getMessage());
+      }
+    } finally {
+      DeprecatedTableConfigValidationUtils.clearRulesOverrideForTesting();
+    }
   }
 
   @AfterClass

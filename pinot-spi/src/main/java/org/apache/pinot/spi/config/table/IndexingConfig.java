@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashSet;
 import java.util.List;
@@ -26,16 +27,14 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.DeprecatedConfig;
 
 
 public class IndexingConfig extends BaseJsonConfig {
   // Default ratio for overriding dictionary for fixed width columns
   public static final double DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD = 0.85d;
 
-  /**
-   * This should be equal to the one specified in RangeIndexType.
-   */
+  /// This should be equal to the one specified in `RangeIndexType`.
   private static final int DEFAULT_RANGE_INDEX_VERSION = 2;
 
   private List<String> _invertedIndexColumns;
@@ -69,22 +68,16 @@ public class IndexingConfig extends BaseJsonConfig {
   // we can enable it by default and deprecate this config
   private boolean _optimizeNoDictStatsCollection = false;
 
-  /**
-   * If `optimizeDictionary` enabled, dictionary is not created for the high-cardinality
-   * single-valued columns for which rawIndexSize / forwardIndexSize is less than the `noDictionarySizeRatioThreshold`.
-   * It also disables dictionary for json and text columns.
-   */
+  /// If `optimizeDictionary` enabled, dictionary is not created for the high-cardinality single-valued columns for
+  /// which rawIndexSize / forwardIndexSize is less than the `noDictionarySizeRatioThreshold`. It also disables
+  /// dictionary for json and text columns.
   private boolean _optimizeDictionary;
 
-  /**
-   * Same as `optimizeDictionary` but only for metric columns.
-   */
+  /// Same as `optimizeDictionary` but only for metric columns.
   private boolean _optimizeDictionaryForMetrics;
 
-  /**
-   * Optimize the dictionary type for var width columns, if values are all the same length then use a fixed-width
-   * dictionary. Else, use a var-width dictionary.
-   */
+  /// Optimize the dictionary type for var width columns, if values are all the same length then use a fixed-width
+  /// dictionary. Else, use a var-width dictionary.
   private boolean _optimizeDictionaryType;
 
   private double _noDictionarySizeRatioThreshold = DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
@@ -101,11 +94,8 @@ public class IndexingConfig extends BaseJsonConfig {
   @Deprecated
   private boolean _createInvertedIndexDuringSegmentGeneration;
 
-  /**
-   * The list of columns for which the variable length dictionary needs to be enabled in offline
-   * segments. This is only valid for string and bytes columns and has no impact for columns of
-   * other data types.
-   */
+  /// The list of columns for which the variable length dictionary needs to be enabled in offline segments. This is
+  /// only valid for string and bytes columns and has no impact for columns of other data types.
   private List<String> _varLengthDictionaryColumns;
 
   private JsonNode _tierOverwrites;
@@ -137,6 +127,8 @@ public class IndexingConfig extends BaseJsonConfig {
     _rangeIndexVersion = rangeIndexVersion;
   }
 
+  @Deprecated
+  @DeprecatedConfig(replacement = "Use 'tableIndexConfig.jsonIndexConfigs' instead.", since = "0.12.0")
   public List<String> getJsonIndexColumns() {
     return _jsonIndexColumns;
   }
@@ -162,6 +154,8 @@ public class IndexingConfig extends BaseJsonConfig {
   }
 
   @Deprecated
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @DeprecatedConfig(replacement = "Remove this field; it is ignored.", since = "1.6.0")
   public boolean isCreateInvertedIndexDuringSegmentGeneration() {
     return _createInvertedIndexDuringSegmentGeneration;
   }
@@ -207,11 +201,12 @@ public class IndexingConfig extends BaseJsonConfig {
     _loadMode = loadMode;
   }
 
-  /**
-   * @deprecated Use <code>List<Map<String, String>> streamConfigs</code> from
-   * {@link IngestionConfig#getStreamIngestionConfig()}
-   */
+  /// @deprecated Use `List<Map<String, String>> streamConfigs` from
+  /// [org.apache.pinot.spi.config.table.ingestion.IngestionConfig#getStreamIngestionConfig()]
   @Nullable
+  @Deprecated
+  @DeprecatedConfig(replacement = "Use 'ingestionConfig.streamIngestionConfig.streamConfigMaps' instead.",
+      since = "0.7.1")
   public Map<String, String> getStreamConfigs() {
     return _streamConfigs;
   }
@@ -324,12 +319,10 @@ public class IndexingConfig extends BaseJsonConfig {
     _aggregateMetrics = value;
   }
 
-  /**
-   * Returns {@code true} if null handling is enabled at table config level.
-   *
-   * Remember that {@link org.apache.pinot.spi.data.Schema} can also have null handling enabled at column level and
-   * that one has more priority.
-   */
+  /// Returns `true` if null handling is enabled at table config level.
+  ///
+  /// Remember that [org.apache.pinot.spi.data.Schema] can also have null handling enabled at column level and that
+  /// one has more priority.
   public boolean isNullHandlingEnabled() {
     return _nullHandlingEnabled;
   }
@@ -420,11 +413,9 @@ public class IndexingConfig extends BaseJsonConfig {
     _multiColumnTextIndexConfig = multiColumnTextIndexConfig;
   }
 
-  /**
-   * Returns all columns referenced in the indexing config. This is useful to construct FieldIndexConfigs in
-   * IndexLoadingConfig when schema is not provided. Only including the columns referenced by indexes supported in
-   * FieldIndexConfigs.
-   */
+  /// Returns all columns referenced in the indexing config. This is useful to construct `FieldIndexConfigs` in
+  /// `IndexLoadingConfig` when schema is not provided. Only including the columns referenced by indexes supported in
+  /// `FieldIndexConfigs`.
   @JsonIgnore
   public Set<String> getAllReferencedColumns() {
     Set<String> allColumns = new HashSet<>();

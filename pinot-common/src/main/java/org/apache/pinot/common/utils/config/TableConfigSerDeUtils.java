@@ -20,11 +20,15 @@ package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -48,10 +52,14 @@ import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Util class for serializing and deserializing [TableConfig] to and from [ZNRecord].
 public class TableConfigSerDeUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigSerDeUtils.class);
+
   private TableConfigSerDeUtils() {
   }
 
@@ -296,5 +304,71 @@ public class TableConfigSerDeUtils {
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
     znRecord.setSimpleFields(simpleFields);
     return znRecord;
+  }
+
+  /// Reconstructs the table-config JSON tree from a stored [ZNRecord], preserving every key originally written to
+  /// ZK. Unlike `TableConfig.toJsonNode()`, this method does not round-trip through the Java bean and therefore
+  /// does not strip fields that the bean's getters mark with `@JsonIgnore` or `@JsonInclude(NON_DEFAULT)`. It is
+  /// intended for code paths (e.g. update-time deprecation diffing) that need to compare an incoming request
+  /// against the exact bytes that were stored.
+  ///
+  /// JSON parsing is restricted to values whose first non-whitespace character is `{` or `[` (objects/arrays).
+  /// Other values are kept as raw text nodes so that a stored simple field like a tableName `"123"` is not
+  /// coerced by Jackson's lenient parser into a numeric node.
+  ///
+  /// @param znRecord the raw ZNRecord read from the property store
+  /// @return a JsonNode equivalent to what the user originally PUT/POST-ed for the table, or `null` if the input is
+  /// `null`
+  @Nullable
+  public static JsonNode toRawJsonNode(@Nullable ZNRecord znRecord) {
+    if (znRecord == null) {
+      return null;
+    }
+    ObjectNode root = JsonNodeFactory.instance.objectNode();
+    Map<String, String> simpleFields = znRecord.getSimpleFields();
+    for (Map.Entry<String, String> entry : simpleFields.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (value == null) {
+        // ZNRecord simpleFields is a regular HashMap that permits null values. Preserve the null in the JSON tree
+        // (NullNode) so a downstream diff sees the original ZK state byte-faithfully.
+        root.putNull(key);
+        continue;
+      }
+      if (looksLikeJsonContainer(value)) {
+        try {
+          root.set(key, JsonUtils.stringToJsonNode(value));
+          continue;
+        } catch (IOException e) {
+          // Malformed JSON container under a key that we expected to be parseable. Operators need to know — the
+          // downstream diff will treat the value as a text node instead of a structured object, which can
+          // produce spurious "path newly introduced" warnings on update. WARN-log so the corruption is visible
+          // (the table is still usable since fromZNRecord owns the deserialization path; this only affects the
+          // raw-JSON view used by the deprecation validator).
+          LOGGER.warn("Stored simpleField {} on znode {} starts with '{}'/'[' but failed to parse as JSON: {}. "
+                  + "Falling back to a text-node representation; downstream diffs may treat the path as newly "
+                  + "introduced.", key, znRecord.getId(), e.getMessage());
+        }
+      }
+      root.put(key, value);
+    }
+    if (!root.has(TableConfig.TABLE_NAME_KEY)) {
+      root.put(TableConfig.TABLE_NAME_KEY, znRecord.getId());
+    }
+    return root;
+  }
+
+  /// Returns true if the value's first non-whitespace character is `{` or `[`, indicating a JSON object/array
+  /// payload. Restricts JSON parsing in [#toRawJsonNode] so that simple textual fields whose contents happen to
+  /// look like JSON primitives (`"true"`, `"null"`, `"123"`, etc.) are kept as text nodes rather than coerced.
+  private static boolean looksLikeJsonContainer(String value) {
+    for (int i = 0; i < value.length(); i++) {
+      char c = value.charAt(i);
+      if (Character.isWhitespace(c)) {
+        continue;
+      }
+      return c == '{' || c == '[';
+    }
+    return false;
   }
 }

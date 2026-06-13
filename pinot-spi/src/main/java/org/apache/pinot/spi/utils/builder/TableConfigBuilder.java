@@ -55,8 +55,8 @@ import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
 
 public class TableConfigBuilder {
-  private static final String DEFAULT_SEGMENT_PUSH_TYPE = "APPEND";
   private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
+  private static final String APPEND_SEGMENT_PUSH_TYPE = "APPEND";
   private static final String DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD = "7d";
   private static final String DEFAULT_NUM_REPLICAS = "1";
   private static final String MMAP_LOAD_MODE = "MMAP";
@@ -80,9 +80,12 @@ public class TableConfigBuilder {
   @Deprecated
   private String _segmentPushFrequency;
 
-  // TODO: Remove 'DEFAULT_SEGMENT_PUSH_TYPE' in the future major release.
   @Deprecated
-  private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
+  // Historical default preserved so existing programmatic callers that depend on segmentsConfig.segmentPushType
+  // being "APPEND" when not explicitly set continue to work. The new @DeprecatedConfig soft-launch surfaces
+  // this as a warning on create/update, signalling migration to ingestionConfig.batchIngestionConfig
+  // .segmentIngestionType. TODO: drop the default once the soft-launch flag flips and callers have migrated.
+  private String _segmentPushType = APPEND_SEGMENT_PUSH_TYPE;
   private String _peerSegmentDownloadScheme;
   @Deprecated
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
@@ -123,7 +126,7 @@ public class TableConfigBuilder {
 
   /// @deprecated This flag is ignored. Keep it for backward compatibility during upgrade (especially for JSON ser/de).
   @Deprecated
-  private boolean _createInvertedIndexDuringSegmentGeneration;
+  private Boolean _createInvertedIndexDuringSegmentGeneration;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -223,21 +226,19 @@ public class TableConfigBuilder {
     return this;
   }
 
-  /**
-   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
+  /// @deprecated Use `segmentIngestionType` from [IngestionConfig#getBatchIngestionConfig()]
+  @Deprecated
   public TableConfigBuilder setSegmentPushType(String segmentPushType) {
     if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
       _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
     } else {
-      _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
+      _segmentPushType = APPEND_SEGMENT_PUSH_TYPE;
     }
     return this;
   }
 
-  /**
-   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
+  /// @deprecated Use `segmentIngestionFrequency` from [IngestionConfig#getBatchIngestionConfig()]
+  @Deprecated
   public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
     _segmentPushFrequency = segmentPushFrequency;
     return this;
@@ -375,6 +376,8 @@ public class TableConfigBuilder {
     return this;
   }
 
+  /// @deprecated Use `streamConfigMaps` from [IngestionConfig#getStreamIngestionConfig()]
+  @Deprecated
   public TableConfigBuilder setStreamConfigs(Map<String, String> streamConfigs) {
     Preconditions.checkState(_tableType == TableType.REALTIME);
     _streamConfigs = streamConfigs;
@@ -542,7 +545,9 @@ public class TableConfigBuilder {
       indexingConfig.setSortedColumn(Collections.singletonList(_sortedColumn));
     }
     indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
-    indexingConfig.setCreateInvertedIndexDuringSegmentGeneration(_createInvertedIndexDuringSegmentGeneration);
+    if (_createInvertedIndexDuringSegmentGeneration != null) {
+      indexingConfig.setCreateInvertedIndexDuringSegmentGeneration(_createInvertedIndexDuringSegmentGeneration);
+    }
     indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
     indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
     indexingConfig.setBloomFilterColumns(_bloomFilterColumns);

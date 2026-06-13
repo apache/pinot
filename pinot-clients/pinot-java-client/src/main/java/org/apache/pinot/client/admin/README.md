@@ -147,6 +147,94 @@ String status = tableClient.getTableStatus("myTable");
 String rebalanceResult = tableClient.rebalanceTable("myTable", true, "default", 1);
 ```
 
+### Creating Tables With Modern Config Fields
+
+Table create and update endpoints surface deprecated table-config properties via a `deprecationWarnings` field on
+the success response. The validator is in soft-launch mode: requests with deprecated keys succeed (HTTP 200) and the
+controller logs a warning. A future release will promote older deprecations to a `400 BAD_REQUEST` rejection, so
+clients should treat any value in `deprecationWarnings` as a migration TODO and update their payloads accordingly.
+
+Common migrations:
+
+- `segmentsConfig.segmentPushType` -> `ingestionConfig.batchIngestionConfig.segmentIngestionType`
+- `segmentsConfig.segmentPushFrequency` -> `ingestionConfig.batchIngestionConfig.segmentIngestionFrequency`
+- `tableIndexConfig.streamConfigs` -> `ingestionConfig.streamIngestionConfig.streamConfigMaps`
+- `fieldConfigList[].indexType` -> `fieldConfigList[].indexTypes`
+
+### Wire-shape changes (rolling upgrade)
+
+The same migration touches the controller's REST response shape. Several deprecated fields are no longer emitted
+when at their Java default. Old clients reading `GET /tables/{name}` or `GET /tableConfigs/{name}` MUST tolerate
+the absent fields:
+
+- `fieldConfigList[].indexType` is preserved in the response shape for back-compat, but the controller emits a
+  `deprecationWarnings` entry pointing callers to `indexTypes` instead.
+- The following boolean getters are now annotated with `@JsonInclude(NON_DEFAULT)`; the field disappears from the
+  response when the value is `false` (the type default): `upsertConfig.enableSnapshot`, `dedupConfig.enablePreload`,
+  `indexingConfig.createInvertedIndexDuringSegmentGeneration`,
+  `instanceAssignmentConfigMap.*.replicaGroupPartitionConfig.minimizeDataMovement`.
+
+The new `deprecationWarnings` field on `ConfigSuccessResponse` and `CopyTableResponse` is annotated with
+`@JsonInclude(NON_EMPTY)` and the response classes carry `@JsonIgnoreProperties(ignoreUnknown = true)`, so:
+
+- New clients reading old controllers: succeed (no `deprecationWarnings`, treated as empty).
+- Old clients reading new controllers: succeed (unknown field is ignored).
+
+Rolling-upgrade label: this PR changes wire shape (field elision and new optional field) but no field name or
+type is changed; existing clients that parse leniently round-trip cleanly. Strict-parsing clients should set
+`FAIL_ON_UNKNOWN_PROPERTIES=false` or upgrade in lockstep with the controller.
+
+Sample REALTIME table config for create:
+
+```json
+{
+  "tableName": "events",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "timeColumnName": "ts",
+    "replication": "1"
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP"
+  },
+  "fieldConfigList": [
+    {
+      "name": "userId",
+      "encodingType": "DICTIONARY",
+      "indexTypes": [
+        "INVERTED"
+      ]
+    }
+  ],
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND",
+      "segmentIngestionFrequency": "DAILY"
+    },
+    "streamIngestionConfig": {
+      "streamConfigMaps": [
+        {
+          "streamType": "kafka",
+          "stream.kafka.topic.name": "events",
+          "stream.kafka.consumer.type": "lowlevel",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder"
+        }
+      ]
+    }
+  },
+  "metadata": {}
+}
+```
+
+A create or update request that includes deprecated fields succeeds (HTTP 200) with a populated
+`deprecationWarnings` array on the response body. Each entry names the offending JSON path and the replacement
+field to use. The response shape is identical for the `/tables/.../validate` and `/tableConfigs/.../validate`
+endpoints, so the same parser can surface warnings from any of them.
+
 ### Schema Operations
 
 ```java

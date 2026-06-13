@@ -84,6 +84,7 @@ import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.config.DeprecatedTableConfigValidationUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -575,6 +576,14 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       SslContext serverSslContext = GrpcQueryServer.buildGrpcSslContext(tlsDefaults);
       controllerContext.setServerGrpcSslContext(serverSslContext);
     }
+
+    // Warm up the deprecation-validator lazy holder so the first REST request after startup doesn't pay the
+    // reflection cost (Class.getMethods() over every nested TableConfig bean). The cost is small (~13 rules in
+    // the current SPI) but happens on a user-facing latency path otherwise. Failure here is fatal-loud: an
+    // ExceptionInInitializerError would otherwise surface on every subsequent table-config REST endpoint, so
+    // catching it at startup gives operators an actionable signal instead of a cluster-wide 500 cascade.
+    int discoveredRuleCount = DeprecatedTableConfigValidationUtils.warmUp();
+    LOGGER.info("Deprecation validator initialised with {} rules.", discoveredRuleCount);
 
     // Set up Pinot cluster in Helix if needed
     HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode,

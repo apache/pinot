@@ -289,4 +289,23 @@ public class TableConfigsSerializationTest {
     Assert.assertFalse(jsonNode.has("offline"), "offline should not be present when null");
     Assert.assertTrue(jsonNode.has("realtime"));
   }
+
+  /// Locks the invariant relied upon by `TableConfigsRestletResource.subConfigJson` — uppercase `OFFLINE` /
+  /// `REALTIME` keys in the user-submitted JSON are silently dropped by Jackson at deserialization time because
+  /// the constructor parameters are annotated `@JsonProperty("offline")` / `@JsonProperty("realtime")`. The
+  /// deprecation pass therefore needs only to look up the lowercase keys.
+  @Test
+  public void testUppercaseOfflineRealtimeKeysAreIgnoredByJackson()
+      throws Exception {
+    final String jsonWithUppercaseKeys = "{"
+        + "\"tableName\":\"" + TEST_TABLE_NAME + "\","
+        + "\"schema\":" + createTestSchema().toSingleLineJsonString() + ","
+        + "\"OFFLINE\":{},"
+        + "\"REALTIME\":{}"
+        + "}";
+
+    final TableConfigs parsed = JsonUtils.stringToObject(jsonWithUppercaseKeys, TableConfigs.class);
+    Assert.assertNull(parsed.getOffline(), "uppercase OFFLINE key must not populate the offline sub-config");
+    Assert.assertNull(parsed.getRealtime(), "uppercase REALTIME key must not populate the realtime sub-config");
+  }
 }
