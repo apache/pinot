@@ -66,5 +66,5 @@ public class ColumnarDataBlock extends BaseDataBlock {
     return _fixDataSize;
   }
 
-// TODO: add whole-column access methods.
+  // TODO: add whole-column access methods.
 }

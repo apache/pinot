@@ -93,5 +93,15 @@ public interface BlockSplitter {
       }
       return Iterators.singletonIterator(block);
     }
+
+    @Override
+    public Iterator<MseBlock.Data> visit(ArrowBlock block, Integer maxBlockSize) {
+      // No operator currently produces ArrowBlocks, so the splitter is never invoked with one.
+      // A real splitter (Arrow vector slicing) will be added alongside the first operator that
+      // produces ArrowBlocks, at which point the allocator-ownership contract for sliced blocks
+      // can be designed against a concrete call site.
+      throw new UnsupportedOperationException(
+          "BlockSplitter does not yet support ArrowBlocks; Arrow path is not wired into any operator");
+    }
   }
 }

@@ -44,6 +44,7 @@ import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
+import org.apache.pinot.query.runtime.blocks.ArrowBlock;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
@@ -548,6 +549,15 @@ public class GrpcSendingMailbox implements SendingMailbox {
         throw new UnsupportedOperationException("Cannot serialize stats with SerializedDataBlock");
       }
       return block.getDataBlock();
+    }
+
+    @Override
+    public DataBlock visit(ArrowBlock block, List<DataBuffer> serializedStats) {
+      // No operator currently produces ArrowBlocks, so the gRPC sender is never invoked with one.
+      // When ArrowBlocks start flowing to this mailbox, they should travel via Arrow Flight (zero-copy,
+      // allocator-to-allocator transfer) rather than being flattened through the gRPC DataBlock path.
+      throw new UnsupportedOperationException(
+          "GrpcSendingMailbox does not support ArrowBlocks; Arrow transport will go via Flight");
     }
 
     @Override
