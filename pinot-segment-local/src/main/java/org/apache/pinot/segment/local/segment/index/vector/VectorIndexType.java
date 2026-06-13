@@ -41,6 +41,7 @@ import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -111,6 +112,21 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
       // Run backend-aware property validation
       VectorIndexConfigValidator.validate(vectorIndexConfig);
+
+      for (IndexType indexType : List.of(
+          StandardIndexes.bloomFilter(),
+          StandardIndexes.dictionary(),
+          StandardIndexes.inverted(),
+          StandardIndexes.range(),
+          StandardIndexes.json(),
+          StandardIndexes.text(),
+          StandardIndexes.fst(),
+          StandardIndexes.h3(),
+          StandardIndexes.ifst())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both vector index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 
@@ -253,8 +269,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
       case IVF_PQ:
       case IVF_ON_DISK:
         LOGGER.warn("{} vector index does not support mutable/realtime segments. "
-            + "No vector index will be built for column: {} in segment: {}. "
-            + "Queries will fall back to exact scan.",
+                + "No vector index will be built for column: {} in segment: {}. "
+                + "Queries will fall back to exact scan.",
             backendType, context.getFieldSpec().getName(), context.getSegmentName());
         return null;
       default:
