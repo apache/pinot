@@ -213,7 +213,8 @@ public class PlanNodeDeserializer {
         extractInputs(protoNode), protoWindowNode.getKeysList(), convertCollations(protoWindowNode.getCollationsList()),
         convertFunctionCalls(protoWindowNode.getAggCallsList()),
         convertWindowFrameType(protoWindowNode.getWindowFrameType()), protoWindowNode.getLowerBound(),
-        protoWindowNode.getUpperBound(), convertLiterals(protoWindowNode.getConstantsList()));
+        protoWindowNode.getUpperBound(), convertWindowExclusion(protoWindowNode.getExclude()),
+        convertLiterals(protoWindowNode.getConstantsList()));
   }
 
   private static ExplainedNode deserializeExplainedNode(Plan.PlanNode protoNode) {
@@ -494,6 +495,21 @@ public class PlanNodeDeserializer {
         return WindowNode.WindowFrameType.RANGE;
       default:
         throw new IllegalStateException("Unsupported WindowFrameType: " + windowFrameType);
+    }
+  }
+
+  private static WindowNode.WindowExclusion convertWindowExclusion(Plan.WindowExclusion exclude) {
+    switch (exclude) {
+      case EXCLUDE_NO_OTHERS:
+        return WindowNode.WindowExclusion.NO_OTHERS;
+      case EXCLUDE_CURRENT_ROW:
+        return WindowNode.WindowExclusion.CURRENT_ROW;
+      case EXCLUDE_GROUP:
+        return WindowNode.WindowExclusion.GROUP;
+      case EXCLUDE_TIES:
+        return WindowNode.WindowExclusion.TIES;
+      default:
+        throw new IllegalStateException("Unsupported WindowExclusion: " + exclude);
     }
   }
 }

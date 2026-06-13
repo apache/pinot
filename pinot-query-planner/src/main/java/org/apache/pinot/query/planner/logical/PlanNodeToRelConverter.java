@@ -377,7 +377,7 @@ public final class PlanNodeToRelConverter {
 
         Window.Group group =
             new Window.Group(keys, isRow, getWindowBound(node.getLowerBound()), getWindowBound(node.getUpperBound()),
-                RexWindowExclusion.EXCLUDE_NO_OTHER, orderKeys, aggCalls);
+                toRexWindowExclusion(node.getExclude()), orderKeys, aggCalls);
 
         List<RexLiteral> constants =
             node.getConstants().stream().map(constant -> RexExpressionUtils.toRexLiteral(_builder, constant))
@@ -393,6 +393,21 @@ public final class PlanNodeToRelConverter {
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
       return null;
+    }
+
+    private static RexWindowExclusion toRexWindowExclusion(WindowNode.WindowExclusion exclude) {
+      switch (exclude) {
+        case NO_OTHERS:
+          return RexWindowExclusion.EXCLUDE_NO_OTHER;
+        case CURRENT_ROW:
+          return RexWindowExclusion.EXCLUDE_CURRENT_ROW;
+        case GROUP:
+          return RexWindowExclusion.EXCLUDE_GROUP;
+        case TIES:
+          return RexWindowExclusion.EXCLUDE_TIES;
+        default:
+          throw new IllegalStateException("Unsupported WindowExclusion: " + exclude);
+      }
     }
 
     private RexWindowBound getWindowBound(int bound) {

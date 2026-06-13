@@ -47,6 +47,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
@@ -188,7 +189,8 @@ public class PRelToPlanNodeConverter {
     }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         new ArrayList<>(), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
-        aggCalls, windowFrameType, lowerBound, upperBound, constants);
+        aggCalls, windowFrameType, lowerBound, upperBound,
+        RelToPlanNodeConverter.fromRexWindowExclusion(windowGroup.exclude), constants);
   }
 
   public static SortNode convertSort(Sort node) {

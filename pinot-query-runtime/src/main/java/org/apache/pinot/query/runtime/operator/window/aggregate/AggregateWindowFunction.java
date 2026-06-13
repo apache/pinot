@@ -27,6 +27,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
@@ -40,18 +41,21 @@ public class AggregateWindowFunction extends WindowFunction {
       List<RelFieldCollation> collations, WindowFrame windowFrame) {
     super(aggCall, inputSchema, collations, windowFrame);
     _functionName = aggCall.getFunctionName();
+    // Removal support is required for sliding ROWS frames and whenever an EXCLUDE clause forces per-row corrections.
+    boolean nonDefaultExclude = !windowFrame.isExcludeNoOthers();
+    boolean supportRemoval = nonDefaultExclude || (windowFrame.isRowType() && !(
+        windowFrame.isUnboundedPreceding() && windowFrame.isUnboundedFollowing()));
     _windowValueAggregator = WindowValueAggregatorFactory.getWindowValueAggregator(_functionName, _dataType,
-        windowFrame.isRowType() && !(_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()));
+        supportRemoval, nonDefaultExclude);
   }
 
   @Override
   public final List<Object> processRows(List<Object[]> rows) {
     _windowValueAggregator.clear();
-    if (_windowFrame.isRowType()) {
-      return processRowsWindow(rows);
-    } else {
-      return processRangeWindow(rows);
+    if (_windowFrame.isExcludeNoOthers()) {
+      return _windowFrame.isRowType() ? processRowsWindow(rows) : processRangeWindow(rows);
     }
+    return _windowFrame.isRowType() ? processRowsWindowWithExclude(rows) : processRangeWindowWithExclude(rows);
   }
 
   /**
@@ -170,6 +174,205 @@ public class AggregateWindowFunction extends WindowFunction {
       return results;
     } else {
       throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+    }
+  }
+
+  /**
+   * ROWS frame with a non-default EXCLUDE clause. Loads the base frame into the aggregator and removes / re-adds the
+   * excluded values per row. Peer-group boundaries are precomputed once per partition.
+   */
+  private List<Object> processRowsWindowWithExclude(List<Object[]> rows) {
+    int numRows = rows.size();
+    WindowNode.WindowExclusion exclude = _windowFrame.getExclude();
+    int[] peerStart = null;
+    int[] peerEnd = null;
+    if (needsPeerBoundaries(exclude)) {
+      peerStart = new int[numRows];
+      peerEnd = new int[numRows];
+      computePeerBoundaries(rows, peerStart, peerEnd);
+    }
+
+    int lowerBound = _windowFrame.getLowerBound();
+    int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
+
+    for (int i = Math.max(0, lowerBound); i <= upperBound; i++) {
+      _windowValueAggregator.addValue(extractValueFromRow(rows.get(i)));
+    }
+
+    List<Object> result = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      if (lowerBound >= numRows) {
+        for (int j = i; j < numRows; j++) {
+          result.add(null);
+        }
+        return result;
+      }
+      int frameStart = Math.max(0, lowerBound);
+      int frameEnd = upperBound;
+      int pStart = peerStart != null ? peerStart[i] : i;
+      int pEnd = peerEnd != null ? peerEnd[i] : i;
+
+      applyExclude(rows, i, frameStart, frameEnd, pStart, pEnd, exclude, true);
+      result.add(_windowValueAggregator.getCurrentAggregatedValue());
+      applyExclude(rows, i, frameStart, frameEnd, pStart, pEnd, exclude, false);
+
+      if (lowerBound >= 0) {
+        _windowValueAggregator.removeValue(extractValueFromRow(rows.get(lowerBound)));
+      }
+      lowerBound++;
+      if (upperBound < numRows - 1) {
+        upperBound++;
+        if (upperBound >= 0) {
+          _windowValueAggregator.addValue(extractValueFromRow(rows.get(upperBound)));
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
+   * RANGE frame with a non-default EXCLUDE clause. The frame for each row is determined by its peer group; we maintain
+   * the aggregator state corresponding to the base frame and apply per-row EXCLUDE corrections.
+   */
+  private List<Object> processRangeWindowWithExclude(List<Object[]> rows) {
+    int numRows = rows.size();
+    int[] peerStart = new int[numRows];
+    int[] peerEnd = new int[numRows];
+    computePeerBoundaries(rows, peerStart, peerEnd);
+
+    boolean lowerCurrentRow = _windowFrame.isLowerBoundCurrentRow();
+    boolean upperCurrentRow = _windowFrame.isUpperBoundCurrentRow();
+    WindowNode.WindowExclusion exclude = _windowFrame.getExclude();
+    List<Object> result = new ArrayList<>(numRows);
+
+    if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()) {
+      // Frame = whole partition for every row
+      for (Object[] row : rows) {
+        _windowValueAggregator.addValue(extractValueFromRow(row));
+      }
+      for (int i = 0; i < numRows; i++) {
+        applyExclude(rows, i, 0, numRows - 1, peerStart[i], peerEnd[i], exclude, true);
+        result.add(_windowValueAggregator.getCurrentAggregatedValue());
+        applyExclude(rows, i, 0, numRows - 1, peerStart[i], peerEnd[i], exclude, false);
+      }
+      return result;
+    }
+
+    if (_windowFrame.isUnboundedPreceding() && upperCurrentRow) {
+      // Frame for row i = [0, peerEnd[i]]; aggregator is built peer-group by peer-group
+      int loaded = 0;
+      int i = 0;
+      while (i < numRows) {
+        int end = peerEnd[i];
+        for (int j = loaded; j <= end; j++) {
+          _windowValueAggregator.addValue(extractValueFromRow(rows.get(j)));
+        }
+        loaded = end + 1;
+        while (i <= end) {
+          applyExclude(rows, i, 0, end, peerStart[i], peerEnd[i], exclude, true);
+          result.add(_windowValueAggregator.getCurrentAggregatedValue());
+          applyExclude(rows, i, 0, end, peerStart[i], peerEnd[i], exclude, false);
+          i++;
+        }
+      }
+      return result;
+    }
+
+    if (lowerCurrentRow && _windowFrame.isUnboundedFollowing()) {
+      // Frame for row i = [peerStart[i], numRows-1]; build up the aggregator peer group by peer group, from the
+      // rightmost peer toward the leftmost. After adding peer g, the aggregator contains [peerStart_g, numRows-1].
+      Object[] perRow = new Object[numRows];
+      int i = numRows - 1;
+      while (i >= 0) {
+        int start = peerStart[i];
+        for (int j = start; j <= i; j++) {
+          _windowValueAggregator.addValue(extractValueFromRow(rows.get(j)));
+        }
+        for (int j = start; j <= i; j++) {
+          applyExclude(rows, j, start, numRows - 1, peerStart[j], peerEnd[j], exclude, true);
+          perRow[j] = _windowValueAggregator.getCurrentAggregatedValue();
+          applyExclude(rows, j, start, numRows - 1, peerStart[j], peerEnd[j], exclude, false);
+        }
+        i = start - 1;
+      }
+      Collections.addAll(result, perRow);
+      return result;
+    }
+
+    if (lowerCurrentRow && upperCurrentRow) {
+      // Frame for row i = peer group of i; load each peer group separately
+      int i = 0;
+      while (i < numRows) {
+        int start = peerStart[i];
+        int end = peerEnd[i];
+        for (int j = start; j <= end; j++) {
+          _windowValueAggregator.addValue(extractValueFromRow(rows.get(j)));
+        }
+        while (i <= end) {
+          applyExclude(rows, i, start, end, start, end, exclude, true);
+          result.add(_windowValueAggregator.getCurrentAggregatedValue());
+          applyExclude(rows, i, start, end, start, end, exclude, false);
+          i++;
+        }
+        for (int j = start; j <= end; j++) {
+          _windowValueAggregator.removeValue(extractValueFromRow(rows.get(j)));
+        }
+      }
+      return result;
+    }
+
+    throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+  }
+
+  /**
+   * Removes (when {@code remove} is true) or re-adds (otherwise) the rows in the EXCLUDE set, restricted to the base
+   * frame {@code [frameStart, frameEnd]}. The exclude set is derived from the current row {@code i} and its peer group
+   * {@code [pStart, pEnd]} as defined by SQL's EXCLUDE clause.
+   */
+  private void applyExclude(List<Object[]> rows, int i, int frameStart, int frameEnd, int pStart, int pEnd,
+      WindowNode.WindowExclusion exclude, boolean remove) {
+    switch (exclude) {
+      case CURRENT_ROW:
+        if (i >= frameStart && i <= frameEnd) {
+          Object value = extractValueFromRow(rows.get(i));
+          if (remove) {
+            _windowValueAggregator.removeValue(value);
+          } else {
+            _windowValueAggregator.addValue(value);
+          }
+        }
+        break;
+      case GROUP: {
+        int from = Math.max(pStart, frameStart);
+        int to = Math.min(pEnd, frameEnd);
+        for (int j = from; j <= to; j++) {
+          Object value = extractValueFromRow(rows.get(j));
+          if (remove) {
+            _windowValueAggregator.removeValue(value);
+          } else {
+            _windowValueAggregator.addValue(value);
+          }
+        }
+        break;
+      }
+      case TIES: {
+        int from = Math.max(pStart, frameStart);
+        int to = Math.min(pEnd, frameEnd);
+        for (int j = from; j <= to; j++) {
+          if (j == i) {
+            continue;
+          }
+          Object value = extractValueFromRow(rows.get(j));
+          if (remove) {
+            _windowValueAggregator.removeValue(value);
+          } else {
+            _windowValueAggregator.addValue(value);
+          }
+        }
+        break;
+      }
+      default:
+        throw new IllegalStateException("Unsupported WindowExclusion: " + exclude);
     }
   }
 }

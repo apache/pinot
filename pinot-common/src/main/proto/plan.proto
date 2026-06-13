@@ -243,6 +243,15 @@ enum WindowFrameType {
   RANGE = 1;
 }
 
+// SQL standard `<window exclusion>` clause. Names are wire-stable; renumbering breaks mixed-version brokers/servers.
+// `EXCLUDE_NO_OTHERS = 0` so that nodes serialized before this field existed deserialize to the default behavior.
+enum WindowExclusion {
+  EXCLUDE_NO_OTHERS = 0;
+  EXCLUDE_CURRENT_ROW = 1;
+  EXCLUDE_GROUP = 2;
+  EXCLUDE_TIES = 3;
+}
+
 message WindowNode {
   repeated int32 keys = 1;
   repeated Collation collations = 2;
@@ -251,6 +260,7 @@ message WindowNode {
   int32 lowerBound = 5;
   int32 upperBound = 6;
   repeated Literal constants = 7;
+  WindowExclusion exclude = 8;
 }
 
 // A node that doesn't carry semantic information.
