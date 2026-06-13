@@ -117,7 +117,15 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       updateTableConfigMetrics(tableNameWithType, tableConfig, context);
       updateSegmentMetrics(tableNameWithType, tableConfig, context);
-      updateTableSizeMetrics(tableNameWithType);
+      // Skip the /table/{name}/size scatter-gather when the table can't return useful size data. Two cases:
+      //   - Disabled table: servers do not load segments, every server responds 404, controller logs flood with
+      //     ERROR entries (issue #14279).
+      //   - Null IdealState: no servers known to query; getServerToSegmentsMap throws IllegalStateException
+      //     which propagates to the outer catch as an ERROR + stack trace per table per cycle.
+      // updateSegmentMetrics populates context._tablesToSkipSizeAggregation in both branches.
+      if (!context._tablesToSkipSizeAggregation.contains(tableNameWithType)) {
+        updateTableSizeMetrics(tableNameWithType);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
       // Remove the metric for this table
@@ -215,6 +223,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     if (idealState == null) {
       LOGGER.warn("Table {} has null ideal state. Skipping segment status checks", tableNameWithType);
       removeMetricsForTable(tableNameWithType);
+      context._tablesToSkipSizeAggregation.add(tableNameWithType);
       return;
     }
 
@@ -224,6 +233,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       removeMetricsForTable(tableNameWithType);
       context._disabledTables.add(tableNameWithType);
+      context._tablesToSkipSizeAggregation.add(tableNameWithType);
       return;
     }
 
@@ -528,6 +538,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     private final Map<String, Integer> _tierBackendTableCountMap = new HashMap<>();
     private final Set<String> _processedTables = new HashSet<>();
     private final Set<String> _disabledTables = new HashSet<>();
+    // Superset of _disabledTables: tables for which updateTableSizeMetrics should be skipped because
+    // /table/{name}/size cannot return useful data (disabled tables, or tables with null IdealState).
+    private final Set<String> _tablesToSkipSizeAggregation = new HashSet<>();
     private final Set<String> _pausedTables = new HashSet<>();
   }
 }
