@@ -117,7 +117,7 @@ public class CompositeQueryKillingStrategyTest {
     ctx.addDocsScanned(501);
     assertTrue(composite.shouldTerminate(ctx));
 
-    QueryKillReport report = composite.buildKillReport(ctx, "q1", "t1", "cluster");
+    QueryKillReport report = composite.buildKillReport(ctx, 1L, "q1", "t1", "cluster");
     assertEquals(report.getTriggeringMetric(), "numDocsScanned");
     assertEquals(report.getActualValue(), 501L);
   }
