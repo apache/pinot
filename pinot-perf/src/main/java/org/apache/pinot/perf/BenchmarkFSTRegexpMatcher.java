@@ -84,6 +84,8 @@ public class BenchmarkFSTRegexpMatcher {
   public String _regex;
 
   private File _tempDir;
+  private PinotDataBuffer _fstBuffer;
+  private PinotDataBuffer _ifstBuffer;
   private LuceneFSTIndexReader _fstReader;
   private LuceneIFSTIndexReader _ifstReader;
 
@@ -107,7 +109,8 @@ public class BenchmarkFSTRegexpMatcher {
         OutputStreamDataOutput dataOutput = new OutputStreamDataOutput(outputStream)) {
       fst.save(dataOutput, dataOutput);
     }
-    _fstReader = new LuceneFSTIndexReader(PinotDataBuffer.loadBigEndianFile(fstFile));
+    _fstBuffer = PinotDataBuffer.loadBigEndianFile(fstFile);
+    _fstReader = new LuceneFSTIndexReader(_fstBuffer);
 
     FST<BytesRef> ifst = IFSTBuilder.buildIFST(entries);
     File ifstFile = new File(_tempDir, "ifst.lucene");
@@ -115,7 +118,8 @@ public class BenchmarkFSTRegexpMatcher {
         OutputStreamDataOutput dataOutput = new OutputStreamDataOutput(outputStream)) {
       ifst.save(dataOutput, dataOutput);
     }
-    _ifstReader = new LuceneIFSTIndexReader(PinotDataBuffer.loadBigEndianFile(ifstFile));
+    _ifstBuffer = PinotDataBuffer.loadBigEndianFile(ifstFile);
+    _ifstReader = new LuceneIFSTIndexReader(_ifstBuffer);
   }
 
   @TearDown(Level.Trial)
@@ -126,6 +130,14 @@ public class BenchmarkFSTRegexpMatcher {
     }
     if (_ifstReader != null) {
       _ifstReader.close();
+    }
+    // The readers' close() is a no-op; the off-heap buffers own the mapped memory and must be closed explicitly,
+    // otherwise the mapping stays live and can prevent the temp dir from being deleted.
+    if (_fstBuffer != null) {
+      _fstBuffer.close();
+    }
+    if (_ifstBuffer != null) {
+      _ifstBuffer.close();
     }
     FileUtils.deleteDirectory(_tempDir);
   }
