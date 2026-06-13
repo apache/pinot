@@ -78,7 +78,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final int _numAggregationFunctions;
-  private final int _numGroupByExpressions;
+  /// Number of key columns: union group-by columns plus the synthetic $groupingId column for grouping sets.
+  /// Key columns precede the aggregation columns in the merged row layout.
+  private final int _numKeyColumns;
   private final int _numColumns;
 
   public GroupByDataTableReducer(QueryContext queryContext) {
@@ -88,8 +90,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
     _numAggregationFunctions = _aggregationFunctions.length;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
-    _numGroupByExpressions = groupByExpressions.size();
-    _numColumns = _numAggregationFunctions + _numGroupByExpressions;
+    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
+    _numColumns = _numAggregationFunctions + _numKeyColumns;
   }
 
   /**
@@ -202,8 +204,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
     FilterContext havingFilter = _queryContext.getHavingFilter();
     if (havingFilter != null) {
       rows = new ArrayList<>();
-      HavingFilterHandler havingFilterHandler =
-          new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.isNullHandlingEnabled());
+      HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler,
+          _queryContext.requiresNullAwareKeySerialization());
       int processedRows = 0;
       while (rows.size() < limit && sortedIterator.hasNext()) {
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(processedRows++, "GroupByDataTableReducer");
@@ -248,9 +250,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
   private DataSchema getPrePostAggregationDataSchema(DataSchema dataSchema) {
     String[] columnNames = dataSchema.getColumnNames();
     ColumnDataType[] columnDataTypes = new ColumnDataType[_numColumns];
-    System.arraycopy(dataSchema.getColumnDataTypes(), 0, columnDataTypes, 0, _numGroupByExpressions);
+    System.arraycopy(dataSchema.getColumnDataTypes(), 0, columnDataTypes, 0, _numKeyColumns);
     for (int i = 0; i < _numAggregationFunctions; i++) {
-      columnDataTypes[i + _numGroupByExpressions] = _aggregationFunctions[i].getFinalResultColumnType();
+      columnDataTypes[i + _numKeyColumns] = _aggregationFunctions[i].getFinalResultColumnType();
     }
     return new DataSchema(columnNames, columnDataTypes);
   }
@@ -292,9 +294,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
         public void runJob() {
           try {
             for (DataTable dataTable : reduceGroup) {
-              boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+              /// Grouping-set queries serialize NULL group keys via null bitmaps regardless of the user's
+              /// null-handling option, so their key nulls must be restored here as well.
+              boolean restoreNulls = _queryContext.requiresNullAwareKeySerialization();
               RoaringBitmap[] nullBitmaps = null;
-              if (nullHandlingEnabled) {
+              if (restoreNulls) {
                 nullBitmaps = new RoaringBitmap[_numColumns];
                 for (int i = 0; i < _numColumns; i++) {
                   nullBitmaps[i] = dataTable.getNullRowIds(i);
@@ -358,7 +362,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       if (customObject != null) {
                         assert _aggregationFunctions != null;
                         values[colId] =
-                            _aggregationFunctions[colId - _numGroupByExpressions].deserializeIntermediateResult(
+                            _aggregationFunctions[colId - _numKeyColumns].deserializeIntermediateResult(
                                 customObject);
                       }
                       break;
@@ -367,7 +371,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       throw new IllegalStateException();
                   }
                 }
-                if (nullHandlingEnabled) {
+                if (restoreNulls) {
                   for (int colId = 0; colId < _numColumns; colId++) {
                     if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
                       values[colId] = null;
@@ -448,8 +452,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
     FilterContext havingFilter = _queryContext.getHavingFilter();
     if (havingFilter != null) {
       rows = new ArrayList<>();
-      HavingFilterHandler havingFilterHandler =
-          new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.isNullHandlingEnabled());
+      HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler,
+          _queryContext.requiresNullAwareKeySerialization());
       for (int i = 0; i < numRows; i++) {
         Object[] row = getConvertedRowWithFinalResult(dataTable, i);
         if (havingFilterHandler.isMatch(row)) {
@@ -496,7 +500,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     Object[] row = new Object[_numColumns];
     ColumnDataType[] columnDataTypes = dataTable.getDataSchema().getColumnDataTypes();
     for (int i = 0; i < _numColumns; i++) {
-      if (i < _numGroupByExpressions) {
+      if (i < _numKeyColumns) {
         row[i] = getConvertedKey(dataTable, columnDataTypes[i], rowId, i);
       } else {
         row[i] = AggregationFunctionUtils.getConvertedFinalResult(dataTable, columnDataTypes[i], rowId, i);
@@ -543,7 +547,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     Iterator<Record> iterator = indexedTable.iterator();
-    if (_queryContext.isNullHandlingEnabled()) {
+    /// Grouping-set queries carry NULL group keys that must be serialized via the null-aware path even when
+    /// the user did not enable null handling.
+    if (_queryContext.requiresNullAwareKeySerialization()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[_numColumns];
       Object[] nullPlaceholders = new Object[_numColumns];
       for (int colId = 0; colId < _numColumns; colId++) {
@@ -562,7 +568,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
               dataTableBuilder.setNull(i);
             } else {
               dataTableBuilder.setColumn(i,
-                  _aggregationFunctions[i - _numGroupByExpressions].serializeIntermediateResult(value));
+                  _aggregationFunctions[i - _numKeyColumns].serializeIntermediateResult(value));
             }
           } else {
             if (value == null) {
@@ -590,7 +596,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
             dataTableBuilder.setNull(i);
           } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
             dataTableBuilder.setColumn(i,
-                _aggregationFunctions[i - _numGroupByExpressions].serializeIntermediateResult(value));
+                _aggregationFunctions[i - _numKeyColumns].serializeIntermediateResult(value));
           } else {
             DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
           }

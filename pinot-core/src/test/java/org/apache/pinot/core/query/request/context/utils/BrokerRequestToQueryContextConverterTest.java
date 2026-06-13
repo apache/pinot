@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -38,6 +39,7 @@ import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -809,5 +811,39 @@ public class BrokerRequestToQueryContextConverterTest {
     query = "SELECT * FROM testTable WHERE NOT 1 = 0";
     queryContext = QueryContextConverterUtils.getQueryContext(query);
     assertNull(queryContext.getFilter());
+  }
+
+  @Test
+  public void testInvalidGroupingSetMasksRejected() {
+    /// A well-formed grouping-set query decodes into per-set column-index arrays.
+    PinotQuery pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM testTable GROUP BY ROLLUP(a, b)");
+    assertNotNull(QueryContextConverterUtils.getQueryContext(pinotQuery).getGroupingSets());
+
+    /// A mask referencing a non-existent union column (bit >= groupByList size) or with the sign bit set must be
+    /// rejected at conversion instead of causing out-of-bounds access in the group key generator.
+    for (int badMask : new int[]{1 << 2, -1}) {
+      PinotQuery corrupted =
+          CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM testTable GROUP BY ROLLUP(a, b)");
+      corrupted.setGroupingSetMasks(List.of(3, badMask));
+      assertThrows(IllegalStateException.class, () -> QueryContextConverterUtils.getQueryContext(corrupted));
+    }
+
+    /// An empty set list must be rejected rather than silently producing zero groups.
+    PinotQuery emptyMasks =
+        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM testTable GROUP BY ROLLUP(a, b)");
+    emptyMasks.setGroupingSetMasks(List.of());
+    assertThrows(IllegalStateException.class, () -> QueryContextConverterUtils.getQueryContext(emptyMasks));
+
+    /// A group-by union of more than 31 columns cannot be represented in the INT grouping-id bitmask; the
+    /// parser never emits this (it caps the union at 31), so it must be rejected as malformed.
+    StringBuilder columns = new StringBuilder();
+    for (int i = 0; i < 32; i++) {
+      columns.append(i == 0 ? "c0" : ", c" + i);
+    }
+    PinotQuery wideUnion =
+        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM testTable GROUP BY " + columns);
+    wideUnion.setGroupingSetMasks(List.of(0));
+    assertThrows(IllegalStateException.class, () -> QueryContextConverterUtils.getQueryContext(wideUnion));
   }
 }
