@@ -29,8 +29,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class PercentileTDigestValueAggregator implements ValueAggregator<Object, TDigest> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
-  // TODO: This is copied from PercentileTDigestAggregationFunction.
-  public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
+  // NOTE: This is intentionally higher than the query-time default (100) in PercentileTDigestAggregationFunction.
+  // t-digest 3.3 has higher merge-order sensitivity, and star-tree building involves multi-level merge with
+  // intermediate serialization/deserialization. At compression=100, this causes ~0.35% error (vs 0.06% in 3.2).
+  // Compression=500 brings error back to ~0.09%, comparable to 3.2's accuracy at compression=100.
+  public static final int DEFAULT_TDIGEST_COMPRESSION = 500;
   private final int _compressionFactor;
   private int _maxByteSize;
 

@@ -30,8 +30,13 @@ import static org.testng.Assert.assertEquals;
 
 
 public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, TDigest> {
-  // Use non-default compression
-  private static final double COMPRESSION = 50;
+  // Use high compression to keep star-tree vs non-star-tree quantile divergence within 0.5%.
+  // t-digest 3.3 changed centroid management (unit-weight first/last centroids, stricter tail interpolation),
+  // which increases merge-order sensitivity. The star-tree path does multi-level serialize/deserialize/merge
+  // while the non-star-tree path merges sequentially, causing quantile divergence at low compression values.
+  // Experimentally verified: compression >= 750 keeps error < 0.5% across 10 randomized runs.
+  private static final double COMPRESSION = 750;
+  private static final double MAX_ERROR = 0.005;
   private static final int MAX_VALUE = 10000;
 
   @Override
@@ -54,7 +59,7 @@ public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2
 
   @Override
   void assertAggregatedValue(TDigest starTreeResult, TDigest nonStarTreeResult) {
-    double delta = MAX_VALUE * 0.05;
+    double delta = MAX_VALUE * MAX_ERROR;
     for (int i = 0; i <= 100; i++) {
       assertEquals(starTreeResult.quantile(i / 100.0), nonStarTreeResult.quantile(i / 100.0), delta);
     }

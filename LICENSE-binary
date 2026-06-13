@@ -278,7 +278,7 @@ com.squareup.wire:wire-runtime-jvm:5.1.0
 com.squareup.wire:wire-schema-jvm:5.1.0
 com.squareup:javapoet:1.13.0
 com.squareup:kotlinpoet-jvm:1.18.1
-com.tdunning:t-digest:3.2
+com.tdunning:t-digest:3.3
 com.typesafe.scala-logging:scala-logging_2.13:3.9.5
 com.uber:h3:4.4.0
 com.yammer.metrics:metrics-core:2.2.0

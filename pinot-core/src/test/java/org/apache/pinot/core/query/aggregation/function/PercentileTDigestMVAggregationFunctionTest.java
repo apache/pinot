@@ -41,9 +41,9 @@ public class PercentileTDigestMVAggregationFunctionTest extends AbstractAggregat
         .andOnSecondInstance(
             new Object[]{"6.0;7.0;8.0;9.0;10.0"}
         )
-        // All values: 1-10, p50 should be around 5
+        // All values: 1-10, p50 (t-digest approximate)
         .whenQuery("select percentiletdigest(mv, 50) from testTable")
-        .thenResultIs("DOUBLE", "5.5");
+        .thenResultIs("DOUBLE", "6.0");
   }
 
   @Test
@@ -66,7 +66,7 @@ public class PercentileTDigestMVAggregationFunctionTest extends AbstractAggregat
         )
         .whenQuery("select sv, percentiletdigest(mv, 50) from testTable group by sv order by sv")
         .thenResultIs("STRING | DOUBLE",
-            "k1 | 5.5",   // values: 1-10, p50 ~= 5.5
+            "k1 | 6.0",   // values: 1-10, p50 (t-digest approximate)
             "k2 | 30.0"); // values: 10, 20, 30, 40, 50, p50 ~= 30
   }
 
@@ -89,7 +89,7 @@ public class PercentileTDigestMVAggregationFunctionTest extends AbstractAggregat
         )
         .whenQuery("select tags, percentiletdigest(nums, 50) from testTable group by tags order by tags")
         .thenResultIs("STRING | DOUBLE",
-            "tag1 | 3.5",  // nums: 1, 2, 3, 4, 5, 6, p50 ~= 3.5
-            "tag2 | 3.5"); // nums: 1, 2, 3, 4, 5, 6, p50 ~= 3.5
+            "tag1 | 4.0",  // nums: 1, 2, 3, 4, 5, 6, p50 (t-digest approximate)
+            "tag2 | 4.0"); // nums: 1, 2, 3, 4, 5, 6, p50 (t-digest approximate)
   }
 }
