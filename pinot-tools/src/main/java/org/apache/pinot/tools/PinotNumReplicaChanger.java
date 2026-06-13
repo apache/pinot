@@ -89,6 +89,9 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
     Set<String> segmentIds = idealState.getPartitionSet();
     for (String segmentId : segmentIds) {
       Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentId);
+      if (instanceStateMap == null) {
+        continue;
+      }
       if (instanceStateMap.size() > newNumReplicas) {
         Set<String> keys = instanceStateMap.keySet();
         while (instanceStateMap.size() > newNumReplicas) {
