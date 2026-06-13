@@ -19,10 +19,13 @@
 package org.apache.pinot.segment.local.aggregator;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
+import org.apache.datasketches.memory.Memory;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -102,6 +105,27 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
     CpcUnion cpcUnion = extractUnion(aggregatedValue);
     CpcSketch sketch = extractSketch(value);
     cpcUnion.update(sketch);
+    return cpcUnion;
+  }
+
+  @Override
+  public Object applyRawValueFromBuffer(Object aggregatedValue, ByteBuffer buf) {
+    // CpcSketch.heapify materialises a heap-resident sketch; CPC has no zero-copy wrap API.
+    // The saving relative to applyRawValue(byte[]) is skipping the intermediate byte[] allocation
+    // and buf.get(bytes) copy at the call site — heapify itself still allocates internal state.
+    CpcUnion cpcUnion = extractUnion(aggregatedValue);
+    if (buf.remaining() > 0) {
+      cpcUnion.update(CpcSketch.heapify(Memory.wrap(buf, ByteOrder.LITTLE_ENDIAN)));
+    }
+    return cpcUnion;
+  }
+
+  @Override
+  public Object applyAggregatedValueFromBuffer(Object value, ByteBuffer buf) {
+    CpcUnion cpcUnion = extractUnion(value);
+    if (buf.remaining() > 0) {
+      cpcUnion.update(CpcSketch.heapify(Memory.wrap(buf, ByteOrder.LITTLE_ENDIAN)));
+    }
     return cpcUnion;
   }
 

@@ -135,6 +135,18 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
+  public ByteBuffer getBytesView(int docId, ReaderContext context) {
+    return context.getValueView(docId);
+  }
+
+  @Override
+  public boolean isBufferViewStableAcrossReads() {
+    // PASS_THROUGH views slice the mmap'd chunk buffer (fresh per call); compressed views slice the
+    // per-context decompression scratch buffer, which is overwritten on the next chunk decode.
+    return getCompressionType() == ChunkCompressionType.PASS_THROUGH;
+  }
+
+  @Override
   public Map<String, Object> getMap(int docId, ReaderContext context) {
     return MapUtils.deserializeMap(context.getValue(docId));
   }
@@ -284,6 +296,24 @@ public class VarByteChunkForwardIndexReaderV4
       }
     }
 
+    /**
+     * View variant of {@link #getValue} — returns a {@link ByteBuffer} slice into the cached
+     * decompressed chunk (or into the raw {@code PinotDataBuffer} for {@code PASS_THROUGH}). The
+     * returned slice is valid only until the next call on this context.
+     */
+    public ByteBuffer getValueView(int docId) {
+      if (docId >= _docIdOffset && docId < _nextDocIdOffset) {
+        return readSmallUncompressedValueView(docId);
+      } else {
+        try {
+          return decompressAndReadView(docId);
+        } catch (IOException e) {
+          LOGGER.error("Exception caught while decompressing data chunk", e);
+          throw new RuntimeException(e);
+        }
+      }
+    }
+
     protected long chunkIndexFor(int docId) {
       long low = 0;
       long high = (_metadata.size() / METADATA_ENTRY_SIZE) - 1;
@@ -307,6 +337,11 @@ public class VarByteChunkForwardIndexReaderV4
 
     protected abstract byte[] readSmallUncompressedValue(int docId);
 
+    protected abstract ByteBuffer processChunkAndReadFirstValueView(int docId, long offset, long limit)
+        throws IOException;
+
+    protected abstract ByteBuffer readSmallUncompressedValueView(int docId);
+
     private byte[] decompressAndRead(int docId)
         throws IOException {
       long metadataEntry = chunkIndexFor(docId);
@@ -323,6 +358,26 @@ public class VarByteChunkForwardIndexReaderV4
         limit = _chunks.size();
       }
       return processChunkAndReadFirstValue(docId, offset, limit);
+    }
+
+    private ByteBuffer decompressAndReadView(int docId)
+        throws IOException {
+      // Mirrors decompressAndRead but dispatches to the view-returning terminal call. Kept as a
+      // duplicate metadata walk to avoid touching the hot byte[] path.
+      long metadataEntry = chunkIndexFor(docId);
+      int info = _metadata.getInt(metadataEntry);
+      _docIdOffset = info & 0x7FFFFFFF;
+      _regularChunk = _docIdOffset == info;
+      long offset = _metadata.getInt(metadataEntry + Integer.BYTES) & 0xFFFFFFFFL;
+      long limit;
+      if (_metadata.size() - METADATA_ENTRY_SIZE > metadataEntry) {
+        _nextDocIdOffset = _metadata.getInt(metadataEntry + METADATA_ENTRY_SIZE) & 0x7FFFFFFF;
+        limit = _metadata.getInt(metadataEntry + METADATA_ENTRY_SIZE + Integer.BYTES) & 0xFFFFFFFFL;
+      } else {
+        _nextDocIdOffset = Integer.MAX_VALUE;
+        limit = _chunks.size();
+      }
+      return processChunkAndReadFirstValueView(docId, offset, limit);
     }
 
     private void initAndRecordRangesForDocId(int docId, List<ByteRange> ranges) {
@@ -385,6 +440,30 @@ public class VarByteChunkForwardIndexReaderV4
     }
 
     @Override
+    protected ByteBuffer processChunkAndReadFirstValueView(int docId, long offset, long limit) {
+      _chunk = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
+      if (!_regularChunk) {
+        // Huge value: whole chunk is the value. Return a duplicated view so the caller can read it
+        // without disturbing _chunk's position cursor.
+        return _chunk.duplicate();
+      }
+      _numDocsInCurrentChunk = _chunk.getInt(0);
+      return readSmallUncompressedValueView(docId);
+    }
+
+    @Override
+    protected ByteBuffer readSmallUncompressedValueView(int docId) {
+      int index = docId - _docIdOffset;
+      int offset = _chunk.getInt((index + 1) * Integer.BYTES);
+      int nextOffset =
+          index == _numDocsInCurrentChunk - 1 ? _chunk.limit() : _chunk.getInt((index + 2) * Integer.BYTES);
+      ByteBuffer view = _chunk.duplicate();
+      view.position(offset);
+      view.limit(nextOffset);
+      return view.slice();
+    }
+
+    @Override
     public void close() {
     }
   }
@@ -438,6 +517,32 @@ public class VarByteChunkForwardIndexReaderV4
       _decompressedBuffer.get(bytes);
       _decompressedBuffer.position(0);
       return bytes;
+    }
+
+    @Override
+    protected ByteBuffer processChunkAndReadFirstValueView(int docId, long offset, long limit)
+        throws IOException {
+      _decompressedBuffer.clear();
+      ByteBuffer compressed = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
+      if (_regularChunk) {
+        decompressChunk(compressed);
+        return readSmallUncompressedValueView(docId);
+      }
+      // Huge compressed value: no slice path available (decompression target is allocated per call).
+      // Fall back to wrapping the byte[].
+      return ByteBuffer.wrap(readHugeCompressedValue(compressed, _chunkDecompressor.decompressedLength(compressed)));
+    }
+
+    @Override
+    protected ByteBuffer readSmallUncompressedValueView(int docId) {
+      int index = docId - _docIdOffset;
+      int offset = _decompressedBuffer.getInt((index + 1) * Integer.BYTES);
+      int nextOffset = index == _numDocsInCurrentChunk - 1 ? _decompressedBuffer.limit()
+          : _decompressedBuffer.getInt((index + 2) * Integer.BYTES);
+      ByteBuffer view = _decompressedBuffer.duplicate();
+      view.position(offset);
+      view.limit(nextOffset);
+      return view.slice();
     }
 
     private byte[] readHugeCompressedValue(ByteBuffer compressed, int decompressedLength)

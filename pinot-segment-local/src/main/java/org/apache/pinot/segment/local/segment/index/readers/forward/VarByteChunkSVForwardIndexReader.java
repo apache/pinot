@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -129,6 +130,21 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     }
   }
 
+  @Override
+  public ByteBuffer getBytesView(int docId, ChunkReaderContext context) {
+    if (_isCompressed) {
+      return getBytesViewCompressed(docId, context);
+    } else {
+      return getBytesViewUncompressed(docId);
+    }
+  }
+
+  @Override
+  public boolean isBufferViewStableAcrossReads() {
+    // PASS_THROUGH views slice the underlying mmap'd buffer (fresh slice per call, never reused);
+    // compressed views slice the per-context decompression scratch buffer (overwritten on next read).
+    return getCompressionType() == ChunkCompressionType.PASS_THROUGH;
+  }
 
   @Override
   public Map getMap(int docId, ChunkReaderContext context) {
@@ -168,6 +184,39 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     byte[] bytes = new byte[(int) (valueEndOffset - valueStartOffset)];
     _dataBuffer.copyTo(valueStartOffset, bytes);
     return bytes;
+  }
+
+  /**
+   * View variant of {@link #getBytesCompressed} — slices into the per-context decompression buffer.
+   * The returned slice is valid only until the next call on the same context.
+   */
+  private ByteBuffer getBytesViewCompressed(int docId, ChunkReaderContext context) {
+    int chunkRowId = docId % _numDocsPerChunk;
+    ByteBuffer chunkBuffer = getChunkBuffer(docId, context);
+
+    int valueStartOffset = chunkBuffer.getInt(chunkRowId * ROW_OFFSET_SIZE);
+    int valueEndOffset = getValueEndOffset(chunkRowId, chunkBuffer);
+
+    ByteBuffer view = chunkBuffer.duplicate();
+    view.position(valueStartOffset);
+    view.limit(valueEndOffset);
+    return view.slice();
+  }
+
+  /**
+   * View variant of {@link #getBytesUncompressed} — returns a direct view into the underlying
+   * {@code PinotDataBuffer} with no per-row allocation.
+   */
+  private ByteBuffer getBytesViewUncompressed(int docId) {
+    int chunkId = docId / _numDocsPerChunk;
+    int chunkRowId = docId % _numDocsPerChunk;
+
+    long chunkStartOffset = getChunkPosition(chunkId);
+    long valueStartOffset =
+        chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
+    long valueEndOffset = getValueEndOffset(chunkId, chunkRowId, chunkStartOffset);
+
+    return _dataBuffer.toDirectByteBuffer(valueStartOffset, (int) (valueEndOffset - valueStartOffset));
   }
 
   /**

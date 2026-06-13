@@ -19,6 +19,8 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -162,7 +164,8 @@ public class IntegerTupleSketchAggregationFunction
     // Treat BYTES value as serialized Integer Tuple Sketch
     FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == FieldSpec.DataType.BYTES) {
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      Object bytesValues = blockValSet.isBytesViewStableAcrossReads()
+          ? blockValSet.getBytesValueViewsSV() : blockValSet.getBytesValuesSV();
       try {
         TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(aggregationResultHolder);
         Sketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
@@ -187,7 +190,8 @@ public class IntegerTupleSketchAggregationFunction
     FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
 
     if (storedType == FieldSpec.DataType.BYTES) {
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      Object bytesValues = blockValSet.isBytesViewStableAcrossReads()
+          ? blockValSet.getBytesValueViewsSV() : blockValSet.getBytesValuesSV();
       try {
         Sketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
@@ -214,7 +218,8 @@ public class IntegerTupleSketchAggregationFunction
     boolean singleValue = blockValSet.isSingleValue();
 
     if (singleValue && storedType == FieldSpec.DataType.BYTES) {
-      byte[][] bytesValues = blockValSetMap.get(_expression).getBytesValuesSV();
+      Object bytesValues = blockValSet.isBytesViewStableAcrossReads()
+          ? blockValSet.getBytesValueViewsSV() : blockValSet.getBytesValuesSV();
       try {
         Sketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
@@ -336,6 +341,27 @@ public class IntegerTupleSketchAggregationFunction
       groupByResultHolder.setValueForKey(groupKey, accumulator);
     }
     return accumulator;
+  }
+
+  /**
+   * Deserializes the sketches from the extracted value array, which is either a {@code byte[][]}
+   * (default path) or a {@code ByteBuffer[]} of zero-copy views (when the forward index reader's
+   * views are stable across the block — see {@link BlockValSet#getBytesValueViewsSV()}).
+   */
+  @SuppressWarnings({"unchecked"})
+  private Sketch<IntegerSummary>[] deserializeSketches(Object serializedSketches, int length) {
+    if (serializedSketches instanceof ByteBuffer[]) {
+      ByteBuffer[] views = (ByteBuffer[]) serializedSketches;
+      Sketch<IntegerSummary>[] sketches = new Sketch[length];
+      for (int i = 0; i < length; i++) {
+        // Explicit LITTLE_ENDIAN matches the byte[] path's Memory.wrap default. heapifySketch still
+        // copies into a heap sketch; the win is skipping the upstream byte[] alloc + copy.
+        sketches[i] =
+            Sketches.heapifySketch(Memory.wrap(views[i], ByteOrder.LITTLE_ENDIAN), new IntegerSummaryDeserializer());
+      }
+      return sketches;
+    }
+    return deserializeSketches((byte[][]) serializedSketches, length);
   }
 
   /**

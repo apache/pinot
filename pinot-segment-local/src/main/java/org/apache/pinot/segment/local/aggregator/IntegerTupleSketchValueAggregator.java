@@ -19,11 +19,16 @@
 package org.apache.pinot.segment.local.aggregator;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.tuple.Sketch;
+import org.apache.datasketches.tuple.Sketches;
 import org.apache.datasketches.tuple.Union;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
@@ -109,6 +114,27 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
   public Object applyAggregatedValue(Object value, Object aggregatedValue) {
     Union tupleUnion = extractUnion(aggregatedValue);
     Sketch sketch = extractSketch(value);
+    tupleUnion.union(sketch);
+    return tupleUnion;
+  }
+
+  @Override
+  public Object applyRawValueFromBuffer(Object aggregatedValue, ByteBuffer buf) {
+    // Sketches.heapifySketch materialises the tuple sketch and its IntegerSummary entries on heap;
+    // tuple sketches have no zero-copy wrap API. Saving is skipping the byte[] alloc at the call
+    // site only — summary objects are still materialised per retained entry during heapify.
+    Union tupleUnion = extractUnion(aggregatedValue);
+    Sketch<IntegerSummary> sketch =
+        Sketches.heapifySketch(Memory.wrap(buf, ByteOrder.LITTLE_ENDIAN), new IntegerSummaryDeserializer());
+    tupleUnion.union(sketch);
+    return tupleUnion;
+  }
+
+  @Override
+  public Object applyAggregatedValueFromBuffer(Object value, ByteBuffer buf) {
+    Union tupleUnion = extractUnion(value);
+    Sketch<IntegerSummary> sketch =
+        Sketches.heapifySketch(Memory.wrap(buf, ByteOrder.LITTLE_ENDIAN), new IntegerSummaryDeserializer());
     tupleUnion.union(sketch);
     return tupleUnion;
   }

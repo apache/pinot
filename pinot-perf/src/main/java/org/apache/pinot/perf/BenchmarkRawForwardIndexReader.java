@@ -95,7 +95,7 @@ public class BenchmarkRawForwardIndexReader {
 
     @Param({"UNIFORM(1000,10000)", "EXP(0.001)"})
     String _distribution;
-    @Param({"SNAPPY", "LZ4", "ZSTANDARD"})
+    @Param({"PASS_THROUGH", "SNAPPY", "LZ4", "ZSTANDARD"})
     ChunkCompressionType _chunkCompressionType;
 
     @Param("1048576")
@@ -195,6 +195,24 @@ public class BenchmarkRawForwardIndexReader {
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
+  public void readV4View(V4State state, Blackhole bh)
+      throws IOException {
+    try (PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(state._file);
+        VarByteChunkForwardIndexReaderV4 reader =
+        new VarByteChunkForwardIndexReaderV4(buffer, FieldSpec.DataType.BYTES, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      for (int i = 0; i < state._records; i++) {
+        java.nio.ByteBuffer view = reader.getBytesView(i, context);
+        // Consume the view's contents before the next read invalidates it. Touching remaining()
+        // is enough to ensure the slice is materialised; we also consume the buffer itself.
+        bh.consume(view.remaining());
+        bh.consume(view);
+      }
+    }
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
   public void readV3(V3State state, Blackhole bh)
       throws IOException {
     try (PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(state._file);
@@ -203,6 +221,22 @@ public class BenchmarkRawForwardIndexReader {
         ChunkReaderContext context = reader.createContext()) {
       for (int i = 0; i < state._records; i++) {
         bh.consume(reader.getBytes(i, context));
+      }
+    }
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  public void readV3View(V3State state, Blackhole bh)
+      throws IOException {
+    try (PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(state._file);
+        VarByteChunkSVForwardIndexReader reader =
+            new VarByteChunkSVForwardIndexReader(buffer, FieldSpec.DataType.BYTES);
+        ChunkReaderContext context = reader.createContext()) {
+      for (int i = 0; i < state._records; i++) {
+        java.nio.ByteBuffer view = reader.getBytesView(i, context);
+        bh.consume(view.remaining());
+        bh.consume(view);
       }
     }
   }
