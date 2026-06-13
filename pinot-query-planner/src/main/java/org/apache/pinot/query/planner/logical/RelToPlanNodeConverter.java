@@ -581,7 +581,7 @@ public final class RelToPlanNodeConverter {
       PinotLogicalSortExchange sortExchange = (PinotLogicalSortExchange) node;
       exchangeType = sortExchange.getExchangeType();
       keys = distribution.getKeys();
-      prePartitioned = null;
+      prePartitioned = sortExchange.getPrePartitioned();
       collations = sortExchange.getCollation().getFieldCollations();
       sortOnSender = sortExchange.isSortOnSender();
       sortOnReceiver = sortExchange.isSortOnReceiver();
