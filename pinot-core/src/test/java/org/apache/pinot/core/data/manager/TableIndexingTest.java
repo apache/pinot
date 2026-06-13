@@ -300,7 +300,11 @@ public class TableIndexingTest {
               "fieldConfigList":[
               {
                 "name":"text_col_1",
-                "encodingType":"DICTIONARY",
+                "indexes": {
+                  "forward": {
+                    "encodingType":"DICTIONARY"
+                  }
+                },
                 "indexType":"FST"
                 }
                 ]
@@ -313,8 +317,10 @@ public class TableIndexingTest {
               "fieldConfigList": [
                 {
                   "name": "location_st_point",
-                  "encodingType":"RAW", // this actually disables the dictionary
                   "indexes": {
+                    "forward": {
+                      "encodingType":"RAW"
+                    },
                     "h3": {
                       "resolutions": [13, 5, 6]
                     }
@@ -366,8 +372,12 @@ public class TableIndexingTest {
             "fieldConfigList":[
               {
                  "name":"text_col_1",
-                 "encodingType":"RAW",
-                 "indexTypes":["TEXT"]
+                 "indexTypes":["TEXT"],
+                 "indexes": {
+                   "forward": {
+                     "encodingType":"RAW"
+                   }
+                 }
               }
             ] */
           indexTypes.add(FieldConfig.IndexType.TEXT);
@@ -453,9 +463,13 @@ public class TableIndexingTest {
             /* vector
             "fieldConfigList": [
             {
-              "encodingType": "RAW",
               "indexType": "VECTOR",
               "name": "embedding",
+              "indexes": {
+                "forward": {
+                  "encodingType": "RAW"
+                }
+              },
               "properties": {
                 "vectorIndexType": "HNSW",
                 "vectorDimension": 1536,
@@ -473,8 +487,15 @@ public class TableIndexingTest {
           throw new IllegalArgumentException("Unexpected index type " + indexType);
       }
 
-      config =
-          new FieldConfig(field.getName(), encoding, null, indexTypes, null, tstmpConfig, indexes, properties, null);
+      ObjectNode forwardIndex = JsonUtils.newObjectNode();
+      forwardIndex.put("encodingType", encoding.name());
+      indexes.set("forward", forwardIndex);
+      config = new FieldConfig.Builder(field.getName())
+          .withIndexTypes(indexTypes)
+          .withTimestampConfig(tstmpConfig)
+          .withIndexes(indexes)
+          .withProperties(properties)
+          .build();
 
       tableConfig.getFieldConfigList().add(config);
 

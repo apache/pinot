@@ -60,7 +60,6 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -1619,11 +1618,13 @@ public final class TableConfigUtils {
         String column = fieldConfig.getName();
         Preconditions.checkState(seenColumns.add(column), "Duplicate FieldConfig for column: %s", column);
         Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
+        Preconditions.checkState(!fieldConfig.hasFieldLevelEncodingType(),
+            "FieldConfig.encodingType is deprecated for column: %s. Use fieldConfigList[].indexes.forward.encodingType "
+                + "instead.", column);
 
         // Validate DELTA / DELTADELTA compression codecs compatibility
         validateGorillaCompressionCodecIfPresent(fieldConfig, schema.getFieldSpecFor(column));
       }
-      validateIndexingConfigAndFieldConfigListCompatibility(indexingConfig, fieldConfigs);
     }
 
     Map<String, FieldIndexConfigs> indexConfigsMap;
@@ -1717,29 +1718,6 @@ public final class TableConfigUtils {
         for (String key : multiColTextIndex.getPerColumnProperties().get(column).keySet()) {
           Preconditions.checkState(MultiColumnTextMetadata.isValidPerColumnProperty(key),
               "Multi-column text index doesn't allow: %s as property for column: %s", key, column);
-        }
-      }
-    }
-  }
-
-  /// Validates compatibility across [IndexingConfig] and [FieldConfig]s, ensures that:
-  /// - Columns with DICTIONARY encoding type in [FieldConfig]s are not defined as no-dictionary in [IndexingConfig]
-  private static void validateIndexingConfigAndFieldConfigListCompatibility(IndexingConfig indexingConfig,
-      List<FieldConfig> fieldConfigs) {
-    Set<String> noDictionaryColumnsFromIndexingConfig = new HashSet<>();
-    if (indexingConfig.getNoDictionaryColumns() != null) {
-      noDictionaryColumnsFromIndexingConfig.addAll(indexingConfig.getNoDictionaryColumns());
-    }
-    if (indexingConfig.getNoDictionaryConfig() != null) {
-      noDictionaryColumnsFromIndexingConfig.addAll(indexingConfig.getNoDictionaryConfig().keySet());
-    }
-    if (!noDictionaryColumnsFromIndexingConfig.isEmpty()) {
-      for (FieldConfig fieldConfig : fieldConfigs) {
-        String column = fieldConfig.getName();
-        EncodingType encodingType = fieldConfig.getEncodingType();
-        if (encodingType == EncodingType.DICTIONARY) {
-          Preconditions.checkState(!noDictionaryColumnsFromIndexingConfig.contains(column),
-              "FieldConfig encoding type is different from indexingConfig for column: %s", column);
         }
       }
     }

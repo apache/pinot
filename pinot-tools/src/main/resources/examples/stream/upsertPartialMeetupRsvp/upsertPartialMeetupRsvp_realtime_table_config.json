@@ -64,10 +64,14 @@
   "fieldConfigList": [
     {
       "name": "location",
-      "encodingType": "RAW",
       "indexType": "H3",
       "properties": {
         "resolutions": "5"
+      },
+      "indexes": {
+        "forward": {
+          "encodingType": "RAW"
+        }
       }
     }
   ],

@@ -137,20 +137,18 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     }
 
     return Arrays.asList(
-        new FieldConfig.Builder(NULLABLE_TEXT_COL).withEncodingType(FieldConfig.EncodingType.RAW).build(),
-        new FieldConfig.Builder(NULLABLE_TEXT_COL_MV).withEncodingType(FieldConfig.EncodingType.RAW).build(),
-        new FieldConfig.Builder(TEXT_COL).withEncodingType(FieldConfig.EncodingType.RAW).build(),
-        new FieldConfig.Builder(TEXT_COL_CASE_SENSITIVE).withEncodingType(FieldConfig.EncodingType.RAW).build(),
-        new FieldConfig.Builder(TEXT_COL_MV).withEncodingType(FieldConfig.EncodingType.RAW).build(),
-        new FieldConfig.Builder(TEXT_COL_CASE_SENSITIVE_MV).withEncodingType(FieldConfig.EncodingType.RAW).build(),
-        new FieldConfig.Builder(DICT_TEXT_COL).withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+        fieldConfigBuilderWithForwardEncoding(NULLABLE_TEXT_COL, FieldConfig.EncodingType.RAW).build(),
+        fieldConfigBuilderWithForwardEncoding(NULLABLE_TEXT_COL_MV, FieldConfig.EncodingType.RAW).build(),
+        fieldConfigBuilderWithForwardEncoding(TEXT_COL, FieldConfig.EncodingType.RAW).build(),
+        fieldConfigBuilderWithForwardEncoding(TEXT_COL_CASE_SENSITIVE, FieldConfig.EncodingType.RAW).build(),
+        fieldConfigBuilderWithForwardEncoding(TEXT_COL_MV, FieldConfig.EncodingType.RAW).build(),
+        fieldConfigBuilderWithForwardEncoding(TEXT_COL_CASE_SENSITIVE_MV, FieldConfig.EncodingType.RAW).build(),
+        new FieldConfig.Builder(DICT_TEXT_COL)
             .withIndexes(indexes)
             .build(), // column missing forward index can still be indexed if there's dictionary and inverted index
-        new FieldConfig.Builder(DICT_TEXT_COL_CASE_SENSITIVE).withEncodingType(FieldConfig.EncodingType.DICTIONARY)
-            .build(),
-        new FieldConfig.Builder(DICT_TEXT_COL_MV).withEncodingType(FieldConfig.EncodingType.DICTIONARY).build(),
-        new FieldConfig.Builder(DICT_TEXT_COL_CASE_SENSITIVE_MV).withEncodingType(FieldConfig.EncodingType.DICTIONARY)
-            .build());
+        new FieldConfig.Builder(DICT_TEXT_COL_CASE_SENSITIVE).build(),
+        new FieldConfig.Builder(DICT_TEXT_COL_MV).build(),
+        new FieldConfig.Builder(DICT_TEXT_COL_CASE_SENSITIVE_MV).build());
   }
 
   @Override

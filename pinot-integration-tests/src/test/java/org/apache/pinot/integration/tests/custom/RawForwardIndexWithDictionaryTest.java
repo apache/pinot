@@ -157,7 +157,7 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
 
   @Override
   protected List<String> getNoDictionaryColumns() {
-    // Forward-index encoding for the raw-dict columns is set via FieldConfig (RAW + explicit dictionary).
+    // Forward-index encoding for the raw-dict columns is set via fieldConfig.indexes.forward.
     return List.of();
   }
 
@@ -165,21 +165,21 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
   protected List<FieldConfig> getFieldConfigs() {
     ObjectNode dictionaryIndex = JsonUtils.newObjectNode();
     dictionaryIndex.set("dictionary", JsonUtils.newObjectNode());
-    FieldConfig rawDictString =
-        new FieldConfig(RAW_DICT_DIMENSION, FieldConfig.EncodingType.RAW, null, null, null, null, dictionaryIndex,
-            null, null);
-    FieldConfig rawDictInvString =
-        new FieldConfig(RAW_DICT_INV_DIMENSION, FieldConfig.EncodingType.RAW, null, null, null, null,
-            dictionaryIndex.deepCopy(), null, null);
-    FieldConfig rawDictInt =
-        new FieldConfig(RAW_DICT_INT_DIMENSION, FieldConfig.EncodingType.RAW, null, null, null, null,
-            dictionaryIndex.deepCopy(), null, null);
-    FieldConfig rawDictInvInt =
-        new FieldConfig(RAW_DICT_INV_INT_DIMENSION, FieldConfig.EncodingType.RAW, null, null, null, null,
-            dictionaryIndex.deepCopy(), null, null);
-    FieldConfig rawDictRangeInt =
-        new FieldConfig(RAW_DICT_RANGE_INT_DIMENSION, FieldConfig.EncodingType.RAW, null, null, null, null,
-            dictionaryIndex.deepCopy(), null, null);
+    FieldConfig rawDictString = new FieldConfig.Builder(RAW_DICT_DIMENSION)
+        .withIndexes(withForwardEncoding(dictionaryIndex, FieldConfig.EncodingType.RAW))
+        .build();
+    FieldConfig rawDictInvString = new FieldConfig.Builder(RAW_DICT_INV_DIMENSION)
+        .withIndexes(withForwardEncoding(dictionaryIndex, FieldConfig.EncodingType.RAW))
+        .build();
+    FieldConfig rawDictInt = new FieldConfig.Builder(RAW_DICT_INT_DIMENSION)
+        .withIndexes(withForwardEncoding(dictionaryIndex, FieldConfig.EncodingType.RAW))
+        .build();
+    FieldConfig rawDictInvInt = new FieldConfig.Builder(RAW_DICT_INV_INT_DIMENSION)
+        .withIndexes(withForwardEncoding(dictionaryIndex, FieldConfig.EncodingType.RAW))
+        .build();
+    FieldConfig rawDictRangeInt = new FieldConfig.Builder(RAW_DICT_RANGE_INT_DIMENSION)
+        .withIndexes(withForwardEncoding(dictionaryIndex, FieldConfig.EncodingType.RAW))
+        .build();
     return List.of(rawDictString, rawDictInvString, rawDictInt, rawDictInvInt, rawDictRangeInt);
   }
 

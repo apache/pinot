@@ -415,9 +415,8 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(getTableName())
         .setFieldConfigList(List.of(
-            new FieldConfig.Builder(VECTOR_1)
+            fieldConfigBuilderWithForwardEncoding(VECTOR_1, FieldConfig.EncodingType.RAW)
                 .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
-                .withEncodingType(FieldConfig.EncodingType.RAW)
                 .withProperties(Map.of(
                     "vectorIndexType", "HNSW",
                     "vectorDimension", String.valueOf(VECTOR_DIM_SIZE),
