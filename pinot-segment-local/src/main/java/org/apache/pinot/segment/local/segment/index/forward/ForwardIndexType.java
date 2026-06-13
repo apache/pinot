@@ -32,6 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineValidator;
+import org.apache.pinot.segment.local.io.codec.CodecRegistry;
+import org.apache.pinot.segment.local.io.codec.CodecSpecUtils;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
@@ -40,6 +43,9 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeInd
 import org.apache.pinot.segment.local.segment.index.loader.ForwardIndexHandler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.codec.CodecContext;
+import org.apache.pinot.segment.spi.codec.CodecPipeline;
+import org.apache.pinot.segment.spi.codec.CodecSpecParser;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
@@ -117,6 +123,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     String column = fieldSpec.getName();
     CompressionCodec compressionCodec = forwardIndexConfig.getCompressionCodec();
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
+    if (forwardIndexConfig.hasCodecSpec()) {
+      validateCodecSpec(forwardIndexConfig, fieldSpec);
+    }
     // Dictionary-encoded forward index requires a dictionary to translate dict ids back to values.
     if (forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
       Preconditions.checkState(dictionaryConfig.isEnabled(),
@@ -135,6 +144,38 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         Preconditions.checkState(compressionCodec == null || compressionCodec.isApplicableToRawIndex(),
             "Compression codec: %s is not applicable to raw column: %s", compressionCodec, column);
       }
+    }
+  }
+
+  private void validateCodecSpec(ForwardIndexConfig forwardIndexConfig, FieldSpec fieldSpec) {
+    String column = fieldSpec.getName();
+    Preconditions.checkState(forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.RAW,
+        "codecSpec requires RAW forward-index encoding for column: %s", column);
+    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+
+    String codecSpec = forwardIndexConfig.getCodecSpec();
+    CodecPipeline pipeline;
+    try {
+      pipeline = CodecSpecParser.parse(codecSpec);
+      CodecPipelineValidator.validate(pipeline, CodecRegistry.DEFAULT, new CodecContext(storedType));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalStateException(
+          "Codec pipeline validation failed for column '" + column + "' (codecSpec='" + codecSpec + "'): "
+              + e.getMessage(), e);
+    }
+    boolean hasTransform = CodecSpecUtils.hasTransform(pipeline, CodecRegistry.DEFAULT);
+    boolean needsV7Writer = hasTransform || CodecSpecUtils.toLegacyChunkCompressionType(pipeline) == null;
+    if (needsV7Writer) {
+      // V7 writer supports SV INT/LONG only. Reject other shapes early with a clear message.
+      Preconditions.checkState(fieldSpec.isSingleValueField(),
+          "codecSpec '%s' requires the V7 codec-pipeline writer (transform or non-default compression options), "
+              + "which only supports single-value columns. Column '%s' is multi-value; use a compression-only "
+              + "spec representable by ChunkCompressionType (LZ4, SNAPPY, GZIP, ZSTD/ZSTD(3)).",
+          codecSpec, column);
+      Preconditions.checkState(storedType == FieldSpec.DataType.INT || storedType == FieldSpec.DataType.LONG,
+          "codecSpec '%s' requires the V7 codec-pipeline writer (transform or non-default compression options), "
+              + "which only supports INT and LONG columns. Column '%s' has type: %s.",
+          codecSpec, column, storedType);
     }
   }
 
@@ -242,9 +283,16 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
                   "Conflicting forward-index compressionCodec for column: %s — FieldConfig.compressionCodec=%s "
                       + "but indexes.forward.compressionCodec=%s", column, fcCodec, inner);
             }
+            // codecSpec is configured only via `indexes.forward.codecSpec` (no top-level FieldConfig field).
+            // A top-level legacy `compressionCodec` cannot coexist with an `indexes.forward.codecSpec`.
+            JsonNode innerCodecSpecNode = forwardIndexNode.get("codecSpec");
+            Preconditions.checkState(fcCodec == null || innerCodecSpecNode == null || innerCodecSpecNode.isNull(),
+                "Conflicting forward-index config for column: %s — FieldConfig.compressionCodec=%s but "
+                    + "indexes.forward.codecSpec is also set", column, fcCodec);
 
-            // Inject the resolved encodingType / compressionCodec into the JSON when absent so the resulting
-            // ForwardIndexConfig always matches the column-level signals.
+            // Inject the resolved encodingType / compressionCodec into the JSON when absent so the
+            // resulting ForwardIndexConfig always matches the column-level signals. codecSpec, if any,
+            // is already present in the indexes.forward JSON and parsed directly.
             ObjectNode configNode = (ObjectNode) forwardIndexNode.deepCopy();
             if (innerEncodingNode == null || innerEncodingNode.isNull()) {
               configNode.put("encodingType", encodingType.name());
@@ -279,8 +327,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig,
       FieldConfig.EncodingType resolvedEncodingType) {
-    ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder(resolvedEncodingType)
-        .withCompressionCodec(fieldConfig.getCompressionCodec());
+    // No top-level FieldConfig.codecSpec: the only legacy column-level signal here is compressionCodec.
+    // codecSpec is configured via indexes.forward and handled by the JSON deserialization branch above.
+    ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder(resolvedEncodingType);
+    builder.withCompressionCodec(fieldConfig.getCompressionCodec());
     Map<String, String> properties = fieldConfig.getProperties();
     if (properties != null) {
       builder.withLegacyProperties(properties);

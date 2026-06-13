@@ -19,8 +19,12 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
+import org.apache.pinot.segment.local.io.codec.CodecRegistry;
+import org.apache.pinot.segment.local.io.codec.CodecSpecUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV2;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueEntryDictForwardIndexCreator;
@@ -31,6 +35,9 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedB
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import org.apache.pinot.segment.spi.codec.CodecContext;
+import org.apache.pinot.segment.spi.codec.CodecPipeline;
+import org.apache.pinot.segment.spi.codec.CodecSpecParser;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -73,26 +80,57 @@ public class ForwardIndexCreatorFactory {
     } else {
       // Raw forward index
       DataType storedType = fieldSpec.getDataType().getStoredType();
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+
+      ChunkCompressionType chunkCompressionType = null;
+
+      // codecSpec takes priority over legacy compressionCodec. Compression-only specs that map
+      // exactly to existing ChunkCompressionType values use the existing raw writers, which support
+      // SV/MV and fixed/var-byte values. Transform specs (DELTA/DELTADELTA) use the V7 codec-pipeline
+      // writer because the legacy raw-index header cannot represent transform + compression stages.
+      if (indexConfig.hasCodecSpec()) {
+        String codecSpec = indexConfig.getCodecSpec();
+        CodecPipeline pipeline = CodecSpecParser.parse(codecSpec);
+        chunkCompressionType = CodecSpecUtils.toLegacyChunkCompressionType(pipeline);
+        if (chunkCompressionType == null) {
+          // The spec is either a transform or a compression-only spec with arguments that can't be
+          // represented by a legacy ChunkCompressionType (e.g. ZSTD(5)). Both routes need V7. Table-config
+          // validation (ForwardIndexType.validateCodecSpec) already rejects MV / non-INT/LONG combinations;
+          // these checks are defense-in-depth in case the creator is reached via a path that bypasses it.
+          Preconditions.checkArgument(fieldSpec.isSingleValueField(),
+              "codecSpec '%s' requires the V7 codec-pipeline writer (transform or non-default compression options), "
+                  + "which only supports single-value columns. Column '%s' is multi-value.",
+              codecSpec, columnName);
+          Preconditions.checkArgument(storedType == DataType.INT || storedType == DataType.LONG,
+              "codecSpec '%s' requires the V7 codec-pipeline writer (transform or non-default compression options), "
+                  + "which only supports INT and LONG columns. Column '%s' has type: %s.",
+              codecSpec, columnName, storedType);
+          CodecPipelineExecutor executor = CodecPipelineExecutor.create(codecSpec, new CodecContext(storedType),
+              CodecRegistry.DEFAULT);
+          return new SingleValueFixedByteRawIndexCreator(indexDir, columnName, numTotalDocs, storedType,
+              indexConfig.getTargetDocsPerChunk(), executor);
+        }
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
         // CLP (V1) uses hard-coded chunk compressor which is set to `PassThrough`
         return new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
-      }
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2) {
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2) {
         // Use the default chunk compression codec for CLP, currently configured to use ZStandard
         return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics());
-      }
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_ZSTD) {
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_ZSTD) {
         return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.ZSTANDARD);
-      }
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_LZ4) {
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_LZ4) {
         return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.LZ4);
       }
-      ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
+      if (chunkCompressionType == null) {
+        chunkCompressionType = indexConfig.getChunkCompressionType();
+      }
       if (chunkCompressionType == null) {
         chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
       }
       boolean deriveNumDocsPerChunk = indexConfig.isDeriveNumDocsPerChunk();
       int writerVersion = indexConfig.getRawIndexWriterVersion();
+      if (indexConfig.hasCodecSpec() && writerVersion == ForwardIndexConfig.CODEC_PIPELINE_WRITER_VERSION) {
+        writerVersion = ForwardIndexConfig.getDefaultRawWriterVersion();
+      }
       int targetMaxChunkSize = indexConfig.getTargetMaxChunkSizeBytes();
       int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
       if (fieldSpec.isSingleValueField()) {
@@ -107,10 +145,8 @@ public class ForwardIndexCreatorFactory {
     }
   }
 
-  /**
-   * Helper method to build the raw index creator for the column.
-   * Assumes that column to be indexed is single valued.
-   */
+  /// Helper method to build the raw index creator for the column.
+  /// Assumes that column to be indexed is single valued.
   public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File indexDir, ChunkCompressionType compressionType,
       String column, DataType storedType, int numTotalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
       int writerVersion, int targetMaxChunkSize, int targetDocsPerChunk)
@@ -133,10 +169,8 @@ public class ForwardIndexCreatorFactory {
     }
   }
 
-  /**
-   * Helper method to build the raw index creator for the column.
-   * Assumes that column to be indexed is multi-valued.
-   */
+  /// Helper method to build the raw index creator for the column.
+  /// Assumes that column to be indexed is multi-valued.
   public static ForwardIndexCreator getRawIndexCreatorForMVColumn(File indexDir, ChunkCompressionType compressionType,
       String column, DataType storedType, int numTotalDocs, int maxNumberOfMultiValueElements,
       boolean deriveNumDocsPerChunk, int writerVersion, int maxRowLengthInBytes, int targetMaxChunkSize,
