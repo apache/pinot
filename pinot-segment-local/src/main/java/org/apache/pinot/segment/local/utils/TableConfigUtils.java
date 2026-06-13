@@ -1219,9 +1219,9 @@ public final class TableConfigUtils {
     if (tableConfig.getInstanceAssignmentConfigMap() == null) {
       return;
     }
-    for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry :
-        tableConfig.getInstanceAssignmentConfigMap()
-        .entrySet()) {
+    for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry
+        : tableConfig.getInstanceAssignmentConfigMap()
+            .entrySet()) {
       String instancePartitionsType = instanceAssignmentConfigMapEntry.getKey();
       InstanceAssignmentConfig instanceAssignmentConfig = instanceAssignmentConfigMapEntry.getValue();
       if (instanceAssignmentConfig.getPartitionSelector()
