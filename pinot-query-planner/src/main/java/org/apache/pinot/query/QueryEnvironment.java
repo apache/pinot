@@ -43,6 +43,7 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
@@ -56,6 +57,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.metadata.PinotDefaultRelMetadataProvider;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
@@ -79,6 +81,7 @@ import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
 import org.apache.pinot.query.planner.explain.MultiStageExplainAskingServersUtils;
 import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
+import org.apache.pinot.query.planner.logical.JoinReorderOptimizer;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
@@ -92,6 +95,8 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.rules.PinotRuleSet;
 import org.apache.pinot.query.planner.spi.Phase;
 import org.apache.pinot.query.planner.spi.RuleSetCustomizer;
+import org.apache.pinot.query.planner.spi.stats.NoOpStatisticsProvider;
+import org.apache.pinot.query.planner.spi.stats.PinotStatisticsProvider;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
@@ -159,7 +164,7 @@ public class QueryEnvironment {
   public QueryEnvironment(Config config, MultiClusterRoutingContext multiClusterRoutingContext) {
     _envConfig = config;
     String database = config.getDatabase();
-    _catalog = new PinotCatalog(config.getTableCache(), database);
+    _catalog = new PinotCatalog(config.getTableCache(), database, config.getStatisticsProvider());
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
     _config = Frameworks.newConfigBuilder()
         .traitDefs()
@@ -442,6 +447,12 @@ public class QueryEnvironment {
     try {
       RexBuilder rexBuilder = new RexBuilder(_typeFactory);
       RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
+      // Install the Pinot metadata provider so that selectivity estimates use statistics.
+      // PinotDefaultRelMetadataProvider.INSTANCE is a global singleton — Janino compiles
+      // handler classes only once regardless of how many QueryEnvironment instances exist.
+      cluster.setMetadataProvider(
+          JaninoRelMetadataProvider.of(PinotDefaultRelMetadataProvider.INSTANCE));
+      cluster.invalidateMetadataQuery();
       SqlToRelConverter converter =
           new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
               PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
@@ -496,6 +507,15 @@ public class QueryEnvironment {
       RelNode optimized = optPlanner.findBestExp();
       listener.printRuleTimings();
       listener.populateRuleTimings();
+      // Scoped, gated, cost-based join-reordering phase. Runs after the logical Hep program and
+      // before the trait phase. Off by default; when disabled or when its eligibility gates fail
+      // it returns the plan unchanged. It never throws — see JoinReorderOptimizer.maybeReorder.
+      if (QueryOptionsUtils.isUseJoinReorder(plannerContext.getOptions(),
+          _envConfig.defaultUseJoinReorder())) {
+        int maxJoins = QueryOptionsUtils.getJoinReorderMaxJoins(plannerContext.getOptions(),
+            _envConfig.defaultJoinReorderMaxJoins());
+        optimized = JoinReorderOptimizer.maybeReorder(optimized, maxJoins);
+      }
       RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
       traitPlanner.setRoot(optimized);
       return traitPlanner.findBestExp();
@@ -792,6 +812,27 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER;
     }
 
+    /// Whether to run the cost-based join-reordering phase by default.
+    ///
+    /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+    /// This default value can be always overridden at query level by the query option
+    /// [CommonConstants.Broker.Request.QueryOptionKey#USE_JOIN_REORDER].
+    @Value.Default
+    default boolean defaultUseJoinReorder() {
+      return CommonConstants.Broker.DEFAULT_USE_JOIN_REORDER;
+    }
+
+    /// Maximum number of joins a plan may contain for the cost-based join-reordering phase to run.
+    /// Plans that exceed this cap skip the reorder phase.
+    ///
+    /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+    /// This default value can be always overridden at query level by the query option
+    /// [CommonConstants.Broker.Request.QueryOptionKey#JOIN_REORDER_MAX_JOINS].
+    @Value.Default
+    default int defaultJoinReorderMaxJoins() {
+      return CommonConstants.Broker.DEFAULT_JOIN_REORDER_MAX_JOINS;
+    }
+
     /**
      * Whether to use lite mode by default.
      *
@@ -899,6 +940,16 @@ public class QueryEnvironment {
      */
     @Nullable
     WorkerManager getWorkerManager();
+
+    /// Returns the statistics provider used to supply row-count and column statistics to the
+    /// Calcite planner. Defaults to [NoOpStatisticsProvider#INSTANCE], which causes the
+    /// planner to fall back to heuristic cost estimation as before this field was introduced.
+    ///
+    /// A `null` value is treated the same as [NoOpStatisticsProvider#INSTANCE].
+    @Value.Default
+    default PinotStatisticsProvider getStatisticsProvider() {
+      return NoOpStatisticsProvider.INSTANCE;
+    }
 
     /// See [CommonConstants.Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
     @Value.Default

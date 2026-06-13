@@ -519,6 +519,7 @@ org.eclipse.jetty:jetty-util-ajax:9.4.58.v20250814
 org.eclipse.jetty:jetty-webapp:9.4.58.v20250814
 org.eclipse.jetty:jetty-xml:9.4.58.v20250814
 org.eclipse.jetty:jetty-util:9.4.58.v20250814
+org.flywaydb:flyway-core:8.5.13
 org.immutables:value-annotations:2.12.1
 org.javassist:javassist:3.30.2-GA
 org.jetbrains.kotlin:kotlin-reflect:2.3.10
@@ -540,6 +541,7 @@ org.scala-lang:scala-reflect:2.13.18
 org.slf4j:jcl-over-slf4j:2.0.17
 org.webjars:swagger-ui:5.32.0
 org.xerial.snappy:snappy-java:1.1.10.8
+org.xerial:sqlite-jdbc:3.46.1.3
 org.yaml:snakeyaml:2.6
 software.amazon.awssdk:annotations:2.42.11
 software.amazon.awssdk:apache-client:2.42.11
