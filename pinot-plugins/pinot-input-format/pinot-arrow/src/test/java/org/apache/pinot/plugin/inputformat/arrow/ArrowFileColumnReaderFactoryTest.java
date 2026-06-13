@@ -56,6 +56,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -300,7 +301,146 @@ public class ArrowFileColumnReaderFactoryTest {
     }
   }
 
+  @Test
+  public void testInterleavedReadersAcrossBatchesStayConsistent()
+      throws Exception {
+    // Two readers over a multi-batch file, accessed interleaved so they fight over the single shared
+    // batch cursor. Each must still return its own correct value — the per-batch delegate is rebuilt
+    // when the shared source has been moved by the other reader, rather than reading whichever batch
+    // the other reader last loaded.
+    File arrowFile = writeTwoColumnMultiBatchFixture("interleave.arrow", 3, 4); // 12 docs
+    try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(arrowFile)) {
+      factory.init(twoColumnSchema());
+      ColumnReader a = factory.getColumnReader("aCol");
+      ColumnReader b = factory.getColumnReader("bCol");
+      assertNotNull(a);
+      assertNotNull(b);
+      // aCol[i] == i, bCol[i] == 1000 + i.
+      assertEquals(a.getInt(9), 9);     // loads batch 2 for a
+      assertEquals(b.getInt(0), 1000);  // moves the shared cursor back to batch 0
+      assertEquals(a.getInt(9), 9);     // a must rebuild (source moved) -> batch 2, not batch 0
+      assertEquals(b.getInt(11), 1011); // batch 2
+      assertEquals(a.getInt(1), 1);     // batch 0
+    }
+  }
+
+  @Test
+  public void testEmptyFileRandomAccessThrowsBounds()
+      throws Exception {
+    File emptyFile = writeEmptyFixture("empty.arrow");
+    try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(emptyFile)) {
+      factory.init(oneIntColumnSchema("seqCol"));
+      ColumnReader reader = factory.getColumnReader("seqCol");
+      assertNotNull(reader);
+      assertEquals(reader.getTotalDocs(), 0);
+      assertFalse(reader.hasNext());
+      // SPI contract: an out-of-range docId yields IndexOutOfBoundsException, not an opaque internal
+      // error from seeking a non-existent batch.
+      assertThrows(IndexOutOfBoundsException.class, () -> reader.getValue(0));
+      assertThrows(IndexOutOfBoundsException.class, () -> reader.isNull(0));
+    }
+  }
+
+  @Test
+  public void testBatchBoundedConsumptionUnderTightAllocatorLimit()
+      throws Exception {
+    // The total data far exceeds the allocator limit, but each record batch fits. Because the reader
+    // holds one batch at a time, consuming every value twice (the stats + index passes of the build)
+    // succeeds under a limit a materialize-all reader would blow past — demonstrating the
+    // file-size-independent, one-batch-resident memory profile.
+    int batchCount = 8;
+    int rowsPerBatch = 50_000;                 // ~1.6 MB total int data; ~200 KB per batch
+    int total = batchCount * rowsPerBatch;
+    File arrowFile = writeMultiBatchFixture("mem-bound.arrow", batchCount, rowsPerBatch);
+    long oneMebibyte = 1L << 20;               // below the total footprint, well above one batch
+
+    org.apache.pinot.spi.data.Schema schema = oneIntColumnSchema("seqCol");
+    try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(arrowFile)) {
+      factory.init(schema, null,
+          Map.of(ArrowFileColumnReaderFactory.CONFIG_ALLOCATOR_LIMIT, Long.toString(oneMebibyte)));
+      ColumnReader reader = factory.getColumnReader("seqCol");
+      assertNotNull(reader);
+      assertEquals(reader.getTotalDocs(), total);
+      for (int pass = 0; pass < 2; pass++) {
+        reader.rewind();
+        int count = 0;
+        while (reader.hasNext()) {
+          assertEquals(reader.nextInt(), count);
+          count++;
+        }
+        assertEquals(count, total, "pass " + pass + " did not read every doc");
+      }
+    }
+  }
+
   // ===== Fixture builders =====
+
+  private org.apache.pinot.spi.data.Schema oneIntColumnSchema(String columnName) {
+    return new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+        .setSchemaName("oneInt")
+        .addSingleValueDimension(columnName, FieldSpec.DataType.INT)
+        .build();
+  }
+
+  private org.apache.pinot.spi.data.Schema twoColumnSchema() {
+    return new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+        .setSchemaName("twoCol")
+        .addSingleValueDimension("aCol", FieldSpec.DataType.INT)
+        .addSingleValueDimension("bCol", FieldSpec.DataType.INT)
+        .build();
+  }
+
+  private File writeEmptyFixture(String fileName)
+      throws IOException {
+    File out = _tempDir.resolve(fileName).toFile();
+    try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE)) {
+      Field seqField = new Field("seqCol", FieldType.nullable(new ArrowType.Int(32, true)), null);
+      Schema schema = new Schema(Collections.singletonList(seqField));
+      try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator);
+          FileOutputStream fos = new FileOutputStream(out);
+          FileChannel channel = fos.getChannel();
+          ArrowFileWriter writer = new ArrowFileWriter(root, null, channel)) {
+        // Schema header + footer, no record batches.
+        writer.start();
+        writer.end();
+      }
+    }
+    return out;
+  }
+
+  private File writeTwoColumnMultiBatchFixture(String fileName, int batchCount, int rowsPerBatch)
+      throws IOException {
+    File out = _tempDir.resolve(fileName).toFile();
+    try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE)) {
+      Field aField = new Field("aCol", FieldType.nullable(new ArrowType.Int(32, true)), null);
+      Field bField = new Field("bCol", FieldType.nullable(new ArrowType.Int(32, true)), null);
+      Schema schema = new Schema(Arrays.asList(aField, bField));
+      try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator);
+          FileOutputStream fos = new FileOutputStream(out);
+          FileChannel channel = fos.getChannel();
+          ArrowFileWriter writer = new ArrowFileWriter(root, null, channel)) {
+        writer.start();
+        IntVector aVec = (IntVector) root.getVector("aCol");
+        IntVector bVec = (IntVector) root.getVector("bCol");
+        int global = 0;
+        for (int b = 0; b < batchCount; b++) {
+          aVec.allocateNew(rowsPerBatch);
+          bVec.allocateNew(rowsPerBatch);
+          for (int i = 0; i < rowsPerBatch; i++) {
+            aVec.set(i, global);
+            bVec.set(i, 1000 + global);
+            global++;
+          }
+          aVec.setValueCount(rowsPerBatch);
+          bVec.setValueCount(rowsPerBatch);
+          root.setRowCount(rowsPerBatch);
+          writer.writeBatch();
+        }
+        writer.end();
+      }
+    }
+    return out;
+  }
 
   private org.apache.pinot.spi.data.Schema primitiveSchema() {
     org.apache.pinot.spi.data.Schema schema = new org.apache.pinot.spi.data.Schema();
