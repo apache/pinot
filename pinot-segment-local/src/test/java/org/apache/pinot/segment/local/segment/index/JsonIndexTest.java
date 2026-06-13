@@ -100,6 +100,22 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   }
 
   @Test
+  public void testAddRecordWithUnpairedSurrogateDoesNotShiftDocIds()
+      throws IOException {
+    JsonIndexConfig jsonIndexConfig = getIndexConfig();
+    try (MutableJsonIndexImpl mutableJsonIndex =
+        new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
+      mutableJsonIndex.add("{\"name\":\"first\"}");
+      mutableJsonIndex.add("{\"name\":\"" + '\uD800' + "\"}");
+      mutableJsonIndex.add("{\"name\":\"third\"}");
+
+      assertDocIds(mutableJsonIndex, "name='first'", ids(0));
+      assertDocIds(mutableJsonIndex, "name='" + '\uD800' + "'", ids(1));
+      assertDocIds(mutableJsonIndex, "name='third'", ids(2));
+    }
+  }
+
+  @Test
   public void testSmallIndex()
       throws Exception {
     // @formatter: off
