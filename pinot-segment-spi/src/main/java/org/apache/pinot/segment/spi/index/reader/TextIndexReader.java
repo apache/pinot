@@ -57,6 +57,15 @@ public interface TextIndexReader extends IndexReader {
   }
 
   /**
+   * Whether this text index was built over the column dictionary (one entry per distinct value) rather than per row.
+   * When true, {@link #getDictIds(String)} returns matching dictionary ids (resolved to docIds by the dictionary-based
+   * filter operators) and {@link #getDocIds(String)} is not used. Defaults to false (per-row index).
+   */
+  default boolean isBuildOnDictionary() {
+    return false;
+  }
+
+  /**
    * Returns the number of documents that are searchable in the index. For near-realtime indexes
    * (e.g. Lucene on consuming segments), this may be less than the total segment doc count because
    * recently ingested documents may not yet be visible to the index searcher. For offline/completed

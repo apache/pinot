@@ -74,6 +74,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final String _column;
   private final DocIdTranslator _docIdTranslator;
   private final Analyzer _analyzer;
+  // When true, this index was built over the column dictionary (one Lucene doc per distinct value, Lucene docId ==
+  // dictId). Derived from the persisted segment properties, NOT the live table config, so a table holding a mix of
+  // dictionary-based and per-row text segments reads each correctly. In this mode searches return dictIds via
+  // getDictIds(), and the doc-id translator is a no-op (Lucene docId already equals dictId).
+  private final boolean _buildOnDictionary;
   private boolean _useANDForMultiTermQueries = false;
   private final String _queryParserClass;
   private Constructor<QueryParserBase> _queryParserClassConstructor;
@@ -105,7 +110,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
         config = TextIndexUtils.getUpdatedConfigFromPropertiesFile(propertiesFile, config);
       }
 
-      _docIdTranslator = prepareDocIdTranslator(indexDir, _column, numDocs, _indexSearcher, config, indexFile);
+      _buildOnDictionary = config.isBuildOnDictionary();
+      // In dictionary mode the Lucene docId equals the dictId (entries are added in dictId order and the index is
+      // force-merged to a single segment), so no docId mapping is needed.
+      _docIdTranslator = _buildOnDictionary ? NoOpDocIdTranslator.INSTANCE
+          : prepareDocIdTranslator(indexDir, _column, numDocs, _indexSearcher, config, indexFile);
       _analyzer = TextIndexUtils.getAnalyzer(config);
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
@@ -173,12 +182,18 @@ public class LuceneTextIndexReader implements TextIndexReader {
       if (config.isEnablePrefixSuffixMatchingInPhraseQueries()) {
         _enablePrefixSuffixMatchingInPhraseQueries = true;
       }
-      PinotDataBuffer docIdMappingBuffer = LuceneTextIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
-      // Initialize docId translator
-      long startTime = System.currentTimeMillis();
-      _docIdTranslator = createDocIdTranslator(docIdMappingBuffer, config, numDocs);
-      LOGGER.info("Time taken to create docIdTranslator for column {}: {} ms", column,
-          System.currentTimeMillis() - startTime);
+      _buildOnDictionary = config.isBuildOnDictionary();
+      if (_buildOnDictionary) {
+        // In dictionary mode the Lucene docId equals the dictId, so no docId mapping is needed.
+        _docIdTranslator = NoOpDocIdTranslator.INSTANCE;
+      } else {
+        PinotDataBuffer docIdMappingBuffer = LuceneTextIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
+        // Initialize docId translator
+        long startTime = System.currentTimeMillis();
+        _docIdTranslator = createDocIdTranslator(docIdMappingBuffer, config, numDocs);
+        LOGGER.info("Time taken to create docIdTranslator for column {}: {} ms", column,
+            System.currentTimeMillis() - startTime);
+      }
       // Initialize analyzer and query parser
       _analyzer = TextIndexUtils.getAnalyzer(config);
       _queryParserClass = config.getLuceneQueryParserClass();
@@ -216,8 +231,18 @@ public class LuceneTextIndexReader implements TextIndexReader {
   }
 
   @Override
+  public boolean isBuildOnDictionary() {
+    return _buildOnDictionary;
+  }
+
+  @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
-    throw new UnsupportedOperationException("");
+    if (_buildOnDictionary) {
+      // In dictionary mode the Lucene docId equals the dictId, so the matching "doc ids" are the matching dict ids.
+      return getDocIdsWithoutOptions(searchQuery);
+    }
+    throw new UnsupportedOperationException(
+        "getDictIds is only supported when the text index is built on the dictionary for column: " + _column);
   }
 
   @Deprecated
@@ -329,6 +354,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
     String docIdTranslatorMode = properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE);
     if (docIdTranslatorMode != null) {
       builder.withDocIdTranslatorMode(docIdTranslatorMode);
+    }
+
+    String buildOnDictionary = properties.getProperty(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY);
+    if (buildOnDictionary != null) {
+      builder.withBuildOnDictionary(Boolean.parseBoolean(buildOnDictionary));
     }
 
     return builder.build();
