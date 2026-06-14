@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.spi.index.mutable;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
@@ -31,14 +33,32 @@ public interface MutableJsonIndex extends JsonIndexReader, MutableIndex {
   @Override
   default void add(Object value, int dictId, int docId) {
     try {
-      if (value instanceof Map) {
-        add(JsonUtils.objectToString(value));
+      if (value instanceof Map || value instanceof List || value instanceof JsonNode) {
+        // Already-parsed JSON value (e.g. a Map / JsonNode cached on the GenericRow before it was serialized for the
+        // forward index): flatten it directly, avoiding the serialize-then-reparse round-trip.
+        addParsed(value);
       } else {
+        // String (the common case) or, for any other unexpected type, fail fast with a ClassCastException as before.
         add((String) value);
       }
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
+  }
+
+  /// Indexes an already-parsed JSON document ({@code Map} / {@code List}). The default serializes and re-parses for
+  /// compatibility; implementations should override to flatten the parsed value directly, avoiding the re-parse.
+  default void addParsed(Object parsedValue)
+      throws IOException {
+    add(JsonUtils.objectToString(parsedValue));
+  }
+
+  /// Whether {@link #addParsed} flattens a parsed value directly (no serialize+reparse). Callers should feed the
+  /// cached parsed value via {@link #addParsed} only when this is {@code true}; otherwise feeding a parsed value would
+  /// trigger the default serialize+reparse, which is slower than passing the already-serialized string. Default
+  /// {@code false}; implementations that override {@link #addParsed} should return {@code true}.
+  default boolean supportsParsedValue() {
+    return false;
   }
 
   @Override

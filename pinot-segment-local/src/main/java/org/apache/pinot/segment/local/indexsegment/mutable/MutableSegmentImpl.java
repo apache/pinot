@@ -98,6 +98,7 @@ import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
+import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
@@ -941,7 +942,18 @@ public class MutableSegmentImpl implements MutableSegment {
         for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
           try {
             MutableIndex mutableIndex = indexEntry.getValue();
-            mutableIndex.add(value, dictId, docId);
+            Object indexValue = value;
+            if (mutableIndex instanceof MutableJsonIndex && ((MutableJsonIndex) mutableIndex).supportsParsedValue()) {
+              // Feed the JSON index the parsed value cached by the DataTypeTransformer (if any), so it flattens the
+              // document directly instead of re-parsing the string this column was serialized into for the forward
+              // index. Gated on supportsParsedValue() so an index that does not optimize the parsed path keeps
+              // getting the already-serialized string (no extra serialize).
+              Object parsedValue = row.getParsedJsonValue(column);
+              if (parsedValue != null) {
+                indexValue = parsedValue;
+              }
+            }
+            mutableIndex.add(indexValue, dictId, docId);
             updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
           } catch (Exception e) {
             recordIndexingError(indexEntry.getKey(), e);
