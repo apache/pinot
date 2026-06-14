@@ -92,6 +92,21 @@ public class TextIndexConfigTest {
   }
 
   @Test
+  public void withBuildOnDictionary()
+      throws JsonProcessingException {
+    // Defaults to false when absent.
+    assertFalse(JsonUtils.stringToObject("{}", TextIndexConfig.class).isBuildOnDictionary(),
+        "buildOnDictionary should default to false");
+
+    // Parses from JSON and survives a full serialize/deserialize round-trip (mirrors how the segment persists it).
+    TextIndexConfig config = JsonUtils.stringToObject("{\"buildOnDictionary\": true}", TextIndexConfig.class);
+    assertTrue(config.isBuildOnDictionary(), "Unexpected buildOnDictionary");
+    TextIndexConfig roundTripped =
+        JsonUtils.stringToObject(JsonUtils.objectToString(config), TextIndexConfig.class);
+    assertTrue(roundTripped.isBuildOnDictionary(), "buildOnDictionary not preserved across round-trip");
+  }
+
+  @Test
   public void withSomeData()
       throws JsonProcessingException {
     String confStr = "{\n"
