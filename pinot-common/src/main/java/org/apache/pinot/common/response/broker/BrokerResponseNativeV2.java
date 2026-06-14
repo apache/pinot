@@ -52,7 +52,7 @@ import org.apache.pinot.common.response.ProcessingException;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed",
+    "pools", "rlsFiltersApplied", "groupsTrimmed", "liteLeafCapTruncation",
     "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
@@ -126,7 +126,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean isPartialResult() {
     return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
-        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached();
+        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached() || isLiteLeafCapTruncation();
   }
 
   @Override

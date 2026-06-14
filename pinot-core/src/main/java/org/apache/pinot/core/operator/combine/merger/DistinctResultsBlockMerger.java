@@ -20,8 +20,8 @@ package org.apache.pinot.core.operator.combine.merger;
 
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;

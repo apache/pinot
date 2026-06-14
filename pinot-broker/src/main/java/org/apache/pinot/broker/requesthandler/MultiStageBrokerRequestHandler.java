@@ -870,6 +870,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         if (brokerResponse.isGroupsTrimmed()) {
           _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
         }
+        if (brokerResponse.isLiteLeafCapTruncation()) {
+          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_LITE_LEAF_CAP_TRUNCATION, 1);
+        }
         if (brokerResponse.isMseLiteLeafStageLimitReached()) {
           _brokerMetrics.addMeteredTableValue(table,
               BrokerMeter.BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED, 1);
