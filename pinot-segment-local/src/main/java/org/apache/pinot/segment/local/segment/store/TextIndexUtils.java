@@ -398,6 +398,9 @@ public class TextIndexUtils {
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES, escapedLuceneAnalyzerClassArgTypes);
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS, config.getLuceneQueryParserClass());
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE, config.getDocIdTranslatorMode());
+    // Persist the build mode so the reader self-describes (a table may hold a mix of dictionary-based and per-row
+    // text segments; reads must not depend on the live table config).
+    properties.setProperty(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, config.isBuildOnDictionary());
 
     File propertiesFile = new File(indexDir, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
     CommonsConfigurationUtils.saveToFile(properties, propertiesFile);
@@ -436,6 +439,9 @@ public class TextIndexUtils {
         .withLuceneAnalyzerClassArgTypes(recoveredLuceneAnalyzerClassArgTypes)
         .withLuceneQueryParserClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS))
         .withDocIdTranslatorMode(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE))
+        // Default to the existing config value when the property is absent (segments written before this feature).
+        .withBuildOnDictionary(properties.getBoolean(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY,
+            config.isBuildOnDictionary()))
         .build();
   }
 }

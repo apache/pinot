@@ -71,6 +71,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   private final TextIndexConfig _config;
   private final File _indexFile;
   private final boolean _reuseMutableIndex;
+  // When true, the index is built over the column dictionary (one document per distinct value, fed via add(String)),
+  // so the per-row IndexCreator entry points (add(Object, int) / add(Object[], int[])) are no-ops.
+  private final boolean _buildOnDictionary;
   private Directory _indexDirectory;
   private IndexWriter _indexWriter;
   private int _nextDocId = 0;
@@ -120,6 +123,10 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     _combineAndCleanupFiles = combineAndCleanupFiles;
     _segmentDirectory = segmentIndexDir;
     _config = config;
+    // Dictionary-based indexing only applies to immutable segments (commit == true): offline creation and the
+    // realtime-to-offline conversion. A consuming (mutable) segment has no immutable dictionary, so it always builds
+    // the per-row index regardless of the flag.
+    _buildOnDictionary = config.isBuildOnDictionary() && commit;
     String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
@@ -150,7 +157,10 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       // 1. Not the realtime index, i.e. commit is set to true
       // 2. Happens during realtime segment conversion
       // 3. Mutable segment not compacted
-      _reuseMutableIndex = config.isReuseMutableIndex() && commit && realtimeConversion && !mutableSegmentCompacted;
+      // 4. Not a dictionary-based index: the mutable index is per-row, so a dictionary-based immutable index must be
+      //    rebuilt from the sealed dictionary rather than reusing the mutable index.
+      _reuseMutableIndex = config.isReuseMutableIndex() && commit && realtimeConversion && !mutableSegmentCompacted
+          && !_buildOnDictionary;
       if (_reuseMutableIndex) {
         LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
@@ -291,6 +301,23 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     } finally {
       indexReader.close();
     }
+  }
+
+  @Override
+  public void add(Object value, int dictId) {
+    // In dictionary mode the index is built once from the dictionary (via add(String)); ignore the per-row callbacks.
+    if (_buildOnDictionary) {
+      return;
+    }
+    super.add(value, dictId);
+  }
+
+  @Override
+  public void add(Object[] values, @Nullable int[] dictIds) {
+    if (_buildOnDictionary) {
+      return;
+    }
+    super.add(values, dictIds);
   }
 
   @Override
