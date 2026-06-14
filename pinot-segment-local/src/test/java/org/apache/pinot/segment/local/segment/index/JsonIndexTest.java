@@ -98,6 +98,57 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 
+  /// The realtime parse-once path must build an identical index: indexing each document via `addParsed(Map)` (the cache
+  /// path) must yield the same matching docIds as `add(String)` (the re-parse path) for every filter.
+  @Test
+  public void testMutableJsonIndexParsedMatchesString()
+      throws Exception {
+    String[] docs = {
+        "{\"name\":\"adam\",\"age\":20,\"addresses\":[{\"country\":\"us\"},{\"country\":\"ca\"}]}",
+        "{\"name\":\"bob\",\"age\":30,\"tags\":[\"x\",\"y\"],\"active\":true}",
+        "{\"name\":\"carol\",\"nested\":{\"a\":1,\"b\":\"z\"}}"
+    };
+    JsonIndexConfig config = new JsonIndexConfig();
+    try (MutableJsonIndexImpl fromString = new MutableJsonIndexImpl(config, "table__0__0", "col");
+        MutableJsonIndexImpl fromParsed = new MutableJsonIndexImpl(config, "table__0__0", "col")) {
+      for (String doc : docs) {
+        fromString.add(doc);
+        fromParsed.addParsed(JsonUtils.stringToObject(doc, Map.class));
+      }
+      for (String filter : new String[]{
+          "name='adam'", "name='bob'", "name='carol'", "age='20'", "age='30'", "active='true'", "name='nobody'"}) {
+        assertEquals(fromParsed.getMatchingDocIds(filter), fromString.getMatchingDocIds(filter), "filter: " + filter);
+      }
+    }
+  }
+
+  /// The JSON-text fast path: a column fed as JSON text is parsed once into a JsonNode (with BigDecimal, as
+  /// PinotDataType does) and that node is fed to the index via `addParsed`. It must yield the same matching docIds as
+  /// re-parsing the serialized string. The docs include a fractional number to exercise the DecimalNode fallback.
+  @Test
+  public void testMutableJsonIndexParsedNodeMatchesString()
+      throws Exception {
+    String[] docs = {
+        "{\"name\":\"adam\",\"age\":20,\"score\":98.6,\"addresses\":[{\"country\":\"us\"},{\"country\":\"ca\"}]}",
+        "{\"name\":\"bob\",\"age\":30,\"tags\":[\"x\",\"y\"],\"active\":true}",
+        "{\"name\":\"carol\",\"nested\":{\"a\":1,\"b\":\"z\"}}"
+    };
+    JsonIndexConfig config = new JsonIndexConfig();
+    try (MutableJsonIndexImpl fromString = new MutableJsonIndexImpl(config, "table__0__0", "col");
+        MutableJsonIndexImpl fromParsed = new MutableJsonIndexImpl(config, "table__0__0", "col")) {
+      for (String doc : docs) {
+        // The forward index stores the canonical string (node.toString()); the index re-parses it on the string path.
+        String canonical = JsonUtils.stringToJsonNodeWithBigDecimal(doc).toString();
+        fromString.add(canonical);
+        fromParsed.addParsed(JsonUtils.stringToJsonNodeWithBigDecimal(doc));
+      }
+      for (String filter : new String[]{
+          "name='adam'", "name='bob'", "name='carol'", "age='20'", "score='98.6'", "active='true'", "name='nobody'"}) {
+        assertEquals(fromParsed.getMatchingDocIds(filter), fromString.getMatchingDocIds(filter), "filter: " + filter);
+      }
+    }
+  }
+
   @Test
   public void testAddRecordWithUnpairedSurrogateDoesNotShiftDocIds()
       throws IOException {

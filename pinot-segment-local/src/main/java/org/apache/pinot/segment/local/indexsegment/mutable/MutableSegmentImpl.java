@@ -62,6 +62,7 @@ import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableD
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.MultiColumnRealtimeLuceneTextIndex;
+import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
@@ -946,7 +947,15 @@ public class MutableSegmentImpl implements MutableSegment {
         for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
           try {
             MutableIndex mutableIndex = indexEntry.getValue();
-            mutableIndex.add(value, dictId, docId);
+            // Feed the JSON index the parsed value cached by the DataTypeTransformer (if any), so it flattens the
+            // document directly instead of re-parsing the string this column was serialized into for the forward index.
+            Object parsedValue =
+                mutableIndex instanceof MutableJsonIndexImpl ? row.getParsedJsonValue(column) : null;
+            if (parsedValue != null) {
+              ((MutableJsonIndexImpl) mutableIndex).addParsed(parsedValue);
+            } else {
+              mutableIndex.add(value, dictId, docId);
+            }
             updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
           } catch (Exception e) {
             recordIndexingError(indexEntry.getKey(), e);
