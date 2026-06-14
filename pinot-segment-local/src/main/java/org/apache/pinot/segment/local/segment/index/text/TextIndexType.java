@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextInd
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
@@ -86,6 +87,10 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     if (textIndexConfig.isEnabled()) {
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
           "Cannot create TEXT index on column: %s of stored type other than STRING", fieldSpec.getName());
+      if (textIndexConfig.isBuildOnDictionary()) {
+        Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+            "buildOnDictionary TEXT index requires a dictionary-encoded column: %s", fieldSpec.getName());
+      }
     }
   }
 
@@ -105,6 +110,25 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       throws IOException {
     Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
         "Text index is currently only supported on STRING type columns");
+    if (indexConfig.isBuildOnDictionary()) {
+      Preconditions.checkState(context.hasDictionary(),
+          "buildOnDictionary TEXT index requires a dictionary-encoded column: %s", context.getFieldSpec().getName());
+      LuceneTextIndexCreator creator = new LuceneTextIndexCreator(context, indexConfig);
+      // Columnar segment-creation / realtime-conversion path: build one Lucene document per distinct dictionary value
+      // (Lucene docId == dictId). On the reload path ColumnStatistics is null and TextIndexHandler feeds the
+      // dictionary values via add(String) instead.
+      ColumnStatistics columnStatistics = context.getColumnStatistics();
+      if (columnStatistics != null) {
+        Object uniqueValues = columnStatistics.getUniqueValuesSet();
+        Preconditions.checkState(uniqueValues instanceof String[],
+            "Expected String[] dictionary values for dictionary-based TEXT index on column: %s",
+            context.getFieldSpec().getName());
+        for (String value : (String[]) uniqueValues) {
+          creator.add(value);
+        }
+      }
+      return creator;
+    }
     return new LuceneTextIndexCreator(context, indexConfig);
   }
 
