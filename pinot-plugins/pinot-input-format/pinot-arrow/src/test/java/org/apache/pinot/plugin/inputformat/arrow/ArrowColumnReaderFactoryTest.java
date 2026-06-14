@@ -152,6 +152,42 @@ public class ArrowColumnReaderFactoryTest {
   }
 
   /**
+   * A second {@code init()} on the same factory must release the first init's off-heap accumulator
+   * vectors rather than orphaning them. Without the re-init guard the first set leaks, and the
+   * caller-owned allocator throws {@code IllegalStateException} on its own {@code close()} because the
+   * outstanding buffers are still allocated — so reaching the end of the caller-allocator
+   * try-with-resources cleanly is the leak detector.
+   */
+  @Test
+  public void testReInitReleasesPriorAccumulators()
+      throws Exception {
+    try (RootAllocator callerAllocator = new RootAllocator(Long.MAX_VALUE)) {
+      byte[] ipcBytes = writeArrowStreamFixture(callerAllocator);
+
+      try (ArrowStreamReader streamReader = new ArrowStreamReader(
+          Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
+          ArrowColumnReaderFactory factory =
+              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
+
+        factory.init(newSchema());
+        // Second init() over the same (now-drained) reader: it allocates a fresh accumulator set and
+        // must release the first set instead of overwriting the only reference to it.
+        factory.init(newSchema());
+        assertTrue(factory.getAvailableColumns().contains("intCol"));
+      }
+
+      // factory.close() above released the latest accumulator set; if the first set had leaked, this
+      // allocator close (and the probe) would trip on the outstanding buffers.
+      try (IntVector probe = new IntVector("probe", callerAllocator)) {
+        probe.allocateNew(1);
+        probe.set(0, 1);
+        probe.setValueCount(1);
+        assertEquals(probe.get(0), 1);
+      }
+    }
+  }
+
+  /**
    * After the reader is drained, the sequential accessors ({@code next}, the typed {@code nextXxx},
    * {@code isNextNull}, {@code skipNext}) must throw {@link IllegalStateException} rather than read out
    * of bounds — matching the {@code DefaultValueColumnReader} / {@code PinotSegmentColumnReaderImpl}

@@ -102,6 +102,12 @@ public class ArrowColumnReaderFactory implements ColumnReaderFactory {
   @Override
   public void init(Schema targetSchema, @Nullable Set<String> colsToRead, Map<String, String> configs)
       throws IOException {
+    if (_initialized) {
+      // Defensive: a second init() would otherwise overwrite _accumulatorVectors and leak the prior
+      // init's off-heap accumulator vectors (close() would only ever release the latest set). Release
+      // them first, mirroring ArrowFileColumnReaderFactory.init().
+      close();
+    }
     boolean extractRawTimeValues =
         configs != null && Boolean.parseBoolean(configs.get(CONFIG_EXTRACT_RAW_TIME_VALUES));
     ArrowAccumulators.Result built =
