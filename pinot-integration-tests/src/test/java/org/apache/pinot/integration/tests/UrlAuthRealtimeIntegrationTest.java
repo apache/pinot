@@ -137,7 +137,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected Map<String, String> getControllerRequestClientHeaders() {
+  protected Map<String, String> getAdminClientHeaders() {
     return AUTH_HEADER;
   }
 

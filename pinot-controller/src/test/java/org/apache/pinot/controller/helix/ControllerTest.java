@@ -217,15 +217,13 @@ public class ControllerTest {
     return _httpClient;
   }
 
-  /**
-   * Retrieves the headers to be used for the `ControllerRequestClient`.
-   *
-   * <p>This method returns an empty map, indicating that no custom headers
-   * are set by default for the `ControllerRequestClient`.
-   *
-   * @return A map of headers (key-value pairs) to be used for the `ControllerRequestClient`.
-   */
-  protected Map<String, String> getControllerRequestClientHeaders() {
+  /// Retrieves the headers to be used for the [PinotAdminClient].
+  ///
+  /// This method returns an empty map, indicating that no custom headers
+  /// are set by default for the [PinotAdminClient].
+  ///
+  /// @return A map of headers (key-value pairs) to be used for the [PinotAdminClient].
+  protected Map<String, String> getAdminClientHeaders() {
     return Collections.emptyMap();
   }
 
@@ -759,7 +757,7 @@ public class ControllerTest {
       if (sslContext != null) {
         org.apache.pinot.common.utils.tls.TlsUtils.setSslContext(sslContext);
       }
-      _pinotAdminClient = new PinotAdminClient(controllerAddress, properties, getControllerRequestClientHeaders(),
+      _pinotAdminClient = new PinotAdminClient(controllerAddress, properties, getAdminClientHeaders(),
           sslContext);
       return _pinotAdminClient;
     } catch (PinotClientException e) {
