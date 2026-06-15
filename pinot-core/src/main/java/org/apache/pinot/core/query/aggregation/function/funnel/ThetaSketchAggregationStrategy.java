@@ -56,7 +56,7 @@ class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdateSketch[]>
   }
 
   @Override
-  void addSingleKey(UpdateSketch[] stepsSketches, int step, Dictionary dictionary, int correlationId) {
+  void add(Dictionary dictionary, UpdateSketch[] stepsSketches, int step, int correlationId) {
     final UpdateSketch sketch = stepsSketches[step];
     switch (dictionary.getValueType()) {
       case INT:

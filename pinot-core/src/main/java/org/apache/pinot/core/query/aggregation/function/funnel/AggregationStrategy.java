@@ -128,7 +128,7 @@ public abstract class AggregationStrategy<A> {
     for (int i = 0; i < length; i++) {
       for (int n = 0; n < _numSteps; n++) {
         if (steps[n][i] > 0) {
-          addSingleKey(aggResult, n, dictionary, correlationIds[i]);
+          add(dictionary, aggResult, n, correlationIds[i]);
         }
       }
     }
@@ -175,7 +175,7 @@ public abstract class AggregationStrategy<A> {
       final A aggResult = getAggregationResultGroupBy(dictionary, groupByResultHolder, groupKey);
       for (int n = 0; n < _numSteps; n++) {
         if (steps[n][i] > 0) {
-          addSingleKey(aggResult, n, dictionary, correlationIds[i]);
+          add(dictionary, aggResult, n, correlationIds[i]);
         }
       }
     }
@@ -223,7 +223,7 @@ public abstract class AggregationStrategy<A> {
         final A aggResult = getAggregationResultGroupBy(dictionary, groupByResultHolder, groupKey);
         for (int n = 0; n < _numSteps; n++) {
           if (steps[n][i] > 0) {
-            addSingleKey(aggResult, n, dictionary, correlationIds[i]);
+            add(dictionary, aggResult, n, correlationIds[i]);
           }
         }
       }
@@ -251,9 +251,9 @@ public abstract class AggregationStrategy<A> {
   }
 
   /**
-   * Adds a correlation id to the aggregation counter for a given step (single-key fast path).
+   * Adds a correlation id to the aggregation counter for a given step in the funnel.
    */
-  abstract void addSingleKey(A aggResult, int step, Dictionary dictionary, int correlationId);
+  abstract void add(Dictionary dictionary, A aggResult, int step, int correlationId);
 
   /**
    * Adds a row's composite correlation identity to the aggregation counter for a given step (multi-key path).

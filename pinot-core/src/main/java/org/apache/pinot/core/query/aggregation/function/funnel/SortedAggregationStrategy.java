@@ -45,7 +45,7 @@ class SortedAggregationStrategy extends AggregationStrategy<SortedAggregationRes
   }
 
   @Override
-  void addSingleKey(SortedAggregationResult aggResult, int step, Dictionary dictionary, int correlationId) {
+  void add(Dictionary dictionary, SortedAggregationResult aggResult, int step, int correlationId) {
     aggResult.add(step, correlationId);
   }
 

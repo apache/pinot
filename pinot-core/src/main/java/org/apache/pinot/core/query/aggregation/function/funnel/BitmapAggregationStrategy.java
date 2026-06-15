@@ -43,7 +43,7 @@ class BitmapAggregationStrategy extends AggregationStrategy<DictIdsWrapper> {
   }
 
   @Override
-  void addSingleKey(DictIdsWrapper dictIdsWrapper, int step, Dictionary dictionary, int correlationId) {
+  protected void add(Dictionary dictionary, DictIdsWrapper dictIdsWrapper, int step, int correlationId) {
     dictIdsWrapper._stepsBitmaps[step].add(correlationId);
   }
 
