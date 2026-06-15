@@ -250,7 +250,7 @@
     <!-- Java EE Libraries -->
     <!-- Include both newer jakarta ones and older javax ones, but not migrate to Jakarta EE yet -->
     <!-- DO NOT upgrade these versions unless we are migrating to Jakarta EE -->
-    <jakarta.servlet-api.version>4.0.4</jakarta.servlet-api.version>        <!-- DO NOT UPGRADE -->
+    <jakarta.servlet-api.version>6.1.0</jakarta.servlet-api.version>        <!-- DO NOT UPGRADE -->
     <javax.servlet-api.version>4.0.1</javax.servlet-api.version>            <!-- DO NOT UPGRADE -->
     <jakarta.annotation-api.version>1.3.5</jakarta.annotation-api.version>  <!-- DO NOT UPGRADE -->
     <javax.annotation-api.version>1.3.2</javax.annotation-api.version>      <!-- DO NOT UPGRADE -->
