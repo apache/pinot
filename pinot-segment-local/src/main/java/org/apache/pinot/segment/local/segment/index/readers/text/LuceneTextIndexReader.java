@@ -356,10 +356,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
       builder.withDocIdTranslatorMode(docIdTranslatorMode);
     }
 
-    String buildOnDictionary = properties.getProperty(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY);
-    if (buildOnDictionary != null) {
-      builder.withBuildOnDictionary(Boolean.parseBoolean(buildOnDictionary));
-    }
+    // The build mode is intrinsic to the segment: default to false when the property is absent (segments written
+    // before this feature are always per-row). Must NOT keep the live table-config value, otherwise a per-row segment
+    // could be misread as dictionary-based after the flag is flipped on.
+    builder.withBuildOnDictionary(
+        Boolean.parseBoolean(properties.getProperty(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY)));
 
     return builder.build();
   }
