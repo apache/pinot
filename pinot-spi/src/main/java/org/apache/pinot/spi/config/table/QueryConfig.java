@@ -62,12 +62,33 @@ public class QueryConfig extends BaseJsonConfig {
 
   private final Long _maxEntriesScannedPostFilter;
 
+  // Per-table pre-OOM-kill query pause duration (ms). Null (the default) means the pause is disabled for this table —
+  // the field is omitted from serialized JSON by BaseJsonConfig's NON_NULL inclusion policy. A positive value pauses
+  // the queries for that many ms before killing them when the server hits panic-level heap pressure. A value of 0 is
+  // also treated as disabled and is allowed as an explicit opt-out signal.
+  private final Long _oomPreQueryKillPauseDurationMs;
+
+  // Per-table flag controlling whether the pre-OOM-kill pause is allowed at panic-level heap usage. Null (the default)
+  // means panic-level pause is disabled for this table — the field is omitted from serialized JSON. Pair with a
+  // positive _oomPreQueryKillPauseDurationMs to enable it.
+  private final Boolean _oomPanicAllowPreQueryKillPause;
 
   public QueryConfig(@Nullable Long timeoutMs, @Nullable Boolean disableGroovy,
       @Nullable Boolean useApproximateFunction, @Nullable Map<String, String> expressionOverrideMap,
       @Nullable Long maxQueryResponseSizeBytes, @Nullable Long maxServerResponseSizeBytes) {
     this(timeoutMs, disableGroovy, useApproximateFunction, expressionOverrideMap,
-        maxQueryResponseSizeBytes, maxServerResponseSizeBytes, null, null, null);
+        maxQueryResponseSizeBytes, maxServerResponseSizeBytes, null, null, null, null, null);
+  }
+
+  public QueryConfig(@Nullable Long timeoutMs, @Nullable Boolean disableGroovy,
+      @Nullable Boolean useApproximateFunction, @Nullable Map<String, String> expressionOverrideMap,
+      @Nullable Long maxQueryResponseSizeBytes, @Nullable Long maxServerResponseSizeBytes,
+      @Nullable Long maxEntriesScannedInFilter, @Nullable Long maxDocsScanned,
+      @Nullable Long maxEntriesScannedPostFilter) {
+    this(timeoutMs, disableGroovy, useApproximateFunction, expressionOverrideMap,
+        maxQueryResponseSizeBytes, maxServerResponseSizeBytes,
+        maxEntriesScannedInFilter, maxDocsScanned, maxEntriesScannedPostFilter,
+        null, null);
   }
 
   @JsonCreator
@@ -79,7 +100,9 @@ public class QueryConfig extends BaseJsonConfig {
       @JsonProperty("maxServerResponseSizeBytes") @Nullable Long maxServerResponseSizeBytes,
       @JsonProperty("maxEntriesScannedInFilter") @Nullable Long maxEntriesScannedInFilter,
       @JsonProperty("maxDocsScanned") @Nullable Long maxDocsScanned,
-      @JsonProperty("maxEntriesScannedPostFilter") @Nullable Long maxEntriesScannedPostFilter) {
+      @JsonProperty("maxEntriesScannedPostFilter") @Nullable Long maxEntriesScannedPostFilter,
+      @JsonProperty("oomPreQueryKillPauseDurationMs") @Nullable Long oomPreQueryKillPauseDurationMs,
+      @JsonProperty("oomPanicAllowPreQueryKillPause") @Nullable Boolean oomPanicAllowPreQueryKillPause) {
     Preconditions.checkArgument(timeoutMs == null || timeoutMs > 0, "Invalid 'timeoutMs': %s", timeoutMs);
     Preconditions.checkArgument(maxQueryResponseSizeBytes == null || maxQueryResponseSizeBytes > 0,
         "Invalid 'maxQueryResponseSizeBytes': %s", maxQueryResponseSizeBytes);
@@ -91,6 +114,9 @@ public class QueryConfig extends BaseJsonConfig {
         "Invalid 'maxDocsScanned': %s", maxDocsScanned);
     Preconditions.checkArgument(maxEntriesScannedPostFilter == null || maxEntriesScannedPostFilter > 0,
         "Invalid 'maxEntriesScannedPostFilter': %s", maxEntriesScannedPostFilter);
+    Preconditions.checkArgument(oomPreQueryKillPauseDurationMs == null || oomPreQueryKillPauseDurationMs >= 0,
+        "Invalid 'oomPreQueryKillPauseDurationMs': %s (must be >= 0; 0 disables the pause for this table)",
+        oomPreQueryKillPauseDurationMs);
 
     _timeoutMs = timeoutMs;
     _disableGroovy = disableGroovy;
@@ -101,6 +127,8 @@ public class QueryConfig extends BaseJsonConfig {
     _maxEntriesScannedInFilter = maxEntriesScannedInFilter;
     _maxDocsScanned = maxDocsScanned;
     _maxEntriesScannedPostFilter = maxEntriesScannedPostFilter;
+    _oomPreQueryKillPauseDurationMs = oomPreQueryKillPauseDurationMs;
+    _oomPanicAllowPreQueryKillPause = oomPanicAllowPreQueryKillPause;
   }
 
   @Nullable
@@ -155,5 +183,17 @@ public class QueryConfig extends BaseJsonConfig {
   @JsonProperty("maxEntriesScannedPostFilter")
   public Long getMaxEntriesScannedPostFilter() {
     return _maxEntriesScannedPostFilter;
+  }
+
+  @Nullable
+  @JsonProperty("oomPreQueryKillPauseDurationMs")
+  public Long getOomPreQueryKillPauseDurationMs() {
+    return _oomPreQueryKillPauseDurationMs;
+  }
+
+  @Nullable
+  @JsonProperty("oomPanicAllowPreQueryKillPause")
+  public Boolean getOomPanicAllowPreQueryKillPause() {
+    return _oomPanicAllowPreQueryKillPause;
   }
 }
