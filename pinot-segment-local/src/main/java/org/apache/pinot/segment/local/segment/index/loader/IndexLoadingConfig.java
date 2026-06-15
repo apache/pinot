@@ -358,6 +358,10 @@ public class IndexLoadingConfig {
     _forwardIndexOnly = forwardIndexOnly;
   }
 
+  public boolean isSkipSecondaryIndexes() {
+    return _tableConfig != null && _tableConfig.getIndexingConfig().isSkipSecondaryIndexes();
+  }
+
   public boolean isSkipSegmentPreprocess() {
     return _tableConfig != null && _tableConfig.getIndexingConfig().isSkipSegmentPreprocess();
   }

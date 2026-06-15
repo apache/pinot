@@ -64,6 +64,10 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
   private boolean _skipSegmentPreprocess;
+  // If true, only the forward index is loaded for each column; all secondary indexes (dictionary, null-value vector,
+  // inverted, range, text, json, h3, FST, bloom, vector, etc.) are skipped during segment loading and processing.
+  // Intended for workloads that do not need secondary indexes.
+  private boolean _skipSecondaryIndexes;
   // If set to true, uses NoDictColumnStatisticsCollector for stats collection for no-dictionary columns.
   // Once we are confident about the stability of NoDictColumnStatisticsCollector,
   // we can enable it by default and deprecate this config
@@ -352,6 +356,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setSkipSegmentPreprocess(boolean skipSegmentPreprocess) {
     _skipSegmentPreprocess = skipSegmentPreprocess;
+  }
+
+  public boolean isSkipSecondaryIndexes() {
+    return _skipSecondaryIndexes;
+  }
+
+  public void setSkipSecondaryIndexes(boolean skipSecondaryIndexes) {
+    _skipSecondaryIndexes = skipSecondaryIndexes;
   }
 
   public boolean isOptimizeNoDictStatsCollection() {

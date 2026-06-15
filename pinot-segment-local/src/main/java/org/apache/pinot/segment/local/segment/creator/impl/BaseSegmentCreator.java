@@ -244,8 +244,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       throws Exception {
     Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
         Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
+    // When skipSecondaryIndexes is enabled, only the forward index creator is wired up at segment-build time.
+    boolean skipSecondaryIndexes = isSkipSecondaryIndexes();
     for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
       if (index.getIndexBuildLifecycle() != IndexType.BuildLifecycle.DURING_SEGMENT_CREATION) {
+        continue;
+      }
+      if (skipSecondaryIndexes && index != StandardIndexes.forward()) {
         continue;
       }
       tryCreateIndexCreator(creatorsByIndex, index, context, config);
@@ -293,6 +298,16 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
    */
   private boolean isNullable(FieldSpec fieldSpec) {
     return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isDefaultNullHandlingEnabled();
+  }
+
+  /**
+   * Returns true when the table is configured to skip all secondary indexes — both at segment-build time and at
+   * preprocess time. New segments built under this flag carry only the forward index.
+   */
+  private boolean isSkipSecondaryIndexes() {
+    TableConfig tableConfig = _config.getTableConfig();
+    return tableConfig != null && tableConfig.getIndexingConfig() != null
+        && tableConfig.getIndexingConfig().isSkipSecondaryIndexes();
   }
 
   /**
@@ -932,6 +947,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
    */
   private void updatePostSegmentCreationIndexes(File indexDir)
       throws Exception {
+    // When skipSecondaryIndexes is enabled, skip all post-segment-creation indexes (star-tree, etc.).
+    if (isSkipSecondaryIndexes()) {
+      return;
+    }
     Set<IndexType> postSegCreationIndexes = IndexService.getInstance().getAllIndexes().stream()
         .filter(indexType -> indexType.getIndexBuildLifecycle() == IndexType.BuildLifecycle.POST_SEGMENT_CREATION)
         .collect(Collectors.toSet());
