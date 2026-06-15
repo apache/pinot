@@ -168,6 +168,9 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
 
   ResultExtractionStrategy<DictIdsWrapper, List<Long>> bitmapPartitionedResultExtractionStrategy() {
     final MergeStrategy<List<RoaringBitmap>> bitmapMergeStrategy = bitmapMergeStrategy();
+    // For partitioned mode, each segment is self-contained: every row for a given correlation key
+    // appears in exactly one segment. Therefore we can count bitmap cardinality directly without
+    // converting segment-local composite IDs to global values — they will never be merged across segments.
     return dictIdsWrapper -> {
       if (dictIdsWrapper == null) {
         return Collections.nCopies(_numSteps, 0L);

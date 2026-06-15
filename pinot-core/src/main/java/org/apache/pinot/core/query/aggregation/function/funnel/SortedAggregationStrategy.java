@@ -25,6 +25,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 /**
  * Aggregation strategy for segments partitioned and sorted by the main correlation column.
+ * For multi-key correlate-by, data must be sorted by the first (primary) column; secondary
+ * keys are handled within each primary-key group by {@link SortedAggregationResult}.
  */
 class SortedAggregationStrategy extends AggregationStrategy<SortedAggregationResult> {
   public SortedAggregationStrategy(List<ExpressionContext> stepExpressions,
@@ -38,7 +40,17 @@ class SortedAggregationStrategy extends AggregationStrategy<SortedAggregationRes
   }
 
   @Override
-  void add(Dictionary dictionary, SortedAggregationResult aggResult, int step, int correlationId) {
+  public SortedAggregationResult createAggregationResultMultiKey(Dictionary[] dictionaries) {
+    return new SortedAggregationResult(_numSteps, dictionaries.length);
+  }
+
+  @Override
+  void addSingleKey(SortedAggregationResult aggResult, int step, Dictionary dictionary, int correlationId) {
     aggResult.add(step, correlationId);
+  }
+
+  @Override
+  void addMultiKey(SortedAggregationResult aggResult, int step, Dictionary[] dictionaries, int[] correlationDictIds) {
+    aggResult.addMultiKey(step, correlationDictIds);
   }
 }
