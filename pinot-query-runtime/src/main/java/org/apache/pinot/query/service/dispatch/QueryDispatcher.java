@@ -276,7 +276,12 @@ public class QueryDispatcher {
       }
       result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
-        cancel(requestId, servers);
+        if (statsManager != null) {
+          cancelOutcome = cancelWithStats(requestId, servers);
+        } else {
+          // Don't bother getting stats if we won't do anything with them
+          cancel(requestId, servers);
+        }
       }
       return result;
     } catch (Exception ex) {
@@ -286,6 +291,7 @@ public class QueryDispatcher {
       return result;
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
+      // We don't cancelWithStats here because likely something more severe has happened.
       cancel(requestId);
       throw e;
     } finally {

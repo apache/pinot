@@ -33,6 +33,7 @@ import java.util.function.LongSupplier;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -42,9 +43,11 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -52,6 +55,7 @@ import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -437,6 +441,82 @@ public class QueryDispatcherTest extends QueryTestSet {
     // The finally block's tiered latency recorder iterates an empty incrementedServers set,
     // so statsManager receives no interactions.
     Mockito.verifyNoInteractions(statsManager);
+  }
+
+  /**
+   * Reproduces the bug where runReducer returns a QueryResult with processingException (e.g. EXECUTION_TIMEOUT
+   * from a mailbox receive timeout), and the old code called cancel() instead of cancelWithStats(). This left
+   * cancelOutcome == NONE, causing all servers to fall into Tier 4 (latency=-1) — a no-op for the EMA.
+   *
+   * After the fix (cancelWithStats on the processingException path), servers that don't respond to the cancel
+   * get Tier 3 (latency=elapsedMs), which is > 0 and actually updates the EMA.
+   */
+  @Test
+  public void testProcessingExceptionPathRecordsElapsedLatencyNotMinusOne()
+      throws Exception {
+    // Clock ticks by tickMs on each call: submitTimeMs = 1000, then elapsedMs = 1100 - 1000 = 100.
+    final long tickMs = 100L;
+    AtomicLong fakeClockMs = new AtomicLong(1_000L);
+    QueryDispatcher dispatcher = newDispatcher(() -> fakeClockMs.getAndAdd(tickMs));
+
+    ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
+    String sql = "SELECT * FROM a";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+
+    Set<String> expectedInstanceIds = new HashSet<>();
+    for (DispatchablePlanFragment fragment : plan.getQueryStagesWithoutRoot()) {
+      for (QueryServerInstance server : fragment.getServerInstanceToWorkerIdMap().keySet()) {
+        expectedInstanceIds.add(server.getInstanceId());
+      }
+    }
+    Assert.assertFalse(expectedInstanceIds.isEmpty());
+
+    // Build a QueryResult with a processingException — simulates runReducer returning an
+    // EXECUTION_TIMEOUT error block (the real production path for MSE timeouts).
+    QueryProcessingException processingException =
+        new QueryProcessingException(QueryErrorCode.EXECUTION_TIMEOUT, "simulated timeout");
+    MultiStageQueryStats emptyStats = MultiStageQueryStats.emptyStats(0);
+    QueryDispatcher.QueryResult errorResult =
+        new QueryDispatcher.QueryResult(processingException, emptyStats, 0L);
+
+    // Make servers hang on cancel — simulating a slow/overloaded server that caused the query timeout
+    // and also doesn't respond to the cancel RPC. This is what triggers Tier 3.
+    CountDownLatch cancelLatch = new CountDownLatch(1);
+    for (QueryServer queryServer : _queryServerMap.values()) {
+      Mockito.doAnswer(invocationOnMock -> {
+        cancelLatch.await();
+        StreamObserver<Worker.CancelResponse> observer = invocationOnMock.getArgument(1);
+        observer.onCompleted();
+        return null;
+      }).when(queryServer).cancel(Mockito.any(), Mockito.any());
+    }
+
+    try (MockedStatic<QueryDispatcher> mockedStatic =
+        Mockito.mockStatic(QueryDispatcher.class, Mockito.CALLS_REAL_METHODS)) {
+      mockedStatic.when(() -> QueryDispatcher.runReducer(Mockito.any(), Mockito.any(), Mockito.any()))
+          .thenReturn(errorResult);
+
+      QueryDispatcher.QueryResult result;
+      try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+        result = dispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
+      }
+      Assert.assertNotNull(result.getProcessingException());
+
+      for (String instanceId : expectedInstanceIds) {
+        Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
+        Mockito.verify(statsManager).recordStatsUponResponseArrival(
+            Mockito.eq(requestId), Mockito.eq(instanceId), Mockito.longThat(latency -> latency > 0));
+      }
+    } finally {
+      cancelLatch.countDown();
+      for (QueryServer queryServer : _queryServerMap.values()) {
+        Mockito.reset(queryServer);
+      }
+      dispatcher.shutdown();
+    }
   }
 
   /** Creates a local {@link QueryDispatcher} wired to the shared query servers with an injected clock. */
