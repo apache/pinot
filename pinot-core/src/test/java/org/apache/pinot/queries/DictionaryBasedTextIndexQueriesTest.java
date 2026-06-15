@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -284,6 +286,38 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
       dictBased.destroy();
       _indexSegment = null;
     }
+  }
+
+  @Test
+  public void segmentWithoutPersistedFlagReadsAsPerRow()
+      throws Exception {
+    // Build a per-row segment, then strip the buildOnDictionary key from its persisted properties to simulate a
+    // segment written before this feature existed.
+    buildAndLoad("preFeature", false).destroy();
+    for (File propsFile : FileUtils.listFiles(new File(INDEX_DIR, "preFeature"), new String[]{"properties"}, true)) {
+      if (propsFile.getName().equals("lucene.properties")) {
+        List<String> kept = new ArrayList<>();
+        for (String line : FileUtils.readLines(propsFile, StandardCharsets.UTF_8)) {
+          if (!line.contains(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY)) {
+            kept.add(line);
+          }
+        }
+        FileUtils.writeLines(propsFile, kept);
+      }
+    }
+
+    // Reload under a table config that turns buildOnDictionary ON. The segment self-describes, so it must still be
+    // read as per-row (the build mode comes from the segment, not the live table config).
+    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, "preFeature"),
+        new IndexLoadingConfig(tableConfig(true), SCHEMA));
+    _indexSegment = segment;
+    _indexSegments = List.of(segment);
+    assertFalse(segment.getDataSource(SV_COL).getTextIndex().isBuildOnDictionary(),
+        "A segment whose persisted properties lack the flag must be read as per-row, regardless of table config");
+    assertEquals(count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple')"),
+        NUM_ROWS / SV_TOKENS.length);
+    segment.destroy();
+    _indexSegment = null;
   }
 
   private static long countMv(int mod) {

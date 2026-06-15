@@ -439,9 +439,10 @@ public class TextIndexUtils {
         .withLuceneAnalyzerClassArgTypes(recoveredLuceneAnalyzerClassArgTypes)
         .withLuceneQueryParserClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS))
         .withDocIdTranslatorMode(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE))
-        // Default to the existing config value when the property is absent (segments written before this feature).
-        .withBuildOnDictionary(properties.getBoolean(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY,
-            config.isBuildOnDictionary()))
+        // The build mode is intrinsic to the segment: default to false when the property is absent (segments written
+        // before this feature are always per-row). Must NOT fall back to the live table config, otherwise a per-row
+        // segment could be misread as dictionary-based after the flag is flipped on.
+        .withBuildOnDictionary(properties.getBoolean(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, false))
         .build();
   }
 }
