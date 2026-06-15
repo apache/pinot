@@ -121,7 +121,13 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
   }
 
   private TableConfig tableConfig(boolean buildOnDictionary) {
-    Map<String, String> props = Map.of(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, Boolean.toString(buildOnDictionary));
+    return tableConfig(buildOnDictionary, false);
+  }
+
+  private TableConfig tableConfig(boolean buildOnDictionary, boolean storeInSegmentFile) {
+    Map<String, String> props = Map.of(
+        FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, Boolean.toString(buildOnDictionary),
+        "storeInSegmentFile", Boolean.toString(storeInSegmentFile));
     List<FieldConfig> fieldConfigs = List.of(
         new FieldConfig(SV_COL, EncodingType.DICTIONARY, List.of(IndexType.TEXT), null, props),
         new FieldConfig(MV_COL, EncodingType.DICTIONARY, List.of(IndexType.TEXT), null, props));
@@ -130,7 +136,12 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
 
   private ImmutableSegment buildAndLoad(String segmentName, boolean buildOnDictionary)
       throws Exception {
-    TableConfig tableConfig = tableConfig(buildOnDictionary);
+    return buildAndLoad(segmentName, buildOnDictionary, false);
+  }
+
+  private ImmutableSegment buildAndLoad(String segmentName, boolean buildOnDictionary, boolean storeInSegmentFile)
+      throws Exception {
+    TableConfig tableConfig = tableConfig(buildOnDictionary, storeInSegmentFile);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -286,6 +297,44 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
       dictBased.destroy();
       _indexSegment = null;
     }
+  }
+
+  @Test
+  public void dictionaryBasedTextMatchWithStoreInSegmentFile()
+      throws Exception {
+    // storeInSegmentFile packs the Lucene index into the segment's single file, exercising the buffer-based reader
+    // path (LuceneTextIndexReader buffer constructor + buffer property overlay) in dictionary mode.
+    ImmutableSegment perRow = buildAndLoad("perRowSif", false, true);
+    _indexSegment = perRow;
+    _indexSegments = List.of(perRow);
+    long svCount = count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple')");
+    long mvCount = count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + MV_COL + ", 'green')");
+    perRow.destroy();
+
+    ImmutableSegment dictBased = buildAndLoad("dictSif", true, true);
+    _indexSegment = dictBased;
+    _indexSegments = List.of(dictBased);
+    assertTrue(dictBased.getDataSource(SV_COL).getTextIndex().isBuildOnDictionary(),
+        "store-in-segment-file segment should still self-describe as dictionary-based");
+    assertEquals(count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple')"), svCount);
+    assertEquals(count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + MV_COL + ", 'green')"), mvCount);
+    dictBased.destroy();
+    _indexSegment = null;
+  }
+
+  @Test
+  public void dictionaryBasedTextMatchMatchingAllValues()
+      throws Exception {
+    // Matching every distinct dictionary value exercises the always-true short-circuit in the dict-id evaluator.
+    ImmutableSegment dictBased = buildAndLoad("dictAll", true);
+    _indexSegment = dictBased;
+    _indexSegments = List.of(dictBased);
+    // MV distinct values are {fruit, red, green, blue}; OR-ing all of them matches every distinct dictId, so every
+    // row matches.
+    assertEquals(count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + MV_COL
+        + ", 'fruit OR red OR green OR blue')"), NUM_ROWS);
+    dictBased.destroy();
+    _indexSegment = null;
   }
 
   @Test
