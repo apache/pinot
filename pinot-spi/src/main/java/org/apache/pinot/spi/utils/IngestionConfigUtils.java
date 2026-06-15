@@ -359,4 +359,16 @@ public final class IngestionConfigUtils {
     }
     return streamIndexToPartitions;
   }
+
+  // --- Stable config ID methods (Phase 1: multi-topic safe deletion) ---
+
+  /// Returns the Pinot segment partition id encoded from a stream partition id and a stable config ID.
+  public static int getPinotPartitionIdFromConfigId(int streamPartitionId, int configId) {
+    return configId * PARTITION_PADDING_OFFSET + streamPartitionId;
+  }
+
+  /// Extracts the stable config ID from an encoded Pinot segment partition id.
+  public static int getConfigIdFromPinotPartitionId(int partitionId) {
+    return partitionId / PARTITION_PADDING_OFFSET;
+  }
 }

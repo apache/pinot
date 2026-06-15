@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,6 +33,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -229,5 +231,135 @@ public class IngestionConfigUtilsTest {
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(0), new HashSet<>(Arrays.asList(2)));
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(1), new HashSet<>(Arrays.asList(100, 1)));
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(3), new HashSet<>(Arrays.asList(400)));
+  }
+
+  @Test
+  public void testGetPinotPartitionIdFromConfigId() {
+    Assert.assertEquals(IngestionConfigUtils.getPinotPartitionIdFromConfigId(5, 0), 5);
+    Assert.assertEquals(IngestionConfigUtils.getPinotPartitionIdFromConfigId(3, 1), 10003);
+    Assert.assertEquals(IngestionConfigUtils.getPinotPartitionIdFromConfigId(0, 2), 20000);
+    Assert.assertEquals(IngestionConfigUtils.getPinotPartitionIdFromConfigId(99, 5), 50099);
+  }
+
+  @Test
+  public void testGetConfigIdFromPinotPartitionId() {
+    Assert.assertEquals(IngestionConfigUtils.getConfigIdFromPinotPartitionId(5), 0);
+    Assert.assertEquals(IngestionConfigUtils.getConfigIdFromPinotPartitionId(10003), 1);
+    Assert.assertEquals(IngestionConfigUtils.getConfigIdFromPinotPartitionId(20000), 2);
+    Assert.assertEquals(IngestionConfigUtils.getConfigIdFromPinotPartitionId(50099), 5);
+  }
+
+  @Test
+  public void testGetStreamConfigMapByConfigId() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put(StreamConfigProperties.STREAM_CONFIG_ID, "0");
+    config0.put("stream.kafka.topic.name", "topic-A");
+
+    Map<String, String> config2 = new HashMap<>();
+    config2.put(StreamConfigProperties.STREAM_CONFIG_ID, "2");
+    config2.put("stream.kafka.topic.name", "topic-B");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config2));
+
+    Assert.assertEquals(sic.getStreamConfigMapByConfigId(0).get("stream.kafka.topic.name"), "topic-A");
+    Assert.assertEquals(sic.getStreamConfigMapByConfigId(2).get("stream.kafka.topic.name"), "topic-B");
+
+    // Config ID 1 was deleted — should throw
+    try {
+      sic.getStreamConfigMapByConfigId(1);
+      Assert.fail("Should fail for missing config ID");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testGetStreamConfigMapByConfigIdFallback() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("stream.kafka.topic.name", "topic-A");
+    Map<String, String> config1 = new HashMap<>();
+    config1.put("stream.kafka.topic.name", "topic-B");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config1));
+
+    Assert.assertEquals(sic.getStreamConfigMapByConfigId(0).get("stream.kafka.topic.name"), "topic-A");
+    Assert.assertEquals(sic.getStreamConfigMapByConfigId(1).get("stream.kafka.topic.name"), "topic-B");
+  }
+
+  @Test
+  public void testGetConfigIdToStreamConfigMap() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put(StreamConfigProperties.STREAM_CONFIG_ID, "0");
+    config0.put("stream.kafka.topic.name", "topic-A");
+
+    Map<String, String> config3 = new HashMap<>();
+    config3.put(StreamConfigProperties.STREAM_CONFIG_ID, "3");
+    config3.put("stream.kafka.topic.name", "topic-B");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config3));
+    Map<Integer, Map<String, String>> idMap = sic.getConfigIdToStreamConfigMap();
+
+    Assert.assertEquals(idMap.size(), 2);
+    Assert.assertEquals(idMap.get(0).get("stream.kafka.topic.name"), "topic-A");
+    Assert.assertEquals(idMap.get(3).get("stream.kafka.topic.name"), "topic-B");
+    Assert.assertNull(idMap.get(1));
+  }
+
+  @Test
+  public void testGetConfigIdToStreamConfigMapFallback() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("stream.kafka.topic.name", "topic-A");
+    Map<String, String> config1 = new HashMap<>();
+    config1.put("stream.kafka.topic.name", "topic-B");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config1));
+    Map<Integer, Map<String, String>> idMap = sic.getConfigIdToStreamConfigMap();
+
+    Assert.assertEquals(idMap.size(), 2);
+    Assert.assertEquals(idMap.get(0).get("stream.kafka.topic.name"), "topic-A");
+    Assert.assertEquals(idMap.get(1).get("stream.kafka.topic.name"), "topic-B");
+  }
+
+  @Test
+  public void testGetConfigId() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put(StreamConfigProperties.STREAM_CONFIG_ID, "5");
+    config0.put("stream.kafka.topic.name", "topic-A");
+    Map<String, String> config1 = new HashMap<>();
+    config1.put("stream.kafka.topic.name", "topic-B");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config1));
+    Assert.assertEquals(sic.getConfigId(0), 5);
+    Assert.assertEquals(sic.getConfigId(1), 1);
+  }
+
+  @Test
+  public void testStreamIngestionConfigSerDe()
+      throws Exception {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put(StreamConfigProperties.STREAM_CONFIG_ID, "0");
+    config0.put("streamType", "kafka");
+    config0.put("stream.kafka.topic.name", "topic-A");
+
+    Map<String, String> config1 = new HashMap<>();
+    config1.put(StreamConfigProperties.STREAM_CONFIG_ID, "1");
+    config1.put("streamType", "kafka");
+    config1.put("stream.kafka.topic.name", "topic-B");
+
+    StreamIngestionConfig original = new StreamIngestionConfig(Arrays.asList(config0, config1));
+    original.setNextStreamConfigId(2);
+
+    ObjectMapper mapper = new ObjectMapper();
+    String json = mapper.writeValueAsString(original);
+    StreamIngestionConfig deserialized = mapper.readValue(json, StreamIngestionConfig.class);
+
+    Assert.assertEquals(deserialized.getNextStreamConfigId(), 2);
+    Assert.assertEquals(deserialized.getStreamConfigMaps().size(), 2);
+    Assert.assertEquals(
+        deserialized.getStreamConfigMaps().get(0).get(StreamConfigProperties.STREAM_CONFIG_ID), "0");
+    Assert.assertEquals(
+        deserialized.getStreamConfigMaps().get(1).get(StreamConfigProperties.STREAM_CONFIG_ID), "1");
+    Assert.assertEquals(
+        deserialized.getStreamConfigMaps().get(0).get("stream.kafka.topic.name"), "topic-A");
   }
 }
