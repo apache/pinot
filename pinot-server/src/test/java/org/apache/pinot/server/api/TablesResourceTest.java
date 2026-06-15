@@ -848,6 +848,7 @@ public class TablesResourceTest extends BaseResourceTest {
           .path("/tables/" + mixedTableName + "/metadata")
           .queryParam("columns", "column1")
           .queryParam("columns", "column2")
+          .queryParam("includeColumnStats", "true")
           .request()
           .get(String.class));
       TableMetadataInfo metadataInfo = JsonUtils.jsonNodeToObject(jsonResponse, TableMetadataInfo.class);
