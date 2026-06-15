@@ -104,6 +104,17 @@ public class TextIndexConfigTest {
     TextIndexConfig roundTripped =
         JsonUtils.stringToObject(JsonUtils.objectToString(config), TextIndexConfig.class);
     assertTrue(roundTripped.isBuildOnDictionary(), "buildOnDictionary not preserved across round-trip");
+
+    // buildOnDictionary participates in equals/hashCode.
+    TextIndexConfig off = JsonUtils.stringToObject("{\"buildOnDictionary\": false}", TextIndexConfig.class);
+    assertNotEquals(config, off, "Configs differing only by buildOnDictionary must not be equal");
+    assertEquals(config, JsonUtils.stringToObject("{\"buildOnDictionary\": true}", TextIndexConfig.class));
+
+    // The pre-buildOnDictionary constructor (retained for binary compatibility) defaults the flag to false.
+    TextIndexConfig legacy = new TextIndexConfig(false, null, false, false, java.util.Collections.emptyList(),
+        java.util.Collections.emptyList(), true, 500, null, null, null, null, false, false, 0, false, null, false,
+        false);
+    assertFalse(legacy.isBuildOnDictionary(), "Legacy constructor should default buildOnDictionary to false");
   }
 
   @Test
