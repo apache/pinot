@@ -308,7 +308,7 @@
     <javassist.version>3.31.0-GA</javassist.version>
     <bouncycastle.version>1.84</bouncycastle.version>
     <aircompressor.version>2.0.3</aircompressor.version>
-    <jna.version>5.19.0</jna.version>
+    <jna.version>5.19.1</jna.version>
     <jnr-ffi.version>2.2.19</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.10.1</asm.version>
