@@ -142,10 +142,8 @@ public class TextIndexConfig extends IndexConfig {
          LUCENE_INDEX_DEFAULT_BUILD_ON_DICTIONARY);
   }
 
-  /**
-   * Retained for binary compatibility (pre-{@code buildOnDictionary}). Delegates to the canonical constructor with
-   * {@code buildOnDictionary} defaulted to false.
-   */
+  /// Retained for binary compatibility (pre-`buildOnDictionary`). Delegates to the canonical constructor with
+  /// `buildOnDictionary` defaulted to false.
   public TextIndexConfig(Boolean disabled, @Nullable Object rawValueForTextIndex, boolean enableQueryCache,
       boolean useANDForMultiTermQueries, List<String> stopWordsInclude, List<String> stopWordsExclude,
       Boolean luceneUseCompoundFile, Integer luceneMaxBufferSizeMB, String luceneAnalyzerClass,
@@ -341,12 +339,10 @@ public class TextIndexConfig extends IndexConfig {
     return _storeInSegmentFile;
   }
 
-  /**
-   * Whether the Lucene text index is built over the column's dictionary (one document per distinct value, with the
-   * Lucene docId equal to the dictId) instead of one document per row. When enabled, {@code TEXT_MATCH} returns
-   * matching dictIds that are resolved to docIds through the dictionary-based filter operators. Requires a
-   * dictionary-encoded column and is only applied to immutable segments. Defaults to false.
-   */
+  /// Whether the Lucene text index is built over the column's dictionary (one document per distinct value, with the
+  /// Lucene docId equal to the dictId) instead of one document per row. When enabled, `TEXT_MATCH` returns
+  /// matching dictIds that are resolved to docIds through the dictionary-based filter operators. Requires a
+  /// dictionary-encoded column and is only applied to immutable segments. Defaults to false.
   public boolean isBuildOnDictionary() {
     return _buildOnDictionary;
   }
