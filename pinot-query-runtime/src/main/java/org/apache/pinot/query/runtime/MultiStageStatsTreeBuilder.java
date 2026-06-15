@@ -164,7 +164,57 @@ public class MultiStageStatsTreeBuilder {
     if (!children.isEmpty()) {
       json.set("children", children);
     }
+
+    // self* fields: parent-minus-children derived stats, matching InStageStatsTreeBuilder semantics.
+    // These must be omitted when zero to keep parity with the legacy renderer.
+    JsonNode execNode = json.get("executionTimeMs");
+    if (execNode != null) {
+      long selfExecTimeMs = execNode.asLong(0) - sumChildrenStat(node, "executionTimeMs");
+      if (selfExecTimeMs != 0) {
+        json.put("selfExecutionTimeMs", selfExecTimeMs);
+        json.put("selfClockTimeMs", selfExecTimeMs / parallelism);
+      }
+    }
+    JsonNode allocNode = json.get("allocatedMemoryBytes");
+    if (allocNode != null) {
+      long selfAllocBytes = allocNode.asLong(0) - sumChildrenStat(node, "allocatedMemoryBytes");
+      if (selfAllocBytes != 0) {
+        json.put("selfAllocatedMB", selfAllocBytes / (1024 * 1024));
+      }
+    }
+    JsonNode gcNode = json.get("gcTimeMs");
+    if (gcNode != null) {
+      long selfGcTimeMs = gcNode.asLong(0) - sumChildrenStat(node, "gcTimeMs");
+      if (selfGcTimeMs != 0) {
+        json.put("selfGcTimeMs", selfGcTimeMs);
+      }
+    }
+
     return json;
+  }
+
+  /**
+   * Sums a named stat field across the logical children of a node (with PIPELINE_BREAKER collapse,
+   * mirroring the child iteration in {@link #jsonFromStatsTreeNode}).
+   */
+  private static long sumChildrenStat(StageStatsTreeNode node, String statKey) {
+    long sum = 0;
+    for (StageStatsTreeNode child : node.getChildren()) {
+      if (child.getType().getId() == MultiStageOperator.Type.PIPELINE_BREAKER.getId()) {
+        for (StageStatsTreeNode grandChild : child.getChildren()) {
+          JsonNode val = grandChild.getStatMap().asJson().get(statKey);
+          if (val != null) {
+            sum += val.asLong(0);
+          }
+        }
+      } else {
+        JsonNode val = child.getStatMap().asJson().get(statKey);
+        if (val != null) {
+          sum += val.asLong(0);
+        }
+      }
+    }
+    return sum;
   }
 
   /**
