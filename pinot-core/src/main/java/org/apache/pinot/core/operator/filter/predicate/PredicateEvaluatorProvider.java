@@ -27,6 +27,7 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -87,17 +88,26 @@ public class PredicateEvaluatorProvider {
                 dataType);
           case REGEXP_LIKE: {
             // Prefer FST/IFST text index when present on the data source; otherwise fall back to the generic
-            // dict-based evaluator (dict-id scan or eager dict iteration).
+            // dict-based evaluator (dict-id scan or eager dict iteration). A broad pattern (e.g. a leading '.*') over
+            // a high-cardinality column can make the FST walk allocate without bound, so the walk is capped: when it
+            // exceeds the traversal limit the factory returns null and we fall back to the same scan evaluator
+            // (correct, and often cheaper for broad patterns). Selective patterns visit a small subtree and never
+            // trip the cap.
             RegexpLikePredicate regexpLike = (RegexpLikePredicate) predicate;
             if (dataSource != null) {
+              int maxTraversalPaths = getFstRegexpTraversalLimit(queryContext, dictionary);
+              BaseDictionaryBasedPredicateEvaluator fstEvaluator = null;
               if (regexpLike.isCaseInsensitive() && dataSource.getIFSTIndex() != null) {
-                return IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLike,
-                    dataSource.getIFSTIndex(), dictionary);
+                fstEvaluator = IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLike,
+                    dataSource.getIFSTIndex(), dictionary, maxTraversalPaths);
+              } else if (!regexpLike.isCaseInsensitive() && dataSource.getFSTIndex() != null) {
+                fstEvaluator = FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLike,
+                    dataSource.getFSTIndex(), dictionary, maxTraversalPaths);
               }
-              if (!regexpLike.isCaseInsensitive() && dataSource.getFSTIndex() != null) {
-                return FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLike,
-                    dataSource.getFSTIndex(), dictionary);
+              if (fstEvaluator != null) {
+                return fstEvaluator;
               }
+              // No FST/IFST index, or the walk exceeded the traversal limit; fall back to the scan evaluator below.
             }
             return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator(regexpLike, dictionary, dataType,
                 queryContext);
@@ -129,6 +139,21 @@ public class PredicateEvaluatorProvider {
       // Exception here is caused by mismatch between the column data type and the predicate value in the query
       throw new BadQueryRequestException(e);
     }
+  }
+
+  /// Resolves the per-evaluation cap on FST paths visited by an FST/IFST-backed REGEXP_LIKE walk. The
+  /// `fstRegexpTraversalLimit` query option overrides it with an absolute value when set (a non-positive value
+  /// disables the cap, which the matcher normalizes to an unbounded walk); otherwise it defaults to the column
+  /// cardinality, so a non-pruning pattern that would walk the whole FST falls back to a scan while selective
+  /// patterns stay on the FST.
+  private static int getFstRegexpTraversalLimit(@Nullable QueryContext queryContext, Dictionary dictionary) {
+    if (queryContext != null) {
+      Integer limit = QueryOptionsUtils.getFstRegexpTraversalLimit(queryContext.getQueryOptions());
+      if (limit != null) {
+        return limit;
+      }
+    }
+    return dictionary.length();
   }
 
   /// Returns the column dictionary if the planner can actually use it for filtering this specific predicate, otherwise

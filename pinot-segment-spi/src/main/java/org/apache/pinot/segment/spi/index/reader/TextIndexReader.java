@@ -31,6 +31,21 @@ public interface TextIndexReader extends IndexReader {
   ImmutableRoaringBitmap getDictIds(String searchQuery);
 
   /**
+   * Returns the matching dictionary ids for the given search query, bounding the work performed (e.g. the number of
+   * FST paths visited by a regexp walk) to {@code maxTraversalPaths}. Implementations that can exceed a safe memory
+   * footprint for broad queries should honor this bound by aborting once it is reached and returning {@code null},
+   * which signals the caller to fall back to a scan-based evaluator (rather than failing the query). The default
+   * implementation ignores the bound and delegates to {@link #getDictIds(String)}, which is correct for readers
+   * whose work is already bounded.
+   *
+   * @return the matching dictionary ids, or {@code null} if the bounded traversal was aborted before completing
+   */
+  @Nullable
+  default ImmutableRoaringBitmap getDictIds(String searchQuery, int maxTraversalPaths) {
+    return getDictIds(searchQuery);
+  }
+
+  /**
    * Returns the matching document ids for the given search query.
    * This is the legacy entry point retained for backward compatibility.
    */

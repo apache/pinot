@@ -720,6 +720,15 @@ public class QueryOptionsUtils {
     return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
   }
 
+  /// Cap on the number of FST paths visited per FST/IFST-backed REGEXP_LIKE evaluation before falling back to the
+  /// dictionary-scan evaluator. Returns `null` if the query option is not set, in which case the caller defaults the
+  /// cap to the column cardinality.
+  @Nullable
+  public static Integer getFstRegexpTraversalLimit(Map<String, String> queryOptions) {
+    String fstRegexpTraversalLimit = queryOptions.get(QueryOptionKey.FST_REGEXP_TRAVERSAL_LIMIT);
+    return uncheckedParseInt(QueryOptionKey.FST_REGEXP_TRAVERSAL_LIMIT, fstRegexpTraversalLimit);
+  }
+
   // --- Vector search query option accessors ---
 
   /**

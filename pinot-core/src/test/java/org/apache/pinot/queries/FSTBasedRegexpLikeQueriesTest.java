@@ -98,6 +98,19 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseFSTBasedRegexpLikeQueries
   }
 
   @Test
+  public void testFSTBasedRegexLikeFallsBackToScanOnTraversalLimit() {
+    // With a tiny FST traversal budget the FST walk is abandoned mid-flight and the query falls back to the
+    // dictionary-scan evaluator, which must produce identical results to the FST path.
+    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') LIMIT 50000";
+    testInnerSegmentSelectionQuery(query, 256, null);
+    testInnerSegmentSelectionQuery("SET fstRegexpTraversalLimit = 1; " + query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*domain1.*') LIMIT 50000";
+    testInnerSegmentSelectionQuery(query, 512, null);
+    testInnerSegmentSelectionQuery("SET fstRegexpTraversalLimit = 1; " + query, 512, null);
+  }
+
+  @Test
   public void testLikeOperator() {
     String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.dom_in1.com' LIMIT 50000";
     testInnerSegmentSelectionQuery(query, 64, null);

@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.io.IOException;
+import javax.annotation.Nullable;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.fst.ByteSequenceOutputs;
 import org.apache.lucene.util.fst.FST;
@@ -60,9 +61,18 @@ public class LuceneIFSTIndexReader implements TextIndexReader {
 
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
+    return getDictIds(searchQuery, Integer.MAX_VALUE);
+  }
+
+  @Override
+  @Nullable
+  public ImmutableRoaringBitmap getDictIds(String searchQuery, int maxTraversalPaths) {
     try {
       MutableRoaringBitmap dictIds = new MutableRoaringBitmap();
-      RegexpMatcherCaseInsensitive.regexMatch(searchQuery, _ifst, dictIds::add);
+      // Returns null when the walk is stopped at the traversal limit, signaling the caller to fall back to scan.
+      if (!RegexpMatcherCaseInsensitive.regexMatch(searchQuery, _ifst, dictIds::add, maxTraversalPaths)) {
+        return null;
+      }
       return dictIds.toImmutableRoaringBitmap();
     } catch (QueryException ex) {
       // Let query termination exceptions (timeout, OOM-protection kill) propagate as-is.

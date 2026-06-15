@@ -887,6 +887,15 @@ public class CommonConstants {
         //   during the scan
         public static final String REGEX_DICT_SIZE_THRESHOLD = "regexDictSizeThreshold";
 
+        // When evaluating a REGEXP_LIKE predicate backed by an FST/IFST index, bound the number of FST paths visited
+        // during the automaton-over-FST walk. Once the limit is reached the FST evaluation is abandoned and the query
+        // falls back to the dictionary-scan evaluator (correct, and often cheaper for broad patterns). When unset, the
+        // limit defaults to the column cardinality (dictionary length): a non-pruning pattern (e.g. a leading '.*')
+        // walks the whole FST (~cardinality paths) and so falls back to scan, while selective prefix/fuzzy patterns
+        // visit only a small subtree and stay on the FST. A positive value overrides this with an absolute cap; a
+        // non-positive value disables the cap (unbounded traversal).
+        public static final String FST_REGEXP_TRAVERSAL_LIMIT = "fstRegexpTraversalLimit";
+
         public static final String DROP_RESULTS = "dropResults";
 
         // Exclude virtual columns (columns starting with '$') from table schema

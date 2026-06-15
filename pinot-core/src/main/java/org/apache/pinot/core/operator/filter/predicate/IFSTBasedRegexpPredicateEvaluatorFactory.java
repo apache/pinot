@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -33,26 +34,35 @@ public class IFSTBasedRegexpPredicateEvaluatorFactory {
   }
 
   /**
-   * Create a new instance of IFST based REGEXP_LIKE predicate evaluator for case-insensitive matching.
+   * Create a new instance of IFST based REGEXP_LIKE predicate evaluator for case-insensitive matching, bounding the
+   * traversal to {@code maxTraversalPaths}.
    *
    * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
    * @param ifstIndexReader IFST index reader
    * @param dictionary Dictionary for the column
-   * @return IFST based REGEXP_LIKE predicate evaluator
+   * @param maxTraversalPaths cap on FST paths visited before the walk is abandoned
+   * @return IFST based REGEXP_LIKE predicate evaluator, or {@code null} if the traversal exceeded the limit (the
+   *         caller should fall back to a scan-based evaluator)
    */
+  @Nullable
   public static BaseDictionaryBasedPredicateEvaluator newIFSTBasedEvaluator(RegexpLikePredicate regexpLikePredicate,
-      TextIndexReader ifstIndexReader, Dictionary dictionary) {
-    return new IFSTBasedRegexpPredicateEvaluator(regexpLikePredicate, ifstIndexReader, dictionary);
+      TextIndexReader ifstIndexReader, Dictionary dictionary, int maxTraversalPaths) {
+    String searchQuery = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePredicate.getValue());
+    ImmutableRoaringBitmap matchingDictIds = ifstIndexReader.getDictIds(searchQuery, maxTraversalPaths);
+    if (matchingDictIds == null) {
+      // Traversal limit exceeded; signal the caller to fall back to a scan-based evaluator.
+      return null;
+    }
+    return new IFSTBasedRegexpPredicateEvaluator(regexpLikePredicate, dictionary, matchingDictIds);
   }
 
   private static class IFSTBasedRegexpPredicateEvaluator extends BaseDictIdBasedRegexpLikePredicateEvaluator {
     final ImmutableRoaringBitmap _matchingDictIdBitmap;
 
-    public IFSTBasedRegexpPredicateEvaluator(RegexpLikePredicate regexpLikePredicate,
-        TextIndexReader ifstIndexReader, Dictionary dictionary) {
+    public IFSTBasedRegexpPredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary,
+        ImmutableRoaringBitmap matchingDictIds) {
       super(regexpLikePredicate, dictionary);
-      String searchQuery = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePredicate.getValue());
-      _matchingDictIdBitmap = ifstIndexReader.getDictIds(searchQuery);
+      _matchingDictIdBitmap = matchingDictIds;
       int numMatchingDictIds = _matchingDictIdBitmap.getCardinality();
       if (numMatchingDictIds == 0) {
         _alwaysFalse = true;

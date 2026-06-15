@@ -39,6 +39,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -128,6 +130,43 @@ public class FSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
     } finally {
       // Clear the interrupt flag in case the matcher did not consume it
       Thread.interrupted();
+    }
+  }
+
+  @Test
+  public void testRegexMatchTraversalLimit()
+      throws IOException {
+    SortedMap<String, Integer> x = new TreeMap<>();
+    for (int i = 0; i < 1000; i++) {
+      x.put(String.format("key-%06d", i), i);
+    }
+    FST<Long> fst = FSTBuilder.buildFST(x);
+    File outputFile = new File(TEMP_DIR, "test_traversal_limit.lucene");
+    try (FileOutputStream outputStream = new FileOutputStream(outputFile);
+        OutputStreamDataOutput dataOutput = new OutputStreamDataOutput(outputStream)) {
+      fst.save(dataOutput, dataOutput);
+    }
+
+    int cardinality = 1000;
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.loadBigEndianFile(outputFile);
+        LuceneFSTIndexReader reader = new LuceneFSTIndexReader(dataBuffer)) {
+      // A broad walk exceeds a tiny path budget and is abandoned: the matcher reports incomplete (false) and the
+      // reader returns null to signal the caller to fall back to a scan.
+      assertFalse(RegexpMatcher.regexMatch(".*", fst, new MutableRoaringBitmap()::add, 10));
+      assertNull(reader.getDictIds(".*", 10));
+
+      // Unbounded (or a cap above the full-walk path count) completes and returns all entries.
+      assertEquals(reader.getDictIds(".*", Integer.MAX_VALUE).getCardinality(), cardinality);
+
+      // With the cap at the column cardinality (the provider's default), a non-pruning '.*' walk visits more than
+      // `cardinality` FST paths, so it trips and falls back (null); a selective prefix visits a small subtree and
+      // stays on the FST.
+      assertNull(reader.getDictIds(".*", cardinality));
+      assertEquals(reader.getDictIds("key-000001", cardinality).getCardinality(), 1);
+
+      // A non-positive limit disables the cap (unbounded walk).
+      assertEquals(reader.getDictIds(".*", 0).getCardinality(), cardinality);
+      assertEquals(reader.getDictIds(".*", -1).getCardinality(), cardinality);
     }
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -33,17 +34,26 @@ public class FSTBasedRegexpPredicateEvaluatorFactory {
   }
 
   /**
-   * Creates a predicate evaluator which matches the regexp query pattern using FST Index available.
+   * Creates a predicate evaluator which matches the regexp query pattern using the available FST index, bounding the
+   * traversal to {@code maxTraversalPaths}.
    *
    * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
    * @param fstIndexReader FST Index reader
    * @param dictionary Dictionary for the column
-   * @return Predicate evaluator
+   * @param maxTraversalPaths cap on FST paths visited before the walk is abandoned
+   * @return Predicate evaluator, or {@code null} if the traversal exceeded the limit (the caller should fall back to
+   *         a scan-based evaluator)
    */
+  @Nullable
   public static BaseDictionaryBasedPredicateEvaluator newFSTBasedEvaluator(RegexpLikePredicate regexpLikePredicate,
-      TextIndexReader fstIndexReader, Dictionary dictionary) {
-    return new FSTBasedRegexpPredicateEvaluatorFactory.FSTBasedRegexpPredicateEvaluator(regexpLikePredicate,
-        fstIndexReader, dictionary);
+      TextIndexReader fstIndexReader, Dictionary dictionary, int maxTraversalPaths) {
+    String searchQuery = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePredicate.getValue());
+    ImmutableRoaringBitmap matchingDictIds = fstIndexReader.getDictIds(searchQuery, maxTraversalPaths);
+    if (matchingDictIds == null) {
+      // Traversal limit exceeded; signal the caller to fall back to a scan-based evaluator.
+      return null;
+    }
+    return new FSTBasedRegexpPredicateEvaluator(regexpLikePredicate, dictionary, matchingDictIds);
   }
 
   /**
@@ -52,11 +62,10 @@ public class FSTBasedRegexpPredicateEvaluatorFactory {
   private static class FSTBasedRegexpPredicateEvaluator extends BaseDictIdBasedRegexpLikePredicateEvaluator {
     final ImmutableRoaringBitmap _matchingDictIdBitmap;
 
-    public FSTBasedRegexpPredicateEvaluator(RegexpLikePredicate regexpLikePredicate, TextIndexReader fstIndexReader,
-        Dictionary dictionary) {
+    public FSTBasedRegexpPredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary,
+        ImmutableRoaringBitmap matchingDictIds) {
       super(regexpLikePredicate, dictionary);
-      String searchQuery = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePredicate.getValue());
-      _matchingDictIdBitmap = fstIndexReader.getDictIds(searchQuery);
+      _matchingDictIdBitmap = matchingDictIds;
       int numMatchingDictIds = _matchingDictIdBitmap.getCardinality();
       if (numMatchingDictIds == 0) {
         _alwaysFalse = true;

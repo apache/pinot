@@ -269,6 +269,8 @@ public class FilterPlanNodeTest {
     TextIndexReader reader = Mockito.mock(TextIndexReader.class);
     ImmutableRoaringBitmap emptyBitmap = ImmutableRoaringBitmap.bitmapOf();
     when(reader.getDictIds(Mockito.anyString())).thenReturn(emptyBitmap);
+    // FST/IFST regexp evaluators call the bounded overload; stub it too so the mock returns a real bitmap.
+    when(reader.getDictIds(Mockito.anyString(), Mockito.anyInt())).thenReturn(emptyBitmap);
     return reader;
   }
 }

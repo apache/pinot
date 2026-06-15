@@ -55,7 +55,16 @@ public class RegexpMatcherCaseInsensitive {
   /// collect them without this class materializing the full result set in memory.
   public static void regexMatch(String regexQuery, FST<BytesRef> ifst, IntConsumer dictIdConsumer)
       throws IOException {
-    new RegexpMatcherCaseInsensitive(regexQuery, ifst).regexMatchOnFST(dictIdConsumer);
+    regexMatch(regexQuery, ifst, dictIdConsumer, Integer.MAX_VALUE);
+  }
+
+  /// Same as [#regexMatch(String, FST, IntConsumer)] but stops the walk once `maxPaths` FST paths have been visited.
+  /// Returns `true` if the walk completed (all matches emitted), or `false` if it was stopped at the limit (the
+  /// emitted values are partial and should be discarded, with the caller falling back to a scan). A non-positive
+  /// `maxPaths` disables the cap, so the walk runs unbounded.
+  public static boolean regexMatch(String regexQuery, FST<BytesRef> ifst, IntConsumer dictIdConsumer, int maxPaths)
+      throws IOException {
+    return new RegexpMatcherCaseInsensitive(regexQuery, ifst).regexMatchOnFST(dictIdConsumer, maxPaths);
   }
 
   // Matches "input" string with _regexQuery Automaton (case-insensitive).
@@ -81,9 +90,19 @@ public class RegexpMatcherCaseInsensitive {
   /// for query termination (timeout or OOM-protection kill) to remain interruptible.
   public void regexMatchOnFST(IntConsumer dictIdConsumer)
       throws IOException {
+    regexMatchOnFST(dictIdConsumer, Integer.MAX_VALUE);
+  }
+
+  /// Same as [#regexMatchOnFST(IntConsumer)] but stops once `maxPaths` FST paths have been visited. Returns `true` if
+  /// the walk completed, or `false` if it was stopped at the limit (partial results emitted). A non-positive
+  /// `maxPaths` disables the cap (unbounded walk).
+  public boolean regexMatchOnFST(IntConsumer dictIdConsumer, int maxPaths)
+      throws IOException {
     if (_automaton.getNumStates() == 0) {
-      return;
+      return true;
     }
+    // A non-positive limit means "unbounded"; normalize so the per-iteration check never trips spuriously.
+    int pathLimit = maxPaths <= 0 ? Integer.MAX_VALUE : maxPaths;
 
     // Automaton start state and FST start node is added to the stack.
     List<Path<BytesRef>> stack = new ArrayList<>();
@@ -95,6 +114,10 @@ public class RegexpMatcherCaseInsensitive {
     Transition t = new Transition();
     int numPathsProcessed = 0;
     while (!stack.isEmpty()) {
+      if (numPathsProcessed >= pathLimit) {
+        // Pattern too broad for the FST index; signal the caller to fall back to a scan-based evaluator.
+        return false;
+      }
       QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numPathsProcessed++,
           "RegexpMatcherCaseInsensitive#regexMatchOnFST");
       Path<BytesRef> path = stack.remove(stack.size() - 1);
@@ -139,6 +162,7 @@ public class RegexpMatcherCaseInsensitive {
         }
       }
     }
+    return true;
   }
 
   public static final class Path<T> {
