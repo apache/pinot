@@ -144,6 +144,24 @@ public class TextIndexConfig extends IndexConfig {
          LUCENE_INDEX_DEFAULT_BUILD_ON_DICTIONARY);
   }
 
+  /**
+   * Retained for binary compatibility (pre-{@code buildOnDictionary}). Delegates to the canonical constructor with
+   * {@code buildOnDictionary} defaulted to false.
+   */
+  public TextIndexConfig(Boolean disabled, @Nullable Object rawValueForTextIndex, boolean enableQueryCache,
+      boolean useANDForMultiTermQueries, List<String> stopWordsInclude, List<String> stopWordsExclude,
+      Boolean luceneUseCompoundFile, Integer luceneMaxBufferSizeMB, String luceneAnalyzerClass,
+      Object luceneAnalyzerClassArgs, Object luceneAnalyzerClassArgTypes, String luceneQueryParserClass,
+      Boolean enablePrefixSuffixMatchingInPhraseQueries, Boolean reuseMutableIndex,
+      Integer luceneNRTCachingDirectoryMaxBufferSizeMB, Boolean useLogByteSizeMergePolicy,
+      DocIdTranslatorMode docIdTranslatorMode, Boolean caseSensitive, Boolean storeInSegmentFile) {
+    this(disabled, rawValueForTextIndex, enableQueryCache, useANDForMultiTermQueries, stopWordsInclude,
+        stopWordsExclude, luceneUseCompoundFile, luceneMaxBufferSizeMB, luceneAnalyzerClass, luceneAnalyzerClassArgs,
+        luceneAnalyzerClassArgTypes, luceneQueryParserClass, enablePrefixSuffixMatchingInPhraseQueries,
+        reuseMutableIndex, luceneNRTCachingDirectoryMaxBufferSizeMB, useLogByteSizeMergePolicy, docIdTranslatorMode,
+        caseSensitive, storeInSegmentFile, LUCENE_INDEX_DEFAULT_BUILD_ON_DICTIONARY);
+  }
+
   @JsonCreator
   public TextIndexConfig(@JsonProperty("disabled") Boolean disabled,
       @JsonProperty("rawValue") @Nullable Object rawValueForTextIndex,
