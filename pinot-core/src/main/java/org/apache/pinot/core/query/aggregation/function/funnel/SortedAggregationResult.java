@@ -131,12 +131,12 @@ class SortedAggregationResult {
   }
 
   /**
-   * Extracts the final funnel result. Must be called exactly once; subsequent calls will double-count
-   * the last open correlation group.
+   * Extracts the final funnel result. Must be called exactly once.
    */
   public LongArrayList extractResult() {
     if (_numKeys > 1) {
       flushMultiKeyGroup();
+      _secondaryKeySteps.clear();
     } else {
       incrStepCounters();
     }

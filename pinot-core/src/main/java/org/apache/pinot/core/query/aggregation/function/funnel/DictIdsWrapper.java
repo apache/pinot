@@ -105,6 +105,10 @@ final class DictIdsWrapper {
     return _dictionaries.length > 1;
   }
 
+  boolean isHashMapPath() {
+    return _compositeKeyMap != null;
+  }
+
   /**
    * Maps a tuple of per-column dictionary IDs to a single composite int suitable for RoaringBitmap.
    * Only used for multi-key; for single-key, callers should add the dictId directly.
