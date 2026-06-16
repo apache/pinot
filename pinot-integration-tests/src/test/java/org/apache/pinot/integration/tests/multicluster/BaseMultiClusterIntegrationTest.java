@@ -146,6 +146,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
         _cluster2._zkUrl);
     brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, UNAVAILABLE_CLUSTER_NAME),
         UNAVAILABLE_ZK_ADDRESS);
+    configureIntegrationBrokerResponseMode(brokerConfig);
 
     _brokerWithUnavailableCluster._brokerStarter = createBrokerStarter();
     _brokerWithUnavailableCluster._brokerStarter.init(brokerConfig);
@@ -247,6 +248,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
     brokerConfig.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
     brokerConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+    configureIntegrationBrokerResponseMode(brokerConfig);
     cluster._brokerStarter = createBrokerStarter();
     cluster._brokerStarter.init(brokerConfig);
     cluster._brokerStarter.start();

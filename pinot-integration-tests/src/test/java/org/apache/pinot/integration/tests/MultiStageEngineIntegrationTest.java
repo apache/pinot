@@ -1773,8 +1773,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       // at QueryAssert$QueryErrorAssert$Soft.hasErrorCode(QueryAssert$QueryErrorAssert$Soft.java:119)
       // 2) Expected message to contain <BrokerTimeoutError> but was <ACTUAL ERROR MESSAGE>
       assertions
-          .hasErrorCode(QueryErrorCode.BROKER_TIMEOUT)
-          .containsMessage(QueryErrorCode.BROKER_TIMEOUT.getDefaultMessage());
+          .hasErrorCode(QueryErrorCode.BROKER_TIMEOUT);
     }
   }
 

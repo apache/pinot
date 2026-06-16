@@ -121,7 +121,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean isPartialResult() {
     return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
-        || isMaxRowsInJoinReached();
+        || isMaxRowsInJoinReached() || isMaxRowsInWindowReached();
   }
 
   @Override
@@ -515,7 +515,10 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
         return Math.max(value1, value2);
       }
     },
-    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET);
+    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
+
+    MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN),
+    MAX_ROWS_IN_WINDOW_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

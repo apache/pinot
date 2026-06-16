@@ -20,6 +20,7 @@ package org.apache.pinot.broker.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
@@ -35,12 +36,14 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.BadRequestException;
@@ -67,11 +70,13 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.EagerToLazyBrokerResponseAdaptor;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
@@ -138,6 +143,21 @@ public class PinotClientRequest {
   @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
   private String _instanceId;
 
+  private final ObjectMapper _mapper;
+  private boolean _streamingResponseDefault;
+
+  public PinotClientRequest() {
+    _mapper = JsonUtils.createMapper();
+    StreamingBrokerResponseJacksonSerializer.registerModule(_mapper, KeysComparator.INSTANCE);
+  }
+
+  @PostConstruct
+  public void init() {
+    _streamingResponseDefault = _brokerConf.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE);
+  }
+
   @GET
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
@@ -158,9 +178,9 @@ public class PinotClientRequest {
       if (traceEnabled != null) {
         requestJson.put(Request.TRACE, traceEnabled);
       }
-      BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
-      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+      StreamingBrokerResponse streamingResponse =
+          executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
+      respond(asyncResponse, streamingResponse, httpHeaders);
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -199,11 +219,10 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new BadRequestException("Payload is missing the query string field 'sql'");
       }
-      BrokerResponse brokerResponse =
+      StreamingBrokerResponse streamingResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
               getCursor, numRows);
-      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+      respond(asyncResponse, streamingResponse, httpHeaders);
     } catch (BadRequestException bre) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
       asyncResponse.resume(bre);
@@ -322,10 +341,9 @@ public class PinotClientRequest {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
-      BrokerResponse brokerResponse =
+      StreamingBrokerResponse streamingResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
-      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+      respond(asyncResponse, streamingResponse, httpHeaders);
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -364,11 +382,10 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new BadRequestException("Payload is missing the query string field 'sql'");
       }
-      BrokerResponse brokerResponse =
+      StreamingBrokerResponse streamingResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
               getCursor, numRows);
-      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+      respond(asyncResponse, streamingResponse, httpHeaders);
     } catch (BadRequestException bre) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
       asyncResponse.resume(bre);
@@ -533,7 +550,10 @@ public class PinotClientRequest {
       CompletableFuture<BrokerResponse> v1Response = CompletableFuture.supplyAsync(
           () -> {
             try {
-              return executeSqlQuery(v1RequestJson, makeHttpIdentity(requestContext), true, httpHeaders, false);
+              HttpRequesterIdentity identity = makeHttpIdentity(requestContext);
+              try (StreamingBrokerResponse lazy = executeSqlQuery(v1RequestJson, identity, true, httpHeaders, false)) {
+                return lazy.asEagerBrokerResponse();
+              }
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -546,7 +566,10 @@ public class PinotClientRequest {
       CompletableFuture<BrokerResponse> v2Response = CompletableFuture.supplyAsync(
           () -> {
             try {
-              return executeSqlQuery(v2RequestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
+              HttpRequesterIdentity identity = makeHttpIdentity(requestContext);
+              try (StreamingBrokerResponse lazy = executeSqlQuery(v2RequestJson, identity, true, httpHeaders, true)) {
+                return lazy.asEagerBrokerResponse();
+              }
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -647,27 +670,28 @@ public class PinotClientRequest {
     }
   }
 
-  private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders)
-      throws Exception {
+  private StreamingBrokerResponse executeSqlQuery(ObjectNode sqlRequestJson,
+      HttpRequesterIdentity httpRequesterIdentity,
+      boolean onlyDql, HttpHeaders httpHeaders) throws Exception {
     return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, false);
   }
 
-  private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage)
-      throws Exception {
+  private StreamingBrokerResponse executeSqlQuery(ObjectNode sqlRequestJson,
+      HttpRequesterIdentity httpRequesterIdentity, boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage
+  ) throws Exception {
     return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, forceUseMultiStage, false, 0);
   }
 
-  private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, boolean getCursor, int numRows)
-      throws Exception {
+  private StreamingBrokerResponse executeSqlQuery(ObjectNode sqlRequestJson,
+      HttpRequesterIdentity httpRequesterIdentity, boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage,
+      boolean getCursor, int numRows
+  ) throws Exception {
     long requestArrivalTimeMs = System.currentTimeMillis();
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
     } catch (Exception e) {
-      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+      return StreamingBrokerResponse.error(QueryErrorCode.SQL_PARSING, e.getMessage());
     }
     if (forceUseMultiStage) {
       sqlNodeAndOptions.setExtraOptions(Map.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
@@ -684,15 +708,23 @@ public class PinotClientRequest {
     }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (onlyDql && sqlType != PinotSqlType.DQL) {
-      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
-          "Unsupported SQL type - " + sqlType + ", this API only supports DQL.");
+      String errorMessage = "Unsupported SQL type - " + sqlType + ", this API only supports DQL.";
+      return StreamingBrokerResponse.error(QueryErrorCode.SQL_PARSING, errorMessage);
     }
     switch (sqlType) {
       case DQL:
         try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
           requestContext.setRequestArrivalTimeMillis(requestArrivalTimeMs);
-          return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext,
-              httpHeaders);
+          StreamingBrokerResponse streamingBrokerResponse;
+          if (isStreamingResponseEnabled(sqlNodeAndOptions)) {
+            streamingBrokerResponse = _requestHandler.handleStreamingRequest(
+                sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext, httpHeaders);
+          } else {
+            BrokerResponse eagerResponse = _requestHandler.handleRequest(
+                sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext, httpHeaders);
+            return new EagerToLazyBrokerResponseAdaptor(eagerResponse);
+          }
+          return streamingBrokerResponse;
         } catch (Exception e) {
           LOGGER.error("Error handling DQL request:\n{}", sqlRequestJson, e);
           throw e;
@@ -702,13 +734,14 @@ public class PinotClientRequest {
           Map<String, String> headers = new HashMap<>();
           httpRequesterIdentity.getHttpHeaders().entries()
               .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
-          return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
+          return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers)
+              .toStreamingResponse();
         } catch (Exception e) {
           LOGGER.error("Error handling DML request:\n{}", sqlRequestJson, e);
           throw e;
         }
       default:
-        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
+        return StreamingBrokerResponse.error(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
     }
   }
 
@@ -777,15 +810,16 @@ public class PinotClientRequest {
    * 'Pinot-Use-Http-Status-For-Errors' is set to 'true', returns appropriate HTTP status
    * codes based on the error type from QueryErrorCode.getHttpResponseStatus().
    *
+   * Note: callers are responsible for emitting the RESPONSE_EXCEPTION_MARKER log line (via the
+   * consumption listener installed by onQueryFinished) before invoking this method.
+   *
    * @param brokerResponse The broker response containing query results or errors
    * @param httpHeaders The HTTP headers from the request
    * @return Response
-   * @throws Exception
    */
   @VisibleForTesting
   public static Response getPinotQueryResponse(BrokerResponse brokerResponse, HttpHeaders httpHeaders,
-      BrokerMetrics brokerMetrics)
-      throws Exception {
+      BrokerMetrics brokerMetrics) {
     int queryErrorCodeHeaderValue = -1; // default value of the header.
     Response.Status httpStatus = Response.Status.OK;
 
@@ -800,16 +834,6 @@ public class PinotClientRequest {
         QueryErrorCode queryErrorCode = QueryErrorCode.fromErrorCode(queryErrorCodeHeaderValue);
         httpStatus = queryErrorCode.getHttpResponseStatus();
       }
-
-      // do log with the exception flagged with a particular marker for filtering
-      MDC.put("queryErrorCode", Integer.toString(queryErrorCodeHeaderValue));
-      StringBuilder sb = new StringBuilder();
-      sb.append("Query processing exceptions:");
-      for (QueryProcessingException exception : exceptions) {
-        sb.append(" ").append(exception.toString());
-      }
-      LOGGER.error(RESPONSE_EXCEPTION_MARKER, sb.toString());
-      MDC.remove("queryErrorCode");
     }
 
     // returning the Response with appropriate status and header value.
@@ -910,5 +934,185 @@ public class PinotClientRequest {
     }
 
     return differences;
+  }
+
+  private void respond(
+      AsyncResponse asyncResponse, StreamingBrokerResponse streamingResponse, HttpHeaders httpHeaders
+  ) throws Exception {
+    // Attach the consumption listener to all paths: emits error metrics and logs exceptions once per query.
+    StreamingBrokerResponse withListener = onQueryFinished(streamingResponse);
+
+    boolean errorsAsHttpCode = Boolean.parseBoolean(httpHeaders.getHeaderString(
+        CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER));
+
+    if (errorsAsHttpCode) {
+      // We need to set the HTTP status code based on whether there are errors in the response.
+      // Given the HTTP status code needs to be set before the response entity is written out, we need to
+      // pre-scan the response for errors and therefore we cannot stream the response directly.
+      // Consuming via asEagerBrokerResponse() fires the listener, which emits error metrics.
+      BrokerResponse eagerResponse = withListener.asEagerBrokerResponse();
+      asyncResponse.resume(getPinotQueryResponse(eagerResponse, httpHeaders, _brokerMetrics));
+    } else {
+      // In default mode, set X-Pinot-Error-Code if the metainfo is already known (EarlyResponse or
+      // EagerToLazyBrokerResponseAdaptor). For truly streaming responses the header is omitted because
+      // HTTP response headers must be committed before the body, so the error code is unavailable
+      // until after the stream is consumed.
+      int errorCodeHeaderValue = -1;
+      boolean headerKnown = false;
+      try {
+        StreamingBrokerResponse.Metainfo preMetainfo = withListener.getMetaInfo();
+        QueryErrorCode errorCode = preMetainfo.getErrorCode();
+        errorCodeHeaderValue = errorCode != null ? errorCode.getId() : -1;
+        headerKnown = true;
+      } catch (IllegalStateException ignored) {
+        // Truly streaming response: metainfo not yet known; omit the header.
+      }
+      Response.ResponseBuilder builder = Response.ok()
+          .type(MediaType.APPLICATION_JSON)
+          .entity(streamResponse(withListener));
+      if (headerKnown) {
+        builder.header(PINOT_QUERY_ERROR_CODE_HEADER, errorCodeHeaderValue);
+      }
+      asyncResponse.resume(builder.build());
+    }
+  }
+
+  private StreamingOutput streamResponse(StreamingBrokerResponse streamingResponse) {
+    return (outputStream) -> {
+      try {
+        CountingOutputStream countingOutputStream = new CountingOutputStream(outputStream);
+        _mapper.writeValue(countingOutputStream, streamingResponse);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES, countingOutputStream.getCount());
+        // Error metrics are emitted via the consumption listener added by onQueryFinished() — not here,
+        // to avoid double-counting when onQueryFinished() is used.
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while writing streaming response", e);
+        throw new RuntimeException(e);
+      } finally {
+        streamingResponse.close();
+      }
+    };
+  }
+
+  private StreamingBrokerResponse onQueryFinished(StreamingBrokerResponse streamingResponse) {
+    return streamingResponse.withListener((finishedResponse, metainfo) -> {
+      emitBrokerResponseMetrics(metainfo);
+      List<QueryProcessingException> exceptions = metainfo.getExceptions();
+      if (!exceptions.isEmpty()) {
+        int queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
+        MDC.put("queryErrorCode", Integer.toString(queryErrorCodeHeaderValue));
+        StringBuilder sb = new StringBuilder();
+        sb.append("Query processing exceptions:");
+        for (QueryProcessingException exception : exceptions) {
+          sb.append(" ").append(exception.toString());
+        }
+        LOGGER.error(RESPONSE_EXCEPTION_MARKER, sb.toString());
+        MDC.remove("queryErrorCode");
+      }
+    });
+  }
+
+  /**
+   * Emits metrics for the BrokerResponse. Currently only emits metrics for exceptions.
+   * If a broker response has multiple exceptions, we will emit metrics for all of them.
+   * Thus, the sum total of all exceptions is >= total number of queries impacted.
+   * Additionally, some parts of code might already be emitting metrics for individual error codes.
+   * But that list isn't accurate with a many-to-many relationship (or no metrics) between error codes and metrics.
+   * This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
+   */
+  private void emitBrokerResponseMetrics(StreamingBrokerResponse.Metainfo metainfo) {
+    for (QueryProcessingException exception : metainfo.getExceptions()) {
+      QueryErrorCode queryErrorCode;
+      try {
+        queryErrorCode = QueryErrorCode.fromErrorCode(exception.getErrorCode());
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn("Invalid error code: " + exception.getErrorCode(), e);
+        queryErrorCode = QueryErrorCode.UNKNOWN;
+      }
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.getQueryErrorMeter(queryErrorCode), 1);
+    }
+  }
+
+  @VisibleForTesting
+  boolean isStreamingResponseEnabled(SqlNodeAndOptions sqlNodeAndOptions) {
+    return QueryOptionsUtils.isUseStreamingResponse(sqlNodeAndOptions.getOptions(), _streamingResponseDefault);
+  }
+
+  public static class KeysComparator implements Comparator<String> {
+    public static final KeysComparator INSTANCE = new KeysComparator();
+    public static final List<String> SORTED_STAT_KEYS = List.of(
+        "resultTable",
+        "numRowsResultSet",
+        "partialResult",
+        "exceptions",
+        "numGroupsLimitReached",
+        "numGroupsWarningLimitReached",
+        "maxRowsInJoinReached",
+        "maxRowsInWindowReached",
+        "timeUsedMs",
+        "stageStats",
+        "maxRowsInOperator",
+        "requestId",
+        "clientRequestId",
+        "brokerId",
+        "numDocsScanned",
+        "totalDocs",
+        "numEntriesScannedInFilter",
+        "numEntriesScannedPostFilter",
+        "numServersQueried",
+        "numServersResponded",
+        "numSegmentsQueried",
+        "numSegmentsProcessed",
+        "numSegmentsMatched",
+        "numConsumingSegmentsQueried",
+        "numConsumingSegmentsProcessed",
+        "numConsumingSegmentsMatched",
+        "minConsumingFreshnessTimeMs",
+        "numSegmentsPrunedByBroker",
+        "numSegmentsPrunedByServer",
+        "numSegmentsPrunedInvalid",
+        "numSegmentsPrunedByLimit",
+        "numSegmentsPrunedByValue",
+        "brokerReduceTimeMs",
+        "offlineThreadCpuTimeNs",
+        "realtimeThreadCpuTimeNs",
+        "offlineSystemActivitiesCpuTimeNs",
+        "realtimeSystemActivitiesCpuTimeNs",
+        "offlineResponseSerializationCpuTimeNs",
+        "realtimeResponseSerializationCpuTimeNs",
+        "offlineTotalCpuTimeNs",
+        "realtimeTotalCpuTimeNs",
+        "explainPlanNumEmptyFilterSegments",
+        "explainPlanNumMatchAllFilterSegments",
+        "traceInfo",
+        "tablesQueried",
+        "realtimeThreadMemAllocatedBytes",
+        "offlineThreadMemAllocatedBytes",
+        "offlineResponseSerMemAllocatedBytes",
+        "realtimeResponseSerMemAllocatedBytes",
+        "offlineTotalMemAllocatedBytes",
+        "realtimeTotalMemAllocatedBytes",
+        "pools",
+        "rlsFiltersApplied",
+        "groupsTrimmed"
+    );
+
+    private KeysComparator() {
+    }
+
+    @Override
+    public int compare(String o1, String o2) {
+      int idx1 = SORTED_STAT_KEYS.indexOf(o1);
+      int idx2 = SORTED_STAT_KEYS.indexOf(o2);
+      if (idx1 == -1 && idx2 == -1) {
+        return 0;
+      } else if (idx1 == -1) {
+        return -1;
+      } else if (idx2 == -1) {
+        return 1;
+      } else {
+        return Integer.compare(idx1, idx2);
+      }
+    }
   }
 }
