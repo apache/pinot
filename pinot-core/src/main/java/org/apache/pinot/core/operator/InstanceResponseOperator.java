@@ -30,10 +30,13 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
   private static final String EXPLAIN_NAME = "INSTANCE_RESPONSE";
+  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponseOperator.class);
 
   protected final BaseCombineOperator<?> _combineOperator;
   protected final List<SegmentContext> _segmentContexts;

@@ -74,7 +74,6 @@ public class PhysicalPlannerContext {
   private final boolean _liteModeJoinsEnabled;
   @Nullable
   private final MultiClusterRoutingContext _multiClusterRoutingContext;
-  private boolean _liteModeImplicitSortApplied = false;
   private int _liteModeEffectiveSortLimit = -1;
 
   /**
@@ -188,13 +187,12 @@ public class PhysicalPlannerContext {
     return _liteModeLeafStageFanOutAdjustedLimit;
   }
 
-  public void setLiteModeImplicitSortApplied(int effectiveLimit) {
-    _liteModeImplicitSortApplied = true;
+  public void setLiteModeEffectiveSortLimit(int effectiveLimit) {
     _liteModeEffectiveSortLimit = effectiveLimit;
   }
 
   public boolean isLiteModeImplicitSortApplied() {
-    return _liteModeImplicitSortApplied;
+    return _liteModeEffectiveSortLimit >= 0;
   }
 
   public int getLiteModeEffectiveSortLimit() {

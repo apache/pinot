@@ -186,6 +186,8 @@ public interface RequestContext {
 
   void setNumGroupsLimitReached(boolean numGroupsLimitReached);
 
+  void setMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached);
+
   void setNumExceptions(int numExceptions);
 
   void setNumRowsResultSet(int numRowsResultSet);
