@@ -129,25 +129,26 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Update single-column indices, like inverted index, json index etc.
       List<IndexHandler> indexHandlers = new ArrayList<>();
 
-      // We cannot just create all the index handlers in a random order.
-      // Specifically, ForwardIndexHandler MUST run first. It is the only handler that:
-      //   (a) creates the shared dictionary for a RAW forward index column when a secondary index requires one
-      //       (ENABLE_DICTIONARY operation in ForwardIndexHandler.createDictionaryForRawForwardIndex);
-      //   (b) updates the segment metadata's HAS_DICTIONARY / FORWARD_INDEX_ENCODING properties accordingly.
-      // The InvertedIndexHandler / RangeIndexHandler / FSTIndexHandler then read the freshly-reloaded metadata and
-      // build dict-id-based indexes on top of the new shared dictionary. If this order is violated, downstream
-      // handlers fail with an IllegalStateException because the dictionary they require does not yet exist.
-      // Any future change to handler scheduling MUST preserve: ForwardIndexHandler → reloadMetadata → other handlers.
-      IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
-      indexHandlers.add(forwardHandler);
-      forwardHandler.updateIndices(segmentWriter);
-      _segmentDirectory.reloadMetadata();
-
-      // Now that ForwardIndexHandler.updateIndices has been updated, we can run all other indexes in any order.
-      // When skipSecondaryIndexes is enabled, skip all non-forward index handlers (no secondary indexes are created
-      // or updated during preprocess).
+      // When skipSecondaryIndexes is enabled, the segment is loaded "as is": no forward-index encoding flips, no
+      // dict upgrade driven by a (skipped) secondary index, no secondary index build, no star-tree, no multi-col
+      // text, no min/max. Default-column materialization above is still applied.
       boolean skipSecondaryIndexes = _indexLoadingConfig.isSkipSecondaryIndexes();
       if (!skipSecondaryIndexes) {
+        // We cannot just create all the index handlers in a random order.
+        // Specifically, ForwardIndexHandler MUST run first. It is the only handler that:
+        //   (a) creates the shared dictionary for a RAW forward index column when a secondary index requires one
+        //       (ENABLE_DICTIONARY operation in ForwardIndexHandler.createDictionaryForRawForwardIndex);
+        //   (b) updates the segment metadata's HAS_DICTIONARY / FORWARD_INDEX_ENCODING properties accordingly.
+        // The InvertedIndexHandler / RangeIndexHandler / FSTIndexHandler then read the freshly-reloaded metadata
+        // and build dict-id-based indexes on top of the new shared dictionary. If this order is violated,
+        // downstream handlers fail with an IllegalStateException because the dictionary they require does not
+        // yet exist. Any future change to handler scheduling MUST preserve:
+        //   ForwardIndexHandler → reloadMetadata → other handlers.
+        IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
+        indexHandlers.add(forwardHandler);
+        forwardHandler.updateIndices(segmentWriter);
+        _segmentDirectory.reloadMetadata();
+
         for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
           if (type != StandardIndexes.forward()) {
             IndexHandler handler = createHandler(type);
@@ -226,16 +227,15 @@ public class SegmentPreProcessor implements AutoCloseable {
         return true;
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
-      // When skipSecondaryIndexes is enabled, only the forward index is considered; secondary indexes, star-trees,
-      // and multi-column text indexes are all skipped.
+      // When skipSecondaryIndexes is enabled, the entire index-handler check loop is skipped — preprocess only
+      // runs for default-column materialization in that case.
       boolean skipSecondaryIndexes = _indexLoadingConfig.isSkipSecondaryIndexes();
-      for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
-        if (skipSecondaryIndexes && type != StandardIndexes.forward()) {
-          continue;
-        }
-        if (createHandler(type).needUpdateIndices(segmentReader)) {
-          LOGGER.info("Found index type: {} needs updates in segment: {}", type, segmentName);
-          return true;
+      if (!skipSecondaryIndexes) {
+        for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
+          if (createHandler(type).needUpdateIndices(segmentReader)) {
+            LOGGER.info("Found index type: {} needs updates in segment: {}", type, segmentName);
+            return true;
+          }
         }
       }
       if (!skipSecondaryIndexes) {
