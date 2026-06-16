@@ -152,7 +152,9 @@ public class MergeTaskUtils {
       return;
     }
     FieldSpec fieldSpec = schema.getFieldSpecFor(column);
-    Preconditions.checkState(fieldSpec != null && fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
+    Preconditions.checkState(fieldSpec != null,
+        "Aggregation type: %s on column: %s requires the column to exist in schema!", aggregationType, column);
+    Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
         "Aggregation type: %s on column: %s requires the column to be a metric column in schema!", aggregationType,
         column);
     // The reducer can only order the values by time when the table has a time column resolvable in the schema

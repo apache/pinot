@@ -515,6 +515,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
       if (entry.getKey().endsWith(MergeTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
         String column = StringUtils.removeEnd(entry.getKey(), MergeTask.AGGREGATION_TYPE_KEY_SUFFIX);
+        Preconditions.checkState(columnNames.contains(column), "Column \"%s\" not found in schema!", column);
         try {
           // check that it's a valid aggregation function type, and a value aggregator is available for it
           AggregationFunctionType aggregationType =

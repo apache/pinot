@@ -206,6 +206,14 @@ public class MergeRollupTaskGeneratorTest {
     dimensionColumnConfig.put("d.aggregationType", "lastWithTime");
     assertThrows(IllegalStateException.class,
         () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, dimensionColumnConfig));
+
+    // An aggregationType configured for a column that does not exist in schema should fail the validation, even for
+    // non-order-sensitive types (e.g. a typo in the column name)
+    Map<String, String> missingColumnConfig = new HashMap<>();
+    missingColumnConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "hourly");
+    missingColumnConfig.put("missingCol.aggregationType", "sum");
+    assertThrows(IllegalStateException.class,
+        () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, missingColumnConfig));
   }
 
   @Test
