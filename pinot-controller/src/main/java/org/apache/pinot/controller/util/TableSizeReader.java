@@ -133,6 +133,9 @@ public class TableSizeReader {
       }
       if (largestSegmentSizeOnServer != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
         emitMetrics(realtimeTableName, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER, largestSegmentSizeOnServer);
+      } else {
+        _controllerMetrics.removeTableGauge(realtimeTableName,
+            ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER);
       }
       emitTierMetrics(realtimeTableName, tableSizeDetails._realtimeSegments._storageBreakdown);
       if (isCompressionStatsEnabled(realtimeTableConfig)) {
@@ -171,6 +174,9 @@ public class TableSizeReader {
       }
       if (largestSegmentSizeOnServer != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
         emitMetrics(offlineTableName, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER, largestSegmentSizeOnServer);
+      } else {
+        _controllerMetrics.removeTableGauge(offlineTableName,
+            ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER);
       }
       emitTierMetrics(offlineTableName, tableSizeDetails._offlineSegments._storageBreakdown);
       if (isCompressionStatsEnabled(offlineTableConfig)) {
