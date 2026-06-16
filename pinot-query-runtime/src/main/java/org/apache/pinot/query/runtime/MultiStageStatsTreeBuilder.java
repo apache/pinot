@@ -194,24 +194,21 @@ public class MultiStageStatsTreeBuilder {
   }
 
   /**
-   * Sums a named stat field across the logical children of a node (with PIPELINE_BREAKER collapse,
-   * mirroring the child iteration in {@link #jsonFromStatsTreeNode}).
+   * Sums a named stat field across the direct non-pipeline-breaker children of a node.
+   *
+   * <p>PIPELINE_BREAKER children are skipped entirely, mirroring {@link InStageStatsTreeBuilder}'s
+   * {@code adjustWithChildren=false} path for LEAF nodes: the breaker runs pre-stage, so its
+   * cumulative time is not part of the parent's time budget and must not be subtracted.
    */
   private static long sumChildrenStat(StageStatsTreeNode node, String statKey) {
     long sum = 0;
     for (StageStatsTreeNode child : node.getChildren()) {
       if (child.getType().getId() == MultiStageOperator.Type.PIPELINE_BREAKER.getId()) {
-        for (StageStatsTreeNode grandChild : child.getChildren()) {
-          JsonNode val = grandChild.getStatMap().asJson().get(statKey);
-          if (val != null) {
-            sum += val.asLong(0);
-          }
-        }
-      } else {
-        JsonNode val = child.getStatMap().asJson().get(statKey);
-        if (val != null) {
-          sum += val.asLong(0);
-        }
+        continue;
+      }
+      JsonNode val = child.getStatMap().asJson().get(statKey);
+      if (val != null) {
+        sum += val.asLong(0);
       }
     }
     return sum;
