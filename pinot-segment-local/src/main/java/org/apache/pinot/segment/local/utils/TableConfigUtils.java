@@ -109,6 +109,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1648,7 +1649,8 @@ public final class TableConfigUtils {
     // Star-tree index config is not managed by FieldIndexConfigs, and we need to validate it separately.
     List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
     if (CollectionUtils.isNotEmpty(starTreeIndexConfigs)) {
-      validateStarTreeIndexConfigs(starTreeIndexConfigs, indexConfigsMap, schema);
+      validateStarTreeIndexConfigs(starTreeIndexConfigs, indexConfigsMap, schema,
+          TimestampIndexUtils.extractColumnsWithGranularity(tableConfig));
     }
 
     // TIMESTAMP index is not managed by FieldIndexConfigs, and we need to validate it separately.
@@ -1750,14 +1752,23 @@ public final class TableConfigUtils {
   /// - 'dimensionsSplitOrder' contains all dimensions in 'skipStarNodeCreationForDimensions'
   /// - Either functionColumnPairs or aggregationConfigs must be specified, but not both
   /// - All referenced columns exist in the schema and are single-valued
+  ///
+  /// `timestampIndexColumns` holds the TIMESTAMP-index derived columns (e.g. `$ts$DAY`) declared via
+  /// [TimestampConfig#getGranularities()]. These are materialized as dictionary-encoded single-value TIMESTAMP
+  /// columns at segment generation time (see [TimestampIndexUtils#applyTimestampIndex(TableConfig, Schema)]), so
+  /// they are absent from the schema at config-validation time and are accepted here without a schema lookup.
   private static void validateStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs,
-      Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema) {
+      Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema, Set<String> timestampIndexColumns) {
     Set<String> dimensionColumns = new HashSet<>();
     for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
       // Validate dimension columns are dictionary encoded
       List<String> dimensionsSplitOrder = starTreeIndexConfig.getDimensionsSplitOrder();
       assert CollectionUtils.isNotEmpty(dimensionsSplitOrder);
       for (String dimension : dimensionsSplitOrder) {
+        if (timestampIndexColumns.contains(dimension)) {
+          dimensionColumns.add(dimension);
+          continue;
+        }
         FieldIndexConfigs indexConfigs = indexConfigsMap.get(dimension);
         Preconditions.checkState(indexConfigs != null,
             "Failed to find dimension column: %s specified in star-tree index config in schema", dimension);
@@ -1844,6 +1855,9 @@ public final class TableConfigUtils {
       }
 
       for (String column : Iterables.concat(dimensionColumns, aggregatedColumns)) {
+        if (timestampIndexColumns.contains(column)) {
+          continue;
+        }
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null,
             "Failed to find column: %s specified in star-tree index config in schema", column);
@@ -1852,6 +1866,9 @@ public final class TableConfigUtils {
       }
 
       for (String column : dimensionColumns) {
+        if (timestampIndexColumns.contains(column)) {
+          continue;
+        }
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             "Star-tree dimension columns must be single-value, but found multi-value column: %s", column);
