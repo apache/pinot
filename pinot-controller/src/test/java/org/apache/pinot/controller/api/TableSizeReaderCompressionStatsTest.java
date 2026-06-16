@@ -200,6 +200,31 @@ public class TableSizeReaderCompressionStatsTest {
     return reader.getTableSizeDetails(table, TIMEOUT_MSEC, true, true);
   }
 
+  private TableSizeReader.TableSizeDetails testRunner(String[] servers, String table, boolean includeColumnStats)
+      throws InvalidConfigException {
+    when(_helix.getServerToSegmentsMap(anyString(), any(), anyBoolean())).thenAnswer(
+        (Answer<Map<String, List<String>>>) invocation -> {
+          Map<String, List<String>> map = new HashMap<>();
+          for (String server : servers) {
+            map.put(server, _serverMap.get(server)._segments);
+          }
+          return map;
+        });
+
+    when(_helix.getDataInstanceAdminEndpoints(ArgumentMatchers.anySet())).thenAnswer(
+        (Answer<BiMap<String, String>>) invocation -> {
+          BiMap<String, String> endpoints = HashBiMap.create(servers.length);
+          for (String server : servers) {
+            endpoints.put(server, _serverMap.get(server)._endpoint);
+          }
+          return endpoints;
+        });
+
+    TableSizeReader reader =
+        new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix, _leadControllerManager);
+    return reader.getTableSizeDetails(table, TIMEOUT_MSEC, true, includeColumnStats);
+  }
+
   @Test
   public void testCompressionStatsAggregation()
       throws InvalidConfigException {
@@ -332,11 +357,7 @@ public class TableSizeReaderCompressionStatsTest {
     // Previously, the summary was gated on perColumnMax which is only populated when servers are
     // called with includeColumnStats=true. This caused the summary to be null for the default case.
     String[] servers = {"server0", "server1"};
-    TableSizeReader reader =
-        new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix, _leadControllerManager);
-    setUpHttpMocks(servers);
-    TableSizeReader.TableSizeDetails details =
-        reader.getTableSizeDetails("offline", TIMEOUT_MSEC, true, false);
+    TableSizeReader.TableSizeDetails details = testRunner(servers, "offline", false);
 
     TableSizeReader.TableSubTypeSizeDetails offlineDetails = details._offlineSegments;
     assertNotNull(offlineDetails);
