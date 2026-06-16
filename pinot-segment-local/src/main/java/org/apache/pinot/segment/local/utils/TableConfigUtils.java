@@ -1605,17 +1605,17 @@ public final class TableConfigUtils {
     validateMultiColumnTextIndex(indexingConfig.getMultiColumnTextIndexConfig());
 
     // OPEN_STRUCT materialized child columns use a reserved separator '$' in their name. When any
-    // schema field is OPEN_STRUCT, reject user columns whose names contain '$' to prevent naming
-    // collisions with future per-key materialized columns (col$key) or the sparse column
-    // (col$__sparse__). This validation runs here (with full schema access) rather than per-field
-    // because each OpenStructIndexType.validate() call only sees one field at a time.
+    // schema field is OPEN_STRUCT, reject ALL columns (including OPEN_STRUCT parents themselves)
+    // whose names contain '$'. This prevents naming collisions: a parent named 'a$b' would produce
+    // children 'a$b$key', which parseParentColumn() would misparse as parent 'a' and key 'b$key'.
+    // This validation runs here (with full schema access) rather than per-field because each
+    // OpenStructIndexType.validate() call only sees one field at a time.
     boolean anyOpenStruct = schema.getAllFieldSpecs().stream()
         .anyMatch(fs -> fs.getDataType() == DataType.OPEN_STRUCT);
     if (anyOpenStruct) {
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
         Preconditions.checkState(
-            fieldSpec.getDataType() == DataType.OPEN_STRUCT
-                || !OpenStructNaming.isMaterializedOpenStructColumn(fieldSpec.getName()),
+            !OpenStructNaming.isMaterializedOpenStructColumn(fieldSpec.getName()),
             "Schema column '%s' contains reserved OPEN_STRUCT separator '%s'",
             fieldSpec.getName(), OpenStructNaming.SEPARATOR);
       }
