@@ -535,12 +535,26 @@ public class TableSizeReader {
         subTypeSizeDetails._estimatedSizeInBytes += sizeDetails._estimatedSizeInBytes;
         subTypeSizeDetails._reportedSizePerReplicaInBytes += sizeDetails._maxReportedSizePerReplicaInBytes;
 
-        // Aggregate compression stats summary: sum per-column rawIngest and onDisk across all
-        // columns that have stats. This covers raw, dict-only, and mixed tables consistently.
-        if (!perColumnMax.isEmpty()) {
+        // Aggregate compression stats summary. Prefer segment-level sizes (rawIngestSizeBytes /
+        // onDiskSizeBytes in SegmentSizeInfo) which are always populated by servers for segments
+        // with raw forward index columns. Only raw columns contribute to the compression ratio;
+        // dict-only segments count toward coverage but not toward the ratio numerator/denominator.
+        // Fall back to per-column aggregation when segment-level sizes are absent (e.g. legacy
+        // servers that do not populate the segment-level fields).
+        if (maxRawFwdIndexSize > 0) {
+          compressionStats._rawIngestSizePerReplicaInBytes += maxRawFwdIndexSize;
+          compressionStats._onDiskSizePerReplicaInBytes += maxCompressedFwdIndexSize;
+          compressionStats._segmentsWithStats++;
+        } else if (maxCompressedFwdIndexSize > 0) {
+          // Dict-only segment: count for coverage but exclude from ratio to avoid skewing it
+          compressionStats._segmentsWithStats++;
+        } else if (!perColumnMax.isEmpty()) {
+          // Fallback: segment-level sizes absent; accumulate from per-column data
           for (long[] vals : perColumnMax.values()) {
-            compressionStats._rawIngestSizePerReplicaInBytes += vals[0];
-            compressionStats._onDiskSizePerReplicaInBytes += vals[1];
+            if (vals[0] > 0) {
+              compressionStats._rawIngestSizePerReplicaInBytes += vals[0];
+              compressionStats._onDiskSizePerReplicaInBytes += vals[1];
+            }
           }
           compressionStats._segmentsWithStats++;
         }

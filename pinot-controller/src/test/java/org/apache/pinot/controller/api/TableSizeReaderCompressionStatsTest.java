@@ -326,6 +326,37 @@ public class TableSizeReaderCompressionStatsTest {
   }
 
   @Test
+  public void testCompressionStatsSummaryPresentWhenColumnStatsExcluded()
+      throws InvalidConfigException {
+    // Regression test: compressionStats summary must be present even when includeColumnStats=false.
+    // Previously, the summary was gated on perColumnMax which is only populated when servers are
+    // called with includeColumnStats=true. This caused the summary to be null for the default case.
+    String[] servers = {"server0", "server1"};
+    TableSizeReader reader =
+        new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix, _leadControllerManager);
+    setUpHttpMocks(servers);
+    TableSizeReader.TableSizeDetails details =
+        reader.getTableSizeDetails("offline", TIMEOUT_MSEC, true, false);
+
+    TableSizeReader.TableSubTypeSizeDetails offlineDetails = details._offlineSegments;
+    assertNotNull(offlineDetails);
+
+    // Summary must be non-null — the bug was that it returned null without includeColumnStats
+    assertNotNull(offlineDetails._compressionStats,
+        "compressionStats summary should be present even when includeColumnStats=false");
+    assertTrue(offlineDetails._compressionStats._rawIngestSizePerReplicaInBytes > 0,
+        "rawIngestSizePerReplicaInBytes should be > 0");
+    assertTrue(offlineDetails._compressionStats._onDiskSizePerReplicaInBytes > 0,
+        "onDiskSizePerReplicaInBytes should be > 0");
+    assertTrue(offlineDetails._compressionStats._segmentsWithStats > 0,
+        "segmentsWithStats should be > 0");
+
+    // Per-column list must still be null (not requested)
+    assertNull(offlineDetails._columnCompressionStats,
+        "columnCompressionStats should be null when includeColumnStats=false");
+  }
+
+  @Test
   public void testCompressionStatsNullWhenFlagOff()
       throws InvalidConfigException {
     // Use servers with compression stats but with compressionStatsEnabled=false on the table config
