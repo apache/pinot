@@ -1120,4 +1120,41 @@ public class StringFunctions {
     Matcher matcher = Pattern.compile(regexp).matcher(input);
     return matcher.find() ? matcher.group() : null;
   }
+
+  /**
+   * Returns a string with every occurrence of a character in {@code from} replaced by the corresponding character in
+   * {@code to}. Characters in {@code input} that do not appear in {@code from} are left unchanged. If {@code from} is
+   * longer than {@code to}, characters beyond the length of {@code to} are deleted from the result. Equivalent to the
+   * SQL standard {@code TRANSLATE(string, from, to)} function supported by PostgreSQL, Oracle, and Trino.
+   *
+   * <p>Examples:
+   * <pre>
+   *   translate("hello", "aeiou", "AEIOU") → "hEllO"
+   *   translate("abc", "abc", "xy")        → "xy"   (c has no target → deleted)
+   *   translate("abcdef", "ace", "XY")     → "XbYdf" (e has no target → deleted)
+   * </pre>
+   *
+   * @param input the source string
+   * @param from  characters to search for (must not be null)
+   * @param to    replacement characters (must not be null; may be shorter than {@code from})
+   * @return the translated string
+   */
+  @ScalarFunction
+  public static String translate(String input, String from, String to) {
+    if (input.isEmpty() || from.isEmpty()) {
+      return input;
+    }
+    StringBuilder sb = new StringBuilder(input.length());
+    for (int i = 0; i < input.length(); i++) {
+      char c = input.charAt(i);
+      int idx = from.indexOf(c);
+      if (idx < 0) {
+        sb.append(c);
+      } else if (idx < to.length()) {
+        sb.append(to.charAt(idx));
+      }
+      // idx >= to.length(): character is deleted (not appended)
+    }
+    return sb.toString();
+  }
 }

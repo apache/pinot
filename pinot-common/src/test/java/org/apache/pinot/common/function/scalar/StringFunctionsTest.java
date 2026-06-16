@@ -568,4 +568,36 @@ public class StringFunctionsTest {
     assertEquals(StringFunctions.regexpSubstr("", "a"), null);
     assertEquals(StringFunctions.regexpSubstr("Hello World", "[A-Z][a-z]+"), "Hello");
   }
+
+  // ==================== Tests for translate ====================
+
+  @Test
+  public void testTranslate() {
+    // Basic character replacement
+    assertEquals(StringFunctions.translate("hello", "aeiou", "AEIOU"), "hEllO");
+
+    // Replacement and deletion: 'c' has no target in 'to' → deleted
+    assertEquals(StringFunctions.translate("abc", "abc", "xy"), "xy");
+
+    // Mixed: replacement and deletion
+    assertEquals(StringFunctions.translate("abcdef", "ace", "XY"), "XbYdf");
+
+    // No characters in 'from' match → input unchanged
+    assertEquals(StringFunctions.translate("hello", "xyz", "123"), "hello");
+
+    // Empty 'from' → input unchanged
+    assertEquals(StringFunctions.translate("hello", "", "abc"), "hello");
+
+    // Empty input → empty result
+    assertEquals(StringFunctions.translate("", "abc", "xyz"), "");
+
+    // All characters deleted (to is empty)
+    assertEquals(StringFunctions.translate("abc", "abc", ""), "");
+
+    // SQL standard example: partial substitution — digits 0-3 map to z/e/r/o; digits 4-9 are deleted
+    assertEquals(StringFunctions.translate("12300", "0123456789", "zero"), "erozz");
+
+    // Duplicate characters in 'from': first occurrence wins
+    assertEquals(StringFunctions.translate("aaa", "aa", "XY"), "XXX");
+  }
 }
