@@ -601,6 +601,7 @@ public class StringFunctionsTest {
     assertEquals(StringFunctions.translate("aaa", "aa", "XY"), "XXX");
   }
 
+
   // ==================== Tests for overlay ====================
 
   @Test
