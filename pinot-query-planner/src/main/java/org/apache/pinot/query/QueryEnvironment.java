@@ -814,7 +814,8 @@ public class QueryEnvironment {
 
     /// Whether to run the cost-based join-reordering phase by default.
     ///
-    /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+    /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
+    /// configuration.
     /// This default value can be always overridden at query level by the query option
     /// [CommonConstants.Broker.Request.QueryOptionKey#USE_JOIN_REORDER].
     @Value.Default
@@ -825,7 +826,8 @@ public class QueryEnvironment {
     /// Maximum number of joins a plan may contain for the cost-based join-reordering phase to run.
     /// Plans that exceed this cap skip the reorder phase.
     ///
-    /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+    /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
+    /// configuration.
     /// This default value can be always overridden at query level by the query option
     /// [CommonConstants.Broker.Request.QueryOptionKey#JOIN_REORDER_MAX_JOINS].
     @Value.Default

@@ -18,15 +18,16 @@
  */
 package org.apache.pinot.calcite.rel.metadata;
 
-import com.google.common.collect.ImmutableList;
+import java.util.List;
 import org.apache.calcite.rel.metadata.BuiltInMetadata;
 import org.apache.calcite.rel.metadata.ChainedRelMetadataProvider;
 import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
 import org.apache.calcite.rel.metadata.ReflectiveRelMetadataProvider;
+import org.apache.calcite.rel.metadata.RelMetadataProvider;
 
 
-/// Metadata provider for Pinot query planning that places Pinot-aware handlers ahead of Calcite's
-/// [DefaultRelMetadataProvider].
+/// Holds the Pinot metadata provider for query planning, which places Pinot-aware handlers ahead
+/// of Calcite's [DefaultRelMetadataProvider].
 ///
 /// ### Provider chain
 /// 1. [PinotRelMdSelectivity] — time-range and NDV-based selectivity estimation.
@@ -52,18 +53,17 @@ import org.apache.calcite.rel.metadata.ReflectiveRelMetadataProvider;
 ///
 /// ### Thread-safety
 /// The singleton instance is effectively immutable once constructed. Safe for concurrent use.
-public final class PinotDefaultRelMetadataProvider extends ChainedRelMetadataProvider {
+public final class PinotDefaultRelMetadataProvider {
 
   /// Global singleton. Because [PinotRelMdSelectivity] is stateless, all query environments
   /// share this single provider — Janino compiles the handler bytecode only once.
-  public static final PinotDefaultRelMetadataProvider INSTANCE =
-      new PinotDefaultRelMetadataProvider();
+  public static final RelMetadataProvider INSTANCE =
+      ChainedRelMetadataProvider.of(List.of(
+          ReflectiveRelMetadataProvider.reflectiveSource(
+              new PinotRelMdSelectivity(),
+              BuiltInMetadata.Selectivity.Handler.class),
+          DefaultRelMetadataProvider.INSTANCE));
 
   private PinotDefaultRelMetadataProvider() {
-    super(ImmutableList.of(
-        ReflectiveRelMetadataProvider.reflectiveSource(
-            new PinotRelMdSelectivity(),
-            BuiltInMetadata.Selectivity.Handler.class),
-        DefaultRelMetadataProvider.INSTANCE));
   }
 }
