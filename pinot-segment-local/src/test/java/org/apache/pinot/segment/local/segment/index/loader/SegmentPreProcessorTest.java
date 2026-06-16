@@ -2258,4 +2258,66 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     validateIndexDoesNotExist(StandardIndexes.inverted(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
     validateIndexExists(StandardIndexes.dictionary(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
   }
+
+  // Verifies that when `skipSecondaryIndexes=true` is set on the table config, preprocess does NOT build a
+  // dictionary on a raw forward-index column even when the table config declares a secondary index (inverted
+  // here) on that column. This guards against the `ForwardIndexHandler.createDictionaryForRawForwardIndex`
+  // leak where `dictRequiredByIndex` would otherwise force a full per-row scan to materialize the dict.
+  @Test
+  public void testSkipSecondaryIndexesDoesNotCreateDictionaryOnRawColumn()
+      throws Exception {
+    buildV3Segment();
+    SegmentMetadataImpl before = new SegmentMetadataImpl(INDEX_DIR);
+    assertFalse(before.getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Setup: raw column should start without a dictionary");
+
+    _invertedIndexColumns.add(EXISTING_INT_COL_RAW);
+    TableConfig tableConfig = createTableConfig();
+    tableConfig.getIndexingConfig().setSkipSecondaryIndexes(true);
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor =
+            new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(tableConfig, _schema))) {
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    SegmentMetadataImpl after = new SegmentMetadataImpl(INDEX_DIR);
+    assertFalse(after.getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "skipSecondaryIndexes=true must not create a dictionary on a raw column even when an inverted index is "
+            + "requested in the table config");
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      assertFalse(reader.hasIndexFor(EXISTING_INT_COL_RAW, StandardIndexes.dictionary()),
+          "skipSecondaryIndexes=true must not write a dictionary file");
+      assertFalse(reader.hasIndexFor(EXISTING_INT_COL_RAW, StandardIndexes.inverted()),
+          "skipSecondaryIndexes=true must not build the inverted index");
+    }
+  }
+
+  // Verifies that `needProcess()` returns false when `skipSecondaryIndexes=true`, even if the table config
+  // declares secondary-index drift that would normally trigger preprocess. The sanity check first confirms that
+  // without the flag, the same drift does trigger preprocess.
+  @Test
+  public void testSkipSecondaryIndexesNeedProcessReturnsFalseWhenOnlySecondaryWorkPending()
+      throws Exception {
+    buildV3Segment();
+    _invertedIndexColumns.add(EXISTING_STRING_COL_DICT);
+    _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.ALL;
+    TableConfig tableConfig = createTableConfig();
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor =
+            new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(tableConfig, _schema))) {
+      assertTrue(processor.needProcess(),
+          "Sanity check: without skipSecondaryIndexes, secondary-index drift must trigger preprocess");
+    }
+
+    tableConfig.getIndexingConfig().setSkipSecondaryIndexes(true);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor =
+            new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(tableConfig, _schema))) {
+      assertFalse(processor.needProcess(),
+          "needProcess must return false when skipSecondaryIndexes=true and no default-column work is required");
+    }
+  }
 }
