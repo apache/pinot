@@ -236,6 +236,11 @@ message UnnestNode {
   repeated int32 elementIndexes = 3;
   // Optional absolute output index of the ordinality column in the stage schema.
   optional int32 ordinalityIndex = 4;
+  // When prunedPassthrough is true, the input-row column indexes copied into the output, in output order.
+  // When absent/empty (old brokers), the operator copies the whole input row (legacy behavior).
+  repeated int32 passthroughInputIndexes = 5;
+  // Whether the output schema was pruned to only the input columns referenced downstream. Absent => false => legacy.
+  bool prunedPassthrough = 6;
 }
 
 enum WindowFrameType {

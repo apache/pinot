@@ -812,6 +812,11 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+        // When true, the multi-stage planner prunes input (passthrough) columns - notably the unnested source array -
+        // from the UNNEST output when they are not referenced downstream, avoiding copying them into every exploded
+        // row. Defaults to false: enabling it makes the broker emit a smaller UNNEST output schema, which an
+        // un-upgraded server cannot honor, so only enable it once all servers support it.
+        public static final String UNNEST_COLUMN_PRUNING = "unnestColumnPruning";
         /**
          * When set to true, the broker uses the long-lived {@code SubmitWithStream} bidi RPC to dispatch the query,
          * receiving stage stats out-of-band as {@code OpChainComplete} messages instead of via mailbox EOS. The

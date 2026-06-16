@@ -519,7 +519,7 @@ public class QueryEnvironment {
       return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
     }
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()),
-        _envConfig.defaultHashFunction());
+        _envConfig.defaultHashFunction(), pruneUnnestColumns(plannerContext.getOptions()));
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
@@ -699,6 +699,16 @@ public class QueryEnvironment {
     if (optionValue == null) {
       return _envConfig.defaultUseSpools();
     }
+    return Boolean.parseBoolean(optionValue);
+  }
+
+  /**
+   * Whether to prune unused input (passthrough) columns from the UNNEST output. Defaults to {@code false} because a
+   * broker emitting the smaller schema cannot be honored by an un-upgraded server; enable only once all servers
+   * support it (see {@link CommonConstants.Broker.Request.QueryOptionKey#UNNEST_COLUMN_PRUNING}).
+   */
+  public boolean pruneUnnestColumns(Map<String, String> options) {
+    String optionValue = options.get(CommonConstants.Broker.Request.QueryOptionKey.UNNEST_COLUMN_PRUNING);
     return Boolean.parseBoolean(optionValue);
   }
 

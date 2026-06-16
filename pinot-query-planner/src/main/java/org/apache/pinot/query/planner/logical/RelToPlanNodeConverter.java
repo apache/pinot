@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.logical;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -111,6 +112,8 @@ public final class RelToPlanNodeConverter {
   private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
   private final String _hashFunction;
   private final boolean _caseSensitive;
+  // When true, UNNEST output is pruned to drop input (passthrough) columns not referenced downstream. Default off.
+  private final boolean _pruneUnnestColumns;
 
   public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
       String hashFunction) {
@@ -119,9 +122,15 @@ public final class RelToPlanNodeConverter {
 
   public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
       String hashFunction, boolean caseSensitive) {
+    this(tracker, hashFunction, caseSensitive, false);
+  }
+
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      String hashFunction, boolean caseSensitive, boolean pruneUnnestColumns) {
     _tracker = tracker;
     _hashFunction = hashFunction;
     _caseSensitive = caseSensitive;
+    _pruneUnnestColumns = pruneUnnestColumns;
   }
 
   /**
@@ -227,6 +236,9 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), arrayExprs, tableFunctionContext);
   }
 
+  // NOTE: Besides the main dispatch, this is also invoked from tryPruneUnnestPassthrough. Its result is always used
+  // (either directly or rewritten into a pruned node), so it must remain free of non-idempotent side effects beyond
+  // converting/tracking its own subtree.
   private BasePlanNode convertLogicalCorrelate(LogicalCorrelate node) {
     // Pattern: Correlate(left, Uncollect(Project(correlatedFields...)))
     RelNode right = node.getRight();
@@ -709,8 +721,191 @@ public final class RelToPlanNodeConverter {
   }
 
   private ProjectNode convertLogicalProject(LogicalProject node) {
+    if (_pruneUnnestColumns) {
+      ProjectNode pruned = tryPruneUnnestPassthrough(node);
+      if (pruned != null) {
+        return pruned;
+      }
+    }
     return new ProjectNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), RexExpressionUtils.fromRexNodes(node.getProjects()));
+  }
+
+  /**
+   * When a Project sits directly above a CROSS JOIN UNNEST (a {@link LogicalCorrelate} over {@link Uncollect}), prunes
+   * the input (passthrough) columns that the Project does not reference - notably the unnested source array - from the
+   * {@link UnnestNode} output, so the operator does not copy them into every exploded row. The Project's own
+   * {@code InputRef}s are remapped from the full correlate-output index space to the pruned space.
+   * <p>
+   * Returns {@code null} (caller falls back to the default conversion, preserving all passthrough columns) when the
+   * pattern is not recognized, the layout is not the standard one, or pruning would be a no-op.
+   */
+  @Nullable
+  private ProjectNode tryPruneUnnestPassthrough(LogicalProject node) {
+    List<RelNode> inputs = node.getInputs();
+    if (inputs.size() != 1 || !(inputs.get(0) instanceof LogicalCorrelate)) {
+      return null;
+    }
+    LogicalCorrelate correlate = (LogicalCorrelate) inputs.get(0);
+    RelNode right = correlate.getRight();
+    // Only handle the UNNEST pattern, and only when no correlate-filter wraps the Uncollect. With a wrapping filter,
+    // convertLogicalCorrelate emits a FilterNode, so the Project no longer sits directly on the UnnestNode.
+    if (findUncollect(right) == null || findCorrelateFilter(right) != null) {
+      // Cheap structural check failed before any conversion: let the caller fall back to the default conversion.
+      return null;
+    }
+    // Convert the correlate exactly once. From here we always return a ProjectNode wrapping this converted input, so
+    // the caller never re-runs the (side-effecting, tracker-registering) conversion of the left subtree.
+    BasePlanNode converted = convertLogicalCorrelate(correlate);
+    if (converted instanceof UnnestNode) {
+      ProjectNode pruned = buildPrunedProject(node, (UnnestNode) converted, correlate);
+      if (pruned != null) {
+        return pruned;
+      }
+    }
+    // Not prunable (unexpected layout, no-op, or non-UnnestNode): wrap the already-converted input in a Project.
+    if (_tracker != null) {
+      _tracker.trackCreation(correlate, converted);
+    }
+    return new ProjectNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
+        new ArrayList<>(List.of(converted)), RexExpressionUtils.fromRexNodes(node.getProjects()));
+  }
+
+  /**
+   * Builds the pruned Project-over-UnnestNode for the standard CROSS JOIN UNNEST layout, or returns {@code null} when
+   * the layout is non-standard or pruning would be a no-op (all passthrough columns are referenced downstream). On
+   * success it registers the new UnnestNode with the tracker against {@code correlate}.
+   */
+  @Nullable
+  private ProjectNode buildPrunedProject(LogicalProject node, UnnestNode full, RelNode correlate) {
+    if (full.isPrunedPassthrough()) {
+      return null;
+    }
+    DataSchema fullSchema = full.getDataSchema();
+    int outSize = fullSchema.size();
+    int numArrays = full.getArrayExprs().size();
+    boolean withOrdinality = full.isWithOrdinality();
+    int leftCount = outSize - numArrays - (withOrdinality ? 1 : 0);
+    if (leftCount <= 0) {
+      // No passthrough columns to prune.
+      return null;
+    }
+    // Only handle the clean layout produced by the standard path: passthrough columns occupy [0, leftCount) and the
+    // element (then ordinality) columns occupy the trailing region. Fall back otherwise.
+    List<Integer> elementIndexes = full.getElementIndexes();
+    if (elementIndexes.size() != numArrays) {
+      return null;
+    }
+    for (int k = 0; k < numArrays; k++) {
+      if (elementIndexes.get(k) != leftCount + k) {
+        return null;
+      }
+    }
+    if (withOrdinality && full.getOrdinalityIndex() != leftCount + numArrays) {
+      return null;
+    }
+    // Collect referenced passthrough (left) columns from the project expressions.
+    List<RexExpression> projects = RexExpressionUtils.fromRexNodes(node.getProjects());
+    boolean[] referenced = new boolean[leftCount];
+    for (RexExpression project : projects) {
+      collectReferencedColumns(project, leftCount, referenced);
+    }
+    List<Integer> retained = new ArrayList<>();
+    for (int i = 0; i < leftCount; i++) {
+      if (referenced[i]) {
+        retained.add(i);
+      }
+    }
+    if (retained.size() == leftCount) {
+      // All passthrough columns are used downstream; pruning would be a no-op.
+      return null;
+    }
+    int numRetained = retained.size();
+    // Build the old (full correlate output) -> new (pruned output) index map.
+    int[] oldToNew = new int[outSize];
+    Arrays.fill(oldToNew, -1);
+    for (int i = 0; i < numRetained; i++) {
+      oldToNew[retained.get(i)] = i;
+    }
+    for (int k = 0; k < numArrays; k++) {
+      oldToNew[leftCount + k] = numRetained + k;
+    }
+    if (withOrdinality) {
+      oldToNew[leftCount + numArrays] = numRetained + numArrays;
+    }
+    // Build the pruned output schema: retained passthrough columns, then element columns, then ordinality.
+    int newSize = numRetained + numArrays + (withOrdinality ? 1 : 0);
+    String[] columnNames = new String[newSize];
+    ColumnDataType[] columnTypes = new ColumnDataType[newSize];
+    for (int i = 0; i < numRetained; i++) {
+      int oldIdx = retained.get(i);
+      columnNames[i] = fullSchema.getColumnName(oldIdx);
+      columnTypes[i] = fullSchema.getColumnDataType(oldIdx);
+    }
+    for (int k = 0; k < numArrays; k++) {
+      columnNames[numRetained + k] = fullSchema.getColumnName(leftCount + k);
+      columnTypes[numRetained + k] = fullSchema.getColumnDataType(leftCount + k);
+    }
+    if (withOrdinality) {
+      columnNames[numRetained + numArrays] = fullSchema.getColumnName(leftCount + numArrays);
+      columnTypes[numRetained + numArrays] = fullSchema.getColumnDataType(leftCount + numArrays);
+    }
+    DataSchema prunedSchema = new DataSchema(columnNames, columnTypes);
+    // Recompute element/ordinality indexes against the pruned (smaller) output.
+    List<Integer> newElementIndexes = new ArrayList<>(numArrays);
+    for (int k = 0; k < numArrays; k++) {
+      newElementIndexes.add(numRetained + k);
+    }
+    int newOrdinalityIndex = withOrdinality ? numRetained + numArrays : UnnestNode.UNSPECIFIED_INDEX;
+    UnnestNode.TableFunctionContext context = new UnnestNode.TableFunctionContext(withOrdinality, newElementIndexes,
+        newOrdinalityIndex, retained, true);
+    UnnestNode prunedUnnest = new UnnestNode(DEFAULT_STAGE_ID, prunedSchema, full.getNodeHint(), full.getInputs(),
+        full.getArrayExprs(), context);
+    if (_tracker != null) {
+      _tracker.trackCreation(correlate, prunedUnnest);
+    }
+    // Remap the project's input refs from the full correlate-output space to the pruned space.
+    List<RexExpression> remappedProjects = new ArrayList<>(projects.size());
+    for (RexExpression project : projects) {
+      remappedProjects.add(remapInputRefs(project, oldToNew));
+    }
+    return new ProjectNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
+        new ArrayList<>(List.of(prunedUnnest)), remappedProjects);
+  }
+
+  private static void collectReferencedColumns(RexExpression expr, int leftCount, boolean[] referenced) {
+    if (expr instanceof RexExpression.InputRef) {
+      int idx = ((RexExpression.InputRef) expr).getIndex();
+      if (idx >= 0 && idx < leftCount) {
+        referenced[idx] = true;
+      }
+    } else if (expr instanceof RexExpression.FunctionCall) {
+      for (RexExpression op : ((RexExpression.FunctionCall) expr).getFunctionOperands()) {
+        collectReferencedColumns(op, leftCount, referenced);
+      }
+    }
+  }
+
+  private static RexExpression remapInputRefs(RexExpression expr, int[] oldToNew) {
+    if (expr instanceof RexExpression.InputRef) {
+      int idx = ((RexExpression.InputRef) expr).getIndex();
+      int mapped = (idx >= 0 && idx < oldToNew.length) ? oldToNew[idx] : -1;
+      // mapped is always >= 0 here: passthrough columns referenced by the project were retained, and element/
+      // ordinality columns are always mapped. Guard defensively to avoid silently corrupting indexes.
+      Preconditions.checkState(mapped >= 0, "Unexpected unmapped InputRef index %s while pruning UNNEST passthrough",
+          idx);
+      return new RexExpression.InputRef(mapped);
+    } else if (expr instanceof RexExpression.FunctionCall) {
+      RexExpression.FunctionCall fc = (RexExpression.FunctionCall) expr;
+      List<RexExpression> ops = fc.getFunctionOperands();
+      List<RexExpression> rewritten = new ArrayList<>(ops.size());
+      for (RexExpression op : ops) {
+        rewritten.add(remapInputRefs(op, oldToNew));
+      }
+      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten);
+    } else {
+      return expr;
+    }
   }
 
   private FilterNode convertLogicalFilter(LogicalFilter node) {

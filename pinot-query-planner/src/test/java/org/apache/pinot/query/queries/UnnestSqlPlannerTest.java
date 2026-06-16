@@ -86,6 +86,115 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testUnnestColumnPruningDropsSourceArray() {
+    // With pruning enabled, the unnested source array (mcol1) must not be carried in the UnnestNode output.
+    String sql = "SET unnestColumnPruning=true; "
+        + "SELECT e.col1, u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    Assert.assertTrue(unnestNode.isPrunedPassthrough(), "UnnestNode should be pruned");
+    List<String> columns = Arrays.asList(unnestNode.getDataSchema().getColumnNames());
+    Assert.assertFalse(columns.contains("mcol1"),
+        "Source array column should be pruned from UnnestNode output, found: " + columns);
+    Assert.assertTrue(columns.contains("col1"), "Referenced passthrough column col1 should be retained: " + columns);
+    Assert.assertEquals(unnestNode.getDataSchema().size(), 2, "Expected [col1, element] only: " + columns);
+    // col1 is the only retained passthrough column (input index 0); the element lands right after it.
+    Assert.assertEquals(unnestNode.getPassthroughInputIndexes(), List.of(0));
+    Assert.assertEquals(unnestNode.getElementIndexes(), List.of(1));
+  }
+
+  @Test
+  public void testUnnestColumnPruningDisabledByDefault() {
+    // Without the flag, behavior is unchanged: the source array is still part of the UnnestNode output.
+    String sql = "SELECT e.col1, u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    Assert.assertFalse(unnestNode.isPrunedPassthrough(), "UnnestNode should not be pruned by default");
+    List<String> columns = Arrays.asList(unnestNode.getDataSchema().getColumnNames());
+    Assert.assertTrue(columns.contains("mcol1"),
+        "Without pruning, the source array column should remain in the UnnestNode output: " + columns);
+  }
+
+  @Test
+  public void testUnnestColumnPruningRetainsSelectedSourceArray() {
+    // When the user also selects the source array, it must be retained even with pruning enabled.
+    String sql = "SET unnestColumnPruning=true; "
+        + "SELECT e.col1, e.mcol1, u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    List<String> columns = Arrays.asList(unnestNode.getDataSchema().getColumnNames());
+    Assert.assertTrue(columns.contains("mcol1"),
+        "Explicitly selected source array must be retained: " + columns);
+    Assert.assertTrue(columns.contains("col1"), columns.toString());
+  }
+
+  @Test
+  public void testUnnestColumnPruningWithOrdinality() {
+    // The ordinality index must be recomputed against the pruned (smaller) output.
+    String sql = "SET unnestColumnPruning=true; "
+        + "SELECT e.col1, u.s, u.ord FROM e CROSS JOIN UNNEST(e.mcol1) WITH ORDINALITY AS u(s, ord)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    Assert.assertTrue(unnestNode.isWithOrdinality());
+    Assert.assertTrue(unnestNode.isPrunedPassthrough());
+    List<String> columns = Arrays.asList(unnestNode.getDataSchema().getColumnNames());
+    Assert.assertFalse(columns.contains("mcol1"), "Source array should be pruned: " + columns);
+    // Retained passthrough = [col1] (1), element at index 1, ordinality at index 2.
+    Assert.assertEquals(unnestNode.getPassthroughInputIndexes(), List.of(0));
+    Assert.assertEquals(unnestNode.getElementIndexes(), List.of(1));
+    Assert.assertEquals(unnestNode.getOrdinalityIndex(), 2);
+    Assert.assertEquals(unnestNode.getDataSchema().size(), 3);
+  }
+
+  @Test
+  public void testUnnestColumnPruningMultipleArrays() {
+    // Both source arrays must be dropped; element indexes recompute contiguously after the retained passthrough.
+    String sql = "SET unnestColumnPruning=true; "
+        + "SELECT e.col1, u.longVal, u.stringVal FROM e CROSS JOIN UNNEST(e.mcol2, e.mcol1) AS u(longVal, stringVal)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    Assert.assertTrue(unnestNode.isPrunedPassthrough());
+    List<String> columns = Arrays.asList(unnestNode.getDataSchema().getColumnNames());
+    Assert.assertFalse(columns.contains("mcol1"), columns.toString());
+    Assert.assertFalse(columns.contains("mcol2"), columns.toString());
+    Assert.assertTrue(columns.contains("col1"), columns.toString());
+    Assert.assertEquals(unnestNode.getPassthroughInputIndexes(), List.of(0));
+    Assert.assertEquals(unnestNode.getElementIndexes(), List.of(1, 2));
+    Assert.assertEquals(unnestNode.getDataSchema().size(), 3);
+  }
+
+  @Test
+  public void testUnnestColumnPruningToZeroPassthrough() {
+    // Selecting only the unnested element retains zero passthrough columns.
+    String sql = "SET unnestColumnPruning=true; "
+        + "SELECT u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    Assert.assertTrue(unnestNode.isPrunedPassthrough());
+    Assert.assertTrue(unnestNode.getPassthroughInputIndexes().isEmpty());
+    Assert.assertEquals(unnestNode.getElementIndexes(), List.of(0));
+    Assert.assertEquals(unnestNode.getDataSchema().size(), 1);
+  }
+
+  @Test
   public void testAggregateWithOrdinality() {
     String sql = "SELECT SUM(w.ord) FROM e CROSS JOIN UNNEST(e.mcol1) WITH ORDINALITY AS w(s, ord)";
     verifyOrdinalityOnlyQuery(sql);
