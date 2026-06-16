@@ -141,7 +141,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     Preconditions.checkState(_chunkOffset < (1L << 32),
         "exceeded 4GB of compressed chunks for: " + _dataBuffer.getName());
     int sizeRequired = Integer.BYTES + bytes.length;
-    if (_chunkBuffer.position() > _chunkBuffer.capacity() - sizeRequired) {
+    if (shouldStartNewChunk(sizeRequired)) {
       flushChunk();
       if (sizeRequired > _chunkBuffer.capacity() - Integer.BYTES) {
         writeHugeChunk(bytes);
@@ -151,6 +151,18 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     _chunkBuffer.putInt(bytes.length);
     _chunkBuffer.put(bytes);
     _nextDocId++;
+  }
+
+  /// Returns whether the current chunk should be flushed before appending an entry that requires
+  /// `sizeRequired` bytes. V4 flushes only when the entry would overflow the chunk buffer.
+  /// Subclasses (e.g. V6) may override to add extra flush triggers such as a docs-per-chunk cap.
+  protected boolean shouldStartNewChunk(int sizeRequired) {
+    return _chunkBuffer.position() > _chunkBuffer.capacity() - sizeRequired;
+  }
+
+  /// Number of documents written into the chunk currently being accumulated (reset to 0 after each flush).
+  protected int getNumDocsInCurrentChunk() {
+    return _nextDocId - _docIdOffset;
   }
 
   @Override
