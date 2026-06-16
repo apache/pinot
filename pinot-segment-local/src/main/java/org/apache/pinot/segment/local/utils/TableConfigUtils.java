@@ -27,6 +27,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -200,7 +201,7 @@ public final class TableConfigUtils {
     validateSegmentAssignmentConfig(tableConfig);
     validateIngestionConfig(tableConfig, schema);
     if (tableConfig.getTableType() == TableType.REALTIME) {
-      validateStreamConfigMaps(tableConfig);
+      validateStreamConfigMaps(tableConfig, skipTypes);
     }
     validateTierConfigList(tableConfig.getTierConfigsList());
     validateIndexingConfigAndFieldConfigList(tableConfig, schema);
@@ -764,7 +765,92 @@ public final class TableConfigUtils {
     }
   }
 
-  private static void validateStreamConfigMaps(TableConfig tableConfig) {
+  /**
+   * Ensures every stream config map has a stable {@code stream.config.id} assigned.
+   * <p>Edge cases handled:
+   * <ul>
+   *   <li>No entries have stream.config.id (legacy/new table) → auto-assign starting from 0</li>
+   *   <li>Some entries have stream.config.id, some don't → assign only missing ones, skipping used IDs</li>
+   *   <li>nextStreamConfigId is stale (less than max existing ID + 1) → corrected automatically</li>
+   *   <li>Duplicate config IDs → rejected</li>
+   *   <li>Negative config IDs → rejected</li>
+   * </ul>
+   */
+  @VisibleForTesting
+  static void ensureStreamConfigIds(TableConfig tableConfig) {
+    ensureStreamConfigIds(tableConfig, Collections.emptySet());
+  }
+
+  @VisibleForTesting
+  static void ensureStreamConfigIds(TableConfig tableConfig, Set<ValidationType> skipTypes) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null || ingestionConfig.getStreamIngestionConfig() == null) {
+      return;
+    }
+    StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
+    List<Map<String, String>> streamConfigMaps = streamIngestionConfig.getStreamConfigMaps();
+    if (streamConfigMaps == null || streamConfigMaps.isEmpty()) {
+      return;
+    }
+
+    // First pass: collect existing IDs and validate them
+    Set<Integer> usedIds = new HashSet<>();
+    int maxExistingId = -1;
+    for (Map<String, String> configMap : streamConfigMaps) {
+      String idStr = configMap.get(StreamConfigProperties.STREAM_CONFIG_ID);
+      if (idStr != null) {
+        int configId;
+        try {
+          configId = Integer.parseInt(idStr);
+        } catch (NumberFormatException e) {
+          throw new IllegalStateException("Invalid stream.config.id value: " + idStr);
+        }
+        Preconditions.checkState(configId >= 0,
+            "stream.config.id must be non-negative, got: %s", configId);
+        Preconditions.checkState(usedIds.add(configId),
+            "Duplicate stream.config.id found: %s", configId);
+        maxExistingId = Math.max(maxExistingId, configId);
+      }
+    }
+
+    // Determine the starting point for new IDs
+    int nextId = streamIngestionConfig.getNextStreamConfigId();
+    if (maxExistingId >= 0 && nextId > 0 && nextId <= maxExistingId) {
+      if (!skipTypes.contains(ValidationType.STREAM_CONFIG_ID)) {
+        throw new IllegalStateException(String.format(
+            "nextStreamConfigId (%d) must be greater than the max existing stream.config.id (%d). "
+                + "Update nextStreamConfigId to at least %d, or skip validation type STREAM_CONFIG_ID.",
+            nextId, maxExistingId, maxExistingId + 1));
+      }
+      LOGGER.warn("nextStreamConfigId ({}) is not greater than max existing stream.config.id ({}). "
+          + "Overriding to {} because STREAM_CONFIG_ID validation is skipped.", nextId, maxExistingId,
+          maxExistingId + 1);
+      nextId = maxExistingId + 1;
+    }
+
+    // Second pass: assign IDs to entries that don't have one
+    int numAssigned = 0;
+    for (Map<String, String> configMap : streamConfigMaps) {
+      if (!configMap.containsKey(StreamConfigProperties.STREAM_CONFIG_ID)) {
+        while (usedIds.contains(nextId)) {
+          nextId++;
+        }
+        configMap.put(StreamConfigProperties.STREAM_CONFIG_ID, String.valueOf(nextId));
+        usedIds.add(nextId);
+        nextId++;
+        numAssigned++;
+      }
+    }
+
+    streamIngestionConfig.setNextStreamConfigId(nextId);
+    if (numAssigned > 0) {
+      LOGGER.info("Auto-assigned stream.config.id to {} stream config(s). nextStreamConfigId is now {}.",
+          numAssigned, nextId);
+    }
+  }
+
+  private static void validateStreamConfigMaps(TableConfig tableConfig, Set<ValidationType> skipTypes) {
+    ensureStreamConfigIds(tableConfig, skipTypes);
     List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
     int numStreamConfigs = streamConfigMaps.size();
     List<StreamConfig> streamConfigs = new ArrayList<>(numStreamConfigs);
@@ -2039,7 +2125,7 @@ public final class TableConfigUtils {
 
   // enum of all the skip-able validation types.
   public enum ValidationType {
-    ALL, TASK, UPSERT, TENANT, MINION_INSTANCES, ACTIVE_TASKS
+    ALL, TASK, UPSERT, TENANT, MINION_INSTANCES, ACTIVE_TASKS, STREAM_CONFIG_ID
   }
 
   /**
