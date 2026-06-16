@@ -74,6 +74,10 @@ public class SegmentUtils {
     if (llcSegmentName != null) {
       return llcSegmentName.getPartitionGroupId();
     }
+    MultiTopicLLCSegmentName multiTopicLLCSegmentName = MultiTopicLLCSegmentName.of(segmentName);
+    if (multiTopicLLCSegmentName != null) {
+      return multiTopicLLCSegmentName.getPartitionGroupId();
+    }
     UploadedRealtimeSegmentName uploadedRealtimeSegmentName = UploadedRealtimeSegmentName.of(segmentName);
     if (uploadedRealtimeSegmentName != null) {
       return uploadedRealtimeSegmentName.getPartitionId();

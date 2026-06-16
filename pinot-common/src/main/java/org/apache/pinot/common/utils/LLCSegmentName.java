@@ -73,7 +73,8 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   }
 
   /**
-   * Returns whether the given segment name represents an LLC segment.
+   * Returns whether the given segment name represents an LLC segment (either 4-part single-topic
+   * or 5-part multi-topic format).
    */
   public static boolean isLLCSegment(String segmentName) {
     int numSeparators = 0;
@@ -82,7 +83,13 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
       numSeparators++;
       index += 2; // SEPARATOR.length()
     }
-    return numSeparators == 3;
+    if (numSeparators == 3) {
+      return true;
+    }
+    if (numSeparators == 4) {
+      return MultiTopicLLCSegmentName.isMultiTopicLLCSegment(segmentName);
+    }
+    return false;
   }
 
   @Deprecated
