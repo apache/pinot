@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -41,11 +42,21 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   public LLCSegmentName(String segmentName) {
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
-    Preconditions.checkArgument(parts.length == 4, "Invalid LLC segment name: %s", segmentName);
-    _tableName = parts[0];
-    _partitionGroupId = Integer.parseInt(parts[1]);
-    _sequenceNumber = Integer.parseInt(parts[2]);
-    _creationTime = parts[3];
+    if (parts.length == 5) {
+      // Multi-topic format: tableName__configId__streamPartitionId__sequenceNumber__creationTime
+      _tableName = parts[0];
+      int configId = Integer.parseInt(parts[1]);
+      int streamPartitionId = Integer.parseInt(parts[2]);
+      _partitionGroupId = configId * IngestionConfigUtils.PARTITION_PADDING_OFFSET + streamPartitionId;
+      _sequenceNumber = Integer.parseInt(parts[3]);
+      _creationTime = parts[4];
+    } else {
+      Preconditions.checkArgument(parts.length == 4, "Invalid LLC segment name: %s", segmentName);
+      _tableName = parts[0];
+      _partitionGroupId = Integer.parseInt(parts[1]);
+      _sequenceNumber = Integer.parseInt(parts[2]);
+      _creationTime = parts[3];
+    }
     _segmentName = segmentName;
   }
 
