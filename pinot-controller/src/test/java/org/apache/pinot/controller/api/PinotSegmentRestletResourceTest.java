@@ -19,11 +19,15 @@
 package org.apache.pinot.controller.api;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -99,8 +103,15 @@ public class PinotSegmentRestletResourceTest {
     assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"some_segment\"]"));
     assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"s2\",\"s3\"]"));
     assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"another_segment\"]"));
+    SegmentLineage lineage =
+        SegmentLineageAccessHelper.getSegmentLineage(resourceManager.getPropertyStore(), offlineTableName);
+    // Sort the two entry ids the same way toJsonObject does -- by timestamp, then by id.
+    List<String> orderedIds = Stream.of(segmentLineageId, nextSegmentLineageId)
+        .sorted(Comparator.comparingLong((String id) -> lineage.getLineageEntry(id).getTimestamp())
+            .thenComparing(Comparator.naturalOrder()))
+        .toList();
     // Ensures the two entries are sorted in chronological order by timestamp.
-    assertTrue(segmentLineageResponse.indexOf(segmentLineageId) < segmentLineageResponse.indexOf(nextSegmentLineageId));
+    assertTrue(segmentLineageResponse.indexOf(orderedIds.get(0)) < segmentLineageResponse.indexOf(orderedIds.get(1)));
 
     // List segment lineage should fail for non-existing table
     assertThrows(Exception.class,
