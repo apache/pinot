@@ -20,7 +20,7 @@ package org.apache.pinot.common.lineage;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
@@ -30,13 +30,20 @@ public class SegmentLineageUtils {
   private SegmentLineageUtils() {
   }
 
+  // Monotonic counter used as a tiebreaker within the same millisecond. Combined with the
+  // wall-clock millisecond prefix this makes IDs lexicographically ordered by creation time,
+  // which lets toJsonObject() sort by ID rather than needing a separate timestamp comparison.
+  private static final AtomicLong SEQUENCE = new AtomicLong();
+
   /**
-   * Generate lineage entry id using UUID.
-   *
-   * @return lineage entry id
+   * Generate a time-ordered lineage entry id.
+   * Format: {@code <16-hex-ms-timestamp>_<16-hex-sequence>}.
+   * IDs from the same JVM sort lexicographically in creation order, including entries created within the
+   * same millisecond (the sequence counter provides the tiebreaker). Across JVMs (e.g. two controllers
+   * writing concurrently) the counter is independent, so ordering within the same millisecond is best-effort.
    */
   public static String generateLineageEntryId() {
-    return UUID.randomUUID().toString();
+    return String.format("%016x_%016x", System.currentTimeMillis(), SEQUENCE.getAndIncrement());
   }
 
   /**
