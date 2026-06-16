@@ -4222,6 +4222,11 @@ public class PinotHelixResourceManager {
   /**
    * Utility to perform a safety check of the operation to drop an instance.
    * If the resource is not safe to drop the utility lists all the possible reasons.
+   * <p>The cluster-wide IdealState scan is skipped for minion instances: minions never appear in any
+   * resource IdealState (their task assignments live in the Helix Task Framework
+   * {@code JobContext}/{@code WorkflowContext}, not in IdealState), so the scan can only ever return
+   * empty for them. Skipping it avoids pulling every IdealState into the controller heap, which is a
+   * significant source of heap pressure when many minions are dropped in succession.
    * @param instanceName Pinot instance name
    * @return {@link OperationValidationResponse}
    */
@@ -4231,16 +4236,20 @@ public class PinotHelixResourceManager {
     if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName)) != null) {
       response.putIssue(OperationValidationResponse.ErrorCode.IS_ALIVE, instanceName);
     }
-    // Check if any ideal state includes the instance
-    getAllResources().forEach(resource -> {
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
-      for (String partition : idealState.getPartitionSet()) {
-        if (idealState.getInstanceSet(partition).contains(instanceName)) {
-          response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
-          break;
+    // Check if any ideal state includes the instance. Minions never host any resource, so skip the
+    // expensive scan for them. Controllers/servers/brokers can host resources (e.g. controllers are
+    // participants in the lead controller resource), so the scan is still required for them.
+    if (!InstanceTypeUtils.isMinion(instanceName)) {
+      getAllResources().forEach(resource -> {
+        IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
+        for (String partition : idealState.getPartitionSet()) {
+          if (idealState.getInstanceSet(partition).contains(instanceName)) {
+            response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
+            break;
+          }
         }
-      }
-    });
+      });
+    }
     return response.setSafe(response.getIssues().isEmpty());
   }
 
