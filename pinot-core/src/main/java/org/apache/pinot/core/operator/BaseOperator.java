@@ -69,19 +69,22 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   private void checkScanBasedKilling() {
     QueryKillingManager killingManager = QueryKillingManager.getInstance();
-    if (killingManager != null) {
-      QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
-      if (ctx != null) {
-        QueryExecutionContext execCtx = ctx.getExecutionContext();
-        QueryScanCostContext scanCost = execCtx.getQueryScanCostContext();
-        if (scanCost != null) {
-          killingManager.checkAndKillIfNeeded(execCtx, scanCost);
-          TerminationException te = execCtx.getTerminateException();
-          if (te != null) {
-            throw te;
-          }
-        }
-      }
+    if (killingManager == null) {
+      return;
+    }
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    if (ctx == null) {
+      return;
+    }
+    QueryExecutionContext execCtx = ctx.getExecutionContext();
+    QueryScanCostContext scanCost = execCtx.getQueryScanCostContext();
+    if (scanCost == null) {
+      return;
+    }
+    killingManager.checkAndKillIfNeeded(execCtx, scanCost);
+    TerminationException te = execCtx.getTerminateException();
+    if (te != null) {
+      throw te;
     }
   }
 
