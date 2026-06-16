@@ -290,7 +290,7 @@ public class LogicalTableStatsResolverTest {
   }
 
   @Test
-  public void testNoConsumingSegment_confidenceExact()
+  public void testNoConsumingSegmentConfidenceExact()
       throws Exception {
     insertSegments(REALTIME_TABLE, Arrays.asList(
         row("rtSeg1", 1L, 400L, 2048L, 0L, 100L, false)
