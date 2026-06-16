@@ -301,10 +301,16 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   }
 
   /**
-   * Returns true when the table is configured to skip all secondary indexes — both at segment-build time and at
-   * preprocess time. New segments built under this flag carry only the forward index.
+   * Returns true when the build should skip all secondary indexes. Reads {@code tableIndexConfig.skipSecondaryIndexes}
+   * unless the caller has set the per-build override via
+   * {@link SegmentGeneratorConfig#setOverrideSkipSecondaryIndexes(boolean)} — used by reload-style build paths
+   * (minion segment refresh, reload-driven re-conversion) to force secondary indexes into the freshly-built segment
+   * even when the persisted flag is true.
    */
   private boolean isSkipSecondaryIndexes() {
+    if (_config.isOverrideSkipSecondaryIndexes()) {
+      return false;
+    }
     TableConfig tableConfig = _config.getTableConfig();
     return tableConfig != null && tableConfig.getIndexingConfig() != null
         && tableConfig.getIndexingConfig().isSkipSecondaryIndexes();

@@ -548,6 +548,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
       IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
       indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+      // Segment-refresh path (minion-driven replace, SegmentRefreshMessage): treat as a reload — build secondary
+      // indexes against the latest table config even if skipSecondaryIndexes is true. See reloadSegment above for
+      // the same reasoning.
+      indexLoadingConfig.setOverrideSkipSecondaryIndexes(true);
       _segmentReloadSemaphore.acquire(segmentName, _logger);
       try {
         replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
@@ -667,6 +671,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
       IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+      // Reload path: override skipSecondaryIndexes so the reload always builds secondary indexes against the latest
+      // table config, even when the persisted flag is true. The table config in ZK is not modified; the override is
+      // local to this transient IndexLoadingConfig and is discarded when the reload finishes. Boot / state-transition
+      // loads use the plain fetchIndexLoadingConfig() above and continue to honor skipSecondaryIndexes.
+      indexLoadingConfig.setOverrideSkipSecondaryIndexes(true);
       reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
     } else {
       _logger.warn("Failed to find segment: {}, skipping reloading it", segmentName);
@@ -681,7 +690,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Reloading all segments with forceDownload: {}", forceDownload);
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
     if (!segmentDataManagers.isEmpty()) {
-      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
+      IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+      indexLoadingConfig.setOverrideSkipSecondaryIndexes(true);
+      reloadSegments(segmentDataManagers, indexLoadingConfig, forceDownload, reloadJobId);
     }
     _logger.info("Reloaded all {} segments with forceDownload: {}", segmentDataManagers.size(), forceDownload);
   }
@@ -704,7 +715,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
     if (!segmentDataManagers.isEmpty()) {
-      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
+      IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+      indexLoadingConfig.setOverrideSkipSecondaryIndexes(true);
+      reloadSegments(segmentDataManagers, indexLoadingConfig, forceDownload, reloadJobId);
     }
     if (missingSegments.isEmpty()) {
       _logger.info("Reloaded segments: {} with forceDownload: {}", segmentNames, forceDownload);
