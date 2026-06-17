@@ -1546,6 +1546,29 @@ public class CommonConstants {
     // Default to 0.0 (no limit)
     public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
 
+    // Configs for the server-local realtime ingestion memory guard (RealtimeIngestionMemoryGuard). When the JVM heap
+    // crosses the pause threshold, realtime consumers are parked (stop fetching from the stream) until heap recovers
+    // below the resume threshold, protecting the server from OOM (primarily driven by on-heap upsert/dedup primary-key
+    // metadata). It is server-local and self-healing.
+    // Mode controls which tables are guarded: ALL | UPSERT_DEDUP_ONLY | DISABLED. On by default, scoped to the
+    // upsert/dedup tables whose on-heap metadata is the main OOM driver.
+    public static final String CONFIG_OF_SERVER_CONSUMPTION_MEMORY_PAUSE_MODE =
+        "pinot.server.consumption.memory.pause.mode";
+    public static final String DEFAULT_SERVER_CONSUMPTION_MEMORY_PAUSE_MODE = "UPSERT_DEDUP_ONLY";
+    // Pause consumption when usedHeap / maxHeap >= this ratio
+    public static final String CONFIG_OF_SERVER_CONSUMPTION_MEMORY_PAUSE_HEAP_RATIO =
+        "pinot.server.consumption.memory.pause.heap.usage.ratio";
+    public static final double DEFAULT_SERVER_CONSUMPTION_MEMORY_PAUSE_HEAP_RATIO = 0.85;
+    // Resume consumption when usedHeap / maxHeap <= this ratio (must be strictly less than the pause ratio to provide
+    // hysteresis; otherwise the configured values are rejected and the defaults are used)
+    public static final String CONFIG_OF_SERVER_CONSUMPTION_MEMORY_RESUME_HEAP_RATIO =
+        "pinot.server.consumption.memory.resume.heap.usage.ratio";
+    public static final double DEFAULT_SERVER_CONSUMPTION_MEMORY_RESUME_HEAP_RATIO = 0.75;
+    // Heap sampling / pause re-check interval in milliseconds
+    public static final String CONFIG_OF_SERVER_CONSUMPTION_MEMORY_CHECK_INTERVAL_MS =
+        "pinot.server.consumption.memory.check.interval.ms";
+    public static final long DEFAULT_SERVER_CONSUMPTION_MEMORY_CHECK_INTERVAL_MS = 1000L;
+
     public static final String CONFIG_OF_MMAP_DEFAULT_ADVICE = "pinot.server.mmap.advice.default";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
 

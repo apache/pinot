@@ -43,6 +43,10 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   LLC_SIMULTANEOUS_SEGMENT_BUILDS("llcSimultaneousSegmentBuilds", true),
   // Gauge to reflect whether pauseless is enabled or not
   PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
+  // Server-global gauge (0/1) reflecting whether realtime ingestion is currently paused on this server due to JVM heap
+  // pressure (see RealtimeIngestionMemoryGuard). Lets dashboards/alerts distinguish a deliberate memory pause from a
+  // wedged consumer.
+  REALTIME_INGESTION_MEMORY_PAUSED("state", true),
   // Upsert metrics
   UPSERT_PRIMARY_KEYS_COUNT("upsertPrimaryKeysCount", false),
   // Dedup metrics

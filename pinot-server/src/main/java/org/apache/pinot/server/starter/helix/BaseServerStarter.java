@@ -85,6 +85,7 @@ import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeIngestionMemoryGuard;
 import org.apache.pinot.core.data.manager.realtime.ServerRateLimitConfigChangeListener;
 import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerThreadPoolConfigChangeListener;
@@ -789,6 +790,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
         new ServerRateLimitConfigChangeListener(_serverMetrics);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
+
+    // Initialize the server-local realtime ingestion memory guard, which pauses realtime consumption when the JVM is
+    // under heap pressure to protect the server from OOM. On by default (scoped to upsert/dedup tables); tunable and
+    // disableable via pinot.server.consumption.memory.* configs.
+    RealtimeIngestionMemoryGuard.getInstance().init(_serverConf, _serverMetrics);
 
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =

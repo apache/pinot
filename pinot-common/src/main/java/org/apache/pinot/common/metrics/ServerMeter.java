@@ -51,6 +51,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_CLP_UNENCODABLE("rows", false),
   REALTIME_CLP_ENCODED_NON_STRINGS("rows", false),
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
+  // Incremented once per pause check-interval that a consuming segment is parked by the server-local memory guard
+  // (RealtimeIngestionMemoryGuard) due to heap pressure or a primary-key cap. Reported per table so operators can see
+  // which tables are being throttled.
+  REALTIME_CONSUMPTION_PAUSED_MEMORY("count", false),
   REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE("bytes", false),
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),

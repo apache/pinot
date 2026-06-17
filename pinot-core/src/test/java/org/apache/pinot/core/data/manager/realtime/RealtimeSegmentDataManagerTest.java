@@ -70,7 +70,10 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -861,6 +864,80 @@ public class RealtimeSegmentDataManagerTest {
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(),
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  /**
+   * Verifies the server memory guard integration in the consume loop: while in INITIAL_CONSUMING the consumer parks
+   * (stops fetching) as long as the guard reports memory pressure, then resumes and indexes all rows once the pressure
+   * clears.
+   */
+  @Test
+  public void testConsumptionPausesAndResumesUnderMemoryPressure()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), "10m", null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+
+      // Guard reports memory pressure for the first few consume-loop iterations, then clears.
+      RealtimeIngestionMemoryGuard mockGuard = mock(RealtimeIngestionMemoryGuard.class);
+      when(mockGuard.shouldPauseConsumption(any(), any())).thenReturn(true, true, true, false);
+      segmentDataManager.setIngestionMemoryGuard(mockGuard);
+
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      final LongMsgOffset endOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      segmentDataManager._consumeOffsets.add(endOffset);
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(endOffset.toString())));
+
+      consumer.run();
+
+      // The guard was consulted, and despite the initial pauses consumption resumed and indexed every row.
+      verify(mockGuard, atLeast(1)).shouldPauseConsumption(any(), any());
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  /**
+   * Verifies that the memory guard is NOT consulted while catching up (CATCHING_UP). Pausing during catch-up would
+   * stall the Helix CONSUMING -> ONLINE transition, so the guard must only apply in INITIAL_CONSUMING.
+   */
+  @Test
+  public void testConsumptionNotPausedWhileCatchingUp()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), "10m", null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      final LongMsgOffset finalOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      Field finalOffsetField = RealtimeSegmentDataManager.class.getDeclaredField("_finalOffset");
+      finalOffsetField.setAccessible(true);
+      finalOffsetField.set(segmentDataManager, finalOffset);
+
+      // Even though the guard would report pressure, the consume loop must never ask it while catching up.
+      RealtimeIngestionMemoryGuard mockGuard = mock(RealtimeIngestionMemoryGuard.class);
+      when(mockGuard.shouldPauseConsumption(any(), any())).thenReturn(true);
+      segmentDataManager.setIngestionMemoryGuard(mockGuard);
+
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(finalOffset.toString())));
+
+      consumer.run();
+
+      verify(mockGuard, never()).shouldPauseConsumption(any(), any());
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
     }
   }
 

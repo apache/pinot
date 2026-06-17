@@ -346,6 +346,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _partitionRateLimiter;
   private final ConsumptionRateLimiter _serverRateLimiter;
+  // Server-local guard that parks this consumer when the server is under heap pressure, to protect against OOM.
+  // Defaults to the process-wide singleton; no-op unless enabled via server config.
+  // Non-final only so tests can inject a deterministic guard via setIngestionMemoryGuard().
+  private RealtimeIngestionMemoryGuard _ingestionMemoryGuard = RealtimeIngestionMemoryGuard.getInstance();
 
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
@@ -483,7 +487,37 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .create(_currentOffset);  // so that we always update the metric when we enter this method.
 
     _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
+    boolean wasPausedForMemory = false;
     while (!_shouldStop && !endCriteriaReached()) {
+      // Server memory guard: while the server is under heap pressure, park this consumer instead of fetching more
+      // messages, so memory stops growing; resume automatically once the
+      // pressure clears. Only applies in INITIAL_CONSUMING - the catch-up states (CATCHING_UP / CONSUMING_TO_ONLINE)
+      // must keep making progress to complete the Helix transition. The sleep sits above the fetchMessages try-block
+      // so that an interrupt from stop() terminates the thread promptly instead of being misclassified as a transient
+      // stream error. endCriteriaReached() is still evaluated every iteration, so force-commit, time-limit and
+      // end-of-partition all continue to take precedence over the pause.
+      if (_state == State.INITIAL_CONSUMING && _ingestionMemoryGuard.shouldPauseConsumption(
+          _partitionUpsertMetadataManager, _partitionDedupMetadataManager)) {
+        if (!wasPausedForMemory) {
+          _segmentLogger.warn("Pausing consumption due to server memory pressure");
+          wasPausedForMemory = true;
+        }
+        _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_CONSUMPTION_PAUSED_MEMORY, 1L);
+        try {
+          Thread.sleep(_ingestionMemoryGuard.getCheckIntervalMs());
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+        continue;
+      }
+      if (wasPausedForMemory) {
+        _segmentLogger.info("Resuming consumption after server memory pressure cleared");
+        // Reset the idle timer so the paused duration is not counted as stream-idle time, which would otherwise
+        // trigger a spurious stream-consumer recreation on the first post-resume empty batch.
+        _idleTimer.markStreamCreated();
+        wasPausedForMemory = false;
+      }
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
@@ -761,6 +795,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   boolean canAddMore() {
     return _realtimeSegment.canAddMore();
+  }
+
+  @VisibleForTesting
+  void setIngestionMemoryGuard(RealtimeIngestionMemoryGuard ingestionMemoryGuard) {
+    _ingestionMemoryGuard = ingestionMemoryGuard;
   }
 
   public class PartitionConsumer implements Runnable {
