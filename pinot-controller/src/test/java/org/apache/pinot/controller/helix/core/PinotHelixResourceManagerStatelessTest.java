@@ -66,6 +66,7 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -100,9 +101,11 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -1049,6 +1052,40 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertNull(retrievedSegmentZKMetadata.getTier());
     assertTrue(tierToSegmentsMap.isEmpty());
+  }
+
+  @Test
+  public void testUpdateTableConfigRefreshesBrokerAndServerCaches()
+      throws Exception {
+    String rawTableName = "tableConfigRefreshTest";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    addDummySchema(rawTableName);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+    doNothing().when(resourceManager).sendTableConfigRefreshMessage(offlineTableName);
+    doNothing().when(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+
+    try {
+      TableConfig updatedTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+          .setBrokerTenant(BROKER_TENANT_NAME)
+          .setServerTenant(SERVER_TENANT_NAME)
+          .setQueryConfig(new QueryConfig(10000L, null, null, null, null, null))
+          .build();
+
+      resourceManager.updateTableConfig(updatedTableConfig);
+
+      verify(resourceManager).sendTableConfigRefreshMessage(offlineTableName);
+      verify(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+    } finally {
+      _helixResourceManager.deleteOfflineTable(rawTableName);
+      deleteSchema(rawTableName);
+    }
   }
 
   /**

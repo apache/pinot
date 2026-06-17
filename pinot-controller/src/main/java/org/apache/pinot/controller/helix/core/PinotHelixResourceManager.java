@@ -2664,8 +2664,9 @@ public class PinotHelixResourceManager {
     // Assign instances
     assignInstances(tableConfig, false);
 
-    // Send update query quota message if quota is specified
+    // Refresh brokers and servers so in-memory table config caches observe the update.
     sendTableConfigRefreshMessage(tableNameWithType);
+    sendTableConfigSchemaRefreshMessage(tableNameWithType);
   }
 
   public void deleteUser(String username) {
