@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -29,10 +30,13 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
   private static final String EXPLAIN_NAME = "INSTANCE_RESPONSE";
+  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponseOperator.class);
 
   protected final BaseCombineOperator<?> _combineOperator;
   protected final List<SegmentContext> _segmentContexts;
@@ -96,6 +100,13 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
         String.valueOf(_threadMemAllocatedBytes));
     instanceResponseBlock.addMetadata(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
         String.valueOf(_systemActivitiesCpuTimeNs));
+    Integer implicitLimit = QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(
+        _queryContext.getQueryOptions());
+    // false-positive when table has exactly implicitLimit rows
+    if (implicitLimit != null && baseResultsBlock.getNumRows() >= implicitLimit) {
+      instanceResponseBlock.addMetadata(
+          MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
+    }
     return instanceResponseBlock;
   }
 

@@ -651,6 +651,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
 
+    // Inject the implicit leaf-stage limit as a query option so servers can detect truncation
+    if (queryPlanResult.isLiteModeImplicitSortApplied()) {
+      query.getOptions().put(CommonConstants.Broker.Request.QueryOptionKey.LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT,
+          String.valueOf(queryPlanResult.getLiteModeEffectiveSortLimit()));
+    }
+
     // Optionally set ignoreMissingSegments query option based on broker config if not already set.
     if (_config.getProperty(CommonConstants.Broker.CONFIG_OF_IGNORE_MISSING_SEGMENTS,
         CommonConstants.Broker.DEFAULT_IGNORE_MISSING_SEGMENTS)) {
@@ -830,6 +836,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         }
       }
 
+      // Set MSE Lite planning-time warning fields
+      if (queryPlanResult.isLiteModeImplicitSortApplied()) {
+        int effectiveLimit = queryPlanResult.getLiteModeEffectiveSortLimit();
+        brokerResponse.setMseLiteLeafStageEffectiveLimit(effectiveLimit);
+        brokerResponse.setMseLiteFanOutAdjustedLimitApplied(
+            effectiveLimit != QueryOptionsUtils.getLiteModeLeafStageLimit(query.getOptions(),
+                CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT));
+      }
+
       long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
       _brokerMetrics.addTimedValue(BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
 
@@ -841,6 +856,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         }
         if (brokerResponse.isGroupsTrimmed()) {
           _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
+        }
+        if (brokerResponse.isMseLiteLeafStageLimitReached()) {
+          _brokerMetrics.addMeteredTableValue(table,
+              BrokerMeter.BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED, 1);
         }
       }
 
