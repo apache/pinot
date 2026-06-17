@@ -24,6 +24,7 @@ metadata:
   namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.brokerLabels" . | nindent 4 }}
+  annotations: {{ toYaml .Values.broker.annotations | nindent 4 }}
 spec:
   selector:
     matchLabels:

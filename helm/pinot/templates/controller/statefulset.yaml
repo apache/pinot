@@ -24,6 +24,7 @@ metadata:
   namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.controllerLabels" . | nindent 4 }}
+  annotations: {{ toYaml .Values.controller.annotations | nindent 4 }}
 spec:
   selector:
     matchLabels:
@@ -65,7 +66,7 @@ spec:
       - name: controller
         securityContext:
           {{- toYaml .Values.controller.securityContext | nindent 10 }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        image: "{{ .Values.minionImage.repository | default .Values.image.repository }}:{{ .Values.minionImage.tag | default .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [ "{{ .Values.controller.startCommand }}", "-configFileName", "/var/pinot/controller/config/pinot-controller.conf" ]
         env:

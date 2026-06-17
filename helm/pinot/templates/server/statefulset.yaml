@@ -24,6 +24,7 @@ metadata:
   namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.serverLabels" . | nindent 4 }}
+  annotations: {{ toYaml .Values.server.annotations | nindent 4 }}
 spec:
   selector:
     matchLabels:
