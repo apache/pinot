@@ -21,6 +21,7 @@ package org.apache.pinot.common.metrics;
 import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +34,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
@@ -67,6 +69,19 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   // Table level metrics are still emitted for allowed tables even if emitting table level metrics is disabled
   private final Set<String> _allowedTables;
+
+  /// Prometheus label name for the table dimension.
+  static final String TAG_TABLE = "table";
+  /// Prometheus label name for the table-type dimension (OFFLINE/REALTIME).
+  static final String TAG_TABLE_TYPE = "tableType";
+  /// Prometheus label name for the database dimension (present only when the table has a {@code db.table} prefix).
+  static final String TAG_DATABASE = "database";
+  /// Prometheus label name for the partition dimension.
+  static final String TAG_PARTITION = "partition";
+  /// Sentinel returned by {@link #getTableName(String)} when per-table metrics are disabled and no table is allowed.
+  private static final String ALL_TABLES_SENTINEL = "allTables";
+
+  private final Map<String, Map<String, String>> _tableTagsCache = new ConcurrentHashMap<>();
 
   public AbstractMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry, Class clazz) {
     this(metricPrefix, metricsRegistry, clazz, true, Collections.emptySet());
@@ -144,8 +159,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   public void addPhaseTiming(String tableName, QP phase, long duration, TimeUnit timeUnit) {
-    String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
-    addValueToTimer(fullTimerName, duration, timeUnit);
+    String resolved = getTableName(tableName);
+    String fullTimerName = _metricPrefix + resolved + "." + phase.getQueryPhaseName();
+    String baseName = _metricPrefix + phase.getQueryPhaseName();
+    addValueToTimer(fullTimerName, baseName, tableTags(resolved), duration, timeUnit);
   }
 
   public void addPhaseTiming(String tableName, QP phase, long nanos) {
@@ -161,8 +178,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param timeUnit The log time duration time unit
    */
   public void addTimedTableValue(final String tableName, T timer, final long duration, final TimeUnit timeUnit) {
-    final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
-    addValueToTimer(fullTimerName, duration, timeUnit);
+    String resolved = getTableName(tableName);
+    final String fullTimerName = _metricPrefix + resolved + "." + timer.getTimerName();
+    String baseName = _metricPrefix + timer.getTimerName();
+    addValueToTimer(fullTimerName, baseName, tableTags(resolved), duration, timeUnit);
   }
 
   /**
@@ -175,6 +194,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void addTimedTableValue(final String tableName, final String key, final T timer, final long duration,
       final TimeUnit timeUnit) {
+    /// TODO: key-based dimensions (e.g. Kafka clientId) are not yet mapped to tags; follow-up work.
     final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + key + "." + timer.getTimerName();
     addValueToTimer(fullTimerName, duration, timeUnit);
   }
@@ -211,6 +231,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
     final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName);
+    PinotTimer timer =
+        PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
+    if (timer != null) {
+      timer.update(duration, timeUnit);
+    }
+  }
+
+  private void addValueToTimer(String fullTimerName, String baseName, Map<String, String> tags, final long duration,
+      final TimeUnit timeUnit) {
+    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName, baseName, tags);
     PinotTimer timer =
         PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
     if (timer != null) {
@@ -307,7 +337,14 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public PinotMeter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
       PinotMeter reusedMeter) {
-    return addValueToMeter(getTableFullMeterName(tableName, meter), meter.getUnit(), unitCount, reusedMeter);
+    if (reusedMeter != null) {
+      reusedMeter.mark(unitCount);
+      return reusedMeter;
+    }
+    String resolved = getTableName(tableName);
+    String fullMeterName = tableFlatMeterName(resolved, meter);
+    String baseName = tableBaseMeterName(meter);
+    return addValueToMeter(fullMeterName, baseName, tableTags(resolved), meter.getUnit(), unitCount, null);
   }
 
   /**
@@ -331,9 +368,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public PinotMeter addMeteredTableValue(final String tableName, final String key, final M meter, final long unitCount,
       PinotMeter reusedMeter) {
+    if (reusedMeter != null) {
+      reusedMeter.mark(unitCount);
+      return reusedMeter;
+    }
+    /// TODO: key-based dimensions (e.g. Kafka clientId embedded in the metric name) are not yet mapped to tags;
+    ///       follow-up work.
     String meterName = meter.getMeterName();
     final String fullMeterName = _metricPrefix + getTableName(tableName) + "." + key + "." + meterName;
-    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
+    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, null);
   }
 
   public PinotMeter addMeteredValue(final M meter, final long unitCount, final String... tags) {
@@ -356,10 +399,24 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
-  public PinotMeter getMeteredTableValue(final String tableName, final M meter) {
-    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz,
-        getTableFullMeterName(tableName, meter));
+  private PinotMeter addValueToMeter(final String fullMeterName, final String baseName, final Map<String, String> tags,
+      final String unit, final long unitCount, PinotMeter reusedMeter) {
+    if (reusedMeter != null) {
+      reusedMeter.mark(unitCount);
+      return reusedMeter;
+    } else {
+      final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName, baseName, tags);
+      final PinotMeter newMeter =
+          PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, unit, TimeUnit.SECONDS);
+      newMeter.mark(unitCount);
+      return newMeter;
+    }
+  }
 
+  public PinotMeter getMeteredTableValue(final String tableName, final M meter) {
+    String resolved = getTableName(tableName);
+    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, tableFlatMeterName(resolved, meter),
+        tableBaseMeterName(meter), tableTags(resolved));
     return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
   }
 
@@ -367,11 +424,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     final PinotMetricName metricName =
         PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + meter.getMeterName());
     return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
-  }
-
-  private String getTableFullMeterName(final String tableName, final M meter) {
-    String meterName = meter.getMeterName();
-    return _metricPrefix + getTableName(tableName) + "." + meterName;
   }
 
   /**
@@ -417,8 +469,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param value The value to set the gauge to
    */
   public void setValueOfTableGauge(final String tableName, final G gauge, final long value) {
-    final String fullGaugeName = composeTableGaugeName(tableName, gauge);
-    setValueOfGauge(value, fullGaugeName);
+    String resolved = getTableName(tableName);
+    final String fullGaugeName = composeTableGaugeName(resolved, gauge);
+    String baseName = _metricPrefix + gauge.getGaugeName();
+    setValueOfGauge(value, fullGaugeName, baseName, tableTags(resolved));
   }
 
   /**
@@ -430,8 +484,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param value The value to set the gauge to
    */
   public void setValueOfPartitionGauge(final String tableName, final int partitionId, final G gauge, final long value) {
-    final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
-    setValueOfGauge(value, fullGaugeName);
+    String resolved = getTableName(tableName);
+    final String fullGaugeName = composeTableGaugeName(resolved, String.valueOf(partitionId), gauge);
+    String baseName = _metricPrefix + gauge.getGaugeName();
+    setValueOfGauge(value, fullGaugeName, baseName, partitionTags(resolved, partitionId));
   }
 
   /**
@@ -468,6 +524,22 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(value));
           setOrUpdateGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
+        } else {
+          _gaugeValues.get(gaugeName).set(value);
+        }
+      }
+    } else {
+      gaugeValue.set(value);
+    }
+  }
+
+  private void setValueOfGauge(long value, String gaugeName, String baseName, Map<String, String> tags) {
+    AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
+    if (gaugeValue == null) {
+      synchronized (_gaugeValues) {
+        if (!_gaugeValues.containsKey(gaugeName)) {
+          _gaugeValues.put(gaugeName, new AtomicLong(value));
+          setOrUpdateGauge(gaugeName, baseName, tags, () -> _gaugeValues.get(gaugeName).get());
         } else {
           _gaugeValues.get(gaugeName).set(value);
         }
@@ -565,8 +637,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void setOrUpdatePartitionGauge(final String tableName, final int partitionId, final G gauge,
       final Supplier<Long> valueSupplier) {
-    final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
-    setOrUpdateGauge(fullGaugeName, valueSupplier);
+    String resolved = getTableName(tableName);
+    final String fullGaugeName = composeTableGaugeName(resolved, String.valueOf(partitionId), gauge);
+    String baseName = _metricPrefix + gauge.getGaugeName();
+    setOrUpdateGauge(fullGaugeName, baseName, partitionTags(resolved, partitionId), valueSupplier);
   }
 
   /**
@@ -628,6 +702,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param value The value of the gauge
    */
   public void setOrUpdateTableGauge(final String tableName, final String key, final G gauge, final long value) {
+    /// TODO: key-based dimensions are not yet mapped to tags; follow-up work.
     String fullGaugeName = composeTableGaugeName(tableName, key, gauge);
     setOrUpdateGauge(fullGaugeName, value);
   }
@@ -643,6 +718,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void setOrUpdateTableGauge(final String tableName, final String key, final G gauge,
       final Supplier<Long> valueSupplier) {
+    /// TODO: key-based dimensions are not yet mapped to tags; follow-up work.
     String fullGaugeName = composeTableGaugeName(tableName, key, gauge);
     setOrUpdateGauge(fullGaugeName, valueSupplier);
   }
@@ -656,8 +732,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param value The value of the gauge
    */
   public void setOrUpdateTableGauge(final String tableName, final G gauge, final long value) {
-    String fullGaugeName = composeTableGaugeName(tableName, gauge);
-    setOrUpdateGauge(fullGaugeName, value);
+    String resolved = getTableName(tableName);
+    String fullGaugeName = composeTableGaugeName(resolved, gauge);
+    String baseName = _metricPrefix + gauge.getGaugeName();
+    setOrUpdateGauge(fullGaugeName, baseName, tableTags(resolved), value);
   }
 
   /**
@@ -670,8 +748,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void setOrUpdateTableGauge(final String tableName, final G gauge,
       final Supplier<Long> valueSupplier) {
-    String fullGaugeName = composeTableGaugeName(tableName, gauge);
-    setOrUpdateGauge(fullGaugeName, valueSupplier);
+    String resolved = getTableName(tableName);
+    String fullGaugeName = composeTableGaugeName(resolved, gauge);
+    String baseName = _metricPrefix + gauge.getGaugeName();
+    setOrUpdateGauge(fullGaugeName, baseName, tableTags(resolved), valueSupplier);
   }
 
   /**
@@ -698,6 +778,24 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) {
     PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
         PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+        PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.get()));
+    pinotGauge.setValueSupplier(valueSupplier);
+  }
+
+  private void setOrUpdateGauge(final String metricName, final String baseName, final Map<String, String> tags,
+      long value) {
+    String flatName = _metricPrefix + metricName;
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, flatName, baseName, tags),
+        PinotMetricUtils.makePinotGauge(avoid -> value));
+    pinotGauge.setValue(value);
+  }
+
+  private void setOrUpdateGauge(final String metricName, final String baseName, final Map<String, String> tags,
+      final Supplier<Long> valueSupplier) {
+    String flatName = _metricPrefix + metricName;
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, flatName, baseName, tags),
         PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.get()));
     pinotGauge.setValueSupplier(valueSupplier);
   }
@@ -747,8 +845,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param gauge the gauge to be removed
    */
   public void removeTableGauge(final String tableName, final G gauge) {
-    final String fullGaugeName = composeTableGaugeName(tableName, gauge);
-    removeGauge(fullGaugeName);
+    String resolved = getTableName(tableName);
+    final String fullGaugeName = composeTableGaugeName(resolved, gauge);
+    String baseName = _metricPrefix + gauge.getGaugeName();
+    removeGaugeWithTags(fullGaugeName, baseName, tableTags(resolved));
   }
 
 
@@ -760,8 +860,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param gauge the gauge to be removed
    */
   public void removePartitionGauge(final String tableName, final int partitionId, final G gauge) {
-    final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
-    removeGauge(fullGaugeName);
+    String resolved = getTableName(tableName);
+    final String fullGaugeName = composeTableGaugeName(resolved, String.valueOf(partitionId), gauge);
+    String baseName = _metricPrefix + gauge.getGaugeName();
+    removeGaugeWithTags(fullGaugeName, baseName, partitionTags(resolved, partitionId));
   }
 
   /**
@@ -804,8 +906,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   public void removeTableMeter(final String tableName, final M meter) {
+    String resolved = getTableName(tableName);
+    String fullMeterName = tableFlatMeterName(resolved, meter);
+    String baseName = tableBaseMeterName(meter);
     PinotMetricUtils.removeMetric(_metricsRegistry,
-        PinotMetricUtils.makePinotMetricName(_clazz, getTableFullMeterName(tableName, meter)));
+        PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName, baseName, tableTags(resolved)));
   }
 
   /**
@@ -817,6 +922,33 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName));
   }
 
+  /// Removes a gauge registered via the tag-first path, cleaning up both the gauge-values map and the metric registry
+  /// using the same base-name + tags key that was used during creation.
+  private void removeGaugeWithTags(String gaugeName, String baseName, Map<String, String> tags) {
+    synchronized (_gaugeValues) {
+      _gaugeValues.remove(gaugeName);
+      PinotMetricUtils.removeMetric(_metricsRegistry,
+          PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + gaugeName, baseName, tags));
+    }
+  }
+
+  /// Returns the full flat meter name for a table-level meter: prefix + resolved-table + "." + meter-name.
+  private String tableFlatMeterName(String resolved, M meter) {
+    return _metricPrefix + resolved + "." + meter.getMeterName();
+  }
+
+  /// Returns the dimension-free base meter name for a table-level meter: prefix + meter-name.
+  private String tableBaseMeterName(M meter) {
+    return _metricPrefix + meter.getMeterName();
+  }
+
+  /// Builds partition tags by combining the cached table tags with the partition label.
+  private Map<String, String> partitionTags(String resolved, int partitionId) {
+    Map<String, String> tags = new HashMap<>(tableTags(resolved));
+    tags.put(TAG_PARTITION, String.valueOf(partitionId));
+    return Map.copyOf(tags);
+  }
+
   protected abstract QP[] getQueryPhases();
 
   protected abstract M[] getMeters();
@@ -824,6 +956,41 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected abstract G[] getGauges();
 
   protected String getTableName(String tableName) {
-    return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
+    return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : ALL_TABLES_SENTINEL;
+  }
+
+  /// Builds structured dimension tags for a table-level metric from the resolved table name (after allTables fallback).
+  /// Returns an empty map for the {@code allTables} sentinel (not a real table; exposing {@code table="allTables"}
+  /// as a Prometheus label would be misleading). Results are cached per resolved name to avoid repeated allocation.
+  ///
+  /// @param resolvedTableName the table name as returned by {@link #getTableName(String)} (may be the sentinel)
+  private Map<String, String> tableTags(String resolvedTableName) {
+    // The allTables sentinel is synthetic — emit no table/type labels rather than a misleading table="allTables" label.
+    if (ALL_TABLES_SENTINEL.equals(resolvedTableName)) {
+      return Map.of();
+    }
+    return _tableTagsCache.computeIfAbsent(resolvedTableName, this::computeTableTags);
+  }
+
+  private Map<String, String> computeTableTags(String resolvedTableName) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(resolvedTableName);
+    String rawTable = TableNameBuilder.extractRawTableName(resolvedTableName);
+    // Hand-rolled db.table split: TableNameBuilder.extractRawTableName already strips the OFFLINE/REALTIME suffix;
+    // the remaining "db.tableName" prefix (if any) encodes the database. TableNameBuilder has no dedicated
+    // database-prefix splitter, so we do the indexOf('.') split directly.
+    Map<String, String> tags = new HashMap<>();
+    if (rawTable != null && !rawTable.isEmpty()) {
+      int dotIdx = rawTable.indexOf('.');
+      if (dotIdx > 0) {
+        tags.put(TAG_DATABASE, rawTable.substring(0, dotIdx));
+        tags.put(TAG_TABLE, rawTable.substring(dotIdx + 1));
+      } else {
+        tags.put(TAG_TABLE, rawTable);
+      }
+    }
+    if (tableType != null) {
+      tags.put(TAG_TABLE_TYPE, tableType.name());
+    }
+    return Map.copyOf(tags);
   }
 }

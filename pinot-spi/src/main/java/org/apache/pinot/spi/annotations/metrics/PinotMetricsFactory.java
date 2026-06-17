@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.annotations.metrics;
 
+import java.util.Map;
 import java.util.function.Function;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
@@ -46,6 +47,20 @@ public interface PinotMetricsFactory {
    * Makes a {@link PinotMetricName} given the class and the metric name.
    */
   PinotMetricName makePinotMetricName(Class<?> klass, String name);
+
+  /// Makes a {@link PinotMetricName} carrying both the flat name (for legacy compat) and structured dimension tags
+  /// (for tag-first export). Legacy factory implementations inherit this default and ignore {@code baseName}/{@code
+  /// tags}, delegating to {@link #makePinotMetricName(Class, String)} with the flat name so their output is unchanged.
+  /// The native Micrometer implementation overrides this to apply tags.
+  ///
+  /// @param klass     the metrics class (used to derive the metric name prefix by some namers)
+  /// @param flatName  the full dotted metric name including embedded table/type/partition segments (legacy compat)
+  /// @param baseName  the dimension-free dotted metric name (table/type/partition stripped) used by the native backend
+  /// @param tags      structured dimension tags ({@code table}, {@code tableType}, {@code partition}, …)
+  default PinotMetricName makePinotMetricName(Class<?> klass, String flatName, String baseName,
+      Map<String, String> tags) {
+    return makePinotMetricName(klass, flatName);
+  }
 
   /**
    * Makes a {@link PinotGauge} given a function.

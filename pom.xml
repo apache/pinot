@@ -181,6 +181,7 @@
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.39</dropwizard-metrics.version>
+    <micrometer.version>1.14.6</micrometer.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
     <zstd-jni.version>1.5.7-10</zstd-jni.version>
     <lz4-java.version>1.11.0</lz4-java.version>
@@ -741,6 +742,18 @@
         <artifactId>prometheus-metrics-model</artifactId>
         <version>${prometheus.metrics.version}</version>
         <scope>test</scope>
+      </dependency>
+      <!--
+        Align the whole io.prometheus:prometheus-metrics-* family (e.g. exposition-formats / -config pulled
+        transitively by micrometer-registry-prometheus) to a single version, so dependency convergence holds
+        when the Micrometer backend's direct-Prometheus leg is on the compile classpath.
+      -->
+      <dependency>
+        <groupId>io.prometheus</groupId>
+        <artifactId>prometheus-metrics-bom</artifactId>
+        <version>${prometheus.metrics.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <!-- netty BOM -->
@@ -1360,6 +1373,15 @@
         <groupId>io.dropwizard.metrics</groupId>
         <artifactId>metrics-bom</artifactId>
         <version>${dropwizard-metrics.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- micrometer bom -->
+      <dependency>
+        <groupId>io.micrometer</groupId>
+        <artifactId>micrometer-bom</artifactId>
+        <version>${micrometer.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
