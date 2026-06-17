@@ -36,6 +36,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -122,6 +123,12 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
       }
     }
     _numDocsScanned += numDocs;
+    QueryScanCostContext scanCost = getScanCostContext();
+    if (scanCost != null) {
+      scanCost.addDocsScanned(numDocs);
+      scanCost.addEntriesScannedPostFilter(
+          (long) numDocs * _projectOperator.getNumColumnsProjected());
+    }
     return new SelectionResultsBlock(_dataSchema, rows, _queryContext);
   }
 
