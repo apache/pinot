@@ -112,10 +112,14 @@ public class CalciteSqlParser {
 
     sql = ParserUtils.sanitizeSql(sql);
 
-    // extract and remove OPTIONS string
-    List<String> options = extractOptionsFromSql(sql);
+    // extract and remove legacy OPTIONS string (OPTION (<k>=<v>, ...) appended to query)
+    List<String> options = new ArrayList<>();
+    Matcher optionsMatcher = OPTIONS_REGEX_PATTEN.matcher(sql);
+    while (optionsMatcher.find()) {
+      options.add(optionsMatcher.group(1));
+    }
     if (!options.isEmpty()) {
-      sql = removeOptionsFromSql(sql);
+      sql = OPTIONS_REGEX_PATTEN.matcher(sql).replaceAll("");
     }
 
     try (StringReader inStream = new StringReader(sql)) {
@@ -125,7 +129,17 @@ public class CalciteSqlParser {
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
       // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
-        sqlNodeAndOptions.setExtraOptions(extractOptionsMap(options));
+        Map<String, String> optionsMap = new HashMap<>();
+        for (String optionsStatement : options) {
+          for (String option : optionsStatement.split(",")) {
+            final String[] splits = option.split("=");
+            if (splits.length != 2) {
+              throw new SqlCompilationException("OPTION statement requires two parts separated by '='");
+            }
+            optionsMap.put(splits[0].trim(), splits[1].trim());
+          }
+        }
+        sqlNodeAndOptions.setExtraOptions(optionsMap);
       }
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
@@ -643,37 +657,6 @@ public class CalciteSqlParser {
     validate(pinotQuery);
   }
 
-
-  @Deprecated
-  private static List<String> extractOptionsFromSql(String sql) {
-    List<String> results = new ArrayList<>();
-    Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
-    while (matcher.find()) {
-      results.add(matcher.group(1));
-    }
-    return results;
-  }
-
-  @Deprecated
-  private static String removeOptionsFromSql(String sql) {
-    Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
-    return matcher.replaceAll("");
-  }
-
-  @Deprecated
-  private static Map<String, String> extractOptionsMap(List<String> optionsStatements) {
-    Map<String, String> options = new HashMap<>();
-    for (String optionsStatement : optionsStatements) {
-      for (String option : optionsStatement.split(",")) {
-        final String[] splits = option.split("=");
-        if (splits.length != 2) {
-          throw new SqlCompilationException("OPTION statement requires two parts separated by '='");
-        }
-        options.put(splits[0].trim(), splits[1].trim());
-      }
-    }
-    return options;
-  }
 
   private static List<Expression> convertDistinctSelectList(SqlNodeList selectList) {
     // NOTE: Create an ArrayList because we might need to modify the list later

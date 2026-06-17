@@ -205,15 +205,6 @@ public class FunctionRegistry {
   }
 
   /**
-   * @deprecated For performance concern, use {@link #contains(String)} instead to avoid invoking
-   *             {@link #canonicalize(String)} multiple times.
-   */
-  @Deprecated
-  public static boolean containsFunction(String name) {
-    return contains(canonicalize(name));
-  }
-
-  /**
    * Returns the {@link FunctionInfo} associated with the given canonical name and argument types, or {@code null} if
    * there is no matching method. This method should be called after the FunctionRegistry is initialized and all methods
    * are already registered.
@@ -234,16 +225,6 @@ public class FunctionRegistry {
   public static FunctionInfo lookupFunctionInfo(String canonicalName, int numArguments) {
     PinotScalarFunction function = FUNCTION_MAP.get(canonicalName);
     return function != null ? function.getFunctionInfo(numArguments) : null;
-  }
-
-  /**
-   * @deprecated For performance concern, use {@link #lookupFunctionInfo(String, int)} instead to avoid invoking
-   *             {@link #canonicalize(String)} multiple times.
-   */
-  @Deprecated
-  @Nullable
-  public static FunctionInfo getFunctionInfo(String name, int numArguments) {
-    return lookupFunctionInfo(canonicalize(name), numArguments);
   }
 
   public static String canonicalize(String name) {
