@@ -287,6 +287,15 @@ public class OpChainExecutionContext {
     return id != null ? id : -1;
   }
 
+  /**
+   * Returns an unmodifiable view of the recorded PlanNode→id assignments, or an empty map when none were recorded
+   * (ids are only assigned in stream-stats mode). Useful for plugins that need to resolve PlanNodes by id, e.g. to
+   * register synthetic stats operators via {@link #recordPlanNodesForOperator}.
+   */
+  public Map<PlanNode, Integer> getPlanNodeIdMap() {
+    return _planNodeIds == null ? Map.of() : Collections.unmodifiableMap(_planNodeIds);
+  }
+
   private static QueryOperatorFactoryProvider getDefaultQueryOperatorFactoryProvider() {
     // Prefer server context when explicitly configured, otherwise fall back to broker, then default.
     Object serverProvider = ServerContext.getInstance().getQueryOperatorFactoryProvider();
