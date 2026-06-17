@@ -19,6 +19,8 @@
 
 # Default values for Pinot.
 
+namespace:
+  create: false
 namespaceOverride:
 namespaceAnnotations: {}
 
@@ -34,6 +36,8 @@ image:
   #   - MS OpenJDK 21, e.g. `latest-21-ms-openjdk`, `1.0.0-21-ms-openjdk`
   tag: latest # 1.0.0, 0.12.1, latest
   pullPolicy: Always # Use IfNotPresent when you pinged a version of image tag
+
+minionImage: {}
 
 cluster:
   name: pinot-quickstart
@@ -93,6 +97,7 @@ controller:
   # you want to specify the port in controller.access.protocols.https.port instead.
   configureControllerPort: true
   replicaCount: 1
+  annotations: {}
   podManagementPolicy: Parallel
   podSecurityContext: {}
     # fsGroup: 2000
@@ -245,6 +250,7 @@ broker:
   # you want to specify the port in pinot.broker.access.protocols.https.port instead.
   configureBrokerPort: true
   replicaCount: 1
+  annotations: {}
   podManagementPolicy: Parallel
   podSecurityContext: {}
     # fsGroup: 2000
@@ -389,6 +395,7 @@ server:
   # you want to specify the port in pinot.server.nettytls.port instead.
   configureServerPort: true
   replicaCount: 1
+  annotations: {}
   podManagementPolicy: Parallel
   podSecurityContext: {}
     # fsGroup: 2000
@@ -523,6 +530,7 @@ minion:
   # or when you're configuring ports through another mechanism.
   configureMinionPort: true
   replicaCount: 0
+  annotations: {}
   podManagementPolicy: Parallel
   podSecurityContext: {}
     # fsGroup: 2000
@@ -646,6 +654,7 @@ minionStateless:
   # or when you're configuring ports through another mechanism.
   configureMinionStatelessPort: true
   replicaCount: 1
+  annotations: {}
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
