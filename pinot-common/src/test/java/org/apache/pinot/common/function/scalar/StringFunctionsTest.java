@@ -615,7 +615,8 @@ public class StringFunctionsTest {
     assertEquals(StringFunctions.overlay("abcdef", "XY", 3, 0), "abXYcdef");
 
     // Delete more than replacement length: replacement is shorter than deleted span
-    assertEquals(StringFunctions.overlay("abcdef", "XY", 3, 4), "abXYf");
+    // FROM 3 FOR 4 removes positions 3-6 (cdef), nothing remains after position 6
+    assertEquals(StringFunctions.overlay("abcdef", "XY", 3, 4), "abXY");
 
     // Replace at start (position 1)
     assertEquals(StringFunctions.overlay("abcdef", "Z", 1, 1), "Zbcdef");

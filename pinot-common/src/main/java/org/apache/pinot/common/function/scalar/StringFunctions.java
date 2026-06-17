@@ -1171,7 +1171,7 @@ public class StringFunctions {
    *   overlay("hello world", "there", 7)     → "hello there"   (length defaults to len("there") = 5)
    *   overlay("hello world", "there", 7, 5)  → "hello there"
    *   overlay("abcdef", "XY", 3, 0)          → "abXYcdef"      (insertion without deletion)
-   *   overlay("abcdef", "XY", 3, 4)          → "abXYf"         (delete 4, insert 2)
+   *   overlay("abcdef", "XY", 3, 4)          → "abXY"          (delete 4 chars cdef, insert 2)
    * </pre>
    *
    * @param input       the source string
