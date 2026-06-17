@@ -556,7 +556,10 @@ export default function CustomizedTables({
               {styleCell(cellData.value)}
             </Tooltip>
         );
-      } else if(has(cellData, 'value') && cellData.value) {
+      } else if (has(cellData, 'value')) {
+        // Render via the value path whenever the key is present, including falsy values
+        // (0, false, null, ''). styleCell safely coerces any type, so we no longer fall
+        // through to dumping the whole {value: ...} object for a falsy value.
         return styleCell(cellData.value);
       } else {
           // Fall back to a stringified representation. toDisplayString guards against
