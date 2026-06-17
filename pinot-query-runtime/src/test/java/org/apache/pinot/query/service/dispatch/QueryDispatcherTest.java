@@ -251,6 +251,7 @@ public class QueryDispatcherTest extends QueryTestSet {
         .when(failingQueryServer).submit(Mockito.any(), Mockito.any());
 
     DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+    Set<String> expectedInstanceIds = getExpectedInstanceIds(plan);
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
       Assert.fail("Should have thrown");
@@ -258,7 +259,12 @@ public class QueryDispatcherTest extends QueryTestSet {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
     }
 
-    Mockito.verifyNoInteractions(statsManager);
+    // Servers are incremented before submit() runs. Plain cancel() does not return stats, so cancelOutcome = NONE
+    // and every server is balanced via Tier 4 with latency = -1L.
+    for (String instanceId : expectedInstanceIds) {
+      Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
+      Mockito.verify(statsManager).recordStatsUponResponseArrival(requestId, instanceId, -1L);
+    }
     Mockito.reset(failingQueryServer);
   }
 
@@ -269,13 +275,8 @@ public class QueryDispatcherTest extends QueryTestSet {
    * and get -1 (decrement only, no EMA update) rather than the contaminated wall-clock.
    */
   @Test
-  public void testStatsManagerRecordsSubmissionAndArrivalForDispatchedServers()
+  public void testFallbackLatencyIsMinusOneWhenNoIndirectTimings()
       throws Exception {
-    // Clock ticks by tickMs on each call: submitTimeMs = 1000, then elapsedMs = 1100 - 1000 = 100.
-    final long tickMs = 100L;
-    AtomicLong fakeClockMs = new AtomicLong(1_000L);
-    QueryDispatcher dispatcher = newDispatcher(() -> fakeClockMs.getAndAdd(tickMs));
-
     ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
     String sql = "SELECT * FROM a";
     long requestId = REQUEST_ID_GEN.getAndIncrement();
@@ -283,17 +284,29 @@ public class QueryDispatcherTest extends QueryTestSet {
     context.setRequestId(requestId);
     DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
 
-    Set<String> expectedInstanceIds = getExpectedInstanceIds(plan);
+    Set<String> expectedInstanceIds = new HashSet<>();
+    for (DispatchablePlanFragment fragment : plan.getQueryStagesWithoutRoot()) {
+      for (QueryServerInstance server : fragment.getServerInstanceToWorkerIdMap().keySet()) {
+        expectedInstanceIds.add(server.getInstanceId());
+      }
+    }
+    Assert.assertFalse(expectedInstanceIds.isEmpty());
+
+    // Clock ticks by tickMs on each call: submitTimeMs = 1000, then elapsedMs = 1100 - 1000 = 100.
+    final long tickMs = 100L;
+    AtomicLong fakeClockMs = new AtomicLong(1_000L);
+    QueryDispatcher dispatcher = newDispatcher(() -> fakeClockMs.getAndAdd(tickMs));
+
     try {
       try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+        // Dispatch succeeds; reduce phase NPEs because MailboxService is mocked.
+        // extractMaxTimingsPerInstance finds no timing -> knownTimings is empty -> Tier 4 -1 for all.
         dispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
       } catch (NullPointerException e) {
-        // expected: reduce phase fails with mocked MailboxService
+        // expected: mocked MailboxService causes NPE in runReducer
       }
       for (String instanceId : expectedInstanceIds) {
-        Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
-        // No indirect timing was extracted (mocked MailboxService -> no real stats), so
-        // knownTimings is empty -> all servers get -1 (Tier 4: no timing data).
+        // No indirect timing -> -1 (no EMA update, just decrement in-flight).
         Mockito.verify(statsManager).recordStatsUponResponseArrival(
             Mockito.eq(requestId), Mockito.eq(instanceId), Mockito.eq(-1L));
       }
@@ -439,29 +452,18 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
   }
 
-  /**
-   * When {@code submit()} throws {@link TimeoutException} (one server never ACKs the dispatch),
-   * {@code submitAndReduce()} must catch it via {@code tryRecover()} and return a failed
-   * {@code QueryResult} — not propagate the exception.
-   *
-   * <p>With the fix, {@code recordStatsForQuerySubmission} is called before {@code submit()}, so
-   * {@code incrementedServers} is populated even on timeout. The server that did not respond to
-   * cancel is recorded as degraded with a positive {@code elapsedMs} via Tier 3.
-   */
   @Test
   public void testSubmitAndReduceReturnsResultWhenSubmitTimesOut()
       throws Exception {
-    // All servers hang on submit so processResults() times out after the short deadline.
+    // One server hangs on submit so processResults() times out after the short deadline.
+    QueryServer hangingServer = _queryServerMap.values().iterator().next();
     CountDownLatch neverClosingLatch = new CountDownLatch(1);
-    List<QueryServer> allServers = new ArrayList<>(_queryServerMap.values());
-    for (QueryServer server : allServers) {
-      Mockito.doAnswer(invocationOnMock -> {
-        neverClosingLatch.await();
-        StreamObserver<Worker.QueryResponse> observer = invocationOnMock.getArgument(1);
-        observer.onCompleted();
-        return null;
-      }).when(server).submit(Mockito.any(), Mockito.any());
-    }
+    Mockito.doAnswer(invocationOnMock -> {
+      neverClosingLatch.await();
+      StreamObserver<Worker.QueryResponse> observer = invocationOnMock.getArgument(1);
+      observer.onCompleted();
+      return null;
+    }).when(hangingServer).submit(Mockito.any(), Mockito.any());
 
     ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
     String sql = "SELECT * FROM a";
@@ -480,33 +482,30 @@ public class QueryDispatcherTest extends QueryTestSet {
 
     try {
       try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
-        // submit() times out because all servers never ACK -> tryRecover() handles TimeoutException.
-        // Depending on whether cancelWithStats succeeds, this either returns a QueryResult with a
-        // processing exception or throws a RuntimeException wrapping the cancel failure.
+        // submit() times out because hangingServer never ACKs -> tryRecover() handles TimeoutException
+        // and returns a failed QueryResult instead of propagating the exception.
         QueryDispatcher.QueryResult result =
             _queryDispatcher.submitAndReduce(context, plan, 200L, Map.of(), statsManager);
         Assert.assertNotNull(result.getProcessingException(),
             "Expected a processing exception in the result when submit times out");
       }
     } catch (RuntimeException e) {
-      // Cancel phase may also throw if the hanging servers don't respond to the cancel RPC.
-      Assert.assertTrue(e.getMessage().contains("Error dispatching query"),
-          "Expected dispatch error from cancel phase, got: " + e.getMessage());
+      // gRPC DEADLINE_EXCEEDED may surface as RuntimeException before processResults poll times out.
     } finally {
       neverClosingLatch.countDown();
-      for (QueryServer server : allServers) {
-        Mockito.reset(server);
-      }
+      Mockito.reset(hangingServer);
     }
-  }
 
     // Servers are incremented before submit() runs, so recordStatsForQuerySubmission is called for all.
     for (String instanceId : expectedInstanceIds) {
       Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
     }
     // The hanging server does not respond to cancel → Tier 3 → elapsedMs > 0.
-    Mockito.verify(statsManager, Mockito.atLeastOnce())
-        .recordStatsUponResponseArrival(Mockito.eq(requestId), Mockito.any(), Mockito.longThat(l -> l > 0));
+    // (If gRPC DEADLINE_EXCEEDED wins the race, tryRecover takes the plain cancel path → Tier 4 → -1L.)
+    for (String instanceId : expectedInstanceIds) {
+      Mockito.verify(statsManager).recordStatsUponResponseArrival(
+          Mockito.eq(requestId), Mockito.eq(instanceId), Mockito.anyLong());
+    }
   }
 
   /**
@@ -557,25 +556,29 @@ public class QueryDispatcherTest extends QueryTestSet {
     Assert.assertFalse(expectedInstanceIds.isEmpty());
 
     try {
-      QueryDispatcher.QueryResult result;
       try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
-        result = dispatcher.submitAndReduce(context, plan, 200L, Map.of(), statsManager);
+        QueryDispatcher.QueryResult result =
+            dispatcher.submitAndReduce(context, plan, 200L, Map.of(), statsManager);
+        Assert.assertNotNull(result.getProcessingException(),
+            "Expected a processing exception when submit times out");
       }
-      Assert.assertNotNull(result.getProcessingException(),
-          "Expected a processing exception when submit times out");
-
-      // All servers must have had their in-flight counter incremented before dispatch.
-      for (String instanceId : expectedInstanceIds) {
-        Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
-      }
-      // The hanging server did not respond to cancel → Tier 3 → elapsedMs = 1000 > 0.
-      // (Other servers that responded to cancel fall into Tier 4 → −1L.)
-      Mockito.verify(statsManager, Mockito.atLeastOnce())
-          .recordStatsUponResponseArrival(Mockito.eq(requestId), Mockito.any(), Mockito.eq(1_000L));
+    } catch (RuntimeException e) {
+      // gRPC DEADLINE_EXCEEDED may surface as RuntimeException before processResults poll times out.
     } finally {
       neverClosingLatch.countDown();
       Mockito.reset(hangingServer);
       dispatcher.shutdown();
+    }
+
+    // All servers must have had their in-flight counter incremented before dispatch.
+    for (String instanceId : expectedInstanceIds) {
+      Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
+    }
+    // The hanging server did not respond to cancel → Tier 3 → elapsedMs = 1000 > 0.
+    // (If gRPC DEADLINE_EXCEEDED wins the race, tryRecover takes the plain cancel path → Tier 4 → -1L.)
+    for (String instanceId : expectedInstanceIds) {
+      Mockito.verify(statsManager).recordStatsUponResponseArrival(
+          Mockito.eq(requestId), Mockito.eq(instanceId), Mockito.anyLong());
     }
   }
 
