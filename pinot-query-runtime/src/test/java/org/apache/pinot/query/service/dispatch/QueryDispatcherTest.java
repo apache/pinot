@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -385,14 +386,67 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
   }
 
+  @Test
+  public void testStatsBalancedWhenDispatchThrowsUnknownException() throws Exception {
+    // Stub submit() to populate serversOut like serializePlanFragments(), then throw a RuntimeException. This exercises
+    // the unknown-exception path where tryRecover() plain-cancels and re-throws without calling cancelWithStats.
+    QueryDispatcher spyDispatcher = Mockito.spy(_queryDispatcher);
+    Mockito.doAnswer(invocation -> {
+      DispatchableSubPlan submittedPlan = invocation.getArgument(1);
+      Set<QueryServerInstance> serversOut = invocation.getArgument(3);
+      Consumer<QueryServerInstance> hook = invocation.getArgument(5);
+      for (DispatchablePlanFragment fragment : submittedPlan.getQueryStagesWithoutRoot()) {
+        for (QueryServerInstance server : fragment.getServerInstanceToWorkerIdMap().keySet()) {
+          serversOut.add(server);
+          if (hook != null) {
+            hook.accept(server);
+          }
+        }
+      }
+      throw new RuntimeException("simulated failure");
+    })
+        .when(spyDispatcher)
+        .submit(Mockito.anyLong(), Mockito.any(), Mockito.anyLong(), Mockito.any(), Mockito.any(),
+            Mockito.any());
+
+    ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+
+    Set<String> expectedInstanceIds = new HashSet<>();
+    for (DispatchablePlanFragment fragment : plan.getQueryStagesWithoutRoot()) {
+      for (QueryServerInstance server : fragment.getServerInstanceToWorkerIdMap().keySet()) {
+        expectedInstanceIds.add(server.getInstanceId());
+      }
+    }
+    Assert.assertFalse(expectedInstanceIds.isEmpty());
+
+    RuntimeException thrown = Assert.expectThrows(RuntimeException.class, () -> {
+      try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+        spyDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
+      }
+    });
+    Assert.assertEquals(thrown.getMessage(), "simulated failure");
+
+    // Servers are incremented before submit() runs. Plain cancel() does not return stats, so cancelOutcome = NONE
+    // and every server is balanced via Tier 4 with latency = -1L.
+    for (String instanceId : expectedInstanceIds) {
+      Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
+      Mockito.verify(statsManager).recordStatsUponResponseArrival(requestId, instanceId, -1L);
+    }
+  }
+
   /**
    * When {@code submit()} throws {@link TimeoutException} (one server never ACKs the dispatch),
    * {@code submitAndReduce()} must catch it via {@code tryRecover()} and return a failed
    * {@code QueryResult} — not propagate the exception.
    *
-   * <p>Because {@code submit()} threw before the submission-stats loop ran, {@code incrementedServers}
-   * is empty and the finally block's tiered latency recorder has nothing to update, so
-   * {@code statsManager} receives zero interactions.
+   * <p>With the fix, {@code recordStatsForQuerySubmission} is called before {@code submit()}, so
+   * {@code incrementedServers} is populated even on timeout. The server that did not respond to
+   * cancel is recorded as degraded with a positive {@code elapsedMs} via Tier 3.
    */
   @Test
   public void testSubmitAndReduceReturnsResultWhenSubmitTimesOut()
@@ -416,6 +470,14 @@ public class QueryDispatcherTest extends QueryTestSet {
     context.setRequestId(requestId);
     DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
 
+    Set<String> expectedInstanceIds = new HashSet<>();
+    for (DispatchablePlanFragment fragment : plan.getQueryStagesWithoutRoot()) {
+      for (QueryServerInstance server : fragment.getServerInstanceToWorkerIdMap().keySet()) {
+        expectedInstanceIds.add(server.getInstanceId());
+      }
+    }
+    Assert.assertFalse(expectedInstanceIds.isEmpty());
+
     try {
       try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
         // submit() times out because all servers never ACK -> tryRecover() handles TimeoutException.
@@ -436,11 +498,85 @@ public class QueryDispatcherTest extends QueryTestSet {
         Mockito.reset(server);
       }
     }
+  }
 
-    // submit() threw before recordStatsForQuerySubmission ran -> incrementedServers is empty.
-    // The finally block's tiered latency recorder iterates an empty incrementedServers set,
-    // so statsManager receives no interactions.
-    Mockito.verifyNoInteractions(statsManager);
+    // Servers are incremented before submit() runs, so recordStatsForQuerySubmission is called for all.
+    for (String instanceId : expectedInstanceIds) {
+      Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
+    }
+    // The hanging server does not respond to cancel → Tier 3 → elapsedMs > 0.
+    Mockito.verify(statsManager, Mockito.atLeastOnce())
+        .recordStatsUponResponseArrival(Mockito.eq(requestId), Mockito.any(), Mockito.longThat(l -> l > 0));
+  }
+
+  /**
+   * Simulates the SIGSTOP scenario: one server hangs on submit AND does not respond to cancel
+   * (TCP connection alive, server frozen). With the fix, {@code incrementedServers} is populated
+   * before {@code submit()}, so {@code recordPerServerLatencies} marks the unresponsive server
+   * degraded via Tier 3 with {@code latency = elapsedMs > 0} — the EMA is updated correctly.
+   *
+   * <p>A fake clock pins {@code elapsedMs} to 1000 ms regardless of wall-clock time.
+   * A short cancel timeout (100 ms) keeps the test fast.
+   */
+  @Test
+  public void testDispatchTimeoutRecordsElapsedLatency()
+      throws Exception {
+    AtomicLong fakeClockMs = new AtomicLong(1_000L);
+    // Each getAsLong() call advances the fake clock by 1000 ms:
+    //   call 1 (submitTimeMs) → 1000, call 2 (finally elapsedMs) → 2000 − 1000 = 1000.
+    QueryDispatcher dispatcher = new QueryDispatcher(
+        Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, true,
+        Duration.ofMillis(100),          // short cancel timeout so the test completes quickly
+        () -> fakeClockMs.getAndAdd(1_000L));
+
+    QueryServer hangingServer = _queryServerMap.values().iterator().next();
+    CountDownLatch neverClosingLatch = new CountDownLatch(1);
+    // Hang both submit and cancel to simulate a fully frozen server (SIGSTOP).
+    Mockito.doAnswer(inv -> {
+      neverClosingLatch.await();
+      return null;
+    }).when(hangingServer).submit(Mockito.any(), Mockito.any());
+    Mockito.doAnswer(inv -> {
+      neverClosingLatch.await();
+      return null;
+    }).when(hangingServer).cancel(Mockito.any(), Mockito.any());
+
+    ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
+    String sql = "SELECT * FROM a";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+
+    Set<String> expectedInstanceIds = new HashSet<>();
+    for (DispatchablePlanFragment fragment : plan.getQueryStagesWithoutRoot()) {
+      for (QueryServerInstance server : fragment.getServerInstanceToWorkerIdMap().keySet()) {
+        expectedInstanceIds.add(server.getInstanceId());
+      }
+    }
+    Assert.assertFalse(expectedInstanceIds.isEmpty());
+
+    try {
+      QueryDispatcher.QueryResult result;
+      try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+        result = dispatcher.submitAndReduce(context, plan, 200L, Map.of(), statsManager);
+      }
+      Assert.assertNotNull(result.getProcessingException(),
+          "Expected a processing exception when submit times out");
+
+      // All servers must have had their in-flight counter incremented before dispatch.
+      for (String instanceId : expectedInstanceIds) {
+        Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
+      }
+      // The hanging server did not respond to cancel → Tier 3 → elapsedMs = 1000 > 0.
+      // (Other servers that responded to cancel fall into Tier 4 → −1L.)
+      Mockito.verify(statsManager, Mockito.atLeastOnce())
+          .recordStatsUponResponseArrival(Mockito.eq(requestId), Mockito.any(), Mockito.eq(1_000L));
+    } finally {
+      neverClosingLatch.countDown();
+      Mockito.reset(hangingServer);
+      dispatcher.shutdown();
+    }
   }
 
   /**

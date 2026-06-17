@@ -225,7 +225,8 @@ public class QueryDispatcher {
   /// request statistics into `statsManager` for use by the adaptive query router. When `statsManager` is non-null:
   ///
   /// - Each submitted server is registered as having one more in-flight request via
-  ///      [ServerRoutingStatsManager#recordStatsForQuerySubmission] after the fan-out succeeds.
+  ///      [ServerRoutingStatsManager#recordStatsForQuerySubmission] before the fan-out begins, so the counter is
+  ///      incremented even when `submit()` hangs and times out.
   /// - Servers reporting trusted leaf-stage timings are decremented with their measured elapsed time.
   /// - If no timing was received, all submitted servers are decremented with `-1`. When timings are partial, unreported
   ///      tracked leaf servers use the elapsed dispatch time and intermediate servers use `-1`.
@@ -244,6 +245,7 @@ public class QueryDispatcher {
     CancelOutcome cancelOutcome = CancelOutcome.NONE;
 
     AdaptiveRoutingStageClassification classification = null;
+    Consumer<QueryServerInstance> preDispatchHook = null;
     if (statsManager != null) {
       classification = AdaptiveRoutingStageClassification.classify(dispatchableSubPlan);
       dispatchableSubPlan.getQueryStageMap().get(0).getCustomProperties()
@@ -254,19 +256,15 @@ public class QueryDispatcher {
           fragment.getCustomProperties().put(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY, "true");
         }
       }
+      preDispatchHook = server -> {
+        if (incrementedServers.add(server)) {
+          statsManager.recordStatsForQuerySubmission(requestId, server.getInstanceId());
+        }
+      };
     }
 
     try {
-      submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      // The SSE engine increments before `submit`, but here we increment after because `submit` populates
-      // the list of servers. Getting the list of servers before calling `submit` would expose
-      // implementation details of `submit`.
-      if (statsManager != null) {
-        for (QueryServerInstance server : servers) {
-          statsManager.recordStatsForQuerySubmission(requestId, server.getInstanceId());
-          incrementedServers.add(server);
-        }
-      }
+      submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions, preDispatchHook);
       result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
         if (statsManager != null) {
@@ -631,7 +629,7 @@ public class QueryDispatcher {
             }
           }
         }
-      });
+      }, null);
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
       cancel(requestId, servers);
@@ -644,6 +642,14 @@ public class QueryDispatcher {
   void submit(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Set<QueryServerInstance> serversOut, Map<String, String> queryOptions)
       throws Exception {
+    submit(requestId, dispatchableSubPlan, timeoutMs, serversOut, queryOptions, null);
+  }
+
+  @VisibleForTesting
+  void submit(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
+      Set<QueryServerInstance> serversOut, Map<String, String> queryOptions,
+      @Nullable Consumer<QueryServerInstance> preDispatchHook)
+      throws Exception {
     SendRequest<Worker.QueryRequest, Worker.QueryResponse> requestSender = DispatchClient::submit;
     Set<DispatchablePlanFragment> plansWithoutRoot = dispatchableSubPlan.getQueryStagesWithoutRoot();
     execute(requestId, plansWithoutRoot, timeoutMs, queryOptions, requestSender, serversOut,
@@ -654,7 +660,7 @@ public class QueryDispatcher {
                 String.format("Unable to execute query plan for request: %d on server: %s, ERROR: %s", requestId,
                     serverInstance, response.getMetadataOrDefault(ServerResponseStatus.STATUS_ERROR, "null")));
           }
-        });
+        }, preDispatchHook);
     if (isQueryCancellationEnabled()) {
       _serversByQuery.put(requestId, serversOut);
     }
@@ -755,13 +761,20 @@ public class QueryDispatcher {
 
   private <E> void execute(long requestId, Set<DispatchablePlanFragment> stagePlans, long timeoutMs,
       Map<String, String> queryOptions, SendRequest<Worker.QueryRequest, E> sendRequest,
-      Set<QueryServerInstance> serverInstancesOut, BiConsumer<E, QueryServerInstance> resultConsumer)
+      Set<QueryServerInstance> serverInstancesOut, BiConsumer<E, QueryServerInstance> resultConsumer,
+      @Nullable Consumer<QueryServerInstance> preDispatchHook)
       throws ExecutionException, InterruptedException, TimeoutException {
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
 
     Map<DispatchablePlanFragment, StageInfo> stageInfos = serializePlanFragments(stagePlans, serverInstancesOut);
     if (serverInstancesOut.isEmpty()) {
       return;
+    }
+
+    if (preDispatchHook != null) {
+      for (QueryServerInstance server : serverInstancesOut) {
+        preDispatchHook.accept(server);
+      }
     }
 
     Map<String, String> requestMetadata =
