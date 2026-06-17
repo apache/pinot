@@ -50,7 +50,8 @@
           "stream.kafka.zk.broker.url": "localhost:2191/kafka",
           "stream.kafka.broker.list": "localhost:19092"
         }
-      ]
+      ],
+      "oomProtection": "ENABLE"
     }
   },
   "upsertConfig": {

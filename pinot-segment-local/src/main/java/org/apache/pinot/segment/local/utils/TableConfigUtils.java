@@ -486,11 +486,12 @@ public final class TableConfigUtils {
         IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
         Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
             "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
-        List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
+        StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
+        List<Map<String, String>> streamConfigMaps = streamIngestionConfig.getStreamConfigMaps();
         Preconditions.checkState(!streamConfigMaps.isEmpty(), "Must have at least 1 stream in REALTIME table");
         // TODO: for multiple stream configs, validate them
 
-        boolean isPauselessEnabled = ingestionConfig.getStreamIngestionConfig().isPauselessConsumptionEnabled();
+        boolean isPauselessEnabled = streamIngestionConfig.isPauselessConsumptionEnabled();
         if (isPauselessEnabled) {
           int replication = tableConfig.getReplication();
           // We are checking for this only when replication is greater than 1 because in test environments

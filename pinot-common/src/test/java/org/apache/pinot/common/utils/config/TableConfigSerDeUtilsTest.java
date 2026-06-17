@@ -58,6 +58,7 @@ import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPol
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
@@ -307,6 +308,7 @@ public class TableConfigSerDeUtilsTest {
           new StreamIngestionConfig(Collections.singletonList(Collections.singletonMap("streamType", "kafka")));
       streamIngestionConfig.setParallelSegmentConsumptionPolicy(
           ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
+      streamIngestionConfig.setOomProtection(Enablement.ENABLE);
       ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
       ingestionConfig.setFilterConfig(new FilterConfig("filterFunc(foo)"));
       ingestionConfig.setTransformConfigs(
@@ -499,6 +501,7 @@ public class TableConfigSerDeUtilsTest {
     assertEquals(ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps().size(), 1);
     assertEquals(ingestionConfig.getStreamIngestionConfig().getParallelSegmentConsumptionPolicy(),
         ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
+    assertEquals(ingestionConfig.getStreamIngestionConfig().getOomProtection(), Enablement.ENABLE);
   }
 
   private void checkTierConfigList(TableConfig tableConfig) {
