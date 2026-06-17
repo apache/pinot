@@ -52,8 +52,8 @@ import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
@@ -119,10 +119,6 @@ public class QueryDispatcher {
     CancelOutcome(@Nullable MultiStageQueryStats stats, Set<String> respondingServerIds) {
       _stats = stats;
       _respondingServerIds = respondingServerIds;
-    }
-
-    boolean wasAttempted() {
-      return !_respondingServerIds.isEmpty();
     }
   }
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
@@ -529,11 +525,11 @@ public class QueryDispatcher {
       } else if (classification._trackedServers.contains(id) && !knownTimings.isEmpty()) {
         // Tier 2: tracked leaf server whose timing is missing while other servers had data — mark degraded.
         latency = elapsedMs;
-      } else if (cancelOutcome.wasAttempted() && !cancelOutcome._respondingServerIds.contains(id)) {
+      } else if (cancelOutcome != CancelOutcome.NONE && !cancelOutcome._respondingServerIds.contains(id)) {
         // Tier 3: cancel was attempted but this server didn't respond — mark degraded.
         latency = elapsedMs;
       } else {
-        // Tier 4: no timing data, but server is responsive (or cancel wasn't attempted).
+        // Tier 4: no timing data, but server is responsive.
         latency = -1L;
       }
       LOGGER.debug("==[UPSTREAM_TIMING]== request {} recording server {} latency={}ms", requestId, id, latency);
@@ -559,9 +555,12 @@ public class QueryDispatcher {
     } else if (ex instanceof QueryException) {
       errorCode = ((QueryException) ex).getErrorCode();
     } else {
+      // in case of unknown exceptions, the exception will be rethrown, so we don't need stats
       cancel(requestId, servers);
       throw ex;
     }
+    // in case of known exceptions (timeout or query exception), we need can build here the erroneous QueryResult
+    // that include the stats.
     LOGGER.warn("Query failed with a known exception. Trying to cancel the other opchains");
     CancelOutcome outcome = cancelWithStats(requestId, servers);
     if (outcome._stats == null) {
@@ -999,6 +998,9 @@ public class QueryDispatcher {
       throw QueryErrorCode.INTERNAL.asException("Interrupted while waiting for cancel response", e);
     } catch (TimeoutException e) {
       LOGGER.debug("Timed out waiting for cancel response", e);
+      return new CancelOutcome(stats, respondedServerIds);
+    } catch (RuntimeException e) {
+      LOGGER.debug("Cancel RPC failed for request {}", requestId, e);
       return new CancelOutcome(stats, respondedServerIds);
     }
   }
