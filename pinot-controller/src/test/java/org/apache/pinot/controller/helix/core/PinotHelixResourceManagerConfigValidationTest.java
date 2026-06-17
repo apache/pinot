@@ -52,8 +52,7 @@ public class PinotHelixResourceManagerConfigValidationTest {
   public void setUp()
       throws Exception {
     LineageManager lineageManager = Mockito.mock(LineageManager.class);
-    _resourceManager =
-        new PinotHelixResourceManager("testCluster", null, false, false, 7, false, lineageManager, null);
+    _resourceManager = new PinotHelixResourceManager("testCluster", null, false, 7, false, lineageManager, null);
 
     _helixAdmin = Mockito.mock(HelixAdmin.class);
     _helixDataAccessor = Mockito.mock(HelixDataAccessor.class);

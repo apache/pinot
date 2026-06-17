@@ -388,7 +388,6 @@ public class ControllerConf extends PinotConfiguration {
   // the controller as ready. When enabled, controller.resource.utilization.checker.initial.delay is set to 0.
   public static final String RESOURCE_UTILIZATION_CHECKER_COLLECT_USAGE_AT_STARTUP =
       "controller.resource.utilization.checker.collect.usage.at.startup";
-  public static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
   public static final String ENABLE_HYBRID_TABLE_RETENTION_STRATEGY =
       "controller.enable.hybrid.table.retention.strategy";
   // When true (default), segment deletion refuses to remove segments that participate in a live segment lineage
@@ -428,7 +427,6 @@ public class ControllerConf extends PinotConfiguration {
   public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY = 300L; // 5 minutes
   public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY = 300L; // 5 minutes
   public static final boolean DEFAULT_RESOURCE_UTILIZATION_CHECKER_COLLECT_USAGE_AT_STARTUP = false;
-  public static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
   public static final boolean DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY = false;
   public static final boolean DEFAULT_LINEAGE_EXCLUSIVE_DELETE_ENABLED = true;
   public static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
@@ -1304,10 +1302,6 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isDiskUtilizationCheckerEnabled() {
     return getProperty(ENABLE_DISK_UTILIZATION_CHECKER, DEFAULT_ENABLE_DISK_UTILIZATION_CHECKER);
-  }
-
-  public boolean getEnableBatchMessageMode() {
-    return getProperty(ENABLE_BATCH_MESSAGE_MODE, DEFAULT_ENABLE_BATCH_MESSAGE_MODE);
   }
 
   public boolean isHybridTableRetentionStrategyEnabled() {
