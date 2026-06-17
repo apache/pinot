@@ -1157,4 +1157,50 @@ public class StringFunctions {
     }
     return sb.toString();
   }
+
+  /**
+   * Replaces a substring of {@code input} with {@code replacement}, starting at the 1-based position {@code start}
+   * and replacing {@code length} characters. Equivalent to the SQL standard
+   * {@code OVERLAY(string PLACING replacement FROM start FOR length)} function supported by PostgreSQL and Trino.
+   *
+   * <p>When {@code length} is omitted (i.e. {@code OVERLAY(string PLACING new_str FROM start)}), it defaults to the
+   * length of {@code replacement}, so the replaced and inserted substrings are the same width.
+   *
+   * <p>Examples:
+   * <pre>
+   *   overlay("hello world", "there", 7)     → "hello there"   (length defaults to len("there") = 5)
+   *   overlay("hello world", "there", 7, 5)  → "hello there"
+   *   overlay("abcdef", "XY", 3, 0)          → "abXYcdef"      (insertion without deletion)
+   *   overlay("abcdef", "XY", 3, 4)          → "abXYf"         (delete 4, insert 2)
+   * </pre>
+   *
+   * @param input       the source string
+   * @param replacement the string to insert
+   * @param start       1-based position in {@code input} at which replacement begins (clamped to [1, len+1])
+   * @return the result string
+   */
+  @ScalarFunction
+  public static String overlay(String input, String replacement, int start) {
+    return overlay(input, replacement, start, replacement.length());
+  }
+
+  /**
+   * Replaces {@code length} characters of {@code input} with {@code replacement}, starting at the 1-based position
+   * {@code start}. Equivalent to the SQL standard
+   * {@code OVERLAY(string PLACING replacement FROM start FOR length)} function.
+   *
+   * @param input       the source string
+   * @param replacement the string to insert
+   * @param start       1-based start position (clamped to [1, len+1])
+   * @param length      number of characters to delete from {@code input} (clamped to [0, remaining])
+   * @return the result string
+   */
+  @ScalarFunction
+  public static String overlay(String input, String replacement, int start, int length) {
+    int len = input.length();
+    // Convert to 0-based, clamping to valid range
+    int s = Math.max(0, Math.min(start - 1, len));
+    int e = Math.min(s + Math.max(0, length), len);
+    return input.substring(0, s) + replacement + input.substring(e);
+  }
 }

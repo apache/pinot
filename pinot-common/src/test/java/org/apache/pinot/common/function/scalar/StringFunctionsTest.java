@@ -600,4 +600,42 @@ public class StringFunctionsTest {
     // Duplicate characters in 'from': first occurrence wins
     assertEquals(StringFunctions.translate("aaa", "aa", "XY"), "XXX");
   }
+
+  // ==================== Tests for overlay ====================
+
+  @Test
+  public void testOverlay() {
+    // Basic replacement: length defaults to length of replacement
+    assertEquals(StringFunctions.overlay("hello world", "there", 7), "hello there");
+
+    // Explicit length equal to length of replacement — same result
+    assertEquals(StringFunctions.overlay("hello world", "there", 7, 5), "hello there");
+
+    // Zero-length deletion: pure insertion
+    assertEquals(StringFunctions.overlay("abcdef", "XY", 3, 0), "abXYcdef");
+
+    // Delete more than replacement length: replacement is shorter than deleted span
+    assertEquals(StringFunctions.overlay("abcdef", "XY", 3, 4), "abXYf");
+
+    // Replace at start (position 1)
+    assertEquals(StringFunctions.overlay("abcdef", "Z", 1, 1), "Zbcdef");
+
+    // Replace at end
+    assertEquals(StringFunctions.overlay("abcdef", "Z", 6, 1), "abcdeZ");
+
+    // Replace entire string
+    assertEquals(StringFunctions.overlay("abcdef", "XY", 1, 6), "XY");
+
+    // Empty replacement (deletion only)
+    assertEquals(StringFunctions.overlay("abcdef", "", 3, 2), "abef");
+
+    // Empty input: result is the replacement
+    assertEquals(StringFunctions.overlay("", "abc", 1), "abc");
+
+    // start beyond end: appends replacement
+    assertEquals(StringFunctions.overlay("abc", "XY", 10), "abcXY");
+
+    // length clamped: cannot delete past end of string
+    assertEquals(StringFunctions.overlay("abc", "Z", 2, 100), "aZ");
+  }
 }
