@@ -1981,6 +1981,11 @@ public enum PinotDataType {
           return MAP;
         }
         throw new IllegalStateException("There is no multi-value type for MAP");
+      case OPEN_STRUCT:
+        if (fieldSpec.isSingleValueField()) {
+          return MAP;
+        }
+        throw new IllegalStateException("There is no multi-value type for OPEN_STRUCT");
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }

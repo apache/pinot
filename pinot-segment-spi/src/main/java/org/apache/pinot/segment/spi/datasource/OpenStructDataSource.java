@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.datasource;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 
@@ -61,4 +62,13 @@ public interface OpenStructDataSource extends DataSource {
 
   /// Returns the ColumnIndexContainer for the given key's values.
   ColumnIndexContainer getIndexContainer(String key);
+
+  /// Reconstructs the full OPEN_STRUCT value for {@code docId} as a {@code Map<String, Object>}, or
+  /// {@code null} when no key is present at that doc. Used by the realtime seal path to re-feed the
+  /// OPEN_STRUCT column into the immutable segment build.
+  @Nullable
+  default Map<String, Object> getMapValue(int docId) {
+    throw new UnsupportedOperationException(
+        "Per-doc OPEN_STRUCT map reconstruction is not supported by this implementation");
+  }
 }
