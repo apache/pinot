@@ -1898,6 +1898,19 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Delete the given schema.
+   * @param schema The schema to be deleted.
+   * @return True on success, false otherwise.
+   */
+  @Deprecated
+  public boolean deleteSchema(Schema schema) {
+    if (schema != null) {
+      deleteSchema(schema.getSchemaName());
+    }
+    return false;
+  }
+
+  /**
    * Deletes the given schema. Returns {@code true} when schema exists, {@code false} when schema does not exist.
    */
   public boolean deleteSchema(String schemaName) {
@@ -1920,6 +1933,12 @@ public class PinotHelixResourceManager {
   @Nullable
   public Schema getTableSchema(String tableName) {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
+  }
+
+  @Deprecated
+  @Nullable
+  public Schema getSchemaForTableConfig(TableConfig tableConfig) {
+    return ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
   }
 
   /**
@@ -3832,6 +3851,11 @@ public class PinotHelixResourceManager {
       }
     }
     return consumingSegments;
+  }
+
+  @Deprecated
+  public Set<String> getServersForSegment(String tableNameWithType, String segmentName) {
+    return getServers(tableNameWithType, segmentName);
   }
 
   public synchronized Map<String, String> getSegmentsCrcForTable(String tableNameWithType) {
