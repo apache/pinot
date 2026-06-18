@@ -176,9 +176,6 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
       SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setInstanceType(InstanceType.MINION);
-    // RefreshSegmentTask re-segments existing data against the current table config — always build secondary
-    // indexes here, regardless of tableIndexConfig.skipSegmentPreprocess.
-    config.setOverrideSkipSegmentPreprocess(true);
     config.setOutDir(workingDir.getPath());
     config.setSegmentName(segmentName);
 

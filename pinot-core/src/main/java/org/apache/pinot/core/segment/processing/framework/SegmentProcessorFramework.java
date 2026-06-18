@@ -304,10 +304,6 @@ public class SegmentProcessorFramework {
     String fixedSegmentName = _segmentProcessorConfig.getSegmentConfig().getFixedSegmentName();
     SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     generatorConfig.setInstanceType(InstanceType.MINION);
-    // Minion-driven rebuilds (merge-rollup, realtime-to-offline, purge, etc.) must always materialize secondary
-    // indexes against the latest table config — even when tableIndexConfig.skipSegmentPreprocess is true. The flag
-    // only governs initial/server-side load behavior; a minion task replacing a segment is conceptually a reload.
-    generatorConfig.setOverrideSkipSegmentPreprocess(true);
     generatorConfig.setOutDir(_segmentsOutputDir.getPath());
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
     generatorConfig.setCreationTime(String.valueOf(_segmentProcessorConfig.getCustomCreationTime()));

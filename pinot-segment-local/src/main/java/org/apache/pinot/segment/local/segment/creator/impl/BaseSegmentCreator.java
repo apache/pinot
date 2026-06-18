@@ -244,15 +244,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       throws Exception {
     Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
         Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
-    // When skipSegmentPreprocess is enabled at the table level, only the forward index creator is wired up at
-    // segment-build time. Other index types will be added later via the AsyncIndexReloader catch-up reload that
-    // flips the IndexLoadingConfig override on the load path.
-    boolean skipNonForwardCreators = isSkipPreprocess();
     for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
       if (index.getIndexBuildLifecycle() != IndexType.BuildLifecycle.DURING_SEGMENT_CREATION) {
-        continue;
-      }
-      if (skipNonForwardCreators && index != StandardIndexes.forward()) {
         continue;
       }
       tryCreateIndexCreator(creatorsByIndex, index, context, config);
@@ -300,22 +293,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
    */
   private boolean isNullable(FieldSpec fieldSpec) {
     return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isDefaultNullHandlingEnabled();
-  }
-
-  /**
-   * Returns true when the build should skip all secondary indexes. Reads {@code tableIndexConfig.skipSegmentPreprocess}
-   * unless the caller has set the per-build override via
-   * {@link SegmentGeneratorConfig#setOverrideSkipSegmentPreprocess(boolean)} — used by reload-style build paths
-   * (minion segment refresh, reload-driven re-conversion) to force secondary indexes into the freshly-built segment
-   * even when the persisted flag is true.
-   */
-  private boolean isSkipPreprocess() {
-    if (_config.isOverrideSkipSegmentPreprocess()) {
-      return false;
-    }
-    TableConfig tableConfig = _config.getTableConfig();
-    return tableConfig != null && tableConfig.getIndexingConfig() != null
-        && tableConfig.getIndexingConfig().isSkipSegmentPreprocess();
   }
 
   /**
@@ -955,10 +932,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
    */
   private void updatePostSegmentCreationIndexes(File indexDir)
       throws Exception {
-    // When skipSegmentPreprocess is enabled, skip all post-segment-creation indexes (star-tree, etc.).
-    if (isSkipPreprocess()) {
-      return;
-    }
     Set<IndexType> postSegCreationIndexes = IndexService.getInstance().getAllIndexes().stream()
         .filter(indexType -> indexType.getIndexBuildLifecycle() == IndexType.BuildLifecycle.POST_SEGMENT_CREATION)
         .collect(Collectors.toSet());
