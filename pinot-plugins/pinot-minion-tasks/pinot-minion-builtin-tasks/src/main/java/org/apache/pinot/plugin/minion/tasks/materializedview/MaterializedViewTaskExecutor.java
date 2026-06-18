@@ -731,8 +731,8 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(tableName);
     // Materialized-view task is a minion-driven rebuild — always materialize secondary indexes against the latest
-    // table config, regardless of tableIndexConfig.skipSecondaryIndexes.
-    segmentGeneratorConfig.setOverrideSkipSecondaryIndexes(true);
+    // table config, regardless of tableIndexConfig.skipSegmentPreprocess.
+    segmentGeneratorConfig.setOverrideSkipSegmentPreprocess(true);
     segmentGeneratorConfig.setOutDir(segmentOutputDir.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(segmentName);
 

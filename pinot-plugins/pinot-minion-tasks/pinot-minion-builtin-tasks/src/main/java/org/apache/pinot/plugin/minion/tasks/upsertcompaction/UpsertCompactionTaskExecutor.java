@@ -143,8 +143,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setInstanceType(InstanceType.MINION);
     // Upsert compaction is conceptually a reload of an existing segment — always materialize secondary indexes
-    // against the latest table config, regardless of tableIndexConfig.skipSecondaryIndexes.
-    config.setOverrideSkipSecondaryIndexes(true);
+    // against the latest table config, regardless of tableIndexConfig.skipSegmentPreprocess.
+    config.setOverrideSkipSegmentPreprocess(true);
     config.setOutDir(workingDir.getPath());
     config.setSegmentName(segmentName);
 

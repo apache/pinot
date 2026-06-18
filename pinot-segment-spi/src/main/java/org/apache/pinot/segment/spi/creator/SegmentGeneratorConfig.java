@@ -117,10 +117,10 @@ public class SegmentGeneratorConfig implements Serializable {
   private double _noDictionarySizeRatioThreshold = IndexingConfig.DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
   private Double _noDictionaryCardinalityRatioThreshold;
   private boolean _realtimeConversion = false;
-  // Transient override that lets a specific build bypass tableIndexConfig.skipSecondaryIndexes. Not persisted —
+  // Transient override that lets a specific build bypass tableIndexConfig.skipSegmentPreprocess. Not persisted —
   // set per-build by reload-style callers (minion segment refresh, reload-driven re-conversion) so that the new
   // segment carries all secondary indexes even though the table config still says skip.
-  private boolean _overrideSkipSecondaryIndexes = false;
+  private boolean _overrideSkipSegmentPreprocess = false;
   // consumerDir contains data from the consuming segment, and is used during _realtimeConversion optimization
   private File _consumerDir;
   private SegmentZKPropsConfig _segmentZKPropsConfig;
@@ -663,17 +663,17 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   /**
-   * Per-build override that suppresses {@code tableIndexConfig.skipSecondaryIndexes}. When set, the segment
+   * Per-build override that suppresses {@code tableIndexConfig.skipSegmentPreprocess}. When set, the segment
    * creator wires up every index creator as if the flag were {@code false}. Used by reload-style build paths
    * (e.g. minion segment refresh) so the rebuilt segment carries all secondary indexes even when the table
    * config still asks fresh builds to skip them.
    */
-  public boolean isOverrideSkipSecondaryIndexes() {
-    return _overrideSkipSecondaryIndexes;
+  public boolean isOverrideSkipSegmentPreprocess() {
+    return _overrideSkipSegmentPreprocess;
   }
 
-  public void setOverrideSkipSecondaryIndexes(boolean overrideSkipSecondaryIndexes) {
-    _overrideSkipSecondaryIndexes = overrideSkipSecondaryIndexes;
+  public void setOverrideSkipSegmentPreprocess(boolean overrideSkipSegmentPreprocess) {
+    _overrideSkipSegmentPreprocess = overrideSkipSegmentPreprocess;
   }
 
   public File getConsumerDir() {

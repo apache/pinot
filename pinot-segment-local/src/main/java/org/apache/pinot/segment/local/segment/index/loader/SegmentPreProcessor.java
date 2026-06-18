@@ -129,32 +129,26 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Update single-column indices, like inverted index, json index etc.
       List<IndexHandler> indexHandlers = new ArrayList<>();
 
-      // When skipSecondaryIndexes is enabled, the segment is loaded "as is": no forward-index encoding flips, no
-      // dict upgrade driven by a (skipped) secondary index, no secondary index build, no star-tree, no multi-col
-      // text, no min/max. Default-column materialization above is still applied.
-      boolean skipSecondaryIndexes = _indexLoadingConfig.isSkipSecondaryIndexes();
-      if (!skipSecondaryIndexes) {
-        // We cannot just create all the index handlers in a random order.
-        // Specifically, ForwardIndexHandler MUST run first. It is the only handler that:
-        //   (a) creates the shared dictionary for a RAW forward index column when a secondary index requires one
-        //       (ENABLE_DICTIONARY operation in ForwardIndexHandler.createDictionaryForRawForwardIndex);
-        //   (b) updates the segment metadata's HAS_DICTIONARY / FORWARD_INDEX_ENCODING properties accordingly.
-        // The InvertedIndexHandler / RangeIndexHandler / FSTIndexHandler then read the freshly-reloaded metadata
-        // and build dict-id-based indexes on top of the new shared dictionary. If this order is violated,
-        // downstream handlers fail with an IllegalStateException because the dictionary they require does not
-        // yet exist. Any future change to handler scheduling MUST preserve:
-        //   ForwardIndexHandler → reloadMetadata → other handlers.
-        IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
-        indexHandlers.add(forwardHandler);
-        forwardHandler.updateIndices(segmentWriter);
-        _segmentDirectory.reloadMetadata();
+      // We cannot just create all the index handlers in a random order.
+      // Specifically, ForwardIndexHandler MUST run first. It is the only handler that:
+      //   (a) creates the shared dictionary for a RAW forward index column when a secondary index requires one
+      //       (ENABLE_DICTIONARY operation in ForwardIndexHandler.createDictionaryForRawForwardIndex);
+      //   (b) updates the segment metadata's HAS_DICTIONARY / FORWARD_INDEX_ENCODING properties accordingly.
+      // The InvertedIndexHandler / RangeIndexHandler / FSTIndexHandler then read the freshly-reloaded metadata and
+      // build dict-id-based indexes on top of the new shared dictionary. If this order is violated, downstream
+      // handlers fail with an IllegalStateException because the dictionary they require does not yet exist.
+      // Any future change to handler scheduling MUST preserve: ForwardIndexHandler → reloadMetadata → other handlers.
+      IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
+      indexHandlers.add(forwardHandler);
+      forwardHandler.updateIndices(segmentWriter);
+      _segmentDirectory.reloadMetadata();
 
-        for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
-          if (type != StandardIndexes.forward()) {
-            IndexHandler handler = createHandler(type);
-            indexHandlers.add(handler);
-            handler.updateIndices(segmentWriter);
-          }
+      // Now that ForwardIndexHandler.updateIndices has been updated, we can run all other indexes in any order
+      for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
+        if (type != StandardIndexes.forward()) {
+          IndexHandler handler = createHandler(type);
+          indexHandlers.add(handler);
+          handler.updateIndices(segmentWriter);
         }
       }
 
@@ -167,10 +161,9 @@ public class SegmentPreProcessor implements AutoCloseable {
       segmentMetadata = _segmentDirectory.getSegmentMetadata();
 
       // Add min/max value to column metadata according to the prune mode.
-      // Skip min/max generation when skipSecondaryIndexes is enabled — it is only used for query-time pruning.
       ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
           _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
-      if (!skipSecondaryIndexes && columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
+      if (columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
         ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
             new ColumnMinMaxValueGenerator(segmentMetadata, segmentWriter, columnMinMaxValueGeneratorMode);
         columnMinMaxValueGenerator.addColumnMinMaxValue();
@@ -178,11 +171,6 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       segmentWriter.save();
-    }
-
-    // Star-tree and multi-column text indexes are secondary indexes; skip both when the flag is set.
-    if (_indexLoadingConfig.isSkipSecondaryIndexes()) {
-      return;
     }
 
     // Startree creation will load the segment again, so we need to close and re-open the segment writer to make sure
@@ -227,39 +215,30 @@ public class SegmentPreProcessor implements AutoCloseable {
         return true;
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
-      // When skipSecondaryIndexes is enabled, the entire index-handler check loop is skipped — preprocess only
-      // runs for default-column materialization in that case.
-      boolean skipSecondaryIndexes = _indexLoadingConfig.isSkipSecondaryIndexes();
-      if (!skipSecondaryIndexes) {
-        for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
-          if (createHandler(type).needUpdateIndices(segmentReader)) {
-            LOGGER.info("Found index type: {} needs updates in segment: {}", type, segmentName);
-            return true;
-          }
-        }
-      }
-      if (!skipSecondaryIndexes) {
-        // Check if there is need to create/modify/remove star-trees.
-        if (needProcessStarTrees()) {
-          LOGGER.info("Found startree index needs updates in segment: {}", segmentName);
-          return true;
-        }
-
-        // Check if there is need to create/modify/remove multi-col text index
-        if (needProcessMultiColumnTextIndex()) {
-          LOGGER.info("Found multi-column text index needs updates in segment: {}", segmentName);
+      for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
+        if (createHandler(type).needUpdateIndices(segmentReader)) {
+          LOGGER.info("Found index type: {} needs updates in segment: {}", type, segmentName);
           return true;
         }
       }
+      // Check if there is need to create/modify/remove star-trees.
+      if (needProcessStarTrees()) {
+        LOGGER.info("Found startree index needs updates in segment: {}", segmentName);
+        return true;
+      }
 
-      // Check if there is need to update column min max value. Skipped when skipSecondaryIndexes is enabled.
-      if (!skipSecondaryIndexes) {
-        List<String> columnMinMaxValueUpdates = columnMinMaxValueUpdates();
-        if (!columnMinMaxValueUpdates.isEmpty()) {
-          LOGGER.info("Found min max values need updates for columns: {} in segment: {}", columnMinMaxValueUpdates,
-              segmentName);
-          return true;
-        }
+      // Check if there is need to create/modify/remove multi-col text index
+      if (needProcessMultiColumnTextIndex()) {
+        LOGGER.info("Found multi-column text index needs updates in segment: {}", segmentName);
+        return true;
+      }
+
+      // Check if there is need to update column min max value.
+      List<String> columnMinMaxValueUpdates = columnMinMaxValueUpdates();
+      if (!columnMinMaxValueUpdates.isEmpty()) {
+        LOGGER.info("Found min max values need updates for columns: {} in segment: {}", columnMinMaxValueUpdates,
+            segmentName);
+        return true;
       }
     }
     return false;
