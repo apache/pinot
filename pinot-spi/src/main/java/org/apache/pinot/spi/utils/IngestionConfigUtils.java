@@ -385,4 +385,14 @@ public final class IngestionConfigUtils {
   public static int getConfigIdFromPinotPartitionId(int partitionId) {
     return partitionId / PARTITION_PADDING_OFFSET;
   }
+
+  /// Builds a map from stable config ID to StreamConfig for O(1) lookup by config ID.
+  /// For single-topic tables, returns a singleton map with key 0.
+  public static Map<Integer, StreamConfig> buildConfigIdToStreamConfigMap(List<StreamConfig> streamConfigs) {
+    Map<Integer, StreamConfig> result = new HashMap<>(streamConfigs.size());
+    for (StreamConfig streamConfig : streamConfigs) {
+      result.put(getConfigIdFromStreamConfig(streamConfig), streamConfig);
+    }
+    return result;
+  }
 }
