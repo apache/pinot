@@ -33,9 +33,11 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 
 
@@ -137,9 +139,23 @@ public final class IngestionConfigUtils {
   }
 
   /// Returns the StreamConfig for the given Pinot segment partition id.
+  /// For multi-topic tables, uses the stable config ID stored in the stream config rather than positional index.
   public static StreamConfig getStreamConfigFromPinotPartitionId(List<StreamConfig> streamConfigs, int partitionId) {
-    return streamConfigs.size() > 1 ? streamConfigs.get(getStreamConfigIndexFromPinotPartitionId(partitionId))
-        : streamConfigs.get(0);
+    if (streamConfigs.size() == 1) {
+      return streamConfigs.get(0);
+    }
+    int configId = getConfigIdFromPinotPartitionId(partitionId);
+    return streamConfigs.stream()
+        .filter(sc -> configId == getConfigIdFromStreamConfig(sc))
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException(
+            "Cannot find stream config with config ID: " + configId + " for partition: " + partitionId));
+  }
+
+  /// Returns the config ID stored in a StreamConfig, or 0 if not set (single-topic backward compat).
+  public static int getConfigIdFromStreamConfig(StreamConfig streamConfig) {
+    String idStr = streamConfig.getStreamConfigsMap().get(StreamConfigProperties.STREAM_CONFIG_ID);
+    return idStr != null ? Integer.parseInt(idStr) : 0;
   }
 
   /// Returns the index of the StreamConfigs from the Pinot segment partition id.
@@ -150,23 +166,21 @@ public final class IngestionConfigUtils {
   }
 
   /**
-   * Fetches the streamConfig from the list of streamConfigs according to the partition id.
+   * Fetches the streamConfig map from the table config for the given Pinot partition id.
+   * For multi-topic tables, uses the stable config ID to look up the correct stream config.
    */
   public static Map<String, String> getStreamConfigMap(TableConfig tableConfig, int partitionId) {
     List<Map<String, String>> streamConfigMaps = getStreamConfigMaps(tableConfig);
     int numStreams = streamConfigMaps.size();
     if (numStreams == 1) {
-      // Single stream
-      // NOTE: We skip partition id translation logic to handle cases where custom stream might return partition id
-      // larger than 10000.
+      // Single stream — skip partition id translation to handle custom streams with large partition ids.
       return streamConfigMaps.get(0);
-    } else {
-      // Multiple streams
-      int index = getStreamConfigIndexFromPinotPartitionId(partitionId);
-      Preconditions.checkState(numStreams > index, "Cannot find stream config of index: %s for table: %s", index,
-          tableConfig.getTableName());
-      return streamConfigMaps.get(index);
     }
+    // Multi-stream: look up by stable config ID rather than positional index.
+    int configId = getConfigIdFromPinotPartitionId(partitionId);
+    StreamIngestionConfig streamIngestionConfig =
+        tableConfig.getIngestionConfig().getStreamIngestionConfig();
+    return streamIngestionConfig.getStreamConfigMapByConfigId(configId);
   }
 
   public static List<AggregationConfig> getAggregationConfigs(TableConfig tableConfig) {
