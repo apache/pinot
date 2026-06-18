@@ -501,8 +501,8 @@ public class IngestionDelayTrackerTest {
     final String segment0 = new LLCSegmentName(RAW_TABLE_NAME, partition0, 0, 123).getSegmentName();
     final int partition1 = 1;
 
-    ingestionDelayTracker._partitionsHostedByThisServer.put(partition0, true);
-    ingestionDelayTracker._partitionsHostedByThisServer.put(partition1, true);
+    ingestionDelayTracker._partitionsHostedByThisServer.put(partition0, 0);
+    ingestionDelayTracker._partitionsHostedByThisServer.put(partition1, 0);
     ingestionDelayTracker.updateMetrics(segment0, partition0, System.currentTimeMillis(), System.currentTimeMillis(),
         new LongMsgOffset(50));
 

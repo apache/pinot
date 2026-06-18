@@ -154,7 +154,8 @@ public class IngestionDelayTracker {
   private Clock _clock = Clock.systemUTC();
 
   protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
-  protected volatile ConcurrentHashMap<Integer, Boolean> _partitionsHostedByThisServer = new ConcurrentHashMap<>();
+  // Maps partitionGroupId -> streamConfigId, populated from LLCSegmentName so no arithmetic needed.
+  protected volatile ConcurrentHashMap<Integer, Integer> _partitionsHostedByThisServer = new ConcurrentHashMap<>();
   // Map of StreamMetadataProvider to fetch upstream latest stream offset (Table can have multiple upstream topics)
   // This map is accessed by:
   // 1. _ingestionDelayTrackingScheduler thread.
@@ -370,7 +371,8 @@ public class IngestionDelayTracker {
 
   @VisibleForTesting
   void createMetrics(int partitionId) {
-    int configId = IngestionConfigUtils.getConfigIdFromPinotPartitionId(partitionId);
+    int configId = _partitionsHostedByThisServer.getOrDefault(partitionId,
+        IngestionConfigUtils.getConfigIdFromPinotPartitionId(partitionId));
     StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(configId);
 
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
@@ -394,7 +396,8 @@ public class IngestionDelayTracker {
   }
 
   private void removeMetrics(int partitionId) {
-    int configId = IngestionConfigUtils.getConfigIdFromPinotPartitionId(partitionId);
+    int configId = _partitionsHostedByThisServer.getOrDefault(partitionId,
+        IngestionConfigUtils.getConfigIdFromPinotPartitionId(partitionId));
     StreamMetadataProvider streamMetadataProvider =
         _streamConfigIndexToStreamMetadataProvider.get(configId);
     // Remove all metrics associated with this partition
@@ -507,7 +510,11 @@ public class IngestionDelayTracker {
     }
     Set<Integer> partitionsHostedByThisServer;
     try {
-      partitionsHostedByThisServer = _realTimeTableDataManager.getHostedPartitionsGroupIds();
+      Map<Integer, Integer> partitionGroupIdToConfigId =
+          _realTimeTableDataManager.getHostedPartitionsGroupIds();
+      partitionsHostedByThisServer = partitionGroupIdToConfigId.keySet();
+      ConcurrentHashMap<Integer, Integer> newMap = new ConcurrentHashMap<>(partitionGroupIdToConfigId);
+      _partitionsHostedByThisServer = newMap;
     } catch (Exception e) {
       LOGGER.error("Failed to get partitions hosted by this server, table={}, exception={}:{}", _tableNameWithType,
           e.getClass(), e.getMessage());
@@ -519,10 +526,6 @@ public class IngestionDelayTracker {
         removePartitionId(partitionId);
       }
     }
-
-    ConcurrentHashMap<Integer, Boolean> newMap = new ConcurrentHashMap<>();
-    partitionsHostedByThisServer.forEach(p -> newMap.put(p, true));
-    _partitionsHostedByThisServer = newMap;
   }
 
   /**
