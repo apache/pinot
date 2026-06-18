@@ -135,18 +135,6 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
-   * Reloads a segment, bypassing {@code tableIndexConfig.skipSegmentPreprocess}. Preprocess always runs against
-   * the latest table config regardless of the persisted flag — secondary indexes get built even on tables that
-   * are configured to skip preprocess at initial load. Default delegates to {@link #reloadSegment(String, String,
-   * boolean, String)} so existing custom implementations remain functional; subclasses that opt into the bypass
-   * semantic should override.
-   */
-  default void reloadSegmentBypassingSkipPreprocess(String tableNameWithType, String segmentName,
-      boolean forceDownload, String reloadJobId) throws Exception {
-    reloadSegment(tableNameWithType, segmentName, forceDownload, reloadJobId);
-  }
-
-  /**
    * Returns all tables served by the instance.
    */
   Set<String> getAllTables();

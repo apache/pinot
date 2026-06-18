@@ -463,20 +463,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegmentBypassingSkipPreprocess(String tableNameWithType, String segmentName,
-      boolean forceDownload, String reloadJobId) throws Exception {
-    LOGGER.info("Reloading segment: {} in table: {} (bypassing skipSegmentPreprocess)", segmentName,
-        tableNameWithType);
-    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    if (tableDataManager != null) {
-      tableDataManager.reloadSegmentBypassingSkipPreprocess(segmentName, forceDownload, reloadJobId);
-    } else {
-      LOGGER.warn("Failed to find data manager for table: {}, skipping bypass-reload of segment: {}",
-          tableNameWithType, segmentName);
-    }
-  }
-
-  @Override
   public Set<String> getAllTables() {
     return _tableDataManagerMap.keySet();
   }
