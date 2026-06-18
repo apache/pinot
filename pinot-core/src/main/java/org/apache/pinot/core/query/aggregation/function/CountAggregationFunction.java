@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -204,8 +205,8 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
   }
 
   @Override
-  public Long extractFinalResult(Long intermediateResult) {
-    return intermediateResult;
+  public Long extractFinalResult(@Nullable Long intermediateResult) {
+    return intermediateResult != null ? intermediateResult : 0L;
   }
 
   @Override
