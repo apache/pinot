@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.MultiTopicLLCSegmentName;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
@@ -404,6 +405,138 @@ public class MultiTopicRealtimeClusterIntegrationTest extends CustomDataQueryClu
 
     for (int i = 0; i < numTopics; i++) {
       assertEquals(rows.get(i).get(0).asText(), sourceName(i));
+    }
+  }
+
+  @Test
+  public void testStreamConfigIdsAssigned() {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+    TableConfig tableConfig = getSharedHelixResourceManager().getTableConfig(realtimeTableName);
+    assertNotNull(tableConfig, "Table config should exist");
+
+    StreamIngestionConfig streamIngestionConfig =
+        tableConfig.getIngestionConfig().getStreamIngestionConfig();
+    assertNotNull(streamIngestionConfig, "Stream ingestion config should exist");
+
+    List<Map<String, String>> streamConfigMaps = streamIngestionConfig.getStreamConfigMaps();
+    int numTopics = getNumTopics();
+    assertEquals(streamConfigMaps.size(), numTopics, "Should have " + numTopics + " stream configs");
+
+    Set<Integer> configIds = new HashSet<>();
+    for (int i = 0; i < numTopics; i++) {
+      Map<String, String> configMap = streamConfigMaps.get(i);
+      String configIdStr = configMap.get(StreamConfigProperties.STREAM_CONFIG_ID);
+      assertNotNull(configIdStr, "stream.config.id should be set for stream config at index " + i);
+
+      int configId = Integer.parseInt(configIdStr);
+      assertTrue(configId >= 0, "Config ID should be non-negative, got: " + configId);
+      assertTrue(configIds.add(configId), "Config IDs should be unique, duplicate: " + configId);
+    }
+
+    assertEquals(streamIngestionConfig.getNextStreamConfigId(), numTopics,
+        "nextStreamConfigId should equal the number of topics");
+  }
+
+  @Test
+  public void testMultiTopicSegmentNameFormat() {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+    IdealState idealState = getSharedHelixResourceManager().getTableIdealState(realtimeTableName);
+    assertNotNull(idealState);
+
+    int numTopics = getNumTopics();
+    if (numTopics <= 1) {
+      return;
+    }
+
+    int multiTopicSegmentCount = 0;
+    Set<Integer> configIdsSeen = new HashSet<>();
+
+    for (String segmentName : idealState.getPartitionSet()) {
+      MultiTopicLLCSegmentName multiTopicName = MultiTopicLLCSegmentName.of(segmentName);
+      if (multiTopicName != null) {
+        multiTopicSegmentCount++;
+        configIdsSeen.add(multiTopicName.getConfigId());
+
+        assertTrue(multiTopicName.getConfigId() >= 0,
+            "Config ID should be non-negative: " + segmentName);
+        assertTrue(multiTopicName.getStreamPartitionId() >= 0,
+            "Stream partition ID should be non-negative: " + segmentName);
+        assertTrue(multiTopicName.getStreamPartitionId() < NUM_PARTITIONS_PER_TOPIC,
+            "Stream partition ID should be < " + NUM_PARTITIONS_PER_TOPIC + ": " + segmentName);
+
+        int expectedPartitionGroupId =
+            IngestionConfigUtils.getPinotPartitionIdFromConfigId(
+                multiTopicName.getStreamPartitionId(), multiTopicName.getConfigId());
+        assertEquals(multiTopicName.getPartitionGroupId(), expectedPartitionGroupId,
+            "Partition group ID encoding mismatch for segment: " + segmentName);
+
+        LLCSegmentName llcParsed = new LLCSegmentName(segmentName);
+        assertEquals(llcParsed.getPartitionGroupId(), expectedPartitionGroupId,
+            "LLCSegmentName should parse 5-part format and produce same partition group ID");
+      }
+    }
+
+    assertTrue(multiTopicSegmentCount > 0,
+        "Should have at least one segment in 5-part multi-topic format");
+
+    for (int i = 0; i < numTopics; i++) {
+      assertTrue(configIdsSeen.contains(i),
+          "Should have segments with config ID " + i);
+    }
+  }
+
+  @Test
+  public void testConfigIdLookupMethods() {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+    TableConfig tableConfig = getSharedHelixResourceManager().getTableConfig(realtimeTableName);
+    assertNotNull(tableConfig);
+
+    StreamIngestionConfig streamIngestionConfig =
+        tableConfig.getIngestionConfig().getStreamIngestionConfig();
+    int numTopics = getNumTopics();
+
+    for (int i = 0; i < numTopics; i++) {
+      int configId = streamIngestionConfig.getConfigId(i);
+      assertEquals(configId, i, "Config ID at index " + i + " should be " + i);
+
+      Map<String, String> configMap = streamIngestionConfig.getStreamConfigMapByConfigId(configId);
+      assertNotNull(configMap, "Should find stream config for config ID " + configId);
+
+      String topicName = configMap.get(
+          StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_TOPIC_NAME));
+      assertEquals(topicName, topicName(i),
+          "Topic name for config ID " + configId + " should match");
+    }
+
+    Map<Integer, Map<String, String>> configIdMap = streamIngestionConfig.getConfigIdToStreamConfigMap();
+    assertEquals(configIdMap.size(), numTopics, "Config ID map should have " + numTopics + " entries");
+    for (int i = 0; i < numTopics; i++) {
+      assertTrue(configIdMap.containsKey(i), "Config ID map should contain key " + i);
+    }
+  }
+
+  @Test
+  public void testSegmentNameBackwardCompatibility() {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+    IdealState idealState = getSharedHelixResourceManager().getTableIdealState(realtimeTableName);
+    assertNotNull(idealState);
+
+    for (String segmentName : idealState.getPartitionSet()) {
+      if (!LLCSegmentName.isLLCSegment(segmentName)) {
+        continue;
+      }
+
+      LLCSegmentName llcName = LLCSegmentName.of(segmentName);
+      assertNotNull(llcName, "LLCSegmentName.of() should parse segment: " + segmentName);
+
+      MultiTopicLLCSegmentName multiTopicName = MultiTopicLLCSegmentName.of(segmentName);
+      if (multiTopicName != null) {
+        assertEquals(llcName.getPartitionGroupId(), multiTopicName.getPartitionGroupId(),
+            "Partition group ID should match between LLCSegmentName and MultiTopicLLCSegmentName "
+                + "for segment: " + segmentName);
+        assertEquals(llcName.getTableName(), multiTopicName.getTableName());
+        assertEquals(llcName.getSequenceNumber(), multiTopicName.getSequenceNumber());
+      }
     }
   }
 }
