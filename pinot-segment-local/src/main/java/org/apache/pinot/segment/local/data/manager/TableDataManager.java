@@ -224,6 +224,18 @@ public interface TableDataManager {
       throws Exception;
 
   /**
+   * Reloads a segment, bypassing {@code tableIndexConfig.skipSegmentPreprocess}. Preprocess always runs against
+   * the latest table config regardless of the persisted flag — secondary indexes get built even on tables that
+   * are configured to skip preprocess at initial load. Default delegates to {@link #reloadSegment(String, boolean,
+   * String)} so existing custom implementations remain functional; subclasses that opt into the bypass semantic
+   * should override.
+   */
+  default void reloadSegmentBypassingSkipPreprocess(String segmentName, boolean forceDownload, String reloadJobId)
+      throws Exception {
+    reloadSegment(segmentName, forceDownload, reloadJobId);
+  }
+
+  /**
    * Get the segment data directory, considering the segment tier if provided.
    */
   File getSegmentDataDir(String segmentName, @Nullable String segmentTier, TableConfig tableConfig);
