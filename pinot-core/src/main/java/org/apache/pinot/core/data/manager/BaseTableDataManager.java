@@ -462,6 +462,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected void replaceSegmentIfCrcMismatch(SegmentDataManager segmentDataManager, SegmentZKMetadata zkMetadata,
       IndexLoadingConfig indexLoadingConfig)
       throws Exception {
+    // Segment-refresh path (minion-driven replace, SegmentRefreshMessage) — treat as reload: always run full
+    // preprocess against the latest table config, regardless of tableIndexConfig.skipSegmentPreprocess. Mirrors
+    // the protected reloadSegment worker so every reload-style code path inherits the override automatically.
+    indexLoadingConfig.setOverrideSkipSegmentPreprocess(true);
     String segmentName = segmentDataManager.getSegmentName();
     Preconditions.checkState(segmentDataManager instanceof ImmutableSegmentDataManager,
         "Cannot replace CONSUMING segment: %s in table: %s", segmentName, _tableNameWithType);
@@ -548,10 +552,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
       IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
       indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-      // Segment-refresh path (minion-driven replace, SegmentRefreshMessage): treat as a reload — run full
-      // preprocess against the latest table config even if skipSegmentPreprocess is true. See reloadSegment
-      // below for the same reasoning.
-      indexLoadingConfig.setOverrideSkipSegmentPreprocess(true);
+      // The override that suppresses skipSegmentPreprocess for this reload-style call is set inside
+      // replaceSegmentIfCrcMismatch — no need to repeat it here.
       _segmentReloadSemaphore.acquire(segmentName, _logger);
       try {
         replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
@@ -671,12 +673,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
       IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-      // Reload path: override skipSegmentPreprocess so the reload always runs full preprocess against the latest
-      // table config, even when the persisted flag is true. The table config in ZK is not modified; the override
-      // is local to this transient IndexLoadingConfig and is discarded when the reload finishes. Boot /
-      // state-transition loads use the plain fetchIndexLoadingConfig() above and continue to honor
-      // skipSegmentPreprocess.
-      indexLoadingConfig.setOverrideSkipSegmentPreprocess(true);
+      // The override that suppresses skipSegmentPreprocess is set inside the protected reloadSegment worker
+      // below, so every reload entry point inherits the reload semantics without an explicit setter call here.
       reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
     } else {
       _logger.warn("Failed to find segment: {}, skipping reloading it", segmentName);
@@ -691,9 +689,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Reloading all segments with forceDownload: {}", forceDownload);
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
     if (!segmentDataManagers.isEmpty()) {
-      IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-      indexLoadingConfig.setOverrideSkipSegmentPreprocess(true);
-      reloadSegments(segmentDataManagers, indexLoadingConfig, forceDownload, reloadJobId);
+      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
     }
     _logger.info("Reloaded all {} segments with forceDownload: {}", segmentDataManagers.size(), forceDownload);
   }
@@ -716,9 +712,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
     if (!segmentDataManagers.isEmpty()) {
-      IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-      indexLoadingConfig.setOverrideSkipSegmentPreprocess(true);
-      reloadSegments(segmentDataManagers, indexLoadingConfig, forceDownload, reloadJobId);
+      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
     }
     if (missingSegments.isEmpty()) {
       _logger.info("Reloaded segments: {} with forceDownload: {}", segmentNames, forceDownload);
@@ -1057,6 +1051,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected void reloadSegment(SegmentDataManager segmentDataManager, IndexLoadingConfig indexLoadingConfig,
       boolean forceDownload)
       throws Exception {
+    // Reload path — always run full preprocess against the latest table config, regardless of the persisted
+    // tableIndexConfig.skipSegmentPreprocess. The override lives on this transient IndexLoadingConfig only and
+    // is discarded when the reload finishes. Centralizing it here means every public reload entry point
+    // (reloadSegment / reloadAllSegments / reloadSegments) gets the reload semantics for free; boot /
+    // state-transition loads continue to use a plain fetchIndexLoadingConfig() and honor skipSegmentPreprocess.
+    indexLoadingConfig.setOverrideSkipSegmentPreprocess(true);
     String segmentName = segmentDataManager.getSegmentName();
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
