@@ -107,6 +107,17 @@ public class InstanceSelectorFactory {
           case RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE: {
             LOGGER.info("Using StrictReplicaGroupInstanceSelector for table: {}", tableNameWithType);
             instanceSelector = new StrictReplicaGroupInstanceSelector();
+
+            // Adaptive Routing is incompatible with Strict Replica Group routing, because Adaptive Routing routes
+            // each segment independently to the lowest-latency server, violating the same-replica-group guarantee.
+            // TODO: rework StrictReplicaGroupInstanceSelector::select to do pool-based adaptive routing.
+            // See https://github.com/apache/pinot/issues/12507
+            if (adaptiveServerSelector != null) {
+              LOGGER.info(
+                  "Disabling adaptive routing for StrictReplicaGroupInstanceSelector table: {}",
+                  tableNameWithType);
+              adaptiveServerSelector = null;
+            }
             break;
           }
           case RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE: {
