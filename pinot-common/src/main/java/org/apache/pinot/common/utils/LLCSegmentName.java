@@ -36,6 +36,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   private final String _tableName;
   private final int _partitionGroupId;
+  private final int _streamConfigId;
   private final int _sequenceNumber;
   private final String _creationTime;
   private final String _segmentName;
@@ -47,6 +48,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
       _tableName = parts[0];
       int configId = Integer.parseInt(parts[1]);
       int streamPartitionId = Integer.parseInt(parts[2]);
+      _streamConfigId = configId;
       _partitionGroupId = configId * IngestionConfigUtils.PARTITION_PADDING_OFFSET + streamPartitionId;
       _sequenceNumber = Integer.parseInt(parts[3]);
       _creationTime = parts[4];
@@ -54,6 +56,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
       Preconditions.checkArgument(parts.length == 4, "Invalid LLC segment name: %s", segmentName);
       _tableName = parts[0];
       _partitionGroupId = Integer.parseInt(parts[1]);
+      _streamConfigId = 0;
       _sequenceNumber = Integer.parseInt(parts[2]);
       _creationTime = parts[3];
     }
@@ -64,6 +67,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
     _tableName = tableName;
     _partitionGroupId = partitionGroupId;
+    _streamConfigId = 0;
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
     _creationTime = DATE_FORMATTER.print(msSinceEpoch);
@@ -121,6 +125,10 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   public int getPartitionGroupId() {
     return _partitionGroupId;
+  }
+
+  public int getStreamConfigId() {
+    return _streamConfigId;
   }
 
   public int getSequenceNumber() {
