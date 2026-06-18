@@ -52,7 +52,8 @@ import org.apache.pinot.common.response.ProcessingException;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed"
+    "pools", "rlsFiltersApplied", "groupsTrimmed",
+    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -94,6 +95,10 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
+  @Nullable
+  private Integer _mseLiteLeafStageEffectiveLimit;
+  @Nullable
+  private Boolean _mseLiteFanOutAdjustedLimitApplied;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
@@ -121,7 +126,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean isPartialResult() {
     return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
-        || isMaxRowsInJoinReached();
+        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached();
   }
 
   @Override
@@ -170,6 +175,35 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
     _brokerStats.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, numGroupsWarningLimitReached);
+  }
+
+  public boolean isMseLiteLeafStageLimitReached() {
+    return _brokerStats.getBoolean(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED);
+  }
+
+  public void mergeMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached) {
+    _brokerStats.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, mseLiteLeafStageLimitReached);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  public Integer getMseLiteLeafStageEffectiveLimit() {
+    return _mseLiteLeafStageEffectiveLimit;
+  }
+
+  public void setMseLiteLeafStageEffectiveLimit(int mseLiteLeafStageEffectiveLimit) {
+    _mseLiteLeafStageEffectiveLimit = mseLiteLeafStageEffectiveLimit;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @JsonProperty("mseLiteFanOutAdjustedLimitApplied")
+  @Nullable
+  public Boolean getMseLiteFanOutAdjustedLimitApplied() {
+    return _mseLiteFanOutAdjustedLimitApplied;
+  }
+
+  public void setMseLiteFanOutAdjustedLimitApplied(boolean mseLiteFanOutAdjustedLimitApplied) {
+    _mseLiteFanOutAdjustedLimitApplied = mseLiteFanOutAdjustedLimitApplied;
   }
 
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
@@ -515,7 +549,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
         return Math.max(value1, value2);
       }
     },
-    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET);
+    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

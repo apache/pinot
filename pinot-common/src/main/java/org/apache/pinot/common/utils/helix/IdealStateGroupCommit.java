@@ -249,9 +249,14 @@ public class IdealStateGroupCommit {
 
           // If there are changes to apply, apply them
           if (updatedIdealState != null && !idealState.equals(updatedIdealState)) {
-            ZNRecord updatedZNRecord = updatedIdealState.getRecord();
+            // Disable batch message mode if set
+            if (updatedIdealState.getBatchMessageMode()) {
+              LOGGER.warn("Disabling batch message mode for resource: {}", resourceName);
+              updatedIdealState.setBatchMessageMode(false);
+            }
 
             // Update number of partitions
+            ZNRecord updatedZNRecord = updatedIdealState.getRecord();
             int numPartitions = updatedZNRecord.getMapFields().size();
             updatedIdealState.setNumPartitions(numPartitions);
 

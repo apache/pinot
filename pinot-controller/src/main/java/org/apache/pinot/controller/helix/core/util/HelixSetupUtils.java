@@ -133,7 +133,7 @@ public class HelixSetupUtils {
   }
 
   public static void setupPinotCluster(String helixClusterName, String zkPath, boolean isUpdateStateModel,
-      boolean enableBatchMessageMode, ControllerConf controllerConf) {
+      ControllerConf controllerConf) {
     ZkClient zkClient = null;
     int zkClientSessionConfig =
         controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
@@ -161,11 +161,10 @@ public class HelixSetupUtils {
       addSegmentStateModelDefinitionIfNeeded(helixClusterName, helixAdmin, helixDataAccessor, isUpdateStateModel);
 
       // Add broker resource if needed
-      createBrokerResourceIfNeeded(helixClusterName, helixAdmin, enableBatchMessageMode);
+      createBrokerResourceIfNeeded(helixClusterName, helixAdmin);
 
       // Add lead controller resource if needed
-      createLeadControllerResourceIfNeeded(helixClusterName, helixAdmin, configAccessor, enableBatchMessageMode,
-          controllerConf);
+      createLeadControllerResourceIfNeeded(helixClusterName, helixAdmin, configAccessor, controllerConf);
     } finally {
       ZkStarter.closeAsync(zkClient);
     }
@@ -187,8 +186,7 @@ public class HelixSetupUtils {
     }
   }
 
-  private static void createBrokerResourceIfNeeded(String helixClusterName, HelixAdmin helixAdmin,
-      boolean enableBatchMessageMode) {
+  private static void createBrokerResourceIfNeeded(String helixClusterName, HelixAdmin helixAdmin) {
     // Add state model definition if needed
     String stateModel =
         PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL;
@@ -200,24 +198,27 @@ public class HelixSetupUtils {
     }
 
     // Add broker resource if needed
-    if (helixAdmin.getResourceIdealState(helixClusterName, BROKER_RESOURCE_INSTANCE) == null) {
+    IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, BROKER_RESOURCE_INSTANCE);
+    if (currentIdealState == null) {
       LOGGER.info("Adding resource: {}", BROKER_RESOURCE_INSTANCE);
       IdealState idealState = new CustomModeISBuilder(BROKER_RESOURCE_INSTANCE).setStateModel(stateModel).build();
-      idealState.setBatchMessageMode(enableBatchMessageMode);
       helixAdmin.addResource(helixClusterName, BROKER_RESOURCE_INSTANCE, idealState);
+    } else if (currentIdealState.getBatchMessageMode()) {
+      LOGGER.warn("Disabling batch message mode for resource: {}", BROKER_RESOURCE_INSTANCE);
+      currentIdealState.setBatchMessageMode(false);
+      helixAdmin.updateIdealState(helixClusterName, BROKER_RESOURCE_INSTANCE, currentIdealState);
     }
   }
 
   private static void createLeadControllerResourceIfNeeded(String helixClusterName, HelixAdmin helixAdmin,
-      ConfigAccessor configAccessor, boolean enableBatchMessageMode, ControllerConf controllerConf) {
+      ConfigAccessor configAccessor, ControllerConf controllerConf) {
     IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME);
     if (currentIdealState == null) {
       LOGGER.info("Adding resource: {}", LEAD_CONTROLLER_RESOURCE_NAME);
-      IdealState newIdealState = constructIdealState(enableBatchMessageMode, controllerConf);
+      IdealState newIdealState = constructIdealState(controllerConf);
       helixAdmin.addResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, newIdealState);
     } else {
-      enableAndUpdateLeadControllerResource(helixClusterName, helixAdmin, currentIdealState, enableBatchMessageMode,
-          controllerConf);
+      enableAndUpdateLeadControllerResource(helixClusterName, helixAdmin, currentIdealState, controllerConf);
     }
 
     // Create resource config for lead controller resource if it doesn't exist
@@ -232,7 +233,7 @@ public class HelixSetupUtils {
     configAccessor.setResourceConfig(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
   }
 
-  private static IdealState constructIdealState(boolean enableBatchMessageMode, ControllerConf controllerConf) {
+  private static IdealState constructIdealState(ControllerConf controllerConf) {
     // FULL-AUTO Master-Slave state model with a rebalance strategy, auto-rebalance by default
     FullAutoModeISBuilder idealStateBuilder = new FullAutoModeISBuilder(LEAD_CONTROLLER_RESOURCE_NAME);
     idealStateBuilder.setStateModel(MasterSlaveSMD.name)
@@ -256,8 +257,6 @@ public class HelixSetupUtils {
     // Set instance group tag
     IdealState idealState = idealStateBuilder.build();
     idealState.setInstanceGroupTag(CONTROLLER_INSTANCE);
-    // Set batch message mode
-    idealState.setBatchMessageMode(enableBatchMessageMode);
     return idealState;
   }
 
@@ -265,7 +264,7 @@ public class HelixSetupUtils {
    * If user defined properties for the lead controller have changed, update the resource.
    */
   private static void enableAndUpdateLeadControllerResource(String helixClusterName, HelixAdmin helixAdmin,
-      IdealState idealState, boolean enableBatchMessageMode, ControllerConf controllerConf) {
+      IdealState idealState, ControllerConf controllerConf) {
     boolean needsUpdating = false;
 
     if (!idealState.isEnabled()) {
@@ -275,10 +274,9 @@ public class HelixSetupUtils {
       idealState.enable(true);
       needsUpdating = true;
     }
-    if (idealState.getBatchMessageMode() != enableBatchMessageMode) {
-      LOGGER.info("Updating batch message mode to: {} for resource: {}", enableBatchMessageMode,
-          LEAD_CONTROLLER_RESOURCE_NAME);
-      idealState.setBatchMessageMode(enableBatchMessageMode);
+    if (idealState.getBatchMessageMode()) {
+      LOGGER.warn("Disabling batch message mode for resource: {}", LEAD_CONTROLLER_RESOURCE_NAME);
+      idealState.setBatchMessageMode(false);
       needsUpdating = true;
     }
     if (!idealState.getRebalanceStrategy().equals(controllerConf.getLeadControllerResourceRebalanceStrategy())) {

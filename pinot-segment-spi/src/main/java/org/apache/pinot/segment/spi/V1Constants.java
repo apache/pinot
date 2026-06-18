@@ -178,6 +178,9 @@ public class V1Constants {
       //   parentColumn = metrics
       public static final String PARENT_COLUMN = "parentColumn";
 
+      // Whether this OPEN_STRUCT column has a sparse column for keys not materialized as dense.
+      public static final String HAS_SPARSE_COLUMN = "hasSparseColumn";
+
       /// Partition function, all optional
       public static final String PARTITION_FUNCTION = "partitionFunction";
       public static final String NUM_PARTITIONS = "numPartitions";

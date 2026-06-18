@@ -260,8 +260,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       try {
         TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
         if (tableDataManager != null) {
-          // Update the table config and schema by fetching from ZK
-          tableDataManager.fetchIndexLoadingConfig();
+          // A genuine table config / schema change: notify the table data manager so it can refresh the cached config
+          // and schema (and react to the change) without going through the incidental index-loading-config fetch.
+          tableDataManager.onTableConfigOrSchemaRefresh();
         } else {
           _logger.warn("No data manager found for table: {}", _tableNameWithType);
         }

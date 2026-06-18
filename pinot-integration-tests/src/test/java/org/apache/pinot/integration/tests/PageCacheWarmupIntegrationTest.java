@@ -25,10 +25,9 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.client.admin.PageCacheWarmupAdminClient;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -131,13 +130,12 @@ public class PageCacheWarmupIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   /**
-   * Builds a {@link ControllerRequestClient} on top of the test's controller URL builder. The base
-   * class no longer exposes a shared client instance, so the warmup-query endpoints are reached
-   * through a locally-constructed client.
+   * Returns the page-cache warmup admin client backed by the test harness's shared
+   * {@link org.apache.pinot.client.admin.PinotAdminClient}.
    */
-  private ControllerRequestClient getControllerRequestClient() {
-    return new ControllerRequestClient(getControllerRequestURLBuilder(), HttpClient.getInstance(),
-        getControllerRequestClientHeaders());
+  private PageCacheWarmupAdminClient getWarmupAdminClient()
+      throws Exception {
+    return getOrCreateAdminClient().getPageCacheWarmupClient();
   }
 
   @BeforeClass
@@ -176,7 +174,7 @@ public class PageCacheWarmupIntegrationTest extends BaseClusterIntegrationTest {
         "SELECT DISTINCT " + ORIGIN_COLUMN + " FROM " + tableName + " LIMIT 10",
         "SELECT SUM(" + COUNT_COLUMN + ") FROM " + tableName);
 
-    ControllerRequestClient controllerRequestClient = getControllerRequestClient();
+    PageCacheWarmupAdminClient warmupAdminClient = getWarmupAdminClient();
     try {
       // Step 1: Enable warmup on restart in the table config. This serializes pageCacheWarmupConfig to
       // ZooKeeper and is read back by the server's TableDataManager.
@@ -187,12 +185,11 @@ public class PageCacheWarmupIntegrationTest extends BaseClusterIntegrationTest {
       updateTableConfig(tableConfig);
 
       // Step 2: Store the warmup queries on the controller.
-      assertTrue(controllerRequestClient.storePageCacheWarmupQueries(tableName, TableType.OFFLINE.name(), queries),
+      assertTrue(warmupAdminClient.storeWarmupQueries(tableName, TableType.OFFLINE.name(), queries),
           "Failed to store page cache warmup queries");
 
       // Step 3: Verify the stored queries round-trip through the controller's data dir.
-      List<String> storedQueries =
-          controllerRequestClient.getPageCacheWarmupQueries(tableName, TableType.OFFLINE.name());
+      List<String> storedQueries = warmupAdminClient.getWarmupQueries(tableName, TableType.OFFLINE.name());
       assertEquals(storedQueries, queries, "Stored warmup queries do not match");
 
       // Step 4: Capture the baseline of the host-level warmup-queries meter before the restart. The
@@ -228,7 +225,7 @@ public class PageCacheWarmupIntegrationTest extends BaseClusterIntegrationTest {
       TableConfig tableConfig = getOfflineTableConfig();
       tableConfig.setPageCacheWarmupConfig(null);
       updateTableConfig(tableConfig);
-      controllerRequestClient.deletePageCacheWarmupQueries(tableName, TableType.OFFLINE.name());
+      warmupAdminClient.deleteWarmupQueries(tableName, TableType.OFFLINE.name());
     }
   }
 

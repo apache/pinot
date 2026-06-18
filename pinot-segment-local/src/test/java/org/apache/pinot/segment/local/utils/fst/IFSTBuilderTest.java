@@ -32,13 +32,17 @@ import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.index.readers.LuceneIFSTIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -105,6 +109,40 @@ public class IFSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
       assertEquals(result.getCardinality(), 2); // Should still match both
       assertTrue(result.contains(12));
       assertTrue(result.contains(13));
+
+      // Test full enumeration
+      result = reader.getDictIds(".*");
+      assertEquals(result.getCardinality(), 6); // Should match all entries
+    }
+  }
+
+  @Test
+  public void testRegexMatchHonorsTermination()
+      throws IOException {
+    SortedMap<String, Integer> x = new TreeMap<>();
+    for (int i = 0; i < 1000; i++) {
+      x.put(String.format("key-%06d", i), i);
+    }
+    FST<BytesRef> ifst = IFSTBuilder.buildIFST(x);
+    File outputFile = new File(TEMP_DIR, "test_termination_case_insensitive.lucene");
+    try (FileOutputStream outputStream = new FileOutputStream(outputFile);
+        OutputStreamDataOutput dataOutput = new OutputStreamDataOutput(outputStream)) {
+      ifst.save(dataOutput, dataOutput);
+    }
+
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.loadBigEndianFile(outputFile);
+        LuceneIFSTIndexReader reader = new LuceneIFSTIndexReader(dataBuffer);
+        QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      Thread.currentThread().interrupt();
+      assertThrows(EarlyTerminationException.class,
+          () -> RegexpMatcherCaseInsensitive.regexMatch(".*", ifst, new MutableRoaringBitmap()::add));
+
+      // The reader should propagate the termination exception as-is instead of wrapping it
+      Thread.currentThread().interrupt();
+      assertThrows(EarlyTerminationException.class, () -> reader.getDictIds(".*"));
+    } finally {
+      // Clear the interrupt flag in case the matcher did not consume it
+      Thread.interrupted();
     }
   }
 

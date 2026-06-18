@@ -167,6 +167,13 @@ public interface BrokerResponse {
   boolean isMaxRowsInWindowReached();
 
   /**
+   * Returns whether the MSE Lite leaf-stage limit has been reached.
+   */
+  default boolean isMseLiteLeafStageLimitReached() {
+    return false;
+  }
+
+  /**
    * Returns the total time used for query execution in milliseconds.
    */
   long getTimeUsedMs();
