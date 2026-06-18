@@ -152,6 +152,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
    * Initialize the driver for columnar segment building using a ColumnReaderFactory.
    * This method sets up the driver to use column-wise input data access instead of row-wise.
    *
+   * <p>The column-major build this driver currently performs is two-pass — a statistics pass (which
+   * seals the dictionary) followed by an index pass — so each column's {@link ColumnReader} is read
+   * sequentially, {@code rewind()}ed, and read again. A factory supplied here must therefore return
+   * readers that support repeated {@code rewind()} and a full re-read; how it meets that (buffering all
+   * values, or re-reading a seekable/batch-bounded backing store) is the factory's own choice and sets
+   * the build's peak memory — this driver does not constrain it.
+   *
    * @param config Segment generator configuration
    * @param columnReaderFactory Factory for creating column readers
    * @throws Exception if initialization fails
