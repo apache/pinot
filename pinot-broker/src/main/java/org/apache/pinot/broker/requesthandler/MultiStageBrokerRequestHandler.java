@@ -608,6 +608,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       RequestContext requestContext, HttpHeaders httpHeaders) {
   }
 
+  /**
+   * Estimates the total number of server query threads the given plan will consume; used to acquire permits from the
+   * multi-stage query throttler before dispatch. Subclasses can override to accurately
+   * estimate the real per-server work.
+   */
+  protected int getEstimatedNumQueryThreads(DispatchableSubPlan dispatchableSubPlan) {
+    return dispatchableSubPlan.getEstimatedNumQueryThreads();
+  }
+
   private long getTimeoutMs(Map<String, String> queryOptions) {
     Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
     return timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
@@ -696,7 +705,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     // Short-circuit: if all leaf stages are empty (all segments pruned or table has no data),
     // run only the broker reduce stage locally. No server dispatch is attempted.
     boolean allLeafStagesEmpty = dispatchableSubPlan.isAllLeafStagesEmpty();
-    int estimatedNumQueryThreads = dispatchableSubPlan.getEstimatedNumQueryThreads();
+    int estimatedNumQueryThreads = getEstimatedNumQueryThreads(dispatchableSubPlan);
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
       // these requests.
