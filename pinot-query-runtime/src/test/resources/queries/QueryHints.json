@@ -162,6 +162,27 @@
       {
         "description": "Colocated, Dynamic broadcast SEMI-JOIN with partially empty right table result for some servers",
         "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.name, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ WHERE {tbl2}.val = 'z') GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "INTERSECT on the partition column num with is_colocated_by_set_op_keys hint forces a pre-partitioned (direct) exchange; tbl1 and tbl2 are both partitioned by num so results stay correct",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} INTERSECT SELECT {tbl2}.num FROM {tbl2}"
+      },
+      {
+        "description": "EXCEPT on the partition column num with is_colocated_by_set_op_keys hint forces a pre-partitioned (direct) exchange; tbl1 and tbl2 are both partitioned by num so results stay correct",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} EXCEPT SELECT {tbl2}.num FROM {tbl2}"
+      },
+      {
+        "description": "UNION ALL on the partition column num with is_colocated_by_set_op_keys hint forces a pre-partitioned (direct) exchange; UNION ALL only concatenates so a direct exchange is always correct",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} UNION ALL SELECT {tbl2}.num FROM {tbl2}"
+      },
+      {
+        "description": "Multi-column INTERSECT with is_colocated_by_set_op_keys hint; both tables are partitioned by num, a subset of the projected columns, so equal rows still colocate and results stay correct. V1 only: the V2 optimizer derives set-op distributions itself and does not yet handle multi-column set ops over subset-partitioned inputs",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num, {tbl1}.name FROM {tbl1} INTERSECT SELECT {tbl2}.num, {tbl2}.val FROM {tbl2}",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "INTERSECT with is_colocated_by_set_op_keys='false' disables auto-detected pre-partitioning and falls back to a shuffle; results stay correct",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ INTERSECT SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
       }
     ]
   },
@@ -239,6 +260,10 @@
       {
         "description": "Colocated, Dynamic broadcast SEMI-JOIN with partially empty right table result for some servers",
         "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.name, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='2') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ WHERE {tbl2}.val = 'z') GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Forcing is_colocated_by_set_op_keys='true' when the inputs have mismatched partition counts (tbl1=2, tbl2=4): the planner cannot form a direct exchange, so it still shuffles and results stay correct",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='2') */ INTERSECT SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
       }
     ]
   },

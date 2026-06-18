@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.testng.annotations.DataProvider;
@@ -1050,6 +1051,120 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         dispatchableSubPlan.getQueryStageMap().get(receiveNode.getSenderStageId()).getPlanFragment().getFragmentRoot();
     assertTrue(senderRoot instanceof MailboxSendNode, "Sender fragment root should be a MailboxSendNode");
     return (MailboxSendNode) senderRoot;
+  }
+
+  /// The {@code setOpOptions(is_colocated_by_set_op_keys='true')} hint forces a pre-partitioned (direct) exchange on
+  /// every input of a set operation, avoiding the shuffle. Here the inputs project {@code col3}, which is neither
+  /// table's partition column, so without the hint the planner would shuffle. Covers UNION ALL, INTERSECT and EXCEPT,
+  /// which all share {@link org.apache.pinot.calcite.rel.rules.PinotSetOpExchangeNodeInsertRule}.
+  @Test(dataProvider = "setOpColocationHintQueries")
+  public void testSetOpColocationHintForcesPrePartitionedExchange(String query) {
+    List<MailboxSendNode> sendNodes = findSetOpInputSendNodes(_queryEnvironment.planQuery(query));
+    for (MailboxSendNode sendNode : sendNodes) {
+      assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+      assertTrue(sendNode.isPrePartitioned(),
+          "setOpOptions(is_colocated_by_set_op_keys='true') should force a pre-partitioned exchange on every input");
+    }
+  }
+
+  @DataProvider(name = "setOpColocationHintQueries")
+  private Object[][] setOpColocationHintQueries() {
+    String hint = "/*+ setOpOptions(is_colocated_by_set_op_keys='true') */";
+    return new Object[][]{
+        {"SELECT " + hint + " col3 FROM a UNION ALL SELECT col3 FROM b"},
+        {"SELECT " + hint + " col3 FROM a INTERSECT SELECT col3 FROM b"},
+        {"SELECT " + hint + " col3 FROM a EXCEPT SELECT col3 FROM b"},
+    };
+  }
+
+  /// The hint also lands on the set operation when it is wrapped in an outer {@code SELECT} that carries the hint (the
+  /// hint then attaches to the set operation directly rather than to a branch).
+  @Test
+  public void testSetOpColocationHintViaOuterSelectWrap() {
+    String query = "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ * FROM "
+        + "(SELECT col3 FROM a UNION ALL SELECT col3 FROM b)";
+    for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
+      assertTrue(sendNode.isPrePartitioned(), "Hint on the wrapping SELECT should force a pre-partitioned exchange");
+    }
+  }
+
+  /// When branches carry conflicting hints, the first input that specifies the hint wins and its value is applied to
+  /// all inputs (the documented precedence of the rule). Here the first branch forces it on, so both branches are
+  /// pre-partitioned even though the second branch sets it to {@code 'false'}.
+  @Test
+  public void testSetOpColocationHintFirstInputWins() {
+    String query = "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ col3 FROM a "
+        + "UNION ALL SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ col3 FROM a";
+    for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
+      assertTrue(sendNode.isPrePartitioned(),
+          "The first input's hint value should win and apply to all inputs when branches conflict");
+    }
+  }
+
+  /// Without the hint and with inputs that are not partitioned by the projected column, the exchanges below the set
+  /// operation must be regular (shuffled) exchanges.
+  @Test
+  public void testSetOpWithoutHintIsNotPrePartitioned() {
+    String query = "SELECT col3 FROM a UNION ALL SELECT col3 FROM b";
+    for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
+      assertFalse(sendNode.isPrePartitioned(),
+          "Without the hint and matching partitioning, the set op exchanges should be a full shuffle");
+    }
+  }
+
+  /// When each input is declared partitioned by the projected column, the single-column set-op exchange matches the
+  /// input partitioning, so the planner auto-detects a pre-partitioned exchange even without the hint. This is the
+  /// baseline that {@link #testSetOpColocationHintFalseDisablesAutoDetected} overrides.
+  @Test
+  public void testSetOpAutoDetectsPrePartitioningWithoutHint() {
+    for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(AUTO_DETECTED_SET_OP))) {
+      assertTrue(sendNode.isPrePartitioned(),
+          "A single-column set op over each table's partition column should auto-detect a pre-partitioned exchange");
+    }
+  }
+
+  /// Setting the hint to {@code 'false'} overrides the planner's automatic detection of pre-partitioning (see
+  /// {@link #testSetOpAutoDetectsPrePartitioningWithoutHint} for the same query without the hint).
+  @Test
+  public void testSetOpColocationHintFalseDisablesAutoDetected() {
+    String query = AUTO_DETECTED_SET_OP.replaceFirst("SELECT",
+        "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */");
+    for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
+      assertFalse(sendNode.isPrePartitioned(),
+          "setOpOptions(is_colocated_by_set_op_keys='false') should disable auto-detected pre-partitioning");
+    }
+  }
+
+  // A set op whose inputs are each declared partitioned by the (single) projected column, so the exchange below the set
+  // op matches the input partitioning and the planner auto-detects pre-partitioning.
+  private static final String AUTO_DETECTED_SET_OP =
+      "SELECT col2 FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ "
+          + "UNION ALL "
+          + "SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', "
+          + "partition_size='4') */";
+
+  /// Finds the {@link MailboxSendNode}s feeding each input exchange of the (single) set-op stage. A set operation has
+  /// one mailbox exchange per branch, and the {@code prePartitioned} flag lives on each branch's send node.
+  private List<MailboxSendNode> findSetOpInputSendNodes(DispatchableSubPlan dispatchableSubPlan) {
+    SetOpNode setOpNode = null;
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      setOpNode = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(), SetOpNode.class);
+      if (setOpNode != null) {
+        break;
+      }
+    }
+    assertNotNull(setOpNode, "Expected a SetOp node in the plan");
+    List<MailboxSendNode> sendNodes = new ArrayList<>();
+    for (PlanNode input : setOpNode.getInputs()) {
+      assertTrue(input instanceof MailboxReceiveNode, "Each SetOp input should be a mailbox exchange");
+      int senderStageId = ((MailboxReceiveNode) input).getSenderStageId();
+      PlanNode senderRoot =
+          dispatchableSubPlan.getQueryStageMap().get(senderStageId).getPlanFragment().getFragmentRoot();
+      assertTrue(senderRoot instanceof MailboxSendNode, "Sender fragment root should be a MailboxSendNode");
+      sendNodes.add((MailboxSendNode) senderRoot);
+    }
+    assertFalse(sendNodes.isEmpty(), "Expected the SetOp to have input send nodes");
+    return sendNodes;
   }
 
   /**
