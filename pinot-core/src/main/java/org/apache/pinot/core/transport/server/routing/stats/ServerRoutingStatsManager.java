@@ -19,14 +19,17 @@
 
 package org.apache.pinot.core.transport.server.routing.stats;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -34,6 +37,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryExecutionContext.QueryType;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -43,12 +47,18 @@ import org.slf4j.LoggerFactory;
 
 
 /**
+ * {@code ServerRoutingStatsManager} manages the query routing stats for each server and used by the Adaptive
+ * Server Selection feature (when enabled). The stats are maintained at the broker and are updated when a query is
+ * submitted to a server and when a server responds after processing a query.
  *
- *  {@code ServerRoutingStatsManager} manages the query routing stats for each server and used by the Adaptive
- *  Server Selection feature (when enabled). The stats are maintained at the broker and are updated when a query is
- *  submitted to a server and when a server responds after processing a query.
+ * <p>Thread safety: {@code onChange} is invoked on the Helix config-change callback thread.
+ * {@code exportStatsAsMetrics} runs on the single-threaded {@code _periodicTaskExecutor}.
+ * {@code _enableStatsMetricExport} and {@code _statsMetricExportIntervalMs} are {@code volatile} so
+ * writes from the Helix callback thread are immediately visible to the export thread. All other config
+ * fields ({@code _alpha}, {@code _autoDecayWindowMs}, etc.) are written once during {@code init()}
+ * before any executor threads start, so no additional synchronization is needed for those.
  */
-public class ServerRoutingStatsManager {
+public class ServerRoutingStatsManager implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerRoutingStatsManager.class);
 
   private final PinotConfiguration _config;
@@ -69,7 +79,9 @@ public class ServerRoutingStatsManager {
   private double _avgInitializationVal;
   private int _hybridScoreExponent;
   private int _hybridScoreQueueFloor;
-  private boolean _enableStatsMetricExport;
+  private volatile boolean _enableStatsMetricExport;
+  private volatile long _statsMetricExportIntervalMs;
+  private volatile ScheduledFuture<?> _metricExportFuture;
 
   public ServerRoutingStatsManager(PinotConfiguration pinotConfig, BrokerMetrics brokerMetrics) {
     _config = pinotConfig;
@@ -112,17 +124,67 @@ public class ServerRoutingStatsManager {
 
     _enableStatsMetricExport = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT,
         AdaptiveServerSelector.DEFAULT_ENABLE_STATS_METRIC_EXPORT);
-    if (_enableStatsMetricExport) {
-      long intervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
-          AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
-      _periodicTaskExecutor.scheduleAtFixedRate(this::exportStatsAsMetrics, intervalMs, intervalMs,
-          TimeUnit.MILLISECONDS);
-      LOGGER.info("Adaptive server routing stats metric export enabled with interval {}ms.", intervalMs);
+    _statsMetricExportIntervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
+        AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+    _metricExportFuture = _periodicTaskExecutor.scheduleAtFixedRate(this::exportStatsAsMetrics,
+        _statsMetricExportIntervalMs, _statsMetricExportIntervalMs, TimeUnit.MILLISECONDS);
+    LOGGER.info("Adaptive server routing stats metric export scheduled with interval {}ms (enabled={}).",
+        _statsMetricExportIntervalMs, _enableStatsMetricExport);
+  }
+
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT)) {
+      String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT);
+      if (value != null) {
+        _enableStatsMetricExport = Boolean.parseBoolean(value);
+      } else {
+        // Key was removed from cluster config — fall back to the static broker config value.
+        _enableStatsMetricExport = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT,
+            AdaptiveServerSelector.DEFAULT_ENABLE_STATS_METRIC_EXPORT);
+      }
+      LOGGER.info("Updated enableStatsMetricExport to {} from cluster config.", _enableStatsMetricExport);
+      if (!_enableStatsMetricExport) {
+        removeAllServerStatsGauges();
+      }
+    }
+    if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS)) {
+      String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
+      long newIntervalMs;
+      if (value != null) {
+        try {
+          newIntervalMs = Long.parseLong(value);
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid value '{}' for config '{}'; ignoring interval change", value,
+              AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
+          return;
+        }
+        if (newIntervalMs <= 0) {
+          LOGGER.warn("Non-positive value {} for config '{}'; ignoring interval change", newIntervalMs,
+              AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
+          return;
+        }
+      } else {
+        newIntervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
+            AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+      }
+      if (newIntervalMs != _statsMetricExportIntervalMs) {
+        _statsMetricExportIntervalMs = newIntervalMs;
+        _metricExportFuture.cancel(false);
+        _metricExportFuture = _periodicTaskExecutor.scheduleAtFixedRate(this::exportStatsAsMetrics,
+            newIntervalMs, newIntervalMs, TimeUnit.MILLISECONDS);
+        LOGGER.info("Rescheduled adaptive server routing stats metric export with new interval {}ms.", newIntervalMs);
+      }
     }
   }
 
   public boolean isEnabled() {
     return _isEnabled;
+  }
+
+  @VisibleForTesting
+  public long getStatsMetricExportIntervalMs() {
+    return _statsMetricExportIntervalMs;
   }
 
   public void shutDown() {
@@ -441,12 +503,28 @@ public class ServerRoutingStatsManager {
     }
   }
 
+  private void removeAllServerStatsGauges() {
+    if (_serverQueryStatsMap == null) {
+      return;
+    }
+    for (String serverInstanceId : _serverQueryStatsMap.keySet()) {
+      String serverTag = "server." + serverInstanceId;
+      _brokerMetrics.removeGauge(BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS.getGaugeName() + "." + serverTag);
+      _brokerMetrics.removeGauge(BrokerGauge.ADAPTIVE_SERVER_LATENCY_EMA.getGaugeName() + "." + serverTag);
+      _brokerMetrics.removeGauge(BrokerGauge.ADAPTIVE_SERVER_HYBRID_SCORE.getGaugeName() + "." + serverTag);
+    }
+    LOGGER.info("Removed adaptive server routing stats gauges for {} servers.", _serverQueryStatsMap.size());
+  }
+
   private void recordQueueSizeMetrics() {
     int queueSize = getQueueSize();
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ROUTING_STATS_MANAGER_QUEUE_SIZE, queueSize);
   }
 
   private void exportStatsAsMetrics() {
+    if (!_enableStatsMetricExport) {
+      return;
+    }
     try {
       exportStatsForMap(_serverQueryStatsMap, "server.",
           BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS,
