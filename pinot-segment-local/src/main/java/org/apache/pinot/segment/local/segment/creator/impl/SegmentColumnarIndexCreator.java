@@ -152,11 +152,25 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     SegmentDictionaryCreator dictionaryCreator = _colIndexes.get(columnName).getDictionaryCreator();
 
     PinotDataType destDataType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
-    Object reuseColumnValueToIndex;
 
     // Reset column reader to start from beginning
     columnReader.rewind();
 
+    // Typed fast path: for a single-value INT/LONG/FLOAT/DOUBLE column the reader can serve a primitive
+    // directly (ColumnReader.isInt()/...), the dictionary offers indexOfSV(primitive), and every index
+    // creator offers addInt/addLong/... (ForwardIndexCreator, CombinedInvertedIndexCreator and
+    // DictionaryBasedInvertedIndexCreator de-box; any other creator falls back to the boxing default).
+    // Driving the column through those eliminates the per-value Integer/Long/Float/Double box that
+    // next() -> indexOfSV(Object) -> add(Object, ...) incurs. Null docs (rare) and everything else
+    // (multi-value, BIG_DECIMAL/STRING/BYTES, BOOLEAN/TIMESTAMP coercion) fall through to the Object
+    // path below, which stays the single source of truth for null and type handling.
+    if (fieldSpec.isSingleValueField()
+        && indexSingleValuePrimitive(columnName, fieldSpec, destDataType, columnReader, dictionaryCreator,
+            creatorsByIndex, nullVec)) {
+      return;
+    }
+
+    Object reuseColumnValueToIndex;
     int docId = 0;
     while (columnReader.hasNext()) {
       Object rawValue = columnReader.next();
@@ -183,6 +197,118 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
 
       docId++;
     }
+  }
+
+  /**
+   * Typed, allocation-free index write for a single-value primitive column. Returns {@code true} if it
+   * consumed the column (the reader served it as INT / LONG / FLOAT / DOUBLE directly), or {@code
+   * false} — without advancing the reader — if the caller should fall back to the Object path. Drives
+   * each value through {@code ColumnReader.nextInt()}/... -> {@code indexOfSV(primitive)} -> {@code
+   * IndexCreator.addInt(primitive, dictId)}, avoiding the box that {@code next() -> indexOfSV(Object) ->
+   * add(Object, ...)} incurs. Null docs (rare) are routed through the shared Object handling for exact
+   * parity, including whole-value-null marking in the null-value vector.
+   */
+  private boolean indexSingleValuePrimitive(String columnName, FieldSpec fieldSpec, PinotDataType destDataType,
+      ColumnReader columnReader, SegmentDictionaryCreator dictionaryCreator, List<IndexCreator> creatorsByIndex,
+      NullValueVectorCreator nullVec)
+      throws IOException {
+    int docId = 0;
+    switch (fieldSpec.getDataType()) {
+      case INT: {
+        if (!columnReader.isInt()) {
+          return false;
+        }
+        while (columnReader.hasNext()) {
+          if (columnReader.isNextNull()) {
+            indexSingleValueRow(dictionaryCreator,
+                normalizeNullRow(columnName, fieldSpec, destDataType, columnReader, nullVec, docId), creatorsByIndex);
+          } else {
+            int value = columnReader.nextInt();
+            int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
+            for (IndexCreator creator : creatorsByIndex) {
+              creator.addInt(value, dictId);
+            }
+          }
+          docId++;
+        }
+        return true;
+      }
+      case LONG: {
+        if (!columnReader.isLong()) {
+          return false;
+        }
+        while (columnReader.hasNext()) {
+          if (columnReader.isNextNull()) {
+            indexSingleValueRow(dictionaryCreator,
+                normalizeNullRow(columnName, fieldSpec, destDataType, columnReader, nullVec, docId), creatorsByIndex);
+          } else {
+            long value = columnReader.nextLong();
+            int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
+            for (IndexCreator creator : creatorsByIndex) {
+              creator.addLong(value, dictId);
+            }
+          }
+          docId++;
+        }
+        return true;
+      }
+      case FLOAT: {
+        if (!columnReader.isFloat()) {
+          return false;
+        }
+        while (columnReader.hasNext()) {
+          if (columnReader.isNextNull()) {
+            indexSingleValueRow(dictionaryCreator,
+                normalizeNullRow(columnName, fieldSpec, destDataType, columnReader, nullVec, docId), creatorsByIndex);
+          } else {
+            float value = columnReader.nextFloat();
+            int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
+            for (IndexCreator creator : creatorsByIndex) {
+              creator.addFloat(value, dictId);
+            }
+          }
+          docId++;
+        }
+        return true;
+      }
+      case DOUBLE: {
+        if (!columnReader.isDouble()) {
+          return false;
+        }
+        while (columnReader.hasNext()) {
+          if (columnReader.isNextNull()) {
+            indexSingleValueRow(dictionaryCreator,
+                normalizeNullRow(columnName, fieldSpec, destDataType, columnReader, nullVec, docId), creatorsByIndex);
+          } else {
+            double value = columnReader.nextDouble();
+            int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
+            for (IndexCreator creator : creatorsByIndex) {
+              creator.addDouble(value, dictId);
+            }
+          }
+          docId++;
+        }
+        return true;
+      }
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Read a whole-value-null doc on the typed fast path and resolve it exactly as the Object path does:
+   * read the raw value (an actual {@code null}, or a stored sentinel from a segment source), mark the
+   * null-value vector only for an actual {@code null}, and return the normalized value (the column
+   * default) for the shared single-value row helper to index.
+   */
+  private Object normalizeNullRow(String columnName, FieldSpec fieldSpec, PinotDataType destDataType,
+      ColumnReader columnReader, NullValueVectorCreator nullVec, int docId)
+      throws IOException {
+    Object rawValue = columnReader.next();
+    if (rawValue == null && nullVec != null) {
+      nullVec.setNull(docId);
+    }
+    return ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, rawValue);
   }
 
   private void indexColumnValue(PinotSegmentColumnReader colReader,
