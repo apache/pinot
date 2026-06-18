@@ -448,6 +448,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
+  public void onTableConfigOrSchemaRefresh() {
+    // A genuine config/schema change: refresh the cached table config and schema from ZK. The returned index loading
+    // config is not needed here; the side effect of updating the cache is the contract of this callback.
+    fetchIndexLoadingConfig();
+  }
+
+  @Override
   public void addNewOnlineSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     _logger.info("Adding new ONLINE segment: {}", zkMetadata.getSegmentName());
