@@ -63,6 +63,9 @@ class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIds
     return result;
   }
 
+  /// Converts segment-local composite dictionary IDs to hash-coded value bitmaps for cross-segment merging.
+  /// Uses {@code .hashCode()} on the length-prefix-encoded composite string — same approximation as the
+  /// single-key non-INT path in {@link #convertToValueBitmap}, so hash collisions may cause under-counting.
   private RoaringBitmap convertCompositeToValueBitmap(DictIdsWrapper wrapper, RoaringBitmap compositeIdBitmap) {
     RoaringBitmap valueBitmap = new RoaringBitmap();
     PeekableIntIterator iterator = compositeIdBitmap.getIntIterator();
