@@ -151,16 +151,6 @@ public class MinionConstants {
     // Tasks can take use of this field to coordinate with the merge task. By default, segment is safe
     // to merge, so existing segments w/o this field can be merged just as before.
     public static final String SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY = "shouldNotMerge";
-
-    /// Aggregation types supported by the rollup reducer (see ValueAggregatorFactory in pinot-core). Used to reject
-    /// parseable but unsupported aggregation types at table config validation time instead of at task runtime.
-    public static final EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
-        EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
-            DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
-            SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS,
-            DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
-            DISTINCTCOUNTRAWULL, PERCENTILEKLL, PERCENTILERAWKLL, PERCENTILETDIGEST, PERCENTILERAWTDIGEST,
-            FIRSTWITHTIME, LASTWITHTIME);
   }
 
   public static class MergeRollupTask extends MergeTask {
@@ -177,6 +167,18 @@ public class MinionConstants {
     public static final String SEGMENT_GROUP_MANAGER_CLASS_NAME_KEY = "segment.group.manager.class.name";
 
     public static final String ERASE_DIMENSION_VALUES_KEY = "eraseDimensionValues";
+
+    /// Aggregation types supported by the rollup reducer (see ValueAggregatorFactory in pinot-core). Used to reject
+    /// parseable but unsupported aggregation types at table config validation time instead of at task runtime. Shared
+    /// with RealtimeToOfflineSegmentsTask, which performs the same rollup aggregation when configured with rollup
+    /// merge type.
+    public static final EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
+        EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
+            DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
+            SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS,
+            DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
+            DISTINCTCOUNTRAWULL, PERCENTILEKLL, PERCENTILERAWKLL, PERCENTILETDIGEST, PERCENTILERAWTDIGEST,
+            FIRSTWITHTIME, LASTWITHTIME);
   }
 
   /**

@@ -112,7 +112,7 @@ public class RollupReducer implements Reducer {
       if (fieldSpec.getFieldType() == FieldType.METRIC) {
         AggregationFunctionType aggregationType =
             _aggregationTypes.getOrDefault(fieldSpec.getName(), DEFAULT_AGGREGATOR_TYPE);
-        if (ValueAggregatorFactory.isOrderSensitive(aggregationType) && !hasOriginalTimeField) {
+        if (ValueAggregatorFactory.requiresTimeOrdering(aggregationType) && !hasOriginalTimeField) {
           throw new IllegalStateException(String.format(
               "Aggregation type: %s on column: %s requires a time column with EPOCH time handling",
               aggregationType, fieldSpec.getName()));

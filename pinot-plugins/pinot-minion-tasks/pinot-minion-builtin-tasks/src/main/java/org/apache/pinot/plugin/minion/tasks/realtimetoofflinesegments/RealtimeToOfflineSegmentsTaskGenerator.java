@@ -346,7 +346,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           // check that it's a valid aggregation function type
           AggregationFunctionType aft = AggregationFunctionType.getAggregationFunctionType(entry.getValue());
           // check that a value aggregator is available
-          if (!MinionConstants.RealtimeToOfflineSegmentsTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
+          if (!MinionConstants.MergeRollupTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
             throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft.toString());
           }
         } catch (IllegalArgumentException e) {

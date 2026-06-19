@@ -129,11 +129,11 @@ public class SegmentProcessorConfig {
   /// sensitive (FIRSTWITHTIME/LASTWITHTIME), which picks the value based on the original time order instead of
   /// combining the values.
   public boolean requiresOriginalTimeOrdering() {
-    if (_mergeType != MergeType.ROLLUP || _timeHandlerConfig.getType() != TimeHandler.Type.EPOCH) {
+    if (_mergeType != MergeType.ROLLUP || _timeHandlerConfig.getType() == TimeHandler.Type.NO_OP) {
       return false;
     }
     for (AggregationFunctionType aggregationType : _aggregationTypes.values()) {
-      if (ValueAggregatorFactory.isOrderSensitive(aggregationType)) {
+      if (ValueAggregatorFactory.requiresTimeOrdering(aggregationType)) {
         return true;
       }
     }

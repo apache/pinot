@@ -30,10 +30,11 @@ public class ValueAggregatorFactory {
   private ValueAggregatorFactory() {
   }
 
-  /// Returns `true` if the given aggregation type is order sensitive, i.e. it picks a value based on the original
-  /// (pre-rounding) time order of the rows instead of combining the values, and therefore requires the rollup rows
-  /// to be sorted on the hidden original time column within each rollup group.
-  public static boolean isOrderSensitive(AggregationFunctionType aggregationType) {
+  /// Returns `true` if the given aggregation type requires the rollup rows to be ordered by the original
+  /// (pre-rounding) time, i.e. it picks a value based on the original time order of the rows instead of combining the
+  /// values, and therefore requires the rollup rows to be sorted on the hidden original time column within each
+  /// rollup group.
+  public static boolean requiresTimeOrdering(AggregationFunctionType aggregationType) {
     return aggregationType == AggregationFunctionType.FIRSTWITHTIME
         || aggregationType == AggregationFunctionType.LASTWITHTIME;
   }
@@ -41,7 +42,7 @@ public class ValueAggregatorFactory {
   /// Constructs a ValueAggregator from the given aggregation type.
   ///
   /// When adding entries to this please add them to the Set named AVAILABLE_CORE_VALUE_AGGREGATORS in
-  /// org.apache.pinot.core.common.MinionConstants.MergeTask so that they pass the task config validation of the
+  /// org.apache.pinot.core.common.MinionConstants.MergeRollupTask so that they pass the task config validation of the
   /// merge tasks (MergeRollupTask, RealtimeToOfflineSegmentsTask)
   public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType, DataType dataType) {
     switch (aggregationType) {

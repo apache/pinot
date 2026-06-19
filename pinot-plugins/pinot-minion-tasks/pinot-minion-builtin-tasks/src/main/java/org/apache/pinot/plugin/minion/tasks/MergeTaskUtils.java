@@ -148,7 +148,7 @@ public class MergeTaskUtils {
       String aggregationType) {
     AggregationFunctionType aggregationFunctionType = AggregationFunctionType.getAggregationFunctionType(
         aggregationType);
-    if (!ValueAggregatorFactory.isOrderSensitive(aggregationFunctionType)) {
+    if (!ValueAggregatorFactory.requiresTimeOrdering(aggregationFunctionType)) {
       return;
     }
     FieldSpec fieldSpec = schema.getFieldSpecFor(column);

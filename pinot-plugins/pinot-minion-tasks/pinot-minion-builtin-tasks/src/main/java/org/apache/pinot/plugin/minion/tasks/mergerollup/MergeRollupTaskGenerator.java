@@ -520,7 +520,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           // check that it's a valid aggregation function type, and a value aggregator is available for it
           AggregationFunctionType aggregationType =
               AggregationFunctionType.getAggregationFunctionType(entry.getValue());
-          if (!MergeTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aggregationType)) {
+          if (!MergeRollupTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aggregationType)) {
             throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aggregationType);
           }
         } catch (IllegalArgumentException e) {
