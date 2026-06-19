@@ -23,6 +23,8 @@ import java.io.IOException;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 
 /// Forward index writer that extends [VarByteChunkForwardIndexWriterV5] and delta-encodes the chunk header
 /// when compression is enabled, writing individual entry sizes instead of cumulative byte offsets.
@@ -67,6 +69,8 @@ public class VarByteChunkForwardIndexWriterV6 extends VarByteChunkForwardIndexWr
       int targetDocsPerChunk)
       throws IOException {
     super(file, compressionType, chunkSize);
+    checkArgument(targetDocsPerChunk == DISABLE_DOCS_PER_CHUNK || targetDocsPerChunk > 0,
+        "targetDocsPerChunk must be -1 (disabled) or positive, got: %s", targetDocsPerChunk);
     _deltaEncoding = compressionType != ChunkCompressionType.PASS_THROUGH;
     _targetDocsPerChunk = targetDocsPerChunk;
   }

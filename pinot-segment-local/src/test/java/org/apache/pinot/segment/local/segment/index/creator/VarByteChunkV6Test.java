@@ -109,7 +109,8 @@ public class VarByteChunkV6Test extends VarByteChunkV5Test {
   public void testTargetDocsPerChunkCapsChunk()
       throws IOException {
     int numDocs = 1000;
-    int docsPerChunk = 50;
+    // 1000 is not a multiple of 30, so the last chunk holds a remainder (10 docs).
+    int docsPerChunk = 30;
     // Large byte budget so flushing is driven purely by the docs-per-chunk cap, not the buffer size.
     int chunkSize = 1 << 20;
     File file = new File(FileUtils.getTempDirectory(), "v6test_docs_cap");
@@ -125,11 +126,16 @@ public class VarByteChunkV6Test extends VarByteChunkV5Test {
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file)) {
-      // Chunk metadata starts at byte 16; each entry is 8 bytes. The metadata region ends at the offset
-      // stored at byte 12 (start of chunk data).
+      // Chunk metadata starts at byte 16; each 8-byte entry begins with the chunk's first docId (stored
+      // little-endian, MSB reserved for the huge-chunk flag). The region ends at the offset stored at byte 12.
       int numChunks = (buffer.getInt(12) - 16) / 8;
-      Assert.assertEquals(numChunks, (numDocs + docsPerChunk - 1) / docsPerChunk,
-          "Each chunk should hold exactly targetDocsPerChunk documents");
+      Assert.assertEquals(numChunks, (numDocs + docsPerChunk - 1) / docsPerChunk, "Unexpected chunk count");
+      // Each chunk must start exactly docsPerChunk docs after the previous one, so every chunk holds
+      // docsPerChunk docs and the last holds the remainder.
+      for (int chunk = 0; chunk < numChunks; chunk++) {
+        int firstDocId = Integer.reverseBytes(buffer.getInt(16 + chunk * 8)) & 0x7FFFFFFF;
+        Assert.assertEquals(firstDocId, chunk * docsPerChunk, "Unexpected start docId for chunk " + chunk);
+      }
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
