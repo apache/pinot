@@ -53,8 +53,9 @@ public class SchemaAdminClient extends BaseServiceAdminClient {
    */
   public List<String> listSchemaNames()
       throws PinotAdminException {
+    /// GET /schemas returns a bare JSON array of schema names, not a wrapper object.
     JsonNode response = _transport.executeGet(_controllerAddress, "/schemas", null, _headers);
-    return _transport.parseStringArray(response, "schemas");
+    return PinotAdminTransport.parseStringArrayNode(response);
   }
 
   /**
@@ -243,7 +244,7 @@ public class SchemaAdminClient extends BaseServiceAdminClient {
    */
   public CompletableFuture<List<String>> listSchemaNamesAsync() {
     return _transport.executeGetAsync(_controllerAddress, "/schemas", null, _headers)
-        .thenApply(response -> _transport.parseStringArraySafe(response, "schemas"));
+        .thenApply(BaseServiceAdminClient::toStringListSafe);
   }
 
   /**

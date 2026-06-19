@@ -203,7 +203,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected String _helixControllerInstanceId;
   protected String _helixParticipantInstanceId;
   protected boolean _isUpdateStateModel;
-  protected boolean _enableBatchMessageMode;
   protected ControllerConf.ControllerMode _controllerMode;
   protected HelixManager _helixControllerManager;
   protected HelixManager _helixParticipantManager;
@@ -286,7 +285,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(_hostname, _port);
     }
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
-    _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
     _serviceStatusCallbackList = new ArrayList<>();
     if (_controllerMode == ControllerConf.ControllerMode.HELIX_ONLY) {
@@ -577,8 +575,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     }
 
     // Set up Pinot cluster in Helix if needed
-    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode,
-        _config);
+    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _config);
 
     // Start all components
     initPinotFSFactory();

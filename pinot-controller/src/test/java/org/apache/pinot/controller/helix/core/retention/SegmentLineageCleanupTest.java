@@ -26,6 +26,8 @@ import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -46,6 +48,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentLineageCleanupTest {
@@ -160,6 +163,23 @@ public class SegmentLineageCleanupTest {
     segmentLineage =
         SegmentLineageAccessHelper.getSegmentLineage(_resourceManager.getPropertyStore(), OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
+
+    // Validate that reaping a zombie IN_PROGRESS entry also deletes a destination znode that never reached the
+    // ideal state. The prior pass kept entry "1" because "merged_1" was still in the ideal state. Plant a
+    // property-store znode for "merged_2" — which was never added to the ideal state — to mimic a crash between
+    // destination-metadata creation and the ideal-state update. Now neither destination is in the ideal state, so
+    // the entry must be reaped and the orphan znode deleted along with it.
+    ZKMetadataProvider.setSegmentZKMetadata(_resourceManager.getPropertyStore(), OFFLINE_TABLE_NAME,
+        new SegmentZKMetadata("merged_2"));
+    assertTrue(_resourceManager.getSegmentsFromPropertyStore(OFFLINE_TABLE_NAME).contains("merged_2"));
+    _retentionManager.processTable(OFFLINE_TABLE_NAME);
+    segmentLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_resourceManager.getPropertyStore(), OFFLINE_TABLE_NAME);
+    assertEquals(segmentLineage.getLineageEntryIds().size(), 0);
+    // Segment znode deletion is asynchronous, so wait for the orphan to disappear from the property store.
+    TestUtils.waitForCondition(
+        aVoid -> !_resourceManager.getSegmentsFromPropertyStore(OFFLINE_TABLE_NAME).contains("merged_2"), 60_000L,
+        "Orphan destination znode absent from the ideal state must be reaped when the zombie entry is cleaned up");
   }
 
   private void verifySegmentsDeleted(int expectedNumRemainingSegments) {

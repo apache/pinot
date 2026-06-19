@@ -61,9 +61,9 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   private final File _indexDir;
   private final File _segmentDirectory;
-  private final SegmentLock _segmentLock;
   private final ReadMode _readMode;
   private final SegmentDirectoryLoaderContext _segmentDirectoryLoaderContext;
+  private final SegmentLock _segmentLock = new SegmentLock();
   private SegmentMetadataImpl _segmentMetadata;
   private ColumnIndexDirectory _columnIndexDirectory;
   private StarTreeIndexReader _starTreeIndexReader;
@@ -72,45 +72,33 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   // Create an empty SegmentLocalFSDirectory object mainly used to
   // prepare env for subsequent processing on the segment.
-  public SegmentLocalFSDirectory(File directory) {
-    _indexDir = directory;
+  public SegmentLocalFSDirectory(File indexDir) {
+    _indexDir = indexDir;
     _segmentDirectory = null;
-    _segmentLock = new SegmentLock();
     _readMode = null;
     _segmentDirectoryLoaderContext = null;
   }
 
-  public SegmentLocalFSDirectory(File directory, ReadMode readMode)
+  public SegmentLocalFSDirectory(File indexDir, ReadMode readMode)
       throws IOException, ConfigurationException {
-    this(directory, new SegmentMetadataImpl(directory), null, readMode);
-  }
-
-  public SegmentLocalFSDirectory(File directory, @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext,
-      ReadMode readMode)
-      throws IOException, ConfigurationException {
-    this(directory, new SegmentMetadataImpl(directory), segmentDirectoryLoaderContext, readMode);
-  }
-
-  public SegmentLocalFSDirectory(File directory, SegmentMetadataImpl metadata, ReadMode readMode)
-      throws IOException, ConfigurationException {
-    this(directory, metadata, null, readMode);
+    this(indexDir, new SegmentMetadataImpl(indexDir), readMode, null);
   }
 
   @VisibleForTesting
-  public SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata,
-      @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext, ReadMode readMode) {
-    _segmentDirectoryLoaderContext = segmentDirectoryLoaderContext;
+  public SegmentLocalFSDirectory(File indexDir, SegmentMetadataImpl metadata, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    this(indexDir, metadata, readMode, null);
+  }
 
-    Preconditions.checkNotNull(directoryFile);
-    Preconditions.checkNotNull(metadata);
-
-    _indexDir = directoryFile;
-    _segmentDirectory = getSegmentPath(directoryFile, metadata.getVersion());
-    Preconditions.checkState(_segmentDirectory.exists(), "Segment directory: " + directoryFile + " must exist");
-
-    _segmentLock = new SegmentLock();
+  public SegmentLocalFSDirectory(File indexDir, SegmentMetadataImpl metadata, ReadMode readMode,
+      @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext) {
+    _indexDir = indexDir;
+    _segmentDirectory = getSegmentPath(indexDir, metadata.getVersion());
+    Preconditions.checkState(_segmentDirectory.exists(), "Segment directory: " + indexDir + " must exist");
     _segmentMetadata = metadata;
     _readMode = readMode;
+    _segmentDirectoryLoaderContext = segmentDirectoryLoaderContext;
+
     try {
       load();
     } catch (IOException | ConfigurationException e) {

@@ -4398,4 +4398,42 @@ public class TableConfigUtilsTest {
         .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(buildMaterializedViewTaskMap(definedSql)))
         .build();
   }
+
+  @Test
+  public void testValidateOpenStructSeparatorInColumnNames() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+
+    // Valid: no '$' in any column name — OPEN_STRUCT and regular column both clean.
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("event_type", FieldSpec.DataType.STRING)
+        .addOpenStruct("payload", Map.of())
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // Invalid: non-OPEN_STRUCT column contains '$'.
+    Schema schemaWithDollarInNonOpenStruct = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("event$type", FieldSpec.DataType.STRING)
+        .addOpenStruct("payload", Map.of())
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schemaWithDollarInNonOpenStruct);
+      fail("Should fail when a non-OPEN_STRUCT column contains the reserved '$' separator");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("event$type"));
+    }
+
+    // Invalid: OPEN_STRUCT parent name itself contains '$'. Without this check, a parent named
+    // 'metrics$v2' would produce children 'metrics$v2$key', and parseParentColumn() would split
+    // on the first '$' and return 'metrics' instead of 'metrics$v2', corrupting the name mapping.
+    Schema schemaWithDollarInOpenStructParent = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("event_type", FieldSpec.DataType.STRING)
+        .addOpenStruct("metrics$v2", Map.of())
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schemaWithDollarInOpenStructParent);
+      fail("Should fail when an OPEN_STRUCT parent column name contains the reserved '$' separator");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("metrics$v2"));
+    }
+  }
 }

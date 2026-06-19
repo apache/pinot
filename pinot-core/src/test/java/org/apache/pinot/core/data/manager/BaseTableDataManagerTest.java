@@ -80,6 +80,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -895,6 +896,30 @@ public class BaseTableDataManagerTest {
 
     assertTrue(dataDir.exists());
     assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
+  }
+
+  @Test
+  public void testOnTableConfigOrSchemaRefreshRefreshesCachedConfig()
+      throws Exception {
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    TableConfig refreshedConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(2).build();
+    Schema refreshedSchema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension(STRING_COLUMN, DataType.STRING).build();
+    // Stand in for the ZK fetch fetchIndexLoadingConfig performs: its contract is to refresh the cached config/schema.
+    doAnswer(invocation -> {
+      tableDataManager.updateCachedTableConfigAndSchema(refreshedConfig, refreshedSchema);
+      return new IndexLoadingConfig();
+    }).when(tableDataManager).fetchIndexLoadingConfig();
+
+    assertSame(tableDataManager.getCachedTableConfigAndSchema().getLeft(), DEFAULT_TABLE_CONFIG);
+
+    tableDataManager.onTableConfigOrSchemaRefresh();
+
+    // The default callback refreshes the cache via the index-loading-config fetch.
+    verify(tableDataManager).fetchIndexLoadingConfig();
+    assertSame(tableDataManager.getCachedTableConfigAndSchema().getLeft(), refreshedConfig);
+    assertSame(tableDataManager.getCachedTableConfigAndSchema().getRight(), refreshedSchema);
   }
 
   // Has to be public class for the class loader to work.

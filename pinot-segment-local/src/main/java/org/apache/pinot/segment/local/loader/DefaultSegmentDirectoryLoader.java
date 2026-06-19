@@ -21,14 +21,11 @@ package org.apache.pinot.segment.local.loader;
 import java.io.File;
 import java.net.URI;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentLoader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,13 +47,11 @@ public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
   @Override
   public SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentLoaderContext)
       throws Exception {
-    PinotConfiguration segmentDirectoryConfigs = segmentLoaderContext.getSegmentDirectoryConfigs();
     File directory = new File(indexDir);
     if (!directory.exists()) {
       return new SegmentLocalFSDirectory(directory);
     }
-    return new SegmentLocalFSDirectory(directory, segmentLoaderContext,
-        ReadMode.valueOf(segmentDirectoryConfigs.getProperty(IndexLoadingConfig.READ_MODE_KEY)));
+    return new SegmentLocalFSDirectory(directory, segmentLoaderContext.getReadMode());
   }
 
   @Override

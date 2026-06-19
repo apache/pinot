@@ -89,6 +89,26 @@ staticSortFunctions.set("Estimated Size", sortBytes);
 staticSortFunctions.set("Reported Size", sortBytes);
 staticSortFunctions.set("Status", sortCellValue);
 
+// Safely coerce an arbitrary cell value to a string for display. Most cells are strings, but
+// complex column types (e.g. MAP, which the broker serializes as an object) arrive as non-strings.
+// JSON.stringify can itself throw (circular references, BigInt) or return undefined (functions,
+// symbols), so both are guarded — the results view has no error boundary, and any throw here
+// white-screens the whole page.
+const toDisplayString = (value: any): string => {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return String(value);
+  }
+  try {
+    const json = JSON.stringify(value);
+    return json === undefined ? String(value) : json;
+  } catch (e) {
+    return '<DATA COULD NOT BE PARSED TO DISPLAY>';
+  }
+};
+
 const StyledTableRow = withStyles((theme) =>
   createStyles({
     root: {
@@ -414,7 +434,10 @@ export default function CustomizedTables({
     };
   }, [search, timeoutId, filterSearchResults]);
 
-  const styleCell = (str: string) => {
+  const styleCell = (cellValue: any) => {
+    // Coerce to a string first so the String methods below (toLowerCase/search/replace) never
+    // throw on a non-string cell value (e.g. a MAP column) and crash the whole results view.
+    const str = toDisplayString(cellValue);
     if (str.toLowerCase() === 'good' || str.toLowerCase() === 'healthy' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
           return (
             <StyledChip
@@ -533,17 +556,15 @@ export default function CustomizedTables({
               {styleCell(cellData.value)}
             </Tooltip>
         );
-      } else if(has(cellData, 'value') && cellData.value) {
+      } else if (has(cellData, 'value')) {
+        // Render via the value path whenever the key is present, including falsy values
+        // (0, false, null, ''). styleCell safely coerces any type, so we no longer fall
+        // through to dumping the whole {value: ...} object for a falsy value.
         return styleCell(cellData.value);
       } else {
-          try {
-            const stringifiedJSON = JSON.stringify(cellData)
-            return stringifiedJSON
-          } catch(e) {
-            // If the data is corrupted and not recognizable by JSON.stringify, fallback to below error message instead
-            // of crashing the whole page for the user.
-            return '<DATA COULD NOT BE PARSED TO DISPLAY>'
-          }
+          // Fall back to a stringified representation. toDisplayString guards against
+          // JSON.stringify throwing (e.g. corrupted/circular data) so we never crash the page.
+          return toDisplayString(cellData);
       }
     }
     return styleCell(cellData.toString());

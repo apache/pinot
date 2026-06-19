@@ -452,7 +452,7 @@ public class QueryDispatcher {
       stageCoverage.add(expected == 0 ? null : new QueryResult.StageCoverage(responded, mergeFailed, missing));
     }
     return new QueryResult(brokerResult.getResultTable(), brokerResult.getProcessingException(), merged,
-        brokerResult.getBrokerReduceTimeMs(), stageCoverage);
+        brokerResult.getBrokerReduceTimeMs(), stageCoverage, accumulator);
   }
 
   /// Tries to recover from an exception thrown during legacy (non-streaming) query dispatching.
@@ -1004,6 +1004,14 @@ public class QueryDispatcher {
      */
     @Nullable
     private final List<StageCoverage> _stageCoverage;
+    /**
+     * Non-null only in stream-mode queries: the explicit per-stage stats trees decoded from the
+     * {@code SubmitWithStream} reports, keyed by stage id. Carries the exact tree shape (including plugin-defined
+     * operator types), which the flat {@link #_queryStats} list cannot represent. Stage 0 (broker-local) and stages
+     * that never reported are absent.
+     */
+    @Nullable
+    private final Map<Integer, StageStatsTreeNode> _stageStatsTrees;
 
     /**
      * Creates a successful query result.
@@ -1021,6 +1029,7 @@ public class QueryDispatcher {
       _brokerReduceTimeMs = brokerReduceTimeMs;
       _processingException = null;
       _stageCoverage = null;
+      _stageStatsTrees = null;
     }
 
     /**
@@ -1042,6 +1051,7 @@ public class QueryDispatcher {
         _queryStats.add(queryStats.getUpstreamStageStats(i));
       }
       _stageCoverage = null;
+      _stageStatsTrees = null;
     }
 
     /**
@@ -1051,12 +1061,13 @@ public class QueryDispatcher {
      */
     public QueryResult(@Nullable ResultTable resultTable, @Nullable QueryProcessingException processingException,
         List<MultiStageQueryStats.StageStats.Closed> queryStats, long brokerReduceTimeMs,
-        @Nullable List<StageCoverage> stageCoverage) {
+        @Nullable List<StageCoverage> stageCoverage, @Nullable Map<Integer, StageStatsTreeNode> stageStatsTrees) {
       _resultTable = resultTable;
       _processingException = processingException;
       _queryStats = queryStats;
       _brokerReduceTimeMs = brokerReduceTimeMs;
       _stageCoverage = stageCoverage;
+      _stageStatsTrees = stageStatsTrees;
     }
 
     @Nullable
@@ -1084,6 +1095,15 @@ public class QueryDispatcher {
     @Nullable
     public List<StageCoverage> getStageCoverage() {
       return _stageCoverage;
+    }
+
+    /**
+     * Returns the explicit per-stage stats trees decoded from stream-mode reports, keyed by stage id, or {@code null}
+     * when the query ran in legacy mode. Stages that never reported are absent from the map.
+     */
+    @Nullable
+    public Map<Integer, StageStatsTreeNode> getStageStatsTrees() {
+      return _stageStatsTrees;
     }
 
     /**

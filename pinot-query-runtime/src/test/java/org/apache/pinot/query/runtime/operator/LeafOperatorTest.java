@@ -647,4 +647,63 @@ public class LeafOperatorTest {
 
     operator.close();
   }
+
+  @Test
+  public void shouldPropagateLiteModeLeafStageLimitReached() {
+    // Given:
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(),
+        "true");
+    QueryExecutor queryExecutor = mockQueryExecutor(Collections.emptyList(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+
+    // Then:
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertTrue(leafStats.getBoolean(LeafOperator.StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED));
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertTrue(brokerResponse.isMseLiteLeafStageLimitReached());
+    assertTrue(brokerResponse.isPartialResult());
+    JsonNode responseJson = JsonUtils.objectToJsonNode(brokerResponse);
+    assertTrue(responseJson.path("mseLiteLeafStageLimitReached").asBoolean(false));
+    assertTrue(responseJson.path("partialResult").asBoolean(false));
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldNotSetLiteModeLeafStageLimitWhenNotReached() {
+    // Given:
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(Collections.emptyList(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+
+    // Then:
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertFalse(leafStats.getBoolean(LeafOperator.StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED));
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertFalse(brokerResponse.isMseLiteLeafStageLimitReached());
+    assertFalse(brokerResponse.isPartialResult());
+
+    operator.close();
+  }
 }

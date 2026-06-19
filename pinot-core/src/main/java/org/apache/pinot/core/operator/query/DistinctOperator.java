@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
 /**
@@ -60,6 +61,12 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(valueBlock.getNumDocs());
+        scanCost.addEntriesScannedPostFilter(
+            (long) valueBlock.getNumDocs() * _projectOperator.getNumColumnsProjected());
+      }
       if (executor.process(valueBlock)) {
         break;
       }
