@@ -19,8 +19,8 @@
 package org.apache.pinot.server.api;
 
 import java.io.File;
+import java.io.InputStream;
 import java.net.URI;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -108,9 +108,15 @@ public abstract class BaseResourceTest {
 
     FileUtils.deleteQuietly(TEMP_DIR);
     assertTrue(TEMP_DIR.mkdirs());
-    URL resourceUrl = getClass().getClassLoader().getResource(getAvroFileName());
-    assertNotNull(resourceUrl);
-    _avroFile = new File(resourceUrl.getFile());
+    // Copy the Avro fixture out of the classpath into TEMP_DIR so it is always backed by a real file.
+    // The fixture may be served from a packaged test-jar when this base class is reused from another
+    // module, in which case it cannot be opened as a plain File via the resource URL.
+    String avroFileName = getAvroFileName();
+    _avroFile = new File(TEMP_DIR, new File(avroFileName).getName());
+    try (InputStream avroStream = getClass().getClassLoader().getResourceAsStream(avroFileName)) {
+      assertNotNull(avroStream);
+      FileUtils.copyInputStreamToFile(avroStream, _avroFile);
+    }
 
     // Mock the instance data manager
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
@@ -155,6 +161,7 @@ public abstract class BaseResourceTest {
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     _instanceId = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _instanceId);
+    configureServerConf(serverConf);
     _adminApiApplication = new AdminApiApplication(_serverInstance, new AllowAllAccessFactory(),
         mock(ServerReloadJobStatusCache.class),
         serverConf);
@@ -164,6 +171,9 @@ public abstract class BaseResourceTest {
 
     _webTarget = ClientBuilder.newClient().target(
         String.format("http://%s:%d", NetUtils.getHostAddress(), CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+  }
+
+  protected void configureServerConf(PinotConfiguration serverConf) {
   }
 
   @AfterClass

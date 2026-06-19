@@ -83,6 +83,14 @@ public abstract class SegmentDataManager {
   }
 
   /**
+   * The index segment(s) this manager exposes.
+   * Defaults to the single backing segment.
+   */
+  public List<IndexSegment> getReportableSegments() {
+    return List.of(getSegment());
+  }
+
+  /**
    * Offloads the segment from the metadata management (e.g. upsert metadata), but not releases the resources yet
    * because there might be queries still accessing the segment.
    */

@@ -50,6 +50,7 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.server.starter.ServerInstance;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
@@ -105,13 +106,14 @@ public class TableSizeResource {
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        if (segmentDataManager instanceof ImmutableSegmentDataManager) {
-          ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
-          long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
-          if (detailed) {
-            segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes));
+        for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+          if (segment instanceof ImmutableSegment immutableSegment) {
+            long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
+            if (detailed) {
+              segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes));
+            }
+            tableSizeInBytes += segmentSizeBytes;
           }
-          tableSizeInBytes += segmentSizeBytes;
         }
       }
     } finally {

@@ -332,16 +332,17 @@ public class TablesResource {
           // REALTIME segments may not have indexes since not all indexes have mutable implementations
           continue;
         }
-        totalSegmentCount++;
-        IndexSegment segment = segmentDataManager.getSegment();
-        segment.getColumnNames().forEach(col -> {
-          columnToIndexesCount.putIfAbsent(col, new HashMap<>());
-          DataSource colDataSource = segment.getDataSource(col);
-          IndexService.getInstance().getAllIndexes().forEach(idxType -> {
-            int count = colDataSource.getIndex(idxType) != null ? 1 : 0;
-            columnToIndexesCount.get(col).merge(idxType.getId(), count, Integer::sum);
+        for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+          totalSegmentCount++;
+          segment.getColumnNames().forEach(col -> {
+            columnToIndexesCount.putIfAbsent(col, new HashMap<>());
+            DataSource colDataSource = segment.getDataSource(col);
+            IndexService.getInstance().getAllIndexes().forEach(idxType -> {
+              int count = colDataSource.getIndex(idxType) != null ? 1 : 0;
+              columnToIndexesCount.get(col).merge(idxType.getId(), count, Integer::sum);
+            });
           });
-        });
+        }
       }
       TableIndexMetadataResponse tableIndexMetadataResponse =
           new TableIndexMetadataResponse(totalSegmentCount, columnToIndexesCount);
