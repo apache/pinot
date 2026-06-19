@@ -240,7 +240,6 @@ public class PinotHelixResourceManager {
   private final String _helixClusterName;
   private final String _dataDir;
   private final boolean _isSingleTenantCluster;
-  private final boolean _enableBatchMessageMode;
   private final int _deletedSegmentsRetentionInDays;
   private final boolean _enableTieredSegmentAssignment;
   @Nullable
@@ -266,14 +265,12 @@ public class PinotHelixResourceManager {
   private volatile ZkClient _zkClient;
   private volatile MaterializedViewConsistencyManager _materializedViewConsistencyManager;
 
-  public PinotHelixResourceManager(String helixClusterName, @Nullable String dataDir,
-      boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
-      boolean enableTieredSegmentAssignment, LineageManager lineageManager,
+  public PinotHelixResourceManager(String helixClusterName, @Nullable String dataDir, boolean isSingleTenantCluster,
+      int deletedSegmentsRetentionInDays, boolean enableTieredSegmentAssignment, LineageManager lineageManager,
       @Nullable ControllerConf controllerConf) {
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
     _isSingleTenantCluster = isSingleTenantCluster;
-    _enableBatchMessageMode = enableBatchMessageMode;
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     _enableTieredSegmentAssignment = enableTieredSegmentAssignment;
     _controllerConf = controllerConf;
@@ -295,8 +292,7 @@ public class PinotHelixResourceManager {
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
-    this(controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
-        controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
+    this(controllerConf.getHelixClusterName(), controllerConf.getDataDir(), controllerConf.tenantIsolationEnabled(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf), controllerConf);
   }
@@ -2097,8 +2093,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("Adding table {}: Successfully validated added table", tableNameWithType);
 
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableNameWithType, tableConfig.getReplication(),
-            _enableBatchMessageMode);
+        PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableNameWithType, tableConfig.getReplication());
     TableType tableType = tableConfig.getTableType();
     // Ensure that table is not created if schema is not present
     if (ZKMetadataProvider.getSchema(_propertyStore, rawTableName) == null) {
@@ -2664,8 +2659,9 @@ public class PinotHelixResourceManager {
     // Assign instances
     assignInstances(tableConfig, false);
 
-    // Send update query quota message if quota is specified
+    // Refresh brokers and servers so in-memory table config caches observe the update.
     sendTableConfigRefreshMessage(tableNameWithType);
+    sendTableConfigSchemaRefreshMessage(tableNameWithType);
   }
 
   public void deleteUser(String username) {
@@ -4222,6 +4218,11 @@ public class PinotHelixResourceManager {
   /**
    * Utility to perform a safety check of the operation to drop an instance.
    * If the resource is not safe to drop the utility lists all the possible reasons.
+   * <p>The cluster-wide IdealState scan is skipped for minion instances: minions never appear in any
+   * resource IdealState (their task assignments live in the Helix Task Framework
+   * {@code JobContext}/{@code WorkflowContext}, not in IdealState), so the scan can only ever return
+   * empty for them. Skipping it avoids pulling every IdealState into the controller heap, which is a
+   * significant source of heap pressure when many minions are dropped in succession.
    * @param instanceName Pinot instance name
    * @return {@link OperationValidationResponse}
    */
@@ -4231,16 +4232,20 @@ public class PinotHelixResourceManager {
     if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName)) != null) {
       response.putIssue(OperationValidationResponse.ErrorCode.IS_ALIVE, instanceName);
     }
-    // Check if any ideal state includes the instance
-    getAllResources().forEach(resource -> {
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
-      for (String partition : idealState.getPartitionSet()) {
-        if (idealState.getInstanceSet(partition).contains(instanceName)) {
-          response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
-          break;
+    // Check if any ideal state includes the instance. Minions never host any resource, so skip the
+    // expensive scan for them. Controllers/servers/brokers can host resources (e.g. controllers are
+    // participants in the lead controller resource), so the scan is still required for them.
+    if (!InstanceTypeUtils.isMinion(instanceName)) {
+      getAllResources().forEach(resource -> {
+        IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
+        for (String partition : idealState.getPartitionSet()) {
+          if (idealState.getInstanceSet(partition).contains(instanceName)) {
+            response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
+            break;
+          }
         }
-      }
-    });
+      });
+    }
     return response.setSafe(response.getIssues().isEmpty());
   }
 
@@ -5471,15 +5476,13 @@ public class PinotHelixResourceManager {
     final long externalViewOnlineToOfflineTimeoutMillis = 100L;
     final boolean isSingleTenantCluster = false;
     final boolean isUpdateStateModel = false;
-    final boolean enableBatchMessageMode = false;
     MetricsRegistry metricsRegistry = new MetricsRegistry();
     final boolean dryRun = true;
     final String tableName = "testTable";
     final TableType tableType = TableType.OFFLINE;
     PinotHelixResourceManager helixResourceManager =
         new PinotHelixResourceManager(zkURL, helixClusterName, controllerInstanceId, localDiskDir,
-            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel,
-            * enableBatchMessageMode);
+            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel);
     helixResourceManager.start();
     ZNRecord record = helixResourceManager.rebalanceTable(tableName, dryRun, tableType);
     ObjectMapper mapper = new ObjectMapper();

@@ -36,6 +36,7 @@ import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.mapping.IntPair;
@@ -156,6 +157,13 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
       if (inputRelDistribution != null) {
         // Since we only support LEFT RelTrait propagation, the inputRelDistribution can directly be applied
         // b/c the Join node always puts left relation RowTypes then right relation RowTypes sequentially.
+        return inputRelDistribution;
+      }
+    } else if (node instanceof LogicalWindow) {
+      assert inputs.size() == 1;
+      // Window input should be an exchange node that is hash distributed by the window's partition keys
+      RelDistribution inputRelDistribution = inputs.get(0).getTraitSet().getDistribution();
+      if (inputRelDistribution != null) {
         return inputRelDistribution;
       }
     }

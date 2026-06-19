@@ -190,7 +190,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
       // The table was previously paused due to exceeding resource utilization, but the current status cannot be
       // determined. To be safe, leave it as paused and once the status is available take the correct action
-      LOGGER.warn("Resource utilization limit could not be determined for for table: {}, and it is paused, leave it as "
+      LOGGER.warn("Resource utilization limit could not be determined for table: {}, and it is paused, leave it as "
           + "paused", tableNameWithType);
       return false;
     }

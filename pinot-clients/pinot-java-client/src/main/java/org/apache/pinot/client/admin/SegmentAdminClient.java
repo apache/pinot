@@ -479,8 +479,9 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
       long endTimestampMs, boolean excludeReplacedSegments)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
-    queryParams.put("startTimestampMs", String.valueOf(startTimestampMs));
-    queryParams.put("endTimestampMs", String.valueOf(endTimestampMs));
+    /// Controller reads startTimestamp/endTimestamp (ms); see PinotSegmentRestletResource#getSelectedSegments.
+    queryParams.put("startTimestamp", String.valueOf(startTimestampMs));
+    queryParams.put("endTimestamp", String.valueOf(endTimestampMs));
     queryParams.put("excludeReplacedSegments", String.valueOf(excludeReplacedSegments));
     if (tableType != null) {
       queryParams.put("type", tableType);
@@ -628,7 +629,8 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/zkmetadata",
         null, _headers);
-    return PinotAdminTransport.getObjectMapper().convertValue(response.get("zkMetadata"),
+    /// GET /segments/{tableName}/zkmetadata returns a bare map of segment name -> metadata, not a wrapper object.
+    return PinotAdminTransport.getObjectMapper().convertValue(response,
         new TypeReference<Map<String, Map<String, String>>>() {
         });
   }

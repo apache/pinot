@@ -1120,4 +1120,87 @@ public class StringFunctions {
     Matcher matcher = Pattern.compile(regexp).matcher(input);
     return matcher.find() ? matcher.group() : null;
   }
+
+  /**
+   * Returns a string with every occurrence of a character in {@code from} replaced by the corresponding character in
+   * {@code to}. Characters in {@code input} that do not appear in {@code from} are left unchanged. If {@code from} is
+   * longer than {@code to}, characters beyond the length of {@code to} are deleted from the result. Equivalent to the
+   * SQL standard {@code TRANSLATE(string, from, to)} function supported by PostgreSQL, Oracle, and Trino.
+   *
+   * <p>Examples:
+   * <pre>
+   *   translate("hello", "aeiou", "AEIOU") → "hEllO"
+   *   translate("abc", "abc", "xy")        → "xy"   (c has no target → deleted)
+   *   translate("abcdef", "ace", "XY")     → "XbYdf" (e has no target → deleted)
+   * </pre>
+   *
+   * @param input the source string
+   * @param from  characters to search for (must not be null)
+   * @param to    replacement characters (must not be null; may be shorter than {@code from})
+   * @return the translated string
+   */
+  @ScalarFunction
+  public static String translate(String input, String from, String to) {
+    if (input.isEmpty() || from.isEmpty()) {
+      return input;
+    }
+    StringBuilder sb = new StringBuilder(input.length());
+    for (int i = 0; i < input.length(); i++) {
+      char c = input.charAt(i);
+      int idx = from.indexOf(c);
+      if (idx < 0) {
+        sb.append(c);
+      } else if (idx < to.length()) {
+        sb.append(to.charAt(idx));
+      }
+      // idx >= to.length(): character is deleted (not appended)
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Replaces a substring of {@code input} with {@code replacement}, starting at the 1-based position {@code start}
+   * and replacing {@code length} characters. Equivalent to the SQL standard
+   * {@code OVERLAY(string PLACING replacement FROM start FOR length)} function supported by PostgreSQL and Trino.
+   *
+   * <p>When {@code length} is omitted (i.e. {@code OVERLAY(string PLACING new_str FROM start)}), it defaults to the
+   * length of {@code replacement}, so the replaced and inserted substrings are the same width.
+   *
+   * <p>Examples:
+   * <pre>
+   *   overlay("hello world", "there", 7)     → "hello there"   (length defaults to len("there") = 5)
+   *   overlay("hello world", "there", 7, 5)  → "hello there"
+   *   overlay("abcdef", "XY", 3, 0)          → "abXYcdef"      (insertion without deletion)
+   *   overlay("abcdef", "XY", 3, 4)          → "abXY"          (delete 4 chars cdef, insert 2)
+   * </pre>
+   *
+   * @param input       the source string
+   * @param replacement the string to insert
+   * @param start       1-based position in {@code input} at which replacement begins (clamped to [1, len+1])
+   * @return the result string
+   */
+  @ScalarFunction
+  public static String overlay(String input, String replacement, int start) {
+    return overlay(input, replacement, start, replacement.length());
+  }
+
+  /**
+   * Replaces {@code length} characters of {@code input} with {@code replacement}, starting at the 1-based position
+   * {@code start}. Equivalent to the SQL standard
+   * {@code OVERLAY(string PLACING replacement FROM start FOR length)} function.
+   *
+   * @param input       the source string
+   * @param replacement the string to insert
+   * @param start       1-based start position (clamped to [1, len+1])
+   * @param length      number of characters to delete from {@code input} (clamped to [0, remaining])
+   * @return the result string
+   */
+  @ScalarFunction
+  public static String overlay(String input, String replacement, int start, int length) {
+    int len = input.length();
+    // Convert to 0-based, clamping to valid range
+    int s = Math.max(0, Math.min(start - 1, len));
+    int e = Math.min(s + Math.max(0, length), len);
+    return input.substring(0, s) + replacement + input.substring(e);
+  }
 }

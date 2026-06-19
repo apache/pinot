@@ -1021,6 +1021,9 @@ public class CommonConstants {
         // Server stage limit for lite mode queries.
         public static final String LITE_MODE_LEAF_STAGE_LIMIT = "liteModeLeafStageLimit";
         public static final String LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT = "liteModeLeafStageFanOutAdjustedLimit";
+        // System-internal option injected by the broker when MSE Lite implicitly inserts a leaf-stage limit.
+        // Not user-settable; used by servers to detect silent truncation at execution time.
+        public static final String LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT = "liteModeImplicitLeafStageLimit";
         // Used by the MSE engine to enable broker-side segment pruning during routing. The physical optimizer
         // path defaults to DEFAULT_USE_BROKER_PRUNING (true); the logical planner path defaults to
         // DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING (false). Both can be overridden per-query.

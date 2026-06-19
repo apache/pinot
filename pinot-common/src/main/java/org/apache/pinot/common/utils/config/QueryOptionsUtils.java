@@ -598,6 +598,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getLiteModeImplicitLeafStageLimit(Map<String, String> queryOptions) {
+    String val = queryOptions.get(QueryOptionKey.LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT);
+    return val != null ? Integer.parseInt(val) : null;
+  }
+
+  @Nullable
   private static Integer uncheckedParseInt(String optionName, @Nullable String optionValue) {
     if (optionValue == null) {
       return null;

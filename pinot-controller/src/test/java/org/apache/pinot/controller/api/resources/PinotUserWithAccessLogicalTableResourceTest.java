@@ -58,7 +58,7 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
   }
 
   @Override
-  protected Map<String, String> getControllerRequestClientHeaders() {
+  protected Map<String, String> getAdminClientHeaders() {
     return AUTH_HEADER;
   }
 

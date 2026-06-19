@@ -49,6 +49,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -153,6 +154,66 @@ public class MergeRollupTaskGeneratorTest {
     assertThrows(IllegalStateException.class, () -> {
       taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
     });
+  }
+
+  @Test
+  public void testFirstLastAggregationTypeValidation() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new MetricFieldSpec("c", FieldSpec.DataType.LONG));
+    schema.addField(new DimensionFieldSpec("d", FieldSpec.DataType.STRING, true));
+    schema.addField(new DateTimeFieldSpec(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS"));
+
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "hourly");
+    taskConfig.put("c.aggregationType", "lastWithTime");
+    TableConfig tableConfigWithTimeColumn = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME)
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, taskConfig))).build();
+    // "lastWithTime"/"firstWithTime" on a metric column with a resolvable time column are valid
+    taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, taskConfig);
+    taskConfig.put("c.aggregationType", "firstWithTime");
+    taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, taskConfig);
+
+    // Invalid aggregation type should fail the validation
+    taskConfig.put("c.aggregationType", "unsupported");
+    assertThrows(IllegalStateException.class,
+        () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, taskConfig));
+
+    // Parseable aggregation type without an available value aggregator should fail the validation
+    taskConfig.put("c.aggregationType", "avg");
+    assertThrows(IllegalStateException.class,
+        () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, taskConfig));
+    taskConfig.put("c.aggregationType", "lastWithTime");
+
+    // "lastWithTime"/"firstWithTime" requires the table to have a time column
+    TableConfig tableConfigWithoutTimeColumn = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, taskConfig))).build();
+    assertThrows(IllegalStateException.class,
+        () -> taskGenerator.validateTaskConfigs(tableConfigWithoutTimeColumn, schema, taskConfig));
+
+    // "lastWithTime"/"firstWithTime" requires the time column to be resolvable as a DateTime column in schema
+    TableConfig tableConfigWithUnresolvableTimeColumn =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("otherTime")
+            .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, taskConfig))).build();
+    assertThrows(IllegalStateException.class,
+        () -> taskGenerator.validateTaskConfigs(tableConfigWithUnresolvableTimeColumn, schema, taskConfig));
+
+    // "lastWithTime"/"firstWithTime" requires the column to be a metric column in schema
+    Map<String, String> dimensionColumnConfig = new HashMap<>();
+    dimensionColumnConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "hourly");
+    dimensionColumnConfig.put("d.aggregationType", "lastWithTime");
+    assertThrows(IllegalStateException.class,
+        () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, dimensionColumnConfig));
+
+    // An aggregationType configured for a column that does not exist in schema should fail the validation, even for
+    // non-order-sensitive types (e.g. a typo in the column name)
+    Map<String, String> missingColumnConfig = new HashMap<>();
+    missingColumnConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "hourly");
+    missingColumnConfig.put("missingCol.aggregationType", "sum");
+    assertThrows(IllegalStateException.class,
+        () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, missingColumnConfig));
   }
 
   @Test

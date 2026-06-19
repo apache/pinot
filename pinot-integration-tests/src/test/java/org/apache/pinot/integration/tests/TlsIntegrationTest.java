@@ -281,7 +281,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected Map<String, String> getControllerRequestClientHeaders() {
+  protected Map<String, String> getAdminClientHeaders() {
     return AUTH_HEADER;
   }
 

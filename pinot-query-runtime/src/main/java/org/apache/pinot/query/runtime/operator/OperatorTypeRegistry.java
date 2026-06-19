@@ -21,17 +21,23 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.plugin.PluginManager;
 
 
 /**
  * Registry of all known MSE {@link OperatorTypeDescriptor}s. Built-in types ({@link MultiStageOperator.Type} enum
  * entries) are always present. Plugin-defined types are discovered at class-loading time via {@link ServiceLoader}:
- * any jar on the classpath that ships a
+ * any jar that ships a
  * {@code META-INF/services/org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor} file will have its
- * descriptors automatically registered without configuration.
+ * descriptors automatically registered without configuration. Discovery covers both the context classpath and the
+ * {@link PluginManager} plugin classloaders, so descriptors packaged in isolated plugin jars are found too — like
+ * {@code PinotRuleSet} does for {@code RuleSetCustomizer}. The registry is first used well after plugins are loaded
+ * (decoding/encoding stream-mode stats), so the plugin classloader snapshot is complete by then.
  *
  * <p>Thread-safe: the registry map is built once in a static initializer and never mutated afterward.
  */
@@ -44,7 +50,22 @@ public final class OperatorTypeRegistry {
     for (MultiStageOperator.Type builtIn : MultiStageOperator.Type.values()) {
       map.put(builtIn.getId(), builtIn);
     }
-    for (OperatorTypeDescriptor plugin : ServiceLoader.load(OperatorTypeDescriptor.class)) {
+    // Dedup by class name: the context classloader and a plugin classloader may both see the same
+    // META-INF/services file if their classpaths overlap (e.g. fat-jar + plugin realm).
+    Set<String> seen = new HashSet<>();
+    registerPlugins(ServiceLoader.load(OperatorTypeDescriptor.class), map, seen);
+    for (ClassLoader pluginClassLoader : PluginManager.get().getPluginClassLoaders()) {
+      registerPlugins(ServiceLoader.load(OperatorTypeDescriptor.class, pluginClassLoader), map, seen);
+    }
+    ID_TO_DESCRIPTOR = Collections.unmodifiableMap(map);
+  }
+
+  private static void registerPlugins(ServiceLoader<OperatorTypeDescriptor> plugins,
+      Map<Integer, OperatorTypeDescriptor> map, Set<String> seen) {
+    for (OperatorTypeDescriptor plugin : plugins) {
+      if (!seen.add(plugin.getClass().getName())) {
+        continue;
+      }
       // Enforce the documented id contract: ids below PLUGIN_ID_FLOOR are reserved for built-ins (current and
       // future). Without this check a plugin could squat on a reserved id and work until a built-in claims it —
       // and ids that fit in the legacy single-byte stat format would be silently emitted there, defeating the
@@ -60,7 +81,6 @@ public final class OperatorTypeRegistry {
             "Duplicate operator type id " + plugin.getId() + ": " + prev.name() + " vs " + plugin.name());
       }
     }
-    ID_TO_DESCRIPTOR = Collections.unmodifiableMap(map);
   }
 
   private OperatorTypeRegistry() {

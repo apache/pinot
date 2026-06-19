@@ -163,7 +163,7 @@
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.22.0</jackson.version>
     <zookeeper.version>3.9.5</zookeeper.version>
-    <async-http-client.version>3.0.10</async-http-client.version>
+    <async-http-client.version>3.0.11</async-http-client.version>
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
@@ -182,7 +182,7 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.39</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
-    <zstd-jni.version>1.5.7-10</zstd-jni.version>
+    <zstd-jni.version>1.5.7-11</zstd-jni.version>
     <lz4-java.version>1.11.0</lz4-java.version>
     <libthrift.version>0.23.0</libthrift.version>
     <log4j.version>2.26.0</log4j.version>
@@ -197,7 +197,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.0</stax2-api.version>
-    <aws.sdk.version>2.46.8</aws.sdk.version>
+    <aws.sdk.version>2.46.13</aws.sdk.version>
     <azure.sdk.version>1.3.7</azure.sdk.version>
     <azure.msal4j.version>1.25.0</azure.msal4j.version>
     <joda-time.version>2.14.2</joda-time.version>
@@ -213,7 +213,7 @@
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.6.14</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.6.0</prometheus.jmx-exporter.version>
-    <prometheus.metrics.version>1.7.0</prometheus.metrics.version>
+    <prometheus.metrics.version>1.8.0</prometheus.metrics.version>
     <fastutil.version>8.5.18</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
     <snakeyaml.version>2.6</snakeyaml.version>
@@ -269,9 +269,9 @@
     <httpcore5.version>5.4.2</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>4.35.0</protobuf.version>
+    <protobuf.version>4.35.1</protobuf.version>
     <grpc.version>1.82.0</grpc.version>
-    <google.cloud.libraries.version>26.83.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.84.0</google.cloud.libraries.version>
     <opentelemetry.gcp.resources.version>1.57.0-alpha</opentelemetry.gcp.resources.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
@@ -297,9 +297,9 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.1</kerby.version>
-    <jline.version>4.1.3</jline.version>
+    <jline.version>4.2.1</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
-    <jettison.version>1.5.5</jettison.version>
+    <jettison.version>1.5.6</jettison.version>
     <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.5</dnsjava.version>
     <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
@@ -308,7 +308,7 @@
     <javassist.version>3.31.0-GA</javassist.version>
     <bouncycastle.version>1.84</bouncycastle.version>
     <aircompressor.version>2.0.3</aircompressor.version>
-    <jna.version>5.19.0</jna.version>
+    <jna.version>5.19.1</jna.version>
     <jnr-ffi.version>2.2.19</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.10.1</asm.version>

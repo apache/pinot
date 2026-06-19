@@ -30,12 +30,20 @@ public class ValueAggregatorFactory {
   private ValueAggregatorFactory() {
   }
 
-  /**
-   * Constructs a ValueAggregator from the given aggregation type.
-   *
-   * When adding entries to this please add them to the Set in org.apache.pinot.segment.local.utils.TableConfigUtils
-   * named AVAILABLE_CORE_VALUE_AGGREGATORS so that they can be used in RealtimeToOfflineTask
-   */
+  /// Returns `true` if the given aggregation type requires the rollup rows to be ordered by the original
+  /// (pre-rounding) time, i.e. it picks a value based on the original time order of the rows instead of combining the
+  /// values, and therefore requires the rollup rows to be sorted on the hidden original time column within each
+  /// rollup group.
+  public static boolean requiresTimeOrdering(AggregationFunctionType aggregationType) {
+    return aggregationType == AggregationFunctionType.FIRSTWITHTIME
+        || aggregationType == AggregationFunctionType.LASTWITHTIME;
+  }
+
+  /// Constructs a ValueAggregator from the given aggregation type.
+  ///
+  /// When adding entries to this please add them to the Set named AVAILABLE_CORE_VALUE_AGGREGATORS in
+  /// org.apache.pinot.core.common.MinionConstants.MergeRollupTask so that they pass the task config validation of the
+  /// merge tasks (MergeRollupTask, RealtimeToOfflineSegmentsTask)
   public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType, DataType dataType) {
     switch (aggregationType) {
       case MIN:
@@ -67,6 +75,10 @@ public class ValueAggregatorFactory {
       case PERCENTILETDIGEST:
       case PERCENTILERAWTDIGEST:
         return new PercentileTDigestAggregator();
+      case FIRSTWITHTIME:
+        return new FirstWithTimeValueAggregator();
+      case LASTWITHTIME:
+        return new LastWithTimeValueAggregator();
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

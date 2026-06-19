@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.client.admin;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -50,5 +53,21 @@ abstract class BaseServiceAdminClient {
       merged.putAll(headers);
     }
     return merged;
+  }
+
+  /// Lenient variant of [PinotAdminTransport#parseStringArrayNode(JsonNode)] for async / best-effort paths:
+  /// returns an empty list instead of throwing when the node is not a string array.
+  ///
+  /// Synchronous callers should use [PinotAdminTransport#parseStringArrayNode(JsonNode)] directly so that an
+  /// unexpected response shape surfaces as a [PinotAdminException] rather than an empty result.
+  ///
+  /// @param node the response node (expected to be a bare JSON array, or a comma-separated string)
+  /// @return the parsed list, or an empty list when `node` is not a string array
+  protected static List<String> toStringListSafe(@Nullable JsonNode node) {
+    try {
+      return PinotAdminTransport.parseStringArrayNode(node);
+    } catch (PinotAdminException e) {
+      return Collections.emptyList();
+    }
   }
 }

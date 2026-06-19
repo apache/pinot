@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
+import org.apache.pinot.core.segment.processing.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
@@ -39,6 +40,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 
@@ -135,6 +137,33 @@ public class MergeTaskUtils {
       }
     }
     return aggregationTypes;
+  }
+
+  /// Validates the prerequisites for an order sensitive aggregation (FIRSTWITHTIME/LASTWITHTIME) on the given
+  /// column: the column must be a metric column in the schema, and the table must have a time column with a DateTime
+  /// spec in the schema so that the reducer can order the values by the original time. No-op for other aggregation
+  /// types. The given aggregation type must be parseable (see
+  /// [AggregationFunctionType#getAggregationFunctionType(String)]).
+  public static void validateOrderSensitiveAggregation(TableConfig tableConfig, Schema schema, String column,
+      String aggregationType) {
+    AggregationFunctionType aggregationFunctionType = AggregationFunctionType.getAggregationFunctionType(
+        aggregationType);
+    if (!ValueAggregatorFactory.requiresTimeOrdering(aggregationFunctionType)) {
+      return;
+    }
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    Preconditions.checkState(fieldSpec != null,
+        "Aggregation type: %s on column: %s requires the column to exist in schema!", aggregationType, column);
+    Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
+        "Aggregation type: %s on column: %s requires the column to be a metric column in schema!", aggregationType,
+        column);
+    // The reducer can only order the values by time when the table has a time column resolvable in the schema
+    String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    Preconditions.checkState(timeColumn != null,
+        "Aggregation type: %s on column: %s requires the table to have a time column!", aggregationType, column);
+    Preconditions.checkState(schema.getSpecForTimeColumn(timeColumn) != null,
+        "Aggregation type: %s on column: %s requires the time column: %s to be a DateTime column in schema!",
+        aggregationType, column, timeColumn);
   }
 
   /**

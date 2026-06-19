@@ -19,11 +19,15 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class CountAggregationFunctionTest extends AbstractAggregationFunctionTest {
@@ -232,6 +236,14 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
             "tag2    | 2",
             "tag3    | 0"
         );
+  }
+
+  @Test
+  public void testExtractFinalResultReturnsZeroForNull() {
+    CountAggregationFunction function =
+        new CountAggregationFunction(List.of(ExpressionContext.forIdentifier("col")), false);
+    assertEquals(function.extractFinalResult(null), Long.valueOf(0L));
+    assertEquals(function.extractFinalResult(5L), Long.valueOf(5L));
   }
 
   @DataProvider(name = "nullHandlingEnabled")

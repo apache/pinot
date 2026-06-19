@@ -282,7 +282,13 @@ public class QueryEnvironment {
       extraFields.put(RuleTimingPlannerListener.RULE_TIMINGS,
           plannerContext.getPlannerOutput().get(RuleTimingPlannerListener.RULE_TIMINGS));
     }
-    return new QueryPlannerResult(dispatchableSubPlan, explainStr, tableNames, extraFields);
+    int liteModeEffectiveSortLimit = -1;
+    PhysicalPlannerContext physicalPlannerContext = plannerContext.getPhysicalPlannerContext();
+    if (physicalPlannerContext != null) {
+      liteModeEffectiveSortLimit = physicalPlannerContext.getLiteModeEffectiveSortLimit();
+    }
+    return new QueryPlannerResult(dispatchableSubPlan, explainStr, tableNames, extraFields,
+        liteModeEffectiveSortLimit);
   }
 
   /// @deprecated Use [#compile] and then [explain][CompiledQuery#explain(long) ] the returned query instead
@@ -359,13 +365,16 @@ public class QueryEnvironment {
     private final String _explainPlan;
     private final Set<String> _tableNames;
     private final Map<String, String> _extraFields;
+    private final int _liteModeEffectiveSortLimit;
 
     QueryPlannerResult(@Nullable DispatchableSubPlan dispatchableSubPlan, @Nullable String explainPlan,
-        Set<String> tableNames, Map<String, String> extraFields) {
+        Set<String> tableNames, Map<String, String> extraFields,
+        int liteModeEffectiveSortLimit) {
       _dispatchableSubPlan = dispatchableSubPlan;
       _explainPlan = explainPlan;
       _tableNames = tableNames;
       _extraFields = extraFields;
+      _liteModeEffectiveSortLimit = liteModeEffectiveSortLimit;
     }
 
     public String getExplainPlan() {
@@ -382,6 +391,14 @@ public class QueryEnvironment {
 
     public Map<String, String> getExtraFields() {
       return _extraFields;
+    }
+
+    public boolean isLiteModeImplicitSortApplied() {
+      return _liteModeEffectiveSortLimit >= 0;
+    }
+
+    public int getLiteModeEffectiveSortLimit() {
+      return _liteModeEffectiveSortLimit;
     }
   }
 

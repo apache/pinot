@@ -19,6 +19,7 @@
 package org.apache.pinot.client.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,8 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
   public List<String> listLiveInstances()
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/liveinstances", null, _headers);
-    return _transport.parseStringArray(response, "liveInstances");
+    /// GET /liveinstances returns an Instances wrapper serialized as {"instances": [...]}.
+    return _transport.parseStringArray(response, "instances");
   }
 
   /**
@@ -245,22 +247,39 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Validates whether it's safe to update the tags of the given instances.
-   *
-   * @param instanceNames Comma-separated list of instance names to validate
-   * @param newTags New tags to assign
-   * @return Validation response as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Validates whether it's safe to update the tags of the given instances.
+  ///
+  /// The controller endpoint reads a `List<InstanceTagUpdateRequest>` from the request body (not query
+  /// params). This method builds one request per instance name, all sharing the given tags. Use
+  /// [#validateInstanceTagUpdates(String)] when you need to supply per-instance tags.
+  ///
+  /// @param instanceNames Comma-separated list of instance names to validate
+  /// @param newTags Comma-separated list of tags to assign to every listed instance
+  /// @return Validation response as JSON string
+  /// @throws PinotAdminException If the request fails
   public String validateUpdateInstanceTags(String instanceNames, String newTags)
       throws PinotAdminException {
-    Map<String, String> queryParams = new HashMap<>();
-    queryParams.put("instanceNames", instanceNames);
-    queryParams.put("newTags", newTags);
+    List<String> tags = new ArrayList<>();
+    for (String tag : newTags.split(",")) {
+      String trimmedTag = tag.trim();
+      if (!trimmedTag.isEmpty()) {
+        tags.add(trimmedTag);
+      }
+    }
+    List<Map<String, Object>> requestBody = new ArrayList<>();
+    for (String instanceName : instanceNames.split(",")) {
+      String trimmedName = instanceName.trim();
+      if (trimmedName.isEmpty()) {
+        continue;
+      }
+      Map<String, Object> request = new HashMap<>();
+      request.put("instanceName", trimmedName);
+      request.put("newTags", tags);
+      requestBody.add(request);
+    }
 
     JsonNode response = _transport.executePost(_controllerAddress, "/instances/updateTags/validate",
-        null, queryParams, _headers);
+        requestBody, null, _headers);
     return response.toString();
   }
 

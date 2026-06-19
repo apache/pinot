@@ -643,6 +643,55 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
             Map.of("RealtimeToOfflineSegmentsTask", validAgg2Config, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
     taskGenerator.validateTaskConfigs(tableConfig, schema, validAgg2Config);
+
+    // valid first/last agg on a metric column with a resolvable time column
+    Schema schemaWithMetric = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addMetric("myMetric", FieldSpec.DataType.LONG)
+        .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    HashMap<String, String> firstLastAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
+    firstLastAggConfig.remove("myCol.aggregationType");
+    firstLastAggConfig.put("myMetric.aggregationType", "lastWithTime");
+    TableConfig tableConfigWithTimeColumn =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+            .setTaskConfig(new TableTaskConfig(
+                Map.of("RealtimeToOfflineSegmentsTask", firstLastAggConfig, "SegmentGenerationAndPushTask",
+                    segmentGenerationAndPushTaskConfig))).build();
+    taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schemaWithMetric, firstLastAggConfig);
+
+    // first/last agg on a non-metric column should fail
+    HashMap<String, String> firstLastOnDimensionConfig = new HashMap<>(realtimeToOfflineTaskConfig);
+    firstLastOnDimensionConfig.put("myCol.aggregationType", "firstWithTime");
+    try {
+      taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schemaWithMetric, firstLastOnDimensionConfig);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("requires the column to be a metric column"));
+    }
+
+    // first/last agg without a time column on the table should fail
+    TableConfig tableConfigWithoutTimeColumn = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME).setTaskConfig(new TableTaskConfig(
+            Map.of("RealtimeToOfflineSegmentsTask", firstLastAggConfig, "SegmentGenerationAndPushTask",
+                segmentGenerationAndPushTaskConfig))).build();
+    try {
+      taskGenerator.validateTaskConfigs(tableConfigWithoutTimeColumn, schemaWithMetric, firstLastAggConfig);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("requires the table to have a time column"));
+    }
+
+    // first/last agg with a time column not resolvable in schema should fail
+    TableConfig tableConfigWithUnresolvableTimeColumn = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME).setTimeColumnName("otherTime").setTaskConfig(new TableTaskConfig(
+            Map.of("RealtimeToOfflineSegmentsTask", firstLastAggConfig, "SegmentGenerationAndPushTask",
+                segmentGenerationAndPushTaskConfig))).build();
+    try {
+      taskGenerator.validateTaskConfigs(tableConfigWithUnresolvableTimeColumn, schemaWithMetric, firstLastAggConfig);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("to be a DateTime column in schema"));
+    }
   }
 
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName, Status status, long startTime, long endTime,

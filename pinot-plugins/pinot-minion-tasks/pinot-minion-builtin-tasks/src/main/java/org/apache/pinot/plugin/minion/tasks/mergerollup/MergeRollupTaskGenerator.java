@@ -53,6 +53,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.mergerollup.segmentgroupmananger.MergeRollupTaskSegmentGroupManagerProvider;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -509,6 +510,25 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     for (String dimension : dimensionsToErase) {
       Preconditions.checkState(columnNames.contains(dimension), "Column dimension to erase \"" + dimension
           + "\" not found in schema!");
+    }
+    // check no mis-configured aggregation types
+    for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
+      if (entry.getKey().endsWith(MergeTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
+        String column = StringUtils.removeEnd(entry.getKey(), MergeTask.AGGREGATION_TYPE_KEY_SUFFIX);
+        Preconditions.checkState(columnNames.contains(column), "Column \"%s\" not found in schema!", column);
+        try {
+          // check that it's a valid aggregation function type, and a value aggregator is available for it
+          AggregationFunctionType aggregationType =
+              AggregationFunctionType.getAggregationFunctionType(entry.getValue());
+          if (!MergeRollupTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aggregationType)) {
+            throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aggregationType);
+          }
+        } catch (IllegalArgumentException e) {
+          throw new IllegalStateException(
+              "Invalid aggregation type: " + entry.getValue() + " for column: " + column, e);
+        }
+        MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, column, entry.getValue());
+      }
     }
     // check no mis-configured aggregation function parameters
     Set<String> allowedFunctionParameterNames = ImmutableSet.of(Constants.CPCSKETCH_LGK_KEY.toLowerCase(),

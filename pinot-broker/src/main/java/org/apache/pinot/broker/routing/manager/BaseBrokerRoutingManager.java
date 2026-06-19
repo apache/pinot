@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -39,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import org.apache.commons.collections4.CollectionUtils;
@@ -149,6 +151,14 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   @Nullable
   private volatile BrokerTableStatsManager _statsManager;
 
+  // Providers of extra per-table segment ZK metadata fetch listeners, registered alongside the built-in segment
+  // pruners on every table's routing entry. Each provider is invoked once per table (with the table name with type)
+  // and may return null to skip that table. Lets deployments attach routing-adjacent metadata caches that observe the
+  // same ZNRecords the routing manager already fetches, without extra ZK reads. CopyOnWriteArrayList because providers
+  // are added once at startup but iterated concurrently across per-table routing builds.
+  private final List<Function<String, SegmentZkMetadataFetchListener>> _extraFetchListenerProviders =
+      new CopyOnWriteArrayList<>();
+
   // Global read-write lock for protecting the global data structures such as _enabledServerInstanceMap,
   // _excludedServers, and _routableServerInstanceMap. Write lock must be held if any of these are modified, read lock
   // must be held otherwise
@@ -222,6 +232,16 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   /// @param statsManager the stats manager to use, or `null` to disable stats
   public void setStatsManager(@Nullable BrokerTableStatsManager statsManager) {
     _statsManager = statsManager;
+  }
+
+  /**
+   * Registers a provider of an extra {@link SegmentZkMetadataFetchListener} that is attached to every table's routing
+   * entry, alongside the built-in segment pruners. The provider is invoked once per table with the table name with
+   * type and may return {@code null} to skip a table. Must be called before routing is built (i.e. before the cluster
+   * change mediator starts) so that all tables pick it up.
+   */
+  public void addSegmentZkMetadataFetchListenerProvider(Function<String, SegmentZkMetadataFetchListener> provider) {
+    _extraFetchListenerProviders.add(provider);
   }
 
   private Object getRoutingTableBuildLock(String tableNameWithType) {
@@ -851,6 +871,12 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       // Register CBO stats listener before the fetcher's init() so the first bulk-load is captured.
       if (_statsManager != null) {
         segmentZkMetadataFetcher.register(_statsManager.createListener(tableNameWithType));
+      }
+      for (Function<String, SegmentZkMetadataFetchListener> provider : _extraFetchListenerProviders) {
+        SegmentZkMetadataFetchListener listener = provider.apply(tableNameWithType);
+        if (listener != null) {
+          segmentZkMetadataFetcher.register(listener);
+        }
       }
       segmentZkMetadataFetcher.init(idealState, externalView, preSelectedOnlineSegments);
 

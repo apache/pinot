@@ -43,7 +43,6 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.Obfuscator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,15 +82,14 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    PinotConfiguration segmentDirectoryConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
-    SegmentDirectoryLoaderContext segmentLoaderContext =
-        new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
-            .setSchema(schema)
-            .setInstanceId(indexLoadingConfig.getInstanceId())
-            .setSegmentName(segmentMetadata.getName())
-            .setSegmentCrc(segmentMetadata.getCrc())
-            .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
-            .build();
+    SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
+        .setReadMode(indexLoadingConfig.getReadMode())
+        .setTableConfig(indexLoadingConfig.getTableConfig())
+        .setSchema(schema)
+        .setInstanceId(indexLoadingConfig.getInstanceId())
+        .setSegmentName(segmentMetadata.getName())
+        .setSegmentCrc(segmentMetadata.getCrc())
+        .build();
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
 

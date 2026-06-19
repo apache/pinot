@@ -759,6 +759,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_serverRoutingStatsManager);
 
     NettyInspector.registerMetrics(_brokerMetrics);
 
