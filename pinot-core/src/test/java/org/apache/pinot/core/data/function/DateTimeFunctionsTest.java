@@ -20,6 +20,8 @@ package org.apache.pinot.core.data.function;
 
 import com.google.common.collect.Lists;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -748,6 +750,30 @@ public class DateTimeFunctionsTest {
     // Test time value with scientific number
     testDateTimeConvert(1.50598536E12/* 20170921T02:16:00 */, "1:MILLISECONDS:EPOCH",
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", "20170921");
+  }
+
+  @Test
+  public void testDateTimeConvertRecordExtractorDateTypes() {
+    // The RecordExtractor contract decodes date-related logical types into TIMESTAMP -> java.sql.Timestamp,
+    // DATE -> java.time.LocalDate, TIME -> java.time.LocalTime. These reach dateTimeConvert as the raw object
+    // and are coerced via PinotDataType the same way FunctionInvoker.convertTypes does: EPOCH / TIMESTAMP input
+    // is read as LONG, SIMPLE_DATE_FORMAT input is read as STRING. (The raw-mode Integer / Long forms are already
+    // covered by the numeric cases above.)
+
+    // TIMESTAMP -> epoch millis (Timestamp#getTime)
+    testDateTimeConvert(new Timestamp(1505898960000L), "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS", 1505898960000L);
+    testDateTimeConvert(new Timestamp(1505898960000L), "TIMESTAMP", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS",
+        "20170920");
+
+    // DATE -> days since epoch (LocalDate#toEpochDay)
+    testDateTimeConvert(LocalDate.of(2017, 9, 20), "1:DAYS:EPOCH", "1:MILLISECONDS:EPOCH", "1:DAYS", 1505865600000L);
+    testDateTimeConvert(LocalDate.of(2017, 9, 20), "1:DAYS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS",
+        "20170920");
+
+    // TIME -> millis since midnight (LocalTime#toNanoOfDay / 1_000_000)
+    testDateTimeConvert(LocalTime.of(2, 16, 0), "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS",
+        8160000L);
   }
 
   @Test
