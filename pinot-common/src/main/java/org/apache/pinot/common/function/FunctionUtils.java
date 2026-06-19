@@ -37,8 +37,8 @@ public class FunctionUtils {
 
   // Types allowed as the function parameter (in the function signature) for type conversion
   private static final Map<Class<?>, PinotDataType> PARAMETER_TYPE_MAP = new HashMap<>() {{
-      put(int.class, PinotDataType.INTEGER);
-      put(Integer.class, PinotDataType.INTEGER);
+      put(int.class, PinotDataType.INT);
+      put(Integer.class, PinotDataType.INT);
       put(long.class, PinotDataType.LONG);
       put(Long.class, PinotDataType.LONG);
       put(float.class, PinotDataType.FLOAT);

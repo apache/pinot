@@ -207,7 +207,7 @@ public class AvgAggregationFunctionTest extends AbstractAggregationFunctionTest 
                 + "group by key "
                 + "order by key")
         .thenResultIs(
-            "INTEGER | DOUBLE",
+            "INT | DOUBLE",
             "5   |  3",
             "6   |  2",
             "7   |  1"
@@ -241,7 +241,7 @@ public class AvgAggregationFunctionTest extends AbstractAggregationFunctionTest 
                 + "group by key1, key2 "
                 + "order by key1, key2")
         .thenResultIs(
-            "INTEGER | INTEGER | LONG",
+            "INT | INT | LONG",
             "5   |  3  |  2",
             "6   |  2  |  2",
             "7   |  1  |  2"

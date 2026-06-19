@@ -37,10 +37,10 @@ public final class OpenStructTypeInference {
   @Nullable
   public static FieldSpec.DataType inferDataType(Object rawValue) {
     switch (PinotDataType.getSingleValueType(rawValue)) {
-      case INTEGER:
       case BYTE:
       case CHARACTER:
       case SHORT:
+      case INT:
         return FieldSpec.DataType.INT;
       case LONG:
         return FieldSpec.DataType.LONG;
