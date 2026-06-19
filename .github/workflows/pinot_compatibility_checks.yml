@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Pinot Binary Compatibility Check
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
@@ -137,7 +137,7 @@ jobs:
               sys.exit(1)
           PY
       - name: Checkout master into a subfolder
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: master-head
@@ -183,7 +183,7 @@ jobs:
         ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
@@ -242,7 +242,7 @@ jobs:
         ]
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
