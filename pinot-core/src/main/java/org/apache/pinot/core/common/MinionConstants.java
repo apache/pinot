@@ -167,6 +167,18 @@ public class MinionConstants {
     public static final String SEGMENT_GROUP_MANAGER_CLASS_NAME_KEY = "segment.group.manager.class.name";
 
     public static final String ERASE_DIMENSION_VALUES_KEY = "eraseDimensionValues";
+
+    /// Aggregation types supported by the rollup reducer (see ValueAggregatorFactory in pinot-core). Used to reject
+    /// parseable but unsupported aggregation types at table config validation time instead of at task runtime. Shared
+    /// with RealtimeToOfflineSegmentsTask, which performs the same rollup aggregation when configured with rollup
+    /// merge type.
+    public static final EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
+        EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
+            DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
+            SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS,
+            DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
+            DISTINCTCOUNTRAWULL, PERCENTILEKLL, PERCENTILERAWKLL, PERCENTILETDIGEST, PERCENTILERAWTDIGEST,
+            FIRSTWITHTIME, LASTWITHTIME);
   }
 
   /**
@@ -183,13 +195,6 @@ public class MinionConstants {
     public static final String ROUND_BUCKET_TIME_PERIOD_KEY = "roundBucketTimePeriod";
     public static final String MERGE_TYPE_KEY = "mergeType";
     public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
-
-    public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
-        EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
-            DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
-            SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS,
-            DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
-            DISTINCTCOUNTRAWULL, PERCENTILEKLL, PERCENTILERAWKLL, PERCENTILETDIGEST, PERCENTILERAWTDIGEST);
   }
 
   // Generate segment and push to controller based on batch ingestion configs

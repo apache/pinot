@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.segment.processing.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
@@ -121,6 +122,22 @@ public class SegmentProcessorConfig {
    */
   public Map<String, Map<String, String>> getAggregationFunctionParameters() {
     return _aggregationFunctionParameters;
+  }
+
+  /// Returns whether the rollup requires the original (pre-rounding) time values to be preserved as an extra sort
+  /// field in the intermediate files. This is the case when any of the configured aggregation types is order
+  /// sensitive (FIRSTWITHTIME/LASTWITHTIME), which picks the value based on the original time order instead of
+  /// combining the values.
+  public boolean requiresOriginalTimeOrdering() {
+    if (_mergeType != MergeType.ROLLUP || _timeHandlerConfig.getType() == TimeHandler.Type.NO_OP) {
+      return false;
+    }
+    for (AggregationFunctionType aggregationType : _aggregationTypes.values()) {
+      if (ValueAggregatorFactory.requiresTimeOrdering(aggregationType)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

@@ -39,6 +39,7 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
+import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
@@ -337,21 +338,22 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     Set<String> columnNames = schema.getColumnNames();
     for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
       if (entry.getKey().endsWith(".aggregationType")) {
-        Preconditions.checkState(columnNames.contains(
-                StringUtils.removeEnd(entry.getKey(), RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)),
-            String.format("Column \"%s\" not found in schema!", entry.getKey()));
+        String column =
+            StringUtils.removeEnd(entry.getKey(), RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX);
+        Preconditions.checkState(columnNames.contains(column),
+            String.format("Column \"%s\" not found in schema!", column));
         try {
           // check that it's a valid aggregation function type
           AggregationFunctionType aft = AggregationFunctionType.getAggregationFunctionType(entry.getValue());
           // check that a value aggregator is available
-          if (!MinionConstants.RealtimeToOfflineSegmentsTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
+          if (!MinionConstants.MergeRollupTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
             throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft.toString());
           }
         } catch (IllegalArgumentException e) {
-          String err =
-              String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
-          throw new IllegalStateException(err);
+          String err = String.format("Column \"%s\" has invalid aggregate type: %s", column, entry.getValue());
+          throw new IllegalStateException(err, e);
         }
+        MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, column, entry.getValue());
       }
     }
   }

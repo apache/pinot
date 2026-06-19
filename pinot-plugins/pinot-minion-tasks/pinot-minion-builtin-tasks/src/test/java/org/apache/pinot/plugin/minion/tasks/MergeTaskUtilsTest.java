@@ -156,12 +156,19 @@ public class MergeTaskUtilsTest {
     taskConfig.put("colA.aggregationType", "sum");
     taskConfig.put("colB.aggregationType", "Min");
     taskConfig.put("colC.aggregationType", "MaX");
+    taskConfig.put("colE.aggregationType", "firstWithTime");
+    taskConfig.put("colF.aggregationType", "LastWithTime");
+    taskConfig.put("colG.aggregationType", "lastWithTime");
 
     Map<String, AggregationFunctionType> aggregationTypes = MergeTaskUtils.getAggregationTypes(taskConfig);
-    assertEquals(aggregationTypes.size(), 3);
+    assertEquals(aggregationTypes.size(), 6);
     assertEquals(aggregationTypes.get("colA"), AggregationFunctionType.SUM);
     assertEquals(aggregationTypes.get("colB"), AggregationFunctionType.MIN);
     assertEquals(aggregationTypes.get("colC"), AggregationFunctionType.MAX);
+    // "firstWithTime"/"lastWithTime" are parsed case-insensitively like any other aggregation type
+    assertEquals(aggregationTypes.get("colE"), AggregationFunctionType.FIRSTWITHTIME);
+    assertEquals(aggregationTypes.get("colF"), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationTypes.get("colG"), AggregationFunctionType.LASTWITHTIME);
 
     taskConfig.put("colD.aggregationType", "unsupported");
     try {
@@ -170,6 +177,45 @@ public class MergeTaskUtilsTest {
     } catch (IllegalArgumentException e) {
       // Expected
     }
+  }
+
+  @Test
+  public void testValidateOrderSensitiveAggregation() {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("dateTime").build();
+    Schema schema = new Schema.SchemaBuilder().addMetric("metricCol", DataType.LONG)
+        .addSingleValueDimension("dimensionCol", DataType.STRING)
+        .addDateTime("dateTime", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+
+    // Valid: order sensitive aggregation on a metric column with a resolvable time column
+    MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, "metricCol", "firstWithTime");
+    MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, "metricCol", "lastWithTime");
+
+    // No-op for non order sensitive aggregation types, even when the prerequisites do not hold
+    TableConfig tableConfigWithoutTimeColumn =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    MergeTaskUtils.validateOrderSensitiveAggregation(tableConfigWithoutTimeColumn, schema, "dimensionCol", "sum");
+
+    // Column not a metric column in schema
+    assertThrows(IllegalStateException.class,
+        () -> MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, "dimensionCol", "firstWithTime"));
+
+    // Column not in schema
+    assertThrows(IllegalStateException.class,
+        () -> MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, "missingCol", "lastWithTime"));
+
+    // Table has no time column
+    assertThrows(IllegalStateException.class, () -> MergeTaskUtils
+        .validateOrderSensitiveAggregation(tableConfigWithoutTimeColumn, schema, "metricCol", "firstWithTime"));
+
+    // Time column not a DateTime column in schema
+    Schema schemaWithoutTimeColumn = new Schema.SchemaBuilder().addMetric("metricCol", DataType.LONG).build();
+    assertThrows(IllegalStateException.class, () -> MergeTaskUtils
+        .validateOrderSensitiveAggregation(tableConfig, schemaWithoutTimeColumn, "metricCol", "lastWithTime"));
+
+    // Aggregation type must be parseable
+    assertThrows(IllegalArgumentException.class,
+        () -> MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, "metricCol", "unsupported"));
   }
 
   @Test

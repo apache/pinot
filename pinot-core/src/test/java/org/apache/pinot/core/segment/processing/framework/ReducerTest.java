@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.processing.framework;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,6 +38,7 @@ import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordR
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
 import org.apache.pinot.core.segment.processing.reducer.Reducer;
 import org.apache.pinot.core.segment.processing.reducer.ReducerFactory;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -51,6 +53,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 /**
@@ -426,6 +429,248 @@ public class ReducerTest {
       assertEquals(fieldToValueMap.get("d2"), dValues[expectedDIndex][1]);
       assertEquals(fieldToValueMap.get("m"), entry.getValue());
     }
+  }
+
+  @Test
+  public void testRollupWithFirstLast()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d", DataType.INT)
+        .addMetric("m1", DataType.LONG).addMetric("m2", DataType.LONG).build();
+    Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, null, true);
+    List<FieldSpec> fieldSpecs = result.getLeft();
+    int numSortFields = result.getRight();
+    // The hidden original time column should be appended as the last sort field
+    assertEquals(numSortFields, 2);
+    assertEquals(fieldSpecs.get(numSortFields - 1).getName(), TimeHandler.ORIGINAL_TIME_MS_COLUMN);
+    GenericRowFileManager fileManager =
+        new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, fieldSpecs, false, numSortFields, true);
+
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    int numDimensionValues = 10;
+    int numRecordsPerDimensionValue = 10;
+    List<Long> times = new ArrayList<>();
+    for (long timeMs = 0; timeMs < numRecordsPerDimensionValue; timeMs++) {
+      times.add(timeMs);
+    }
+    GenericRow row = new GenericRow();
+    for (int d = 0; d < numDimensionValues; d++) {
+      // Write the rows in random time order to verify that the values are picked based on the original time order
+      Collections.shuffle(times, RANDOM);
+      for (long timeMs : times) {
+        row.clear();
+        row.putValue("d", d);
+        row.putValue(TimeHandler.ORIGINAL_TIME_MS_COLUMN, timeMs);
+        // Metric values encode the original time so that the expected first/last values can be derived
+        row.putValue("m1", timeMs * 100 + d);
+        row.putValue("m2", timeMs * 100 + d);
+        fileWriter.write(row);
+      }
+    }
+    fileManager.closeFileWriter();
+
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
+    aggregationTypes.put("m1", AggregationFunctionType.LASTWITHTIME);
+    aggregationTypes.put("m2", AggregationFunctionType.FIRSTWITHTIME);
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setMergeType(MergeType.ROLLUP).setAggregationTypes(aggregationTypes).build();
+    Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
+    GenericRowFileManager reducedFileManager = reducer.reduce();
+    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    assertEquals(fileReader.getNumRows(), numDimensionValues);
+    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    for (int d = 0; d < numDimensionValues; d++) {
+      row.clear();
+      recordReader.read(d, row);
+      Map<String, Object> fieldToValueMap = row.getFieldToValueMap();
+      // The hidden original time column should be stripped from the output
+      assertEquals(fieldToValueMap.size(), 3);
+      assertEquals(fieldToValueMap.get("d"), d);
+      assertEquals(fieldToValueMap.get("m1"), (numRecordsPerDimensionValue - 1) * 100L + d);
+      assertEquals(fieldToValueMap.get("m2"), (long) d);
+    }
+    reducedFileManager.cleanUp();
+  }
+
+  @Test
+  public void testRollupWithFirstLastAndNull()
+      throws Exception {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setNullHandlingEnabled(true).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d", DataType.INT)
+        .addMetric("m1", DataType.LONG, -1L).addMetric("m2", DataType.LONG, -1L).build();
+    Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, null, true);
+    GenericRowFileManager fileManager =
+        new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), true, result.getRight(), true);
+
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    GenericRow row = new GenericRow();
+    // Null values should be skipped:
+    // m1 (last): null at time > 2, so the last non-null value (at time 2) should be picked
+    // m2 (first): null at time < 2, so the first non-null value (at time 2) should be picked
+    long[] times = new long[]{4, 1, 3, 0, 2};
+    for (long timeMs : times) {
+      row.clear();
+      row.putValue("d", 0);
+      row.putValue(TimeHandler.ORIGINAL_TIME_MS_COLUMN, timeMs);
+      if (timeMs > 2) {
+        row.putDefaultNullValue("m1", -1L);
+      } else {
+        row.putValue("m1", timeMs * 100);
+      }
+      if (timeMs < 2) {
+        row.putDefaultNullValue("m2", -1L);
+      } else {
+        row.putValue("m2", timeMs * 100);
+      }
+      fileWriter.write(row);
+    }
+    fileManager.closeFileWriter();
+
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
+    aggregationTypes.put("m1", AggregationFunctionType.LASTWITHTIME);
+    aggregationTypes.put("m2", AggregationFunctionType.FIRSTWITHTIME);
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setMergeType(MergeType.ROLLUP).setAggregationTypes(aggregationTypes).build();
+    Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
+    GenericRowFileManager reducedFileManager = reducer.reduce();
+    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    assertEquals(fileReader.getNumRows(), 1);
+    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    row.clear();
+    recordReader.read(0, row);
+    Map<String, Object> fieldToValueMap = row.getFieldToValueMap();
+    assertEquals(fieldToValueMap.size(), 3);
+    assertEquals(fieldToValueMap.get("d"), 0);
+    assertEquals(fieldToValueMap.get("m1"), 200L);
+    assertEquals(fieldToValueMap.get("m2"), 200L);
+    reducedFileManager.cleanUp();
+  }
+
+  @Test
+  public void testRollupFirstLastWithoutOriginalTimeField()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d", DataType.INT)
+        .addMetric("m", DataType.LONG).build();
+    Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, null);
+    GenericRowFileManager fileManager =
+        new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
+
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    GenericRow row = new GenericRow();
+    row.putValue("d", 0);
+    row.putValue("m", 1L);
+    fileWriter.write(row);
+    fileManager.closeFileWriter();
+
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
+    aggregationTypes.put("m", AggregationFunctionType.LASTWITHTIME);
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setMergeType(MergeType.ROLLUP).setAggregationTypes(aggregationTypes).build();
+    Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
+    // Without the hidden original time column, order sensitive aggregation should fail
+    assertThrows(IllegalStateException.class, reducer::reduce);
+    fileManager.cleanUp();
+  }
+
+  @Test
+  public void testRollupWithColumnNamedLikeOriginalTimeField()
+      throws Exception {
+    // A schema column which happens to share the hidden column name must be treated as a regular group field when
+    // order sensitive aggregation is not configured: not stripped from the output, and part of the group key
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension(TimeHandler.ORIGINAL_TIME_MS_COLUMN, DataType.LONG)
+        .addMetric("m", DataType.INT).build();
+    Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, null);
+    // The real column is the only (and last) sort field, mimicking the hidden column layout
+    assertEquals((int) result.getRight(), 1);
+    assertEquals(result.getLeft().get(0).getName(), TimeHandler.ORIGINAL_TIME_MS_COLUMN);
+    GenericRowFileManager fileManager =
+        new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
+
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    GenericRow row = new GenericRow();
+    long[] dValues = new long[]{1, 0, 2, 0, 1};
+    for (int i = 0; i < dValues.length; i++) {
+      row.clear();
+      row.putValue(TimeHandler.ORIGINAL_TIME_MS_COLUMN, dValues[i]);
+      row.putValue("m", i + 1);
+      fileWriter.write(row);
+    }
+    fileManager.closeFileWriter();
+
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setMergeType(MergeType.ROLLUP).build();
+    Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
+    GenericRowFileManager reducedFileManager = reducer.reduce();
+    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    assertEquals(fileReader.getNumRows(), 3);
+    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    long[] expectedDValues = new long[]{0, 1, 2};
+    int[] expectedMValues = new int[]{2 + 4, 1 + 5, 3};
+    for (int i = 0; i < 3; i++) {
+      row.clear();
+      recordReader.read(i, row);
+      Map<String, Object> fieldToValueMap = row.getFieldToValueMap();
+      assertEquals(fieldToValueMap.size(), 2);
+      assertEquals(fieldToValueMap.get(TimeHandler.ORIGINAL_TIME_MS_COLUMN), expectedDValues[i]);
+      assertEquals(fieldToValueMap.get("m"), expectedMValues[i]);
+    }
+    reducedFileManager.cleanUp();
+  }
+
+  @Test
+  public void testConcatIgnoresAggregationTypes()
+      throws Exception {
+    // For CONCAT merge type, aggregation type configs (including order sensitive ones) are ignored: rows pass
+    // through unchanged and no hidden time column is involved
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d", DataType.INT)
+        .addMetric("m", DataType.LONG).build();
+    Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.CONCAT, null);
+    GenericRowFileManager fileManager =
+        new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
+
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    GenericRow row = new GenericRow();
+    int numRecords = 5;
+    for (int i = 0; i < numRecords; i++) {
+      row.clear();
+      row.putValue("d", 0);
+      row.putValue("m", (long) i);
+      fileWriter.write(row);
+    }
+    fileManager.closeFileWriter();
+
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
+    aggregationTypes.put("m", AggregationFunctionType.LASTWITHTIME);
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setMergeType(MergeType.CONCAT).setAggregationTypes(aggregationTypes).build();
+    Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
+    GenericRowFileManager reducedFileManager = reducer.reduce();
+    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    assertEquals(fileReader.getNumRows(), numRecords);
+    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    for (int i = 0; i < numRecords; i++) {
+      row.clear();
+      recordReader.read(i, row);
+      Map<String, Object> fieldToValueMap = row.getFieldToValueMap();
+      assertEquals(fieldToValueMap.size(), 2);
+      assertEquals(fieldToValueMap.get("m"), (long) i);
+    }
+    reducedFileManager.cleanUp();
+  }
+
+  @Test
+  public void testHasOriginalTimeFieldRequiresHiddenColumn() {
+    // The explicit flag must match the field layout: the last sort field has to be the hidden original time column
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d", DataType.INT)
+        .addMetric("m", DataType.INT).build();
+    Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, null);
+    assertThrows(IllegalArgumentException.class,
+        () -> new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight(), true));
   }
 
   @Test
