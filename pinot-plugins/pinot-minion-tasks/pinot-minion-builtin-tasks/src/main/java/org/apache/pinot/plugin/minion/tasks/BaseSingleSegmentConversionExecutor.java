@@ -195,7 +195,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       BatchConfigProperties.SegmentPushType pushType = getSegmentPushType(configs);
       _eventObserver.notifyProgress(_pinotTaskConfig, "Uploading segment: " + segmentName + " (push mode: " + pushType
           + ")");
-      boolean uploadSuccessful = true;
       try {
         switch (pushType) {
           case TAR:
@@ -210,19 +209,17 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
             throw new UnsupportedOperationException("Unrecognized push mode: " + pushType);
         }
       } catch (Exception e) {
-        uploadSuccessful = false;
         _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
         LOGGER.error("Segment upload failed for segment {}, table {}", segmentName, tableNameWithType, e);
         _eventObserver.notifyTaskError(_pinotTaskConfig, e);
-      }
-      if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
-        LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
-      }
-
-      if (uploadSuccessful) {
-        LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
+        throw e;
+      } finally {
+        if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
+          LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
+        }
       }
 
+      LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
       return segmentConversionResult;
     } finally {
       FileUtils.deleteQuietly(tempDataDir);
