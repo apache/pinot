@@ -355,6 +355,11 @@ public class AggregationFunctionUtils {
   public static AggregationInfo buildAggregationInfoWithStarTree(SegmentContext segmentContext,
       QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
       BaseFilterOperator filterOperator, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
+    /// Star-tree stores pre-aggregated values per group key and cannot expand a row across multiple grouping
+    /// sets, so it cannot serve GROUP BY GROUPING SETS / ROLLUP / CUBE queries. Fall back to the regular path.
+    if (queryContext.isGroupingSets()) {
+      return null;
+    }
     if (!filterOperator.isResultEmpty()) {
       BaseProjectOperator<?> projectOperator =
           StarTreeUtils.createStarTreeBasedProjectOperator(segmentContext.getIndexSegment(), queryContext,

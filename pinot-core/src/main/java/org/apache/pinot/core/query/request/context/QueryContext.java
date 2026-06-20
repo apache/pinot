@@ -151,6 +151,10 @@ public class QueryContext {
   private boolean _serverReturnFinalResultKeyUnpartitioned;
   private boolean _accurateGroupByWithoutOrderBy;
   private boolean _isUnsafeTrim;
+  /// Grouping sets for GROUP BY GROUPING SETS / ROLLUP / CUBE, as sorted column indexes into
+  /// _groupByExpressions (the union of all grouping columns). Null for a plain GROUP BY (or non-group-by)
+  /// query. Each entry is one grouping set; an empty array denotes the grand-total set ().
+  private List<int[]> _groupingSets;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -244,6 +248,44 @@ public class QueryContext {
   @Nullable
   public List<ExpressionContext> getGroupByExpressions() {
     return _groupByExpressions;
+  }
+
+  /// Returns the grouping sets for a GROUP BY GROUPING SETS / ROLLUP / CUBE query, or {@code null} for a
+  /// plain GROUP BY (or non-group-by) query. Each entry is the sorted list of column indexes into
+  /// {@link #getGroupByExpressions()} (the union of all grouping columns) that participate in that set; an
+  /// empty array denotes the grand-total set ().
+  @Nullable
+  public List<int[]> getGroupingSets() {
+    return _groupingSets;
+  }
+
+  public void setGroupingSets(@Nullable List<int[]> groupingSets) {
+    _groupingSets = groupingSets;
+  }
+
+  /// Returns whether this is a GROUP BY GROUPING SETS / ROLLUP / CUBE query.
+  public boolean isGroupingSets() {
+    return _groupingSets != null;
+  }
+
+  /// Returns the number of synthetic key columns appended after the group-by (union) columns: 1 for a
+  /// grouping-set query (the {@code $groupingId} discriminator column), 0 otherwise.
+  public int getNumExtraGroupByKeyColumns() {
+    return isGroupingSets() ? 1 : 0;
+  }
+
+  /// Returns the total number of group-by key columns in the server result / reducer row layout: the union
+  /// group-by columns plus any synthetic key columns ({@link #getNumExtraGroupByKeyColumns()}).
+  public int getNumGroupByKeyColumns() {
+    int numGroupByExpressions = _groupByExpressions != null ? _groupByExpressions.size() : 0;
+    return numGroupByExpressions + getNumExtraGroupByKeyColumns();
+  }
+
+  /// Returns whether group-by key columns must be serialized/deserialized through the null-aware path (null
+  /// bitmaps). True when the user enabled null handling, or for grouping-set queries, which produce NULL keys
+  /// for rolled-up columns regardless of the user's null-handling option.
+  public boolean requiresNullAwareKeySerialization() {
+    return isNullHandlingEnabled() || isGroupingSets();
   }
 
   /**
@@ -565,7 +607,31 @@ public class QueryContext {
     return _effectiveSegmentGroupTrimSize;
   }
 
+  /// Returns the PER-grouping-set segment group-trim size for a grouping-set query, or -1 to disable
+  /// per-segment trim (no ORDER BY, or trimming disabled). Unlike the global {@link
+  /// #getEffectiveSegmentGroupTrimSize()} (which is -1 for grouping sets), the per-segment trim for grouping
+  /// sets keeps up to this many groups WITHIN each grouping set (bucketed by the discriminator), so a global
+  /// top-K cannot starve low-magnitude sets such as the grand total. The broker still applies the final
+  /// ORDER BY + LIMIT across all sets.
+  public int getGroupingSetSegmentTrimSize() {
+    if (!isGroupingSets()) {
+      return -1;
+    }
+    int minGroupTrimSize = getMinSegmentGroupTrimSize();
+    if (getOrderByExpressions() != null && minGroupTrimSize > 0) {
+      return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
+    }
+    return -1;
+  }
+
   private int calculateEffectiveSegmentGroupTrimSize() {
+    /// Grouping sets expand each input row into one group per set; a global per-segment top-K could drop
+    /// groups belonging to low-magnitude sets (e.g. the grand-total set) before they are merged. Grouping-set
+    /// queries therefore use the per-set bucketed trim (getGroupingSetSegmentTrimSize()) instead of this
+    /// global trim, which is disabled for them here.
+    if (isGroupingSets()) {
+      return -1;
+    }
     int minGroupTrimSize = getMinSegmentGroupTrimSize();
     List<OrderByExpressionContext> orderByExpressions = getOrderByExpressions();
     if (!isUnsafeTrim()) {
@@ -630,6 +696,7 @@ public class QueryContext {
     private List<String> _aliasList;
     private FilterContext _filter;
     private List<ExpressionContext> _groupByExpressions;
+    private List<int[]> _groupingSets;
     private FilterContext _havingFilter;
     private List<OrderByExpressionContext> _orderByExpressions;
     private int _limit;
@@ -675,6 +742,14 @@ public class QueryContext {
 
     public Builder setGroupByExpressions(List<ExpressionContext> groupByExpressions) {
       _groupByExpressions = groupByExpressions;
+      return this;
+    }
+
+    /// Sets the grouping sets for a GROUP BY GROUPING SETS / ROLLUP / CUBE query. Each entry is the sorted
+    /// list of column indexes into {@code groupByExpressions} (the union of all grouping columns); an empty
+    /// array denotes the grand-total set (). Leave unset (null) for a plain GROUP BY query.
+    public Builder setGroupingSets(@Nullable List<int[]> groupingSets) {
+      _groupingSets = groupingSets;
       return this;
     }
 
@@ -736,6 +811,14 @@ public class QueryContext {
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
       queryContext.setServerReturnFinalResultKeyUnpartitioned(
           QueryOptionsUtils.isServerReturnFinalResultKeyUnpartitioned(_queryOptions));
+      queryContext.setGroupingSets(_groupingSets);
+      if (queryContext.isGroupingSets()) {
+        /// Phase 1: grouping-set queries always use the intermediate-result merge path. The final-result
+        /// reduce path (server.returnFinalResult) does not restore the NULL group keys that grouping sets
+        /// produce, so disable that optimization here.
+        queryContext.setServerReturnFinalResult(false);
+        queryContext.setServerReturnFinalResultKeyUnpartitioned(false);
+      }
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);
@@ -743,8 +826,10 @@ public class QueryContext {
 
       // Pre-calculate group-by configs
       if (queryContext.getGroupByExpressions() != null) {
-        queryContext._isUnsafeTrim =
-            !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
+        /// Grouping-set queries expand each row into multiple groups; force the unsafe-trim path so the
+        /// sort-aggregate fast path (which assumes a single flat grouping) is not taken.
+        queryContext._isUnsafeTrim = queryContext.isGroupingSets()
+            || !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
         Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
         if (sortAggregateLimitThreshold != null) {
           queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);

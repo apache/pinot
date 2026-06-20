@@ -375,4 +375,58 @@ public class TableResizerTest {
       assertEquals(results.get(2)._record, _records.get(3));
     }
   }
+
+  @Test
+  public void testTrimInSegmentResultsByGroupingSet() {
+    /// ROLLUP(d1) yields grouping sets {d1} (grouping-id 0) and {} (grouping-id 1). The record layout is
+    /// [d1, $groupingId, sum(m1)], so the discriminator column index is 1 (after the single union column).
+    TableResizer tableResizer = new TableResizer(
+        new DataSchema(new String[]{"d1", "$groupingId", "sum(m1)"}, new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE}),
+        QueryContextConverterUtils.getQueryContext(
+            "SELECT d1, SUM(m1) FROM testTable GROUP BY ROLLUP(d1) ORDER BY SUM(m1) DESC"));
+
+    /// Bucket {d1}: five detail groups with sums 10..50. Bucket {}: one grand-total group with sum 150.
+    String[] details = {"a", "b", "c", "d", "e"};
+    double[] sums = {10.0, 20.0, 30.0, 40.0, 50.0};
+    List<GroupKeyGenerator.GroupKey> groupKeys = new ArrayList<>();
+    DoubleGroupByResultHolder holder = new DoubleGroupByResultHolder(6, 6, 0.0);
+    for (int i = 0; i < details.length; i++) {
+      GroupKeyGenerator.GroupKey groupKey = new GroupKeyGenerator.GroupKey();
+      groupKey._groupId = i;
+      groupKey._keys = new Object[]{details[i], 0};   // grouping-id 0 => set {d1}
+      groupKeys.add(groupKey);
+      holder.setValueForKey(i, sums[i]);
+    }
+    GroupKeyGenerator.GroupKey grandTotal = new GroupKeyGenerator.GroupKey();
+    grandTotal._groupId = 5;
+    grandTotal._keys = new Object[]{null, 1};         // grouping-id 1 => set {} (d1 rolled up to NULL)
+    groupKeys.add(grandTotal);
+    holder.setValueForKey(5, 150.0);
+
+    GroupKeyGenerator groupKeyGenerator = mock(GroupKeyGenerator.class);
+    when(groupKeyGenerator.getGroupKeys()).then(invocation -> groupKeys.iterator());
+
+    /// Keep top-2 PER grouping set. A global top-2 by sum would keep only {grand total (150), e (50)} -- a
+    /// single detail row. The per-set trim must instead keep the grand total AND the top-2 details, so the
+    /// low-cardinality detail set is not starved by the dominant grand-total row.
+    List<IntermediateRecord> result =
+        tableResizer.trimInSegmentResultsByGroupingSet(groupKeyGenerator, new GroupByResultHolder[]{holder}, 2, 1);
+
+    int numDetailRows = 0;
+    int numGrandTotalRows = 0;
+    for (IntermediateRecord record : result) {
+      int groupingId = (int) record._record.getValues()[1];
+      if (groupingId == 0) {
+        numDetailRows++;
+        /// The kept details must be the two highest sums (e=50, d=40).
+        assertTrue((double) record._record.getValues()[2] >= 40.0);
+      } else {
+        numGrandTotalRows++;
+      }
+    }
+    assertEquals(result.size(), 3);
+    assertEquals(numDetailRows, 2);
+    assertEquals(numGrandTotalRows, 1);
+  }
 }
