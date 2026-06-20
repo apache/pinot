@@ -46,7 +46,12 @@ import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlOrderBy;
+import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
@@ -656,8 +661,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       boolean rlsFiltersApplied, boolean queryWasLogged, String workloadName)
       throws QueryException, WebApplicationException {
     // Strip any user-supplied internal-only options to prevent spoofing. These will be set programmatically later.
-    // NOTE: 'leafLimitProvenance' is internal and must not be accepted from client input.
-    query.getOptions().remove("leafLimitProvenance");
+    query.getOptions().remove("leafLimitTruncationRisk");
+    query.getOptions().remove("truncationSensitive");
+
+    // Mark whether the query contains operations sensitive to truncation (ORDER BY, DISTINCT).
+    // This flag travels to servers so that leaf-cap provenance tagging is gated on sensitivity.
+    if (hasTruncationSensitiveOp(query.getSqlNodeAndOptions().getSqlNode())) {
+      query.getOptions().put("truncationSensitive", "true");
+    }
 
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
@@ -1071,5 +1082,31 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   public QueryDispatcher getQueryDispatcher() {
     return _queryDispatcher;
+  }
+
+  /**
+   * Recursively walks the SqlNode tree to determine if the query contains operations that are sensitive to row-level
+   * truncation: ORDER BY (results must be globally sorted) or DISTINCT (result set must be complete). Covers
+   * subqueries and CTEs.
+   */
+  private static boolean hasTruncationSensitiveOp(@Nullable SqlNode node) {
+    if (node == null) {
+      return false;
+    }
+    if (node instanceof SqlOrderBy) {
+      return true;
+    }
+    if (node instanceof SqlSelect
+        && ((SqlSelect) node).getModifierNode(SqlSelectKeyword.DISTINCT) != null) {
+      return true;
+    }
+    if (node instanceof SqlCall) {
+      for (SqlNode operand : ((SqlCall) node).getOperandList()) {
+        if (hasTruncationSensitiveOp(operand)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

@@ -56,7 +56,7 @@ public class InstanceResponseOperatorLiteCapTest {
   private static QueryContext orderByContextWithLiteCap(int limit) {
     QueryContext ctx = QueryContextConverterUtils.getQueryContext(
         "SET \"numReplicaGroupsToQuery\"=1; SELECT col FROM myTable ORDER BY col LIMIT " + limit);
-    ctx.getQueryOptions().put("leafLimitProvenance", "LITE_CAP");
+    ctx.getQueryOptions().put("leafLimitTruncationRisk", "LITE_CAP");
     return ctx;
   }
 
@@ -68,7 +68,7 @@ public class InstanceResponseOperatorLiteCapTest {
   private static QueryContext selectionOnlyContextWithLiteCap(int limit) {
     QueryContext ctx = QueryContextConverterUtils.getQueryContext(
         "SET \"numReplicaGroupsToQuery\"=1; SELECT col FROM myTable LIMIT " + limit);
-    ctx.getQueryOptions().put("leafLimitProvenance", "LITE_CAP");
+    ctx.getQueryOptions().put("leafLimitTruncationRisk", "LITE_CAP");
     return ctx;
   }
 

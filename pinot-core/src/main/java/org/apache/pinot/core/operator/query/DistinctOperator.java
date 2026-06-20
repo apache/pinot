@@ -76,10 +76,10 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
     }
     DistinctResultsBlock results = new DistinctResultsBlock(executor.getResult(), _queryContext);
     results.setNumDocsScanned(_numDocsScanned);
-    String prov = _queryContext.getQueryOptions().get("leafLimitProvenance");
-    if ("LITE_CAP".equals(prov) && brokeEarly) {
+    String risk = _queryContext.getQueryOptions().get("leafLimitTruncationRisk");
+    if ("LITE_CAP".equals(risk) && brokeEarly) {
       results.setLiteLeafLimitReached(true);
-      results.setLeafTruncationReason(prov);
+      results.setLeafTruncationReason(risk);
     }
     return results;
   }

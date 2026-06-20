@@ -151,19 +151,18 @@ public class ServerPlanRequestUtils {
     int prevLimit = pinotQuery.getLimit();
     pinotQuery.setLimit(leafNodeLimit != null ? leafNodeLimit : DEFAULT_LEAF_NODE_LIMIT);
     // Tag provenance if a leaf cap (explicit or lite-mode fallback) tightened the previous limit.
-    tagLeafLimitProvenanceIfTightened(pinotQuery, requestMetadata, prevLimit);
+    tagLeafLimitTruncationRiskIfTightened(pinotQuery, requestMetadata, prevLimit);
     // visit the plan and create PinotQuery and determine the leaf stage boundary PlanNode.
     ServerPlanRequestVisitor.walkPlanNode(stagePlan.getRootNode(), serverContext);
   }
 
   /**
-   * Tags queryOptions["leafLimitProvenance"]="LITE_CAP" if either:
-   *   - an explicit multiStageLeafLimit (in request metadata or query options) would tighten the previous LIMIT; or
-   *   - useLiteMode=true and a lite-mode leaf cap (fanout-adjusted or leaf-stage limit) would tighten the previous LIMIT.
-   * This does not change the effective LIMIT; it only annotates provenance for downstream operators to emit warnings.
+   * Tags queryOptions["leafLimitTruncationRisk"]="LITE_CAP" when the effective leaf cap is stricter than the original
+   * LIMIT AND the query contains truncation-sensitive operations (ORDER BY, DISTINCT). The dual condition ensures the
+   * tag is only present when truncation genuinely risks inaccurate results.
    */
-  private static void tagLeafLimitProvenanceIfTightened(PinotQuery pinotQuery, @Nullable Map<String, String> requestMetadata,
-      int previousLimit) {
+  private static void tagLeafLimitTruncationRiskIfTightened(PinotQuery pinotQuery,
+      @Nullable Map<String, String> requestMetadata, int previousLimit) {
     Map<String, String> qOpts = pinotQuery.getQueryOptions();
     if (qOpts == null) {
       qOpts = new HashMap<>();
@@ -185,10 +184,12 @@ public class ServerPlanRequestUtils {
         tightened = true;
       }
     }
-    if (tightened) {
-      qOpts.put("leafLimitProvenance", "LITE_CAP");
+    boolean truncationSensitive = "true".equals(qOpts.get("truncationSensitive"))
+        || (requestMetadata != null && "true".equals(requestMetadata.get("truncationSensitive")));
+    if (tightened && truncationSensitive) {
+      qOpts.put("leafLimitTruncationRisk", "LITE_CAP");
     } else {
-      qOpts.remove("leafLimitProvenance");
+      qOpts.remove("leafLimitTruncationRisk");
     }
   }
 
