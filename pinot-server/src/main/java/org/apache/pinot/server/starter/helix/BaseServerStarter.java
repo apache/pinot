@@ -795,6 +795,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
         new ServerRateLimitConfigChangeListener(_serverMetrics);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
+    if (instanceDataManager instanceof HelixInstanceDataManager) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          ((HelixInstanceDataManager) instanceDataManager).getServerIngestionOomProtectionThrottleState());
+    }
 
     // Register query killing manager for dynamic config updates (threshold/mode changes via ZK)
     if (_queryKillingManager != null) {

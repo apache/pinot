@@ -94,6 +94,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT("upsertQueryableDocIdsInSnapshot", false),
   REALTIME_INGESTION_OFFSET_LAG("offsetLag", false,
       "The difference between latest message offset and the last consumed message offset."),
+  REALTIME_INGESTION_OOM_PROTECTION_ACTIVE("boolean", true,
+      "Binary indicator (1 or 0) for whether the server-wide realtime ingestion OOM throttle is active."),
   REALTIME_INGESTION_UPSTREAM_OFFSET("upstreamOffset", false, "The offset of the latest message in the upstream."),
   REALTIME_INGESTION_CONSUMING_OFFSET("consumingOffset", false, "The offset of the last consumed message."),
   REALTIME_INGESTION_DELAY_MS("milliseconds", false,

@@ -50,6 +50,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
@@ -139,12 +140,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private final BooleanSupplier _isServerReadyToConsumeData;
   private final BooleanSupplier _isServerReadyToServeQueries;
+  private final ServerIngestionOomProtectionManager.ServerThrottleState _serverIngestionOomProtectionThrottleState;
 
   // Object to track ingestion delay for all partitions
   private IngestionDelayTracker _ingestionDelayTracker;
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private BooleanSupplier _isTableReadyToConsumeData;
+  private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private boolean _enforceConsumptionInOrder = false;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
@@ -152,7 +155,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToServeQueries) {
-    this(segmentBuildSemaphore, () -> true, isServerReadyToServeQueries);
+    this(segmentBuildSemaphore, () -> true, isServerReadyToServeQueries,
+        // Test/legacy: per-instance non-shared unregistered throttle; ignores cluster config; prod uses startup state.
+        ServerIngestionOomProtectionManager.createServerThrottleState(null, ServerMetrics.get()));
   }
 
   /**
@@ -161,10 +166,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    *     entry of its consumer thread; once the gate clears, it is not consulted again for that segment.
    */
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToConsumeData,
-      BooleanSupplier isServerReadyToServeQueries) {
+      BooleanSupplier isServerReadyToServeQueries,
+      ServerIngestionOomProtectionManager.ServerThrottleState serverIngestionOomProtectionThrottleState) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
     _isServerReadyToConsumeData = isServerReadyToConsumeData;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
+    _serverIngestionOomProtectionThrottleState = serverIngestionOomProtectionThrottleState;
   }
 
   @Override
@@ -264,6 +271,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
     _isTableReadyToConsumeData = () -> readyForDedupOrPartialUpsert.getAsBoolean()
         && _isServerReadyToConsumeData.getAsBoolean();
+    _serverIngestionOomProtectionManager = new ServerIngestionOomProtectionManager(
+        () -> getCachedTableConfigAndSchema().getLeft(), () -> isUpsertEnabled() || isDedupEnabled(),
+        _serverIngestionOomProtectionThrottleState);
   }
 
   @VisibleForTesting
@@ -857,6 +867,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public BooleanSupplier getIsServerReadyToServeQueries() {
     return _isServerReadyToServeQueries;
+  }
+
+  ServerIngestionOomProtectionManager getServerIngestionOomProtectionManager() {
+    return _serverIngestionOomProtectionManager;
   }
 
   /**

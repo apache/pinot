@@ -964,6 +964,31 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void ingestionServerIngestionOomProtectionTest() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+    StreamIngestionConfig streamIngestionConfig =
+        new StreamIngestionConfig(Collections.singletonList(getStreamConfigs()));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    streamIngestionConfig.setOomProtection(Enablement.ENABLE);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    streamIngestionConfig.setOomProtection(Enablement.DISABLE);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    streamIngestionConfig.setOomProtection(Enablement.DEFAULT);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    streamIngestionConfig.setOomProtection(null);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+  }
+
+  @Test
   public void ingestionBatchConfigsTest() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
 
