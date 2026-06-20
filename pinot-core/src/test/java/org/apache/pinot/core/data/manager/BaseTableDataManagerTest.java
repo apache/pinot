@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -608,7 +610,12 @@ public class BaseTableDataManagerTest {
     } catch (Exception e) {
       // As expected, when local segment dir is missing, it tries to download
       // raw segment from deep store, but it would fail with bad download uri.
-      assertEquals(e.getMessage(), "Operation failed after 3 attempts");
+      // FileNotFoundException fails without redundant retries (see segment fetcher handling), so we no longer expect
+      // AttemptsExceededException("Operation failed after 3 attempts").
+      boolean hasFileNotFound =
+          ExceptionUtils.isCauseInstanceOf(e, FileNotFoundException.class)
+              || e.toString().contains(FileNotFoundException.class.getName());
+      assertTrue(hasFileNotFound, "Expected FileNotFoundException (or wrapper) when source is missing: " + e);
     }
   }
 

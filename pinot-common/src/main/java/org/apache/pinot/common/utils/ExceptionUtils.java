@@ -59,6 +59,18 @@ public class ExceptionUtils {
     return sb.toString();
   }
 
+  public static boolean isCauseInstanceOf(Throwable e, Class<? extends Throwable> type) {
+    while (e != null) {
+      if (type.isInstance(e)) {
+        return true;
+      }
+      if (e.getCause() == e) {
+        break;
+      }
+      e = e.getCause();
+    }
+    return false;
+  }
 
   public static String getStackTrace(Throwable e) {
     return getStackTrace(e, Integer.MAX_VALUE);

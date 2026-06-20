@@ -19,11 +19,13 @@
 package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -77,6 +79,10 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
         _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
         return true;
       } catch (Exception e) {
+        if (ExceptionUtils.isCauseInstanceOf(e, FileNotFoundException.class)) {
+          _logger.error("File not found while fetching segment from: {} to: {}", uri, dest, e);
+          throw e;
+        }
         _logger.warn("Caught exception while fetching segment from: {} to: {}", uri, dest, e);
         return false;
       }
@@ -97,6 +103,10 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
         _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
         return true;
       } catch (Exception e) {
+        if (ExceptionUtils.isCauseInstanceOf(e, FileNotFoundException.class)) {
+          _logger.error("File not found while fetching segment from: {} to: {}", uri, dest, e);
+          throw e;
+        }
         _logger.warn("Caught exception while fetching segment from: {} to: {}", uri, dest, e);
         return false;
       }
@@ -130,6 +140,10 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
                 fetchSegmentToLocalWithoutRetry(uri, dest);
                 return true;
               } catch (Exception e) {
+                if (ExceptionUtils.isCauseInstanceOf(e, FileNotFoundException.class)) {
+                  _logger.error("File not found while downloading segment {} from peer {}", segmentName, uri, e);
+                  throw e;
+                }
                 _logger.warn("Download segment {} from peer {} failed.", segmentName, uri, e);
               }
             }
