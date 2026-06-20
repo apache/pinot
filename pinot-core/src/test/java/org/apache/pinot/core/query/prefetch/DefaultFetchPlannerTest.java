@@ -19,12 +19,14 @@
 package org.apache.pinot.core.query.prefetch;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -48,7 +50,10 @@ public class DefaultFetchPlannerTest {
     when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("c0", "c1", "c2"));
     String query = "SELECT COUNT(*) FROM testTable WHERE c0 = 0 OR (c1 < 10 AND c2 IN (1, 2))";
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-    FetchContext fetchContext = planner.planFetchForProcessing(indexSegment, queryContext);
+    SegmentContext segmentContext = mock(SegmentContext.class);
+    when(segmentContext.getIndexSegment()).thenReturn(indexSegment);
+    FetchContext fetchContext =
+        planner.planFetchForProcessing(Collections.singletonList(segmentContext), queryContext).get(0);
     assertEquals(fetchContext.getSegmentName(), "s0");
     Map<String, List<IndexType<?, ?, ?>>> columns = fetchContext.getColumnToIndexList();
     assertEquals(columns.size(), 3);
