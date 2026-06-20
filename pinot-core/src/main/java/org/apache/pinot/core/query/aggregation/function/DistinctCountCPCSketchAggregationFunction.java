@@ -19,6 +19,8 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -141,7 +143,8 @@ public class DistinctCountCPCSketchAggregationFunction
     // Treat BYTES value as serialized CPC Sketch
     FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      Object bytesValues = blockValSet.isBytesViewStableAcrossReads()
+          ? blockValSet.getBytesValueViewsSV() : blockValSet.getBytesValuesSV();
       try {
         CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(aggregationResultHolder);
         CpcSketch[] sketches = deserializeSketches(bytesValues, length);
@@ -212,7 +215,8 @@ public class DistinctCountCPCSketchAggregationFunction
     // Treat BYTES value as serialized CPC Sketch
     DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == FieldSpec.DataType.BYTES) {
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      Object bytesValues = blockValSet.isBytesViewStableAcrossReads()
+          ? blockValSet.getBytesValueViewsSV() : blockValSet.getBytesValuesSV();
       try {
         CpcSketch[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
@@ -285,7 +289,8 @@ public class DistinctCountCPCSketchAggregationFunction
     boolean singleValue = blockValSet.isSingleValue();
 
     if (singleValue && storedType == DataType.BYTES) {
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      Object bytesValues = blockValSet.isBytesViewStableAcrossReads()
+          ? blockValSet.getBytesValueViewsSV() : blockValSet.getBytesValuesSV();
       try {
         CpcSketch[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
@@ -603,6 +608,27 @@ public class DistinctCountCPCSketchAggregationFunction
       groupByResultHolder.setValueForKey(groupKey, accumulator);
     }
     return accumulator;
+  }
+
+  /**
+   * Deserializes the sketches from the extracted value array, which is either a {@code byte[][]}
+   * (default path) or a {@code ByteBuffer[]} of zero-copy views (when the forward index reader's
+   * views are stable across the block — see {@link BlockValSet#getBytesValueViewsSV()}). Empty
+   * entries map to {@code null} (the default BYTES value); callers must handle nulls.
+   */
+  private CpcSketch[] deserializeSketches(Object serializedSketches, int length) {
+    if (serializedSketches instanceof ByteBuffer[]) {
+      ByteBuffer[] views = (ByteBuffer[]) serializedSketches;
+      CpcSketch[] sketches = new CpcSketch[length];
+      for (int i = 0; i < length; i++) {
+        ByteBuffer buf = views[i];
+        // Explicit LITTLE_ENDIAN matches the byte[] path's Memory.wrap default. CpcSketch.heapify
+        // still copies into a heap sketch; the win is skipping the upstream byte[] alloc + copy.
+        sketches[i] = buf.remaining() > 0 ? CpcSketch.heapify(Memory.wrap(buf, ByteOrder.LITTLE_ENDIAN)) : null;
+      }
+      return sketches;
+    }
+    return deserializeSketches((byte[][]) serializedSketches, length);
   }
 
   /**

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.Union;
@@ -74,6 +75,40 @@ public class IntegerTupleSketchValueAggregatorTest {
     Sketch<IntegerSummary> merged = toSketch(agg.applyRawValue(s1, agg.serializeAggregatedValue(s2)));
     assertEquals(merged.getEstimate(), 2.0);
     assertEquals(agg.getMaxAggregatedValueByteSize(), 196632);
+  }
+
+  @Test
+  public void applyRawValueFromBufferShouldMatchByteArray() {
+    IntegerSketch s1 = new IntegerSketch(16, IntegerSummary.Mode.Sum);
+    IntegerSketch s2 = new IntegerSketch(16, IntegerSummary.Mode.Sum);
+    s1.update("a", 1);
+    s2.update("b", 1);
+    IntegerTupleSketchValueAggregator agg =
+        new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+    byte[] s2bytes = agg.serializeAggregatedValue(s2);
+
+    Sketch<IntegerSummary> viaArray = toSketch(agg.applyRawValue(s1, s2bytes));
+    IntegerTupleSketchValueAggregator aggBuf =
+        new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+    Sketch<IntegerSummary> viaBuffer = toSketch(aggBuf.applyRawValueFromBuffer(s1, ByteBuffer.wrap(s2bytes)));
+    assertEquals(viaBuffer.getEstimate(), viaArray.getEstimate());
+  }
+
+  @Test
+  public void applyAggregatedValueFromBufferShouldMatchByteArray() {
+    IntegerSketch s1 = new IntegerSketch(16, IntegerSummary.Mode.Sum);
+    IntegerSketch s2 = new IntegerSketch(16, IntegerSummary.Mode.Sum);
+    s1.update("a", 1);
+    s2.update("b", 1);
+    IntegerTupleSketchValueAggregator agg =
+        new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+    byte[] s2bytes = agg.serializeAggregatedValue(s2);
+
+    Sketch<IntegerSummary> viaArray = toSketch(agg.applyAggregatedValue(s1, s2));
+    IntegerTupleSketchValueAggregator aggBuf =
+        new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+    Sketch<IntegerSummary> viaBuffer = toSketch(aggBuf.applyAggregatedValueFromBuffer(s1, ByteBuffer.wrap(s2bytes)));
+    assertEquals(viaBuffer.getEstimate(), viaArray.getEstimate());
   }
 
   @SuppressWarnings("unchecked")

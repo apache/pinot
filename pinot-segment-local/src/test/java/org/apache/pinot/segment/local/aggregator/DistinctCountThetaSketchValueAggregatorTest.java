@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.stream.IntStream;
 import org.apache.datasketches.theta.Sketch;
@@ -106,6 +107,42 @@ public class DistinctCountThetaSketchValueAggregatorTest {
     assertEquals(result.getEstimate(), merged.getEstimate());
     // and should update the max size
     assertEquals(agg.getMaxAggregatedValueByteSize(), union.getCurrentBytes());
+  }
+
+  @Test
+  public void applyRawValueFromBufferShouldMatchByteArray() {
+    UpdateSketch input1 = Sketches.updateSketchBuilder().build();
+    IntStream.range(0, 1000).forEach(input1::update);
+    Sketch result1 = input1.compact();
+    UpdateSketch input2 = Sketches.updateSketchBuilder().build();
+    IntStream.range(0, 1000).forEach(input2::update);
+    Sketch result2 = input2.compact();
+    DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator(Collections.emptyList());
+    byte[] result2bytes = agg.serializeAggregatedValue(result2);
+
+    Sketch viaArray = toSketch(agg.applyRawValue(result1, result2bytes));
+    DistinctCountThetaSketchValueAggregator aggBuf =
+        new DistinctCountThetaSketchValueAggregator(Collections.emptyList());
+    Sketch viaBuffer = toSketch(aggBuf.applyRawValueFromBuffer(result1, ByteBuffer.wrap(result2bytes)));
+    assertEquals(viaBuffer.getEstimate(), viaArray.getEstimate());
+  }
+
+  @Test
+  public void applyAggregatedValueFromBufferShouldMatchByteArray() {
+    UpdateSketch input1 = Sketches.updateSketchBuilder().build();
+    IntStream.range(0, 1000).forEach(input1::update);
+    Sketch result1 = input1.compact();
+    UpdateSketch input2 = Sketches.updateSketchBuilder().build();
+    IntStream.range(0, 1000).forEach(input2::update);
+    Sketch result2 = input2.compact();
+    DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator(Collections.emptyList());
+    byte[] result2bytes = agg.serializeAggregatedValue(result2);
+
+    Sketch viaArray = toSketch(agg.applyAggregatedValue(result1, result2));
+    DistinctCountThetaSketchValueAggregator aggBuf =
+        new DistinctCountThetaSketchValueAggregator(Collections.emptyList());
+    Sketch viaBuffer = toSketch(aggBuf.applyAggregatedValueFromBuffer(result1, ByteBuffer.wrap(result2bytes)));
+    assertEquals(viaBuffer.getEstimate(), viaArray.getEstimate());
   }
 
   @Test

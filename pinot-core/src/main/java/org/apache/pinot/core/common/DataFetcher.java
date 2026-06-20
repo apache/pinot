@@ -20,6 +20,7 @@ package org.apache.pinot.core.common;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -187,6 +188,10 @@ public class DataFetcher implements AutoCloseable {
    */
   public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][] outValues) {
     _columnValueReaderMap.get(column).readBytesValues(inDocIds, length, outValues);
+  }
+
+  public void fetchBytesValueViews(String column, int[] inDocIds, int length, ByteBuffer[] outValues) {
+    _columnValueReaderMap.get(column).readBytesValueViews(inDocIds, length, outValues);
   }
 
   public void fetchMapValues(String column, int[] inDocIds, int length, Map[] outValues) {
@@ -435,6 +440,27 @@ public class DataFetcher implements AutoCloseable {
       } else {
         for (int i = 0; i < length; i++) {
           valueBuffer[i] = _reader.getBytes(docIds[i], readerContext);
+        }
+      }
+    }
+
+    void readBytesValueViews(int[] docIds, int length, ByteBuffer[] valueBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        // Dictionary columns have no view path. This is never reached on the hot path because callers
+        // only request views when the reader reports isBufferViewStableAcrossReads() == true, which a
+        // dictionary reader never does. Wrap the dictionary byte[] defensively for correctness.
+        int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
+        _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
+        byte[][] values = new byte[length][];
+        _dictionary.readBytesValues(dictIdBuffer, length, values);
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = ByteBuffer.wrap(values[i]);
+        }
+      } else {
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getBytesView(docIds[i], readerContext);
         }
       }
     }

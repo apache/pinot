@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -419,7 +420,7 @@ public class DistinctCountThetaSketchAggregationFunction
     } else {
       // Serialized sketch
       List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(aggregationResultHolder);
-      Sketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
+      Sketch[] sketches = deserializeSketches(valueArrays[0], length);
       if (_includeDefaultSketch) {
         ThetaSketchAccumulator defaultThetaAccumulator = thetaSketchAccumulators.get(0);
         for (Sketch sketch : sketches) {
@@ -646,7 +647,7 @@ public class DistinctCountThetaSketchAggregationFunction
       }
     } else {
       // Serialized sketch
-      Sketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
+      Sketch[] sketches = deserializeSketches(valueArrays[0], length);
       for (int i = 0; i < length; i++) {
         List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(groupByResultHolder, groupKeyArray[i]);
         Sketch sketch = sketches[i];
@@ -920,7 +921,7 @@ public class DistinctCountThetaSketchAggregationFunction
       }
     } else {
       // Serialized sketch
-      Sketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
+      Sketch[] sketches = deserializeSketches(valueArrays[0], length);
       if (_includeDefaultSketch) {
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
@@ -1271,7 +1272,11 @@ public class DistinctCountThetaSketchAggregationFunction
             valueArrays[i] = blockValSet.getStringValuesSV();
             break;
           case BYTES:
-            valueArrays[i] = blockValSet.getBytesValuesSV();
+            // Zero-copy view path only for the plain form (no filter evaluators re-reading the
+            // value array per row) and only when the reader's views survive the block read.
+            valueArrays[i] = (_filterEvaluators.isEmpty() && blockValSet.isBytesViewStableAcrossReads())
+                ? blockValSet.getBytesValueViewsSV()
+                : blockValSet.getBytesValuesSV();
             break;
           default:
             throw new IllegalStateException();
@@ -1372,6 +1377,25 @@ public class DistinctCountThetaSketchAggregationFunction
       unions.add(thetaSketchAccumulator);
     }
     return unions;
+  }
+
+  /**
+   * Deserializes the sketches from the extracted value array, which is either a {@code byte[][]}
+   * (default path) or a {@code ByteBuffer[]} of zero-copy views (when the forward index reader's
+   * views are stable across the block — see {@link BlockValSet#getBytesValueViewsSV()}).
+   */
+  private Sketch[] deserializeSketches(Object serializedSketches, int length) {
+    if (serializedSketches instanceof ByteBuffer[]) {
+      ByteBuffer[] views = (ByteBuffer[]) serializedSketches;
+      Sketch[] sketches = new Sketch[length];
+      for (int i = 0; i < length; i++) {
+        // Explicit LITTLE_ENDIAN matches the byte[] path's Memory.wrap(byte[]) default and the
+        // serialized sketch format, regardless of the source buffer's own byte order.
+        sketches[i] = Sketch.wrap(Memory.wrap(views[i], ByteOrder.LITTLE_ENDIAN));
+      }
+      return sketches;
+    }
+    return deserializeSketches((byte[][]) serializedSketches, length);
   }
 
   /**

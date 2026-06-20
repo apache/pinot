@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -507,6 +508,46 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    */
   default byte[] getBytes(int docId, T context) {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads the BYTES type single-value at the given document id as a {@link ByteBuffer} view,
+   * avoiding the per-call {@code byte[]} allocation performed by {@link #getBytes(int, ForwardIndexReaderContext)}.
+   *
+   * <p><b>Lifetime contract:</b> the returned buffer is valid only until the next call on this
+   * {@code ForwardIndexReader} that uses the same {@code context}. Reader implementations that
+   * decompress chunks into a per-context scratch buffer return a slice that becomes invalid the
+   * moment the next value is decoded. Callers MUST fully consume the returned buffer before making
+   * another reader call with the same context, and MUST NOT retain the buffer across calls.
+   *
+   * <p>The default implementation falls back to {@link #getBytes(int, ForwardIndexReaderContext)}
+   * and wraps the resulting array, so it is safe to call on any reader.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return a {@link ByteBuffer} positioned at the start of the value with limit at its end
+   */
+  default ByteBuffer getBytesView(int docId, T context) {
+    return ByteBuffer.wrap(getBytes(docId, context));
+  }
+
+  /**
+   * Returns {@code true} if the {@link ByteBuffer} returned by {@link #getBytesView} remains valid
+   * after subsequent reads on the same context — i.e. it is safe for a batched caller to materialize
+   * a block of views into an array and consume them later.
+   *
+   * <p>This holds for readers whose views point at storage that is not reused between reads (e.g. an
+   * uncompressed, memory-mapped forward index, where each call returns a fresh slice of the mapped
+   * buffer). It does NOT hold for readers that decode into a per-context scratch buffer (e.g. a
+   * compressed chunk reader), where the next read overwrites the previous view.
+   *
+   * <p>Default is {@code false} (conservative): the default {@link #getBytesView} wraps a fresh
+   * {@code byte[]} which is itself stable, but unknown implementations are assumed unsafe to batch.
+   * Callers that hold views across a block read MUST gate on this flag and fall back to
+   * {@link #getBytes} when it returns {@code false}.
+   */
+  default boolean isBufferViewStableAcrossReads() {
+    return false;
   }
 
   /**

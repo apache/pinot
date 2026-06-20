@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -79,6 +80,11 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   final ValueAggregator[] _valueAggregators;
   // Readers and data types for column in function-column pair
   final PinotSegmentColumnReader[] _metricReaders;
+  // True for a metric whose source column is BYTES and whose forward index reader reports stable
+  // views across reads (PASS_THROUGH). When true, getSegmentRecord reads a zero-copy ByteBuffer
+  // view via getValueAsBuffer instead of allocating a byte[] per row, and mergeSegmentRecord
+  // dispatches to ValueAggregator.applyRawValueFromBuffer.
+  final boolean[] _metricUsesBufferPath;
   final AggregationSpec[] _aggregationSpecs;
 
   final int _maxLeafRecords;
@@ -138,6 +144,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _metrics = new String[_numMetrics];
     _valueAggregators = new ValueAggregator[_numMetrics];
     _metricReaders = new PinotSegmentColumnReader[_numMetrics];
+    _metricUsesBufferPath = new boolean[_numMetrics];
     _aggregationSpecs = new AggregationSpec[_numMetrics];
 
     int index = 0;
@@ -154,6 +161,13 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
         String column = functionColumnPair.getColumn();
         _metricReaders[index] = new PinotSegmentColumnReader(segment, column);
+        // Enable the zero-copy buffer path only when (a) the source column is BYTES (matches the
+        // ValueAggregator buffer SPI surface) and (b) the reader's views survive the read-all-then-
+        // sort batching done by sortAndAggregateSegmentRecords. The flag is reader-intrinsic
+        // (PASS_THROUGH var-byte readers report true, compressed readers report false).
+        _metricUsesBufferPath[index] =
+            _metricReaders[index].getValueType().getStoredType() == BYTES
+                && _metricReaders[index].isBufferViewStableAcrossReads();
       }
 
       index++;
@@ -244,7 +258,11 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     for (int i = 0; i < _numMetrics; i++) {
       // Ignore the column for COUNT aggregation function
       if (_metricReaders[i] != null) {
-        metrics[i] = _metricReaders[i].getValue(docId);
+        // Zero-copy ByteBuffer view for stable BYTES readers (PASS_THROUGH); byte[] otherwise.
+        // The view survives the read-all-then-sort batch because PASS_THROUGH views are mmap-backed
+        // and never overwritten — see _metricUsesBufferPath at construction.
+        metrics[i] = _metricUsesBufferPath[i] ? _metricReaders[i].getValueAsBuffer(docId)
+            : _metricReaders[i].getValue(docId);
       }
     }
     return new Record(dimensions, metrics);
@@ -265,7 +283,12 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       for (int i = 0; i < _numMetrics; i++) {
         Object rawValue = segmentRecord._metrics[i];
         if (rawValue != null) {
-          metrics[i] = _valueAggregators[i].getInitialAggregatedValue(rawValue);
+          // Buffer path (PASS_THROUGH BYTES metric): applyRawValueFromBuffer(null, buf) is
+          // semantically equivalent to getInitialAggregatedValue(rawBytes) for the sketch
+          // aggregators — extractUnion(null) creates a fresh accumulator and unions the buffer.
+          metrics[i] = (rawValue instanceof ByteBuffer)
+              ? _valueAggregators[i].applyRawValueFromBuffer(null, (ByteBuffer) rawValue)
+              : _valueAggregators[i].getInitialAggregatedValue(rawValue);
         } else {
           assert _valueAggregators[i].getAggregationType() == AggregationFunctionType.COUNT;
           metrics[i] = 1L;
@@ -276,7 +299,9 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       for (int i = 0; i < _numMetrics; i++) {
         Object rawValue = segmentRecord._metrics[i];
         if (rawValue != null) {
-          aggregatedRecord._metrics[i] = _valueAggregators[i].applyRawValue(aggregatedRecord._metrics[i], rawValue);
+          aggregatedRecord._metrics[i] = (rawValue instanceof ByteBuffer)
+              ? _valueAggregators[i].applyRawValueFromBuffer(aggregatedRecord._metrics[i], (ByteBuffer) rawValue)
+              : _valueAggregators[i].applyRawValue(aggregatedRecord._metrics[i], rawValue);
         } else {
           assert _valueAggregators[i].getAggregationType() == AggregationFunctionType.COUNT;
           aggregatedRecord._metrics[i] = ((long) aggregatedRecord._metrics[i]) + 1;
