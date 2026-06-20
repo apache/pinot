@@ -157,7 +157,12 @@ public class RowExpressionValidationVisitor extends SqlBasicVisitor<Void> {
   private boolean isAllowedRowContext(SqlKind kind) {
     return kind == SqlKind.VALUES
         || kind == SqlKind.INSERT
-        || kind == SqlKind.ARRAY_VALUE_CONSTRUCTOR;
+        || kind == SqlKind.ARRAY_VALUE_CONSTRUCTOR
+        // Grouping-set constructs list their grouping columns as parenthesized ROW expressions, e.g.
+        // GROUP BY GROUPING SETS ((col1, col2), (col1), ()).
+        || kind == SqlKind.GROUPING_SETS
+        || kind == SqlKind.ROLLUP
+        || kind == SqlKind.CUBE;
   }
 
   private boolean hasRowOperands(SqlCall call) {

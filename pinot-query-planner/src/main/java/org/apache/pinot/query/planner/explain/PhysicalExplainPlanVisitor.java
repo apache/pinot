@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -277,6 +278,11 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
 
   @Override
   public StringBuilder visitUnnest(UnnestNode node, Context context) {
+    return visitSimpleNode(node, context);
+  }
+
+  @Override
+  public StringBuilder visitGroupingSetsExpand(GroupingSetsExpandNode node, Context context) {
     return visitSimpleNode(node, context);
   }
 

@@ -58,6 +58,7 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -482,6 +483,16 @@ public final class PlanNodeToRelConverter {
         _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownUnnest", Map.of(),
             node.getDataSchema(), inputs));
       }
+      return null;
+    }
+
+    @Override
+    public Void visitGroupingSetsExpand(GroupingSetsExpandNode node, Void context) {
+      // Rendered as an opaque node for rel-based EXPLAIN: the grouping-set expansion has no standard Calcite rel, so it
+      // is shown as a labeled placeholder over its input rather than reconstructed.
+      List<RelNode> inputs = inputsAsList(node);
+      _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "GroupingSetsExpand", Map.of(),
+          node.getDataSchema(), inputs));
       return null;
     }
 

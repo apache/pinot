@@ -65,6 +65,7 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Join;
 import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -789,10 +790,7 @@ public class CalciteSqlParser {
     Set<Integer> seen = new HashSet<>();
     List<Integer> groupingSetMasks = new ArrayList<>();
     for (LinkedHashSet<Expression> set : combinedSets) {
-      int mask = 0;
-      for (Expression expr : set) {
-        mask |= 1 << unionIndex.get(expr);
-      }
+      int mask = GroupingSets.participationMask(set.stream().mapToInt(unionIndex::get));
       if (seen.add(mask)) {
         groupingSetMasks.add(mask);
       }

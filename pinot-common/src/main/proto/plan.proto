@@ -42,6 +42,7 @@ message PlanNode {
     ExplainNode explainNode = 16;
     EnrichedJoinNode enrichedJoinNode = 17;
     UnnestNode unnestNode = 18;
+    GroupingSetsExpandNode groupingSetsExpandNode = 19;
   }
 }
 
@@ -73,6 +74,20 @@ message AggregateNode {
   bool leafReturnFinalResult = 5;
   repeated Collation collations = 6;
   int32 limit = 7;
+  // 8 was groupingSetMasks (multi-stage leaf pushdown), removed in favor of the native GroupingSetsExpandNode.
+  reserved 8;
+}
+
+// Native multi-stage GROUP BY GROUPING SETS / ROLLUP / CUBE expansion. Emits one output row per input row per grouping
+// set: the union group-by columns at `groupingColumns` are nulled where rolled up, and a synthetic INT `$groupingId`
+// discriminator column is appended (last column of the output schema) carrying the per-set rolled-up bitmask.
+// `groupingIds[s]` is the bitmask for set `s` (bit `p` set iff `groupingColumns[p]` is rolled up in that set), and is
+// also the value emitted into `$groupingId`. This is a node type introduced after the leaf-pushdown design; a server
+// that predates it cannot deserialize this oneof case and fails the query rather than mis-reading it, so the feature
+// requires all multi-stage workers to be upgraded (see GroupingSetsExpandNode Javadoc).
+message GroupingSetsExpandNode {
+  repeated int32 groupingColumns = 1;
+  repeated int32 groupingIds = 2;
 }
 
 message FilterNode {

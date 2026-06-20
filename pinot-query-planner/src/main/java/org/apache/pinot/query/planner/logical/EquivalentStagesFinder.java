@@ -26,6 +26,7 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -364,6 +365,17 @@ public class EquivalentStagesFinder {
             && node1.isWithOrdinality() == that.isWithOrdinality()
             && Objects.equals(node1.getElementIndexes(), that.getElementIndexes())
             && node1.getOrdinalityIndex() == that.getOrdinalityIndex();
+      }
+
+      @Override
+      public Boolean visitGroupingSetsExpand(GroupingSetsExpandNode node1, PlanNode node2) {
+        if (!(node2 instanceof GroupingSetsExpandNode)) {
+          return false;
+        }
+        GroupingSetsExpandNode that = (GroupingSetsExpandNode) node2;
+        return areBaseNodesEquivalent(node1, node2)
+            && Objects.equals(node1.getGroupingColumns(), that.getGroupingColumns())
+            && Objects.equals(node1.getGroupingIds(), that.getGroupingIds());
       }
     }
   }

@@ -439,10 +439,18 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         StatMap<UnnestOperator.StatKey> stats = (StatMap<UnnestOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(UnnestOperator.StatKey.EMITTED_ROWS));
       }
+    },
+    GROUPING_SETS_EXPAND(16, GroupingSetsExpandOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<GroupingSetsExpandOperator.StatKey> stats = (StatMap<GroupingSetsExpandOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(GroupingSetsExpandOperator.StatKey.EMITTED_ROWS));
+      }
     };
 
     // When adding new operator types, update MAX_ID if the new ID exceeds the current max
-    private static final int MAX_ID = 15;
+    private static final int MAX_ID = 16;
     private static final Type[] ID_TO_TYPE = new Type[MAX_ID + 1];
 
     static {

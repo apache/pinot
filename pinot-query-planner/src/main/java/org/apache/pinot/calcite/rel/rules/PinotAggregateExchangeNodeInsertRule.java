@@ -62,6 +62,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalGroupingSetsExpand;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 import org.apache.pinot.query.QueryEnvironment;
@@ -128,6 +129,11 @@ public class PinotAggregateExchangeNodeInsertRule {
       if (aggRel.getGroupSet().isEmpty()) {
         return;
       }
+      if (isOverGroupingSetsExpand(aggRel)) {
+        // Group trim (leaf LIMIT pushdown) on top of the native grouping-set expansion is not supported: the
+        // user-visible ORDER BY / LIMIT applies to the fully expanded result, so keep full aggregation here.
+        return;
+      }
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
 
@@ -179,6 +185,11 @@ public class PinotAggregateExchangeNodeInsertRule {
     public void onMatch(RelOptRuleCall call) {
       LogicalAggregate aggRel = call.rel(1);
       if (aggRel.getGroupSet().isEmpty()) {
+        return;
+      }
+      if (isOverGroupingSetsExpand(aggRel)) {
+        // Group trim (leaf LIMIT pushdown) on top of the native grouping-set expansion is not supported: the
+        // user-visible ORDER BY / LIMIT applies to the fully expanded result, so keep full aggregation here.
         return;
       }
 
@@ -299,6 +310,15 @@ public class PinotAggregateExchangeNodeInsertRule {
         RelDistributions.hash(ImmutableIntList.range(0, aggRel.getGroupCount())));
     // Create a FINAL aggregate over the EXCHANGE.
     return convertAggFromIntermediateInput(aggRel, exchange, AggType.FINAL, leafReturnFinalResult, collations, limit);
+  }
+
+  /**
+   * Returns true if the aggregate is the ordinary aggregate that {@code GroupingSetsExpander} places directly over a
+   * {@link PinotLogicalGroupingSetsExpand}. Group trimming (leaf LIMIT pushdown) is disabled for it because the
+   * user-visible ORDER BY / LIMIT applies to the fully expanded grouping-set result, not to a single leaf's groups.
+   */
+  private static boolean isOverGroupingSetsExpand(Aggregate aggRel) {
+    return PinotRuleUtils.unboxRel(aggRel.getInput()) instanceof PinotLogicalGroupingSetsExpand;
   }
 
   /**

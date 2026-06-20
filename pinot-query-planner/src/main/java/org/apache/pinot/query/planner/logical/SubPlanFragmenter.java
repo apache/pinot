@@ -30,6 +30,7 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -154,6 +155,11 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
 
   @Override
   public PlanNode visitUnnest(UnnestNode node, Context context) {
+    return process(node, context);
+  }
+
+  @Override
+  public PlanNode visitGroupingSetsExpand(GroupingSetsExpandNode node, Context context) {
     return process(node, context);
   }
 

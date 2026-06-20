@@ -30,6 +30,7 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -44,6 +45,7 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.ErrorOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
+import org.apache.pinot.query.runtime.operator.GroupingSetsExpandOperator;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
@@ -379,6 +381,18 @@ public class PlanNodeToOpChain {
         PlanNode input = node.getInputs().get(0);
         child = visit(input, context);
         return new UnnestOperator(context, child, input.getDataSchema(), node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
+      }
+    }
+
+    @Override
+    public MultiStageOperator visitGroupingSetsExpand(GroupingSetsExpandNode node, OpChainExecutionContext context) {
+      MultiStageOperator child = null;
+      try {
+        PlanNode input = node.getInputs().get(0);
+        child = visit(input, context);
+        return new GroupingSetsExpandOperator(context, child, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }

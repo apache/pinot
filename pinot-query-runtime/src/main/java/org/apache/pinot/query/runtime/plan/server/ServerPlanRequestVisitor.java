@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -327,6 +328,16 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitUnnest(UnnestNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       // Unnest is not runnable on leaf, use its input as the boundary.
+      context.setLeafStageBoundaryNode(node.getInputs().get(0));
+    }
+    return null;
+  }
+
+  @Override
+  public Void visitGroupingSetsExpand(GroupingSetsExpandNode node, ServerPlanRequestContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      // The grouping-set expansion runs as a multi-stage operator above the single-stage leaf scan, so it is not
+      // pushed into the single-stage leaf; use its input as the leaf-stage boundary.
       context.setLeafStageBoundaryNode(node.getInputs().get(0));
     }
     return null;

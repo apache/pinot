@@ -35,6 +35,7 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -291,6 +292,16 @@ public class PlanNodeSerializer {
           .addAllPassthroughInputIndexes(context.getPassthroughInputIndexes())
           .setPrunedPassthrough(context.isPrunedPassthrough());
       builder.setUnnestNode(unnestNodeBuilder.build());
+      return null;
+    }
+
+    @Override
+    public Void visitGroupingSetsExpand(GroupingSetsExpandNode node, Plan.PlanNode.Builder builder) {
+      Plan.GroupingSetsExpandNode expandNode = Plan.GroupingSetsExpandNode.newBuilder()
+          .addAllGroupingColumns(node.getGroupingColumns())
+          .addAllGroupingIds(node.getGroupingIds())
+          .build();
+      builder.setGroupingSetsExpandNode(expandNode);
       return null;
     }
 

@@ -56,6 +56,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.GroupingSetsExpander;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
@@ -404,6 +405,18 @@ public class QueryEnvironment {
   private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
+    // Rewrite GROUP BY ROLLUP / CUBE / GROUPING SETS into the native multi-stage expansion (an expand operator feeding
+    // an ordinary aggregate keyed on [groupCols, $groupingId]; see GroupingSetsExpander). Only the legacy planner
+    // supports this; the v2 physical optimizer does not, so reject clearly there rather than emit a plan it cannot
+    // convert.
+    if (GroupingSetsExpander.hasGroupingSets(relation.rel)) {
+      if (plannerContext.isUsePhysicalOptimizer()) {
+        throw new UnsupportedOperationException(
+            "GROUP BY GROUPING SETS / ROLLUP / CUBE is not supported by the multi-stage physical optimizer "
+                + "(usePhysicalOptimizer); disable it to use grouping sets.");
+      }
+      relation = relation.withRel(relation.rel.accept(new GroupingSetsExpander()));
+    }
     RelNode optimized = optimize(relation, plannerContext);
     if (plannerContext.isUsePhysicalOptimizer()) {
       Preconditions.checkNotNull(plannerContext.getPhysicalPlannerContext(), "Physical planner context is null");

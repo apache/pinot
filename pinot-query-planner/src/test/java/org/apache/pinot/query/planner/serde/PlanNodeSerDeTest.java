@@ -20,17 +20,21 @@ package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
@@ -77,5 +81,38 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     assertEquals(deserialized, node);
     assertEquals(deserialized.isPrunedPassthrough(), false);
     assertEquals(deserialized.getPassthroughInputIndexes(), List.of());
+  }
+
+  @Test
+  public void testGroupingSetsExpandSerDe() {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT col1, col2, SUM(col3) FROM a GROUP BY ROLLUP(col1, col2)");
+    boolean foundExpand = false;
+    for (DispatchablePlanFragment dispatchablePlanFragment : dispatchableSubPlan.getQueryStages()) {
+      PlanNode stagePlan = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
+      PlanNode deserializedStagePlan = PlanNodeDeserializer.process(PlanNodeSerializer.process(stagePlan));
+      assertEquals(stagePlan, deserializedStagePlan);
+      foundExpand |= containsExpand(stagePlan);
+    }
+    assertTrue(foundExpand, "ROLLUP plan should contain a GroupingSetsExpandNode that round-trips through serde");
+  }
+
+  @Test
+  public void testUnknownNodeTypeFailsClosed() {
+    // A plan node with no recognized oneof case - e.g. a newer broker's node type reaching an older server - must
+    // hard-fail rather than be silently mis-read. Underpins the GroupingSetsExpandNode rolling-upgrade contract.
+    assertThrows(IllegalStateException.class, () -> PlanNodeDeserializer.process(Plan.PlanNode.newBuilder().build()));
+  }
+
+  private static boolean containsExpand(PlanNode node) {
+    if (node instanceof GroupingSetsExpandNode) {
+      return true;
+    }
+    for (PlanNode input : node.getInputs()) {
+      if (containsExpand(input)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

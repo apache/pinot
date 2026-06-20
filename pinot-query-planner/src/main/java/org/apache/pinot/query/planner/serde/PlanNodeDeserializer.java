@@ -37,6 +37,7 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -84,6 +85,8 @@ public class PlanNodeDeserializer {
         return deserializeEnrichedJoinNode(protoNode);
       case UNNESTNODE:
         return deserializeUnnestNode(protoNode);
+      case GROUPINGSETSEXPANDNODE:
+        return deserializeGroupingSetsExpandNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -253,6 +256,12 @@ public class PlanNodeDeserializer {
 
     return new UnnestNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), arrayExprs, context);
+  }
+
+  private static GroupingSetsExpandNode deserializeGroupingSetsExpandNode(Plan.PlanNode protoNode) {
+    Plan.GroupingSetsExpandNode protoExpandNode = protoNode.getGroupingSetsExpandNode();
+    return new GroupingSetsExpandNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), protoExpandNode.getGroupingColumnsList(), protoExpandNode.getGroupingIdsList());
   }
 
   private static DataSchema extractDataSchema(Plan.DataSchema protoDataSchema) {

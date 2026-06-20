@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.request.context;
 
+import java.util.stream.IntStream;
+
 /// Engine-agnostic conventions for GROUP BY GROUPING SETS / ROLLUP / CUBE, shared so both query engines
 /// agree on the discriminator column and the GROUPING()/GROUPING_ID() semantics.
 ///
@@ -50,6 +52,15 @@ public class GroupingSets {
       result = (result << 1) | ((groupingId >>> unionColumnIndex) & 1);
     }
     return result;
+  }
+
+  /// Builds the per-set participation bitmask over the union group-by columns -- the wire encoding the single-stage
+  /// engine carries in {@code PinotQuery.groupingSetMasks}. Bit {@code p} is set iff union position {@code p}
+  /// participates in the set (the rolled-up inverse read by {@link #groupingValue} from the {@link #GROUPING_ID_COLUMN}
+  /// column is its complement). Centralizing the {@code 1 << position} convention here keeps the producers in agreement.
+  /// (The multi-stage engine instead expands grouping sets natively; see {@code GroupingSetsExpandNode}.)
+  public static int participationMask(IntStream unionPositions) {
+    return unionPositions.map(position -> 1 << position).reduce(0, (left, right) -> left | right);
   }
 
   /// Returns true if the given function name denotes {@code GROUPING} or {@code GROUPING_ID}. The argument is

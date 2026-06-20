@@ -35,6 +35,7 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -179,6 +180,24 @@ class PlanNodeMerger {
         return null;
       }
       if (node.getOrdinalityIndex() != otherNode.getOrdinalityIndex()) {
+        return null;
+      }
+      List<PlanNode> children = mergeChildren(node, context);
+      if (children == null) {
+        return null;
+      }
+      return node.withInputs(children);
+    }
+
+    @Nullable
+    @Override
+    public PlanNode visitGroupingSetsExpand(GroupingSetsExpandNode node, PlanNode context) {
+      if (context.getClass() != GroupingSetsExpandNode.class) {
+        return null;
+      }
+      GroupingSetsExpandNode otherNode = (GroupingSetsExpandNode) context;
+      if (!Objects.equals(node.getGroupingColumns(), otherNode.getGroupingColumns())
+          || !Objects.equals(node.getGroupingIds(), otherNode.getGroupingIds())) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);

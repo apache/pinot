@@ -21,9 +21,11 @@ package org.apache.pinot.query.runtime.queries;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -175,6 +177,100 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   /**
+   * Value-level check for the grouping-set leaf pushdown: ROLLUP(col1, col2) over table {@code a} (col3 summed; the
+   * 5 base rows are replicated to 15 across segments) must yield the 5 detail groups, the 5 col2-rolled-up groups
+   * (col2 = NULL), and the grand total (col1 = col2 = NULL), each with the correct sum. This exercises the single SSE
+   * leaf producing $grouping_id and the final stage merging per (group, set), including rolled-up NULL placement.
+   */
+  @Test
+  public void testRollupPushdownValues() {
+    ResultTable resultTable =
+        queryRunner("SELECT col1, col2, SUM(col3) FROM a GROUP BY ROLLUP(col1, col2)", false).getResultTable();
+    Set<String> actual = new HashSet<>();
+    for (Object[] row : resultTable.getRows()) {
+      actual.add(row[0] + "|" + row[1] + "|" + ((Number) row[2]).longValue());
+    }
+    Set<String> expected = new HashSet<>(Arrays.asList(
+        // {col1, col2}: each distinct pair, summed across the 3 replicas
+        "foo|foo|3", "bar|bar|126", "alice|alice|3", "bob|foo|126", "charlie|bar|3",
+        // {col1}: col2 rolled up to NULL
+        "foo|null|3", "bar|null|126", "alice|null|3", "bob|null|126", "charlie|null|3",
+        // {}: grand total, both columns rolled up to NULL -> (1+42+1+42+1) * 3
+        "null|null|261"));
+    Assert.assertEquals(actual, expected);
+  }
+
+  /**
+   * Same as {@link #testRollupPushdownValues} but with null handling enabled, exercising the SSE generator's null
+   * code path for rolled-up columns (they come through the null bitmap rather than the dictionary sentinel). The rows
+   * stay disambiguated by $grouping_id, so rolled-up NULLs do not collide with one another.
+   */
+  @Test
+  public void testRollupPushdownValuesWithNullHandling() {
+    ResultTable resultTable = queryRunner(
+        "SET enableNullHandling=true; SELECT col1, col2, SUM(col3) FROM a GROUP BY ROLLUP(col1, col2)", false)
+        .getResultTable();
+    Set<String> actual = new HashSet<>();
+    for (Object[] row : resultTable.getRows()) {
+      actual.add(row[0] + "|" + row[1] + "|" + ((Number) row[2]).longValue());
+    }
+    Set<String> expected = new HashSet<>(Arrays.asList(
+        "foo|foo|3", "bar|bar|126", "alice|alice|3", "bob|foo|126", "charlie|bar|3",
+        "foo|null|3", "bar|null|126", "alice|null|3", "bob|null|126", "charlie|null|3",
+        "null|null|261"));
+    Assert.assertEquals(actual, expected);
+  }
+
+  /**
+   * Value-level check for the GROUPING / GROUPING_ID indicator pushdown: the indicators are computed in the top project
+   * from the $grouping_id discriminator (a single SSE leaf scan), not via UNION ALL. For ROLLUP(col1, col2):
+   * GROUPING(col1) is 1 only when col1 is rolled up (the grand total); GROUPING_ID(col1, col2) packs the two roll-up
+   * bits (col1 most significant): {col1,col2}=0, {col1}(col2 rolled)=1, {}(both rolled)=3.
+   */
+  @Test
+  public void testGroupingIndicatorPushdownValues() {
+    ResultTable resultTable = queryRunner(
+        "SELECT col1, col2, SUM(col3), GROUPING(col1), GROUPING_ID(col1, col2) FROM a GROUP BY ROLLUP(col1, col2)",
+        false).getResultTable();
+    Set<String> actual = new HashSet<>();
+    for (Object[] row : resultTable.getRows()) {
+      actual.add(row[0] + "|" + row[1] + "|" + ((Number) row[2]).longValue() + "|" + ((Number) row[3]).intValue()
+          + "|" + ((Number) row[4]).intValue());
+    }
+    Set<String> expected = new HashSet<>(Arrays.asList(
+        // {col1, col2}: nothing rolled up -> GROUPING(col1)=0, GROUPING_ID=0
+        "foo|foo|3|0|0", "bar|bar|126|0|0", "alice|alice|3|0|0", "bob|foo|126|0|0", "charlie|bar|3|0|0",
+        // {col1}: col2 rolled up -> GROUPING(col1)=0, GROUPING_ID=1
+        "foo|null|3|0|1", "bar|null|126|0|1", "alice|null|3|0|1", "bob|null|126|0|1", "charlie|null|3|0|1",
+        // {}: both rolled up -> GROUPING(col1)=1, GROUPING_ID=3
+        "null|null|261|1|3"));
+    Assert.assertEquals(actual, expected);
+  }
+
+  /**
+   * Value-level check that AVG (which Calcite decomposes to $SUM0 + COUNT before the rule) pushes down with correct
+   * values -- the row-count provider only validates the number of groups, and the SUM value test does not exercise the
+   * sum/count division. GROUPING SETS ((col1, col2), (col1)) over table a: each group's col3 values are identical, so
+   * every AVG is a whole number (avoids float-compare fragility); the grand total (a fractional AVG) is excluded.
+   * (H2 cross-comparison is not usable here: Pinot's bundled H2 does not parse the ROLLUP/CUBE/GROUPING SETS syntax.)
+   */
+  @Test
+  public void testAvgPushdownValues() {
+    ResultTable resultTable = queryRunner(
+        "SELECT col1, col2, AVG(col3) FROM a GROUP BY GROUPING SETS ((col1, col2), (col1))", false).getResultTable();
+    Set<String> actual = new HashSet<>();
+    for (Object[] row : resultTable.getRows()) {
+      actual.add(row[0] + "|" + row[1] + "|" + ((Number) row[2]).longValue());
+    }
+    Set<String> expected = new HashSet<>(Arrays.asList(
+        // {col1, col2}: AVG of the single (replicated) col3 value per pair
+        "foo|foo|1", "bar|bar|42", "alice|alice|1", "bob|foo|42", "charlie|bar|1",
+        // {col1}: col2 rolled up to NULL; AVG over the rows of each col1
+        "foo|null|1", "bar|null|42", "alice|null|1", "bob|null|42", "charlie|null|1"));
+    Assert.assertEquals(actual, expected);
+  }
+
+  /**
    * Test automatically compares against H2.
    *
    * @deprecated do not add to this test set. this class will be broken down and clean up.
@@ -256,6 +352,17 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT round_decimal(col3) FROM a", 15},
         new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5},
         new Object[]{"SELECT col1, round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
+        // GROUP BY ROLLUP / CUBE / GROUPING SETS lowered to the native multi-stage expansion (GroupingSetsExpand).
+        // col1 has 5 distinct values, col2 has 3, (col1,col2) has 5.
+        // ROLLUP(col1,col2) = {col1,col2}(5) + {col1}(5) + {}(1) = 11 groups.
+        new Object[]{"SELECT col1, col2, SUM(col3) FROM a GROUP BY ROLLUP(col1, col2)", 11},
+        // CUBE(col1,col2) = {col1,col2}(5) + {col1}(5) + {col2}(3) + {}(1) = 14 groups.
+        new Object[]{"SELECT col1, col2, SUM(col3) FROM a GROUP BY CUBE(col1, col2)", 14},
+        // GROUPING SETS ((col1),(col2)) = {col1}(5) + {col2}(3) = 8 groups.
+        new Object[]{"SELECT col1, col2, SUM(col3) FROM a GROUP BY GROUPING SETS ((col1), (col2))", 8},
+        // Broadened pushable aggregates: AVG (decomposes to $SUM0+COUNT) and DISTINCTCOUNT (set-merge) also push down.
+        new Object[]{"SELECT col1, col2, AVG(col3) FROM a GROUP BY ROLLUP(col1, col2)", 11},
+        new Object[]{"SELECT col1, col2, DISTINCTCOUNT(col3) FROM a GROUP BY CUBE(col1, col2)", 14},
 
         // test queries with special query options attached
         //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.

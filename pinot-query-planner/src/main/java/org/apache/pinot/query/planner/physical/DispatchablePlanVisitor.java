@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -191,6 +192,13 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
 
   @Override
   public Void visitUnnest(UnnestNode node, DispatchablePlanContext context) {
+    node.getInputs().get(0).visit(this, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
+    return null;
+  }
+
+  @Override
+  public Void visitGroupingSetsExpand(GroupingSetsExpandNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     getOrCreateDispatchablePlanMetadata(node, context);
     return null;

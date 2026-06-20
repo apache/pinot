@@ -62,6 +62,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalGroupingSetsExpand;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -77,6 +78,7 @@ import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.GroupingSetsExpandNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
@@ -182,6 +184,8 @@ public final class RelToPlanNodeConverter {
       result = convertLogicalValues((LogicalValues) node);
     } else if (node instanceof SetOp) {
       result = convertLogicalSetOp((SetOp) node);
+    } else if (node instanceof PinotLogicalGroupingSetsExpand) {
+      result = convertGroupingSetsExpand((PinotLogicalGroupingSetsExpand) node);
     } else {
       throw new IllegalStateException("Unsupported RelNode: " + node);
     }
@@ -234,6 +238,11 @@ public final class RelToPlanNodeConverter {
         new UnnestNode.TableFunctionContext(withOrdinality, elementIndexes, ordinalityIndex);
     return new UnnestNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
         convertInputs(node.getInputs()), arrayExprs, tableFunctionContext);
+  }
+
+  private GroupingSetsExpandNode convertGroupingSetsExpand(PinotLogicalGroupingSetsExpand node) {
+    return new GroupingSetsExpandNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+        convertInputs(node.getInputs()), node.getGroupingColumns(), node.getGroupingIds());
   }
 
   // NOTE: Besides the main dispatch, this is also invoked from tryPruneUnnestPassthrough. Its result is always used
