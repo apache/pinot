@@ -150,7 +150,7 @@ public class PredownloadZKClient implements AutoCloseable {
   }
 
   /**
-   * Returns URIs of ONLINE peer servers hosting the given segment, excluding the current instance.
+   * Returns URIs of ONLINE peer servers hosting the given segment.
    * Uses ExternalView to discover peers — mirrors PeerServerSegmentFinder without requiring HelixManager.
    */
   public List<URI> getPeerServerURIs(HelixDataAccessor accessor, String tableNameWithType, String segmentName,

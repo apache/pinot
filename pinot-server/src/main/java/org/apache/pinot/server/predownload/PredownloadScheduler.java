@@ -19,6 +19,7 @@
 package org.apache.pinot.server.predownload;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -114,6 +115,13 @@ public class PredownloadScheduler {
 
     _peerDownloadEnabled = properties.getBoolean("pinot.server.peer.download.enabled", false);
     _peerDownloadScheme = _instanceDataManagerConfig.getSegmentPeerDownloadScheme();
+    if (_peerDownloadScheme != null) {
+      _peerDownloadScheme = _peerDownloadScheme.toLowerCase();
+      Preconditions.checkState(
+          CommonConstants.HTTP_PROTOCOL.equals(_peerDownloadScheme)
+              || CommonConstants.HTTPS_PROTOCOL.equals(_peerDownloadScheme),
+          "Unsupported peer download scheme: %s", _peerDownloadScheme);
+    }
     LOGGER.info("Peer download enabled: {}, scheme: {}", _peerDownloadEnabled, _peerDownloadScheme);
 
     _numOfSkippedSegments = 0;
