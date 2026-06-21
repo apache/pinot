@@ -64,14 +64,8 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
   private boolean _skipSegmentPreprocess;
-  // When enabled, columns physically present in a segment but absent from the table schema (i.e. intentionally dropped)
-  // are physically removed during reload to reclaim disk. When disabled (default), such columns are only hidden from
-  // the query view and their on-disk files remain until the segment is rebuilt from source.
-  //
-  // WARNING: this is a standing flag, not a one-shot operation. While enabled, every reload (including routine reloads
-  // for unrelated changes) irreversibly deletes any column absent from the current schema; the data can only be
-  // recovered by re-ingesting from source. Query semantics are unaffected (a dropped column is hidden and queries
-  // referencing it are rejected regardless of this flag), so toggling it is rolling-upgrade safe.
+  // When enabled, columns physically present in a segment but absent from the table schema
+  // are physically removed during reload to reclaim disk.
   private boolean _reclaimDeletedColumnsOnReload;
   // If set to true, uses NoDictColumnStatisticsCollector for stats collection for no-dictionary columns.
   // Once we are confident about the stability of NoDictColumnStatisticsCollector,

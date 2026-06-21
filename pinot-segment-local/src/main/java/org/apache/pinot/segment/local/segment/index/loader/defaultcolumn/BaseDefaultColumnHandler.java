@@ -338,9 +338,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
     }
 
-    // Compute REMOVE actions. Auto-generated default columns are always removed when dropped from the schema. Ingested
-    // columns are only physically reclaimed when reclaimDeletedColumnsOnReload is enabled; the controller schema-update
-    // API guarantees a dropped column is no longer referenced by the table config before it reaches this point.
+    // Compute REMOVE actions.
     boolean reclaimDeletedColumns = _indexLoadingConfig.isReclaimDeletedColumnsOnReload();
     for (ColumnMetadata columnMetadata : _segmentMetadata.getColumnMetadataMap().values()) {
       String column = columnMetadata.getColumnName();

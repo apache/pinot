@@ -1817,7 +1817,7 @@ public class PinotHelixResourceManager {
    * backward-compatible with the existing schema.
    *
    * <p>When {@code allowColumnDeletion} is set, columns present in the old schema but absent from the new schema are
-   * treated as intentional drops rather than incompatibilities. Primary-key and field-spec (type/cardinality) changes
+   * treated as intentional drops. Primary-key and field-spec (type/cardinality) changes
    * are still enforced. {@code forceTableSchemaUpdate} remains the blunt escape hatch that bypasses all checks.
    */
   private void updateSchema(Schema schema, Schema oldSchema, boolean forceTableSchemaUpdate,

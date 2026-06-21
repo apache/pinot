@@ -212,7 +212,7 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Whether to force update the schema even if the new schema is backward incompatible")
       @DefaultValue("false") @QueryParam("force") boolean force,
       @ApiParam(value = "Whether to allow removing columns that are present in the existing schema but absent from the "
-          + "new schema. Only relaxes column removal; primary-key and type changes are still rejected.")
+          + "new schema")
       @DefaultValue("false") @QueryParam("allowColumnDeletion") boolean allowColumnDeletion,
       @Context HttpHeaders headers, FormDataMultiPart multiPart) {
     schemaName = DatabaseUtils.translateTableName(schemaName, headers);
@@ -245,7 +245,7 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Whether to force update the schema even if the new schema is backward incompatible")
       @DefaultValue("false") @QueryParam("force") boolean force,
       @ApiParam(value = "Whether to allow removing columns that are present in the existing schema but absent from the "
-          + "new schema. Only relaxes column removal; primary-key and type changes are still rejected.")
+          + "new schema")
       @DefaultValue("false") @QueryParam("allowColumnDeletion") boolean allowColumnDeletion,
       @Context HttpHeaders headers, String schemaJsonString) {
     schemaName = DatabaseUtils.translateTableName(schemaName, headers);
