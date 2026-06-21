@@ -90,6 +90,13 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
   }
 
   @Test(dataProvider = "allJsonColumns")
+  public void testExtractJsonLongValue(String column) {
+    // test fails, actual number returned is 1790416068515225856
+    Object[][] expecteds1 = {{1790416068515225918L}};
+    checkResult("SELECT jsonextractscalar(" + column + ", '$.largeLongValue', 'LONG') FROM testTable where intColumn = 15 LIMIT 1", expecteds1);
+  }
+
+  @Test(dataProvider = "allJsonColumns")
   public void testNestedExtractJsonField(String column) {
     Object[][] expecteds1 = {{"duck"}, {"mouse"}, {"duck"}};
     checkResult("SELECT jsonextractscalar(jsonextractscalar(" + column
