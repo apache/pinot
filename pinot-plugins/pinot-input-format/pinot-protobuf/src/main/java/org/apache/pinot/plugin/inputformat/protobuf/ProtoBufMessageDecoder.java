@@ -32,7 +32,10 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
 
-//TODO: Add support for Schema Registry
+// This decoder is intentionally file-based and does not support schema registry.
+// For Confluent Schema Registry-backed descriptor resolution, use
+// KafkaConfluentSchemaRegistryProtoBufMessageDecoder instead.
+
 public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String DESCRIPTOR_FILE_PATH = "descriptorFile";
   public static final String PROTO_CLASS_NAME = "protoClassName";
@@ -43,13 +46,16 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-      throws Exception {
+          throws Exception {
     Preconditions.checkState(props.containsKey(DESCRIPTOR_FILE_PATH),
-        "Protocol Buffer schema descriptor file must be provided");
+            "Property '%s' must be specified for ProtoBufMessageDecoder. "
+                    + "If you are using Confluent Schema Registry, use "
+                    + "KafkaConfluentSchemaRegistryProtoBufMessageDecoder instead.",
+            DESCRIPTOR_FILE_PATH);
 
     _protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
     InputStream descriptorFileInputStream = ProtoBufUtils.getDescriptorFileInputStream(
-        props.get(DESCRIPTOR_FILE_PATH));
+            props.get(DESCRIPTOR_FILE_PATH));
     Descriptors.Descriptor descriptor = buildProtoBufDescriptor(descriptorFileInputStream);
     _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
@@ -58,7 +64,7 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   }
 
   private Descriptors.Descriptor buildProtoBufDescriptor(InputStream fin)
-      throws IOException {
+          throws IOException {
     try {
       DynamicSchema dynamicSchema = DynamicSchema.parseFrom(fin);
 
