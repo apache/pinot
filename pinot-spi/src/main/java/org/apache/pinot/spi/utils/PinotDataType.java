@@ -264,7 +264,7 @@ public enum PinotDataType {
     }
   },
 
-  INTEGER {
+  INT {
     @Override
     public int toInt(Object value) {
       return (Integer) value;
@@ -297,7 +297,7 @@ public enum PinotDataType {
 
     @Override
     public Timestamp toTimestamp(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from INTEGER to TIMESTAMP");
+      throw new UnsupportedOperationException("Cannot convert value from INT to TIMESTAMP");
     }
 
     @Override
@@ -307,7 +307,7 @@ public enum PinotDataType {
 
     @Override
     public byte[] toBytes(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from INTEGER to BYTES");
+      throw new UnsupportedOperationException("Cannot convert value from INT to BYTES");
     }
 
     @Override
@@ -545,7 +545,7 @@ public enum PinotDataType {
   TIMESTAMP {
     @Override
     public int toInt(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to INTEGER");
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to INT");
     }
 
     @Override
@@ -659,7 +659,7 @@ public enum PinotDataType {
       switch (sourceType) {
         case DATE:
           return (LocalDate) value;
-        case INTEGER:
+        case INT:
         case LONG:
           return LocalDate.ofEpochDay(((Number) value).longValue());
         case TIMESTAMP:
@@ -746,7 +746,7 @@ public enum PinotDataType {
       switch (sourceType) {
         case TIME:
           return (LocalTime) value;
-        case INTEGER:
+        case INT:
         case LONG:
           // Treat the input as millis-since-midnight (matches `toLong`).
           return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1_000_000L);
@@ -893,7 +893,7 @@ public enum PinotDataType {
   BYTES {
     @Override
     public int toInt(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from BYTES to INTEGER");
+      throw new UnsupportedOperationException("Cannot convert value from BYTES to INT");
     }
 
     @Override
@@ -959,7 +959,7 @@ public enum PinotDataType {
   UUID {
     @Override
     public int toInt(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from UUID to INTEGER");
+      throw new UnsupportedOperationException("Cannot convert value from UUID to INT");
     }
 
     @Override
@@ -1148,7 +1148,7 @@ public enum PinotDataType {
     }
   },
 
-  INTEGER_ARRAY {
+  INT_ARRAY {
     @Override
     public Integer[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toIntegerArray(value);
@@ -1788,8 +1788,8 @@ public enum PinotDataType {
       case SHORT_ARRAY:
         return SHORT;
       case PRIMITIVE_INT_ARRAY:
-      case INTEGER_ARRAY:
-        return INTEGER;
+      case INT_ARRAY:
+        return INT;
       case PRIMITIVE_LONG_ARRAY:
       case LONG_ARRAY:
         return LONG;
@@ -1829,7 +1829,7 @@ public enum PinotDataType {
   /// (e.g. vendor `Timestamp` subclasses returned by JDBC drivers) are matched by their parent type.
   public static PinotDataType getSingleValueType(Object value) {
     if (value instanceof Integer) {
-      return INTEGER;
+      return INT;
     }
     if (value instanceof Long) {
       return LONG;
@@ -1883,7 +1883,7 @@ public enum PinotDataType {
   /// via `instanceof`. Returns [#OBJECT_ARRAY] for any unrecognized type.
   public static PinotDataType getMultiValueType(Object element) {
     if (element instanceof Integer) {
-      return INTEGER_ARRAY;
+      return INT_ARRAY;
     }
     if (element instanceof Long) {
       return LONG_ARRAY;
@@ -1954,7 +1954,7 @@ public enum PinotDataType {
     DataType dataType = fieldSpec.getDataType();
     switch (dataType) {
       case INT:
-        return fieldSpec.isSingleValueField() ? INTEGER : INTEGER_ARRAY;
+        return fieldSpec.isSingleValueField() ? INT : INT_ARRAY;
       case LONG:
         return fieldSpec.isSingleValueField() ? LONG : LONG_ARRAY;
       case FLOAT:
