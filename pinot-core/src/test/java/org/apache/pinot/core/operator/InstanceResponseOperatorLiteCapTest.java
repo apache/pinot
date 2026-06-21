@@ -132,4 +132,38 @@ public class InstanceResponseOperatorLiteCapTest {
 
     assertNull(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName()));
   }
+
+  @Test
+  public void selectionOnlyWithHasMoreFilteredDocsEmitsFlag() {
+    // SelectionOnly block with hasMoreFilteredDocs=true and LITE_CAP reason → truncation detected via hasMoreDocs
+    QueryContext ctx = selectionOnlyContextWithLiteCap(5);
+    TestableInstanceResponseOperator op = new TestableInstanceResponseOperator(ctx);
+
+    SelectionResultsBlock block = new SelectionResultsBlock(SCHEMA, Collections.emptyList(), ctx);
+    block.setNumDocsScanned(5);
+    block.setHasMoreFilteredDocs(true);
+    block.setLeafTruncationReason("LITE_CAP");
+
+    InstanceResponseBlock response = op.buildBlock(block);
+
+    assertEquals(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName()), "true");
+    assertEquals(response.getResponseMetadata().get(DataTable.MetadataKey.LEAF_TRUNCATION_REASON.getName()),
+        "LITE_CAP");
+  }
+
+  @Test
+  public void selectionOnlyWithHasMoreFilteredDocsButNoLiteCapNoFlag() {
+    // hasMoreFilteredDocs=true but no LITE_CAP reason → not a lite-cap truncation
+    QueryContext ctx = QueryContextConverterUtils.getQueryContext(
+        "SET \"numReplicaGroupsToQuery\"=1; SELECT col FROM myTable LIMIT 5");
+    TestableInstanceResponseOperator op = new TestableInstanceResponseOperator(ctx);
+
+    SelectionResultsBlock block = new SelectionResultsBlock(SCHEMA, Collections.emptyList(), ctx);
+    block.setNumDocsScanned(5);
+    block.setHasMoreFilteredDocs(true);
+
+    InstanceResponseBlock response = op.buildBlock(block);
+
+    assertNull(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName()));
+  }
 }

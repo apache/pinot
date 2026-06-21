@@ -20,12 +20,12 @@ package org.apache.pinot.core.operator.streaming;
 
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -51,6 +51,7 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
 
   private final BaseStreamingCombineOperator<?> _streamingCombineOperator;
   private final ResultsBlockStreamer _streamer;
+  private boolean _hasMoreFilteredDocs;
 
   public StreamingInstanceResponseOperator(BaseCombineOperator<?> combinedOperator,
       List<SegmentContext> segmentContexts, List<FetchContext> fetchContexts, ResultsBlockStreamer streamer,
@@ -74,15 +75,23 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
           if (resultsBlock instanceof ExceptionResultsBlock) {
             return new InstanceResponseBlock(resultsBlock);
           }
+          if (resultsBlock instanceof SelectionResultsBlock) {
+            SelectionResultsBlock selBlock = (SelectionResultsBlock) resultsBlock;
+            if (selBlock.hasMoreFilteredDocs()) {
+              _hasMoreFilteredDocs = true;
+            }
+          }
           if (resultsBlock.getNumRows() > 0) {
             totalRowsStreamed += resultsBlock.getNumRows();
             _streamer.send(resultsBlock);
           }
           resultsBlock = getBaseBlock();
         }
-        // Return a metadata-only block in the end
         InstanceResponseBlock responseBlock = buildInstanceResponseBlock(resultsBlock);
-        addLiteModeMetadataIfNeeded(responseBlock, totalRowsStreamed);
+        if (_hasMoreFilteredDocs) {
+          responseBlock.addMetadata(MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName(), "true");
+          responseBlock.addMetadata(MetadataKey.LEAF_TRUNCATION_REASON.getName(), "LITE_CAP");
+        }
         return responseBlock;
       } else {
         // Handle single block combine operator in streaming fashion
@@ -119,13 +128,6 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
 
   protected BaseResultsBlock getCombinedResults() {
     return _combineOperator.nextBlock();
-  }
-
-  private void addLiteModeMetadataIfNeeded(InstanceResponseBlock responseBlock, long totalRowsStreamed) {
-    Integer implicitLimit = QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(_queryContext.getQueryOptions());
-    if (implicitLimit != null && totalRowsStreamed >= implicitLimit) {
-      responseBlock.addMetadata(MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
-    }
   }
 
   @Override

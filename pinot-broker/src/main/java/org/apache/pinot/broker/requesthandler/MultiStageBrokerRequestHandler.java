@@ -49,6 +49,7 @@ import javax.ws.rs.core.Response;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
@@ -1094,11 +1095,21 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return false;
     }
     if (node instanceof SqlOrderBy) {
-      return true;
+      SqlOrderBy orderBy = (SqlOrderBy) node;
+      if (orderBy.orderList != null && orderBy.orderList.size() > 0) {
+        return true;
+      }
+      return hasTruncationSensitiveOp(orderBy.query);
     }
-    if (node instanceof SqlSelect
-        && ((SqlSelect) node).getModifierNode(SqlSelectKeyword.DISTINCT) != null) {
-      return true;
+    if (node instanceof SqlSelect) {
+      SqlSelect select = (SqlSelect) node;
+      if (select.getModifierNode(SqlSelectKeyword.DISTINCT) != null) {
+        return true;
+      }
+      SqlNodeList orderList = select.getOrderList();
+      if (orderList != null && orderList.size() > 0) {
+        return true;
+      }
     }
     if (node instanceof SqlCall) {
       for (SqlNode operand : ((SqlCall) node).getOperandList()) {

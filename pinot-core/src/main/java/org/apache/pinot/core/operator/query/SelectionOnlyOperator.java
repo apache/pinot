@@ -114,6 +114,7 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
 
   @Override
   protected SelectionResultsBlock getNextBlock() {
+    boolean hasMoreDocs = false;
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       int numExpressions = _expressions.size();
@@ -150,11 +151,21 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
         }
       }
       if (_rows.size() == _numRowsToKeep) {
+        String risk = _queryContext.getQueryOptions() != null
+            ? _queryContext.getQueryOptions().get("leafLimitTruncationRisk") : null;
+        if ("LITE_CAP".equals(risk)) {
+          hasMoreDocs = valueBlock.getNumDocs() > numDocsToAdd || _projectOperator.nextBlock() != null;
+        }
         break;
       }
     }
 
-    return new SelectionResultsBlock(_dataSchema, _rows, _queryContext);
+    SelectionResultsBlock block = new SelectionResultsBlock(_dataSchema, _rows, _queryContext);
+    if (hasMoreDocs) {
+      block.setHasMoreFilteredDocs(true);
+      block.setLeafTruncationReason("LITE_CAP");
+    }
+    return block;
   }
 
   @Override

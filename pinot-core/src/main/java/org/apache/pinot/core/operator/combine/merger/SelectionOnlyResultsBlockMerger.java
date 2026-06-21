@@ -56,5 +56,12 @@ public class SelectionOnlyResultsBlockMerger implements ResultsBlockMerger<Selec
       return;
     }
     SelectionOperatorUtils.mergeWithoutOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
+    if (blockToMerge.hasMoreFilteredDocs()) {
+      mergedBlock.setHasMoreFilteredDocs(true);
+      String reason = blockToMerge.getLeafTruncationReason();
+      if (reason != null) {
+        mergedBlock.setLeafTruncationReason(reason);
+      }
+    }
   }
 }
