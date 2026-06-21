@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -32,6 +34,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
+import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -43,6 +46,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -566,6 +570,50 @@ public class RecordTransformerTest {
     assertTrue(transformers.get(5) instanceof SpecialValueTransformer);
     assertTrue(transformers.get(6) instanceof NullValueTransformer);
     assertTrue(transformers.get(7) instanceof SanitizationTransformer);
+  }
+
+  @Test
+  public void testSourceFieldDataTypeTransformerOrder() {
+    // The pre-complex-type source-field transformer runs first; the post-complex-type one runs right before the
+    // ExpressionTransformer. With no complex-type transformer or enricher configured, they are the first two
+    // transformers in the list.
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.INT)
+        .addSingleValueDimension("expressionTestColumn", DataType.INT)
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setSourceFieldConfigs(List.of(
+        new SourceFieldConfig("preField", PinotDataType.LONG, true),
+        new SourceFieldConfig("postField", PinotDataType.STRING, false)
+    ));
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("expressionTestColumn", "plus(svInt, 10)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    List<RecordTransformer> transformers = RecordTransformerUtils.getDefaultTransformers(tableConfig, schema);
+    assertTrue(transformers.get(0) instanceof DataTypeTransformer);
+    assertEquals(transformers.get(0).getInputColumns(), Set.of("preField"));
+    assertTrue(transformers.get(1) instanceof DataTypeTransformer);
+    assertEquals(transformers.get(1).getInputColumns(), Set.of("postField"));
+    assertTrue(transformers.get(2) instanceof ExpressionTransformer);
+  }
+
+  @Test
+  public void testSourceFieldDataTypeConversion() {
+    DataTypeTransformer transformer = new DataTypeTransformer(TABLE_CONFIG, Map.of("srcLong", PinotDataType.LONG));
+
+    // A mistyped (String) source value is converted to the configured type.
+    GenericRow record = new GenericRow();
+    record.putValue("srcLong", "12345");
+    transformer.transform(record);
+    assertEquals(record.getValue("srcLong"), 12345L);
+
+    // A null source value is handled without throwing.
+    GenericRow nullRecord = new GenericRow();
+    nullRecord.putValue("srcLong", null);
+    transformer.transform(nullRecord);
+    assertNull(nullRecord.getValue("srcLong"));
   }
 
   @Test

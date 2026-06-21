@@ -63,6 +63,7 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -82,6 +83,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
@@ -564,6 +566,35 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail due to name conflict from field name in schema with a prefix in prefixesToRename");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void ingestionSourceFieldConfigsTest() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
+
+    // A field configured once per phase, plus a field shared across phases, are all valid.
+    ingestionConfig.setSourceFieldConfigs(List.of(
+        new SourceFieldConfig("preOnly", PinotDataType.LONG, true),
+        new SourceFieldConfig("postOnly", PinotDataType.STRING, false),
+        new SourceFieldConfig("shared", PinotDataType.LONG, true),
+        new SourceFieldConfig("shared", PinotDataType.INT, false)
+    ));
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    // The same field twice within the same phase is rejected.
+    ingestionConfig.setSourceFieldConfigs(List.of(
+        new SourceFieldConfig("dup", PinotDataType.LONG, false),
+        new SourceFieldConfig("dup", PinotDataType.INT, false)
+    ));
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      fail("Should fail on duplicate SourceFieldConfig within the same phase");
     } catch (IllegalStateException e) {
       // expected
     }

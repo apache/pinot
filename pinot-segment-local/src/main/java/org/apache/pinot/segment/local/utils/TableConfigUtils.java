@@ -89,6 +89,7 @@ import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
+import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -646,6 +647,23 @@ public final class TableConfigUtils {
           Preconditions.checkState(dictConfig != null && dictConfig.isDisabled(),
               "Aggregated column: %s must be a no-dictionary column", column);
         });
+      }
+
+      // Source field configs
+      List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
+      if (sourceFieldConfigs != null) {
+        // A source field can be configured once per phase (pre- and post-complex-type), but not twice within the same
+        // phase, because that would yield two DataTypeTransformers targeting it in the same phase, which is ambiguous.
+        Set<String> preComplexTypeFieldNames = new HashSet<>();
+        Set<String> postComplexTypeFieldNames = new HashSet<>();
+        for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
+          String name = sourceFieldConfig.getName();
+          boolean preComplexTypeTransform = sourceFieldConfig.isPreComplexTypeTransform();
+          Set<String> fieldNames = preComplexTypeTransform ? preComplexTypeFieldNames : postComplexTypeFieldNames;
+          Preconditions.checkState(fieldNames.add(name),
+              "Duplicate SourceFieldConfig found for source field: %s (preComplexTypeTransform: %s)", name,
+              preComplexTypeTransform);
+        }
       }
 
       // Enrichment configs
