@@ -76,7 +76,7 @@ public class PredownloadSchedulerTest {
       throws Exception {
     _temporaryFolder = new File(FileUtils.getTempDirectory(), this.getClass().getName());
     FileUtils.deleteQuietly(_temporaryFolder);
-    _predownloadScheduler = spy(new PredownloadScheduler(properties, false));
+    _predownloadScheduler = spy(new PredownloadScheduler(properties));
     _instanceConfig = new InstanceConfig(INSTANCE_ID);
     _instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     _instanceConfig.addTag(TAG);
@@ -317,7 +317,7 @@ public class PredownloadSchedulerTest {
     PropertiesConfiguration defaultConfig = new PropertiesConfiguration();
     defaultProps.forEach((key, value) -> defaultConfig.setProperty(key, value));
 
-    PredownloadScheduler defaultScheduler = new PredownloadScheduler(defaultConfig, false);
+    PredownloadScheduler defaultScheduler = new PredownloadScheduler(defaultConfig);
     ThreadPoolExecutor defaultExecutor = (ThreadPoolExecutor) defaultScheduler._executor;
     int expectedDefaultThreads = Runtime.getRuntime().availableProcessors() * 3;
     assertEquals(defaultExecutor.getCorePoolSize(), expectedDefaultThreads,
@@ -337,7 +337,7 @@ public class PredownloadSchedulerTest {
     PropertiesConfiguration customConfig = new PropertiesConfiguration();
     customProps.forEach((key, value) -> customConfig.setProperty(key, value));
 
-    PredownloadScheduler customScheduler = new PredownloadScheduler(customConfig, false);
+    PredownloadScheduler customScheduler = new PredownloadScheduler(customConfig);
     ThreadPoolExecutor customExecutor = (ThreadPoolExecutor) customScheduler._executor;
     assertEquals(customExecutor.getCorePoolSize(), customParallelism,
         "Custom parallelism should match configured value");
@@ -355,7 +355,7 @@ public class PredownloadSchedulerTest {
     PropertiesConfiguration zeroConfig = new PropertiesConfiguration();
     zeroProps.forEach((key, value) -> zeroConfig.setProperty(key, value));
 
-    PredownloadScheduler zeroScheduler = new PredownloadScheduler(zeroConfig, false);
+    PredownloadScheduler zeroScheduler = new PredownloadScheduler(zeroConfig);
     ThreadPoolExecutor zeroExecutor = (ThreadPoolExecutor) zeroScheduler._executor;
     assertEquals(zeroExecutor.getCorePoolSize(), expectedDefaultThreads,
         "Zero parallelism should fall back to default");
@@ -366,7 +366,8 @@ public class PredownloadSchedulerTest {
 
   private PredownloadScheduler buildPeerEnabledScheduler(PropertiesConfiguration properties)
       throws Exception {
-    PredownloadScheduler scheduler = spy(new PredownloadScheduler(properties, true));
+    properties.setProperty("pinot.server.peer.download.enabled", true);
+    PredownloadScheduler scheduler = spy(new PredownloadScheduler(properties));
     scheduler._executor = Runnable::run;
 
     Field schemeField = PredownloadScheduler.class.getDeclaredField("_peerDownloadScheme");
@@ -409,11 +410,12 @@ public class PredownloadSchedulerTest {
     Field enabledField = PredownloadScheduler.class.getDeclaredField("_peerDownloadEnabled");
     enabledField.setAccessible(true);
 
-    PredownloadScheduler disabled = new PredownloadScheduler(properties, false);
+    PredownloadScheduler disabled = new PredownloadScheduler(properties);
     assertEquals(enabledField.get(disabled), false);
     disabled.stop();
 
-    PredownloadScheduler enabled = new PredownloadScheduler(properties, true);
+    properties.setProperty("pinot.server.peer.download.enabled", true);
+    PredownloadScheduler enabled = new PredownloadScheduler(properties);
     assertEquals(enabledField.get(enabled), true);
     enabled.stop();
   }
@@ -482,8 +484,8 @@ public class PredownloadSchedulerTest {
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromPath(propertiesFilePath);
     setUp(properties);
 
-    // peerDownloadEnabled=false — no fallback to peer
-    PredownloadScheduler scheduler = spy(new PredownloadScheduler(properties, false));
+    // peerDownloadEnabled=false (default from properties) — no fallback to peer
+    PredownloadScheduler scheduler = spy(new PredownloadScheduler(properties));
     scheduler._executor = Runnable::run;
     Field metricsField = PredownloadScheduler.class.getDeclaredField("_predownloadMetrics");
     metricsField.setAccessible(true);
