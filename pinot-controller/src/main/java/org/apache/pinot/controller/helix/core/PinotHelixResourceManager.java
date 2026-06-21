@@ -1852,8 +1852,7 @@ public class PinotHelixResourceManager {
           }
         }
 
-        // Check for missing columns. When column deletion is explicitly allowed, missing columns are intentional drops
-        // and are not reported as incompatibilities.
+        // When column deletion is allowed, missing columns are intentional drops, not incompatibilities.
         Set<String> newSchemaColumns = schema.getColumnNames();
         List<String> missingColumns = new ArrayList<>();
         if (!allowColumnDeletion) {

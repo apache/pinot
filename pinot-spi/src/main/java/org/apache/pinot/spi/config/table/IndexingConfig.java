@@ -64,20 +64,14 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
   private boolean _skipSegmentPreprocess;
-  // When enabled, columns that exist physically in a segment but are no longer present in the table schema (i.e. they
-  // were intentionally dropped from the schema) are physically removed from the segment during reload, reclaiming disk.
-  // When disabled (default), such columns are only hidden from the query view at load time and their on-disk index
-  // files remain until the segment is refreshed/rebuilt from source.
+  // When enabled, columns physically present in a segment but absent from the table schema (i.e. intentionally dropped)
+  // are physically removed during reload to reclaim disk. When disabled (default), such columns are only hidden from
+  // the query view and their on-disk files remain until the segment is rebuilt from source.
   //
-  // WARNING: This is a standing flag, not a one-shot operation. Once enabled, EVERY subsequent reload (including
-  // routine reloads triggered by unrelated index/config changes) will physically and IRREVERSIBLY delete any column
-  // that is absent from the current schema. A column whose data is reclaimed cannot be recovered except by
-  // re-ingesting from the source. Operators should enable this only when they intend to permanently reclaim dropped
-  // columns, and should generally disable it again afterwards. Columns still referenced by the table config (indexes,
-  // star-tree, partitioning, time column, field configs) are never reclaimed, to avoid dangling index references.
-  // Defaults to false to preserve existing behavior and keep column deletion non-destructive unless operators
-  // explicitly opt in. This flag only affects on-disk reclamation timing; query semantics (a dropped column is hidden
-  // and queries referencing it are rejected) are identical regardless of this flag, so it is rolling-upgrade safe.
+  // WARNING: this is a standing flag, not a one-shot operation. While enabled, every reload (including routine reloads
+  // for unrelated changes) irreversibly deletes any column absent from the current schema; the data can only be
+  // recovered by re-ingesting from source. Query semantics are unaffected (a dropped column is hidden and queries
+  // referencing it are rejected regardless of this flag), so toggling it is rolling-upgrade safe.
   private boolean _reclaimDeletedColumnsOnReload;
   // If set to true, uses NoDictColumnStatisticsCollector for stats collection for no-dictionary columns.
   // Once we are confident about the stability of NoDictColumnStatisticsCollector,
