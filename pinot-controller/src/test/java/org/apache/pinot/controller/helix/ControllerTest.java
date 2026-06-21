@@ -829,6 +829,20 @@ public class ControllerTest {
     }
   }
 
+  /**
+   * Updates the schema with {@code allowColumnDeletion=true}, permitting intentional column removal while keeping the
+   * primary-key and type guardrails enforced (unlike {@link #forceUpdateSchema} which bypasses all checks).
+   */
+  public void updateSchemaWithColumnDeletion(Schema schema)
+      throws IOException {
+    try {
+      getOrCreateAdminClient().getSchemaClient().updateSchema(schema.getSchemaName(),
+          schema.toSingleLineJsonString(), false, false, true);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
+  }
+
   public Schema getSchema(String schemaName) {
     Schema schema = _helixResourceManager.getSchema(schemaName);
     assertNotNull(schema);

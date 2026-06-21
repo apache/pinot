@@ -4300,6 +4300,39 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testSchemaColumnDeletion() throws Exception {
+    String offlineTableName = DEFAULT_TABLE_NAME + "_OFFLINE";
+    Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
+    String columnToDelete = "columnToDelete";
+    try {
+      // Add a new column and reload so that it materializes in the segments.
+      Schema schemaWithExtraColumn = new Schema();
+      schemaWithExtraColumn.setSchemaName(oldSchema.getSchemaName());
+      oldSchema.getAllFieldSpecs().forEach(schemaWithExtraColumn::addField);
+      schemaWithExtraColumn.addField(new DimensionFieldSpec(columnToDelete, DataType.INT, true));
+      updateSchema(schemaWithExtraColumn);
+      reloadAndWait(offlineTableName, null);
+      // The column is queryable after being added.
+      assertNoError(postQuery("SELECT " + columnToDelete + " FROM " + DEFAULT_TABLE_NAME + " LIMIT 1"));
+
+      // Removing the column without allowColumnDeletion is rejected as backward-incompatible.
+      Assert.assertThrows(Exception.class, () -> updateSchema(oldSchema));
+
+      // Removing the column with allowColumnDeletion=true is accepted.
+      updateSchemaWithColumnDeletion(oldSchema);
+      reloadAndWait(offlineTableName, null);
+
+      // The dropped column is no longer part of the schema, so queries referencing it are rejected.
+      testQueryError("SELECT " + columnToDelete + " FROM " + DEFAULT_TABLE_NAME + " LIMIT 1",
+          QueryErrorCode.UNKNOWN_COLUMN);
+    } finally {
+      // Restore the original schema for subsequent tests.
+      forceUpdateSchema(oldSchema);
+      reloadAndWait(offlineTableName, null);
+    }
+  }
+
+  @Test
   public void testVirtualColumnAfterReloadForDifferentDataTypes() throws Exception {
     Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
     try {

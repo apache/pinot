@@ -913,6 +913,26 @@ public final class Schema implements Serializable {
    * @param oldSchema old schema
    */
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
+    return isBackwardCompatibleWith(oldSchema, false);
+  }
+
+  /**
+   * Check whether the current schema is backward compatible with oldSchema.
+   *
+   * Backward compatibility requires
+   * (1) all columns in oldSchema should be retained, unless {@code allowColumnDeletion} is set, in which case columns
+   *     present in oldSchema but absent from this schema are treated as intentional drops rather than
+   *     incompatibilities.
+   * (2) all column fieldSpecs (for columns retained in this schema) should be backward compatible with the old ones.
+   * (3) primary key columns should not be changed if present (used in dimension tables, upsert, and dedup).
+   *
+   * <p>Note that {@code allowColumnDeletion} only relaxes the column-removal rule. Primary-key changes and incompatible
+   * field-spec changes (data type, single/multi value) for retained columns are still rejected.
+   *
+   * @param oldSchema old schema
+   * @param allowColumnDeletion whether removing columns present in oldSchema is allowed
+   */
+  public boolean isBackwardCompatibleWith(Schema oldSchema, boolean allowColumnDeletion) {
     List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
     List<String> newPrimaryKeys = getPrimaryKeyColumns();
     // Allow adding primary keys if not present. Helps add upsert and dedup configs to existing tables.
@@ -926,6 +946,11 @@ public final class Schema implements Serializable {
     for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
       String oldSchemaColumnName = entry.getKey();
       if (!columnNames.contains(oldSchemaColumnName)) {
+        // Column removed from the new schema. Only treat it as backward compatible when the caller has explicitly
+        // signalled the intent to drop columns.
+        if (allowColumnDeletion) {
+          continue;
+        }
         return false;
       }
       FieldSpec oldSchemaFieldSpec = entry.getValue();

@@ -1746,7 +1746,7 @@ public class PinotHelixResourceManager {
     if (oldSchema != null) {
       // Update existing schema
       if (override) {
-        updateSchema(schema, oldSchema, force);
+        updateSchema(schema, oldSchema, force, false);
       } else {
         throw new SchemaAlreadyExistsException("Schema: " + schemaName + " already exists");
       }
@@ -1770,6 +1770,11 @@ public class PinotHelixResourceManager {
 
   public void updateSchema(Schema schema, boolean reload, boolean forceTableSchemaUpdate)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
+    updateSchema(schema, reload, forceTableSchemaUpdate, false);
+  }
+
+  public void updateSchema(Schema schema, boolean reload, boolean forceTableSchemaUpdate, boolean allowColumnDeletion)
+      throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     String schemaName = schema.getSchemaName();
     LOGGER.info("Updating schema: {} with reload: {}", schemaName, reload);
 
@@ -1778,7 +1783,7 @@ public class PinotHelixResourceManager {
       throw new SchemaNotFoundException("Schema: " + schemaName + " does not exist");
     }
 
-    updateSchema(schema, oldSchema, forceTableSchemaUpdate);
+    updateSchema(schema, oldSchema, forceTableSchemaUpdate, allowColumnDeletion);
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, schemaName)) {
       // For logical table schemas, we do not need to reload segments or send schema refresh messages
       LOGGER.info("Logical table schema: {} updated, no need to reload segments or send schema refresh messages",
@@ -1810,8 +1815,13 @@ public class PinotHelixResourceManager {
   /**
    * Helper method to update the schema, or throw SchemaBackwardIncompatibleException when the new schema is not
    * backward-compatible with the existing schema.
+   *
+   * <p>When {@code allowColumnDeletion} is set, columns present in the old schema but absent from the new schema are
+   * treated as intentional drops rather than incompatibilities. Primary-key and field-spec (type/cardinality) changes
+   * are still enforced. {@code forceTableSchemaUpdate} remains the blunt escape hatch that bypasses all checks.
    */
-  private void updateSchema(Schema schema, Schema oldSchema, boolean forceTableSchemaUpdate)
+  private void updateSchema(Schema schema, Schema oldSchema, boolean forceTableSchemaUpdate,
+      boolean allowColumnDeletion)
       throws SchemaBackwardIncompatibleException {
     String schemaName = schema.getSchemaName();
     schema.updateBooleanFieldsIfNeeded(oldSchema);
@@ -1820,7 +1830,7 @@ public class PinotHelixResourceManager {
       return;
     }
 
-    boolean isBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema);
+    boolean isBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema, allowColumnDeletion);
     if (!isBackwardCompatible) {
       if (forceTableSchemaUpdate) {
         LOGGER.warn("Force updated schema: {} which is backward incompatible with the existing schema", oldSchema);
@@ -1842,12 +1852,15 @@ public class PinotHelixResourceManager {
           }
         }
 
-        // Check for missing columns
+        // Check for missing columns. When column deletion is explicitly allowed, missing columns are intentional drops
+        // and are not reported as incompatibilities.
         Set<String> newSchemaColumns = schema.getColumnNames();
         List<String> missingColumns = new ArrayList<>();
-        for (String oldColumn : oldSchema.getColumnNames()) {
-          if (!newSchemaColumns.contains(oldColumn)) {
-            missingColumns.add(oldColumn);
+        if (!allowColumnDeletion) {
+          for (String oldColumn : oldSchema.getColumnNames()) {
+            if (!newSchemaColumns.contains(oldColumn)) {
+              missingColumns.add(oldColumn);
+            }
           }
         }
 
@@ -1879,7 +1892,8 @@ public class PinotHelixResourceManager {
 
         // Add suggestions
         errorMsg.append("\n\nSuggestions to fix:");
-        errorMsg.append("\n1. Ensure all columns from the existing schema are retained in the new schema");
+        errorMsg.append("\n1. To intentionally remove columns, set allowColumnDeletion=true (other guardrails such as "
+            + "primary-key and type changes remain enforced)");
         errorMsg.append("\n2. Do not change the data type or field type of existing columns");
         errorMsg.append("\n3. Do not change primary key columns");
         errorMsg.append("\n4. New columns should be added as optional fields with default values");
