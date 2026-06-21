@@ -84,7 +84,7 @@ public class PredownloadScheduler {
   private List<PredownloadSegmentInfo> _predownloadSegmentInfoList;
   private Map<String, PredownloadTableInfo> _tableInfoMap;
 
-  public PredownloadScheduler(PropertiesConfiguration properties, boolean peerDownloadEnabled)
+  public PredownloadScheduler(PropertiesConfiguration properties)
       throws Exception {
     _properties = properties;
     _clusterName = properties.getString(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
@@ -112,7 +112,7 @@ public class PredownloadScheduler {
     _executor = Executors.newFixedThreadPool(predownloadParallelism);
     LOGGER.info("Created thread pool with num of threads: {}", predownloadParallelism);
 
-    _peerDownloadEnabled = peerDownloadEnabled;
+    _peerDownloadEnabled = properties.getBoolean("pinot.server.peer.download.enabled", false);
     _peerDownloadScheme = _instanceDataManagerConfig.getSegmentPeerDownloadScheme();
     LOGGER.info("Peer download enabled: {}, scheme: {}", _peerDownloadEnabled, _peerDownloadScheme);
 
