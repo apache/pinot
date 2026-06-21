@@ -1534,6 +1534,9 @@ public class PinotHelixResourceManager {
     Set<String> taggedInstances = new HashSet<>(HelixHelper.getInstancesWithTag(_helixZkManager, brokerTag));
     String brokerName = Helix.BROKER_RESOURCE_INSTANCE;
     IdealState brokerIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, brokerName);
+    if (brokerIdealState == null) {
+      return true;
+    }
     for (String partition : brokerIdealState.getPartitionSet()) {
       for (String instance : brokerIdealState.getInstanceSet(partition)) {
         if (taggedInstances.contains(instance)) {
@@ -1554,6 +1557,9 @@ public class PinotHelixResourceManager {
         continue;
       }
       IdealState tableIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
+      if (tableIdealState == null) {
+        continue;
+      }
       for (String partition : tableIdealState.getPartitionSet()) {
         for (String instance : tableIdealState.getInstanceSet(partition)) {
           if (taggedInstances.contains(instance)) {
