@@ -929,8 +929,12 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
 
     // Test for multiple stream configs with pauseless consumption enabled - should fail
+    Map<String, String> pauselessStreamConfigs1 = new HashMap<>(streamConfigs);
+    pauselessStreamConfigs1.remove(StreamConfigProperties.STREAM_CONFIG_ID);
+    Map<String, String> pauselessStreamConfigs2 = new HashMap<>(streamConfigs);
+    pauselessStreamConfigs2.remove(StreamConfigProperties.STREAM_CONFIG_ID);
     StreamIngestionConfig streamIngestionConfigWithPauseless =
-        new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
+        new StreamIngestionConfig(Arrays.asList(pauselessStreamConfigs1, pauselessStreamConfigs2));
     streamIngestionConfigWithPauseless.setPauselessConsumptionEnabled(true);
 
     IngestionConfig ingestionConfigWithPauseless = new IngestionConfig();
@@ -951,8 +955,13 @@ public class TableConfigUtilsTest {
     }
 
     // Test for multiple stream configs with pauseless consumption disabled - should pass
+    // Use fresh copies because ensureStreamConfigIds mutates the map (adds stream.config.id)
+    Map<String, String> dupStreamConfigs1 = new HashMap<>(streamConfigs);
+    dupStreamConfigs1.remove(StreamConfigProperties.STREAM_CONFIG_ID);
+    Map<String, String> dupStreamConfigs2 = new HashMap<>(streamConfigs);
+    dupStreamConfigs2.remove(StreamConfigProperties.STREAM_CONFIG_ID);
     StreamIngestionConfig streamIngestionConfigWithoutPauseless =
-        new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
+        new StreamIngestionConfig(Arrays.asList(dupStreamConfigs1, dupStreamConfigs2));
     streamIngestionConfigWithoutPauseless.setPauselessConsumptionEnabled(false);
 
     IngestionConfig ingestionConfigWithoutPauseless = new IngestionConfig();
@@ -973,10 +982,13 @@ public class TableConfigUtilsTest {
     }
 
     // Test for multiple stream configs with pauseless consumption disabled and unique topic names - should pass
-    Map<String, String> anotherStreamConfig = new HashMap<>(streamConfigs);
-    anotherStreamConfig.put("stream.kafka.topic.name", "myTopic2");
+    Map<String, String> uniqueStreamConfig1 = new HashMap<>(streamConfigs);
+    uniqueStreamConfig1.remove(StreamConfigProperties.STREAM_CONFIG_ID);
+    Map<String, String> uniqueStreamConfig2 = new HashMap<>(streamConfigs);
+    uniqueStreamConfig2.remove(StreamConfigProperties.STREAM_CONFIG_ID);
+    uniqueStreamConfig2.put("stream.kafka.topic.name", "myTopic2");
     StreamIngestionConfig streamIngestionConfigWithoutPauselessUniqueTopics =
-        new StreamIngestionConfig(Arrays.asList(streamConfigs, anotherStreamConfig));
+        new StreamIngestionConfig(Arrays.asList(uniqueStreamConfig1, uniqueStreamConfig2));
     streamIngestionConfigWithoutPauselessUniqueTopics.setPauselessConsumptionEnabled(false);
 
     IngestionConfig ingestionConfigWithoutPauselessUniqueTopics = new IngestionConfig();
