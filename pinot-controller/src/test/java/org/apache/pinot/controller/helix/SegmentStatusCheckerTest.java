@@ -976,4 +976,146 @@ public class SegmentStatusCheckerTest {
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME,
         ControllerGauge.SEGMENTS_WITH_INVALID_END_TIME), 1);
   }
+
+  @Test
+  public void tableTenantInfoGaugeNamedTenantTest() {
+    String serverTenant = "myTenant";
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setServerTenant(serverTenant).build();
+
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+    idealState.setReplicas("1");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
+    when(resourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
+    when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+
+    runSegmentStatusChecker(resourceManager, 0);
+
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME, serverTenant,
+        ControllerGauge.TABLE_TENANT_INFO), 1);
+  }
+
+  @Test
+  public void tableTenantInfoGaugeDefaultTenantFallbackTest() {
+    // No server tenant configured — should fall back to "DefaultTenant".
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+    idealState.setReplicas("1");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
+    when(resourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
+    when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+
+    runSegmentStatusChecker(resourceManager, 0);
+
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME,
+        "DefaultTenant", ControllerGauge.TABLE_TENANT_INFO), 1);
+  }
+
+  @Test
+  public void tableTenantInfoGaugeTenantChangeCleansStaleGaugeTest() {
+    String firstTenant = "tenantA";
+    String secondTenant = "tenantB";
+
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+    idealState.setReplicas("1");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
+    when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+
+    // First run: table on firstTenant.
+    when(resourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setServerTenant(firstTenant).build());
+    SegmentStatusChecker checker = buildSegmentStatusChecker(resourceManager, 0);
+    checker.start();
+    checker.run();
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME, firstTenant,
+        ControllerGauge.TABLE_TENANT_INFO), 1);
+
+    // Second run: table moves to secondTenant — stale gauge for firstTenant must be removed.
+    when(resourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setServerTenant(secondTenant).build());
+    checker.run();
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME, secondTenant,
+        ControllerGauge.TABLE_TENANT_INFO), 1);
+    assertFalse(MetricValueUtils.tableGaugeExists(_controllerMetrics, OFFLINE_TABLE_NAME, firstTenant,
+        ControllerGauge.TABLE_TENANT_INFO), "stale firstTenant gauge must be removed after tenant change");
+  }
+
+  @Test
+  public void tableTenantInfoGaugeTableRemovedCleansUpTest() {
+    String serverTenant = "myTenant";
+
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+    idealState.setReplicas("1");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
+    when(resourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setServerTenant(serverTenant).build());
+    when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+
+    SegmentStatusChecker checker = buildSegmentStatusChecker(resourceManager, 0);
+    checker.start();
+    checker.run();
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME, serverTenant,
+        ControllerGauge.TABLE_TENANT_INFO), 1);
+
+    // Table disappears from Helix — nonLeaderCleanup triggers removeMetricsForTable.
+    checker.nonLeaderCleanup(List.of(OFFLINE_TABLE_NAME));
+    assertFalse(MetricValueUtils.tableGaugeExists(_controllerMetrics, OFFLINE_TABLE_NAME, serverTenant,
+        ControllerGauge.TABLE_TENANT_INFO), "tenant gauge must be removed when table is cleaned up");
+  }
+
+  @Test
+  public void tableTenantInfoGaugeRealtimeTableTest() {
+    String serverTenant = "realtimeTenant";
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setServerTenant(serverTenant)
+            .setTimeColumnName("timeColumn").setStreamConfigs(getStreamConfigMap()).build();
+
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    idealState.setReplicas("1");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
+    when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+
+    runSegmentStatusChecker(resourceManager, 0);
+
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME, serverTenant,
+        ControllerGauge.TABLE_TENANT_INFO), 1);
+  }
+
+  private SegmentStatusChecker buildSegmentStatusChecker(PinotHelixResourceManager resourceManager,
+      int waitForPushTimeInSeconds) {
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    ControllerConf controllerConf = mock(ControllerConf.class);
+    when(controllerConf.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(waitForPushTimeInSeconds);
+    TableSizeReader tableSizeReader = mock(TableSizeReader.class);
+    return new SegmentStatusChecker(resourceManager, leadControllerManager, controllerConf, _controllerMetrics,
+        tableSizeReader);
+  }
 }

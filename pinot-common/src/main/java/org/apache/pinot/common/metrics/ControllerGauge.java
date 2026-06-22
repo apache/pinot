@@ -225,6 +225,16 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   // The progress of a certain table rebalance job of a table
   TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false),
+
+  // Mapping metric for table-to-server-tenant attribution. Always set to 1.
+  // The server tenant name is embedded as an extra key segment in the metric name so that Prometheus can extract it
+  // as a label and join it onto other table-scoped metrics via group_left.
+  // JMX name pattern: pinot.controller.tableTenantInfo.<tableNameWithType>.<serverTenant>
+  // NOTE: this gauge is exempt from the standard ControllerGauge.values() loop in removeMetricsForTable because its
+  // registered name includes the tenant segment. Removal is handled explicitly via _tableTenantMap in
+  // SegmentStatusChecker.
+  TABLE_TENANT_INFO("info", false),
+
   // HTTP thread utilization
   HTTP_THREAD_UTILIZATION("httpThreadUtilization", true),
   // Track the concurrent executions of the API resources that use @ManagedAsync

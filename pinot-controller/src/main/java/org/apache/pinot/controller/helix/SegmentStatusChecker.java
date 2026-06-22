@@ -43,6 +43,7 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -54,6 +55,7 @@ import org.apache.pinot.controller.util.ServerQueryInfoFetcher.ServerQueryInfo;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -81,6 +83,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   private final int _waitForPushTimeSeconds;
   private final TableSizeReader _tableSizeReader;
   private final Set<String> _tierBackendGauges = new HashSet<>();
+  // Maps tableNameWithType -> server tenant name, so stale gauges can be removed when a table changes tenant.
+  // Accessed only from the single-threaded periodic task execution loop (processTable / removeMetricsForTable).
+  private final Map<String, String> _tableTenantMap = new HashMap<>();
 
   private long _lastDisabledTableLogTimestamp = 0;
 
@@ -170,6 +175,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     if (tableConfig == null) {
       LOGGER.warn("Found null table config for table: {}. Resetting table config metrics.", tableNameWithType);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, 0);
+      String tenant = _tableTenantMap.remove(tableNameWithType);
+      if (tenant != null) {
+        _controllerMetrics.removeTableGauge(tableNameWithType, tenant, ControllerGauge.TABLE_TENANT_INFO);
+      }
       return;
     }
     if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -194,6 +203,31 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
     int replication = tableConfig.getReplication();
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, replication);
+
+    updateTenantInfoGauge(tableNameWithType, tableConfig);
+  }
+
+  /**
+   * Emits a {@code tableTenantInfo} gauge keyed by server tenant name so Prometheus can extract the tenant as a
+   * label and join it onto other table-scoped metrics.  Always set to {@code 1}.
+   * The gauge is registered once per unique (table, tenant) pair and only re-registered when the tenant changes,
+   * avoiding redundant metric writes on each periodic cycle.
+   * When the tenant changes, the new gauge is registered first to avoid a gap window, then the stale gauge is removed.
+   */
+  private void updateTenantInfoGauge(String tableNameWithType, TableConfig tableConfig) {
+    TenantConfig tenantConfig = tableConfig.getTenantConfig();
+    String serverTenant =
+        (tenantConfig != null && tenantConfig.getServer() != null) ? tenantConfig.getServer()
+            : TagNameUtils.DEFAULT_TENANT_NAME;
+
+    String previousTenant = _tableTenantMap.put(tableNameWithType, serverTenant);
+    if (serverTenant.equals(previousTenant)) {
+      return;
+    }
+    _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, serverTenant, ControllerGauge.TABLE_TENANT_INFO, 1L);
+    if (previousTenant != null) {
+      _controllerMetrics.removeTableGauge(tableNameWithType, previousTenant, ControllerGauge.TABLE_TENANT_INFO);
+    }
   }
 
   private void updateTableSizeMetrics(String tableNameWithType)
@@ -500,6 +534,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private void removeMetricsForTable(String tableNameWithType) {
     LOGGER.info("Removing metrics from {} given it is not a table known by Helix", tableNameWithType);
+    String tenant = _tableTenantMap.remove(tableNameWithType);
+    if (tenant != null) {
+      _controllerMetrics.removeTableGauge(tableNameWithType, tenant, ControllerGauge.TABLE_TENANT_INFO);
+    }
     for (ControllerGauge metric : ControllerGauge.values()) {
       if (!metric.isGlobal()) {
         _controllerMetrics.removeTableGauge(tableNameWithType, metric);
