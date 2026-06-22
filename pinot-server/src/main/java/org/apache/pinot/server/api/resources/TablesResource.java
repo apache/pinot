@@ -234,8 +234,7 @@ public class TablesResource {
         for (IndexSegment indexSegment : segmentDataManager.getReportableSegments()) {
           if (indexSegment instanceof ImmutableSegment immutableSegment) {
             long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
-            SegmentMetadataImpl segmentMetadata =
-                (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
+            SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) immutableSegment.getSegmentMetadata();
 
             totalSegmentSizeBytes += segmentSizeBytes;
             totalNumRows += segmentMetadata.getTotalDocs();

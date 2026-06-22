@@ -106,14 +106,19 @@ public class TableSizeResource {
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        long segmentSizeBytes = 0L;
+        boolean hasImmutable = false;
         for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
           if (segment instanceof ImmutableSegment immutableSegment) {
-            long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
-            if (detailed) {
-              segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes));
-            }
-            tableSizeInBytes += segmentSizeBytes;
+            segmentSizeBytes += immutableSegment.getSegmentSizeBytes();
+            hasImmutable = true;
           }
+        }
+        if (hasImmutable) {
+          if (detailed) {
+            segmentSizeInfos.add(new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes));
+          }
+          tableSizeInBytes += segmentSizeBytes;
         }
       }
     } finally {
