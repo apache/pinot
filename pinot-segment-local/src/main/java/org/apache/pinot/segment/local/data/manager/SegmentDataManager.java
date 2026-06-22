@@ -90,6 +90,10 @@ public abstract class SegmentDataManager {
     return List.of(getSegment());
   }
 
+  public String getCrc() {
+    return getSegment().getSegmentMetadata().getCrc();
+  }
+
   /**
    * Offloads the segment from the metadata management (e.g. upsert metadata), but not releases the resources yet
    * because there might be queries still accessing the segment.
