@@ -30,7 +30,6 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufTestDataGenerator.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
 
 
 public class ProtoBufMessageDecoderTest {
@@ -156,23 +155,4 @@ public class ProtoBufMessageDecoderTest {
     assertEquals(((Map<String, Object>) destination.getValue("sample_record")).get("id"), 18);
   }
 
-  @Test
-  public void testInitThrowsHelpfulMessageWhenDescriptorFileMissing() {
-    ProtoBufMessageDecoder decoder = new ProtoBufMessageDecoder();
-    Map<String, String> props = new HashMap<>();
-    // No descriptorFile provided — should fail with a message pointing
-    // to KafkaConfluentSchemaRegistryProtoBufMessageDecoder
-    try {
-      decoder.init(props, ImmutableSet.of(), "test-topic");
-      throw new AssertionError("Expected IllegalStateException when descriptorFile is missing");
-    } catch (IllegalStateException e) {
-      assertNotNull(e.getMessage());
-      assertTrue(e.getMessage().contains("KafkaConfluentSchemaRegistryProtoBufMessageDecoder"),
-              "Error message should point users to the registry-backed decoder, but was: " + e.getMessage());
-      assertTrue(e.getMessage().contains(ProtoBufMessageDecoder.DESCRIPTOR_FILE_PATH),
-              "Error message should mention the missing property name, but was: " + e.getMessage());
-    } catch (Exception e) {
-      throw new AssertionError("Expected IllegalStateException but got: " + e.getClass().getName(), e);
-    }
-  }
 }

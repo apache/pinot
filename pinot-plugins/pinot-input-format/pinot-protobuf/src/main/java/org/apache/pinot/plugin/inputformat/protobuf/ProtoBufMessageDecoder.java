@@ -32,9 +32,9 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
 
-// This decoder is intentionally file-based and does not support schema registry.
-// For Confluent Schema Registry-backed descriptor resolution, use
-// KafkaConfluentSchemaRegistryProtoBufMessageDecoder instead.
+/// This decoder is intentionally file-based and does not support schema registry.
+/// For Confluent Schema Registry-backed descriptor resolution, use
+/// `KafkaConfluentSchemaRegistryProtoBufMessageDecoder` instead.
 
 public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String DESCRIPTOR_FILE_PATH = "descriptorFile";
@@ -45,8 +45,7 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   private Message.Builder _builder;
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-          throws Exception {
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) throws Exception {
     Preconditions.checkState(props.containsKey(DESCRIPTOR_FILE_PATH),
             "Property '%s' must be specified for ProtoBufMessageDecoder. "
                     + "If you are using Confluent Schema Registry, use "
