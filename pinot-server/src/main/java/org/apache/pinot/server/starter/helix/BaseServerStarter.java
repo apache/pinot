@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
@@ -421,12 +422,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     List<ServiceStatus.ServiceStatusCallback> serviceStatusCallbackListBuilder = new ArrayList<>();
-    serviceStatusCallbackListBuilder.add(
+    serviceStatusCallbackListBuilder.add(new TimeToHealthyTrackingCallback(
         new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId, resourcesToMonitor, minResourcePercentForStartup));
-    serviceStatusCallbackListBuilder.add(
+            _instanceId, resourcesToMonitor, minResourcePercentForStartup),
+        ServerGauge.STARTUP_CURRENT_STATE_MATCH_TIME_MS, _serverMetrics));
+    serviceStatusCallbackListBuilder.add(new TimeToHealthyTrackingCallback(
         new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId, resourcesToMonitor, minResourcePercentForStartup));
+            _instanceId, resourcesToMonitor, minResourcePercentForStartup),
+        ServerGauge.STARTUP_EXTERNAL_VIEW_MATCH_TIME_MS, _serverMetrics));
     boolean foundConsuming = !consumingSegments.isEmpty();
     if (checkRealtime && foundConsuming) {
       // We specifically put the freshness based checker first to ensure it's the only one setup if both checkers
@@ -443,9 +446,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
                 this::getConsumingSegments, realtimeMinFreshnessMs, idleTimeoutMs);
         Supplier<Integer> getNumConsumingSegmentsNotReachedMinFreshness =
             freshnessStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
-        serviceStatusCallbackListBuilder.add(
+        serviceStatusCallbackListBuilder.add(new TimeToHealthyTrackingCallback(
             new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
-                _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedMinFreshness));
+                _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedMinFreshness),
+            ServerGauge.STARTUP_REALTIME_CONSUMPTION_CATCHUP_TIME_MS, _serverMetrics));
       } else if (isOffsetBasedConsumptionStatusCheckerEnabled) {
         LOGGER.info("Setting up offset based status checker");
         OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
@@ -453,11 +457,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
                 this::getConsumingSegments);
         Supplier<Integer> getNumConsumingSegmentsNotReachedTheirLatestOffset =
             consumptionStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
-        serviceStatusCallbackListBuilder.add(
+        serviceStatusCallbackListBuilder.add(new TimeToHealthyTrackingCallback(
             new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
-                _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedTheirLatestOffset));
+                _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedTheirLatestOffset),
+            ServerGauge.STARTUP_REALTIME_CONSUMPTION_CATCHUP_TIME_MS, _serverMetrics));
       } else {
         LOGGER.info("Setting up static time based status checker");
+        // Not wrapped with a time-to-healthy gauge: this checker turns GOOD purely on wall-clock elapsed time, so the
+        // resulting metric would just echo realtimeConsumptionCatchupWaitMs and not reflect actual catchup latency.
         serviceStatusCallbackListBuilder.add(
             new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
                 _instanceId, realtimeConsumptionCatchupWaitMs, null));
@@ -1306,6 +1313,41 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected SegmentOnlineOfflineStateModelFactory createSegmentOnlineOfflineStateModelFactory(
       InstanceDataManager instanceDataManager, StateTransitionThreadPoolManager transitionThreadPoolManager) {
     return new SegmentOnlineOfflineStateModelFactory(instanceDataManager, transitionThreadPoolManager);
+  }
+
+  /**
+   * Wraps a {@link ServiceStatus.ServiceStatusCallback} and records the elapsed time (in ms since this wrapper was
+   * constructed) into the supplied gauge the first time the delegate reports {@link Status#GOOD}. Subsequent calls
+   * leave the gauge value frozen. {@code getServiceStatus} can be called concurrently by the startup poll loop and
+   * by HTTP threads (health/tables endpoints), so the record-once latch uses CAS for visibility.
+   */
+  private static final class TimeToHealthyTrackingCallback implements ServiceStatus.ServiceStatusCallback {
+    private final ServiceStatus.ServiceStatusCallback _delegate;
+    private final ServerGauge _gauge;
+    private final ServerMetrics _serverMetrics;
+    private final long _startNanos = System.nanoTime();
+    private final AtomicBoolean _recorded = new AtomicBoolean(false);
+
+    TimeToHealthyTrackingCallback(ServiceStatus.ServiceStatusCallback delegate, ServerGauge gauge,
+        ServerMetrics serverMetrics) {
+      _delegate = delegate;
+      _gauge = gauge;
+      _serverMetrics = serverMetrics;
+    }
+
+    @Override
+    public Status getServiceStatus() {
+      Status status = _delegate.getServiceStatus();
+      if (status == Status.GOOD && _recorded.compareAndSet(false, true)) {
+        _serverMetrics.setValueOfGlobalGauge(_gauge, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - _startNanos));
+      }
+      return status;
+    }
+
+    @Override
+    public String getStatusDescription() {
+      return _delegate.getStatusDescription();
+    }
   }
 
   private void refreshMessageCount() {
