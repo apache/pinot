@@ -320,11 +320,21 @@ public class PredownloadScheduler {
       long startTime = System.currentTimeMillis();
       try {
         downloadFromDeepStore(predownloadSegmentInfo);
+        _predownloadMetrics.deepStoreSegmentDownloaded();
       } catch (Exception e) {
         if (_peerDownloadEnabled && _peerDownloadScheme != null) {
           LOGGER.warn("Deep store download failed for segment: {} of table: {}, falling back to peer download",
               predownloadSegmentInfo.getSegmentName(), predownloadSegmentInfo.getTableNameWithType(), e);
-          downloadFromPeers(predownloadSegmentInfo);
+          long peerStartTime = System.currentTimeMillis();
+          try {
+            downloadFromPeers(predownloadSegmentInfo);
+            _predownloadMetrics.peerSegmentDownloaded(true, predownloadSegmentInfo.getSegmentName(),
+                predownloadSegmentInfo.getLocalSizeBytes(),
+                System.currentTimeMillis() - peerStartTime);
+          } catch (Exception peerEx) {
+            _predownloadMetrics.peerSegmentDownloaded(false, predownloadSegmentInfo.getSegmentName(), 0, 0);
+            throw peerEx;
+          }
         } else {
           throw e;
         }

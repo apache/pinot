@@ -221,6 +221,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
   PREDOWNLOAD_SUCCEED("predownloadSucceed", true),
   PREDOWNLOAD_FAILED("predownloadFailed", true),
+  PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_COUNT("predownloadPeerSegmentCount", true),
+  PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadPeerSegmentFailureCount", false),
+  PREDOWNLOAD_DEEPSTORE_DOWNLOAD_COUNT("predownloadDeepstoreDownloadCount", true),
 
   // reingestion metrics
   SEGMENT_REINGESTION_FAILURE("segments", false),
