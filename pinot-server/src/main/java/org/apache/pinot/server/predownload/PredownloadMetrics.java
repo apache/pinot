@@ -53,7 +53,7 @@ public class PredownloadMetrics {
       _serverMetrics.setValueOfGlobalGauge(ServerGauge.PEER_DOWNLOAD_SPEED,
           (segmentSizeBytes / BYTES_TO_MB) / (downloadTimeMs / 1000 + 1));
     } else {
-      _serverMetrics.addMeteredValue(segmentName, ServerMeter.PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_FAILURE_COUNT, 1);
+      _serverMetrics.addMeteredValue(ServerMeter.PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_FAILURE_COUNT, 1, segmentName);
     }
   }
 
