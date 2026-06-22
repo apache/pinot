@@ -182,7 +182,7 @@ public class MergeRollupTaskGeneratorTest {
         () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, taskConfig));
 
     // Parseable aggregation type without an available value aggregator should fail the validation
-    taskConfig.put("c.aggregationType", "avg");
+    taskConfig.put("c.aggregationType", "distinctCount");
     assertThrows(IllegalStateException.class,
         () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, taskConfig));
     taskConfig.put("c.aggregationType", "lastWithTime");

@@ -52,6 +52,8 @@ public class ValueAggregatorFactory {
         return new MaxValueAggregator(dataType);
       case SUM:
         return new SumValueAggregator(dataType);
+      case AVG:
+        return new AvgValueAggregator();
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTRAWHLL:
         return new DistinctCountHLLAggregator();
