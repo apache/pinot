@@ -83,6 +83,11 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
    */
   private void flush()
       throws IOException {
+    // Skip flushing an empty posting list map. This could happen when add() didn't add any entry due to invalid
+    // Geometry and _continueOnError is set
+    if (_postingListMap.isEmpty()) {
+      return;
+    }
     long length = 0;
     for (Map.Entry<Long, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
       _postingListOutputStream.writeLong(entry.getKey());
@@ -135,7 +140,10 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
       // Merge posting lists from the chunk iterators
       PriorityQueue<PostingListEntry> priorityQueue = new PriorityQueue<>(numChunks);
       for (ChunkIterator chunkIterator : chunkIterators) {
-        priorityQueue.offer(chunkIterator.next());
+        // Defensive: skip empty chunks instead of blindly reading the first entry (flush() should never produce one)
+        if (chunkIterator.hasNext()) {
+          priorityQueue.offer(chunkIterator.next());
+        }
       }
       long currentH3Id = Long.MIN_VALUE;
       MutableRoaringBitmap currentDocIds = null;
