@@ -73,7 +73,9 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
   public void add(@Nullable Geometry geometry)
       throws IOException {
     super.add(geometry);
-    if (_postingListMap.size() % FLUSH_THRESHOLD == 0) {
+    // Skip flushing an empty posting list map. This could happen when add() didn't add any entry due to invalid
+    // Geometry and _continueOnError is set
+    if (!_postingListMap.isEmpty() && _postingListMap.size() % FLUSH_THRESHOLD == 0) {
       flush();
     }
   }
@@ -83,11 +85,6 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
    */
   private void flush()
       throws IOException {
-    // Skip flushing an empty posting list map. This could happen when add() didn't add any entry due to invalid
-    // Geometry and _continueOnError is set
-    if (_postingListMap.isEmpty()) {
-      return;
-    }
     long length = 0;
     for (Map.Entry<Long, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
       _postingListOutputStream.writeLong(entry.getKey());
@@ -118,7 +115,7 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
     }
 
     // Flush the last chunk
-    if (_postingListMap.size() % FLUSH_THRESHOLD != 0) {
+    if (!_postingListMap.isEmpty() && _postingListMap.size() % FLUSH_THRESHOLD != 0) {
       flush();
     }
     _postingListOutputStream.close();
