@@ -227,9 +227,12 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), expectedTimeValue);
   }
 
+  @SuppressWarnings("deprecation")
   private TableConfig getTableConfig(String rawTableName, String pushFrequency) {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTimeColumnName(TIME_COLUMN)
-        .setSegmentPushFrequency(pushFrequency).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTimeColumnName(TIME_COLUMN).build();
+    tableConfig.getValidationConfig().setSegmentPushFrequency(pushFrequency);
+    return tableConfig;
   }
 
   private void setSchemaTimeFieldSpec(String rawTableName, TimeUnit timeUnit) {
