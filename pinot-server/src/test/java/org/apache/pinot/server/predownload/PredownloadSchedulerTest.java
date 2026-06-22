@@ -48,6 +48,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.server.predownload.PredownloadTestUtil.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -564,5 +565,165 @@ public class PredownloadSchedulerTest {
         "Segment should be in failed set when both deep store and peer download fail");
     scheduler._executor = null;
     scheduler.stop();
+  }
+
+  @Test
+  public void testDeepStoreSuccessEmitsDeepStoreMetric()
+      throws Exception {
+    String propertiesFilePath =
+        this.getClass().getClassLoader().getResource(SAMPLE_PROPERTIES_FILE_NAME).getPath();
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromPath(propertiesFilePath);
+    setUp(properties);
+
+    PredownloadScheduler scheduler = buildPeerEnabledScheduler(properties);
+
+    PredownloadSegmentInfo segment = new PredownloadSegmentInfo(TABLE_NAME, SEGMENT_NAME);
+    segment.updateSegmentInfo(createSegmentZKMetadata());
+
+    File testFolder = new File(_temporaryFolder, "deepStoreMetricTest");
+    testFolder.mkdirs();
+    String dataDir = testFolder.getAbsolutePath();
+    int lastIndex = dataDir.lastIndexOf(File.separator);
+    when(_predownloadTableInfo.getInstanceDataManagerConfig()).thenReturn(_instanceDataManagerConfig);
+    when(_predownloadTableInfo.getTableConfig()).thenReturn(_tableConfig);
+    when(_instanceDataManagerConfig.getInstanceDataDir()).thenReturn(dataDir.substring(0, lastIndex));
+    when(_tableConfig.getTableName()).thenReturn(dataDir.substring(lastIndex + 1));
+    when(_predownloadTableInfo.loadSegmentFromLocal(any())).thenReturn(false);
+    injectSegmentState(scheduler, List.of(segment), Map.of(TABLE_NAME, _predownloadTableInfo));
+
+    PredownloadMetrics mockMetrics = getMockMetrics(scheduler);
+
+    try (MockedStatic<SegmentFetcherFactory> sfMock = mockStatic(SegmentFetcherFactory.class)) {
+      sfMock.when(
+              () -> SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(anyString(), any(File.class), anyString()))
+          .thenAnswer(inv -> null);
+      try (MockedStatic<TarCompressionUtils> tarMock = mockStatic(TarCompressionUtils.class)) {
+        tarMock.when(() -> TarCompressionUtils.untar(any(File.class), any(File.class)))
+            .thenAnswer(inv -> {
+              File untarDir = new File(testFolder, "untared");
+              untarDir.mkdirs();
+              return List.of(untarDir);
+            });
+        scheduler.downloadSegment(segment);
+      }
+    }
+
+    verify(mockMetrics).deepStoreSegmentDownloaded();
+    verify(mockMetrics).segmentDownloaded(eq(true), eq(SEGMENT_NAME), anyLong(), anyLong());
+    verify(mockMetrics, never()).peerSegmentDownloaded(anyBoolean(), anyString(), anyLong(), anyLong());
+    scheduler._executor = null;
+    scheduler.stop();
+  }
+
+  @Test
+  public void testPeerDownloadSuccessEmitsPeerMetrics()
+      throws Exception {
+    String propertiesFilePath =
+        this.getClass().getClassLoader().getResource(SAMPLE_PROPERTIES_FILE_NAME).getPath();
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromPath(propertiesFilePath);
+    setUp(properties);
+
+    PredownloadScheduler scheduler = buildPeerEnabledScheduler(properties);
+    PredownloadZKClient mockZkClient = mock(PredownloadZKClient.class);
+    when(mockZkClient.getPeerServerURIs(any(), anyString(), anyString(), anyString())).thenReturn(new ArrayList<>());
+    injectMockZkClient(scheduler, mockZkClient);
+
+    PredownloadSegmentInfo segment = new PredownloadSegmentInfo(TABLE_NAME, SEGMENT_NAME);
+    segment.updateSegmentInfo(createSegmentZKMetadata());
+
+    File testFolder = new File(_temporaryFolder, "peerMetricTest");
+    testFolder.mkdirs();
+    String dataDir = testFolder.getAbsolutePath();
+    int lastIndex = dataDir.lastIndexOf(File.separator);
+    when(_predownloadTableInfo.getInstanceDataManagerConfig()).thenReturn(_instanceDataManagerConfig);
+    when(_predownloadTableInfo.getTableConfig()).thenReturn(_tableConfig);
+    when(_instanceDataManagerConfig.getInstanceDataDir()).thenReturn(dataDir.substring(0, lastIndex));
+    when(_tableConfig.getTableName()).thenReturn(dataDir.substring(lastIndex + 1));
+    when(_predownloadTableInfo.loadSegmentFromLocal(any())).thenReturn(false);
+    injectSegmentState(scheduler, List.of(segment), Map.of(TABLE_NAME, _predownloadTableInfo));
+
+    PredownloadMetrics mockMetrics = getMockMetrics(scheduler);
+
+    try (MockedStatic<SegmentFetcherFactory> sfMock = mockStatic(SegmentFetcherFactory.class)) {
+      sfMock.when(
+              () -> SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(anyString(), any(File.class), anyString()))
+          .thenThrow(new AttemptsExceededException("deep store failed", 3));
+      sfMock.when(
+              () -> SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(
+                  anyString(), anyString(), any(), any(File.class), anyString()))
+          .thenAnswer(inv -> null);
+
+      try (MockedStatic<TarCompressionUtils> tarMock = mockStatic(TarCompressionUtils.class)) {
+        tarMock.when(() -> TarCompressionUtils.untar(any(File.class), any(File.class)))
+            .thenAnswer(inv -> {
+              File untarDir = new File(testFolder, "untared_peer");
+              untarDir.mkdirs();
+              return List.of(untarDir);
+            });
+        scheduler.downloadSegment(segment);
+      }
+    }
+
+    verify(mockMetrics, never()).deepStoreSegmentDownloaded();
+    verify(mockMetrics).peerSegmentDownloaded(eq(true), eq(SEGMENT_NAME), anyLong(), anyLong());
+    verify(mockMetrics).segmentDownloaded(eq(true), eq(SEGMENT_NAME), anyLong(), anyLong());
+    scheduler._executor = null;
+    scheduler.stop();
+  }
+
+  @Test
+  public void testPeerDownloadFailureEmitsSegmentLevelMetric()
+      throws Exception {
+    String propertiesFilePath =
+        this.getClass().getClassLoader().getResource(SAMPLE_PROPERTIES_FILE_NAME).getPath();
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromPath(propertiesFilePath);
+    setUp(properties);
+
+    PredownloadScheduler scheduler = buildPeerEnabledScheduler(properties);
+    PredownloadZKClient mockZkClient = mock(PredownloadZKClient.class);
+    when(mockZkClient.getPeerServerURIs(any(), anyString(), anyString(), anyString())).thenReturn(new ArrayList<>());
+    injectMockZkClient(scheduler, mockZkClient);
+
+    PredownloadSegmentInfo segment = new PredownloadSegmentInfo(TABLE_NAME, SEGMENT_NAME);
+    segment.updateSegmentInfo(createSegmentZKMetadata());
+
+    File testFolder = new File(_temporaryFolder, "peerFailMetricTest");
+    testFolder.mkdirs();
+    String dataDir = testFolder.getAbsolutePath();
+    int lastIndex = dataDir.lastIndexOf(File.separator);
+    when(_predownloadTableInfo.getInstanceDataManagerConfig()).thenReturn(_instanceDataManagerConfig);
+    when(_predownloadTableInfo.getTableConfig()).thenReturn(_tableConfig);
+    when(_instanceDataManagerConfig.getInstanceDataDir()).thenReturn(dataDir.substring(0, lastIndex));
+    when(_tableConfig.getTableName()).thenReturn(dataDir.substring(lastIndex + 1));
+    injectSegmentState(scheduler, List.of(segment), Map.of(TABLE_NAME, _predownloadTableInfo));
+
+    PredownloadMetrics mockMetrics = getMockMetrics(scheduler);
+
+    try (MockedStatic<SegmentFetcherFactory> sfMock = mockStatic(SegmentFetcherFactory.class)) {
+      sfMock.when(
+              () -> SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(anyString(), any(File.class), anyString()))
+          .thenThrow(new AttemptsExceededException("deep store failed", 3));
+      sfMock.when(
+              () -> SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(
+                  anyString(), anyString(), any(), any(File.class), anyString()))
+          .thenThrow(new AttemptsExceededException("peer download failed", 3));
+
+      try (MockedStatic<TarCompressionUtils> tarMock = mockStatic(TarCompressionUtils.class)) {
+        assertThrows(AttemptsExceededException.class, () -> scheduler.downloadSegment(segment));
+      }
+    }
+
+    verify(mockMetrics, never()).deepStoreSegmentDownloaded();
+    verify(mockMetrics).peerSegmentDownloaded(eq(false), eq(SEGMENT_NAME), eq(0L), eq(0L));
+    verify(mockMetrics).segmentDownloaded(eq(false), eq(SEGMENT_NAME), eq(0L), eq(0L));
+    scheduler._executor = null;
+    scheduler.stop();
+  }
+
+  private PredownloadMetrics getMockMetrics(PredownloadScheduler scheduler)
+      throws Exception {
+    Field metricsField = PredownloadScheduler.class.getDeclaredField("_predownloadMetrics");
+    metricsField.setAccessible(true);
+    return (PredownloadMetrics) metricsField.get(scheduler);
   }
 }
