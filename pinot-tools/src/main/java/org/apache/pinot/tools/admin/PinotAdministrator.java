@@ -40,6 +40,7 @@ import org.apache.pinot.tools.admin.command.DeleteSchemaCommand;
 import org.apache.pinot.tools.admin.command.DeleteTableCommand;
 import org.apache.pinot.tools.admin.command.FileSystemCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
+import org.apache.pinot.tools.admin.command.GeneratePageCacheWarmupQueriesCommand;
 import org.apache.pinot.tools.admin.command.GitHubEventsQuickStartCommand;
 import org.apache.pinot.tools.admin.command.ImportDataCommand;
 import org.apache.pinot.tools.admin.command.JsonToPinotSchema;
@@ -100,6 +101,7 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("QuickStart", new QuickStartCommand());
     SUBCOMMAND_MAP.put("OperateClusterConfig", new OperateClusterConfigCommand());
     SUBCOMMAND_MAP.put("GenerateData", new GenerateDataCommand());
+    SUBCOMMAND_MAP.put("GeneratePageCacheWarmupQueries", new GeneratePageCacheWarmupQueriesCommand());
     SUBCOMMAND_MAP.put("LaunchDataIngestionJob", new LaunchDataIngestionJobCommand());
     SUBCOMMAND_MAP.put("LaunchBackfillIngestionJob", new LaunchBackfillIngestionJobCommand());
     SUBCOMMAND_MAP.put("LaunchSparkDataIngestionJob", new LaunchSparkDataIngestionJobCommand());
