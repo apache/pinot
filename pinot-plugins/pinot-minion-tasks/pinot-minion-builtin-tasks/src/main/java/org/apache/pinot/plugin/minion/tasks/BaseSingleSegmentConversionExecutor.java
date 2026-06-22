@@ -253,8 +253,22 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, outputSegmentDirURI)) {
       Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
           pushJobSpec, new String[]{outputSegmentTarURI.toString()});
-      SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, metadataHeaders,
-          parameters);
+      try {
+        SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, metadataHeaders,
+            parameters);
+      } catch (Exception e) {
+        // The tar was already staged to the output PinotFS before this failure. If the task is retried, the next
+        // moveSegmentToOutputPinotFS() would fail with "Output file already exists" (overwriteOutput defaults to
+        // false), making transient metadata-push failures permanently stuck. Delete the staged tar so the retry can
+        // re-stage it and self-heal.
+        try {
+          outputFileFS.delete(outputSegmentTarURI, true);
+        } catch (Exception deleteException) {
+          LOGGER.warn("Failed to delete staged segment tar: {} after metadata push failure, the next retry may fail "
+              + "with 'Output file already exists'", outputSegmentTarURI, deleteException);
+        }
+        throw e;
+      }
     }
   }
 

@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,6 +34,7 @@ import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -40,6 +42,8 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.mockito.MockedStatic;
@@ -141,6 +145,55 @@ public class BaseSingleSegmentConversionExecutorTest {
     configs.put(MinionConstants.UPLOAD_URL_KEY, "http://unused/upload");
     configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, Long.toString(SEGMENT_CRC));
     configs.put("TASK_ID", TASK_ID);
+    return new PinotTaskConfig(TASK_TYPE, configs);
+  }
+
+  /**
+   * Verifies that when a METADATA-mode push fails after the converted tar was already staged to the output PinotFS,
+   * the staged tar is deleted before the exception propagates. Without this cleanup the rethrow would make the retry
+   * fail in moveSegmentToOutputPinotFS with "Output file already exists" (overwriteOutput defaults to false), so
+   * transient push failures would never self-heal.
+   */
+  @Test
+  public void testExecuteTaskCleansUpStagedTarWhenMetadataPushFails()
+      throws Exception {
+    File outputDir = new File(TEMP_DIR, "output");
+    FileUtils.forceMkdir(outputDir);
+    PinotFS mockOutputFS = Mockito.mock(PinotFS.class);
+    Mockito.when(mockOutputFS.exists(Mockito.any())).thenReturn(false);
+
+    try (MockedStatic<MinionTaskUtils> minionTaskUtils =
+            Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS);
+        MockedStatic<SegmentPushUtils> segmentPushUtils =
+            Mockito.mockStatic(SegmentPushUtils.class, Mockito.CALLS_REAL_METHODS)) {
+      minionTaskUtils.when(() -> MinionTaskUtils.getOutputPinotFS(Mockito.any(), Mockito.any()))
+          .thenReturn(mockOutputFS);
+      segmentPushUtils.when(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(), Mockito.any(),
+              Mockito.any(), Mockito.anyList(), Mockito.anyList()))
+          .thenThrow(new RuntimeException("simulated metadata push failure"));
+
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor();
+      try {
+        executor.executeTask(createMetadataPushTaskConfig(outputDir));
+        Assert.fail("executeTask must rethrow when metadata push fails");
+      } catch (RuntimeException e) {
+        Assert.assertEquals(e.getMessage(), "simulated metadata push failure");
+      }
+      // The staged tar must be deleted so a retry can re-stage it and self-heal.
+      Mockito.verify(mockOutputFS).delete(Mockito.any(URI.class), Mockito.eq(true));
+    }
+  }
+
+  private PinotTaskConfig createMetadataPushTaskConfig(File outputDir) {
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_WITH_TYPE);
+    configs.put(MinionConstants.SEGMENT_NAME_KEY, SEGMENT_NAME);
+    configs.put(MinionConstants.DOWNLOAD_URL_KEY, "http://unused/download");
+    configs.put(MinionConstants.UPLOAD_URL_KEY, "http://unused/upload");
+    configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, Long.toString(SEGMENT_CRC));
+    configs.put("TASK_ID", TASK_ID);
+    configs.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.name());
+    configs.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDir.toURI().toString());
     return new PinotTaskConfig(TASK_TYPE, configs);
   }
 
