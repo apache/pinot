@@ -354,6 +354,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           throw new IllegalStateException(err, e);
         }
         MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, column, entry.getValue());
+        MergeTaskUtils.validateAggregationColumnType(schema, column, entry.getValue());
       }
     }
   }

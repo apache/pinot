@@ -182,7 +182,7 @@ public class MergeRollupTaskGeneratorTest {
         () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, taskConfig));
 
     // Parseable aggregation type without an available value aggregator should fail the validation
-    taskConfig.put("c.aggregationType", "avg");
+    taskConfig.put("c.aggregationType", "distinctCount");
     assertThrows(IllegalStateException.class,
         () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, taskConfig));
     taskConfig.put("c.aggregationType", "lastWithTime");
@@ -214,6 +214,44 @@ public class MergeRollupTaskGeneratorTest {
     missingColumnConfig.put("missingCol.aggregationType", "sum");
     assertThrows(IllegalStateException.class,
         () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, missingColumnConfig));
+  }
+
+  @Test
+  public void testBytesBackedAggregationColumnTypeValidation() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new MetricFieldSpec("bytesCol", FieldSpec.DataType.BYTES));
+    schema.addField(new MetricFieldSpec("longCol", FieldSpec.DataType.LONG));
+    schema.addField(new DimensionFieldSpec("d", FieldSpec.DataType.STRING, true));
+    schema.addField(new DateTimeFieldSpec(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME).build();
+
+    // Bytes-backed aggregations on a BYTES column are valid
+    for (String aggregationType : new String[]{"avg", "percentileTDigest", "distinctCountHLL"}) {
+      Map<String, String> validConfig = new HashMap<>();
+      validConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
+      validConfig.put("bytesCol.aggregationType", aggregationType);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, validConfig);
+    }
+
+    // The same bytes-backed aggregations on a non-BYTES (LONG) column must fail at config time
+    for (String aggregationType : new String[]{"avg", "percentileTDigest", "distinctCountHLL"}) {
+      Map<String, String> invalidConfig = new HashMap<>();
+      invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
+      invalidConfig.put("longCol.aggregationType", aggregationType);
+      assertThrows(IllegalStateException.class,
+          () -> taskGenerator.validateTaskConfigs(tableConfig, schema, invalidConfig));
+    }
+
+    // Non-bytes-backed aggregations on a numeric column remain valid
+    for (String aggregationType : new String[]{"sum", "max"}) {
+      Map<String, String> validConfig = new HashMap<>();
+      validConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
+      validConfig.put("longCol.aggregationType", aggregationType);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, validConfig);
+    }
   }
 
   @Test

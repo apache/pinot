@@ -39,11 +39,42 @@ public class ValueAggregatorFactory {
         || aggregationType == AggregationFunctionType.LASTWITHTIME;
   }
 
+  /// Returns `true` if the rollup ValueAggregator for the given type stores its aggregated value as a serialized
+  /// object (sketch, AvgPair, TDigest, ...) and therefore reads the metric column value as a `byte[]`, i.e. the
+  /// column must be a `BYTES` column. Numeric (MIN/MAX/SUM) and time-ordered (FIRSTWITHTIME/LASTWITHTIME) aggregators
+  /// keep the column's native type. Keep this in sync with [#getValueAggregator]: a type is bytes-backed iff its
+  /// aggregator deserializes the column value as `byte[]`.
+  public static boolean isBytesBacked(AggregationFunctionType aggregationType) {
+    switch (aggregationType) {
+      case AVG:
+      case DISTINCTCOUNTHLL:
+      case DISTINCTCOUNTRAWHLL:
+      case DISTINCTCOUNTTHETASKETCH:
+      case DISTINCTCOUNTRAWTHETASKETCH:
+      case DISTINCTCOUNTTUPLESKETCH:
+      case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
+      case SUMVALUESINTEGERSUMTUPLESKETCH:
+      case AVGVALUEINTEGERSUMTUPLESKETCH:
+      case DISTINCTCOUNTCPCSKETCH:
+      case DISTINCTCOUNTRAWCPCSKETCH:
+      case DISTINCTCOUNTULL:
+      case DISTINCTCOUNTRAWULL:
+      case PERCENTILEKLL:
+      case PERCENTILERAWKLL:
+      case PERCENTILETDIGEST:
+      case PERCENTILERAWTDIGEST:
+        return true;
+      default:
+        return false;
+    }
+  }
+
   /// Constructs a ValueAggregator from the given aggregation type.
   ///
   /// When adding entries to this please add them to the Set named AVAILABLE_CORE_VALUE_AGGREGATORS in
   /// org.apache.pinot.core.common.MinionConstants.MergeRollupTask so that they pass the task config validation of the
-  /// merge tasks (MergeRollupTask, RealtimeToOfflineSegmentsTask)
+  /// merge tasks (MergeRollupTask, RealtimeToOfflineSegmentsTask), and update [#isBytesBacked] if the new aggregator
+  /// reads/writes the column value as `byte[]`.
   public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType, DataType dataType) {
     switch (aggregationType) {
       case MIN:
@@ -52,6 +83,8 @@ public class ValueAggregatorFactory {
         return new MaxValueAggregator(dataType);
       case SUM:
         return new SumValueAggregator(dataType);
+      case AVG:
+        return new AvgValueAggregator();
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTRAWHLL:
         return new DistinctCountHLLAggregator();
