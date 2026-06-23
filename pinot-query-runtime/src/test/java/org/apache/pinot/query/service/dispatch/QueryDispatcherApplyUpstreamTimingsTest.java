@@ -57,7 +57,7 @@ import static org.mockito.Mockito.when;
  * called with the expected arguments.
  *
  * <p>Two kinds of stages are consulted: direct pure-leaf receivers ({@code stagesReceivingFromLeaves},
- * including stage 0 for 2-stage queries), and SINGLETON leaf stages themselves
+ * including stage 0 when only leaves send to it), and SINGLETON leaf stages themselves
  * ({@code singletonLeafStageIds}). All other stages — including receivers of SINGLETON leaf stages —
  * are excluded to prevent SINGLETON cascade contamination.
  * See {@link AdaptiveRoutingStageClassification} for details.

@@ -126,10 +126,6 @@ final class AdaptiveRoutingStageClassification {
     // Exclude stages contaminated by non-leaf/SINGLETON senders.
     trustedStageIds.removeAll(stagesReceivingFromNonLeaf);
 
-    // Stage 0 (the broker reducer) is always trusted: its sender timings are measured directly
-    // by the multi-consumer, not propagated through intermediate stages.
-    trustedStageIds.add(0);
-
     LOGGER.debug("==[UPSTREAM_TIMING]== classifyStages: trustedStageIds={} trackedServers={} "
         + "senderKeyToInstanceId.size={}", trustedStageIds, trackedServers.size(), senderKeyToInstanceId.size());
 
