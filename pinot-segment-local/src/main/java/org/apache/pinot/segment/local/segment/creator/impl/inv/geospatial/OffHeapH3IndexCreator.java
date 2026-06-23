@@ -73,9 +73,7 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
   public void add(@Nullable Geometry geometry)
       throws IOException {
     super.add(geometry);
-    // Skip flushing an empty posting list map. This could happen when add() didn't add any entry due to invalid
-    // Geometry and _continueOnError is set
-    if (!_postingListMap.isEmpty() && _postingListMap.size() % FLUSH_THRESHOLD == 0) {
+    if (_postingListMap.size() == FLUSH_THRESHOLD) {
       flush();
     }
   }
@@ -115,7 +113,7 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
     }
 
     // Flush the last chunk
-    if (!_postingListMap.isEmpty() && _postingListMap.size() % FLUSH_THRESHOLD != 0) {
+    if (!_postingListMap.isEmpty()) {
       flush();
     }
     _postingListOutputStream.close();
