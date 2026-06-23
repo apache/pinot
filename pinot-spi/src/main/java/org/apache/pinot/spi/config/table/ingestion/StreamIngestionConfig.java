@@ -19,13 +19,16 @@
 package org.apache.pinot.spi.config.table.ingestion;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.Enablement;
 
 
@@ -59,6 +62,10 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Recovery mode which is used to decide how to recover a segment online in IS but having no"
       + " completed (immutable) replica on any server in pause-less ingestion")
   private DisasterRecoveryMode _disasterRecoveryMode = DisasterRecoveryMode.DEFAULT;
+
+  @JsonPropertyDescription("Next stream config ID to assign when a new stream config is added. "
+      + "Each stream config map gets a stable, immutable ID stored as 'stream.config.id' in the map.")
+  private int _nextStreamConfigId;
 
   @JsonPropertyDescription("Class to handle realtime offset auto reset")
   private String _realtimeOffsetAutoResetHandlerClass;
@@ -161,5 +168,43 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setOomProtection(@Nullable Enablement oomProtection) {
     _oomProtection = oomProtection == null ? Enablement.DEFAULT : oomProtection;
+  }
+
+  public int getNextStreamConfigId() {
+    return _nextStreamConfigId;
+  }
+
+  public void setNextStreamConfigId(int nextStreamConfigId) {
+    _nextStreamConfigId = nextStreamConfigId;
+  }
+
+  /// Returns the config ID for the stream config at the given list position.
+  /// If the entry has a stream.config.id key, returns that; otherwise returns the positional index.
+  public int getConfigId(int listIndex) {
+    Map<String, String> configMap = _streamConfigMaps.get(listIndex);
+    String idStr = configMap.get(StreamConfigProperties.STREAM_CONFIG_ID);
+    return idStr != null ? Integer.parseInt(idStr) : listIndex;
+  }
+
+  /// Returns the stream config map for the given config ID.
+  /// Falls back to positional index when stream.config.id is not set (legacy tables).
+  /// Throws IllegalStateException if no matching config is found.
+  public Map<String, String> getStreamConfigMapByConfigId(int configId) {
+    Map<String, String> result = getConfigIdToStreamConfigMap().get(configId);
+    if (result == null) {
+      throw new IllegalStateException("Cannot find stream config with config ID: " + configId);
+    }
+    return result;
+  }
+
+  /// Returns a map from config ID to stream config map.
+  /// For legacy tables without stream.config.id, uses positional index as the key.
+  @JsonIgnore
+  public Map<Integer, Map<String, String>> getConfigIdToStreamConfigMap() {
+    Map<Integer, Map<String, String>> result = new HashMap<>();
+    for (int i = 0; i < _streamConfigMaps.size(); i++) {
+      result.put(getConfigId(i), _streamConfigMaps.get(i));
+    }
+    return result;
   }
 }

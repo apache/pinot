@@ -42,6 +42,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -468,8 +469,12 @@ public class IngestionDelayTrackerTest {
 
     IngestionConfig ingestionConfig = new IngestionConfig();
     List<Map<String, String>> streamConfigMaps = new ArrayList<>();
-    streamConfigMaps.add(getStreamConfigs());
-    streamConfigMaps.add(getStreamConfigs());
+    Map<String, String> streamConfig0 = getStreamConfigs();
+    streamConfig0.put(StreamConfigProperties.STREAM_CONFIG_ID, "0");
+    Map<String, String> streamConfig1 = getStreamConfigs();
+    streamConfig1.put(StreamConfigProperties.STREAM_CONFIG_ID, "1");
+    streamConfigMaps.add(streamConfig0);
+    streamConfigMaps.add(streamConfig1);
     StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(streamConfigMaps);
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
@@ -501,8 +506,8 @@ public class IngestionDelayTrackerTest {
     final String segment0 = new LLCSegmentName(RAW_TABLE_NAME, partition0, 0, 123).getSegmentName();
     final int partition1 = 1;
 
-    ingestionDelayTracker._partitionsHostedByThisServer.put(partition0, true);
-    ingestionDelayTracker._partitionsHostedByThisServer.put(partition1, true);
+    ingestionDelayTracker._partitionsHostedByThisServer.put(partition0, 0);
+    ingestionDelayTracker._partitionsHostedByThisServer.put(partition1, 0);
     ingestionDelayTracker.updateMetrics(segment0, partition0, System.currentTimeMillis(), System.currentTimeMillis(),
         new LongMsgOffset(50));
 

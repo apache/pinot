@@ -29,7 +29,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -408,15 +408,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * Returns all partitionGroupIds for the partitions hosted by this server for current table.
    * @apiNote this involves Zookeeper read and should not be used frequently due to efficiency concerns.
    */
-  public Set<Integer> getHostedPartitionsGroupIds() {
-    Set<Integer> partitionsHostedByThisServer = new HashSet<>();
+  public Map<Integer, Integer> getHostedPartitionsGroupIds() {
+    Map<Integer, Integer> partitionGroupIdToConfigId = new HashMap<>();
     List<String> segments = TableStateUtils.getSegmentsInGivenStateForThisInstance(_helixManager, _tableNameWithType,
         CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
     for (String segmentNameStr : segments) {
       LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-      partitionsHostedByThisServer.add(segmentName.getPartitionGroupId());
+      partitionGroupIdToConfigId.put(segmentName.getPartitionGroupId(), segmentName.getStreamConfigId());
     }
-    return partitionsHostedByThisServer;
+    return partitionGroupIdToConfigId;
   }
 
   public RealtimeSegmentStatsHistory getStatsHistory() {

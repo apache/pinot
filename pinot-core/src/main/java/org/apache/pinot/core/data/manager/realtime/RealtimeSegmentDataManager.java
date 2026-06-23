@@ -1797,10 +1797,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } else {
       // Multiple streams
       _streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
-      int index = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId);
-      Preconditions.checkState(numStreams > index, "Cannot find stream config of index: %s for table: %s", index,
-          _tableNameWithType);
-      _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(index));
+      int configId = llcSegmentName.getStreamConfigId();
+      Map<String, String> streamConfigMap = tableConfig.getIngestionConfig().getStreamIngestionConfig()
+          .getStreamConfigMapByConfigId(configId);
+      _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMap);
     }
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();

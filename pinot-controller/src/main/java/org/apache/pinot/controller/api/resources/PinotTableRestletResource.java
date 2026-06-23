@@ -392,31 +392,28 @@ public class PinotTableRestletResource {
       throws Exception {
     Map<Integer, Integer> streamPartitionCountMap =
         _pinotHelixResourceManager.getRealtimeSegmentManager().getPartitionCountMap(streamConfigs);
-    Map<Integer, List<PartitionGroupMetadata>> partitionGroupMetadataByStreamConfigIndex = new HashMap<>();
+    Map<Integer, List<PartitionGroupMetadata>> partitionGroupMetadataByConfigId = new HashMap<>();
     for (WatermarkInductionResult.Watermark watermark : watermarkInductionResult.getWatermarks()) {
-      int streamConfigIndex =
-          IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(watermark.getPartitionGroupId());
-      Preconditions.checkArgument(streamConfigIndex >= 0 && streamConfigIndex < streamConfigs.size(),
-          "Invalid stream config index %s from watermark partition ID %s. Expected index in range [0, %s)",
-          streamConfigIndex, watermark.getPartitionGroupId(), streamConfigs.size());
-      partitionGroupMetadataByStreamConfigIndex.computeIfAbsent(streamConfigIndex, ignored -> new ArrayList<>()).add(
+      int configId = IngestionConfigUtils.getConfigIdFromPinotPartitionId(watermark.getPartitionGroupId());
+      partitionGroupMetadataByConfigId.computeIfAbsent(configId, ignored -> new ArrayList<>()).add(
           new PartitionGroupMetadata(watermark.getPartitionGroupId(), new LongMsgOffset(watermark.getOffset()),
               watermark.getSequenceNumber()));
     }
 
-    // Iterate in order by streamConfigIndex to ensure deterministic ordering
-    List<StreamMetadata> streamMetadataList = new ArrayList<>(partitionGroupMetadataByStreamConfigIndex.size());
-    for (int streamConfigIndex = 0; streamConfigIndex < streamConfigs.size(); streamConfigIndex++) {
+    // Iterate over stream configs in order to ensure deterministic ordering
+    List<StreamMetadata> streamMetadataList = new ArrayList<>(partitionGroupMetadataByConfigId.size());
+    for (int i = 0; i < streamConfigs.size(); i++) {
+      int configId = IngestionConfigUtils.getConfigIdFromStreamConfig(streamConfigs.get(i));
       List<PartitionGroupMetadata> partitionGroupMetadataList =
-          partitionGroupMetadataByStreamConfigIndex.get(streamConfigIndex);
+          partitionGroupMetadataByConfigId.get(configId);
       if (partitionGroupMetadataList == null) {
-        // No watermarks for this stream config index, skip it
+        // No watermarks for this stream config, skip it
         continue;
       }
-      Integer partitionCount = streamPartitionCountMap.get(streamConfigIndex);
+      Integer partitionCount = streamPartitionCountMap.get(configId);
       Preconditions.checkState(partitionCount != null,
-          "Cannot find partition count for stream config index: %s", streamConfigIndex);
-      streamMetadataList.add(new StreamMetadata(streamConfigs.get(streamConfigIndex),
+          "Cannot find partition count for stream config ID: %s", configId);
+      streamMetadataList.add(new StreamMetadata(streamConfigs.get(i),
           partitionCount, partitionGroupMetadataList));
     }
     return streamMetadataList;

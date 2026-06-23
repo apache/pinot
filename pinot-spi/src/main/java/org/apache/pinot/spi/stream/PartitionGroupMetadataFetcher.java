@@ -127,11 +127,10 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
           PartitionGroupMetadataFetcher.class.getSimpleName() + "-" + streamConfig.getTableNameWithType() + "-"
               + topicName;
       StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-      int index = i;
+      int configId = IngestionConfigUtils.getConfigIdFromStreamConfig(streamConfig);
       List<PartitionGroupConsumptionStatus> topicPartitionGroupConsumptionStatusList =
           _partitionGroupConsumptionStatusList.stream()
-              .filter(partitionGroupConsumptionStatus -> IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(
-                  partitionGroupConsumptionStatus.getPartitionGroupId()) == index)
+              .filter(s -> IngestionConfigUtils.getConfigIdFromPinotPartitionId(s.getPartitionGroupId()) == configId)
               .collect(Collectors.toList());
       try (StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(
           StreamConsumerFactory.getUniqueClientId(clientId))) {
@@ -142,8 +141,8 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
                     _forceGetOffsetFromStream)
                 .stream()
                 .map(metadata -> new PartitionGroupMetadata(
-                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(metadata.getPartitionGroupId(),
-                        index), metadata.getStartOffset(), metadata.getSequenceNumber()))
+                    IngestionConfigUtils.getPinotPartitionIdFromConfigId(metadata.getPartitionGroupId(), configId),
+                    metadata.getStartOffset(), metadata.getSequenceNumber()))
                 .collect(Collectors.toList());
         _streamMetadataList.add(
             new StreamMetadata(streamConfig, partitionGroupMetadataList.size(), partitionGroupMetadataList));

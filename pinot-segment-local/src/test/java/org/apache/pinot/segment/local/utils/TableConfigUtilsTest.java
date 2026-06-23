@@ -929,8 +929,12 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
 
     // Test for multiple stream configs with pauseless consumption enabled - should fail
+    Map<String, String> pauselessStreamConfigs1 = new HashMap<>(streamConfigs);
+    pauselessStreamConfigs1.remove(StreamConfigProperties.STREAM_CONFIG_ID);
+    Map<String, String> pauselessStreamConfigs2 = new HashMap<>(streamConfigs);
+    pauselessStreamConfigs2.remove(StreamConfigProperties.STREAM_CONFIG_ID);
     StreamIngestionConfig streamIngestionConfigWithPauseless =
-        new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
+        new StreamIngestionConfig(Arrays.asList(pauselessStreamConfigs1, pauselessStreamConfigs2));
     streamIngestionConfigWithPauseless.setPauselessConsumptionEnabled(true);
 
     IngestionConfig ingestionConfigWithPauseless = new IngestionConfig();
@@ -951,8 +955,13 @@ public class TableConfigUtilsTest {
     }
 
     // Test for multiple stream configs with pauseless consumption disabled - should pass
+    // Use fresh copies because ensureStreamConfigIds mutates the map (adds stream.config.id)
+    Map<String, String> dupStreamConfigs1 = new HashMap<>(streamConfigs);
+    dupStreamConfigs1.remove(StreamConfigProperties.STREAM_CONFIG_ID);
+    Map<String, String> dupStreamConfigs2 = new HashMap<>(streamConfigs);
+    dupStreamConfigs2.remove(StreamConfigProperties.STREAM_CONFIG_ID);
     StreamIngestionConfig streamIngestionConfigWithoutPauseless =
-        new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
+        new StreamIngestionConfig(Arrays.asList(dupStreamConfigs1, dupStreamConfigs2));
     streamIngestionConfigWithoutPauseless.setPauselessConsumptionEnabled(false);
 
     IngestionConfig ingestionConfigWithoutPauseless = new IngestionConfig();
@@ -973,10 +982,13 @@ public class TableConfigUtilsTest {
     }
 
     // Test for multiple stream configs with pauseless consumption disabled and unique topic names - should pass
-    Map<String, String> anotherStreamConfig = new HashMap<>(streamConfigs);
-    anotherStreamConfig.put("stream.kafka.topic.name", "myTopic2");
+    Map<String, String> uniqueStreamConfig1 = new HashMap<>(streamConfigs);
+    uniqueStreamConfig1.remove(StreamConfigProperties.STREAM_CONFIG_ID);
+    Map<String, String> uniqueStreamConfig2 = new HashMap<>(streamConfigs);
+    uniqueStreamConfig2.remove(StreamConfigProperties.STREAM_CONFIG_ID);
+    uniqueStreamConfig2.put("stream.kafka.topic.name", "myTopic2");
     StreamIngestionConfig streamIngestionConfigWithoutPauselessUniqueTopics =
-        new StreamIngestionConfig(Arrays.asList(streamConfigs, anotherStreamConfig));
+        new StreamIngestionConfig(Arrays.asList(uniqueStreamConfig1, uniqueStreamConfig2));
     streamIngestionConfigWithoutPauselessUniqueTopics.setPauselessConsumptionEnabled(false);
 
     IngestionConfig ingestionConfigWithoutPauselessUniqueTopics = new IngestionConfig();
@@ -1017,6 +1029,285 @@ public class TableConfigUtilsTest {
 
     streamIngestionConfig.setOomProtection(null);
     TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsNewTableNoIds() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("streamType", "kafka");
+    config0.put("stream.kafka.topic.name", "topic-A");
+    Map<String, String> config1 = new HashMap<>();
+    config1.put("streamType", "kafka");
+    config1.put("stream.kafka.topic.name", "topic-B");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config1));
+    assertEquals(sic.getNextStreamConfigId(), 0);
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    TableConfigUtils.ensureStreamConfigIds(tableConfig);
+
+    assertEquals(config0.get("stream.config.id"), "0");
+    assertEquals(config1.get("stream.config.id"), "1");
+    assertEquals(sic.getNextStreamConfigId(), 2);
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsSingleStream() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("streamType", "kafka");
+    config0.put("stream.kafka.topic.name", "topic-A");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Collections.singletonList(config0));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    TableConfigUtils.ensureStreamConfigIds(tableConfig);
+
+    assertEquals(config0.get("stream.config.id"), "0");
+    assertEquals(sic.getNextStreamConfigId(), 1);
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsPartialIds() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("streamType", "kafka");
+    config0.put("stream.kafka.topic.name", "topic-A");
+    config0.put("stream.config.id", "0");
+
+    Map<String, String> configNew = new HashMap<>();
+    configNew.put("streamType", "kafka");
+    configNew.put("stream.kafka.topic.name", "topic-C");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, configNew));
+    sic.setNextStreamConfigId(1);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    TableConfigUtils.ensureStreamConfigIds(tableConfig);
+
+    assertEquals(config0.get("stream.config.id"), "0");
+    assertEquals(configNew.get("stream.config.id"), "1");
+    assertEquals(sic.getNextStreamConfigId(), 2);
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsPartialIdsWithGap() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("streamType", "kafka");
+    config0.put("stream.kafka.topic.name", "topic-A");
+    config0.put("stream.config.id", "0");
+
+    Map<String, String> config3 = new HashMap<>();
+    config3.put("streamType", "kafka");
+    config3.put("stream.kafka.topic.name", "topic-D");
+    config3.put("stream.config.id", "3");
+
+    Map<String, String> configNew = new HashMap<>();
+    configNew.put("streamType", "kafka");
+    configNew.put("stream.kafka.topic.name", "topic-E");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config3, configNew));
+    sic.setNextStreamConfigId(4);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    TableConfigUtils.ensureStreamConfigIds(tableConfig);
+
+    assertEquals(config0.get("stream.config.id"), "0");
+    assertEquals(config3.get("stream.config.id"), "3");
+    assertEquals(configNew.get("stream.config.id"), "4");
+    assertEquals(sic.getNextStreamConfigId(), 5);
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsStaleNextId() {
+    // nextStreamConfigId explicitly set but below max existing ID — should fail
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("streamType", "kafka");
+    config0.put("stream.kafka.topic.name", "topic-A");
+    config0.put("stream.config.id", "0");
+
+    Map<String, String> config5 = new HashMap<>();
+    config5.put("streamType", "kafka");
+    config5.put("stream.kafka.topic.name", "topic-F");
+    config5.put("stream.config.id", "5");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config5));
+    sic.setNextStreamConfigId(2);  // Stale — max existing is 5
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.ensureStreamConfigIds(tableConfig);
+      fail("Should fail when nextStreamConfigId is below max existing stream.config.id");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("nextStreamConfigId"));
+      assertTrue(e.getMessage().contains("must be greater than"));
+    }
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsStaleNextIdWithNewEntry() {
+    Map<String, String> config5 = new HashMap<>();
+    config5.put("streamType", "kafka");
+    config5.put("stream.kafka.topic.name", "topic-F");
+    config5.put("stream.config.id", "5");
+
+    Map<String, String> configNew = new HashMap<>();
+    configNew.put("streamType", "kafka");
+    configNew.put("stream.kafka.topic.name", "topic-G");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config5, configNew));
+    sic.setNextStreamConfigId(1);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.ensureStreamConfigIds(tableConfig);
+      fail("Should fail when nextStreamConfigId is below max existing stream.config.id");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("nextStreamConfigId"));
+    }
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsStaleNextIdSkipValidation() {
+    // Same stale nextId scenario, but with STREAM_CONFIG_ID validation skipped — should correct silently
+    Map<String, String> config5 = new HashMap<>();
+    config5.put("streamType", "kafka");
+    config5.put("stream.kafka.topic.name", "topic-F");
+    config5.put("stream.config.id", "5");
+
+    Map<String, String> configNew = new HashMap<>();
+    configNew.put("streamType", "kafka");
+    configNew.put("stream.kafka.topic.name", "topic-G");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config5, configNew));
+    sic.setNextStreamConfigId(1);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    TableConfigUtils.ensureStreamConfigIds(tableConfig,
+        Set.of(TableConfigUtils.ValidationType.STREAM_CONFIG_ID));
+
+    assertEquals(config5.get("stream.config.id"), "5");
+    assertEquals(configNew.get("stream.config.id"), "6");
+    assertEquals(sic.getNextStreamConfigId(), 7);
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsDuplicateIds() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("streamType", "kafka");
+    config0.put("stream.kafka.topic.name", "topic-A");
+    config0.put("stream.config.id", "1");
+
+    Map<String, String> config1 = new HashMap<>();
+    config1.put("streamType", "kafka");
+    config1.put("stream.kafka.topic.name", "topic-B");
+    config1.put("stream.config.id", "1");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config1));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.ensureStreamConfigIds(tableConfig);
+      fail("Should fail for duplicate stream.config.id");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Duplicate stream.config.id"));
+    }
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsNegativeId() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("streamType", "kafka");
+    config0.put("stream.kafka.topic.name", "topic-A");
+    config0.put("stream.config.id", "-1");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Collections.singletonList(config0));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.ensureStreamConfigIds(tableConfig);
+      fail("Should fail for negative stream.config.id");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("non-negative"));
+    }
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsAllIdsPresent() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("streamType", "kafka");
+    config0.put("stream.kafka.topic.name", "topic-A");
+    config0.put("stream.config.id", "0");
+
+    Map<String, String> config1 = new HashMap<>();
+    config1.put("streamType", "kafka");
+    config1.put("stream.kafka.topic.name", "topic-B");
+    config1.put("stream.config.id", "1");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config1));
+    sic.setNextStreamConfigId(2);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    TableConfigUtils.ensureStreamConfigIds(tableConfig);
+
+    assertEquals(config0.get("stream.config.id"), "0");
+    assertEquals(config1.get("stream.config.id"), "1");
+    assertEquals(sic.getNextStreamConfigId(), 2);
+  }
+
+  @Test
+  public void testEnsureStreamConfigIdsIdempotent() {
+    Map<String, String> config0 = new HashMap<>();
+    config0.put("streamType", "kafka");
+    config0.put("stream.kafka.topic.name", "topic-A");
+    Map<String, String> config1 = new HashMap<>();
+    config1.put("streamType", "kafka");
+    config1.put("stream.kafka.topic.name", "topic-B");
+
+    StreamIngestionConfig sic = new StreamIngestionConfig(Arrays.asList(config0, config1));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(sic);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn").setIngestionConfig(ingestionConfig).build();
+
+    TableConfigUtils.ensureStreamConfigIds(tableConfig);
+    assertEquals(config0.get("stream.config.id"), "0");
+    assertEquals(config1.get("stream.config.id"), "1");
+    assertEquals(sic.getNextStreamConfigId(), 2);
+
+    TableConfigUtils.ensureStreamConfigIds(tableConfig);
+    assertEquals(config0.get("stream.config.id"), "0");
+    assertEquals(config1.get("stream.config.id"), "1");
+    assertEquals(sic.getNextStreamConfigId(), 2);
   }
 
   @Test

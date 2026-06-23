@@ -154,7 +154,8 @@ public class IngestionDelayTracker {
   private Clock _clock = Clock.systemUTC();
 
   protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
-  protected volatile ConcurrentHashMap<Integer, Boolean> _partitionsHostedByThisServer = new ConcurrentHashMap<>();
+  // Maps partitionGroupId -> streamConfigId, populated from LLCSegmentName so no arithmetic needed.
+  protected volatile ConcurrentHashMap<Integer, Integer> _partitionsHostedByThisServer = new ConcurrentHashMap<>();
   // Map of StreamMetadataProvider to fetch upstream latest stream offset (Table can have multiple upstream topics)
   // This map is accessed by:
   // 1. _ingestionDelayTrackingScheduler thread.
@@ -198,14 +199,13 @@ public class IngestionDelayTracker {
     List<StreamConfig> streamConfigs =
         IngestionConfigUtils.getStreamConfigs(_realTimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
 
-    for (int streamConfigIndex = 0; streamConfigIndex < streamConfigs.size(); streamConfigIndex++) {
-      if (_streamConfigIndexToStreamMetadataProvider.containsKey(streamConfigIndex)) {
+    for (StreamConfig streamConfig : streamConfigs) {
+      int configId = IngestionConfigUtils.getConfigIdFromStreamConfig(streamConfig);
+      if (_streamConfigIndexToStreamMetadataProvider.containsKey(configId)) {
         continue;
       }
-      StreamConfig streamConfig = null;
       StreamMetadataProvider streamMetadataProvider;
       try {
-        streamConfig = streamConfigs.get(streamConfigIndex);
         StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
         String clientId =
             IngestionConfigUtils.getTableTopicUniqueClientId(IngestionDelayTracker.class.getSimpleName(), streamConfig);
@@ -216,7 +216,7 @@ public class IngestionDelayTracker {
       }
 
       assert streamMetadataProvider != null;
-      _streamConfigIndexToStreamMetadataProvider.put(streamConfigIndex, streamMetadataProvider);
+      _streamConfigIndexToStreamMetadataProvider.put(configId, streamMetadataProvider);
 
       if ((streamMetadataProvider.supportsOffsetLag()) && (_partitionIdToLatestOffset == null)) {
         _partitionIdToLatestOffset = new ConcurrentHashMap<>();
@@ -268,37 +268,37 @@ public class IngestionDelayTracker {
 
   @VisibleForTesting
   void updateLatestStreamOffset(Set<Integer> partitionsHosted) {
-    Map<Integer, Set<Integer>> streamIndexToStreamPartitionIds =
+    Map<Integer, Set<Integer>> configIdToStreamPartitionIds =
         IngestionConfigUtils.getStreamConfigIndexToStreamPartitions(partitionsHosted);
 
-    if (streamIndexToStreamPartitionIds.size() > _streamConfigIndexToStreamMetadataProvider.size()) {
+    if (configIdToStreamPartitionIds.size() > _streamConfigIndexToStreamMetadataProvider.size()) {
       // There might be a new stream config added or need to retry creation of streamMetadataProvider for a stream
       // which might have failed before.
       createOrUpdateStreamMetadataProvider();
     }
 
     for (Map.Entry<Integer, StreamMetadataProvider> entry : _streamConfigIndexToStreamMetadataProvider.entrySet()) {
-      int streamIndex = entry.getKey();
+      int configId = entry.getKey();
       StreamMetadataProvider streamMetadataProvider = entry.getValue();
 
-      if (!streamIndexToStreamPartitionIds.containsKey(streamIndex)) {
+      if (!configIdToStreamPartitionIds.containsKey(configId)) {
         // Server is not hosting any partitions of this stream.
         continue;
       }
 
       if (streamMetadataProvider.supportsOffsetLag()) {
-        Set<Integer> streamPartitionIds = streamIndexToStreamPartitionIds.get(streamIndex);
+        Set<Integer> streamPartitionIds = configIdToStreamPartitionIds.get(configId);
         try {
           Map<Integer, StreamPartitionMsgOffset> streamPartitionIdToLatestOffset =
               streamMetadataProvider.fetchLatestStreamOffset(streamPartitionIds,
                   LATEST_STREAM_OFFSET_FETCH_TIMEOUT_MS);
-          if (streamIndex > 0) {
+          if (configId > 0) {
             // Need to convert stream partition Ids back to pinot partition Ids.
             for (Map.Entry<Integer, StreamPartitionMsgOffset> latestOffsetEntry
                 : streamPartitionIdToLatestOffset.entrySet()) {
               _partitionIdToLatestOffset.put(
-                  IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(latestOffsetEntry.getKey(),
-                      streamIndex), latestOffsetEntry.getValue());
+                  IngestionConfigUtils.getPinotPartitionIdFromConfigId(latestOffsetEntry.getKey(), configId),
+                  latestOffsetEntry.getValue());
             }
           } else {
             _partitionIdToLatestOffset.putAll(streamPartitionIdToLatestOffset);
@@ -371,8 +371,9 @@ public class IngestionDelayTracker {
 
   @VisibleForTesting
   void createMetrics(int partitionId) {
-    int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
-    StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
+    int configId = _partitionsHostedByThisServer.getOrDefault(partitionId,
+        IngestionConfigUtils.getConfigIdFromPinotPartitionId(partitionId));
+    StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(configId);
 
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
       _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
@@ -395,9 +396,10 @@ public class IngestionDelayTracker {
   }
 
   private void removeMetrics(int partitionId) {
-    int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
+    int configId = _partitionsHostedByThisServer.getOrDefault(partitionId,
+        IngestionConfigUtils.getConfigIdFromPinotPartitionId(partitionId));
     StreamMetadataProvider streamMetadataProvider =
-        _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
+        _streamConfigIndexToStreamMetadataProvider.get(configId);
     // Remove all metrics associated with this partition
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
       _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
@@ -508,7 +510,11 @@ public class IngestionDelayTracker {
     }
     Set<Integer> partitionsHostedByThisServer;
     try {
-      partitionsHostedByThisServer = _realTimeTableDataManager.getHostedPartitionsGroupIds();
+      Map<Integer, Integer> partitionGroupIdToConfigId =
+          _realTimeTableDataManager.getHostedPartitionsGroupIds();
+      partitionsHostedByThisServer = partitionGroupIdToConfigId.keySet();
+      ConcurrentHashMap<Integer, Integer> newMap = new ConcurrentHashMap<>(partitionGroupIdToConfigId);
+      _partitionsHostedByThisServer = newMap;
     } catch (Exception e) {
       LOGGER.error("Failed to get partitions hosted by this server, table={}, exception={}:{}", _tableNameWithType,
           e.getClass(), e.getMessage());
@@ -520,10 +526,6 @@ public class IngestionDelayTracker {
         removePartitionId(partitionId);
       }
     }
-
-    ConcurrentHashMap<Integer, Boolean> newMap = new ConcurrentHashMap<>();
-    partitionsHostedByThisServer.forEach(p -> newMap.put(p, true));
-    _partitionsHostedByThisServer = newMap;
   }
 
   /**
