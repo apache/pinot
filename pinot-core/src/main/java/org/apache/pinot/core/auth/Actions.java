@@ -105,6 +105,7 @@ public class Actions {
     public static final String DELETE_QUERY_WORKLOAD_CONFIG = "DeleteQueryWorkloadConfig";
     public static final String GET_GROOVY_STATIC_ANALYZER_CONFIG = "GetGroovyStaticAnalyzerConfig";
     public static final String UPDATE_GROOVY_STATIC_ANALYZER_CONFIG = "UpdateGroovyStaticAnalyzerConfig";
+    public static final String GET_TABLE_COPY_STATUS = "GetTableCopyStatus";
   }
 
   // Action names for table
