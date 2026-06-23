@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
@@ -450,7 +449,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
 
     @Override
     public List<Operator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override

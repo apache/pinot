@@ -20,7 +20,6 @@ package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +96,7 @@ public interface StreamMetadataProvider extends Closeable {
       boolean forceGetOffsetFromStream)
       throws IOException, TimeoutException {
     return computePartitionGroupMetadata(clientId, streamConfig,
-        forceGetOffsetFromStream ? Collections.emptyList() : partitionGroupConsumptionStatuses, timeoutMillis);
+        forceGetOffsetFromStream ? List.of() : partitionGroupConsumptionStatuses, timeoutMillis);
   }
 
   default Map<String, PartitionLagState> getCurrentPartitionLagState(

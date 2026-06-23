@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,9 +116,9 @@ public class UpsertCompactionTaskGeneratorTest {
   @Test
   public void testGenerateTasksWithNoSegments() {
     when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
-        Lists.newArrayList(Collections.emptyList()));
+        Lists.newArrayList(List.of()));
     when(_mockClusterInfoAccessor.getIdealState(REALTIME_TABLE_NAME)).thenReturn(
-        getIdealState(REALTIME_TABLE_NAME, Lists.newArrayList(Collections.emptyList())));
+        getIdealState(REALTIME_TABLE_NAME, Lists.newArrayList(List.of())));
 
     _taskGenerator.init(_mockClusterInfoAccessor);
 

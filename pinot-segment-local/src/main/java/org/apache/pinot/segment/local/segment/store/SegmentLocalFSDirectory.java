@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
@@ -215,7 +214,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   @Override
   public Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type) {
     if (_columnIndexDirectory == null) {
-      return Collections.emptySet();
+      return Set.of();
     }
     return _columnIndexDirectory.getColumnsWithIndex(type);
   }

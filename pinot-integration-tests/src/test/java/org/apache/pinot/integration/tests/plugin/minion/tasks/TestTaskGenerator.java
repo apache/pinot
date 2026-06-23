@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests.plugin.minion.tasks;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +49,7 @@ public class TestTaskGenerator extends BaseTaskGenerator {
     // Generate at most 2 tasks
     if (_clusterInfoAccessor.getTaskStates(SimpleMinionClusterIntegrationTest.TASK_TYPE).size()
         >= SimpleMinionClusterIntegrationTest.NUM_TASKS) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     List<PinotTaskConfig> taskConfigs = new ArrayList<>();

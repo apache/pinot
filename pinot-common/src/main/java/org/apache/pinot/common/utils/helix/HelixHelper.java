@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils.helix;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -126,7 +125,7 @@ public class HelixHelper {
     Set<String> tablesForBrokerTag;
     int numBrokerTags = brokerTags.size();
     if (numBrokerTags == 0) {
-      tablesForBrokerTag = Collections.emptySet();
+      tablesForBrokerTag = Set.of();
     } else if (numBrokerTags == 1) {
       tablesForBrokerTag = getTablesForBrokerTag(helixManager, brokerTags.get(0));
     } else {
@@ -659,7 +658,7 @@ public class HelixHelper {
    * Adds default tags to the instance config if no tag exists, returns {@code true} if the default tags are added,
    * {@code false} otherwise.
    * <p>The {@code defaultTagsSupplier} is a function which is only invoked when the instance does not have any tag.
-   * E.g. () -> Collections.singletonList("DefaultTenant_BROKER").
+   * E.g. () -> List.of("DefaultTenant_BROKER").
    */
   public static boolean addDefaultTags(InstanceConfig instanceConfig, Supplier<List<String>> defaultTagsSupplier) {
     List<String> instanceTags = instanceConfig.getTags();

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 import java.lang.reflect.Field;
-import java.util.Collections;
+import java.util.Set;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.IdealState;
@@ -62,7 +62,7 @@ public class PinotRealtimeTableResourceTest {
     when(helixResourceManager.getTableIdealState(tableNameWithType)).thenReturn(idealState);
 
     PauseStatusDetails expectedDetails =
-        new PauseStatusDetails(true, Collections.singleton("segment"), PauseState.ReasonCode.ADMINISTRATIVE, "comment",
+        new PauseStatusDetails(true, Set.of("segment"), PauseState.ReasonCode.ADMINISTRATIVE, "comment",
             "ts");
     when(segmentManager.pauseConsumption(eq(tableNameWithType), eq(PauseState.ReasonCode.ADMINISTRATIVE),
         eq("comment"), any())).thenReturn(expectedDetails);

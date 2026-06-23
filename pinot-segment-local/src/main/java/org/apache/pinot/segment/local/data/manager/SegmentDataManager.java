@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.data.manager;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -79,7 +78,7 @@ public abstract class SegmentDataManager {
   }
 
   public List<IndexSegment> getSegments() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   /**

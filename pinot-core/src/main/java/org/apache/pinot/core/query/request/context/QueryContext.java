@@ -801,7 +801,7 @@ public class QueryContext {
       // TODO: Add validation logic here
 
       if (_queryOptions == null) {
-        _queryOptions = Collections.emptyMap();
+        _queryOptions = Map.of();
       }
       QueryContext queryContext =
           new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList,

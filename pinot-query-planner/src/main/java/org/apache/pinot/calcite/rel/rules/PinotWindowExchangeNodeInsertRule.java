@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
@@ -180,9 +179,9 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     RexBuilder rexBuilder = cluster.getRexBuilder();
 
     // Construct the project that goes below the window (which projects a literal)
-    final List<RexNode> expsForProjectBelowWindow = Collections.singletonList(
+    final List<RexNode> expsForProjectBelowWindow = List.of(
         rexBuilder.makeLiteral(0, cluster.getTypeFactory().createSqlType(SqlTypeName.INTEGER)));
-    final List<String> expsFieldNamesBelowWindow = Collections.singletonList("winLiteral");
+    final List<String> expsFieldNamesBelowWindow = List.of("winLiteral");
     Project projectBelowWindow =
         LogicalProject.create(project.getInput(), project.getHints(), expsForProjectBelowWindow,
             expsFieldNamesBelowWindow);
@@ -195,7 +194,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     // This scenario is only possible for empty OVER() which uses functions that have no arguments such as COUNT(*) or
     // ROW_NUMBER(). Add an Exchange with empty hash distribution list
     PinotLogicalExchange exchange =
-        PinotLogicalExchange.create(projectBelowWindow, RelDistributions.hash(Collections.emptyList()));
+        PinotLogicalExchange.create(projectBelowWindow, RelDistributions.hash(List.of()));
     Window newWindow = new LogicalWindow(window.getCluster(), window.getTraitSet(), exchange, window.getConstants(),
         outputBuilder.build(), window.groups);
 

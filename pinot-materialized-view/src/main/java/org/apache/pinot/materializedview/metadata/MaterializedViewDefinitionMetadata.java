@@ -21,7 +21,6 @@ package org.apache.pinot.materializedview.metadata;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -168,7 +167,7 @@ public class MaterializedViewDefinitionMetadata {
       String baseTablesJson = znRecord.getSimpleField(BASE_TABLES_KEY);
       List<String> baseTables = baseTablesJson != null
           ? JsonUtils.stringToObject(baseTablesJson, STRING_LIST_TYPE)
-          : Collections.emptyList();
+          : List.of();
 
       String definedSql = znRecord.getSimpleField(DEFINED_SQL_KEY);
 

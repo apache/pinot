@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -625,7 +624,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       try {
         HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
             .forCluster(helixClusterName).build();
-        Map<String, String> values = helixAdminForMv.getConfig(scope, Collections.singletonList(configName));
+        Map<String, String> values = helixAdminForMv.getConfig(scope, List.of(configName));
         return values == null ? null : values.get(configName);
       } catch (Exception e) {
         return null;
@@ -1045,7 +1044,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         }
       }
     }
-    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> Collections.singletonList(Helix.CONTROLLER_INSTANCE));
+    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> List.of(Helix.CONTROLLER_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
 

@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -141,7 +140,7 @@ public class StrictRealtimeSegmentAssignmentTest {
     TableConfigBuilder builder = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
         .setNumReplicas(NUM_REPLICAS)
         .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-        .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(),
+        .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.toString(),
             new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1));
     TableConfig tableConfig;
@@ -372,7 +371,7 @@ public class StrictRealtimeSegmentAssignmentTest {
   public void testRebalanceTableToCompletedServers(String tableType) {
     SegmentAssignment segmentAssignment = createSegmentAssignment(tableType);
     String tierName = "coldTier";
-    List<Tier> sortedTiers = createSortedTiers(tierName, Collections.emptySet());
+    List<Tier> sortedTiers = createSortedTiers(tierName, Set.of());
     Map<String, InstancePartitions> tierInstancePartitionsMap = createTierInstancePartitionsMap(tierName, 3);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
@@ -438,7 +437,7 @@ public class StrictRealtimeSegmentAssignmentTest {
   public void testMultiTierAssignSegmentSkipsExistingWhenLatestOnTier() {
     String olderSegment = _segments.get(0); // partition 0, sequence 0
     String tieredSegment = _segments.get(4); // partition 0, sequence 1 — marked as tiered
-    HelixManager helixManager = createHelixManager(Collections.singleton(tieredSegment));
+    HelixManager helixManager = createHelixManager(Set.of(tieredSegment));
     SegmentAssignment segmentAssignment = createSegmentAssignment("dedup", helixManager);
 
     Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =

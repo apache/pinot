@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
@@ -29,7 +28,7 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 public class TimestampIndexQuickstart extends Quickstart {
   @Override
   public List<String> types() {
-    return Collections.singletonList("TIMESTAMP");
+    return List.of("TIMESTAMP");
   }
 
   @Override

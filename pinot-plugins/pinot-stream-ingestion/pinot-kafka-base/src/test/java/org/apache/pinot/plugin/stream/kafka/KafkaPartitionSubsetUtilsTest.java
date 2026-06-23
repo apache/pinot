@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.kafka;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,7 +107,7 @@ public class KafkaPartitionSubsetUtilsTest {
 
   @Test
   public void testGetPartitionIdsFromConfigEmptyMap() {
-    List<Integer> result = KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(Collections.emptyMap());
+    List<Integer> result = KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(Map.of());
     Assert.assertNull(result);
   }
 

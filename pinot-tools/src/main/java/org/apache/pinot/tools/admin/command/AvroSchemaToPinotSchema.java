@@ -21,7 +21,6 @@ package org.apache.pinot.tools.admin.command;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -165,7 +164,7 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
     if (_fieldsToUnnest != null) {
       return Arrays.asList(_fieldsToUnnest.split("\\s*,\\s*"));
     } else {
-      return Collections.emptyList();
+      return List.of();
     }
   }
 

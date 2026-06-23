@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +55,7 @@ public class OpenStructIndexType
     extends AbstractIndexType<OpenStructIndexConfig, OpenStructIndexReader, ColumnarOpenStructIndexCreator> {
 
   public static final String INDEX_DISPLAY_NAME = "open_struct";
-  private static final List<String> EXTENSIONS = Collections.singletonList(".open_struct.idx");
+  private static final List<String> EXTENSIONS = List.of(".open_struct.idx");
 
   protected OpenStructIndexType() {
     super(StandardIndexes.OPEN_STRUCT_ID);

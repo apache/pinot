@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -292,7 +291,7 @@ public class TableResizer {
   List<Record> getSortedTopRecords(Map<Key, Record> recordsMap, int size) {
     int numRecords = recordsMap.size();
     if (numRecords == 0) {
-      return Collections.emptyList();
+      return List.of();
     }
     if (numRecords <= size) {
       // Use quick sort if all the records are top records

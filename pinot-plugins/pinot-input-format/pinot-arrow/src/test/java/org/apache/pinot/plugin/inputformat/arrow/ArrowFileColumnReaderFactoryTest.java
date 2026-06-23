@@ -27,7 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
@@ -342,7 +342,7 @@ public class ArrowFileColumnReaderFactoryTest {
     org.apache.pinot.spi.data.Schema schema = primitiveSchema();
 
     try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(arrowFile)) {
-      factory.init(schema, java.util.Set.of("intCol", "stringCol"), Collections.emptyMap());
+      factory.init(schema, java.util.Set.of("intCol", "stringCol"), Map.of());
       Map<String, ColumnReader> readers = factory.getAllColumnReaders();
       assertEquals(readers.size(), 2);
       assertTrue(readers.containsKey("intCol"));
@@ -390,7 +390,7 @@ public class ArrowFileColumnReaderFactoryTest {
     org.apache.pinot.spi.data.Schema schema = primitiveSchema();
 
     try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(arrowFile)) {
-      factory.init(schema, java.util.Set.of("intCol"), Collections.emptyMap());
+      factory.init(schema, java.util.Set.of("intCol"), Map.of());
       // getAvailableColumns reflects the source schema, not the requested subset.
       assertTrue(factory.getAvailableColumns().containsAll(
           Arrays.asList("intCol", "longCol", "floatCol", "doubleCol", "stringCol", "bytesCol")));
@@ -491,7 +491,7 @@ public class ArrowFileColumnReaderFactoryTest {
     File out = _tempDir.resolve(fileName).toFile();
     try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE)) {
       Field seqField = new Field("seqCol", FieldType.nullable(new ArrowType.Int(32, true)), null);
-      Schema schema = new Schema(Collections.singletonList(seqField));
+      Schema schema = new Schema(List.of(seqField));
       try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator);
           FileOutputStream fos = new FileOutputStream(out);
           FileChannel channel = fos.getChannel();
@@ -613,7 +613,7 @@ public class ArrowFileColumnReaderFactoryTest {
     File out = _tempDir.resolve(fileName).toFile();
     try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE)) {
       Field seqField = new Field("seqCol", FieldType.nullable(new ArrowType.Int(32, true)), null);
-      Schema schema = new Schema(Collections.singletonList(seqField));
+      Schema schema = new Schema(List.of(seqField));
 
       try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator);
           FileOutputStream fos = new FileOutputStream(out);
@@ -645,8 +645,8 @@ public class ArrowFileColumnReaderFactoryTest {
       Field elementField =
           new Field("element", FieldType.nullable(new ArrowType.Int(32, true)), null);
       Field listField = new Field("intArr", FieldType.nullable(ArrowType.List.INSTANCE),
-          Collections.singletonList(elementField));
-      Schema schema = new Schema(Collections.singletonList(listField));
+          List.of(elementField));
+      Schema schema = new Schema(List.of(listField));
 
       try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
         ListVector listVec = (ListVector) root.getVector("intArr");
@@ -687,7 +687,7 @@ public class ArrowFileColumnReaderFactoryTest {
       // No-timezone Timestamp vector in millisecond units (matches Pinot's TIMESTAMP storage unit).
       Field tsField =
           new Field("tsCol", FieldType.nullable(new ArrowType.Timestamp(TimeUnit.MILLISECOND, null)), null);
-      Schema schema = new Schema(Collections.singletonList(tsField));
+      Schema schema = new Schema(List.of(tsField));
 
       try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
         TimeStampMilliVector tsVec = (TimeStampMilliVector) root.getVector("tsCol");

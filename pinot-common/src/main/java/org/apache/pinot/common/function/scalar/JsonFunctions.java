@@ -445,7 +445,7 @@ public class JsonFunctions {
     JsonExtractFunctionParameters params = new JsonExtractFunctionParameters(paramString);
 
     if (params._maxDepth == 0) {
-      return java.util.Collections.emptyList();
+      return java.util.List.of();
     }
     // Special handling for empty string, '$.**' and '$..' recursive key extraction
     if ("".equals(jsonPath) || "$..**".equals(jsonPath) || "$..".equals(jsonPath)) {

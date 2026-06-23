@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.request.context;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -66,7 +65,7 @@ public final class FilterContext {
   }
 
   public static FilterContext forNot(FilterContext child) {
-    return new FilterContext(Type.NOT, Collections.singletonList(child), null, false);
+    return new FilterContext(Type.NOT, List.of(child), null, false);
   }
 
   public static FilterContext forPredicate(Predicate predicate) {

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -59,11 +58,11 @@ public class ServerIngestionOomProtectionManagerTest {
     TableConfig tableConfig = buildTableConfig(null);
 
     ServerIngestionOomProtectionManager statelessRealtimeManager =
-        buildManager(Collections.emptyMap(), tableConfig, false, usedHeapBytes, maxHeapBytes, nowMs);
+        buildManager(Map.of(), tableConfig, false, usedHeapBytes, maxHeapBytes, nowMs);
     assertFalse(statelessRealtimeManager.shouldThrottle());
 
     ServerIngestionOomProtectionManager upsertOrDedupManager =
-        buildManager(Collections.emptyMap(), tableConfig, true, usedHeapBytes, maxHeapBytes, nowMs);
+        buildManager(Map.of(), tableConfig, true, usedHeapBytes, maxHeapBytes, nowMs);
     assertFalse(upsertOrDedupManager.shouldThrottle());
   }
 
@@ -150,7 +149,7 @@ public class ServerIngestionOomProtectionManagerTest {
     AtomicLong nowMs = new AtomicLong();
 
     ServerIngestionOomProtectionManager manager =
-        buildManager(Collections.emptyMap(), buildTableConfig(Enablement.ENABLE), false, usedHeapBytes,
+        buildManager(Map.of(), buildTableConfig(Enablement.ENABLE), false, usedHeapBytes,
             maxHeapBytes, nowMs);
 
     assertFalse(manager.shouldThrottle());
@@ -271,7 +270,7 @@ public class ServerIngestionOomProtectionManagerTest {
     AtomicLong nowMs = new AtomicLong();
     ServerMetrics serverMetrics = mock(ServerMetrics.class);
     ServerIngestionOomProtectionManager.ServerThrottleState serverThrottleState =
-        buildServerThrottleState(Collections.emptyMap(), usedHeapBytes::get, maxHeapBytes::get, nowMs, serverMetrics);
+        buildServerThrottleState(Map.of(), usedHeapBytes::get, maxHeapBytes::get, nowMs, serverMetrics);
     ServerIngestionOomProtectionManager manager =
         buildManager(buildTableConfig(null), true, serverThrottleState);
 
@@ -343,7 +342,7 @@ public class ServerIngestionOomProtectionManagerTest {
     serverThrottleState.onChange(Set.of(modeConfigKey), Map.of(modeConfigKey, "DISABLE"));
     assertFalse(manager.shouldThrottle());
 
-    serverThrottleState.onChange(Set.of(modeConfigKey), Collections.emptyMap());
+    serverThrottleState.onChange(Set.of(modeConfigKey), Map.of());
     assertTrue(manager.shouldThrottle());
   }
 
@@ -376,7 +375,7 @@ public class ServerIngestionOomProtectionManagerTest {
     AtomicLong nowMs = new AtomicLong();
 
     ServerIngestionOomProtectionManager manager =
-        buildManager(Collections.emptyMap(), buildTableConfig(Enablement.ENABLE), true, usedHeapBytes,
+        buildManager(Map.of(), buildTableConfig(Enablement.ENABLE), true, usedHeapBytes,
             maxHeapBytes, nowMs);
 
     assertTrue(manager.shouldThrottle());

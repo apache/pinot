@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.queries;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -94,7 +93,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   protected Map<String, Object> getConfiguration() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   @BeforeClass

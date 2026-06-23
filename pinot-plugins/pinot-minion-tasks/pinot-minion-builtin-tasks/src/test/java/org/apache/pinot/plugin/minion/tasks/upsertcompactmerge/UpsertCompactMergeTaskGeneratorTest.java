@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -189,7 +188,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertTrue(alreadyMergedSegments.isEmpty());
 
     // no segment present, empty list
-    alreadyMergedSegments = UpsertCompactMergeTaskGenerator.getAlreadyMergedSegments(Collections.emptyList());
+    alreadyMergedSegments = UpsertCompactMergeTaskGenerator.getAlreadyMergedSegments(List.of());
     Assert.assertTrue(alreadyMergedSegments.isEmpty());
   }
 
@@ -372,7 +371,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
             ValidDocIdsType.SNAPSHOT, 10000, System.currentTimeMillis(), "server1",
             ServiceStatus.Status.GOOD)));
 
-    Set<String> alreadyMergedSegments = Collections.emptySet();
+    Set<String> alreadyMergedSegments = Set.of();
 
     SegmentSelectionResult result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(
         RAW_TABLE_NAME + "_REALTIME", taskConfigs, candidateSegmentsMap,
@@ -410,7 +409,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
             ValidDocIdsType.SNAPSHOT, 10000, System.currentTimeMillis(), "server1",
             ServiceStatus.Status.GOOD)));
 
-    Set<String> alreadyMergedSegments = Collections.emptySet();
+    Set<String> alreadyMergedSegments = Set.of();
 
     SegmentSelectionResult result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(
         RAW_TABLE_NAME + "_REALTIME", taskConfigs, candidateSegmentsMap,
@@ -466,7 +465,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .build();
 
-    _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), Collections.emptyMap());
+    _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), Map.of());
   }
 
   /**

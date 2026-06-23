@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
@@ -132,7 +131,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   protected Map<String, String> getHeaders() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   /**

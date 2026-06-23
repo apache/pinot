@@ -23,7 +23,6 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -812,7 +811,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         mutableIndex.add(record);
       }
 
-      Object expectedMap = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
+      Object expectedMap = Map.of(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
 
       String key = "$.key1";
       assertEquals(getMatchingDocsMap(onHeapIndex, key), expectedMap);
@@ -859,7 +858,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
       Map<String, RoaringBitmap> onHeapRes = getMatchingDocsMap(onHeapReader, "$");
       Map<String, RoaringBitmap> offHeapRes = getMatchingDocsMap(offHeapReader, "$");
       Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingFlattenedDocsMap("$", null);
-      Object expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
+      Object expectedRes = Map.of(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
       assertEquals(onHeapRes, expectedRes);
       assertEquals(offHeapRes, expectedRes);
       assertEquals(mutableRes, expectedRes);
@@ -892,7 +891,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
       Map<String, RoaringBitmap> onHeapRes = getMatchingDocsMap(onHeapReader, "$");
       Map<String, RoaringBitmap> offHeapRes = getMatchingDocsMap(offHeapReader, "$");
       Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingFlattenedDocsMap("$", null);
-      Object expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
+      Object expectedRes = Map.of(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
       assertEquals(onHeapRes, expectedRes);
       assertEquals(offHeapRes, expectedRes);
       assertEquals(mutableRes, expectedRes);
@@ -920,7 +919,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length)) {
       Map<String, RoaringBitmap> onHeapRes = getMatchingDocsMap(onHeapReader, "$");
       Map<String, RoaringBitmap> offHeapRes = getMatchingDocsMap(offHeapReader, "$");
-      Object expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
+      Object expectedRes = Map.of(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
       assertEquals(onHeapRes, expectedRes);
       assertEquals(offHeapRes, expectedRes);
     }
@@ -968,7 +967,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
             Map.of("y", RoaringBitmap.bitmapOf(0), "z", RoaringBitmap.bitmapOf(1)),
             Map.of("a", RoaringBitmap.bitmapOf(0)),
             Map.of("u", RoaringBitmap.bitmapOf(0, 1)),
-            Collections.emptyMap(),
+            Map.of(),
             Map.of("x", RoaringBitmap.bitmapOf(0),
                     "y", RoaringBitmap.bitmapOf(0, 1),
                     "z", RoaringBitmap.bitmapOf(1)),

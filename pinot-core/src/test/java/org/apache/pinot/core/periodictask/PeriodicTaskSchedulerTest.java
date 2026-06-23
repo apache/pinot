@@ -19,7 +19,6 @@
 package org.apache.pinot.core.periodictask;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
@@ -321,7 +320,7 @@ public class PeriodicTaskSchedulerTest {
           //mocking runtime execution logic.
         }
       };
-      controllerPeriodicTaskScheduler.init(Collections.singletonList(controllerCronTask));
+      controllerPeriodicTaskScheduler.init(List.of(controllerCronTask));
       controllerPeriodicTaskScheduler.start();
 
       Assert.assertFalse(minionScheduler.checkExists(JobKey.jobKey(controllerTaskName)),

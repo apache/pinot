@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.plan.server;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -159,7 +158,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       if (visit(left, context)) {
         PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
         int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
-        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
+        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, List.of());
         List<Object[]> resultDataContainer = new ArrayList<>();
         DataSchema dataSchema = right.getDataSchema();
         for (MseBlock block : blocks) {
@@ -198,7 +197,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         // semi join to dynamic filter logic
         PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
         int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
-        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
+        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, List.of());
         List<Object[]> resultDataContainer = new ArrayList<>();
         DataSchema dataSchema = right.getDataSchema();
         for (MseBlock block : blocks) {

@@ -21,7 +21,6 @@ package org.apache.pinot.materializedview.consistency;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -271,7 +270,7 @@ public class MaterializedViewConsistencyManager {
   public List<String> getDependentMaterializedViews(String rawBaseTableName) {
     List<String> dependents = _baseTableToMaterializedViewTables.get(rawBaseTableName);
     if (dependents == null || dependents.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
     // Defensive copy so a caller doesn't accidentally mutate the live reverse index.
     return new ArrayList<>(dependents);
@@ -613,7 +612,7 @@ public class MaterializedViewConsistencyManager {
     MaterializedViewRuntimeMetadata runtime =
         MaterializedViewRuntimeMetadataUtils.fetchWithVersion(_propertyStore, viewTableName, stat);
     if (runtime == null) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     long bucketMs = inferBucketMs(viewTableName, runtime.getPartitions());

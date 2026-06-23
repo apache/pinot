@@ -26,7 +26,6 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator;
@@ -334,7 +333,7 @@ public class DateTimeFunctionsTest {
     });
 
     // timezone_hour and timezone_minute
-    List<String> expectedArguments = Collections.singletonList("tz");
+    List<String> expectedArguments = List.of("tz");
     GenericRow row120 = new GenericRow();
     row120.putValue("tz", "UTC");
     inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row120, 0});
@@ -374,7 +373,7 @@ public class DateTimeFunctionsTest {
     inputs.add(new Object[]{"timezone_minute(tz, 1656685381000)", expectedArguments, row125, 0});
 
     // Convenience extraction functions
-    expectedArguments = Collections.singletonList("millis");
+    expectedArguments = List.of("millis");
     GenericRow row130 = new GenericRow();
     // Sat May 23 2020 22:23:13.123 UTC
     row130.putValue("millis", 1590272593123L);
@@ -785,7 +784,7 @@ public class DateTimeFunctionsTest {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timestamp10DaysAgo);
 
-    List<String> arguments = Collections.singletonList("timeCol");
+    List<String> arguments = List.of("timeCol");
 
     testFunction("timestampAdd(DAY, 10, timeCol)", arguments, row, currentTimestamp);
 
@@ -822,7 +821,7 @@ public class DateTimeFunctionsTest {
       String outputGranularityStr, Object expectedResult) {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timeValue);
-    List<String> arguments = Collections.singletonList("timeCol");
+    List<String> arguments = List.of("timeCol");
     testDateFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult);
   }
@@ -831,7 +830,7 @@ public class DateTimeFunctionsTest {
       String outputGranularityStr, String bucketingTz, Object expectedResult) {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timeValue);
-    List<String> arguments = Collections.singletonList("timeCol");
+    List<String> arguments = List.of("timeCol");
     testDateFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr, bucketingTz), arguments, row, expectedResult == null ? null : expectedResult);
   }
@@ -866,7 +865,7 @@ public class DateTimeFunctionsTest {
   @Test
   public void testSleepFunction() {
     long startTime = System.currentTimeMillis();
-    testFunction("sleep(50)", Collections.emptyList(), new GenericRow(), result -> {
+    testFunction("sleep(50)", List.of(), new GenericRow(), result -> {
       assertTrue((long) result >= 50);
     });
     long endTime = System.currentTimeMillis();

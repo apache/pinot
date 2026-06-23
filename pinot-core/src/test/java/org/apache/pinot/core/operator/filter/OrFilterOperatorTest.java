@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.TreeSet;
@@ -168,7 +167,7 @@ public class OrFilterOperatorTest {
         numDocs, true);
 
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Collections.emptyList());
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of());
   }
 
   @Test
@@ -179,7 +178,7 @@ public class OrFilterOperatorTest {
         new OrFilterOperator(Arrays.asList(EmptyFilterOperator.getInstance(), EmptyFilterOperator.getInstance()), null,
             numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), Collections.emptyList());
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of());
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
   }
 

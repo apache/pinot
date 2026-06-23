@@ -20,7 +20,6 @@ package org.apache.pinot.broker.broker.helix;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -341,9 +340,9 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       try {
         Map<ChangeType, List<ClusterChangeHandler>> handlers = new HashMap<>();
         handlers.put(ChangeType.CLUSTER_CONFIG, new ArrayList<>());
-        handlers.put(ChangeType.IDEAL_STATE, Collections.singletonList(routingManager));
-        handlers.put(ChangeType.EXTERNAL_VIEW, Collections.singletonList(routingManager));
-        handlers.put(ChangeType.INSTANCE_CONFIG, Collections.singletonList(routingManager));
+        handlers.put(ChangeType.IDEAL_STATE, List.of(routingManager));
+        handlers.put(ChangeType.EXTERNAL_VIEW, List.of(routingManager));
+        handlers.put(ChangeType.INSTANCE_CONFIG, List.of(routingManager));
 
         ClusterChangeMediator mediator = new ClusterChangeMediator(handlers, _brokerMetrics);
         mediator.start();

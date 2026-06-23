@@ -120,7 +120,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
       LOGGER.error(errorMessage, e);
       closeStream();
       _mailbox.setErrorBlock(
-          ErrorMseBlock.fromException(new RuntimeException(errorMessage, e)), Collections.emptyList());
+          ErrorMseBlock.fromException(new RuntimeException(errorMessage, e)), List.of());
     } finally {
       _mailboxBuffers.clear();
     }

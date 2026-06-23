@@ -21,7 +21,6 @@ package org.apache.pinot.core.startree;
 import it.unimi.dsi.fastutil.objects.ObjectBooleanPair;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -95,7 +94,7 @@ public class StarTreeUtils {
   public static Map<String, List<CompositePredicateEvaluator>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
       @Nullable FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping) {
     if (filter == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap = new HashMap<>();

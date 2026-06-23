@@ -27,7 +27,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -187,7 +186,7 @@ public class PinotDatabaseRestletResource {
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
     String defaultQueryQuota = helixAdmin.getConfig(configScope,
-            Collections.singletonList(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
+            List.of(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
             .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, null);
     return new QuotaConfig(null, defaultQueryQuota);
   }

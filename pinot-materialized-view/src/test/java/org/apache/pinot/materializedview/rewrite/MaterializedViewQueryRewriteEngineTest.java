@@ -19,7 +19,6 @@
 package org.apache.pinot.materializedview.rewrite;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +63,7 @@ public class MaterializedViewQueryRewriteEngineTest {
       Eligibility eligibility, @Nullable MaterializedViewSplitSpec splitSpec, long watermarkMs) {
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         viewTableName,
-        Collections.singletonList(baseTable),
+        List.of(baseTable),
         definedSql,
         new HashMap<>(),
         splitSpec);

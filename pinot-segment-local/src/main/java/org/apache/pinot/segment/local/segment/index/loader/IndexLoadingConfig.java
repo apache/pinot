@@ -77,7 +77,7 @@ public class IndexLoadingConfig {
   private Map<String, Map<String, String>> _instanceTierConfigs;
 
   // Initialized by table config and schema
-  private List<String> _sortedColumns = Collections.emptyList();
+  private List<String> _sortedColumns = List.of();
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;

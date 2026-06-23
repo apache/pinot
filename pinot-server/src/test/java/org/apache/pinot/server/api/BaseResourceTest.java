@@ -22,7 +22,6 @@ import java.io.File;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -158,7 +157,7 @@ public abstract class BaseResourceTest {
     _adminApiApplication = new AdminApiApplication(_serverInstance, new AllowAllAccessFactory(),
         mock(ServerReloadJobStatusCache.class),
         serverConf);
-    _adminApiApplication.start(Collections.singletonList(
+    _adminApiApplication.start(List.of(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
             CommonConstants.HTTP_PROTOCOL, new TlsConfig(), HttpServerThreadPoolConfig.defaultInstance())));
 

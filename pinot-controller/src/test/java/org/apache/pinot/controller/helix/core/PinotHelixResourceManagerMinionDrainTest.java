@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
@@ -72,7 +71,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     String minionHost = "minion-test-1.example.com";
     int minionPort = 9514;
     Instance minionInstance =
-        new Instance(minionHost, minionPort, InstanceType.MINION, Collections.singletonList(
+        new Instance(minionHost, minionPort, InstanceType.MINION, List.of(
             Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
@@ -225,7 +224,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     int grpcPort = 8090;
     int adminPort = 8091;
     Instance minionInstance =
-        new Instance(minionHost, minionPort, InstanceType.MINION, Collections.singletonList(
+        new Instance(minionHost, minionPort, InstanceType.MINION, List.of(
             Helix.UNTAGGED_MINION_INSTANCE), null, grpcPort, adminPort, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
@@ -266,7 +265,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     String minionHost = "minion-test-7.example.com";
     int minionPort = 9520;
     Instance minionInstance =
-        new Instance(minionHost, minionPort, InstanceType.MINION, Collections.singletonList(
+        new Instance(minionHost, minionPort, InstanceType.MINION, List.of(
             Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
@@ -307,7 +306,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     // Create a minion with only standard tag
     String minionHost = "minion-test-8.example.com";
     int minionPort = 9521;
-    List<String> tags = Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE);
+    List<String> tags = List.of(Helix.UNTAGGED_MINION_INSTANCE);
     Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
@@ -364,7 +363,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     // Create a minion with minion_untagged tag
     String minionHost = "minion-test-9.example.com";
     int minionPort = 9522;
-    List<String> originalTags = Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE);
+    List<String> originalTags = List.of(Helix.UNTAGGED_MINION_INSTANCE);
     Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
         originalTags, null, 0, 0, 0, 0, false);
 
@@ -456,7 +455,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     // Create a normal minion
     String minionHost = "minion-test-11.example.com";
     int minionPort = 9524;
-    List<String> originalTags = Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE);
+    List<String> originalTags = List.of(Helix.UNTAGGED_MINION_INSTANCE);
     Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
         originalTags, null, 0, 0, 0, 0, false);
 
@@ -489,7 +488,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     String minionHost = "minion-test-safety.example.com";
     int minionPort = 9530;
     Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     assertTrue(_helixResourceManager.addInstance(minionInstance, false).isSuccessful());
     String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
 
@@ -511,7 +510,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     String brokerHost = "broker-test-safety.example.com";
     int brokerPort = 9531;
     Instance brokerInstance = new Instance(brokerHost, brokerPort, InstanceType.BROKER,
-        Collections.singletonList(Helix.UNTAGGED_BROKER_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_BROKER_INSTANCE), null, 0, 0, 0, 0, false);
     assertTrue(_helixResourceManager.addInstance(brokerInstance, false).isSuccessful());
     String brokerInstanceId = "Broker_" + brokerHost + "_" + brokerPort;
 
@@ -533,7 +532,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     String minionHost = "minion-test-live.example.com";
     int minionPort = 9532;
     Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     assertTrue(_helixResourceManager.addInstance(minionInstance, false).isSuccessful());
     String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
     createFakeMinionLiveInstance(minionInstanceId);

@@ -25,8 +25,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -136,7 +136,7 @@ public class FileIngestionHelper {
         batchConfigMapOverride.put(segmentNamePostfixProp, String.valueOf(System.currentTimeMillis()));
       }
       BatchIngestionConfig batchIngestionConfigOverride =
-          new BatchIngestionConfig(Collections.singletonList(batchConfigMapOverride),
+          new BatchIngestionConfig(List.of(batchConfigMapOverride),
               IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
               IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig));
 

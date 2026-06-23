@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.blocks.results;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -68,7 +67,7 @@ public class ResultsBlockUtils {
     // NOTE: Use STRING column data type as default for selection query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    return new SelectionResultsBlock(dataSchema, Collections.emptyList(), queryContext);
+    return new SelectionResultsBlock(dataSchema, List.of(), queryContext);
   }
 
   private static AggregationResultsBlock buildEmptyAggregationQueryResults(QueryContext queryContext) {

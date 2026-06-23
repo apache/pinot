@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.utils;
 
-import java.util.Collections;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
@@ -90,7 +89,7 @@ public class SegmentMetadataMockUtils {
     SegmentMetadata segmentMetadata =
         mockSegmentMetadata(tableName, segmentName, numTotalDocs, crc, startTime, endTime, timeUnit);
     ColumnMetadata colMeta = mock(ColumnMetadata.class);
-    when(colMeta.getPartitions()).thenReturn(Collections.singleton(partitionId));
+    when(colMeta.getPartitions()).thenReturn(Set.of(partitionId));
     when(colMeta.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(numPartitions, null));
     TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
     columnMetadataMap.put(partitionColumn, colMeta);
@@ -101,7 +100,7 @@ public class SegmentMetadataMockUtils {
   public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String rawTableName, String segmentName,
       String columnName, int partitionNumber) {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
-    Set<Integer> partitions = Collections.singleton(partitionNumber);
+    Set<Integer> partitions = Set.of(partitionNumber);
     when(columnMetadata.getPartitions()).thenReturn(partitions);
     when(columnMetadata.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(5, null));
 

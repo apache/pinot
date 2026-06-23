@@ -19,9 +19,9 @@
 package org.apache.pinot.broker.routing.intervalst;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.broker.routing.segmentpruner.interval.Interval;
 import org.apache.pinot.broker.routing.segmentpruner.interval.IntervalTree;
@@ -78,7 +78,7 @@ public class IntervalTreeTest {
     nameToIntervalMap.put(name12, interval12);
 
     IntervalTree<String> intervalTree = new IntervalTree<>(nameToIntervalMap);
-    Assert.assertEquals(intervalTree.searchAll(new Interval(40, 40)), Collections.emptyList());
+    Assert.assertEquals(intervalTree.searchAll(new Interval(40, 40)), List.of());
     Assert.assertEquals(new HashSet<>(intervalTree.searchAll(new Interval(0, 10))),
         new HashSet<>(Arrays.asList(name0, name1, name2, name3, name4, name5)));
     Assert.assertEquals(new HashSet<>(intervalTree.searchAll(new Interval(10, 20))),

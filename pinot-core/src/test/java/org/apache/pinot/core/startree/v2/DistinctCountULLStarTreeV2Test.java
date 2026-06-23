@@ -19,7 +19,7 @@
 package org.apache.pinot.core.startree.v2;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
-import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.DistinctCountULLValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -32,7 +32,7 @@ public class DistinctCountULLStarTreeV2Test extends BaseStarTreeV2Test<Object, U
 
   @Override
   ValueAggregator<Object, UltraLogLog> getValueAggregator() {
-    return new DistinctCountULLValueAggregator(Collections.emptyList());
+    return new DistinctCountULLValueAggregator(List.of());
   }
 
   @Override

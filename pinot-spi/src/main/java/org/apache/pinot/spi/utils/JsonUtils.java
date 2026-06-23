@@ -48,7 +48,6 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -85,7 +84,7 @@ public class JsonUtils {
   public static final String SKIPPED_VALUE_REPLACEMENT = "$SKIPPED$";
   public static final int MAX_COMBINATIONS = 100_000;
   public static final List<Map<String, String>> SKIPPED_FLATTENED_RECORD =
-      Collections.singletonList(Collections.singletonMap(VALUE_KEY, SKIPPED_VALUE_REPLACEMENT));
+      List.of(Map.of(VALUE_KEY, SKIPPED_VALUE_REPLACEMENT));
 
   // For querying
   public static final String WILDCARD = "*";
@@ -433,7 +432,7 @@ public class JsonUtils {
       String path, boolean includePathMatched, JsonSchemaTreeNode indexPathNode) {
     // Null
     if (node.isNull() || node.isMissingNode() || indexPathNode == null) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     // Value
@@ -443,7 +442,7 @@ public class JsonUtils {
       if (0 < maxValueLength && maxValueLength < valueAsText.length()) {
         valueAsText = SKIPPED_VALUE_REPLACEMENT;
       }
-      return Collections.singletonList(Collections.singletonMap(VALUE_KEY, valueAsText));
+      return List.of(Map.of(VALUE_KEY, valueAsText));
     }
 
     Preconditions.checkArgument(node.isArray() || node.isObject(), "Unexpected node type: %s", node.getNodeType());
@@ -451,23 +450,23 @@ public class JsonUtils {
     // Do not flatten further for array and object when max level reached
     int maxLevels = jsonIndexConfig.getMaxLevels();
     if (maxLevels > 0 && level == maxLevels) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     // Array
     if (node.isArray()) {
       if (jsonIndexConfig.isExcludeArray()) {
-        return Collections.emptyList();
+        return List.of();
       }
       int numChildren = node.size();
       if (numChildren == 0) {
-        return Collections.emptyList();
+        return List.of();
       }
       String childPath = path + ARRAY_PATH;
       IncludeResult includeResult =
           includePathMatched ? IncludeResult.MATCH : shouldInclude(jsonIndexConfig, childPath);
       if (!includeResult._shouldInclude) {
-        return Collections.emptyList();
+        return List.of();
       }
       List<Map<String, String>> results = new ArrayList<>(numChildren);
       for (int i = 0; i < numChildren; i++) {
@@ -545,9 +544,9 @@ public class JsonUtils {
     int nestedResultsListSize = nestedResultsList.size();
     if (nestedResultsListSize == 0) {
       if (nonNestedResult.isEmpty()) {
-        return Collections.emptyList();
+        return List.of();
       } else {
-        return Collections.singletonList(nonNestedResult);
+        return List.of(nonNestedResult);
       }
     }
     if (nestedResultsListSize == 1) {

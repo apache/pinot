@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -109,13 +108,13 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
             .setSortedColumn(D1).build();
     IngestionConfig ingestionConfigEpochHours = new IngestionConfig();
     ingestionConfigEpochHours.setTransformConfigs(
-        Collections.singletonList(new TransformConfig(T_TRX, "toEpochHours(t)")));
+        List.of(new TransformConfig(T_TRX, "toEpochHours(t)")));
     TableConfig tableConfigEpochHours =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_EPOCH_HOURS).setTimeColumnName(T_TRX)
             .setSortedColumn(D1).setIngestionConfig(ingestionConfigEpochHours).build();
     IngestionConfig ingestionConfigSDF = new IngestionConfig();
     ingestionConfigSDF.setTransformConfigs(
-        Collections.singletonList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")));
+        List.of(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")));
     TableConfig tableConfigSDF =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_SDF).setTimeColumnName(T_TRX)
             .setSortedColumn(D1).setIngestionConfig(ingestionConfigSDF).build();
@@ -214,7 +213,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       row.putValue(M_AVG, createAvgPairBytes(avgRanges[i][0], avgRanges[i][1]));
       row.putValue(T, 1600473600000L);
       String segmentName = "segmentAvg_" + i;
-      RecordReader recordReader = new GenericRowRecordReader(Collections.singletonList(row));
+      RecordReader recordReader = new GenericRowRecordReader(List.of(row));
       SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfigAvg, schemaAvg);
       config.setInstanceType(InstanceType.MINION);
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());

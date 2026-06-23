@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -270,7 +269,7 @@ public class TableSizeReader {
     for (Map.Entry<String, List<String>> entry : serverToSegmentsMap.entrySet()) {
       String server = entry.getKey();
       Map<String, SegmentSizeInfo> segmentToSegmentSizeInfoMap = serverToSegmentMap.getOrDefault(server,
-          Collections.emptyMap());
+          Map.of());
 
       List<String> segments = entry.getValue();
       for (String segment : segments) {

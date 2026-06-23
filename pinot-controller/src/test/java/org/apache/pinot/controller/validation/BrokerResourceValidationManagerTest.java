@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.validation;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -89,7 +88,7 @@ public class BrokerResourceValidationManagerTest {
 
   @Test
   public void testGetTablesToProcessWhenNoLogicalPartitions() {
-    when(_resourceManager.getBrokerResourceLogicalTables()).thenReturn(Collections.emptyList());
+    when(_resourceManager.getBrokerResourceLogicalTables()).thenReturn(List.of());
 
     List<String> tables = _validationManager.getTablesToProcess(new Properties());
 

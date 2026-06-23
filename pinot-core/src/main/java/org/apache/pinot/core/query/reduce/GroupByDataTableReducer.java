@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -107,7 +106,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       PostAggregationHandler postAggregationHandler =
           new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema));
       DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
-      RewriterResult rewriterResult = ResultRewriteUtils.rewriteResult(resultDataSchema, Collections.emptyList());
+      RewriterResult rewriterResult = ResultRewriteUtils.rewriteResult(resultDataSchema, List.of());
       brokerResponse.setResultTable(new ResultTable(rewriterResult.getDataSchema(), rewriterResult.getRows()));
       return;
     }
@@ -193,7 +192,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // Directly return when there is no record returned, or limit is 0
     int limit = _queryContext.getLimit();
     if (numRecords == 0 || limit == 0) {
-      brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, List.of()));
       return;
     }
 
@@ -443,7 +442,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     int numRows = dataTable.getNumberOfRows();
     int limit = _queryContext.getLimit();
     if (numRows == 0 || limit == 0) {
-      brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, List.of()));
       return;
     }
 

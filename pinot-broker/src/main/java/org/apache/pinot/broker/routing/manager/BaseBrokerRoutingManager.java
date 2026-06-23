@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -177,7 +176,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   /// servers: its `keySet()` is passed to `InstanceSelector` for per-table selection, and callers that pick workers
   /// outside of per-table instance selection (MSE intermediate-stage worker picking) read the map directly so that
   /// FailureDetector-driven exclusions are honored.
-  private volatile Map<String, ServerInstance> _routableServerInstanceMap = Collections.emptyMap();
+  private volatile Map<String, ServerInstance> _routableServerInstanceMap = Map.of();
 
   // Process assignment change timestamp. Used to check if buildRouting needs to be re-run for a given table to avoid
   // race conditions with processSegmentAssignmentChange()
@@ -561,7 +560,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     Map<String, ServerInstance> routableServerInstanceMap = new HashMap<>(_routableServerInstanceMap);
     routableServerInstanceMap.remove(instanceId);
     _routableServerInstanceMap = routableServerInstanceMap;
-    List<String> changedServers = Collections.singletonList(instanceId);
+    List<String> changedServers = List.of(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       try {
@@ -610,7 +609,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     Map<String, ServerInstance> routableServerInstanceMap = new HashMap<>(_routableServerInstanceMap);
     routableServerInstanceMap.put(instanceId, serverInstance);
     _routableServerInstanceMap = routableServerInstanceMap;
-    List<String> changedServers = Collections.singletonList(instanceId);
+    List<String> changedServers = List.of(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       try {
@@ -1224,7 +1223,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     assert ((ReentrantReadWriteLock) _globalLock).isWriteLockedByCurrentThread()
         : "buildRoutableServerInstanceMap must be called under _globalLock.writeLock()";
     if (routableServers.isEmpty()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, ServerInstance> map = Maps.newHashMapWithExpectedSize(routableServers.size());
     for (String instanceId : routableServers) {
@@ -1489,8 +1488,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
-        return new InstanceSelector.SelectionResult(Pair.of(Collections.emptyMap(), Collections.emptyMap()),
-            Collections.emptyList(), numPrunedSegments);
+        return new InstanceSelector.SelectionResult(Pair.of(Map.of(), Map.of()),
+            List.of(), numPrunedSegments);
       }
     }
 

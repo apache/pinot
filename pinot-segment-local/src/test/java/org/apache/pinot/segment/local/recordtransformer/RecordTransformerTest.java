@@ -22,7 +22,6 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -103,16 +102,16 @@ public class RecordTransformerTest {
     GenericRow record = new GenericRow();
     record.putValue("svInt", (byte) 123);
     record.putValue("svLong", (char) 123);
-    record.putValue("svFloat", Collections.singletonList((short) 123));
+    record.putValue("svFloat", List.of((short) 123));
     record.putValue("svDouble", new String[]{"123"});
     record.putValue("svBoolean", "true");
     record.putValue("svTimestamp", "2020-02-02 22:22:22.222");
     record.putValue("svBytes", "7b7b"/*new byte[]{123, 123}*/);
     record.putValue("svJson", "{\"first\": \"daffy\", \"last\": \"duck\"}");
     record.putValue("mvInt", new Object[]{123L});
-    record.putValue("mvLong", Collections.singletonList(123f));
+    record.putValue("mvLong", List.of(123f));
     record.putValue("mvFloat", new Double[]{123d});
-    record.putValue("mvDouble", Collections.singletonMap("key", 123));
+    record.putValue("mvDouble", Map.of("key", 123));
     record.putValue("svStringWithNullCharacters", "1\0002\0003");
     record.putValue("svStringWithLengthLimit", "123");
     record.putValue("mvString1", new Object[]{"123", 123, 123L, 123f, 123.0});
@@ -661,7 +660,7 @@ public class RecordTransformerTest {
     record.putValue("svNullString", null);
     record.putValue("svInt", (byte) 123);
 
-    record.putValue("mvLong", Collections.singletonList(123f));
+    record.putValue("mvLong", List.of(123f));
     record.putValue("mvNullFloat", null);
     return record;
   }

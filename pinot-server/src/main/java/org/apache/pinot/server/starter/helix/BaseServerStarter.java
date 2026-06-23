@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -503,7 +502,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
         return Arrays.asList(TagNameUtils.getOfflineTagForTenant(null), TagNameUtils.getRealtimeTagForTenant(null));
       } else {
-        return Collections.singletonList(Helix.UNTAGGED_SERVER_INSTANCE);
+        return List.of(Helix.UNTAGGED_SERVER_INSTANCE);
       }
     });
 
@@ -548,7 +547,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       // Retrieve failure domain information and add to the environment properties map
       String failureDomain = _pinotEnvironmentProvider.getFailureDomain();
       Map<String, String> environmentProperties =
-          Collections.singletonMap(CommonConstants.INSTANCE_FAILURE_DOMAIN, failureDomain);
+          Map.of(CommonConstants.INSTANCE_FAILURE_DOMAIN, failureDomain);
       if (!environmentProperties.equals(znRecord.getMapField(CommonConstants.ENVIRONMENT_IDENTIFIER))) {
         LOGGER.info("Updating instance: {} with environment properties: {}", _instanceId, environmentProperties);
         znRecord.setMapField(CommonConstants.ENVIRONMENT_IDENTIFIER, environmentProperties);
@@ -937,7 +936,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // querying the server pre-maturely.
     _serverInstance.startQueryServer();
     _helixAdmin.setConfig(_instanceConfigScope,
-        Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
+        Map.of(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
     _isServerReadyToServeQueries = true;
     // Throttling for realtime consumption is disabled up to this point to allow maximum consumption during startup time
     RealtimeConsumptionRateManager.getInstance().enablePartitionRateLimiter();
@@ -1063,7 +1062,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
-        Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
+        Map.of(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
     if (_transitionThreadPoolManager != null) {
       _transitionThreadPoolManager.shutdown();
     }

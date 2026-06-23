@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator;
 
 import com.google.common.base.CaseFormat;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +96,7 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
 
   @Override
   public List<Operator<DocIdSetBlock>> getChildOperators() {
-    return Collections.singletonList(_docIdSetOperator);
+    return List.of(_docIdSetOperator);
   }
 
   @Override

@@ -21,7 +21,6 @@ package org.apache.pinot.calcite.rel.rules;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -99,7 +98,7 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
           ImmutableList.copyOf(join.getSystemFieldList()));
     } else if (relNode instanceof PinotLogicalTableScan) {
       PinotLogicalTableScan tableScan = (PinotLogicalTableScan) relNode;
-      return tableScan.copy(clusterTraitSet.plus(trait), Collections.emptyList());
+      return tableScan.copy(clusterTraitSet.plus(trait), List.of());
     } else {
       return relNode.copy(clusterTraitSet.plus(trait), relNode.getInputs());
     }

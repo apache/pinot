@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,7 +84,7 @@ public class MissingConsumingSegmentFinder {
     });
     try {
       PauseState pauseState = PinotLLCRealtimeSegmentManager.extractTablePauseState(idealState);
-      PinotTableIdealStateBuilder.getStreamMetadataList(streamConfigs, Collections.emptyList(),
+      PinotTableIdealStateBuilder.getStreamMetadataList(streamConfigs, List.of(),
               pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), false)
           .forEach(streamMetadata -> {
             for (PartitionGroupMetadata metadata : streamMetadata.getPartitionGroupMetadataList()) {
