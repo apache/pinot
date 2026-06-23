@@ -632,6 +632,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Validate the request
     try {
       validateRequest(serverPinotQuery, _queryResponseLimit);
+      // For gapfill queries, validate that all TIMESERIESON columns are present in the SELECT list
+      // before incurring a server round-trip.
+      if (pinotQuery != serverPinotQuery) {
+        QueryContext outerQueryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+        GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(outerQueryContext);
+        if (gapfillType != null) {
+          GapfillUtils.validateGapfillColumns(outerQueryContext, gapfillType);
+        }
+      }
     } catch (Exception e) {
       LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
       requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);

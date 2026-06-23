@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.PinotQuery;
@@ -341,6 +343,53 @@ public class GapfillUtils {
       }
     }
     return false;
+  }
+
+  /**
+   * Validates that every TIMESERIESON column referenced in the gapfill expression is present in
+   * the SELECT list of the gapfill-level query. Should be called before sending the query to
+   * servers so users receive a clear error without paying the cost of a server round-trip.
+   *
+   * @throws IllegalArgumentException if a TIMESERIESON column is absent from the SELECT list
+   */
+  public static void validateGapfillColumns(QueryContext queryContext, GapfillType gapfillType) {
+    ExpressionContext gapFillSelection = getGapfillExpressionContext(queryContext, gapfillType);
+    ExpressionContext timeseriesOn = getTimeSeriesOnExpressionContext(gapFillSelection);
+    if (timeseriesOn == null) {
+      return;
+    }
+    List<ExpressionContext> timeSeries = timeseriesOn.getFunction().getArguments();
+
+    // Get the query context at the level where the gapfill function resides
+    QueryContext gapfillContext;
+    if (gapfillType == GapfillType.AGGREGATE_GAP_FILL || gapfillType == GapfillType.GAP_FILL) {
+      gapfillContext = queryContext;
+    } else {
+      gapfillContext = queryContext.getSubquery();
+    }
+
+    // Build the set of column names the server will return: direct identifiers plus any aliases
+    Set<String> selectColumnNames = new HashSet<>();
+    List<String> aliasList = gapfillContext.getAliasList();
+    List<ExpressionContext> selectExpressions = gapfillContext.getSelectExpressions();
+    for (int i = 0; i < selectExpressions.size(); i++) {
+      String alias = aliasList.get(i);
+      if (alias != null) {
+        selectColumnNames.add(alias);
+      }
+      ExpressionContext expr = selectExpressions.get(i);
+      if (expr.getType() == ExpressionContext.Type.IDENTIFIER) {
+        selectColumnNames.add(expr.getIdentifier());
+      }
+    }
+
+    for (ExpressionContext entityColumn : timeSeries) {
+      String colName = entityColumn.getIdentifier();
+      if (colName != null && !selectColumnNames.contains(colName)) {
+        throw new IllegalArgumentException(
+            "TIMESERIESON column '" + colName + "' is not present in the SELECT list");
+      }
+    }
   }
 
   public enum GapfillType {

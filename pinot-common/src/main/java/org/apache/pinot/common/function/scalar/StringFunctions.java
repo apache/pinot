@@ -1158,7 +1158,6 @@ public class StringFunctions {
     return sb.toString();
   }
 
-
   /**
    * Replaces a substring of {@code input} with {@code replacement}, starting at the 1-based position {@code start}
    * and replacing {@code length} characters. Equivalent to the SQL standard
