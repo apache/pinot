@@ -77,8 +77,11 @@ public class AvgValueAggregatorTest {
   @Test
   public void testAggregateWithBothEmptyBytes() {
     byte[] result = (byte[]) _aggregator.aggregate(new byte[0], new byte[0], _functionParameters);
-    // Both empty (default null value for BYTES columns) -> treated as missing, return empty bytes
-    assertEquals(result.length, 0);
+    // Both empty (default null value for BYTES columns) -> a valid serialized empty AvgPair (sum=0, count=0), not an
+    // empty byte[] that AvgPair deserialization (and the query-time AVG function) cannot read.
+    AvgPair merged = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(result);
+    assertEquals(merged.getSum(), 0.0);
+    assertEquals(merged.getCount(), 0L);
   }
 
   @Test

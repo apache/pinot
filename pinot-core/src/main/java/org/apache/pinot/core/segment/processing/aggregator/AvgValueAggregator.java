@@ -34,17 +34,23 @@ import org.apache.pinot.segment.local.customobject.AvgPair;
 public class AvgValueAggregator implements ValueAggregator {
 
   /// Merges two serialized `AvgPair` values into one. An empty `byte[]` (the default null value for a `BYTES`
-  /// column) is treated as a missing value, so the other side is returned unchanged; if both are empty, the
-  /// empty value is returned.
+  /// column) is treated as a missing value, so the other side is returned unchanged; if both are empty, a serialized
+  /// empty `AvgPair` (sum=0, count=0) is returned rather than an empty `byte[]`, which `AvgPair` deserialization
+  /// (16 bytes) cannot read.
   @Override
   public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
     byte[] bytes1 = (byte[]) value1;
     byte[] bytes2 = (byte[]) value2;
 
-    // Treat empty byte arrays (default null value for BYTES columns) as missing values
+    // Treat empty byte arrays (default null value for BYTES columns) as missing values. When both sides are empty,
+    // emit a valid serialized empty AvgPair rather than propagating an empty byte[] that cannot be deserialized.
+    if (bytes1.length == 0 && bytes2.length == 0) {
+      return ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(new AvgPair());
+    }
     if (bytes1.length == 0) {
       return bytes2;
-    } else if (bytes2.length == 0) {
+    }
+    if (bytes2.length == 0) {
       return bytes1;
     }
 
