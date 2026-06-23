@@ -67,13 +67,10 @@ import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY
 public class HadoopSegmentGenerationJobRunner extends Configured implements IngestionJobRunner, Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopSegmentGenerationJobRunner.class);
 
-  public static final String SEGMENT_GENERATION_JOB_SPEC = "segmentGenerationJobSpec";
+  // Kept for backward compatibility; callers should prefer SegmentGenerationJobUtils.SEGMENT_GENERATION_JOB_SPEC
+  public static final String SEGMENT_GENERATION_JOB_SPEC = SegmentGenerationJobUtils.SEGMENT_GENERATION_JOB_SPEC;
 
-  // Field names in job spec's executionFrameworkSpec/extraConfigs section
-  private static final String DEPS_JAR_DIR_FIELD = "dependencyJarDir";
-  private static final String STAGING_DIR_FIELD = "stagingDir";
-
-  // Sub-dirs under directory specified by STAGING_DIR_FIELD
+  // Sub-dirs under the staging directory
   private static final String SEGMENT_TAR_SUBDIR_NAME = "segmentTar";
   private static final String DEPS_JAR_SUBDIR_NAME = "dependencyJars";
 
@@ -156,7 +153,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     outputDirFS.mkdir(outputDirURI);
 
     //Get staging directory for temporary output pinot segments
-    String stagingDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(STAGING_DIR_FIELD);
+    String stagingDir =
+        _spec.getExecutionFrameworkSpec().getExtraConfigs().get(SegmentGenerationJobUtils.STAGING_DIR);
     Preconditions.checkNotNull(stagingDir, "Please set config: stagingDir under 'executionFrameworkSpec.extraConfigs'");
     URI stagingDirURI = URI.create(stagingDir);
     if (stagingDirURI.getScheme() == null) {
@@ -247,7 +245,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       packPluginsToDistributedCache(job, outputDirFS, stagingDirURI);
 
       // Add dependency jars, if we're provided with a directory containing these.
-      String dependencyJarsSrcDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR_FIELD);
+      String dependencyJarsSrcDir =
+          _spec.getExecutionFrameworkSpec().getExtraConfigs().get(SegmentGenerationJobUtils.DEPENDENCY_JAR_DIR);
       if (dependencyJarsSrcDir != null) {
         Path dependencyJarsDestPath = new Path(stagingDirURI.toString(), DEPS_JAR_SUBDIR_NAME);
         addJarsToDistributedCache(job, new File(dependencyJarsSrcDir), outputDirFS, dependencyJarsDestPath.toUri(),
