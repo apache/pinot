@@ -25,6 +25,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ConnectivityState;
 import io.grpc.Deadline;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.io.DataInputStream;
 import java.io.InputStream;
@@ -828,6 +830,13 @@ public class QueryDispatcher {
           dispatchCallbacks.poll(Math.max(1, deadline.timeRemaining(TimeUnit.MILLISECONDS)), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
+          // DEADLINE_EXCEEDED means our own deadline fired on the gRPC channel. Skip throwing here so the
+          // deadline.isExpired() check below converts this into a TimeoutException that tryRecover() handles.
+          if (resp.getThrowable() instanceof StatusRuntimeException
+                  && ((StatusRuntimeException) resp.getThrowable()).getStatus().getCode()
+                  == Status.Code.DEADLINE_EXCEEDED) {
+            continue;
+          }
           // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
           // subsequent query failures
           if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)

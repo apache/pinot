@@ -518,8 +518,7 @@ public class QueryDispatcherTest extends QueryTestSet {
    * A short cancel timeout (100 ms) keeps the test fast.
    */
   @Test
-  public void testDispatchTimeoutRecordsElapsedLatency()
-      throws Exception {
+  public void testDispatchTimeoutRecordsElapsedLatency() throws Exception {
     AtomicLong fakeClockMs = new AtomicLong(1_000L);
     // Each getAsLong() call advances the fake clock by 1000 ms:
     //   call 1 (submitTimeMs) → 1000, call 2 (finally elapsedMs) → 2000 − 1000 = 1000.
@@ -556,29 +555,25 @@ public class QueryDispatcherTest extends QueryTestSet {
     Assert.assertFalse(expectedInstanceIds.isEmpty());
 
     try {
+      QueryDispatcher.QueryResult result;
       try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
-        QueryDispatcher.QueryResult result =
-            dispatcher.submitAndReduce(context, plan, 200L, Map.of(), statsManager);
-        Assert.assertNotNull(result.getProcessingException(),
-            "Expected a processing exception when submit times out");
+        result = dispatcher.submitAndReduce(context, plan, 200L, Map.of(), statsManager);
       }
-    } catch (RuntimeException e) {
-      // gRPC DEADLINE_EXCEEDED may surface as RuntimeException before processResults poll times out.
+      Assert.assertNotNull(result.getProcessingException(),
+          "Expected a processing exception when submit times out");
+
+      // All servers must have had their in-flight counter incremented before dispatch.
+      for (String instanceId : expectedInstanceIds) {
+        Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
+      }
+      // The hanging server did not respond to cancel → Tier 3 → elapsedMs = 1000 > 0.
+      // (Other servers that responded to cancel fall into Tier 4 → −1L.)
+      Mockito.verify(statsManager, Mockito.atLeastOnce())
+          .recordStatsUponResponseArrival(Mockito.eq(requestId), Mockito.any(), Mockito.eq(1_000L));
     } finally {
       neverClosingLatch.countDown();
       Mockito.reset(hangingServer);
       dispatcher.shutdown();
-    }
-
-    // All servers must have had their in-flight counter incremented before dispatch.
-    for (String instanceId : expectedInstanceIds) {
-      Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
-    }
-    // The hanging server did not respond to cancel → Tier 3 → elapsedMs = 1000 > 0.
-    // (If gRPC DEADLINE_EXCEEDED wins the race, tryRecover takes the plain cancel path → Tier 4 → -1L.)
-    for (String instanceId : expectedInstanceIds) {
-      Mockito.verify(statsManager).recordStatsUponResponseArrival(
-          Mockito.eq(requestId), Mockito.eq(instanceId), Mockito.anyLong());
     }
   }
 
