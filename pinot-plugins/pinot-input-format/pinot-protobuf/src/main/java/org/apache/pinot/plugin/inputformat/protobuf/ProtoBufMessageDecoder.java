@@ -53,8 +53,7 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
             DESCRIPTOR_FILE_PATH);
 
     _protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
-    InputStream descriptorFileInputStream = ProtoBufUtils.getDescriptorFileInputStream(
-            props.get(DESCRIPTOR_FILE_PATH));
+    InputStream descriptorFileInputStream = ProtoBufUtils.getDescriptorFileInputStream(props.get(DESCRIPTOR_FILE_PATH));
     Descriptors.Descriptor descriptor = buildProtoBufDescriptor(descriptorFileInputStream);
     _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
