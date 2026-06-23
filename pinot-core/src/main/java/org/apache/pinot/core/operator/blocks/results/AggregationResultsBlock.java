@@ -97,7 +97,20 @@ public class AggregationResultsBlock extends BaseResultsBlock {
 
   @Override
   public List<Object[]> getRows() {
-    return Collections.singletonList(_results.toArray());
+    if (!_queryContext.isServerReturnFinalResult()) {
+      return Collections.singletonList(_results.toArray());
+    }
+    // When the server is requested to return the final result (e.g. a single-server colocated DIRECT aggregate in the
+    // multi-stage engine), getDataSchema() reports the final column types. Finalize the intermediate results here so
+    // that the rows are consistent with the schema; otherwise an intermediate object (e.g. a HyperLogLogPlus) would be
+    // left in a column typed as its final type (e.g. LONG) and fail when the block is serialized. This mirrors the
+    // finalization done in getDataTable() and in GroupByCombineOperator for the group-by case.
+    int numColumns = _results.size();
+    Object[] row = new Object[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      row[i] = _aggregationFunctions[i].extractFinalResult(_results.get(i));
+    }
+    return Collections.singletonList(row);
   }
 
   @Override
