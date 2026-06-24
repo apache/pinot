@@ -24,8 +24,8 @@ import java.io.IOException;
 import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.FieldVector;
@@ -140,7 +140,7 @@ public class ArrowColumnReaderFactoryTest {
           ArrowColumnReaderFactory factory =
               new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
 
-        factory.init(newSchema(), Collections.singleton("intCol"));
+        factory.init(newSchema(), Set.of("intCol"));
 
         // Only the requested column has a reader; the others fall back to null per the SPI.
         assertNotNull(factory.getColumnReader("intCol"));

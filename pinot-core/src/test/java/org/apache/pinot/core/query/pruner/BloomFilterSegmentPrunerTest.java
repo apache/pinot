@@ -27,7 +27,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,7 +101,7 @@ public class BloomFilterSegmentPrunerTest {
     IndexSegment indexSegment = mockIndexSegment(new String[]{"1.0", "2.0", "3.0", "5.0", "7.0", "21.0"});
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSourceNullable("column")).thenReturn(dataSource);
-    runPruner(Collections.singletonList(indexSegment),
+    runPruner(List.of(indexSegment),
         "SELECT COUNT(*) FROM testTable WHERE column = 5.0 OR column = 0.0", 1);
   }
 
@@ -184,7 +183,7 @@ public class BloomFilterSegmentPrunerTest {
   }
 
   private boolean runPruner(IndexSegment segment, String query) {
-    return runPruner(Collections.singletonList(segment), query, 5000).isEmpty();
+    return runPruner(List.of(segment), query, 5000).isEmpty();
   }
 
   private List<IndexSegment> runPruner(List<IndexSegment> segments, String query, long queryTimeout) {

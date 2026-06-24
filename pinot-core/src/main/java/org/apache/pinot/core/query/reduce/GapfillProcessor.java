@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.reduce;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -75,7 +74,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
-      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, List.of()));
       return;
     }
 

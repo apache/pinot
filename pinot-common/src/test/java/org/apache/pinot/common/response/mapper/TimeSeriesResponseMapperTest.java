@@ -19,7 +19,6 @@
 package org.apache.pinot.common.response.mapper;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +72,7 @@ public class TimeSeriesResponseMapperTest {
 
   @Test
   public void toBrokerResponseWithEmptySeriesEmptyRowsBaseSchema() {
-    when(_block.getSeriesMap()).thenReturn(Collections.emptyMap());
+    when(_block.getSeriesMap()).thenReturn(Map.of());
     when(_timeBuckets.getTimeBuckets()).thenReturn(new Long[]{100L, 200L, 300L});
     when(_block.getTimeBuckets()).thenReturn(_timeBuckets);
 

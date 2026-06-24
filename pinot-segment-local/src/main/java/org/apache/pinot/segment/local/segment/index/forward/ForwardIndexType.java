@@ -25,7 +25,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -354,7 +353,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     if (columnMetadata == null) {
       return EXTENSIONS;
     }
-    return Collections.singletonList(getFileExtension(columnMetadata));
+    return List.of(getFileExtension(columnMetadata));
   }
 
   @Nullable

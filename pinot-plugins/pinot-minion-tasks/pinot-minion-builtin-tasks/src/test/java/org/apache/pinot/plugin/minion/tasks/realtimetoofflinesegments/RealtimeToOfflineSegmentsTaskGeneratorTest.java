@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import com.google.common.collect.Lists;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -451,7 +450,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         getSegmentZKMetadata("testTable__0__1__12345", Status.DONE, 1590220800000L, 1590307200000L,
             TimeUnit.MILLISECONDS, "download2"); // 05-23-2020T08:00:00 UTC to 05-24-2020T08:00:00 UTC
     when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
-        Collections.singletonList(segmentZKMetadata));
+        List.of(segmentZKMetadata));
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME)).thenReturn(getIdealState(REALTIME_TABLE_NAME,
         Lists.newArrayList(segmentZKMetadata.getSegmentName())));
 

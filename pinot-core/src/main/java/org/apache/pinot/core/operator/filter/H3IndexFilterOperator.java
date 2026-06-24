@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import com.uber.h3core.LengthUnit;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -163,7 +162,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
         fullMatchH3Ids = new HashSet<>(upperAlwaysMatchH3Ids);
         fullMatchH3Ids.removeAll(lowerPossibleMatchH3Ids);
       } else {
-        fullMatchH3Ids = Collections.emptySet();
+        fullMatchH3Ids = Set.of();
       }
       MutableRoaringBitmap fullMatchDocIds = new MutableRoaringBitmap();
       for (long fullMatchH3Id : fullMatchH3Ids) {
@@ -198,7 +197,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   private List<Long> getAlwaysMatchH3Ids(double distance) {
     // NOTE: Pick a constant slightly larger than sqrt(3) to be conservative
     int numRings = (int) Math.floor((distance / _edgeLength - 2) / 1.7321);
-    return numRings >= 0 ? getH3Ids(numRings) : Collections.emptyList();
+    return numRings >= 0 ? getH3Ids(numRings) : List.of();
   }
 
   /**
@@ -246,7 +245,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

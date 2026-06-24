@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -119,7 +118,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
 
         // Get tasks that were in-progress during the previous collection cycle
         Set<String> previouslyInProgressTasks =
-            _previousInProgressTasks.getOrDefault(taskType, Collections.emptySet());
+            _previousInProgressTasks.getOrDefault(taskType, Set.of());
 
         // Get in-progress tasks and all tasks to report (including short-lived) in a single Helix call
         TasksByStatus taskResult = _helixTaskResourceManager.getTasksByStatus(taskType, previousExecutionTimestamp);

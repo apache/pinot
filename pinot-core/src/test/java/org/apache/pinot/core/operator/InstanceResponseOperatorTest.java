@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -52,7 +52,7 @@ public class InstanceResponseOperatorTest {
     when(queryContext.getQueryOptions()).thenReturn(queryOptions);
 
     InstanceResponseOperator operator = new InstanceResponseOperator(
-        mock(BaseCombineOperator.class), Collections.emptyList(), Collections.emptyList(), queryContext);
+        mock(BaseCombineOperator.class), List.of(), List.of(), queryContext);
 
     InstanceResponseBlock responseBlock = operator.buildInstanceResponseBlock(resultsBlock);
 
@@ -74,7 +74,7 @@ public class InstanceResponseOperatorTest {
     when(queryContext.getQueryOptions()).thenReturn(queryOptions);
 
     InstanceResponseOperator operator = new InstanceResponseOperator(
-        mock(BaseCombineOperator.class), Collections.emptyList(), Collections.emptyList(), queryContext);
+        mock(BaseCombineOperator.class), List.of(), List.of(), queryContext);
 
     InstanceResponseBlock responseBlock = operator.buildInstanceResponseBlock(resultsBlock);
 
@@ -95,7 +95,7 @@ public class InstanceResponseOperatorTest {
     when(queryContext.getQueryOptions()).thenReturn(queryOptions);
 
     InstanceResponseOperator operator = new InstanceResponseOperator(
-        mock(BaseCombineOperator.class), Collections.emptyList(), Collections.emptyList(), queryContext);
+        mock(BaseCombineOperator.class), List.of(), List.of(), queryContext);
 
     InstanceResponseBlock responseBlock = operator.buildInstanceResponseBlock(resultsBlock);
 
@@ -117,7 +117,7 @@ public class InstanceResponseOperatorTest {
     when(queryContext.getQueryOptions()).thenReturn(queryOptions);
 
     InstanceResponseOperator operator = new InstanceResponseOperator(
-        mock(BaseCombineOperator.class), Collections.emptyList(), Collections.emptyList(), queryContext);
+        mock(BaseCombineOperator.class), List.of(), List.of(), queryContext);
 
     InstanceResponseBlock responseBlock = operator.buildInstanceResponseBlock(resultsBlock);
 

@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -127,7 +126,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   protected GroupByResultsBlock getNextBlock() {
     // Short-circuit LIMIT 0 case
     if (_queryContext.getLimit() == 0) {
-      return new GroupByResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
+      return new GroupByResultsBlock(_dataSchema, List.of(), _queryContext);
     }
 
     int numAggregations = _aggregationFunctions.length;

@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,7 +126,7 @@ public class MinionTaskUtilsTest {
   public void testExtractMinionAllowDownloadFromServer() {
     Map<String, String> configs = new HashMap<>();
     TableTaskConfig tableTaskConfig = new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+        Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
 
@@ -137,7 +136,7 @@ public class MinionTaskUtilsTest {
 
     // Test when the configuration is set to true
     configs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "true");
-    tableTaskConfig = new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+    tableTaskConfig = new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
     assertTrue(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
@@ -145,7 +144,7 @@ public class MinionTaskUtilsTest {
 
     // Test when the configuration is set to false
     configs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "false");
-    tableTaskConfig = new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+    tableTaskConfig = new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
     assertFalse(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,

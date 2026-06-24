@@ -19,11 +19,11 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -68,7 +68,7 @@ public class MutableSegmentImplAggregateMetricsTest {
     schema.addField(virtualMetricFieldSpec);
     MutableSegmentImpl mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(METRIC, METRIC_2)),
-            Collections.singleton(DIMENSION_2),
+            Set.of(DIMENSION_2),
             new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2)), true);
     testAggregateMetrics(mutableSegmentImpl);
     mutableSegmentImpl.destroy();
@@ -84,7 +84,7 @@ public class MutableSegmentImplAggregateMetricsTest {
     schema.addField(virtualMetricFieldSpec);
     mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(METRIC, METRIC_2)),
-            Collections.singleton(DIMENSION_2),
+            Set.of(DIMENSION_2),
             new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2)), true);
     testAggregateMetrics(mutableSegmentImpl);
     mutableSegmentImpl.destroy();

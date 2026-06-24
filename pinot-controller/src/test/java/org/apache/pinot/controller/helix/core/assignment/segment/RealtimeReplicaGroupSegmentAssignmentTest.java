@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -89,7 +88,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setStreamConfigs(streamConfigs)
-            .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(),
+            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.toString(),
                 new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
             .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1)).build();
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
@@ -352,7 +351,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
         int instanceIndex = (partitionId % numConsumingInstancesPerReplicaGroup)
             + replicaGroupId * numConsumingInstancesPerReplicaGroup;
         consumingInstancePartitions.setInstances(partitionId, replicaGroupId,
-            Collections.singletonList(CONSUMING_INSTANCES.get(instanceIndex)));
+            List.of(CONSUMING_INSTANCES.get(instanceIndex)));
       }
     }
 
@@ -368,7 +367,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
       for (int partitionId = 0; partitionId < numCompletedInstancesPerReplicaGroup; partitionId++) {
         completedInstancePartitions.setInstances(partitionId, replicaGroupId,
-            Collections.singletonList(COMPLETED_INSTANCES.get(completedInstanceIdToAdd++)));
+            List.of(COMPLETED_INSTANCES.get(completedInstanceIdToAdd++)));
       }
     }
 
@@ -512,7 +511,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
         int instanceIndex = (partitionId % numConsumingInstancesPerReplicaGroup)
             + replicaGroupId * numConsumingInstancesPerReplicaGroup;
         consumingInstancePartitions.setInstances(partitionId, replicaGroupId,
-            Collections.singletonList(CONSUMING_INSTANCES.get(instanceIndex)));
+            List.of(CONSUMING_INSTANCES.get(instanceIndex)));
       }
     }
 
@@ -660,7 +659,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(numReplicas)
             .setStreamConfigs(streamConfigs)
             .setInstancePartitionsMap(importedInstancePartitions)
-            .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(),
+            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.toString(),
                 new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
             .build();
     assertTrue(InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig),

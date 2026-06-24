@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,9 +74,9 @@ public class SegmentMapperTest {
 
   private static final TableConfigBuilder TABLE_CONFIG_BUILDER =
       new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("ts")
-          .setNullHandlingEnabled(true).setFieldConfigList(Collections.singletonList(
+          .setNullHandlingEnabled(true).setFieldConfigList(List.of(
               new FieldConfig("ts", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TIMESTAMP, null, null,
-                  new TimestampConfig(Collections.singletonList(TimestampIndexGranularity.DAY)), null)));
+                  new TimestampConfig(List.of(TimestampIndexGranularity.DAY)), null)));
   private static final Schema.SchemaBuilder SCHEMA_BUILDER =
       new Schema.SchemaBuilder().setSchemaName("myTable").addSingleValueDimension("campaign", DataType.STRING, "xyz")
           .addMetric("clicks", DataType.INT).addDateTime("ts", DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS");
@@ -149,8 +148,8 @@ public class SegmentMapperTest {
     PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader();
     segmentRecordReader.init(_indexDir, null, null, true);
     SegmentMapper segmentMapper =
-        new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(segmentRecordReader)),
-            Collections.emptyList(), processorConfig, mapperOutputDir);
+        new SegmentMapper(List.of(new RecordReaderFileConfig(segmentRecordReader)),
+            List.of(), processorConfig, mapperOutputDir);
     Map<String, GenericRowFileManager> partitionToFileManagerMap = segmentMapper.map();
     segmentRecordReader.close();
 
@@ -185,9 +184,9 @@ public class SegmentMapperTest {
         assertEquals(buffer.getValue("$ts$DAY"), (long) expectedValues[2] / 86400000 * 86400000);
         // Default null value
         if (expectedValues[0].equals("xyz")) {
-          assertEquals(buffer.getNullValueFields(), Collections.singleton("campaign"));
+          assertEquals(buffer.getNullValueFields(), Set.of("campaign"));
         } else {
-          assertEquals(buffer.getNullValueFields(), Collections.emptySet());
+          assertEquals(buffer.getNullValueFields(), Set.of());
         }
         buffer.clear();
       }
@@ -212,13 +211,13 @@ public class SegmentMapperTest {
     // Default configs
     SegmentProcessorConfig config0 =
         new SegmentProcessorConfig.Builder().setTableConfig(getTableConfig()).setSchema(getSchema()).build();
-    Map<String, List<Object[]>> expectedRecords0 = Collections.singletonMap("0", outputData);
+    Map<String, List<Object[]>> expectedRecords0 = Map.of("0", outputData);
     inputs.add(new Object[]{config0, expectedRecords0});
 
     // Round-robin partitioner
     SegmentProcessorConfig config1 =
         new SegmentProcessorConfig.Builder().setTableConfig(getTableConfig()).setSchema(getSchema())
-            .setPartitionerConfigs(Collections.singletonList(
+            .setPartitionerConfigs(List.of(
                 new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
                     .setNumPartitions(3).build())).build();
     Map<String, List<Object[]>> expectedRecords1 = new HashMap<>();
@@ -230,7 +229,7 @@ public class SegmentMapperTest {
     // Partition by campaign
     SegmentProcessorConfig config2 =
         new SegmentProcessorConfig.Builder().setTableConfig(getTableConfig()).setSchema(getSchema())
-            .setPartitionerConfigs(Collections.singletonList(
+            .setPartitionerConfigs(List.of(
                 new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
                     .setColumnName("campaign").build())).build();
     Map<String, List<Object[]>> expectedRecords2 =
@@ -240,7 +239,7 @@ public class SegmentMapperTest {
     // Transform function partition
     SegmentProcessorConfig config3 =
         new SegmentProcessorConfig.Builder().setTableConfig(getTableConfig()).setSchema(getSchema())
-            .setPartitionerConfigs(Collections.singletonList(new PartitionerConfig.Builder().setPartitionerType(
+            .setPartitionerConfigs(List.of(new PartitionerConfig.Builder().setPartitionerType(
                 PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION).setTransformFunction("toEpochDays(ts)").build()))
             .build();
     Map<String, List<Object[]>> expectedRecords3 =
@@ -447,8 +446,8 @@ public class SegmentMapperTest {
     assertTrue(mapperOutputDir.mkdirs());
 
     SegmentMapper segmentMapper =
-        new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(reader)),
-            Collections.emptyList(), processorConfig, mapperOutputDir);
+        new SegmentMapper(List.of(new RecordReaderFileConfig(reader)),
+            List.of(), processorConfig, mapperOutputDir);
     Map<String, GenericRowFileManager> result = segmentMapper.map();
 
     // Should complete successfully with 3 rows written (successes only).
@@ -463,7 +462,7 @@ public class SegmentMapperTest {
   public void testContinueOnErrorConsistentFetchFailures() {
     // Consistent fetch failures: reader never advances. After maxConsecutiveRecordFetchFailuresAllowed we short-circuit
     List<GenericRow> data = rows(new Object[]{"a", 1, 1597719600000L});
-    List<FailingRecordReader.Action> actions = Collections.singletonList(FailingRecordReader.Action.FETCH_FAIL);
+    List<FailingRecordReader.Action> actions = List.of(FailingRecordReader.Action.FETCH_FAIL);
     FailingRecordReader reader = new FailingRecordReader(data, actions, false);
 
     TableConfig tableConfig = getTableConfigWithContinueOnError(3);
@@ -474,8 +473,8 @@ public class SegmentMapperTest {
     assertTrue(mapperOutputDir.mkdirs());
 
     SegmentMapper segmentMapper =
-        new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(reader)),
-            Collections.emptyList(), processorConfig, mapperOutputDir);
+        new SegmentMapper(List.of(new RecordReaderFileConfig(reader)),
+            List.of(), processorConfig, mapperOutputDir);
 
     try {
       segmentMapper.map();
@@ -516,8 +515,8 @@ public class SegmentMapperTest {
     assertTrue(mapperOutputDir.mkdirs());
 
     SegmentMapper segmentMapper =
-        new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(reader)),
-            Collections.emptyList(), processorConfig, mapperOutputDir);
+        new SegmentMapper(List.of(new RecordReaderFileConfig(reader)),
+            List.of(), processorConfig, mapperOutputDir);
     Map<String, GenericRowFileManager> result = segmentMapper.map();
 
     // Should complete; 3 rows written, 3 incomplete (parse failures).

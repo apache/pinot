@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.logical;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -127,7 +126,7 @@ public class PinotLogicalEnrichedJoin extends Join {
   }
 
   public List<RexNode> getProjects() {
-    return _squashedProjects == null ? Collections.emptyList() : _squashedProjects;
+    return _squashedProjects == null ? List.of() : _squashedProjects;
   }
 
   /// Combine all projects in _filterProjectRexNodes into a single project

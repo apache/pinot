@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.metrics.compound;
 import com.google.auto.service.AutoService;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.ServiceLoader;
@@ -100,7 +99,7 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
   public void init(PinotConfiguration metricsConfiguration) {
     String algorithmName = metricsConfiguration.getProperty(ALGORITHM_KEY, Algorithm.CLASSPATH.name());
 
-    Set<Class<?>> allIgnored = metricsConfiguration.getProperty(IGNORED_METRICS, Collections.emptyList()).stream()
+    Set<Class<?>> allIgnored = metricsConfiguration.getProperty(IGNORED_METRICS, List.of()).stream()
         .flatMap(ignoredClassName -> {
           try {
             return Stream.of(PluginManager.get().loadClass(ignoredClassName));
@@ -215,7 +214,7 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
     LIST {
       @Override
       protected Stream<PinotMetricsFactory> streamInstances(PinotConfiguration metricsConfiguration) {
-        return metricsConfiguration.getProperty(LIST_KEY, Collections.emptyList()).stream()
+        return metricsConfiguration.getProperty(LIST_KEY, List.of()).stream()
             .map(className -> {
                   try {
                     return PluginManager.get().createInstance(className);

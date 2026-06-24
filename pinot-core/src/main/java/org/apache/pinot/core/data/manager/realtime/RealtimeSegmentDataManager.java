@@ -28,7 +28,6 @@ import java.nio.BufferOverflowException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1130,7 +1129,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Returns the current offset for the partition group.
    */
   public Map<String, String> getPartitionToCurrentOffset() {
-    return Collections.singletonMap(String.valueOf(_partitionGroupId), _currentOffset.toString());
+    return Map.of(String.valueOf(_partitionGroupId), _currentOffset.toString());
   }
 
   /**
@@ -1153,7 +1152,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public Map<String, ConsumerPartitionState> getConsumerPartitionState(
       @Nullable StreamPartitionMsgOffset latestMsgOffset) {
     String partitionGroupId = String.valueOf(_partitionGroupId);
-    return Collections.singletonMap(partitionGroupId,
+    return Map.of(partitionGroupId,
         new ConsumerPartitionState(partitionGroupId, getCurrentOffset(), getLastConsumedTimestamp(), latestMsgOffset,
             _lastRowMetadata));
   }

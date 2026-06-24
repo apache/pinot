@@ -26,7 +26,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -504,7 +503,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public List<SegmentMetadata> getAllSegmentsMetadata(String tableNameWithType) {
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager == null) {
-      return Collections.emptyList();
+      return List.of();
     } else {
       List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
       try {

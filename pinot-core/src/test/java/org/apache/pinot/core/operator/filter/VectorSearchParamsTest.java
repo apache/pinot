@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
@@ -54,7 +53,7 @@ public class VectorSearchParamsTest {
 
   @Test
   public void testFromEmptyQueryOptions() {
-    VectorSearchParams params = VectorSearchParams.fromQueryOptions(Collections.emptyMap());
+    VectorSearchParams params = VectorSearchParams.fromQueryOptions(Map.of());
     Assert.assertSame(params, VectorSearchParams.DEFAULT);
   }
 

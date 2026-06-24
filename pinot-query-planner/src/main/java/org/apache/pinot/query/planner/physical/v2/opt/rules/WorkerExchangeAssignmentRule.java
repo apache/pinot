@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -159,7 +158,7 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       currentNode = currentNode.with(currentNode.getPRelInputs(), currentNodeDistribution);
       // Update current node with its distribution, and since this is a leaf stage boundary, add an identity exchange.
       return new PhysicalExchange(nodeId(), currentNode,
-          currentNode.getPinotDataDistribution(), Collections.emptyList(), ExchangeStrategy.IDENTITY_EXCHANGE,
+          currentNode.getPinotDataDistribution(), List.of(), ExchangeStrategy.IDENTITY_EXCHANGE,
           null, PinotExecStrategyTrait.getDefaultExecStrategy(), _physicalPlannerContext.getDefaultHashFunction());
     }
     // When no exchange, simply update current node with the distribution.
@@ -288,7 +287,7 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
         // Add new identity exchange for sort.
         PinotDataDistribution newDataDistribution = derivedDistribution.withCollation(relCollation);
         currentNodeExchange = new PhysicalExchange(nodeId(), currentNode,
-            newDataDistribution, Collections.emptyList(), ExchangeStrategy.IDENTITY_EXCHANGE, relCollation,
+            newDataDistribution, List.of(), ExchangeStrategy.IDENTITY_EXCHANGE, relCollation,
             PinotExecStrategyTrait.getDefaultExecStrategy(), _physicalPlannerContext.getDefaultHashFunction());
       }
     } else {

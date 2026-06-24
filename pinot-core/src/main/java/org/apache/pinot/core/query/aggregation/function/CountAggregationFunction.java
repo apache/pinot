@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -68,7 +67,7 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
 
   @Override
   public List<ExpressionContext> getInputExpressions() {
-    return _nullHandlingEnabled ? super.getInputExpressions() : Collections.emptyList();
+    return _nullHandlingEnabled ? super.getInputExpressions() : List.of();
   }
 
   @Override

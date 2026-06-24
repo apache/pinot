@@ -21,10 +21,10 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -206,7 +206,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("100days.maxNumRecordsPerTask", "15000");
     tableTaskConfigs.put("ActualElapsedTime.aggregationType", "min");
     tableTaskConfigs.put("WeatherDelay.aggregationType", "sum");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private TableConfig createOfflineTableConfig(String tableName, TableTaskConfig taskConfig) {
@@ -251,7 +251,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         .setBloomFilterColumns(getBloomFilterColumns()).setFieldConfigList(getFieldConfigs())
         .setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode())
         .setTaskConfig(
-            new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs)))
+            new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs)))
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
         .setQueryConfig(getQueryConfig()).setStreamConfigs(streamConfigs)
         .setNullHandlingEnabled(getNullHandlingEnabled()).build();
@@ -267,7 +267,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("ActualElapsedTime.aggregationType", "min");
     tableTaskConfigs.put("WeatherDelay.aggregationType", "sum");
     tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private TableTaskConfig getSingleLevelConcatMetadataTaskConfig() {
@@ -281,7 +281,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("WeatherDelay.aggregationType", "sum");
     tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
     tableTaskConfigs.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.toString());
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private TableTaskConfig getSingleLevelRollupTaskConfig() {
@@ -291,7 +291,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("150days.bucketTimePeriod", "150d");
     tableTaskConfigs.put("150days.roundBucketTimePeriod", "7d");
     tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private TableTaskConfig getMultiLevelConcatTaskConfig() {
@@ -308,7 +308,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("90days.maxNumRecordsPerSegment", "100000");
     tableTaskConfigs.put("90days.maxNumRecordsPerTask", "100000");
     tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private SegmentPartitionConfig getMultiColumnsSegmentPartitionConfig() {
@@ -409,7 +409,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_CONCAT_TEST_TABLE);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(offlineTableName));
+        .setTablesToSchedule(Set.of(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -526,7 +526,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_CONCAT_METADATA_TEST_TABLE);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(offlineTableName));
+        .setTablesToSchedule(Set.of(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -636,7 +636,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_ROLLUP_TEST_TABLE);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(offlineTableName));
+        .setTablesToSchedule(Set.of(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -789,7 +789,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(MULTI_LEVEL_CONCAT_TEST_TABLE);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(offlineTableName));
+        .setTablesToSchedule(Set.of(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -971,7 +971,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(realtimeTableName));
+        .setTablesToSchedule(Set.of(realtimeTableName));
     List<String> taskList;
     for (String tasks = taskManager.scheduleTasks(context)
             .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -1078,7 +1078,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(realtimeTableName));
+        .setTablesToSchedule(Set.of(realtimeTableName));
     List<String> taskList;
     for (String tasks = taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0); tasks != null;

@@ -25,7 +25,6 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntListIterator;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -162,6 +161,6 @@ public class PinotLogicalQueryPlanner {
       }
     }
 
-    return new PlanFragment(0, rootReceiveNode, Collections.singletonList(planFragment1));
+    return new PlanFragment(0, rootReceiveNode, List.of(planFragment1));
   }
 }

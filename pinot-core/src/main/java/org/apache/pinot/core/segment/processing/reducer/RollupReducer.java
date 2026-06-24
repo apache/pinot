@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.processing.reducer;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -118,7 +117,7 @@ public class RollupReducer implements Reducer {
               aggregationType, fieldSpec.getName()));
         }
         aggregatorContextList.add(new AggregatorContext(fieldSpec, aggregationType,
-            _aggregationFunctionParameters.getOrDefault(fieldSpec.getName(), Collections.emptyMap())));
+            _aggregationFunctionParameters.getOrDefault(fieldSpec.getName(), Map.of())));
       }
     }
 

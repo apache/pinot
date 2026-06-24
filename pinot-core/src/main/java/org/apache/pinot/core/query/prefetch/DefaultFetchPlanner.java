@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.prefetch;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -50,7 +49,7 @@ public class DefaultFetchPlanner implements FetchPlanner {
     for (String column : eqInColumns) {
       DataSource dataSource = indexSegment.getDataSourceNullable(column);
       if (dataSource != null && dataSource.getBloomFilter() != null) {
-        columnToIndexList.put(column, Collections.singletonList(StandardIndexes.bloomFilter()));
+        columnToIndexList.put(column, List.of(StandardIndexes.bloomFilter()));
       }
     }
     return new FetchContext(UUID.randomUUID(), indexSegment.getSegmentName(), columnToIndexList);

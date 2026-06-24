@@ -915,7 +915,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (isUpsertEnabled()) {
       return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
     }
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   protected void handleUpsert(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {

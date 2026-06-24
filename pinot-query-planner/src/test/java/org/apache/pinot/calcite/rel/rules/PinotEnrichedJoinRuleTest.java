@@ -19,8 +19,8 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepMatchOrder;
@@ -98,7 +98,7 @@ public class PinotEnrichedJoinRuleTest {
     RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
         REX_BUILDER.makeInputRef(intType, 3));
     LogicalJoin originalJoin =
-        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+        LogicalJoin.create(_input, _input, List.of(), joinCondition, Set.of(),
             JoinRelType.INNER);
     // filter condition col2 = 1
     RexNode filterCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 2),
@@ -135,7 +135,7 @@ public class PinotEnrichedJoinRuleTest {
         REX_BUILDER.makeLiteral(2, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER)));
     PinotLogicalEnrichedJoin originalJoin =
         new PinotLogicalEnrichedJoin(cluster, cluster.traitSet(), List.of(), _input, _input, joinCondition,
-            Collections.emptySet(),
+            Set.of(),
             JoinRelType.INNER, List.of(new PinotLogicalEnrichedJoin.FilterProjectRexNode(prevFilterCondition)), null,
             null, null, null);
     // filter condition col2 = 1
@@ -174,12 +174,12 @@ public class PinotEnrichedJoinRuleTest {
     RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
         REX_BUILDER.makeInputRef(intType, 3));
     LogicalJoin originalJoin =
-        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+        LogicalJoin.create(_input, _input, List.of(), joinCondition, Set.of(),
             JoinRelType.INNER);
     // project one column
     List<RexNode> projects = List.of(REX_BUILDER.makeInputRef(intType, 1));
     LogicalProject project =
-        LogicalProject.create(originalJoin, Collections.emptyList(), projects, List.of("projectCol1"));
+        LogicalProject.create(originalJoin, List.of(), projects, List.of("projectCol1"));
 
     planner.setRoot(project);
     RelNode newRoot = planner.findBestExp();
@@ -220,7 +220,7 @@ public class PinotEnrichedJoinRuleTest {
     // one project and one filter
     PinotLogicalEnrichedJoin originalJoin =
         new PinotLogicalEnrichedJoin(cluster, cluster.traitSet(), List.of(), _input, _input, joinCondition,
-            Collections.emptySet(),
+            Set.of(),
             JoinRelType.INNER, List.of(new PinotLogicalEnrichedJoin.FilterProjectRexNode(oldProjects, oldRowType),
               new PinotLogicalEnrichedJoin.FilterProjectRexNode(prevFilterCondition)), oldRowType,
             null, null, null);
@@ -228,7 +228,7 @@ public class PinotEnrichedJoinRuleTest {
     // new project
     List<RexNode> projects = List.of(REX_BUILDER.makeInputRef(intType, 1));
     LogicalProject project =
-        LogicalProject.create(originalJoin, Collections.emptyList(), projects, List.of("projectCol1"));
+        LogicalProject.create(originalJoin, List.of(), projects, List.of("projectCol1"));
     RelDataType rowType =
         RexUtil.createStructType(cluster.getTypeFactory(), projects,
             List.of("projectCol1"), SqlValidatorUtil.F_SUGGESTER);
@@ -267,7 +267,7 @@ public class PinotEnrichedJoinRuleTest {
     RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
         REX_BUILDER.makeInputRef(intType, 3));
     LogicalJoin originalJoin =
-        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+        LogicalJoin.create(_input, _input, List.of(), joinCondition, Set.of(),
             JoinRelType.INNER);
 
     RelCollation collation = RelCollations.EMPTY;
@@ -317,7 +317,7 @@ public class PinotEnrichedJoinRuleTest {
     // one project and one filter
     PinotLogicalEnrichedJoin originalJoin =
         new PinotLogicalEnrichedJoin(cluster, cluster.traitSet(), List.of(), _input, _input, joinCondition,
-            Collections.emptySet(),
+            Set.of(),
             JoinRelType.INNER, List.of(new PinotLogicalEnrichedJoin.FilterProjectRexNode(oldProjects, oldRowType),
               new PinotLogicalEnrichedJoin.FilterProjectRexNode(prevFilterCondition)), oldRowType,
             null, null, null);
@@ -361,7 +361,7 @@ public class PinotEnrichedJoinRuleTest {
     RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
         REX_BUILDER.makeInputRef(intType, 3));
     LogicalJoin originalJoin =
-        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+        LogicalJoin.create(_input, _input, List.of(), joinCondition, Set.of(),
             JoinRelType.INNER);
     // filter condition col2 = 1
     RexNode filterCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 2),
@@ -370,7 +370,7 @@ public class PinotEnrichedJoinRuleTest {
     // project above filter
     List<RexNode> projects = List.of(REX_BUILDER.makeInputRef(intType, 1));
     LogicalProject project =
-        LogicalProject.create(originalFilter, Collections.emptyList(), projects, List.of("projectCol1"));
+        LogicalProject.create(originalFilter, List.of(), projects, List.of("projectCol1"));
 
     planner.setRoot(project);
     RelNode newRoot = planner.findBestExp();
@@ -401,7 +401,7 @@ public class PinotEnrichedJoinRuleTest {
     RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
         REX_BUILDER.makeInputRef(intType, 3));
     LogicalJoin originalJoin =
-        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+        LogicalJoin.create(_input, _input, List.of(), joinCondition, Set.of(),
             JoinRelType.INNER);
     // project above filter with width of 5
     List<RexNode> projects = List.of(REX_BUILDER.makeInputRef(intType, 0), REX_BUILDER.makeInputRef(intType, 1),
@@ -409,7 +409,7 @@ public class PinotEnrichedJoinRuleTest {
         REX_BUILDER.makeInputRef(intType, 4), REX_BUILDER.makeInputRef(intType, 4),
         REX_BUILDER.makeInputRef(intType, 0));
     LogicalProject project =
-        LogicalProject.create(originalJoin, Collections.emptyList(), projects, (List<? extends String>) null);
+        LogicalProject.create(originalJoin, List.of(), projects, (List<? extends String>) null);
     // filter condition col2 = 1
     RexNode filterCondition =
         REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(project.getRowType(), 6),
@@ -445,7 +445,7 @@ public class PinotEnrichedJoinRuleTest {
     RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
         REX_BUILDER.makeInputRef(intType, 3));
     LogicalJoin originalJoin =
-        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+        LogicalJoin.create(_input, _input, List.of(), joinCondition, Set.of(),
             JoinRelType.INNER);
     // project above filter with width of 5
     List<RexNode> projects = List.of(REX_BUILDER.makeInputRef(intType, 0), REX_BUILDER.makeInputRef(intType, 1),
@@ -453,7 +453,7 @@ public class PinotEnrichedJoinRuleTest {
         REX_BUILDER.makeInputRef(intType, 4), REX_BUILDER.makeInputRef(intType, 4),
         REX_BUILDER.makeInputRef(intType, 0));
     LogicalProject project =
-        LogicalProject.create(originalJoin, Collections.emptyList(), projects, (List<? extends String>) null);
+        LogicalProject.create(originalJoin, List.of(), projects, (List<? extends String>) null);
     // filter condition col2 = 1
     RexNode filterCondition =
         REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(project.getRowType(), 6),
@@ -496,7 +496,7 @@ public class PinotEnrichedJoinRuleTest {
     RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
         REX_BUILDER.makeInputRef(intType, 3));
     LogicalJoin originalJoin =
-        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+        LogicalJoin.create(_input, _input, List.of(), joinCondition, Set.of(),
             JoinRelType.INNER);
     // filter condition col2 = 1
     RexNode filterCondition =
@@ -509,7 +509,7 @@ public class PinotEnrichedJoinRuleTest {
         REX_BUILDER.makeInputRef(intType, 4), REX_BUILDER.makeInputRef(intType, 4),
         REX_BUILDER.makeInputRef(intType, 0));
     LogicalProject project =
-        LogicalProject.create(originalFilter, Collections.emptyList(), projects, (List<? extends String>) null);
+        LogicalProject.create(originalFilter, List.of(), projects, (List<? extends String>) null);
 
     RelCollation collation = RelCollations.EMPTY;
     RexNode limit = literal(1);
@@ -547,7 +547,7 @@ public class PinotEnrichedJoinRuleTest {
     RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
         REX_BUILDER.makeInputRef(intType, 3));
     LogicalJoin originalJoin =
-        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+        LogicalJoin.create(_input, _input, List.of(), joinCondition, Set.of(),
             JoinRelType.INNER);
     // filter condition col2 = 1
     RexNode filterCondition =
@@ -560,7 +560,7 @@ public class PinotEnrichedJoinRuleTest {
         REX_BUILDER.makeInputRef(intType, 4), REX_BUILDER.makeInputRef(intType, 4),
         REX_BUILDER.makeInputRef(intType, 0));
     LogicalProject project =
-        LogicalProject.create(originalFilter, Collections.emptyList(), projects, (List<? extends String>) null);
+        LogicalProject.create(originalFilter, List.of(), projects, (List<? extends String>) null);
 
     RelCollation collation = RelCollations.of(0);
     RexNode limit = literal(1);
@@ -602,13 +602,13 @@ public class PinotEnrichedJoinRuleTest {
     RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
         REX_BUILDER.makeInputRef(intType, 3));
     LogicalJoin originalJoin =
-        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+        LogicalJoin.create(_input, _input, List.of(), joinCondition, Set.of(),
             JoinRelType.INNER);
     // project that touches both left and right relations
     List<RexNode> projects = List.of(REX_BUILDER.makeCall(SqlStdOperatorTable.PLUS,
         REX_BUILDER.makeInputRef(intType, 1), REX_BUILDER.makeInputRef(intType, 4)));
     LogicalProject project =
-        LogicalProject.create(originalJoin, Collections.emptyList(), projects, List.of("projectCol1"));
+        LogicalProject.create(originalJoin, List.of(), projects, List.of("projectCol1"));
 
     planner.setRoot(project);
     RelNode newRoot = planner.findBestExp();

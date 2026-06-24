@@ -86,7 +86,7 @@ public class PinotHelixResourceManagerMaterializedViewListingTest {
 
       List<String> result = prm.getAllRawMaterializedViewNames(null);
 
-      assertEquals(result, java.util.Collections.singletonList("mv_orders"),
+      assertEquals(result, java.util.List.of("mv_orders"),
           "Only the OFFLINE resource whose TableConfig has isMaterializedView=true must be "
               + "returned, and the raw name must be stripped of its _OFFLINE suffix so the "
               + "result is reusable as input to SHOW CREATE / DROP MATERIALIZED VIEW.");
@@ -130,7 +130,7 @@ public class PinotHelixResourceManagerMaterializedViewListingTest {
       // `SHOW MATERIALIZED VIEWS FROM analytics` from a session with no Database header still
       // sees the fully-qualified name and can pipe it straight into
       // `SHOW CREATE MATERIALIZED VIEW analytics.mv_revenue` without guessing the qualifier.
-      assertEquals(result, java.util.Collections.singletonList("analytics.mv_revenue"),
+      assertEquals(result, java.util.List.of("analytics.mv_revenue"),
           "Only MVs whose qualified name starts with 'analytics.' must be returned; cross-database "
               + "leaks would let a caller scoped to one database enumerate another database's MVs.");
       // The default-database MV must NOT have been read either — a regression in the database

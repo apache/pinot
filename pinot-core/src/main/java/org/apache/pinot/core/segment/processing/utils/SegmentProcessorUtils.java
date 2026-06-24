@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.processing.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -66,7 +65,7 @@ public final class SegmentProcessorUtils {
           "Schema must not contain the reserved column: %s", TimeHandler.ORIGINAL_TIME_MS_COLUMN);
     }
     if (sortOrder == null) {
-      sortOrder = Collections.emptyList();
+      sortOrder = List.of();
     }
 
     List<FieldSpec> fieldSpecs = new ArrayList<>();

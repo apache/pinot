@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.datatable.DataTable;
@@ -111,7 +111,7 @@ public class GroupByUtilsTest {
       assertTrue(reducerTable instanceof UnboundedConcurrentIndexedTable,
           "grouping-set reducer table must be trim-disabled, got " + reducerTable.getClass().getSimpleName());
 
-      GroupByResultsBlock resultsBlock = new GroupByResultsBlock(schema, Collections.emptyList(), groupingSets);
+      GroupByResultsBlock resultsBlock = new GroupByResultsBlock(schema, List.of(), groupingSets);
       IndexedTable combineTable =
           GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, groupingSets, 2, executorService);
       assertTrue(combineTable instanceof UnboundedConcurrentIndexedTable,

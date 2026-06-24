@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.data.manager;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -406,6 +405,6 @@ public interface TableDataManager {
    * Returns a mapping of partition id to primary key count. Supports both upsert and dedup enabled tables.
    */
   default Map<Integer, Long> getPartitionToPrimaryKeyCount() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 }

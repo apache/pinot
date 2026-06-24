@@ -20,7 +20,7 @@ package org.apache.pinot.tools.segment.converter;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
@@ -99,7 +99,7 @@ public class PinotSegmentConverterTest {
     segmentGeneratorConfig.setOutDir(TEMP_DIR.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(Collections.singletonList(record)));
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(List.of(record)));
     driver.build();
 
     _segmentDir = driver.getOutputDirectory().getPath();

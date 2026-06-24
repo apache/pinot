@@ -21,7 +21,6 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -69,7 +68,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
       .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
   private static final List<FieldConfig> FIELD_CONFIGS = new ArrayList<>();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-      .setInvertedIndexColumns(Collections.singletonList(INT_COL_NAME)).setRangeIndexColumns(List.of(INT_COL_NAME))
+      .setInvertedIndexColumns(List.of(INT_COL_NAME)).setRangeIndexColumns(List.of(INT_COL_NAME))
       .setFieldConfigList(FIELD_CONFIGS).build();
 
   private IndexSegment _indexSegment;

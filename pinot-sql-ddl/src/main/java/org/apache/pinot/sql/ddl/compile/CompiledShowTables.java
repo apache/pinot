@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.sql.ddl.compile;
 
-import java.util.Collections;
+import java.util.List;
 import javax.annotation.Nullable;
 
 
 /// Result of compiling `SHOW TABLES [FROM db]`. Carries no payload beyond the database.
 public final class CompiledShowTables extends CompiledDdl {
   public CompiledShowTables(@Nullable String databaseName) {
-    super(DdlOperation.SHOW_TABLES, databaseName, Collections.emptyList());
+    super(DdlOperation.SHOW_TABLES, databaseName, List.of());
   }
 }

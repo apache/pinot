@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,13 +41,13 @@ public class DataTypeTransformerTest {
      */
 
     // Empty Map
-    Map<String, Object> map = Collections.emptyMap();
+    Map<String, Object> map = Map.of();
     assertNull(DataTypeTransformerUtils.standardize(COLUMN, map, true));
     assertNull(DataTypeTransformerUtils.standardize(COLUMN, map, false));
 
     // Map with single entry
     String expectedValue = "testValue";
-    map = Collections.singletonMap("testKey", expectedValue);
+    map = Map.of("testKey", expectedValue);
     assertEquals(DataTypeTransformerUtils.standardize(COLUMN, map, true), expectedValue);
     assertEquals(DataTypeTransformerUtils.standardize(COLUMN, map, false), expectedValue);
 
@@ -71,12 +70,12 @@ public class DataTypeTransformerTest {
      */
 
     // Empty List
-    List<Object> list = Collections.emptyList();
+    List<Object> list = List.of();
     assertNull(DataTypeTransformerUtils.standardize(COLUMN, list, true));
     assertNull(DataTypeTransformerUtils.standardize(COLUMN, list, false));
 
     // List with single entry
-    list = Collections.singletonList(expectedValue);
+    list = List.of(expectedValue);
     assertEquals(DataTypeTransformerUtils.standardize(COLUMN, list, true), expectedValue);
     assertEquals(DataTypeTransformerUtils.standardize(COLUMN, list, false), expectedValue);
 
@@ -121,25 +120,25 @@ public class DataTypeTransformerTest {
      */
 
     // Map with empty List
-    map = Collections.singletonMap("testKey", Collections.emptyList());
+    map = Map.of("testKey", List.of());
     assertNull(DataTypeTransformerUtils.standardize(COLUMN, map, true));
     assertNull(DataTypeTransformerUtils.standardize(COLUMN, map, false));
 
     // Map with single-entry List
-    map = Collections.singletonMap("testKey", Collections.singletonList(expectedValue));
+    map = Map.of("testKey", List.of(expectedValue));
     assertEquals(DataTypeTransformerUtils.standardize(COLUMN, map, true), expectedValue);
     assertEquals(DataTypeTransformerUtils.standardize(COLUMN, map, false), expectedValue);
 
     // Map with one empty Map and one single-entry Map
     map = new HashMap<>();
-    map.put("testKey1", Collections.emptyMap());
-    map.put("testKey2", Collections.singletonMap("testKey", expectedValue));
+    map.put("testKey1", Map.of());
+    map.put("testKey2", Map.of("testKey", expectedValue));
     // Can be standardized into single value because empty Map should be ignored
     assertEquals(DataTypeTransformerUtils.standardize(COLUMN, map, true), expectedValue);
     assertEquals(DataTypeTransformerUtils.standardize(COLUMN, map, false), expectedValue);
 
     // Map with multi-entries List
-    map = Collections.singletonMap("testKey", Arrays.asList(expectedValues));
+    map = Map.of("testKey", Arrays.asList(expectedValues));
     try {
       // Should fail because Map with multiple entries cannot be standardized as single value
       DataTypeTransformerUtils.standardize(COLUMN, map, true);
@@ -151,8 +150,8 @@ public class DataTypeTransformerTest {
 
     // Map with one empty Map, one single-entry List and one single-entry Object[]
     map = new HashMap<>();
-    map.put("testKey1", Collections.emptyMap());
-    map.put("testKey2", Collections.singletonList("testValue1"));
+    map.put("testKey1", Map.of());
+    map.put("testKey2", List.of("testValue1"));
     map.put("testKey3", new Object[]{"testValue2"});
     try {
       // Should fail because Map with multiple entries cannot be standardized as single value
@@ -165,8 +164,8 @@ public class DataTypeTransformerTest {
 
     // List with two single-entry Maps and one empty Map
     list = Arrays
-        .asList(Collections.singletonMap("testKey", "testValue1"), Collections.singletonMap("testKey", "testValue2"),
-            Collections.emptyMap());
+        .asList(Map.of("testKey", "testValue1"), Map.of("testKey", "testValue2"),
+            Map.of());
     try {
       // Should fail because List with multiple entries cannot be standardized as single value
       DataTypeTransformerUtils.standardize(COLUMN, list, true);
@@ -178,7 +177,7 @@ public class DataTypeTransformerTest {
 
     // Object[] with two single-entry Maps
     values = new Object[]{
-        Collections.singletonMap("testKey", "testValue1"), Collections.singletonMap("testKey", "testValue2")
+        Map.of("testKey", "testValue1"), Map.of("testKey", "testValue2")
     };
     try {
       // Should fail because Object[] with multiple entries cannot be standardized as single value
@@ -191,8 +190,8 @@ public class DataTypeTransformerTest {
 
     // Object[] with one empty Object[], one multi-entries List of nested Map/List/Object[]
     values = new Object[]{
-        new Object[0], Collections.singletonList(Collections.singletonMap("testKey", "testValue1")),
-        Collections.singletonMap("testKey", Arrays.asList(new Object[]{"testValue2"}, Collections.emptyMap()))
+        new Object[0], List.of(Map.of("testKey", "testValue1")),
+        Map.of("testKey", Arrays.asList(new Object[]{"testValue2"}, Map.of()))
     };
     try {
       DataTypeTransformerUtils.standardize(COLUMN, values, true);

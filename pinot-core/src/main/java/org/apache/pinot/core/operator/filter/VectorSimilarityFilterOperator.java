@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -223,7 +222,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override
@@ -541,7 +540,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     double filterSelectivity = (preFilter != null && _numDocs > 0)
         ? (double) preFilter.getCardinality() / _numDocs : -1.0;
     Map<String, Object> indexDebugInfo =
-        _backendType.supportsNprobe() ? _vectorIndexReader.getIndexDebugInfo() : Collections.emptyMap();
+        _backendType.supportsNprobe() ? _vectorIndexReader.getIndexDebugInfo() : Map.of();
     int effectiveEfSearch =
         resolveEffectiveEfSearch(_backendType, _searchParams);
     Boolean effectiveHnswUseRelativeDistance =

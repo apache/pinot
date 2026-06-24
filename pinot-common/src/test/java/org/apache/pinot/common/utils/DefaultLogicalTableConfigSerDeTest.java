@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -78,7 +77,7 @@ public class DefaultLogicalTableConfigSerDeTest {
       throws Exception {
     QuotaConfig quotaConfig = new QuotaConfig(null, "200.00");
     QueryConfig queryConfig =
-        new QueryConfig(3000L, false, true, Collections.singletonMap("func(a)", "b"), null, null);
+        new QueryConfig(3000L, false, true, Map.of("func(a)", "b"), null, null);
     Map<String, Object> params = new HashMap<>();
     params.put("key", "value");
     TimeBoundaryConfig timeBoundaryConfig = new TimeBoundaryConfig("MIN", params);
@@ -121,7 +120,7 @@ public class DefaultLogicalTableConfigSerDeTest {
     assertNotNull(queryConfig);
     assertEquals(queryConfig.getTimeoutMs(), Long.valueOf(3000L));
     assertEquals(queryConfig.getDisableGroovy(), Boolean.FALSE);
-    assertEquals(queryConfig.getExpressionOverrideMap(), Collections.singletonMap("func(a)", "b"));
+    assertEquals(queryConfig.getExpressionOverrideMap(), Map.of("func(a)", "b"));
 
     assertEquals(config.getRefOfflineTableName(), "table_OFFLINE");
     assertEquals(config.getRefRealtimeTableName(), "table_REALTIME");

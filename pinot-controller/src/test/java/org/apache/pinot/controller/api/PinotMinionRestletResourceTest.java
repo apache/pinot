@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -57,7 +56,7 @@ public class PinotMinionRestletResourceTest extends ControllerTest {
       String host = "minion-status-test-" + i + ".example.com";
       int port = 9514;
       Instance minionInstance = new Instance(host, port, InstanceType.MINION,
-          Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+          List.of(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
       sendPostRequest(_urlBuilder.forInstanceCreate(), minionInstance.toJsonString());
       minionIds.add("Minion_" + host + "_" + port);
     }
@@ -122,7 +121,7 @@ public class PinotMinionRestletResourceTest extends ControllerTest {
     String host = "minion-case-test.example.com";
     int port = 9514;
     Instance minionInstance = new Instance(host, port, InstanceType.MINION,
-        Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     sendPostRequest(_urlBuilder.forInstanceCreate(), minionInstance.toJsonString());
     String minionId = "Minion_" + host + "_" + port;
     sendPutRequest(_urlBuilder.forInstanceState(minionId) + "?state=DRAIN", "");

@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.workload.scheme;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -116,7 +115,7 @@ public class TablePropagationScheme implements PropagationScheme {
         return instances;
       }
     }
-    return Collections.emptySet();
+    return Set.of();
   }
 
   private Set<String> getServerInstances(String tableName, @Nullable PropagationEntityOverrides override) {
@@ -167,10 +166,10 @@ public class TablePropagationScheme implements PropagationScheme {
         InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.COMPLETED);
     if (type == OverrideEntityType.CONSUMING) {
       Set<String> instances = getInstancesFromInstancePartitions(consumingKey);
-      return (instances == null) ? Collections.emptySet() : new HashSet<>(instances);
+      return (instances == null) ? Set.of() : new HashSet<>(instances);
     } else if (type == OverrideEntityType.COMPLETED) {
       Set<String> instances = getInstancesFromInstancePartitions(completedKey);
-      return (instances == null) ? Collections.emptySet() : new HashSet<>(instances);
+      return (instances == null) ? Set.of() : new HashSet<>(instances);
     }
 
     // Union CONSUMING + COMPLETED
@@ -206,14 +205,14 @@ public class TablePropagationScheme implements PropagationScheme {
       list.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
       return list;
     }
-    return Collections.singletonList(tableName);
+    return List.of(tableName);
   }
 
   private Set<String> getInstancesFromInstancePartitions(String instancePartitionsName) {
     InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
         _pinotHelixResourceManager.getPropertyStore(), instancePartitionsName);
     if (instancePartitions == null) {
-      return Collections.emptySet();
+      return Set.of();
     }
     Map<String, Integer> instanceToPartitionIdMap = instancePartitions.getInstanceToPartitionIdMap();
     return instanceToPartitionIdMap.keySet();

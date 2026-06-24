@@ -24,7 +24,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,7 +78,7 @@ public class TableTierReader {
     if (segmentName == null) {
       serverToSegmentsMap.putAll(_helixResourceManager.getServerToSegmentsMap(tableNameWithType));
     } else {
-      List<String> segmentInList = Collections.singletonList(segmentName);
+      List<String> segmentInList = List.of(segmentName);
       for (String server : _helixResourceManager.getServers(tableNameWithType, segmentName)) {
         serverToSegmentsMap.put(server, segmentInList);
       }

@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.blocks.results;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -185,7 +184,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   @Override
   public List<Object[]> getRows() {
     if (_table == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     List<Object[]> rows = new ArrayList<>(_table.size());
     Iterator<Record> iterator = _table.iterator();

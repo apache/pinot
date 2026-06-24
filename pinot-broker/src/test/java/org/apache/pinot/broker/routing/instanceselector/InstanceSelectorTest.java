@@ -397,9 +397,9 @@ public class InstanceSelectorTest {
 
     // Disable instance0
     enabledInstances.remove(instance0);
-    balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
-    replicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
-    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
+    balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
+    replicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
+    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
 
     // For the 3rd request:
     //   BalancedInstanceSelector:
@@ -609,9 +609,9 @@ public class InstanceSelectorTest {
 
     // Re-enable instance0
     enabledInstances.add(instance0);
-    balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
-    replicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
-    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
+    balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
+    replicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
+    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
 
     // For the 9th request:
     //   BalancedInstanceSelector:
@@ -1073,8 +1073,8 @@ public class InstanceSelectorTest {
       //   }
       // }
       enabledInstances.add(errorInstance);
-      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(errorInstance));
-      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(errorInstance));
+      balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(errorInstance));
+      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(errorInstance));
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
@@ -1094,8 +1094,8 @@ public class InstanceSelectorTest {
       //   }
       // }
       enabledInstances.add(instance);
-      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance));
-      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance));
+      balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(instance));
+      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance));
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertEquals(selectionResult.getSegmentToInstanceMap().size(), 2);
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
@@ -1208,8 +1208,8 @@ public class InstanceSelectorTest {
       //   }
       // }
       enabledInstances.remove(instance);
-      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance));
-      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance));
+      balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(instance));
+      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance));
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
@@ -1235,7 +1235,7 @@ public class InstanceSelectorTest {
       strictReplicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertEquals(selectionResult.getSegmentToInstanceMap().size(), 1);
-      assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(segment1));
+      assertEquals(selectionResult.getUnavailableSegments(), List.of(segment1));
       selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
@@ -1252,8 +1252,8 @@ public class InstanceSelectorTest {
       //   }
       // }
       enabledInstances.remove(errorInstance);
-      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(errorInstance));
-      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(errorInstance));
+      balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(errorInstance));
+      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(errorInstance));
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));

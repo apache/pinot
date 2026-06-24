@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -188,7 +187,7 @@ public class PinotMetricUtils {
 
   @VisibleForTesting
   public static PinotMetricsRegistry getPinotMetricsRegistry() {
-    return getPinotMetricsRegistry(new PinotConfiguration(Collections.emptyMap()));
+    return getPinotMetricsRegistry(new PinotConfiguration(Map.of()));
   }
 
   /**

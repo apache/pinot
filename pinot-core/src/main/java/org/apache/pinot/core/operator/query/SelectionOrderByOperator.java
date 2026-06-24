@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.query;
 import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -364,7 +363,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   @Override

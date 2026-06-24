@@ -19,7 +19,6 @@
 package org.apache.pinot.query.routing;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -102,7 +101,7 @@ public class WorkerManagerTest {
     serverInstanceMap.put(server2.getInstanceId(), server2);
 
     // Create a routing table with no segments (empty table scenario)
-    RoutingTable emptyRoutingTable = new RoutingTable(Collections.emptyMap(), List.of(), 0);
+    RoutingTable emptyRoutingTable = new RoutingTable(Map.of(), List.of(), 0);
 
     // Create mock routing manager
     RoutingManager routingManager = new EmptyTableRoutingManager(serverInstanceMap, emptyRoutingTable);

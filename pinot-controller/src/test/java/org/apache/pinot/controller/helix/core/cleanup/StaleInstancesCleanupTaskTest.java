@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.cleanup;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -114,7 +113,7 @@ public class StaleInstancesCleanupTaskTest {
 
     List<String> allInstances = Arrays.asList(SERVER_IN_USE, BROKER_IN_USE);
     when(_pinotHelixResourceManager.getAllInstances()).thenReturn(allInstances);
-    when(_pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(Collections.emptyList());
+    when(_pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(List.of());
     when(_pinotHelixResourceManager.isInstanceOfflineFor(eq(SERVER_IN_USE), eq(RETENTION_MS))).thenReturn(true);
 
     _task.runTask(new Properties());
@@ -180,7 +179,7 @@ public class StaleInstancesCleanupTaskTest {
     when(_pinotHelixResourceManager.getTableIdealState(table1)).thenReturn(is1);
     when(_pinotHelixResourceManager.getTableIdealState(table2)).thenReturn(is2);
 
-    IdealState brokerIdealState = buildBrokerIdealState(Collections.emptyMap());
+    IdealState brokerIdealState = buildBrokerIdealState(Map.of());
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     when(_pinotHelixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
     when(helixAdmin.getResourceIdealState(CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE))
@@ -189,7 +188,7 @@ public class StaleInstancesCleanupTaskTest {
     List<String> allInstances =
         Arrays.asList(serverOnlyInTable1, serverOnlyInTable2, serverInBothTables, SERVER_NOT_IN_USE);
     when(_pinotHelixResourceManager.getAllInstances()).thenReturn(allInstances);
-    when(_pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(Collections.emptyList());
+    when(_pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(List.of());
     when(_pinotHelixResourceManager.isInstanceOfflineFor(anyString(), eq(RETENTION_MS))).thenReturn(true);
     when(_pinotHelixResourceManager.dropInstance(anyString()))
         .thenReturn(PinotResourceManagerResponse.success("dropped"));
@@ -210,7 +209,7 @@ public class StaleInstancesCleanupTaskTest {
     when(_pinotHelixResourceManager.getAllTables()).thenReturn(List.of(TABLE_NAME));
     when(_pinotHelixResourceManager.getTableIdealState(TABLE_NAME)).thenReturn(null);
 
-    IdealState brokerIdealState = buildBrokerIdealState(Collections.emptyMap());
+    IdealState brokerIdealState = buildBrokerIdealState(Map.of());
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     when(_pinotHelixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
     when(helixAdmin.getResourceIdealState(CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE))
@@ -218,7 +217,7 @@ public class StaleInstancesCleanupTaskTest {
 
     List<String> allInstances = List.of(SERVER_IN_USE);
     when(_pinotHelixResourceManager.getAllInstances()).thenReturn(allInstances);
-    when(_pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(Collections.emptyList());
+    when(_pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(List.of());
     when(_pinotHelixResourceManager.isInstanceOfflineFor(eq(SERVER_IN_USE), eq(RETENTION_MS))).thenReturn(true);
     when(_pinotHelixResourceManager.dropInstance(SERVER_IN_USE))
         .thenReturn(PinotResourceManagerResponse.success("dropped"));
@@ -234,12 +233,12 @@ public class StaleInstancesCleanupTaskTest {
    */
   @Test
   public void testEmptyIdealStateDoesNotCauseErrors() {
-    IdealState emptyIdealState = buildTableIdealState(TABLE_NAME, Collections.emptyMap());
+    IdealState emptyIdealState = buildTableIdealState(TABLE_NAME, Map.of());
 
     when(_pinotHelixResourceManager.getAllTables()).thenReturn(List.of(TABLE_NAME));
     when(_pinotHelixResourceManager.getTableIdealState(TABLE_NAME)).thenReturn(emptyIdealState);
 
-    IdealState brokerIdealState = buildBrokerIdealState(Collections.emptyMap());
+    IdealState brokerIdealState = buildBrokerIdealState(Map.of());
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     when(_pinotHelixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
     when(helixAdmin.getResourceIdealState(CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE))
@@ -247,7 +246,7 @@ public class StaleInstancesCleanupTaskTest {
 
     List<String> allInstances = List.of(SERVER_NOT_IN_USE);
     when(_pinotHelixResourceManager.getAllInstances()).thenReturn(allInstances);
-    when(_pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(Collections.emptyList());
+    when(_pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(List.of());
     when(_pinotHelixResourceManager.isInstanceOfflineFor(eq(SERVER_NOT_IN_USE), eq(RETENTION_MS))).thenReturn(true);
     when(_pinotHelixResourceManager.dropInstance(SERVER_NOT_IN_USE))
         .thenReturn(PinotResourceManagerResponse.success("dropped"));

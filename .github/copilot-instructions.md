@@ -21,6 +21,13 @@ This document guides AI coding assistants (Copilot, Cursor, etc.) contributing t
   as specified in [JEP-467](https://openjdk.org/jeps/467).
 - Methods and parameters are non-null by default unless annotated with `javax.annotation.Nullable`.
 - Prefer explicit imports for classes rather than fully qualified names used inline.
+- Prefer `List.of()`, `Set.of()`, and `Map.of()` for non-null immutable collection literals. Checkstyle blocks
+  `Collections.emptyList()`, `Collections.emptySet()`, and `Collections.emptyMap()`; use `List.of()`, `Set.of()`, and
+  `Map.of()` instead. Do not add blanket bans for `Collections.singleton*`; use them only when an element/key/value
+  argument is intentionally null because `List.of(null)`, `Set.of(null)`, and `Map.of(...)` with null keys or values
+  throw `NullPointerException`. Before replacing empty collection factories, check whether the value flows to
+  mutating callers. See
+  `kb/code-review-principles.md` C7.12.
 - Use SLF4J for logging; do not use `System.out` or `System.err`.
 - Propagate exceptions with useful context; avoid blanket `catch (Exception)` and never swallow errors.
 - Keep diffs minimal: do not reformat unrelated code and preserve existing whitespace/indentation styles.

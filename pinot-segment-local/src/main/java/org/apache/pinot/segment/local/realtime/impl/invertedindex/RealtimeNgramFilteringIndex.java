@@ -177,7 +177,7 @@ public class RealtimeNgramFilteringIndex implements MutableTextIndex {
   // Use Lucene's NGramTokenizer to generate n-grams from the input value.
   private Iterable<String> generateNgrams(String value) {
     if (value == null || value.isEmpty()) {
-      return java.util.Collections.emptyList();
+      return java.util.List.of();
     }
     ArrayList<String> ngrams = new ArrayList<>();
     // Implement the logic to generate n-grams from the input value.

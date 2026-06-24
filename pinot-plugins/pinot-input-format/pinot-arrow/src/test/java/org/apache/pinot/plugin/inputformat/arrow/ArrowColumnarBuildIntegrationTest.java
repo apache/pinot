@@ -29,7 +29,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
@@ -461,7 +460,7 @@ public class ArrowColumnarBuildIntegrationTest {
       Field idField = new Field("id", FieldType.nullable(new ArrowType.Int(32, true)), null);
       Field elementField = new Field("element", FieldType.nullable(new ArrowType.Int(32, true)), null);
       Field listField = new Field("intArr", FieldType.nullable(ArrowType.List.INSTANCE),
-          Collections.singletonList(elementField));
+          List.of(elementField));
       Schema arrowSchema = new Schema(Arrays.asList(idField, listField));
 
       try (VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, allocator);

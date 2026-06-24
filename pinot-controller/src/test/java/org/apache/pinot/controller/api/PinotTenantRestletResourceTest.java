@@ -20,8 +20,8 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.pinot.client.admin.PinotAdminClient;
@@ -70,10 +70,10 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     String brokerTenant = "test";
     String brokerTag = TagNameUtils.getBrokerTagForTenant(brokerTenant);
     Instance brokerInstance1 =
-        new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(brokerTag), null, 0, 0, 0, 0,
+        new Instance("1.2.3.4", 1234, InstanceType.BROKER, List.of(brokerTag), null, 0, 0, 0, 0,
             false);
     Instance brokerInstance2 =
-        new Instance("2.3.4.5", 2345, InstanceType.BROKER, Collections.singletonList(brokerTag), null, 0, 0, 0, 0,
+        new Instance("2.3.4.5", 2345, InstanceType.BROKER, List.of(brokerTag), null, 0, 0, 0, 0,
             false);
     adminClient.getInstanceClient().createInstance(brokerInstance1.toJsonString());
     adminClient.getInstanceClient().createInstance(brokerInstance2.toJsonString());

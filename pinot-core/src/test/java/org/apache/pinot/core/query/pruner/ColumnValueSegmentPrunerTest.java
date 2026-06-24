@@ -20,9 +20,9 @@ package org.apache.pinot.core.query.pruner;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -123,7 +123,7 @@ public class ColumnValueSegmentPrunerTest {
     when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
     when(dataSourceMetadata.getPartitionFunction()).thenReturn(
         PartitionFunctionFactory.getPartitionFunction("Modulo", 5, null));
-    when(dataSourceMetadata.getPartitions()).thenReturn(Collections.singleton(2));
+    when(dataSourceMetadata.getPartitions()).thenReturn(Set.of(2));
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
 
     // Equality predicate

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.streaming;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Plan;
@@ -158,7 +157,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
 
   @Override
   public List<BaseProjectOperator<?>> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   @Override
