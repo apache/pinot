@@ -42,7 +42,7 @@ public class VectorConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getVectorIndexType(), "Unexpected vectorIndexType");
     assertNull(config.getVectorDistanceFunction(), "Unexpected vectorDistanceFunction");
-    assertNull(config.getProperties(), "unexpected properties");
+    assertTrue(config.getProperties().isEmpty(), "unexpected properties");
     assertEquals(config.getVectorDimension(), 0);
     assertEquals(config.getVersion(), 0);
   }
@@ -56,7 +56,7 @@ public class VectorConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getVectorIndexType(), "Unexpected vectorIndexType");
     assertNull(config.getVectorDistanceFunction(), "Unexpected vectorDistanceFunction");
-    assertNull(config.getProperties(), "unexpected properties");
+    assertTrue(config.getProperties().isEmpty(), "unexpected properties");
     assertEquals(config.getVectorDimension(), 0);
     assertEquals(config.getVersion(), 0);
   }
@@ -70,7 +70,7 @@ public class VectorConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getVectorIndexType(), "Unexpected vectorIndexType");
     assertNull(config.getVectorDistanceFunction(), "Unexpected vectorDistanceFunction");
-    assertNull(config.getProperties(), "unexpected properties");
+    assertTrue(config.getProperties().isEmpty(), "unexpected properties");
     assertEquals(config.getVectorDimension(), 0);
     assertEquals(config.getVersion(), 0);
   }
@@ -84,7 +84,7 @@ public class VectorConfigTest {
     assertTrue(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getVectorIndexType(), "Unexpected vectorIndexType");
     assertNull(config.getVectorDistanceFunction(), "Unexpected vectorDistanceFunction");
-    assertNull(config.getProperties(), "unexpected properties");
+    assertTrue(config.getProperties().isEmpty(), "unexpected properties");
     assertEquals(config.getVectorDimension(), 0);
     assertEquals(config.getVersion(), 0);
   }
@@ -126,7 +126,8 @@ public class VectorConfigTest {
     VectorIndexConfig initialConf = new VectorIndexConfig(false);
 
     String confAsJson = JsonUtils.objectToString(initialConf);
-    Assert.assertEquals(confAsJson, "{\"disabled\":false,\"vectorDimension\":0,\"version\":0}");
+    // Slim serialization: disabled=false and primitive int defaults (0) are omitted.
+    Assert.assertEquals(confAsJson, "{}");
 
     VectorIndexConfig readConf = JsonUtils.stringToObject(confAsJson, VectorIndexConfig.class);
     Assert.assertEquals(readConf, initialConf, "Unexpected configuration after serialization and deserialization");
@@ -137,7 +138,9 @@ public class VectorConfigTest {
       throws JsonProcessingException {
     VectorIndexConfig initialConf = new VectorIndexConfig(false);
 
-    String serialized = "{\"disabled\":false,\"vectorDimension\":0,\"version\":0}";
+    // Slim form omits dim/version when not configured. The "{}" round-trip is the canonical
+    // shape; explicit zero values would survive as Integer.valueOf(0) and break field equality.
+    String serialized = "{}";
     VectorIndexConfig vectorIndexConfig = JsonUtils.stringToObject(serialized, VectorIndexConfig.class);
 
     Assert.assertEquals(vectorIndexConfig, initialConf, "Unexpected configuration after reading " + serialized);

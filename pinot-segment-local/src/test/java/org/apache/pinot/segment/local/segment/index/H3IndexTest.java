@@ -492,7 +492,8 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       assertTrue(fieldConfig.getIndexTypes().isEmpty());
       assertNull(fieldConfig.getProperties());
       JsonNode node = fieldConfig.getIndexes().get(H3IndexType.INDEX_DISPLAY_NAME);
-      Assert.assertEquals(node.toString(), "{\"disabled\":false,\"resolution\":[5,6,13]}");
+      // Slim serialization: disabled=false (default) is omitted.
+      Assert.assertEquals(node.toString(), "{\"resolution\":[5,6,13]}");
     }
   }
 }

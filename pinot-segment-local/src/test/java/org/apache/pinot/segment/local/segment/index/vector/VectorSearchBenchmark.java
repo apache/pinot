@@ -88,7 +88,7 @@ public class VectorSearchBenchmark {
     props.put("version", "1");
     props.put("nlist", String.valueOf(NLIST));
     props.put("trainingSeed", "42");
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_FLAT", DIMENSION, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_FLAT", DIMENSION, 1,
         VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, props);
 
     try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator("embedding", _tempDir, config)) {

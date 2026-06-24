@@ -108,7 +108,7 @@ public class FilterPlanNodeTest {
         boolean.class);
     method.setAccessible(true);
 
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_FLAT", 4, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_FLAT", 4, 1,
         VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, java.util.Map.of("nlist", "2"));
 
     String reason = (String) method.invoke(null, config, true);
@@ -122,7 +122,7 @@ public class FilterPlanNodeTest {
         boolean.class);
     method.setAccessible(true);
 
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 4, 1,
+    VectorIndexConfig config = new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", 4, 1,
         VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
         java.util.Map.of("nlist", "2", "pqM", "2", "pqNbits", "8"));
 

@@ -20,11 +20,14 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class StarTreeIndexConfig extends BaseJsonConfig {
@@ -80,5 +83,31 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
 
   public int getMaxLeafRecords() {
     return _maxLeafRecords;
+  }
+
+  /**
+   * Curated slim serializer. Standalone (not inheriting from {@link IndexConfig}) — this class
+   * extends {@link BaseJsonConfig} directly and has no {@code disabled} field. The constructor
+   * coerces empty optional lists to {@code null}, so the optional list fields are emitted only
+   * when non-null. {@code maxLeafRecords} is a primitive {@code int}; "absent" and {@code 0}
+   * collapse, so {@code 0} is treated as the default and omitted.
+   */
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = JsonUtils.newObjectNode();
+    node.set("dimensionsSplitOrder", JsonUtils.objectToJsonNode(_dimensionsSplitOrder));
+    if (_skipStarNodeCreationForDimensions != null) {
+      node.set("skipStarNodeCreationForDimensions", JsonUtils.objectToJsonNode(_skipStarNodeCreationForDimensions));
+    }
+    if (_functionColumnPairs != null) {
+      node.set("functionColumnPairs", JsonUtils.objectToJsonNode(_functionColumnPairs));
+    }
+    if (_aggregationConfigs != null) {
+      node.set("aggregationConfigs", JsonUtils.objectToJsonNode(_aggregationConfigs));
+    }
+    if (_maxLeafRecords != 0) {
+      node.put("maxLeafRecords", _maxLeafRecords);
+    }
+    return node;
   }
 }

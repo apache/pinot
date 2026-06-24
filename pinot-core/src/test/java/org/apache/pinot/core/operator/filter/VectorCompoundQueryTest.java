@@ -227,6 +227,6 @@ public class VectorCompoundQueryTest {
 
   private VectorIndexConfig createVectorIndexConfig(String backendType,
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
-    return new VectorIndexConfig(false, backendType, 2, 1, distanceFunction, Map.of());
+    return new VectorIndexConfig(Boolean.FALSE, backendType, 2, 1, distanceFunction, Map.of());
   }
 }

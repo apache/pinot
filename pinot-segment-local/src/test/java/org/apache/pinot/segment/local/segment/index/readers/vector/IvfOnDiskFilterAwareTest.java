@@ -207,7 +207,7 @@ public class IvfOnDiskFilterAwareTest {
     properties.put("nlist", String.valueOf(nlist));
     properties.put("quantizer", quantizerType.name());
     VectorIndexConfig creatorConfig =
-        new VectorIndexConfig(false, "IVF_FLAT", dimension, 1, distanceFunction, properties);
+        new VectorIndexConfig(Boolean.FALSE, "IVF_FLAT", dimension, 1, distanceFunction, properties);
     try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator(COLUMN_NAME, _tempDir, creatorConfig)) {
       for (float[] vector : vectors) {
         creator.add(vector);
@@ -226,7 +226,7 @@ public class IvfOnDiskFilterAwareTest {
     Map<String, String> properties = new HashMap<>();
     properties.put("nlist", String.valueOf(nlist));
     properties.put("quantizer", quantizerType.name());
-    return new VectorIndexConfig(false, "IVF_ON_DISK", dimension, 1, distanceFunction, properties);
+    return new VectorIndexConfig(Boolean.FALSE, "IVF_ON_DISK", dimension, 1, distanceFunction, properties);
   }
 
   private static final class CountingIvfOnDiskVectorIndexReader extends IvfOnDiskVectorIndexReader {

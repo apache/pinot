@@ -105,7 +105,7 @@ public class VectorIndexHandlerTest {
   }
 
   private static VectorIndexConfig vectorIndexConfig(String backend) {
-    return new VectorIndexConfig(false, backend, 4, 1, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
+    return new VectorIndexConfig(Boolean.FALSE, backend, 4, 1, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
         Map.of("nlist", "2", "pqM", "2", "pqNbits", "4", "trainSampleSize", "8"));
   }
 

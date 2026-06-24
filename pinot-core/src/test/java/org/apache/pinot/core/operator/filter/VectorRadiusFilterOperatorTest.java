@@ -296,6 +296,6 @@ public class VectorRadiusFilterOperatorTest {
 
   private VectorIndexConfig createVectorIndexConfig(String backendType,
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
-    return new VectorIndexConfig(false, backendType, 2, 1, distanceFunction, new HashMap<>());
+    return new VectorIndexConfig(Boolean.FALSE, backendType, 2, 1, distanceFunction, new HashMap<>());
   }
 }

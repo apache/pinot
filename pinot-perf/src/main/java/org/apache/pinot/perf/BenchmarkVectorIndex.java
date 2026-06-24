@@ -272,7 +272,7 @@ public class BenchmarkVectorIndex {
     props.put("nlist", String.valueOf(nlist));
     props.put("trainingSeed", String.valueOf(SEED));
     props.put("quantizer", quantizerType.name());
-    return new VectorIndexConfig(false, indexType, dimension, 1, distFunc, props);
+    return new VectorIndexConfig(Boolean.FALSE, indexType, dimension, 1, distFunc, props);
   }
 
   /**
@@ -289,7 +289,7 @@ public class BenchmarkVectorIndex {
     props.put("pqNbits", String.valueOf(pqNbits));
     props.put("trainSampleSize", String.valueOf(Math.max(nlist, Math.min(65536, corpusSize))));
     props.put("trainingSeed", String.valueOf(SEED));
-    return new VectorIndexConfig(false, IVF_PQ_INDEX_TYPE, dimension, 1, distFunc, props);
+    return new VectorIndexConfig(Boolean.FALSE, IVF_PQ_INDEX_TYPE, dimension, 1, distFunc, props);
   }
 
   /**
@@ -470,7 +470,7 @@ public class BenchmarkVectorIndex {
     // Lucene defaults: M=16, beamWidth=100
     props.put("maxCon", "16");
     props.put("beamWidth", "100");
-    return new VectorIndexConfig(false, "HNSW", dimension, 1, distFunc, props);
+    return new VectorIndexConfig(Boolean.FALSE, "HNSW", dimension, 1, distFunc, props);
   }
 
   // ---------------------------------------------------------------------------

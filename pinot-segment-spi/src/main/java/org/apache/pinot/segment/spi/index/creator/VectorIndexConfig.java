@@ -20,27 +20,28 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Config for vector index.
- *
- * <p>This is the backend-neutral configuration for all vector index types. Common fields include
- * {@code vectorIndexType}, {@code vectorDimension}, {@code vectorDistanceFunction}, and {@code version}.
- * All backend-specific configuration (e.g., HNSW maxCon/beamWidth, IVF_FLAT nlist/trainSampleSize)
- * is stored in the {@code properties} map.</p>
- *
- * <p>The {@code vectorIndexType} field determines which backend is used. If absent or null, it defaults
- * to {@code HNSW} for backward compatibility. Use {@link #resolveBackendType()} to safely resolve the
- * backend type with this default applied.</p>
- *
- * @see VectorBackendType
- * @see VectorIndexConfigValidator
- */
+/// Config for vector index.
+///
+/// Backend-neutral configuration for all vector index types. Common fields include `vectorIndexType`,
+/// `vectorDimension`, `vectorDistanceFunction`, and `version`. All backend-specific configuration
+/// (e.g., HNSW maxCon/beamWidth, IVF_FLAT nlist/trainSampleSize) is stored in the `properties` map.
+///
+/// The `vectorIndexType` field determines which backend is used. If absent or null, it defaults to
+/// `HNSW` for backward compatibility. Use [#resolveBackendType()] to safely resolve the backend type
+/// with this default applied.
+///
+/// @see VectorBackendType
+/// @see VectorIndexConfigValidator
 public class VectorIndexConfig extends IndexConfig {
   public static final VectorIndexConfig DISABLED = new VectorIndexConfig(true);
   private static final String VECTOR_INDEX_TYPE = "vectorIndexType";
@@ -52,16 +53,15 @@ public class VectorIndexConfig extends IndexConfig {
       VectorDistanceFunction.COSINE;
 
   private String _vectorIndexType;
-  private int _vectorDimension;
-  private int _version;
+  private Integer _vectorDimension;
+  private Integer _version;
   private VectorDistanceFunction _vectorDistanceFunction;
   private Map<String, String> _properties;
 
-  /**
-   * @param disabled whether the config is disabled. Null is considered enabled.
-   */
+  /// @param disabled whether the config is disabled. Null is considered enabled.
   public VectorIndexConfig(Boolean disabled) {
     super(disabled);
+    _properties = Map.of();
   }
 
   // Used to read from older configs
@@ -78,11 +78,22 @@ public class VectorIndexConfig extends IndexConfig {
     _properties = properties;
   }
 
+  /// Binary-compat delegate for the pre-wrapper 6-arg primitive ctor. Kept so existing compiled call sites
+  /// resolved to the primitive `(Boolean, String, int, int, VectorDistanceFunction, Map)` signature continue
+  /// to link.
+  @Deprecated
+  public VectorIndexConfig(@Nullable Boolean disabled, @Nullable String vectorIndexType, int vectorDimension,
+      int version, @Nullable VectorDistanceFunction vectorDistanceFunction,
+      @Nullable Map<String, String> properties) {
+    this(disabled, vectorIndexType, Integer.valueOf(vectorDimension), Integer.valueOf(version),
+        vectorDistanceFunction, properties);
+  }
+
   @JsonCreator
   public VectorIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
       @JsonProperty("vectorIndexType") @Nullable String vectorIndexType,
-      @JsonProperty("vectorDimension") int vectorDimension,
-      @JsonProperty("version") int version,
+      @JsonProperty("vectorDimension") @Nullable Integer vectorDimension,
+      @JsonProperty("version") @Nullable Integer version,
       @JsonProperty("vectorDistanceFunction") @Nullable VectorDistanceFunction vectorDistanceFunction,
       @JsonProperty("properties") @Nullable Map<String, String> properties) {
     super(disabled);
@@ -90,7 +101,7 @@ public class VectorIndexConfig extends IndexConfig {
     _vectorDimension = vectorDimension;
     _version = version;
     _vectorDistanceFunction = vectorDistanceFunction;
-    _properties = properties;
+    _properties = properties != null ? properties : Map.of();
   }
 
   public String getVectorIndexType() {
@@ -103,7 +114,7 @@ public class VectorIndexConfig extends IndexConfig {
   }
 
   public int getVectorDimension() {
-    return _vectorDimension;
+    return _vectorDimension != null ? _vectorDimension : 0;
   }
 
   public VectorIndexConfig setVectorDimension(int vectorDimension) {
@@ -122,7 +133,7 @@ public class VectorIndexConfig extends IndexConfig {
   }
 
   public int getVersion() {
-    return _version;
+    return _version != null ? _version : 0;
   }
 
   public VectorIndexConfig setVersion(int version) {
@@ -135,19 +146,68 @@ public class VectorIndexConfig extends IndexConfig {
   }
 
   public VectorIndexConfig setProperties(Map<String, String> properties) {
-    _properties = properties;
+    _properties = properties != null ? properties : Map.of();
     return this;
   }
 
-  /**
-   * Resolves the {@link VectorBackendType} for this config. If {@code vectorIndexType} is null or empty,
-   * defaults to {@link VectorBackendType#HNSW} for backward compatibility.
-   *
-   * @return the resolved backend type
-   * @throws IllegalArgumentException if vectorIndexType is set to an unrecognized value
-   */
+  /// Resolves the [VectorBackendType] for this config. If `vectorIndexType` is null or empty, defaults to
+  /// [VectorBackendType#HNSW] for backward compatibility.
+  ///
+  /// @return the resolved backend type
+  /// @throws IllegalArgumentException if vectorIndexType is set to an unrecognized value
   public VectorBackendType resolveBackendType() {
     return VectorIndexConfigValidator.resolveBackendType(this);
+  }
+
+  /// Curated slim serializer. See [IndexConfig#toJsonObject()] for the rationale.
+  ///
+  /// Each field is emitted only when explicitly configured (non-null wrapper). Empty `properties` map is
+  /// treated as not-configured and omitted.
+  @Override
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = super.toJsonObject();
+    if (_vectorIndexType != null) {
+      node.put("vectorIndexType", _vectorIndexType);
+    }
+    if (_vectorDimension != null) {
+      node.put("vectorDimension", _vectorDimension);
+    }
+    if (_version != null) {
+      node.put("version", _version);
+    }
+    if (_vectorDistanceFunction != null) {
+      node.put("vectorDistanceFunction", _vectorDistanceFunction.name());
+    }
+    if (_properties != null && !_properties.isEmpty()) {
+      node.set("properties", JsonUtils.objectToJsonNode(_properties));
+    }
+    return node;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    VectorIndexConfig that = (VectorIndexConfig) o;
+    return Objects.equals(_vectorIndexType, that._vectorIndexType)
+        && Objects.equals(_vectorDimension, that._vectorDimension)
+        && Objects.equals(_version, that._version)
+        && _vectorDistanceFunction == that._vectorDistanceFunction
+        && Objects.equals(_properties, that._properties);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _vectorIndexType, _vectorDimension, _version, _vectorDistanceFunction,
+        _properties);
   }
 
   public String toString() {
@@ -156,12 +216,10 @@ public class VectorIndexConfig extends IndexConfig {
         + _vectorDistanceFunction + ", _properties=" + _properties + '}';
   }
 
-  /**
-   * Distance functions supported by vector indexes.
-   *
-   * <p>Note: {@code L2} is an alias for {@code EUCLIDEAN}. Both refer to Euclidean (L2) distance.
-   * Existing configs using {@code EUCLIDEAN} continue to work unchanged.</p>
-   */
+  /// Distance functions supported by vector indexes.
+  ///
+  /// Note: `L2` is an alias for `EUCLIDEAN`. Both refer to Euclidean (L2) distance. Existing configs
+  /// using `EUCLIDEAN` continue to work unchanged.
   public enum VectorDistanceFunction {
     COSINE, INNER_PRODUCT, EUCLIDEAN, DOT_PRODUCT, L2;
   }

@@ -278,7 +278,8 @@ public class IvfFlatFilterAwareTest {
       throws Exception {
     Map<String, String> properties = new HashMap<>();
     properties.put("nlist", String.valueOf(nlist));
-    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_FLAT", dimension, 1, distanceFunction, properties);
+    VectorIndexConfig config =
+        new VectorIndexConfig(Boolean.FALSE, "IVF_FLAT", dimension, 1, distanceFunction, properties);
 
     try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator(
         COLUMN_NAME, _tempDir, config)) {
@@ -293,6 +294,6 @@ public class IvfFlatFilterAwareTest {
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     Map<String, String> properties = new HashMap<>();
     properties.put("nlist", String.valueOf(nlist));
-    return new VectorIndexConfig(false, "IVF_FLAT", dimension, 1, distanceFunction, properties);
+    return new VectorIndexConfig(Boolean.FALSE, "IVF_FLAT", dimension, 1, distanceFunction, properties);
   }
 }
