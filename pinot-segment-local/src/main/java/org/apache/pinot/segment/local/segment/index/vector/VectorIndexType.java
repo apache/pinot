@@ -211,40 +211,62 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         return null;
       }
       VectorBackendType backendType = indexConfig.resolveBackendType();
-      File configuredIndexFile =
-          SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, metadata.getColumnName(), indexConfig);
-      if (configuredIndexFile == null || !configuredIndexFile.exists()) {
-        LOGGER.warn("Skipping vector index reader for column: {} because configured backend {} does not have a "
-                + "matching on-disk artifact in segment: {}",
-            metadata.getColumnName(), backendType, segmentDir);
-        return null;
-      }
+      String column = metadata.getColumnName();
 
       if (backendType == VectorBackendType.HNSW) {
         // HNSW still loads from the sidecar Lucene directory; buffer-backed Directory plumbing
         // will land in a follow-up alongside the combined-file format.
-        return new HnswVectorIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
+        return new HnswVectorIndexReader(column, segmentDir, metadata.getTotalDocs(), indexConfig);
       }
 
-      // IVF backends share the same sidecar-buffer plumbing; the reader chosen below takes
-      // ownership of the buffer and is responsible for closing it (including the constructor's
-      // own failure path).
-      String column = metadata.getColumnName();
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(configuredIndexFile, column,
-          "vector-" + backendType.name().toLowerCase());
+      // IVF backends accept a PinotDataBuffer; that buffer either comes from the consolidated
+      // typed entry inside columns.psf (when storeInSegmentFile=true) or from the legacy sidecar
+      // file. The chosen reader takes ownership of the buffer and is responsible for closing it
+      // (including the constructor's own failure path).
+      PinotDataBuffer buffer;
+      if (indexConfig.isStoreInSegmentFile()) {
+        try {
+          buffer = segmentReader.getIndexFor(column, StandardIndexes.vector());
+        } catch (IOException e) {
+          throw new RuntimeException(
+              "Failed to read consolidated vector index from columns.psf for column: " + column, e);
+        }
+        if (buffer == null) {
+          LOGGER.warn("Skipping vector index reader for column: {} because storeInSegmentFile=true "
+              + "but no consolidated entry was found in columns.psf in segment: {}", column, segmentDir);
+          return null;
+        }
+      } else {
+        File configuredIndexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, column, indexConfig);
+        if (configuredIndexFile == null || !configuredIndexFile.exists()) {
+          LOGGER.warn("Skipping vector index reader for column: {} because configured backend {} does not have a "
+              + "matching on-disk artifact in segment: {}", column, backendType, segmentDir);
+          return null;
+        }
+        buffer = IvfSidecarBuffers.mapSidecarFile(configuredIndexFile, column,
+            "vector-" + backendType.name().toLowerCase());
+      }
+
+      // Buffer ownership: when reading from columns.psf, the segment directory owns the buffer
+      // and the reader must not close it. Sidecar mmap buffers are owned by the reader.
+      boolean ownsBuffer = !indexConfig.isStoreInSegmentFile();
       switch (backendType) {
         case IVF_FLAT:
-          return new IvfFlatVectorIndexReader(column, buffer, indexConfig);
+          return new IvfFlatVectorIndexReader(column, buffer, indexConfig, ownsBuffer);
         case IVF_PQ:
-          return new IvfPqVectorIndexReader(column, buffer, indexConfig);
+          return new IvfPqVectorIndexReader(column, buffer, indexConfig, ownsBuffer);
         case IVF_ON_DISK:
-          return new IvfOnDiskVectorIndexReader(column, buffer, indexConfig);
+          return new IvfOnDiskVectorIndexReader(column, buffer, indexConfig, ownsBuffer);
         default:
           // Close the buffer we just mapped so we don't leak the mmap on an unsupported backend.
-          try {
-            buffer.close();
-          } catch (IOException ignored) {
-            // best-effort cleanup; surface the original "unsupported" error.
+          // (Only applies to the sidecar branch; the columns.psf path's buffer is owned by the
+          // segment directory and we should not close it here.)
+          if (!indexConfig.isStoreInSegmentFile()) {
+            try {
+              buffer.close();
+            } catch (IOException ignored) {
+              // best-effort cleanup; surface the original "unsupported" error.
+            }
           }
           throw new IllegalStateException("Unsupported vector backend type: " + backendType);
       }

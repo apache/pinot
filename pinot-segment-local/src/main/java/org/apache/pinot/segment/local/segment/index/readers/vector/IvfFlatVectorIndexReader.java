@@ -66,8 +66,10 @@ public class IvfFlatVectorIndexReader
   /** Default nprobe value when not explicitly set. */
   static final int DEFAULT_NPROBE = 4;
 
-  // Backing buffer (closed by this reader). Contents are heap-loaded at construction.
+  // Backing buffer. Closed by this reader only when {@code _ownsBuffer} is true. Contents are
+  // heap-loaded at construction, so it is safe for the caller to retain ownership of the buffer.
   private final PinotDataBuffer _buffer;
+  private final boolean _ownsBuffer;
   // Index data loaded from file
   private final int _dimension;
   private final int _numVectors;
@@ -86,20 +88,34 @@ public class IvfFlatVectorIndexReader
   private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
 
   /**
+   * Opens and loads an IVF_FLAT index from the given buffer. The reader takes ownership of the
+   * buffer and closes it in {@link #close()}; use the four-arg overload to pass a borrowed
+   * buffer (e.g. one owned by the segment directory).
+   */
+  public IvfFlatVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
+    this(column, buffer, config, /* ownsBuffer */ true);
+  }
+
+  /**
    * Opens and loads an IVF_FLAT index from the given buffer.
    *
    * <p>The buffer holds the full IVF_FLAT file contents. The reader heap-loads centroids and
    * inverted lists at construction time, so the buffer can be released once the constructor
-   * returns; the reader closes the buffer in {@link #close()}.</p>
+   * returns.</p>
    *
-   * @param column the column name
-   * @param buffer the IVF_FLAT index buffer (mapped or in-memory). Closed by this reader.
-   * @param config the vector index configuration
+   * @param column      the column name
+   * @param buffer      the IVF_FLAT index buffer (mapped or in-memory)
+   * @param config      the vector index configuration
+   * @param ownsBuffer  when {@code true}, the reader closes the buffer in {@link #close()} (or
+   *                    on constructor failure). Pass {@code false} when the buffer is owned by
+   *                    the segment directory (typed entry inside {@code columns.psf}).
    * @throws RuntimeException if the index buffer cannot be read or is corrupt
    */
-  public IvfFlatVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
+  public IvfFlatVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config,
+      boolean ownsBuffer) {
     _column = column;
     _buffer = buffer;
+    _ownsBuffer = ownsBuffer;
 
     // Initialize nprobe to the default; query-time tuning should use NprobeAware#setNprobe.
     int configuredNprobe = DEFAULT_NPROBE;
@@ -182,8 +198,12 @@ public class IvfFlatVectorIndexReader
           column, _numVectors, _nlist, _dimension, getNprobe(), _distanceFunction, _indexFormatVersion,
           _quantizerType);
     } catch (Exception e) {
-      // Close the buffer to avoid leaking the mmap when the caller never receives a reader to close.
-      IvfSidecarBuffers.closeQuietly(_buffer);
+      // Close the buffer to avoid leaking the mmap when the caller never receives a reader to
+      // close — but only if we own it. Borrowed buffers (segment-directory owned) are released
+      // by their owner.
+      if (_ownsBuffer) {
+        IvfSidecarBuffers.closeQuietly(_buffer);
+      }
       if (e instanceof RuntimeException) {
         throw (RuntimeException) e;
       }
@@ -349,7 +369,7 @@ public class IvfFlatVectorIndexReader
   public void close()
       throws IOException {
     clearNprobe();
-    if (_buffer != null) {
+    if (_ownsBuffer && _buffer != null) {
       _buffer.close();
     }
   }

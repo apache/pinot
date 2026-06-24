@@ -81,9 +81,11 @@ public class IvfOnDiskVectorIndexReader
   // Centroids in heap for fast probe selection
   private final float[][] _centroids;
 
-  // Backing buffer for random-access reads of inverted list data. Closed by this reader.
-  // The buffer is mapped BIG_ENDIAN to match the IVF_FLAT on-disk format.
+  // Backing buffer for random-access reads of inverted list data. Closed by this reader only
+  // when {@code _ownsBuffer} is true (sidecar mmap); borrowed buffers (segment-directory owned)
+  // outlive the reader. The buffer is mapped BIG_ENDIAN to match the IVF_FLAT on-disk format.
   private final PinotDataBuffer _buffer;
+  private final boolean _ownsBuffer;
 
   // Offsets to each inverted list in the file
   private final long[] _listOffsets;
@@ -99,19 +101,32 @@ public class IvfOnDiskVectorIndexReader
   private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
 
   /**
-   * Opens an IVF_FLAT index from the given buffer for on-demand positional reads.
-   *
-   * <p>The buffer must be mapped {@link ByteOrder#BIG_ENDIAN} (the IVF_FLAT on-disk byte order).
-   * The reader retains the buffer for the lifetime of queries; the reader closes the buffer
-   * in {@link #close()}.</p>
-   *
-   * @param column the column name
-   * @param buffer the IVF_FLAT index buffer (BIG_ENDIAN). Closed by this reader.
-   * @param config the vector index configuration
+   * Opens an IVF_FLAT index from the given buffer for on-demand positional reads. The reader
+   * takes ownership of the buffer and closes it in {@link #close()}; use the four-arg overload
+   * to pass a borrowed buffer (e.g. one owned by the segment directory).
    */
   public IvfOnDiskVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
+    this(column, buffer, config, /* ownsBuffer */ true);
+  }
+
+  /**
+   * Opens an IVF_FLAT index from the given buffer for on-demand positional reads.
+   *
+   * <p>The buffer must be mapped {@link ByteOrder#BIG_ENDIAN} (the IVF_FLAT on-disk byte order)
+   * and must remain valid for the lifetime of the reader (positional reads at query time).</p>
+   *
+   * @param column      the column name
+   * @param buffer      the IVF_FLAT index buffer (BIG_ENDIAN)
+   * @param config      the vector index configuration
+   * @param ownsBuffer  when {@code true}, the reader closes the buffer in {@link #close()} (or
+   *                    on constructor failure). Pass {@code false} when the buffer is owned by
+   *                    the segment directory.
+   */
+  public IvfOnDiskVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config,
+      boolean ownsBuffer) {
     _column = column;
     _buffer = buffer;
+    _ownsBuffer = ownsBuffer;
 
     try {
       // --- Read Header (6 ints = 24 bytes) ---
@@ -192,8 +207,12 @@ public class IvfOnDiskVectorIndexReader
               + "formatVersion={}, quantizer={}",
           column, _numVectors, _nlist, _dimension, _indexFormatVersion, _quantizerType);
     } catch (Exception e) {
-      // Close the buffer to avoid leaking the mmap when the caller never receives a reader to close.
-      IvfSidecarBuffers.closeQuietly(_buffer);
+      // Close the buffer to avoid leaking the mmap when the caller never receives a reader to
+      // close — but only if we own it. Borrowed buffers (segment-directory owned) are released
+      // by their owner.
+      if (_ownsBuffer) {
+        IvfSidecarBuffers.closeQuietly(_buffer);
+      }
       throw e instanceof RuntimeException ? (RuntimeException) e
           : new RuntimeException("Failed to open IVF index for column: " + column, e);
     }
@@ -524,7 +543,7 @@ public class IvfOnDiskVectorIndexReader
   @Override
   public void close() throws IOException {
     clearNprobe();
-    if (_buffer != null) {
+    if (_ownsBuffer && _buffer != null) {
       _buffer.close();
     }
   }

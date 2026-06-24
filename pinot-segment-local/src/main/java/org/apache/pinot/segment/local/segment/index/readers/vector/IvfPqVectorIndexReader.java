@@ -73,23 +73,35 @@ public class IvfPqVectorIndexReader
   private final String _column;
   private final int _defaultNprobe;
   private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
-  // Backing buffer (closed by this reader). Contents are heap-loaded at construction.
+  // Backing buffer. Closed by this reader only when {@code _ownsBuffer} is true. Contents are
+  // heap-loaded at construction, so it is safe for the caller to retain ownership.
   private final PinotDataBuffer _buffer;
+  private final boolean _ownsBuffer;
+
+  /**
+   * Opens and loads an IVF_PQ index from the given buffer. The reader takes ownership of the
+   * buffer and closes it in {@link #close()}; use the four-arg overload to pass a borrowed
+   * buffer (e.g. one owned by the segment directory).
+   */
+  public IvfPqVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
+    this(column, buffer, config, /* ownsBuffer */ true);
+  }
 
   /**
    * Opens and loads an IVF_PQ index from the given buffer.
    *
-   * <p>The buffer holds the full IVF_PQ file contents. The reader heap-loads centroids,
-   * codebooks, and inverted lists at construction time; the reader closes the buffer
-   * in {@link #close()}.</p>
-   *
-   * @param column the column name
-   * @param buffer the IVF_PQ index buffer (mapped or in-memory). Closed by this reader.
-   * @param config vector index configuration
+   * @param column      the column name
+   * @param buffer      the IVF_PQ index buffer (mapped or in-memory)
+   * @param config      vector index configuration
+   * @param ownsBuffer  when {@code true}, the reader closes the buffer in {@link #close()} (or
+   *                    on constructor failure). Pass {@code false} when the buffer is owned by
+   *                    the segment directory (typed entry inside {@code columns.psf}).
    */
-  public IvfPqVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
+  public IvfPqVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config,
+      boolean ownsBuffer) {
     _column = column;
     _buffer = buffer;
+    _ownsBuffer = ownsBuffer;
 
     // The reader takes ownership of the buffer. If construction throws (bad magic, EOF,
     // unsupported format version, etc.), release the buffer here so the mmap doesn't leak —
@@ -138,8 +150,12 @@ public class IvfPqVectorIndexReader
               + "nprobe={}, distance={}", column, _numVectors, _nlist, _dimension, _pqM, _pqNbits, _defaultNprobe,
           _distanceFunction);
     } catch (Exception e) {
-      // Close the buffer to avoid leaking the mmap when the caller never receives a reader to close.
-      IvfSidecarBuffers.closeQuietly(_buffer);
+      // Close the buffer to avoid leaking the mmap when the caller never receives a reader to
+      // close — but only if we own it. Borrowed buffers (segment-directory owned) are released
+      // by their owner.
+      if (_ownsBuffer) {
+        IvfSidecarBuffers.closeQuietly(_buffer);
+      }
       if (e instanceof RuntimeException) {
         throw (RuntimeException) e;
       }
@@ -365,7 +381,7 @@ public class IvfPqVectorIndexReader
   public void close()
       throws IOException {
     clearNprobe();
-    if (_buffer != null) {
+    if (_ownsBuffer && _buffer != null) {
       _buffer.close();
     }
   }
