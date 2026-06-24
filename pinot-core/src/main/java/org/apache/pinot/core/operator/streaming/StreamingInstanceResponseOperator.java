@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.streaming;
 
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -88,9 +89,9 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
           resultsBlock = getBaseBlock();
         }
         InstanceResponseBlock responseBlock = buildInstanceResponseBlock(resultsBlock);
+        addLiteModeMetadataIfNeeded(responseBlock, totalRowsStreamed);
         if (_hasMoreFilteredDocs) {
-          responseBlock.addMetadata(MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName(), "true");
-          responseBlock.addMetadata(MetadataKey.LEAF_TRUNCATION_REASON.getName(), "LITE_CAP");
+          responseBlock.addMetadata(MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
         }
         return responseBlock;
       } else {
@@ -128,6 +129,13 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
 
   protected BaseResultsBlock getCombinedResults() {
     return _combineOperator.nextBlock();
+  }
+
+  private void addLiteModeMetadataIfNeeded(InstanceResponseBlock responseBlock, long totalRowsStreamed) {
+    Integer implicitLimit = QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(_queryContext.getQueryOptions());
+    if (implicitLimit != null && totalRowsStreamed >= implicitLimit) {
+      responseBlock.addMetadata(MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
+    }
   }
 
   @Override

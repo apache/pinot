@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.combine.merger;
 
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
@@ -80,17 +79,6 @@ public class DistinctResultsBlockMerger implements ResultsBlockMerger<DistinctRe
     }
     if (_deadlineNs != UNLIMITED_TIME_NS && System.nanoTime() >= _deadlineNs) {
       mergedBlock.setEarlyTerminationReason(EarlyTerminationReason.DISTINCT_MAX_EXECUTION_TIME);
-    }
-    // Propagate lite-cap truncation flag/reason from children to merged block (OR semantics)
-    String childLite =
-        blockToMerge.getResultsMetadata().get(MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName());
-    if ("true".equals(childLite)) {
-      mergedBlock.setLiteLeafLimitReached(true);
-      String reason =
-          blockToMerge.getResultsMetadata().get(MetadataKey.LEAF_TRUNCATION_REASON.getName());
-      if (reason != null) {
-        mergedBlock.setLeafTruncationReason(reason);
-      }
     }
   }
 

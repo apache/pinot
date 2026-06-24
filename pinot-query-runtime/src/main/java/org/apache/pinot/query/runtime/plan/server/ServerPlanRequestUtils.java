@@ -146,44 +146,30 @@ public class ServerPlanRequestUtils {
       Map<String, String> requestMetadata) {
     StagePlan stagePlan = serverContext.getStagePlan();
     PinotQuery pinotQuery = serverContext.getPinotQuery();
-    // attach leaf node limit it not set
+    // attach leaf node limit if not set
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadata);
-    int prevLimit = pinotQuery.getLimit();
     pinotQuery.setLimit(leafNodeLimit != null ? leafNodeLimit : DEFAULT_LEAF_NODE_LIMIT);
-    // Tag provenance if a leaf cap (explicit or lite-mode fallback) tightened the previous limit.
-    tagLeafLimitTruncationRiskIfTightened(pinotQuery, requestMetadata, prevLimit);
     // visit the plan and create PinotQuery and determine the leaf stage boundary PlanNode.
+    // The visitor may override the limit (e.g., visitSort sets limit = SortNode.fetch).
     ServerPlanRequestVisitor.walkPlanNode(stagePlan.getRootNode(), serverContext);
+    // Tag provenance AFTER visitor so the check reflects whether the cap actually survived.
+    int finalLimit = pinotQuery.getLimit();
+    tagLeafLimitTruncationRiskIfTightened(pinotQuery, requestMetadata, leafNodeLimit, finalLimit);
   }
 
   /**
-   * Tags queryOptions["leafLimitTruncationRisk"]="LITE_CAP" when the effective leaf cap is stricter than the original
-   * LIMIT AND the query contains truncation-sensitive operations (ORDER BY, DISTINCT). The dual condition ensures the
-   * tag is only present when truncation genuinely risks inaccurate results.
+   * Tags queryOptions["leafLimitTruncationRisk"]="LITE_CAP" when {@code multiStageLeafLimit} is explicitly set,
+   * the cap survived the visitor (finalLimit == cap), and the query is truncation-sensitive (ORDER BY / DISTINCT).
+   * Lite-mode limits are handled at the planner level by {@code LiteModeSortInsertRule} and PR #18725.
    */
   private static void tagLeafLimitTruncationRiskIfTightened(PinotQuery pinotQuery,
-      @Nullable Map<String, String> requestMetadata, int previousLimit) {
+      @Nullable Map<String, String> requestMetadata, @Nullable Integer explicitCap, int finalLimit) {
     Map<String, String> qOpts = pinotQuery.getQueryOptions();
     if (qOpts == null) {
       qOpts = new HashMap<>();
       pinotQuery.setQueryOptions(qOpts);
     }
-    boolean useLiteMode = QueryOptionsUtils.isUseLiteMode(qOpts, false)
-        || (requestMetadata != null && QueryOptionsUtils.isUseLiteMode(requestMetadata, false));
-    boolean tightened = false;
-    // explicit per-query cap
-    Integer explicitCapMeta = requestMetadata != null ? QueryOptionsUtils.getMultiStageLeafLimit(requestMetadata) : null;
-    Integer explicitCapOpts = QueryOptionsUtils.getMultiStageLeafLimit(qOpts);
-    Integer explicitCap = explicitCapMeta != null ? explicitCapMeta : explicitCapOpts;
-    if (explicitCap != null && (previousLimit <= 0 || previousLimit > explicitCap)) {
-      tightened = true;
-    } else if (useLiteMode) {
-      // lite-mode fallbacks: fanout-adjusted first, then leaf-stage limit (options preferred over metadata)
-      Integer fallbackCap = resolveLiteModeFallbackCap(qOpts, requestMetadata);
-      if (fallbackCap != null && (previousLimit <= 0 || previousLimit > fallbackCap)) {
-        tightened = true;
-      }
-    }
+    boolean tightened = explicitCap != null && finalLimit == explicitCap;
     boolean truncationSensitive = "true".equals(qOpts.get("truncationSensitive"))
         || (requestMetadata != null && "true".equals(requestMetadata.get("truncationSensitive")));
     if (tightened && truncationSensitive) {
@@ -191,41 +177,6 @@ public class ServerPlanRequestUtils {
     } else {
       qOpts.remove("leafLimitTruncationRisk");
     }
-  }
-
-  /**
-   * Compute effective lite-mode fallback cap for provenance tagging.
-   * Precedence: fanout-adjusted (options) -> leaf-stage limit (options) -> fanout-adjusted (metadata) -> leaf-stage limit (metadata).
-   */
-  @Nullable
-  private static Integer resolveLiteModeFallbackCap(@Nullable Map<String, String> qOpts,
-      @Nullable Map<String, String> requestMeta) {
-    Integer faOpt = (qOpts != null)
-        ? QueryOptionsUtils.getLiteModeLeafStageFanOutAdjustedLimit(qOpts, 0)
-        : null;
-    Integer lsOpt = (qOpts != null)
-        ? QueryOptionsUtils.getLiteModeLeafStageLimit(qOpts, 0)
-        : null;
-    Integer faMeta = (requestMeta != null)
-        ? QueryOptionsUtils.getLiteModeLeafStageFanOutAdjustedLimit(requestMeta, 0)
-        : null;
-    Integer lsMeta = (requestMeta != null)
-        ? QueryOptionsUtils.getLiteModeLeafStageLimit(requestMeta, 0)
-        : null;
-    return firstPositive(faOpt, lsOpt, faMeta, lsMeta);
-  }
-
-  @Nullable
-  private static Integer firstPositive(@Nullable Integer... values) {
-    if (values == null) {
-      return null;
-    }
-    for (Integer v : values) {
-      if (v != null && v > 0) {
-        return v;
-      }
-    }
-    return null;
   }
 
   /**

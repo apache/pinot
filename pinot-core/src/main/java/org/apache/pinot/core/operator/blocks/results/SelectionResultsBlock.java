@@ -38,7 +38,6 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   private final QueryContext _queryContext;
   private List<Object[]> _rows;
   private boolean _hasMoreFilteredDocs;
-  private String _leafTruncationReason;
 
   public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows,
       @Nullable Comparator<? super Object[]> comparator, QueryContext queryContext) {
@@ -67,15 +66,6 @@ public class SelectionResultsBlock extends BaseResultsBlock {
 
   public void setHasMoreFilteredDocs(boolean hasMoreFilteredDocs) {
     _hasMoreFilteredDocs = hasMoreFilteredDocs;
-  }
-
-  @Nullable
-  public String getLeafTruncationReason() {
-    return _leafTruncationReason;
-  }
-
-  public void setLeafTruncationReason(String leafTruncationReason) {
-    _leafTruncationReason = leafTruncationReason;
   }
 
   @Override
@@ -110,9 +100,8 @@ public class SelectionResultsBlock extends BaseResultsBlock {
     if (_comparator != null) {
       metadata.put(DataTable.MetadataKey.SORTED.getName(), "true");
     }
-    if (_hasMoreFilteredDocs && "LITE_CAP".equals(_leafTruncationReason)) {
-      metadata.put(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName(), "true");
-      metadata.put(DataTable.MetadataKey.LEAF_TRUNCATION_REASON.getName(), _leafTruncationReason);
+    if (_hasMoreFilteredDocs) {
+      metadata.put(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
     }
     return metadata;
   }

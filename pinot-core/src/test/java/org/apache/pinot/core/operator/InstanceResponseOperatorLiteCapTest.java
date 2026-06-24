@@ -84,7 +84,7 @@ public class InstanceResponseOperatorLiteCapTest {
 
     InstanceResponseBlock response = op.buildBlock(block);
 
-    assertEquals(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName()), "true");
+    assertEquals(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName()), "true");
   }
 
   @Test
@@ -99,7 +99,7 @@ public class InstanceResponseOperatorLiteCapTest {
 
     InstanceResponseBlock response = op.buildBlock(block);
 
-    assertNull(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName()));
+    assertNull(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName()));
   }
 
   @Test
@@ -114,7 +114,7 @@ public class InstanceResponseOperatorLiteCapTest {
 
     InstanceResponseBlock response = op.buildBlock(block);
 
-    assertNull(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName()));
+    assertNull(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName()));
   }
 
   @Test
@@ -130,7 +130,7 @@ public class InstanceResponseOperatorLiteCapTest {
 
     InstanceResponseBlock response = op.buildBlock(block);
 
-    assertNull(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName()));
+    assertNull(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName()));
   }
 
   @Test
@@ -142,13 +142,10 @@ public class InstanceResponseOperatorLiteCapTest {
     SelectionResultsBlock block = new SelectionResultsBlock(SCHEMA, Collections.emptyList(), ctx);
     block.setNumDocsScanned(5);
     block.setHasMoreFilteredDocs(true);
-    block.setLeafTruncationReason("LITE_CAP");
 
     InstanceResponseBlock response = op.buildBlock(block);
 
-    assertEquals(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName()), "true");
-    assertEquals(response.getResponseMetadata().get(DataTable.MetadataKey.LEAF_TRUNCATION_REASON.getName()),
-        "LITE_CAP");
+    assertEquals(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName()), "true");
   }
 
   @Test
@@ -164,6 +161,6 @@ public class InstanceResponseOperatorLiteCapTest {
 
     InstanceResponseBlock response = op.buildBlock(block);
 
-    assertNull(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName()));
+    assertNull(response.getResponseMetadata().get(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName()));
   }
 }

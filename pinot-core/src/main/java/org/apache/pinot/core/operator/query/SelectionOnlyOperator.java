@@ -163,7 +163,6 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
     SelectionResultsBlock block = new SelectionResultsBlock(_dataSchema, _rows, _queryContext);
     if (hasMoreDocs) {
       block.setHasMoreFilteredDocs(true);
-      block.setLeafTruncationReason("LITE_CAP");
     }
     return block;
   }

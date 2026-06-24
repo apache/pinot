@@ -38,8 +38,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.roaringbitmap.RoaringBitmap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -50,7 +48,6 @@ import org.slf4j.LoggerFactory;
  */
 public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
   private static final String EXPLAIN_NAME = "SELECT_STREAMING";
-  private static final Logger LOGGER = LoggerFactory.getLogger(StreamingSelectionOnlyOperator.class);
 
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
@@ -135,14 +132,10 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
     if (_numDocsScanned >= _limit) {
       String risk = _queryContext.getQueryOptions() != null
           ? _queryContext.getQueryOptions().get("leafLimitTruncationRisk") : null;
-      LOGGER.warn("hasMoreDocs check: limit={}, numDocsScanned={}, risk={}, numDocs={}, numDocsToReturn={}",
-          _limit, _numDocsScanned, risk, numDocs, numDocsToReturn);
       if ("LITE_CAP".equals(risk)) {
         boolean hasMoreDocs = numDocs > numDocsToReturn || _projectOperator.nextBlock() != null;
-        LOGGER.warn("hasMoreDocs result: {}", hasMoreDocs);
         if (hasMoreDocs) {
           block.setHasMoreFilteredDocs(true);
-          block.setLeafTruncationReason("LITE_CAP");
         }
       }
     }

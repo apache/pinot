@@ -52,7 +52,7 @@ import org.apache.pinot.common.response.ProcessingException;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed", "liteLeafCapTruncation",
+    "pools", "rlsFiltersApplied", "groupsTrimmed",
     "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
@@ -126,7 +126,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean isPartialResult() {
     return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
-        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached() || isLiteLeafCapTruncation();
+        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached();
   }
 
   @Override
@@ -209,20 +209,6 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   public List<String> getEarlyTerminationReasons() {
     return List.copyOf(_brokerStats.getStringSet(StatKey.EARLY_TERMINATION_REASONS));
-  }
-
-  /**
-   * Returns whether the leaf stage truncated due to lite per-node cap.
-   */
-  public boolean isLiteLeafCapTruncation() {
-    return _brokerStats.getBoolean(StatKey.LITE_LEAF_CAP_TRUNCATION);
-  }
-
-  /**
-   * Merges the lite leaf cap truncation flag from server stats.
-   */
-  public void mergeLiteLeafCapTruncation(boolean liteLeafCapTruncation) {
-    _brokerStats.merge(StatKey.LITE_LEAF_CAP_TRUNCATION, liteLeafCapTruncation);
   }
 
   @Override
@@ -564,8 +550,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
       }
     },
     EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
-    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN),
-    LITE_LEAF_CAP_TRUNCATION(StatMap.Type.BOOLEAN);
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 
