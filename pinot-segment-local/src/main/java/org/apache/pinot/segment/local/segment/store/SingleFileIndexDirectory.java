@@ -160,9 +160,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     if (type == StandardIndexes.text() && TextIndexUtils.hasTextIndex(_segmentDirectory, column)) {
       return true;
     }
-    // Vector index may live either as a sidecar file (legacy / storeInSegmentFile=false) or as
+    // Vector index may live either as a combined file (legacy / storeInSegmentFile=false) or as
     // a typed entry inside columns.psf (storeInSegmentFile=true). Check both — mirror the text
-    // pattern of "sidecar OR _columnEntries".
+    // pattern of "combined OR _columnEntries".
     if (type == StandardIndexes.vector() && VectorIndexUtils.hasVectorIndex(_segmentDirectory, column)) {
       return true;
     }
@@ -505,7 +505,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
     }
-    // Vector index can live as a sidecar file and / or as a typed entry in columns.psf;
+    // Vector index can live as a combined file and / or as a typed entry in columns.psf;
     // clean both. The early-return that was here previously left the columns.psf entry
     // dangling whenever a consolidated vector index needed to be removed (e.g. rebuild on
     // backend-type change).
@@ -531,7 +531,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       }
     }
     if (type == StandardIndexes.vector()) {
-      // Vector may live as a sidecar file (legacy / storeInSegmentFile=false) or as a typed
+      // Vector may live as a combined file (legacy / storeInSegmentFile=false) or as a typed
       // entry in columns.psf (storeInSegmentFile=true). Collect both. Removed the early-return
       // that previously hid consolidated entries from this view.
       for (String column : _segmentMetadata.getAllColumns()) {

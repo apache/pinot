@@ -118,7 +118,7 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   private final VectorQuantizerType _quantizerType;
   /**
    * When {@code true}, {@link #seal()} writes to the combined-form extension
-   * ({@code .vector.ivfflat.combined.index}) instead of the legacy sidecar extension. The V2→V3
+   * ({@code .vector.ivfflat.combined.index}) instead of the legacy file extension. The V2→V3
    * format converter recognises the combined extension and packs the bytes into {@code
    * columns.psf} via the standard {@code copyIndexIfExists} path.
    */

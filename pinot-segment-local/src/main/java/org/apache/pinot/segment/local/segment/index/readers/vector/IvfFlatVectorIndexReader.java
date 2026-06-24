@@ -25,8 +25,8 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
-import org.apache.pinot.segment.local.segment.index.vector.IvfSidecarBuffers;
 import org.apache.pinot.segment.local.segment.index.vector.VectorQuantizationUtils;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
@@ -202,7 +202,7 @@ public class IvfFlatVectorIndexReader
       // close — but only if we own it. Borrowed buffers (segment-directory owned) are released
       // by their owner.
       if (_ownsBuffer) {
-        IvfSidecarBuffers.closeQuietly(_buffer);
+        IvfCombinedBuffers.closeQuietly(_buffer);
       }
       if (e instanceof RuntimeException) {
         throw (RuntimeException) e;

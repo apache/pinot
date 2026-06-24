@@ -55,7 +55,7 @@ public class VectorIndexConfig extends IndexConfig {
   /**
    * Key in {@link #_properties} controlling whether the IVF vector index payload is consolidated
    * into the segment's combined index file ({@code columns.psf}) instead of living as a separate
-   * sidecar file. Default {@code false} preserves the legacy sidecar layout. Mirrors the text
+   * combined file. Default {@code false} preserves the legacy combined layout. Mirrors the text
    * index's {@code storeInSegmentFile} flag.
    */
   public static final String STORE_IN_SEGMENT_FILE = "storeInSegmentFile";
@@ -151,14 +151,14 @@ public class VectorIndexConfig extends IndexConfig {
 
   /**
    * Whether the IVF vector index payload is consolidated into the segment's combined index file
-   * ({@code columns.psf}) rather than written as a sidecar file. Default {@code false}. Only
+   * ({@code columns.psf}) rather than written as a combined file. Default {@code false}. Only
    * applies to V3 segments and IVF backends; HNSW is unaffected.
    *
-   * <p>When {@code true} the segment build still produces a transient sidecar file via the IVF
+   * <p>When {@code true} the segment build still produces a transient combined file via the IVF
    * creator; the {@code VectorIndexHandler} then absorbs it into {@code columns.psf} as a typed
    * entry and deletes the sibling. The reader path is selected by this flag — flag-on reads
    * from {@code segmentReader.getIndexFor(column, StandardIndexes.vector())}, flag-off reads
-   * the legacy sidecar mmap.</p>
+   * the legacy combined mmap.</p>
    *
    * <p>This accessor is intentionally not a JSON property: the value is carried inside the
    * {@code properties} map (key {@link #STORE_IN_SEGMENT_FILE}). Marking it {@link JsonIgnore}

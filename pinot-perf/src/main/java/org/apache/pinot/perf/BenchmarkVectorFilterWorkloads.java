@@ -30,7 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfOnDiskVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
-import org.apache.pinot.segment.local.segment.index.vector.IvfSidecarBuffers;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -145,9 +145,9 @@ public final class BenchmarkVectorFilterWorkloads {
       VectorIndexConfig onDiskConfig =
           createIvfConfig("IVF_ON_DISK", DIMENSION, NLIST, distanceFunction, FILTER_QUANTIZER);
       try (IvfFlatVectorIndexReader ivfFlatReader = new IvfFlatVectorIndexReader(COLUMN_NAME,
-          IvfSidecarBuffers.mapSidecar(indexDir, COLUMN_NAME, creatorConfig, "bench-vector"), creatorConfig);
+          IvfCombinedBuffers.mapCombined(indexDir, COLUMN_NAME, creatorConfig, "bench-vector"), creatorConfig);
           IvfOnDiskVectorIndexReader ivfOnDiskReader = new IvfOnDiskVectorIndexReader(COLUMN_NAME,
-              IvfSidecarBuffers.mapSidecar(indexDir, COLUMN_NAME, onDiskConfig, "bench-vector"), onDiskConfig)) {
+              IvfCombinedBuffers.mapCombined(indexDir, COLUMN_NAME, onDiskConfig, "bench-vector"), onDiskConfig)) {
         ivfFlatReader.setNprobe(NPROBE);
         ivfOnDiskReader.setNprobe(NPROBE);
 
@@ -303,7 +303,7 @@ public final class BenchmarkVectorFilterWorkloads {
       buildIvfFlatIndex(indexDir, corpus, creatorConfig);
       if ("IVF_FLAT".equals(backend)) {
         try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
-            IvfSidecarBuffers.mapSidecar(indexDir, COLUMN_NAME, creatorConfig, "bench-vector"), creatorConfig)) {
+            IvfCombinedBuffers.mapCombined(indexDir, COLUMN_NAME, creatorConfig, "bench-vector"), creatorConfig)) {
           reader.setNprobe(NPROBE);
           printRadiusResults(out, backend, distanceFunction, corpus, queries,
               (query, ignoredThreshold) -> reader.getDocIds(query, RADIUS_MAX_CANDIDATES),
@@ -313,7 +313,7 @@ public final class BenchmarkVectorFilterWorkloads {
         VectorIndexConfig readerConfig =
             createIvfConfig("IVF_ON_DISK", DIMENSION, NLIST, distanceFunction, FILTER_QUANTIZER);
         try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN_NAME,
-            IvfSidecarBuffers.mapSidecar(indexDir, COLUMN_NAME, readerConfig, "bench-vector"), readerConfig)) {
+            IvfCombinedBuffers.mapCombined(indexDir, COLUMN_NAME, readerConfig, "bench-vector"), readerConfig)) {
           reader.setNprobe(NPROBE);
           printRadiusResults(out, backend, distanceFunction, corpus, queries,
               (query, ignoredThreshold) -> reader.getDocIds(query, RADIUS_MAX_CANDIDATES),

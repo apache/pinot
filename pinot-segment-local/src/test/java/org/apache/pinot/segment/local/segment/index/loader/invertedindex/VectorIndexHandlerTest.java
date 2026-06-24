@@ -140,11 +140,11 @@ public class VectorIndexHandlerTest {
   // ---------------------------------------------------------------------------
 
   /**
-   * When the segment was built with the legacy sidecar layout and the table now requests
+   * When the segment was built with the legacy combined layout and the table now requests
    * {@code storeInSegmentFile=true}, the handler should detect the mismatch on the first load.
    */
   @Test
-  public void testNeedUpdateIndicesReturnsTrueWhenSidecarExistsButFlagWantsConsolidated()
+  public void testNeedUpdateIndicesReturnsTrueWhenCombinedExistsButFlagWantsConsolidated()
       throws Exception {
     File indexDir = createSegmentDirWithVectorIndex(V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
     try {
@@ -156,18 +156,18 @@ public class VectorIndexHandlerTest {
           vectorIndexConfigWithConsolidation("IVF_FLAT", /* storeInSegmentFile */ true));
 
       assertTrue(handler.needUpdateIndices(reader),
-          "Sidecar present + flag on => handler must re-run to absorb sidecar into columns.psf");
+          "Combined present + flag on => handler must re-run to absorb combined into columns.psf");
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
   }
 
   /**
-   * When the segment is in the legacy sidecar layout and the table also keeps the flag off,
+   * When the segment is in the legacy combined layout and the table also keeps the flag off,
    * there is nothing to do — the segment is already in its target layout.
    */
   @Test
-  public void testNeedUpdateIndicesReturnsFalseWhenSidecarExistsAndFlagIsOff()
+  public void testNeedUpdateIndicesReturnsFalseWhenCombinedExistsAndFlagIsOff()
       throws Exception {
     File indexDir = createSegmentDirWithVectorIndex(V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
     try {
@@ -179,7 +179,7 @@ public class VectorIndexHandlerTest {
           vectorIndexConfigWithConsolidation("IVF_FLAT", /* storeInSegmentFile */ false));
 
       assertFalse(handler.needUpdateIndices(reader),
-          "Sidecar present + flag off => no work required");
+          "Combined present + flag off => no work required");
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
@@ -187,13 +187,13 @@ public class VectorIndexHandlerTest {
 
   /**
    * Reverse migration: segment has the vector index consolidated inside {@code columns.psf} and
-   * the table now wants the legacy sidecar layout ({@code storeInSegmentFile=false}). The
+   * the table now wants the legacy combined layout ({@code storeInSegmentFile=false}). The
    * handler must detect the mismatch on load and extract the bytes back into a sidecar file.
    */
   @Test
-  public void testNeedUpdateIndicesReturnsTrueWhenConsolidatedExistsButFlagWantsSidecar()
+  public void testNeedUpdateIndicesReturnsTrueWhenConsolidatedExistsButFlagWantsCombined()
       throws Exception {
-    // Set up a V3 segment with no sidecar file, but report the column as having a vector index
+    // Set up a V3 segment with no combined file, but report the column as having a vector index
     // via the SegmentDirectory's getColumnsWithIndex (simulating a consolidated _columnEntries
     // entry, since the real SingleFileIndexDirectory would surface it that way).
     File indexDir = createEmptyV3SegmentDir();
@@ -206,7 +206,7 @@ public class VectorIndexHandlerTest {
           vectorIndexConfigWithConsolidation("IVF_FLAT", /* storeInSegmentFile */ false));
 
       assertTrue(handler.needUpdateIndices(reader),
-          "Consolidated entry + flag off => handler must re-run to extract bytes back to sidecar");
+          "Consolidated entry + flag off => handler must re-run to extract bytes back to combined");
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
@@ -214,11 +214,11 @@ public class VectorIndexHandlerTest {
 
   /**
    * Full extract path: the consolidated bytes inside {@code columns.psf} are streamed back to
-   * a sidecar file, the consolidated entry is dropped, and the resulting sidecar exists on disk
+   * a combined file, the consolidated entry is dropped, and the resulting combined exists on disk
    * with the expected extension and byte content.
    */
   @Test
-  public void testUpdateIndicesExtractsConsolidatedBytesIntoSidecar()
+  public void testUpdateIndicesExtractsConsolidatedBytesIntoCombined()
       throws Exception {
     File indexDir = createEmptyV3SegmentDir();
     try {
@@ -227,7 +227,7 @@ public class VectorIndexHandlerTest {
       when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
 
       // Make the writer's getIndexFor return a buffer holding a known payload, then assert the
-      // sidecar on disk contains those exact bytes.
+      // combined on disk contains those exact bytes.
       byte[] expectedPayload = new byte[] {(byte) 0xAB, (byte) 0xCD, (byte) 0xEF, 0x01, 0x02, 0x03, 0x04, 0x05};
       PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(expectedPayload.length,
           ByteOrder.BIG_ENDIAN, "vector-extract-test");
@@ -242,10 +242,10 @@ public class VectorIndexHandlerTest {
         verify(writer).removeIndex(eq(COLUMN), eq(StandardIndexes.vector()));
         File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
         File extracted = new File(v3Dir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
-        assertTrue(extracted.exists(), "extracted sidecar must exist at the final path");
+        assertTrue(extracted.exists(), "extracted combined must exist at the final path");
         byte[] actual = Files.readAllBytes(extracted.toPath());
         assertEquals(actual, expectedPayload,
-            "extracted sidecar bytes must match the consolidated payload exactly");
+            "extracted combined bytes must match the consolidated payload exactly");
         // Temp file must have been cleaned up by rename.
         File temp = new File(v3Dir, COLUMN + ".vector.extract-tmp");
         assertFalse(temp.exists(), "temp extract file must be gone after rename");
@@ -259,8 +259,8 @@ public class VectorIndexHandlerTest {
 
   /**
    * Crash-recovery: if a previous absorb run committed bytes into {@code columns.psf} but then
-   * died before deleting the sidecar, the next load should detect the duplicate and clean up
-   * the orphan sidecar instead of failing the segment load. The
+   * died before deleting the combined, the next load should detect the duplicate and clean up
+   * the orphan sidecar file instead of failing the segment load. The
    * {@code SingleFileIndexDirectory.allocNewBufferInternal} duplicate-key error is simulated by
    * having the mocked {@code newIndexFor} throw the same message.
    */
@@ -282,24 +282,24 @@ public class VectorIndexHandlerTest {
           vectorIndexConfigWithConsolidation("IVF_FLAT", /* storeInSegmentFile */ true));
 
       // Must not propagate the duplicate-key error; instead, the handler treats it as recovery
-      // and the orphan sidecar gets deleted.
+      // and the orphan sidecar file gets deleted.
       handler.updateIndices(writer);
 
       File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
-      File orphanSidecar = new File(v3Dir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
-      assertFalse(orphanSidecar.exists(), "orphan sidecar must be deleted by recovery path");
+      File orphanCombined = new File(v3Dir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+      assertFalse(orphanCombined.exists(), "orphan sidecar file must be deleted by recovery path");
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
   }
 
   /**
-   * The "absorb sidecar into columns.psf" step must not remove the column's vector entry first;
+   * The "absorb combined into columns.psf" step must not remove the column's vector entry first;
    * doing so would discard the bytes we are about to consolidate. Verify that {@code removeIndex}
    * is never called along the consolidation path when the backend matches.
    */
   @Test
-  public void testUpdateIndicesDoesNotRemoveVectorWhenAbsorbingSidecar()
+  public void testUpdateIndicesDoesNotRemoveVectorWhenAbsorbingCombined()
       throws Exception {
     File indexDir = createSegmentDirWithVectorIndex(V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
     try {
@@ -307,7 +307,7 @@ public class VectorIndexHandlerTest {
       SegmentDirectory.Writer writer = mock(SegmentDirectory.Writer.class);
       when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
       // newIndexFor is invoked by LoaderUtils.writeIndexToV3Format under the hood; stub it to a
-      // no-op buffer so we can assert the higher-level contract (no removeIndex, sidecar gone).
+      // no-op buffer so we can assert the higher-level contract (no removeIndex, combined gone).
       when(writer.newIndexFor(eq(COLUMN), eq(StandardIndexes.vector()), any(Long.class)))
           .thenReturn(PinotDataBuffer.empty());
 
@@ -333,7 +333,7 @@ public class VectorIndexHandlerTest {
   }
 
   /**
-   * V3 segment directory with no sidecar file. Used to simulate a segment whose vector payload
+   * V3 segment directory with no combined file. Used to simulate a segment whose vector payload
    * is only present as a typed entry inside {@code columns.psf} (the consolidated form).
    */
   private static File createEmptyV3SegmentDir()

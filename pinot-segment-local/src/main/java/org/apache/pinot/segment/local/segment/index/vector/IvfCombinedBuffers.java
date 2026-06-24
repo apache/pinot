@@ -29,13 +29,13 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 
 
 /**
- * Canonical helper for opening an IVF sidecar index file as a {@link PinotDataBuffer}.
+ * Canonical helper for opening an IVF combined index file as a {@link PinotDataBuffer}.
  *
  * <p>Used by the production reader factory ({@code VectorIndexType.ReaderFactory}) and by tests
  * and benchmarks that instantiate IVF readers directly against a temp directory. Keeping one
  * implementation guarantees identical file resolution, byte order, mmap mode, and ownership
  * semantics across all callers, and makes a future consolidation (when IVF moves into the
- * combined segment index file) a single point of change.</p>
+ * combined-form segment index file) a single point of change.</p>
  *
  * <p><b>Ownership:</b> the returned buffer is owned by the caller (typically the IVF reader,
  * which closes it in its own {@code close()}).</p>
@@ -45,13 +45,13 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
  * {@link IvfPqIndexFormat}, so the buffer-level order is irrelevant for IVF_PQ but is consistent
  * with IVF_FLAT for symmetry.</p>
  */
-public final class IvfSidecarBuffers {
+public final class IvfCombinedBuffers {
 
-  private IvfSidecarBuffers() {
+  private IvfCombinedBuffers() {
   }
 
   /**
-   * Resolves the sidecar IVF index file for {@code column} under {@code segmentDir} and maps
+   * Resolves the IVF index sidecar file for {@code column} under {@code segmentDir} and maps
    * the full file as a read-only {@link PinotDataBuffer}.
    *
    * @param segmentDir segment directory containing the sidecar file
@@ -60,12 +60,12 @@ public final class IvfSidecarBuffers {
    * @param ownerLabel short owner label included in {@code PinotDataBuffer} accounting
    *                   (e.g. {@code "vector-ivf_flat"}, {@code "test-vector"}, {@code "bench-vector"});
    *                   used only for diagnostics
-   * @return a {@code PinotDataBuffer} holding the full sidecar contents; the caller takes ownership
+   * @return a {@code PinotDataBuffer} holding the full sidecar file contents; the caller takes ownership
    *         and is responsible for closing it
    * @throws IllegalStateException if the sidecar file is missing
    * @throws RuntimeException       if mmap fails
    */
-  public static PinotDataBuffer mapSidecar(File segmentDir, String column, VectorIndexConfig config,
+  public static PinotDataBuffer mapCombined(File segmentDir, String column, VectorIndexConfig config,
       String ownerLabel) {
     Preconditions.checkArgument(segmentDir != null, "segmentDir must not be null");
     Preconditions.checkArgument(column != null && !column.isEmpty(), "column must be non-empty");
@@ -82,7 +82,7 @@ public final class IvfSidecarBuffers {
           ByteOrder.BIG_ENDIAN, ownerLabel + "-" + column);
     } catch (IOException e) {
       throw new RuntimeException(
-          "Failed to map vector index sidecar " + indexFile + " for column " + column, e);
+          "Failed to map vector index sidecar file " + indexFile + " for column " + column, e);
     }
   }
 
@@ -90,7 +90,7 @@ public final class IvfSidecarBuffers {
    * Convenience overload for callers that already hold the resolved {@link File} (e.g. the
    * production reader factory). Maps the given file directly.
    */
-  public static PinotDataBuffer mapSidecarFile(File indexFile, String column, String ownerLabel) {
+  public static PinotDataBuffer mapCombinedFile(File indexFile, String column, String ownerLabel) {
     Preconditions.checkArgument(indexFile != null, "indexFile must not be null");
     Preconditions.checkArgument(column != null && !column.isEmpty(), "column must be non-empty");
     Preconditions.checkArgument(ownerLabel != null && !ownerLabel.isEmpty(), "ownerLabel must be non-empty");
@@ -102,7 +102,7 @@ public final class IvfSidecarBuffers {
           ByteOrder.BIG_ENDIAN, ownerLabel + "-" + column);
     } catch (IOException e) {
       throw new RuntimeException(
-          "Failed to map vector index sidecar " + indexFile + " for column " + column, e);
+          "Failed to map vector index sidecar file " + indexFile + " for column " + column, e);
     }
   }
 

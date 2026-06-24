@@ -40,7 +40,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorInde
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
-import org.apache.pinot.segment.local.segment.index.vector.IvfSidecarBuffers;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
@@ -255,7 +255,7 @@ public class BenchmarkVectorIndex {
       VectorIndexConfig.VectorDistanceFunction distFunc) {
     VectorIndexConfig config = createIvfConfig(dimension, nlist, distFunc);
     IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
-        IvfSidecarBuffers.mapSidecar(indexDir, COLUMN_NAME, config, "bench-vector"), config);
+        IvfCombinedBuffers.mapCombined(indexDir, COLUMN_NAME, config, "bench-vector"), config);
     reader.setNprobe(nprobe);
     return reader;
   }
@@ -768,7 +768,7 @@ public class BenchmarkVectorIndex {
               continue;
             }
             try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
-                IvfSidecarBuffers.mapSidecar(ivfDir, COLUMN_NAME, config, "bench-vector"), config)) {
+                IvfCombinedBuffers.mapCombined(ivfDir, COLUMN_NAME, config, "bench-vector"), config)) {
               reader.setNprobe(nprobe);
 
               double recall10 = 0;

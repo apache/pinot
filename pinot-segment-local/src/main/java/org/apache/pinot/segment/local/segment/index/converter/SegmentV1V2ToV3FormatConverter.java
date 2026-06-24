@@ -157,7 +157,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
               }
               continue;
             }
-            // Vector index mirrors text: skip the standard copy when a legacy IVF sidecar (or
+            // Vector index mirrors text: skip the standard copy when a legacy IVF combined (or
             // HNSW directory) is present ({@code copyVectorIndexIfExists} handles those as
             // sibling copies). Combined .vector.ivfflat.combined.index / .ivfpq.combined.index
             // files fall through to the standard path and get packed into columns.psf.

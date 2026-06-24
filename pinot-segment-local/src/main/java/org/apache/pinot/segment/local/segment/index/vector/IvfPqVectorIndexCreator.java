@@ -61,12 +61,12 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
   public static final int FORMAT_VERSION = IvfPqIndexFormat.FORMAT_VERSION;
 
   /**
-   * On-disk file extension for the legacy IVF_PQ sidecar (when {@code storeInSegmentFile=false}).
+   * On-disk file extension for the legacy IVF_PQ sidecar file (when {@code storeInSegmentFile=false}).
    */
   public static final String INDEX_FILE_EXTENSION = IvfPqIndexFormat.INDEX_FILE_EXTENSION;
 
   /**
-   * On-disk file extension for the combined-form IVF_PQ sidecar produced when
+   * On-disk file extension for the combined-form IVF_PQ sidecar file produced when
    * {@code storeInSegmentFile=true}. The V2→V3 converter packs the bytes into {@code columns.psf}
    * via the standard {@code copyIndexIfExists} path and removes the file.
    */
