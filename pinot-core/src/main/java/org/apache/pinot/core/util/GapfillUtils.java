@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.PinotQuery;
@@ -31,6 +33,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
 /**
@@ -282,6 +285,7 @@ public class GapfillUtils {
 
     // Carry over the query options from the original query
     Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+    PinotQuery outerGapfillQuery = pinotQuery;
 
     while (pinotQuery.getDataSource().getSubquery() != null) {
       pinotQuery = pinotQuery.getDataSource().getSubquery();
@@ -322,8 +326,79 @@ public class GapfillUtils {
       }
     }
 
+    validateTimeSeriesOnColumns(outerGapfillQuery, strippedPinotQuery);
     strippedPinotQuery.setQueryOptions(queryOptions);
     return strippedPinotQuery;
+  }
+
+  private static void validateTimeSeriesOnColumns(PinotQuery gapfillQuery, PinotQuery serverQuery) {
+    // Find the gapfill expression in the outer query
+    Expression gapfillExpr = null;
+    for (Expression select : gapfillQuery.getSelectList()) {
+      if (select.getType() != ExpressionType.FUNCTION) {
+        continue;
+      }
+      if (GAP_FILL.equals(select.getFunctionCall().getOperator())) {
+        gapfillExpr = select;
+        break;
+      }
+      if (AS.equals(select.getFunctionCall().getOperator())
+          && select.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION
+          && GAP_FILL.equals(select.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
+        gapfillExpr = select.getFunctionCall().getOperands().get(0);
+        break;
+      }
+    }
+    if (gapfillExpr == null) {
+      return;
+    }
+
+    // Find the TIMESERIESON expression in the gapfill arguments
+    Expression timeSeriesOnExpr = null;
+    List<Expression> gapfillArgs = gapfillExpr.getFunctionCall().getOperands();
+    for (int i = STARTING_INDEX_OF_OPTIONAL_ARGS_FOR_PRE_AGGREGATE_GAP_FILL; i < gapfillArgs.size(); i++) {
+      Expression arg = gapfillArgs.get(i);
+      if (arg.getType() == ExpressionType.FUNCTION
+          && TIME_SERIES_ON.equals(arg.getFunctionCall().getOperator())) {
+        timeSeriesOnExpr = arg;
+        break;
+      }
+    }
+    if (timeSeriesOnExpr == null) {
+      return;
+    }
+
+    // Collect column names available in the server-side SELECT (identifiers and aliases)
+    Set<String> selectColumnNames = new HashSet<>();
+    for (Expression select : serverQuery.getSelectList()) {
+      if (select.getType() == ExpressionType.IDENTIFIER && select.getIdentifier() != null) {
+        selectColumnNames.add(select.getIdentifier().getName());
+      } else if (select.getType() == ExpressionType.FUNCTION
+          && AS.equals(select.getFunctionCall().getOperator())) {
+        List<Expression> asArgs = select.getFunctionCall().getOperands();
+        // Alias name is the second operand of AS
+        if (asArgs.size() >= 2 && asArgs.get(1).getType() == ExpressionType.IDENTIFIER
+            && asArgs.get(1).getIdentifier() != null) {
+          selectColumnNames.add(asArgs.get(1).getIdentifier().getName());
+        }
+        // Also include the inner expression when it is a bare identifier
+        if (!asArgs.isEmpty() && asArgs.get(0).getType() == ExpressionType.IDENTIFIER
+            && asArgs.get(0).getIdentifier() != null) {
+          selectColumnNames.add(asArgs.get(0).getIdentifier().getName());
+        }
+      }
+    }
+
+    // Validate each TIMESERIESON column is present in the server-side SELECT
+    for (Expression entityColumn : timeSeriesOnExpr.getFunctionCall().getOperands()) {
+      if (entityColumn.getType() == ExpressionType.IDENTIFIER && entityColumn.getIdentifier() != null) {
+        String colName = entityColumn.getIdentifier().getName();
+        if (!selectColumnNames.contains(colName)) {
+          throw new BadQueryRequestException(
+              "TIMESERIESON column '" + colName + "' is not present in the SELECT list");
+        }
+      }
+    }
   }
 
   private static boolean hasGapfill(PinotQuery pinotQuery) {

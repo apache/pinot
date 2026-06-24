@@ -41,6 +41,7 @@ import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
 /**
@@ -89,7 +90,12 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
     // The first one argument of timeSeries is time column. The left ones are defining entity.
     for (ExpressionContext entityColum : _timeSeries) {
-      int index = indexes.get(entityColum.getIdentifier());
+      String colName = entityColum.getIdentifier();
+      Integer index = indexes.get(colName);
+      if (index == null) {
+        throw new BadQueryRequestException(
+            "TIMESERIESON column '" + colName + "' is not present in the SELECT list");
+      }
       _isGroupBySelections[index] = true;
     }
 
