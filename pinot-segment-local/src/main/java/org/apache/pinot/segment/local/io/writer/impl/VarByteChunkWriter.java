@@ -42,4 +42,17 @@ public interface VarByteChunkWriter extends Closeable {
   void putStringMV(String[] values);
 
   void putBytesMV(byte[][] values);
+
+  /**
+   * Returns the total uncompressed size of data written so far.
+   */
+  default long getUncompressedSize() {
+    return 0;
+  }
+
+  /**
+   * Controls whether the writer tracks uncompressed data size.
+   */
+  default void setTrackUncompressedSize(boolean trackUncompressedSize) {
+  }
 }

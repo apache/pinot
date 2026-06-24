@@ -470,6 +470,48 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
     _dataFile.close();
   }
 
+  /**
+   * Returns the total uncompressed size across all CLP sub-streams (logtype IDs, dictionary variable
+   * IDs, encoded variables, and raw fallback messages). This represents the pre-compression
+   * sub-stream byte total, not the original UTF-8 message length, because CLP encodes strings into
+   * typed sub-columns before compression. The ratio of this value to the compressed forward index
+   * size reflects how effectively the final compression stage operates on CLP's intermediate
+   * representation.
+   */
+  @Override
+  public long getUncompressedSize() {
+    long total = 0;
+    if (_logtypeIdFwdIndex != null) {
+      total += _logtypeIdFwdIndex.getUncompressedSize();
+    }
+    if (_dictVarIdFwdIndex != null) {
+      total += _dictVarIdFwdIndex.getUncompressedSize();
+    }
+    if (_encodedVarFwdIndex != null) {
+      total += _encodedVarFwdIndex.getUncompressedSize();
+    }
+    if (_rawMsgFwdIndex != null) {
+      total += _rawMsgFwdIndex.getUncompressedSize();
+    }
+    return total;
+  }
+
+  @Override
+  public void setTrackUncompressedSize(boolean trackUncompressedSize) {
+    if (_logtypeIdFwdIndex != null) {
+      _logtypeIdFwdIndex.setTrackUncompressedSize(trackUncompressedSize);
+    }
+    if (_dictVarIdFwdIndex != null) {
+      _dictVarIdFwdIndex.setTrackUncompressedSize(trackUncompressedSize);
+    }
+    if (_encodedVarFwdIndex != null) {
+      _encodedVarFwdIndex.setTrackUncompressedSize(trackUncompressedSize);
+    }
+    if (_rawMsgFwdIndex != null) {
+      _rawMsgFwdIndex.setTrackUncompressedSize(trackUncompressedSize);
+    }
+  }
+
   @Override
   public boolean isDictionaryEncoded() {
     return false;

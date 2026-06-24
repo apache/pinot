@@ -90,7 +90,7 @@ public class TenantTableWithProperties {
     _totalSegments = idealStateInstanceStateMap.size();
     try {
       TableSizeReader.TableSubTypeSizeDetails sizeDetails =
-          tableSizeReader.getTableSubtypeSize(_tableNameWithType, TABLE_SIZE_READER_TIMEOUT_MS, false);
+          tableSizeReader.getTableSubtypeSize(_tableNameWithType, TABLE_SIZE_READER_TIMEOUT_MS, false, false);
       estimatedTableSizeInBytes = sizeDetails._estimatedSizeInBytes;
     } catch (InvalidConfigException e) {
       LOGGER.warn("Failed to read table size for table: {}", _tableNameWithType, e);

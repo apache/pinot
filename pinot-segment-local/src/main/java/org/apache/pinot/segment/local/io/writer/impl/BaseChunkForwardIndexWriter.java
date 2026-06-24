@@ -69,6 +69,8 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
 
   protected int _chunkSize;
   protected long _dataOffset;
+  protected long _uncompressedSize;
+  protected boolean _trackUncompressedSize = false;
 
   private final int _headerEntryChunkOffsetSize;
 
@@ -195,5 +197,17 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
 
     _dataOffset += sizeToWrite;
     _chunkBuffer.clear();
+  }
+
+  /**
+   * Returns the total uncompressed size of data written so far, including any bytes buffered in
+   * the current in-flight chunk. Safe to call at any time — does not require {@link #close()} first.
+   */
+  public long getUncompressedSize() {
+    return _uncompressedSize;
+  }
+
+  public void setTrackUncompressedSize(boolean trackUncompressedSize) {
+    _trackUncompressedSize = trackUncompressedSize;
   }
 }

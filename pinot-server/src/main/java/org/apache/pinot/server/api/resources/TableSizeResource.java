@@ -28,7 +28,9 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -41,6 +43,8 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
@@ -49,8 +53,13 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -86,6 +95,8 @@ public class TableSizeResource {
   public String getTableSize(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed,
+      @ApiParam(value = "Include per-column compression stats (default false to avoid large responses)")
+      @DefaultValue("false") @QueryParam("includeColumnStats") boolean includeColumnStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -100,6 +111,13 @@ public class TableSizeResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
+    Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
+    // compressionStatsEnabled gates segment-level aggregate sizes (rawFwdIndexSize/compressedFwdIndexSize)
+    // and always-on compressionStats summary. includeColumnStats additionally gates the per-column map.
+    boolean compressionStatsEnabled = cachedPair != null && cachedPair.getLeft() != null
+        && cachedPair.getLeft().getIndexingConfig() != null
+        && cachedPair.getLeft().getIndexingConfig().isCompressionStatsEnabled();
+
     long tableSizeInBytes = 0L;
     List<SegmentSizeInfo> segmentSizeInfos = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
@@ -109,7 +127,62 @@ public class TableSizeResource {
           ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
           long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
           if (detailed) {
-            segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes));
+            if (compressionStatsEnabled) {
+              long rawFwdIndexSize = 0;
+              long compressedFwdIndexSize = 0;
+              Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
+              IndexService indexService = IndexService.getInstance();
+              SegmentMetadata segmentMetadata = immutableSegment.getSegmentMetadata();
+              for (ColumnMetadata colMeta : segmentMetadata.getColumnMetadataMap().values()) {
+                String codec = colMeta.getCompressionCodec();
+                long fwdIndexSize = colMeta.getIndexSizeFor(StandardIndexes.forward());
+                if (fwdIndexSize <= 0) {
+                  continue;
+                }
+                long rawIngestSize;
+                long onDiskSize;
+                if (codec != null) {
+                  // Raw column: use persisted uncompressed size and forward index size
+                  rawIngestSize = colMeta.getUncompressedForwardIndexSizeBytes();
+                  onDiskSize = fwdIndexSize;
+                  if (rawIngestSize > 0) {
+                    rawFwdIndexSize += rawIngestSize;
+                    compressedFwdIndexSize += onDiskSize;
+                  } else {
+                    // Old raw segment without persisted uncompressed size — skip
+                    continue;
+                  }
+                } else if (colMeta.hasDictionary()) {
+                  // Dict column: onDisk = fwd + dict file; rawIngest from metadata if available
+                  long dictFileSize = colMeta.getIndexSizeFor(StandardIndexes.dictionary());
+                  onDiskSize = fwdIndexSize + (dictFileSize >= 0 ? dictFileSize : 0);
+                  rawIngestSize = colMeta.getDictColumnRawIngestSizeBytes();
+                  codec = ColumnCompressionStatsInfo.CODEC_DICT_ENCODED;
+                } else {
+                  // Old raw segment without persisted codec — skip
+                  continue;
+                }
+                double ratio = (rawIngestSize > 0 && onDiskSize > 0) ? (double) rawIngestSize / onDiskSize : 0;
+                List<String> indexNames = new ArrayList<>();
+                for (int i = 0, n = colMeta.getNumIndexes(); i < n; i++) {
+                  indexNames.add(indexService.get(colMeta.getIndexType(i)).getId());
+                }
+                if (includeColumnStats) {
+                  if (columnCompressionStats == null) {
+                    columnCompressionStats = new HashMap<>();
+                  }
+                  columnCompressionStats.put(colMeta.getColumnName(),
+                      new ColumnCompressionStatsInfo(colMeta.getColumnName(),
+                          rawIngestSize, onDiskSize, ratio, codec,
+                          indexNames.isEmpty() ? null : indexNames, null));
+                }
+              }
+              segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes,
+                  rawFwdIndexSize, compressedFwdIndexSize, immutableSegment.getTier(), columnCompressionStats));
+            } else {
+              segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes,
+                  -1, -1, immutableSegment.getTier()));
+            }
           }
           tableSizeInBytes += segmentSizeBytes;
         }
@@ -144,8 +217,10 @@ public class TableSizeResource {
   public String getTableSizeOld(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed,
+      @ApiParam(value = "Include per-column compression stats (default false to avoid large responses)")
+      @DefaultValue("false") @QueryParam("includeColumnStats") boolean includeColumnStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
-    return this.getTableSize(tableName, detailed, headers);
+    return this.getTableSize(tableName, detailed, includeColumnStats, headers);
   }
 }

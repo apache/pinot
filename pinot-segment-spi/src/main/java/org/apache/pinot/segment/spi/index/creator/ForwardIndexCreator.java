@@ -310,6 +310,20 @@ public interface ForwardIndexCreator extends IndexCreator {
   DataType getValueType();
 
   /**
+   * Returns the total uncompressed size of the forward index data written, or 0 if not tracked.
+   */
+  default long getUncompressedSize() {
+    return 0;
+  }
+
+  /**
+   * Controls whether the writer tracks uncompressed data size. When disabled, the writer skips
+   * the per-chunk size accumulation, providing zero overhead when compression stats are not needed.
+   */
+  default void setTrackUncompressedSize(boolean trackUncompressedSize) {
+  }
+
+  /**
    * DICTIONARY-ENCODED INDEX APIs
    */
 

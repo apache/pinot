@@ -241,8 +241,8 @@ public class DebugResource {
   private TableDebugInfo.TableSizeSummary getTableSize(String tableNameWithType) {
     TableSizeReader.TableSizeDetails tableSizeDetails;
     try {
-      tableSizeDetails = _tableSizeReader
-          .getTableSizeDetails(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, true);
+      tableSizeDetails = _tableSizeReader.getTableSizeDetails(tableNameWithType,
+          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, true, false);
     } catch (Throwable t) {
       tableSizeDetails = null;
     }

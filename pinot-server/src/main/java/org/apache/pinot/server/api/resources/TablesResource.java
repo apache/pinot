@@ -68,9 +68,12 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
+import org.apache.pinot.common.restlet.resources.CompressionStatsSummary;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.StorageBreakdownInfo;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
@@ -104,10 +107,12 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
@@ -207,6 +212,8 @@ public class TablesResource {
   public String getSegmentMetadata(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @ApiParam(value = "Include per-column compression stats (default false to avoid large responses)")
+      @DefaultValue("false") @QueryParam("includeColumnStats") boolean includeColumnStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -229,6 +236,22 @@ public class TablesResource {
     Map<String, Double> columnCardinalityMap = new HashMap<>();
     Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     Map<String, Map<String, Double>> columnIndexSizesMap = new HashMap<>();
+    // Per-column compression stats accumulators: [0]=uncompressed, [1]=compressed (fwd index)
+    Map<String, long[]> columnCompressionAccum = new HashMap<>();
+    Map<String, String> columnCodecMap = new HashMap<>();
+    // Secondary per-codec breakdown accumulators: column → codec → [rawIngest, onDisk, segmentCount]
+    Map<String, Map<String, long[]>> columnCodecBreakdownAccum = new HashMap<>();
+    Map<String, Set<String>> columnIndexNamesMap = new HashMap<>();
+    Map<String, long[]> tierAccum = new HashMap<>(); // [count, size]
+    int segmentsWithStats = 0;
+
+    Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
+    // compressionStatsEnabled gates all compression stat collection (summary + per-column).
+    // includeColumnStats additionally gates whether per-column stats are included in the response.
+    boolean compressionStatsEnabled = cachedPair != null && cachedPair.getLeft() != null
+        && cachedPair.getLeft().getIndexingConfig() != null
+        && cachedPair.getLeft().getIndexingConfig().isCompressionStatsEnabled();
+
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
@@ -240,11 +263,15 @@ public class TablesResource {
           totalSegmentSizeBytes += segmentSizeBytes;
           totalNumRows += segmentMetadata.getTotalDocs();
 
+          Set<String> allSegmentColumns = segmentMetadata.getAllColumns();
           if (columnSet == null) {
-            columnSet = segmentMetadata.getAllColumns();
+            columnSet = allSegmentColumns;
           } else {
-            columnSet.retainAll(segmentMetadata.getAllColumns());
+            columnSet.retainAll(allSegmentColumns);
           }
+          boolean segmentHasCompressionStats = false;
+          IndexService indexService = IndexService.getInstance();
+          // Column stats (length, cardinality, index sizes) — scoped to caller's column filter
           for (String column : columnSet) {
             ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
             int columnLength = columnMetadata.getLengthOfLongestElement();
@@ -269,18 +296,77 @@ public class TablesResource {
               int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
-
-            IndexService indexService = IndexService.getInstance();
             for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
               String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();
               long value = columnMetadata.getIndexSize(i);
-
               Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
-              Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + value;
-              columnIndexSizes.put(indexName, indexSize);
+              columnIndexSizes.put(indexName, columnIndexSizes.getOrDefault(indexName, 0d) + value);
               columnIndexSizesMap.put(column, columnIndexSizes);
             }
           }
+
+          // Compression stats — always over all segment columns, independent of caller's column filter,
+          // since they are segment-level storage metrics not per-requested-column data.
+          if (compressionStatsEnabled) {
+            for (String column : allSegmentColumns) {
+              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+              List<String> indexNames = new ArrayList<>();
+              for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
+                indexNames.add(indexService.get(columnMetadata.getIndexType(i)).getId());
+              }
+              String codec = columnMetadata.getCompressionCodec();
+              long uncompressedSize = columnMetadata.getUncompressedForwardIndexSizeBytes();
+              long fwdIndexSize = columnMetadata.getIndexSizeFor(StandardIndexes.forward());
+              if (codec != null && uncompressedSize > 0) {
+                // Raw column with stats
+                long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
+                accum[0] += uncompressedSize;
+                long rawOnDisk = fwdIndexSize > 0 ? fwdIndexSize : 0;
+                accum[1] += rawOnDisk;
+                columnCodecMap.merge(column, codec,
+                    (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+                Map<String, long[]> breakdown =
+                    columnCodecBreakdownAccum.computeIfAbsent(column, k -> new HashMap<>());
+                long[] codecAccum = breakdown.computeIfAbsent(codec, k -> new long[3]);
+                codecAccum[0] += uncompressedSize;
+                codecAccum[1] += rawOnDisk;
+                codecAccum[2]++;
+                columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
+                segmentHasCompressionStats = true;
+              } else if (columnMetadata.hasDictionary() && fwdIndexSize > 0) {
+                // Dictionary-encoded column
+                long dictFileSize = columnMetadata.getIndexSizeFor(StandardIndexes.dictionary());
+                long dictRawIngest = columnMetadata.getDictColumnRawIngestSizeBytes();
+                long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
+                accum[0] += (dictRawIngest >= 0 ? dictRawIngest : 0);
+                long dictOnDisk = (fwdIndexSize > 0 ? fwdIndexSize : 0) + (dictFileSize >= 0 ? dictFileSize : 0);
+                accum[1] += dictOnDisk;
+                columnCodecMap.merge(column, ColumnCompressionStatsInfo.CODEC_DICT_ENCODED,
+                    (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+                Map<String, long[]> breakdown =
+                    columnCodecBreakdownAccum.computeIfAbsent(column, k -> new HashMap<>());
+                long[] codecAccum =
+                    breakdown.computeIfAbsent(ColumnCompressionStatsInfo.CODEC_DICT_ENCODED, k -> new long[3]);
+                codecAccum[0] += (dictRawIngest >= 0 ? dictRawIngest : 0);
+                codecAccum[1] += dictOnDisk;
+                codecAccum[2]++;
+                columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
+                segmentHasCompressionStats = true;
+              }
+              // Old segments without stats (codec==null, no rawIngest) excluded
+            }
+          }
+
+          if (segmentHasCompressionStats) {
+            segmentsWithStats++;
+          }
+
+          // Accumulate storage breakdown by tier (always-on, not gated by compression flag)
+          String tier = immutableSegment.getTier();
+          String tierKey = tier != null ? tier : "default";
+          long[] tierVals = tierAccum.computeIfAbsent(tierKey, k -> new long[2]);
+          tierVals[0]++;
+          tierVals[1] += segmentSizeBytes;
         }
       }
     } finally {
@@ -301,10 +387,79 @@ public class TablesResource {
         (partition, primaryKeyCount) -> partitionToServerPrimaryKeyCountMap.put(partition,
             Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
 
+    // Build compression stats when the table flag is enabled and any columns have stats.
+    // compressionStats summary is always built; columnCompressionStats per-column list only when
+    // includeColumnStats=true.
+    List<ColumnCompressionStatsInfo> columnCompressionStats = null;
+    CompressionStatsSummary compressionStatsSummary = null;
+    if (compressionStatsEnabled && !columnCompressionAccum.isEmpty()) {
+      long totalRaw = 0;
+      long totalCompressed = 0;
+      int totalSegmentCount = segmentDataManagers.size();
+      if (includeColumnStats) {
+        columnCompressionStats = new ArrayList<>();
+      }
+      for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
+        String col = entry.getKey();
+        long[] accum = entry.getValue();
+        String colCodec = columnCodecMap.get(col);
+        // Dict-only columns: if no raw ingest size was accumulated (old segment), report -1 to distinguish from 0-size
+        long uncompressed = (ColumnCompressionStatsInfo.CODEC_DICT_ENCODED.equals(colCodec)
+            && accum[0] == 0) ? -1 : accum[0];
+        long compressed = accum[1];
+        // Include all columns with on-disk size in the table-level summary
+        if (compressed > 0) {
+          totalRaw += uncompressed > 0 ? uncompressed : 0;
+          totalCompressed += compressed;
+        }
+        if (includeColumnStats) {
+          double ratio = (uncompressed > 0 && compressed > 0) ? (double) uncompressed / compressed : 0;
+          Set<String> idxNames = columnIndexNamesMap.get(col);
+          List<String> indexes = idxNames != null ? new ArrayList<>(idxNames) : null;
+          // Build codecBreakdown only when codec is MIXED
+          Map<String, ColumnCompressionStatsInfo.CodecBreakdownEntry> codecBreakdown = null;
+          if ("MIXED".equals(colCodec)) {
+            Map<String, long[]> bdAccum = columnCodecBreakdownAccum.get(col);
+            if (bdAccum != null) {
+              codecBreakdown = new HashMap<>();
+              for (Map.Entry<String, long[]> bdEntry : bdAccum.entrySet()) {
+                long[] bd = bdEntry.getValue();
+                codecBreakdown.put(bdEntry.getKey(), new ColumnCompressionStatsInfo.CodecBreakdownEntry(
+                    (int) bd[2], bd[0], bd[1]));
+              }
+            }
+          }
+          columnCompressionStats.add(new ColumnCompressionStatsInfo(
+              col, uncompressed, compressed, ratio, colCodec, indexes, codecBreakdown));
+        }
+      }
+      if (includeColumnStats) {
+        columnCompressionStats.sort((a, b) -> a.getColumn().compareTo(b.getColumn()));
+      }
+      // Build table-level compression summary when any column has on-disk stats
+      if (totalCompressed > 0) {
+        double summaryRatio = totalRaw > 0 ? (double) totalRaw / totalCompressed : 0;
+        boolean isPartialCoverage = segmentsWithStats < totalSegmentCount;
+        compressionStatsSummary = new CompressionStatsSummary(totalRaw, totalCompressed, summaryRatio,
+            segmentsWithStats, totalSegmentCount, isPartialCoverage);
+      }
+    }
+
+    // Build storage breakdown from tier data accumulated inside the try block
+    StorageBreakdownInfo storageBreakdownInfo = null;
+    if (!tierAccum.isEmpty()) {
+      Map<String, StorageBreakdownInfo.TierInfo> tiers = new HashMap<>();
+      for (Map.Entry<String, long[]> entry : tierAccum.entrySet()) {
+        tiers.put(entry.getKey(), new StorageBreakdownInfo.TierInfo((int) entry.getValue()[0], entry.getValue()[1]));
+      }
+      storageBreakdownInfo = new StorageBreakdownInfo(tiers);
+    }
+
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
             totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
-            partitionToServerPrimaryKeyCountMap);
+            partitionToServerPrimaryKeyCountMap, columnCompressionStats, compressionStatsSummary,
+            storageBreakdownInfo);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 

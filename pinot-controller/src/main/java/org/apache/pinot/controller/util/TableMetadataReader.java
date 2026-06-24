@@ -261,7 +261,7 @@ public class TableMetadataReader {
    * @return a map of segmentName to its metadata
    */
   public JsonNode getAggregateTableMetadata(String tableNameWithType, List<String> columns, int numReplica,
-      int timeoutMs)
+      int timeoutMs, boolean compressionStatsEnabled)
       throws InvalidConfigException {
     final Map<String, List<String>> serverToSegments =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
@@ -272,7 +272,7 @@ public class TableMetadataReader {
 
     TableMetadataInfo aggregateTableMetadataInfo =
         serverSegmentMetadataReader.getAggregatedTableMetadataFromServer(tableNameWithType, endpoints, columns,
-            numReplica, timeoutMs);
+            numReplica, timeoutMs, compressionStatsEnabled);
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
 
