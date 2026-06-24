@@ -30,6 +30,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -147,16 +148,26 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
           SegmentDirectory.Writer v3DataWriter = v3Segment.createWriter()) {
         for (String column : v2Metadata.getAllColumns()) {
           for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
-            //If Text index files are combined merge into columns.psf else no-op
+            // Text index: skip the standard copy when a legacy Lucene directory is present
+            // ({@code copyLuceneTextIndexIfExists} below handles that as a sibling copy).
+            // Combined .text.index files fall through to the standard path and get packed.
             if (indexType == StandardIndexes.text()) {
               if (!TextIndexUtils.hasTextIndex(v2Directory, column)) {
                 copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
               }
-            } else {
-              if (indexType != StandardIndexes.vector()) {
+              continue;
+            }
+            // Vector index mirrors text: skip the standard copy when a legacy IVF sidecar (or
+            // HNSW directory) is present ({@code copyVectorIndexIfExists} handles those as
+            // sibling copies). Combined .vector.ivfflat.combined.index / .ivfpq.combined.index
+            // files fall through to the standard path and get packed into columns.psf.
+            if (indexType == StandardIndexes.vector()) {
+              if (!VectorIndexUtils.hasVectorIndex(v2Directory, column)) {
                 copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
               }
+              continue;
             }
+            copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
           }
         }
         v3DataWriter.save();

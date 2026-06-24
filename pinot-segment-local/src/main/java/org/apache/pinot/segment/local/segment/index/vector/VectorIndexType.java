@@ -176,7 +176,10 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
   @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     // NOTE: IVF_ON_DISK intentionally reuses the IVF_FLAT file extension since it reads the
-    // same on-disk format via FileChannel rather than memory-mapped I/O.
+    // same on-disk format. The {@code *.combined.index} entries are the transient single-file
+    // form written by the IVF creator when {@code storeInSegmentFile=true}; the V2→V3 converter
+    // consumes them via the standard {@code copyIndexIfExists} loop and packs the bytes into
+    // {@code columns.psf}.
     return List.of(V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_V99_INDEX_FILE_EXTENSION,
@@ -184,7 +187,9 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         V1Constants.Indexes.VECTOR_V912_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
-        V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+        V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
   }
 
   /**

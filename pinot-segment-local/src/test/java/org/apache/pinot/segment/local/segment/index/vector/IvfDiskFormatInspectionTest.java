@@ -280,6 +280,113 @@ public class IvfDiskFormatInspectionTest {
     return v;
   }
 
+  // ---------------------------------------------------------------------------
+  // Combined-form output (storeInSegmentFile=true)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * When {@code storeInSegmentFile=true}, the IVF_FLAT creator must write to the {@code
+   * .vector.ivfflat.combined.index} extension instead of the legacy {@code .vector.ivfflat.index}
+   * sidecar. The on-disk bytes are byte-identical to the legacy form; only the file name differs.
+   * The V2→V3 converter picks up the combined extension via the standard {@code copyIndexIfExists}
+   * path and packs the bytes into {@code columns.psf}.
+   */
+  @Test
+  public void testIvfFlatCreatorWritesCombinedExtensionWhenFlagOn()
+      throws Exception {
+    File tempDir = Files.createTempDirectory("ivf_flat_combined_").toFile();
+    try {
+      Map<String, String> props = new HashMap<>();
+      props.put("vectorIndexType", "IVF_FLAT");
+      props.put("vectorDimension", String.valueOf(DIMENSION));
+      props.put("vectorDistanceFunction", "EUCLIDEAN");
+      props.put("nlist", String.valueOf(NLIST));
+      props.put("quantizer", "FLAT");
+      props.put(VectorIndexConfig.STORE_IN_SEGMENT_FILE, "true");
+      VectorIndexConfig config = new VectorIndexConfig(false, "IVF_FLAT", DIMENSION, 1,
+          VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, props);
+
+      try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator(COLUMN, tempDir, config)) {
+        for (int i = 0; i < NUM_VECTORS; i++) {
+          creator.add(makeVector(i));
+        }
+        creator.seal();
+      }
+
+      File legacyFile = new File(tempDir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+      File combinedFile = new File(tempDir,
+          COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
+      Assert.assertFalse(legacyFile.exists(),
+          "Legacy IVF_FLAT sidecar must NOT exist when storeInSegmentFile=true");
+      Assert.assertTrue(combinedFile.exists(),
+          "Combined IVF_FLAT file must exist when storeInSegmentFile=true: " + combinedFile);
+
+      // Header bytes are identical to the legacy form — only the file name differs.
+      byte[] all = Files.readAllBytes(combinedFile.toPath());
+      ByteBuffer bb = ByteBuffer.wrap(all).order(ByteOrder.BIG_ENDIAN);
+      Assert.assertEquals(bb.getInt(), IvfFlatVectorIndexCreator.MAGIC, "magic must be IVFF");
+      Assert.assertEquals(bb.getInt(), IvfFlatVectorIndexCreator.FORMAT_VERSION, "format version");
+      Assert.assertEquals(bb.getInt(), DIMENSION, "dimension");
+      Assert.assertEquals(bb.getInt(), NUM_VECTORS, "num vectors");
+      Assert.assertEquals(bb.getInt(), NLIST, "nlist");
+      System.out.printf("[ivf-flat-combined] file=%s size=%d bytes — header matches legacy format%n",
+          combinedFile.getName(), all.length);
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
+  }
+
+  /**
+   * Symmetric coverage for IVF_PQ — same expectations.
+   */
+  @Test
+  public void testIvfPqCreatorWritesCombinedExtensionWhenFlagOn()
+      throws Exception {
+    File tempDir = Files.createTempDirectory("ivf_pq_combined_").toFile();
+    try {
+      int pqM = 2;
+      int pqNbits = 8;
+      Map<String, String> props = new HashMap<>();
+      props.put("vectorIndexType", "IVF_PQ");
+      props.put("vectorDimension", String.valueOf(DIMENSION));
+      props.put("vectorDistanceFunction", "EUCLIDEAN");
+      props.put("nlist", String.valueOf(NLIST));
+      props.put("pqM", String.valueOf(pqM));
+      props.put("pqNbits", String.valueOf(pqNbits));
+      props.put("trainSampleSize", String.valueOf(NUM_VECTORS));
+      props.put("trainingSeed", "42");
+      props.put(VectorIndexConfig.STORE_IN_SEGMENT_FILE, "true");
+      VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", DIMENSION, 1,
+          VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, props);
+
+      try (IvfPqVectorIndexCreator creator = new IvfPqVectorIndexCreator(COLUMN, tempDir, config)) {
+        for (int i = 0; i < NUM_VECTORS; i++) {
+          creator.add(makeVector(i));
+        }
+        creator.seal();
+      }
+
+      File legacyFile = new File(tempDir, COLUMN + V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+      File combinedFile = new File(tempDir,
+          COLUMN + V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
+      Assert.assertFalse(legacyFile.exists(),
+          "Legacy IVF_PQ sidecar must NOT exist when storeInSegmentFile=true");
+      Assert.assertTrue(combinedFile.exists(),
+          "Combined IVF_PQ file must exist when storeInSegmentFile=true: " + combinedFile);
+
+      // First 4 bytes are still the IVPQ magic — combined form does not change the on-disk format.
+      byte[] head = Files.readAllBytes(combinedFile.toPath());
+      Assert.assertEquals(head[0], (byte) 'I');
+      Assert.assertEquals(head[1], (byte) 'V');
+      Assert.assertEquals(head[2], (byte) 'P');
+      Assert.assertEquals(head[3], (byte) 'Q');
+      System.out.printf("[ivf-pq-combined] file=%s size=%d bytes — magic IVPQ unchanged%n",
+          combinedFile.getName(), head.length);
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
+  }
+
   private static String hex(byte[] data, int offset, int length) {
     StringBuilder sb = new StringBuilder(length * 3);
     for (int i = 0; i < length; i++) {
