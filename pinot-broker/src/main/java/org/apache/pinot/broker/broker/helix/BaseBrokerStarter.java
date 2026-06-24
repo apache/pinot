@@ -21,6 +21,8 @@ package org.apache.pinot.broker.broker.helix;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -63,6 +65,10 @@ import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandl
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
+import org.apache.pinot.broker.stats.BrokerStatisticsProvider;
+import org.apache.pinot.broker.stats.BrokerTableStatsManager;
+import org.apache.pinot.broker.stats.SqliteStatsStore;
+import org.apache.pinot.broker.stats.StatsStoreException;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
@@ -96,6 +102,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.NettyInspector;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -111,7 +118,11 @@ import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -127,6 +138,7 @@ import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.slf4j.Logger;
@@ -178,6 +190,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
   protected BrokerRoutingManager _routingManager;
+  @Nullable
+  protected BrokerTableStatsManager _statsManager;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
   protected SqlQueryExecutor _sqlQueryExecutor;
@@ -314,10 +328,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
       WorkerManager workerManager, WorkerManager multiClusterWorkerManager,
       ServerRoutingStatsManager serverRoutingStatsManager) {
+    BrokerStatisticsProvider statisticsProvider =
+        _statsManager != null ? new BrokerStatisticsProvider(_statsManager) : null;
     return new MultiStageBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
         accessControlFactory, queryQuotaManager, tableCache, multiStageQueryThrottler, failureDetector,
         threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
-        serverRoutingStatsManager);
+        serverRoutingStatsManager, statisticsProvider);
   }
 
   private void setupHelixSystemProperties() {
@@ -444,6 +460,52 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
     _tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
+
+    // Wire the stats-manager providers that require both the routing manager and the table cache.
+    // Both are now available: _routingManager was built in initRoutingManager() and _tableCache
+    // was just created above. The setters are no-ops if _statsManager is null (stats disabled).
+    if (_statsManager != null) {
+      _statsManager.setTimeBoundaryMsProvider(rawTableName -> {
+        String offlineTable = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+        TimeBoundaryInfo tbi = _routingManager.getTimeBoundaryInfo(offlineTable);
+        if (tbi == null) {
+          return null;
+        }
+        // Convert the formatted time-boundary value to epoch-milliseconds using the offline
+        // table's DateTimeFormatSpec, falling back to a direct Long parse when no schema is found.
+        // Read schema and config from the TableCache: this lambda runs on the query planning path,
+        // so it must never touch ZooKeeper synchronously.
+        try {
+          Schema schema = _tableCache.getSchema(rawTableName);
+          if (schema != null) {
+            TableConfig tc = _tableCache.getTableConfig(offlineTable);
+            if (tc != null) {
+              String timeCol = tc.getValidationConfig().getTimeColumnName();
+              if (timeCol != null) {
+                DateTimeFieldSpec fieldSpec = schema.getSpecForTimeColumn(timeCol);
+                if (fieldSpec != null) {
+                  DateTimeFormatSpec fmtSpec = fieldSpec.getFormatSpec();
+                  return fmtSpec.fromFormatToMillis(tbi.getTimeValue());
+                }
+              }
+            }
+          }
+        } catch (Exception e) {
+          LOGGER.debug("Could not convert time boundary to millis for {}; falling back to "
+              + "Long.parseLong: {}", rawTableName, e.getMessage());
+        }
+        // Fallback: parse directly (works when time unit is MILLISECONDS)
+        try {
+          return Long.parseLong(tbi.getTimeValue());
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Cannot parse time boundary value '{}' for table {} as long",
+              tbi.getTimeValue(), rawTableName);
+          return null;
+        }
+      });
+      _statsManager.setTableConfigProvider(tableNameWithType -> _tableCache.getTableConfig(
+          tableNameWithType));
+    }
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
@@ -751,9 +813,55 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
   }
 
-  protected void initRoutingManager() throws Exception {
+  protected void initRoutingManager()
+      throws Exception {
     _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
+    boolean statsEnabled =
+        _brokerConf.getProperty(Broker.CONFIG_OF_STATS_ENABLED, Broker.DEFAULT_STATS_ENABLED);
+    if (statsEnabled) {
+      BrokerTableStatsManager statsManager = createStatsManager();
+      if (statsManager != null) {
+        _statsManager = statsManager;
+        _routingManager.setStatsManager(_statsManager);
+      }
+    }
     _routingManager.init(_spectatorHelixManager);
+  }
+
+  /// Creates and initializes the [BrokerTableStatsManager]. Returns `null` if the
+  /// manager cannot be started (error is logged; broker startup continues normally).
+  @Nullable
+  private BrokerTableStatsManager createStatsManager() {
+    Path statsDir = resolveStatsDir();
+    LOGGER.info("Initializing BrokerTableStatsManager at {}", statsDir);
+    SqliteStatsStore statsStore = new SqliteStatsStore(statsDir);
+    BrokerTableStatsManager statsManager = new BrokerTableStatsManager(statsStore);
+    try {
+      statsManager.init();
+      return statsManager;
+    } catch (StatsStoreException e) {
+      LOGGER.error("Failed to initialize BrokerTableStatsManager; stats collection disabled: {}",
+          e.getMessage(), e);
+      try {
+        statsManager.close();
+      } catch (IOException closeEx) {
+        LOGGER.warn("Error closing failed stats manager: {}", closeEx.getMessage());
+      }
+      return null;
+    }
+  }
+
+  /// Resolves the directory for the stats store. Uses [Broker#CONFIG_OF_STATS_DIR] when
+  /// set; otherwise falls back to `<pinot.broker.instance.dataDir>/broker-stats` or
+  /// `<java.io.tmpdir>/broker-stats` when no data dir is configured.
+  private Path resolveStatsDir() {
+    String configured = _brokerConf.getProperty(Broker.CONFIG_OF_STATS_DIR);
+    if (configured != null && !configured.isEmpty()) {
+      return Paths.get(configured);
+    }
+    // Broker has no standard INSTANCE_DATA_DIR; use tmpdir/<instanceId>/broker-stats so that
+    // multiple broker instances on the same host do not share the same SQLite file.
+    return Paths.get(System.getProperty("java.io.tmpdir"), _instanceId, "broker-stats");
   }
 
   protected void initSpectatorHelixManager() throws Exception {
@@ -972,6 +1080,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Stopping the broker routing manager");
     _routingManager.stop();
+
+    if (_statsManager != null) {
+      LOGGER.info("Closing BrokerTableStatsManager");
+      try {
+        _statsManager.close();
+      } catch (IOException e) {
+        LOGGER.warn("Error closing BrokerTableStatsManager: {}", e.getMessage());
+      }
+    }
 
     LOGGER.info("Close PinotFs");
     try {

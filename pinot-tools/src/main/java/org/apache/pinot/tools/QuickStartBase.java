@@ -134,11 +134,6 @@ public abstract class QuickStartBase {
     return _bootstrapDataDirs != null && _bootstrapDataDirs.length == 1 ? _bootstrapDataDirs[0] : null;
   }
 
-  /** @return Table name specified by command line argument -bootstrapTableDir */
-  public String getTableName() {
-    return Paths.get(getBootstrapDataDir()).getFileName().toString();
-  }
-
   /** @return Table name if specified by input bootstrap directory. */
   public String getTableName(String bootstrapDataDir) {
     return Paths.get(bootstrapDataDir).getFileName().toString();
@@ -203,10 +198,14 @@ public abstract class QuickStartBase {
         quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
       }
     } else {
-      String tableName = getTableName();
-      File baseDir = new File(quickstartTmpDir, tableName);
-      copyFilesystemTableToTmpDirectory(getBootstrapDataDir(), tableName, baseDir);
-      quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
+      // -bootstrapTableDir accepts multiple directories (arity 1..*); bootstrap each of them.
+      for (String bootstrapDataDir : _bootstrapDataDirs) {
+        String tableName = getTableName(bootstrapDataDir);
+        File baseDir = new File(quickstartTmpDir, tableName);
+        copyFilesystemTableToTmpDirectory(bootstrapDataDir, tableName, baseDir);
+        quickstartTableRequests.add(
+            new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
+      }
     }
     return quickstartTableRequests;
   }
