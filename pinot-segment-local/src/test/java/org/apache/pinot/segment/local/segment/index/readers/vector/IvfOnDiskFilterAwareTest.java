@@ -27,8 +27,10 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
+import org.apache.pinot.segment.local.segment.index.vector.IvfSidecarBuffers;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
@@ -69,7 +71,8 @@ public class IvfOnDiskFilterAwareTest {
 
     VectorIndexConfig readerConfig =
         createReaderConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
-    try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN_NAME, _tempDir, readerConfig)) {
+    try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN_NAME,
+        IvfSidecarBuffers.mapSidecar(_tempDir, COLUMN_NAME, readerConfig, "test-vector"), readerConfig)) {
       Assert.assertTrue(reader.supportsPreFilter(), "IVF_ON_DISK reader should report pre-filter support");
       reader.setNprobe(nlist);
 
@@ -103,7 +106,8 @@ public class IvfOnDiskFilterAwareTest {
     VectorIndexConfig readerConfig =
         createReaderConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
     try (CountingIvfOnDiskVectorIndexReader reader =
-             new CountingIvfOnDiskVectorIndexReader(COLUMN_NAME, _tempDir, readerConfig)) {
+             new CountingIvfOnDiskVectorIndexReader(COLUMN_NAME,
+                 IvfSidecarBuffers.mapSidecar(_tempDir, COLUMN_NAME, readerConfig, "test-vector"), readerConfig)) {
       reader.setNprobe(nlist);
 
       MutableRoaringBitmap preFilter = new MutableRoaringBitmap();
@@ -128,7 +132,8 @@ public class IvfOnDiskFilterAwareTest {
 
     VectorIndexConfig readerConfig =
         createReaderConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.COSINE);
-    try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN_NAME, _tempDir, readerConfig)) {
+    try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN_NAME,
+        IvfSidecarBuffers.mapSidecar(_tempDir, COLUMN_NAME, readerConfig, "test-vector"), readerConfig)) {
       MutableRoaringBitmap emptyFilter = new MutableRoaringBitmap();
       ImmutableRoaringBitmap result = reader.getDocIds(vectors[0], 5, emptyFilter);
       Assert.assertEquals(result.getCardinality(), 0);
@@ -146,7 +151,8 @@ public class IvfOnDiskFilterAwareTest {
 
     VectorIndexConfig readerConfig =
         createReaderConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
-    try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN_NAME, _tempDir, readerConfig)) {
+    try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN_NAME,
+        IvfSidecarBuffers.mapSidecar(_tempDir, COLUMN_NAME, readerConfig, "test-vector"), readerConfig)) {
       reader.getDocIds(vectors[0], 5);
 
       MutableRoaringBitmap preFilter = new MutableRoaringBitmap();
@@ -176,7 +182,8 @@ public class IvfOnDiskFilterAwareTest {
     VectorIndexConfig readerConfig =
         createReaderConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
             VectorQuantizerType.SQ8);
-    try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN_NAME, _tempDir, readerConfig)) {
+    try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN_NAME,
+        IvfSidecarBuffers.mapSidecar(_tempDir, COLUMN_NAME, readerConfig, "test-vector"), readerConfig)) {
       reader.setNprobe(nlist);
       ImmutableRoaringBitmap result = reader.getDocIds(vectors[0], 5);
       Assert.assertTrue(result.contains(0), "Quantized IVF_ON_DISK search should still retrieve the stored vector");
@@ -232,8 +239,8 @@ public class IvfOnDiskFilterAwareTest {
   private static final class CountingIvfOnDiskVectorIndexReader extends IvfOnDiskVectorIndexReader {
     private final AtomicInteger _distanceComputations = new AtomicInteger();
 
-    private CountingIvfOnDiskVectorIndexReader(String column, File indexDir, VectorIndexConfig config) {
-      super(column, indexDir, config);
+    private CountingIvfOnDiskVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
+      super(column, buffer, config);
     }
 
     @Override

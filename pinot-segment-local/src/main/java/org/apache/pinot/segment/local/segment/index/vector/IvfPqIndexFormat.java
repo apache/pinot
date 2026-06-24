@@ -31,12 +31,15 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.memory.DataBufferPinotInputStream;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**
@@ -93,28 +96,46 @@ public final class IvfPqIndexFormat {
   public static IndexData read(File indexFile)
       throws IOException {
     try (BufferedInputStream bufferedIn = new BufferedInputStream(new FileInputStream(indexFile), 1 << 16)) {
-      byte[] magicBytes = readRequiredBytes(bufferedIn, MAGIC_BYTES.length, "magic");
-      Preconditions.checkState(Arrays.equals(magicBytes, MAGIC_BYTES), "Invalid IVF_PQ magic: %s, expected %s",
-          Arrays.toString(magicBytes), Arrays.toString(MAGIC_BYTES));
-
-      byte[] versionBytes = readRequiredBytes(bufferedIn, Integer.BYTES, "format version");
-      int legacyBigEndianVersion = ByteBuffer.wrap(versionBytes).order(ByteOrder.BIG_ENDIAN).getInt();
-      int littleEndianVersion = ByteBuffer.wrap(versionBytes).order(ByteOrder.LITTLE_ENDIAN).getInt();
-      if (legacyBigEndianVersion == LEGACY_BIG_ENDIAN_FORMAT_VERSION) {
-        try (DataInputStream in = new DataInputStream(bufferedIn)) {
-          return readPayload(in, LEGACY_BIG_ENDIAN_FORMAT_VERSION);
-        }
-      }
-      if (littleEndianVersion == FORMAT_VERSION) {
-        try (LittleEndianDataInputStream in = new LittleEndianDataInputStream(bufferedIn)) {
-          return readPayload(in, FORMAT_VERSION);
-        }
-      }
-      throw new IllegalStateException(String.format(
-          "Unsupported IVF_PQ format version: headerBytes=%s, legacyBigEndian=%s, littleEndian=%s, supported=[%s,%s]",
-          Arrays.toString(versionBytes), legacyBigEndianVersion, littleEndianVersion,
-          LEGACY_BIG_ENDIAN_FORMAT_VERSION, FORMAT_VERSION));
+      return readFromStream(bufferedIn);
     }
+  }
+
+  /**
+   * Reads an IVF_PQ index from a {@link PinotDataBuffer}. Used by the buffer-based reader factory
+   * (sidecar mmap today; column-buffer in tiered/storeInSegment scenarios).
+   *
+   * <p>The caller retains ownership of {@code buffer}; this method does not close it.</p>
+   */
+  public static IndexData read(PinotDataBuffer buffer)
+      throws IOException {
+    try (DataBufferPinotInputStream pinotIn = new DataBufferPinotInputStream(buffer)) {
+      return readFromStream(pinotIn);
+    }
+  }
+
+  private static IndexData readFromStream(InputStream in)
+      throws IOException {
+    byte[] magicBytes = readRequiredBytes(in, MAGIC_BYTES.length, "magic");
+    Preconditions.checkState(Arrays.equals(magicBytes, MAGIC_BYTES), "Invalid IVF_PQ magic: %s, expected %s",
+        Arrays.toString(magicBytes), Arrays.toString(MAGIC_BYTES));
+
+    byte[] versionBytes = readRequiredBytes(in, Integer.BYTES, "format version");
+    int legacyBigEndianVersion = ByteBuffer.wrap(versionBytes).order(ByteOrder.BIG_ENDIAN).getInt();
+    int littleEndianVersion = ByteBuffer.wrap(versionBytes).order(ByteOrder.LITTLE_ENDIAN).getInt();
+    if (legacyBigEndianVersion == LEGACY_BIG_ENDIAN_FORMAT_VERSION) {
+      // Do not close the DataInputStream wrapper: it would close the underlying stream, which the
+      // caller owns (BufferedInputStream over the file, or DataBufferPinotInputStream over the buffer).
+      DataInputStream dataIn = new DataInputStream(in);
+      return readPayload(dataIn, LEGACY_BIG_ENDIAN_FORMAT_VERSION);
+    }
+    if (littleEndianVersion == FORMAT_VERSION) {
+      LittleEndianDataInputStream dataIn = new LittleEndianDataInputStream(in);
+      return readPayload(dataIn, FORMAT_VERSION);
+    }
+    throw new IllegalStateException(String.format(
+        "Unsupported IVF_PQ format version: headerBytes=%s, legacyBigEndian=%s, littleEndian=%s, supported=[%s,%s]",
+        Arrays.toString(versionBytes), legacyBigEndianVersion, littleEndianVersion,
+        LEGACY_BIG_ENDIAN_FORMAT_VERSION, FORMAT_VERSION));
   }
 
   private static void writePayload(DataOutput out, int dimension, int numVectors, int effectiveNlist, int pqM,
@@ -280,7 +301,7 @@ public final class IvfPqIndexFormat {
         distanceFunction, centroids, codebooks, listDocIds, listCodes, subvectorLengths);
   }
 
-  private static byte[] readRequiredBytes(BufferedInputStream in, int length, String description)
+  private static byte[] readRequiredBytes(InputStream in, int length, String description)
       throws IOException {
     byte[] bytes = in.readNBytes(length);
     if (bytes.length != length) {
