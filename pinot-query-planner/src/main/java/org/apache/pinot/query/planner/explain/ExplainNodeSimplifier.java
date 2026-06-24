@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -232,6 +233,11 @@ public class ExplainNodeSimplifier {
 
     @Override
     public PlanNode visitUnnest(UnnestNode node, Void context) {
+      return defaultNode(node);
+    }
+
+    @Override
+    public PlanNode visitRuntimeFilter(RuntimeFilterNode node, Void context) {
       return defaultNode(node);
     }
 

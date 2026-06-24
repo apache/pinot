@@ -39,6 +39,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -171,6 +172,14 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
 
   @Override
   public StringBuilder visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    appendInfo(node, context).append('\n');
+    node.getInputs().get(0).visit(this, context.next(true, context._host, context._workerId));
+    node.getInputs().get(1).visit(this, context.next(false, context._host, context._workerId));
+    return context._builder;
+  }
+
+  @Override
+  public StringBuilder visitRuntimeFilter(RuntimeFilterNode node, Context context) {
     appendInfo(node, context).append('\n');
     node.getInputs().get(0).visit(this, context.next(true, context._host, context._workerId));
     node.getInputs().get(1).visit(this, context.next(false, context._host, context._workerId));

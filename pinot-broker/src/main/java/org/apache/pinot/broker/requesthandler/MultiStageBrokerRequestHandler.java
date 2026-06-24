@@ -524,6 +524,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean defaultEnableDynamicFilteringSemiJoin = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN,
         CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN);
+    boolean defaultEnableRuntimeFilterJoin = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_RUNTIME_FILTER_JOIN,
+        CommonConstants.Broker.DEFAULT_ENABLE_RUNTIME_FILTER_JOIN);
     boolean defaultUsePhysicalOptimizer = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_USE_PHYSICAL_OPTIMIZER,
         CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER);
@@ -576,6 +579,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
+        .defaultEnableRuntimeFilterJoin(defaultEnableRuntimeFilterJoin)
         .defaultUsePhysicalOptimizer(defaultUsePhysicalOptimizer)
         .defaultUseLiteMode(defaultUseLiteMode)
         .defaultRunInBroker(defaultRunInBroker)

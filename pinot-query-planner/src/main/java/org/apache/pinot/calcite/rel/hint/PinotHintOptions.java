@@ -125,6 +125,14 @@ public class PinotHintOptions {
      */
     public static final String APPEND_DISTINCT_TO_SEMI_JOIN_PROJECT = "append_distinct_to_semi_join_project";
 
+    /**
+     * Controls the additive INNER-join probe-side runtime filter. Supported values (case-insensitive):
+     * {@code off} (disable), {@code in} (exact IN list), {@code bloom} (bloom filter), {@code auto}
+     * (exact IN below a threshold, else bloom). When absent, the cluster/query-level default applies.
+     * See {@code PinotJoinToInnerRuntimeFilterRule}.
+     */
+    public static final String RUNTIME_FILTER = "runtime_filter";
+
     @Nullable
     public static Map<String, String> getJoinHintOptions(Join join) {
       return PinotHintStrategyTable.getHintOptions(join.getHints(), JOIN_HINT_OPTIONS);
@@ -154,6 +162,50 @@ public class PinotHintOptions {
     public static Boolean isColocatedByJoinKeys(Join join) {
       String hint = PinotHintStrategyTable.getHintOption(join.getHints(), JOIN_HINT_OPTIONS, IS_COLOCATED_BY_JOIN_KEYS);
       return hint != null ? Boolean.parseBoolean(hint) : null;
+    }
+
+    /**
+     * Returns the per-join {@link RuntimeFilterMode} from the {@link #RUNTIME_FILTER} hint, or
+     * {@code null} when the hint is absent (the cluster/query-level default then applies).
+     */
+    @Nullable
+    public static RuntimeFilterMode getRuntimeFilterMode(Join join) {
+      return RuntimeFilterMode.fromHint(
+          PinotHintStrategyTable.getHintOption(join.getHints(), JOIN_HINT_OPTIONS, RUNTIME_FILTER));
+    }
+  }
+
+  /**
+   * Mode for the additive INNER-join probe-side runtime filter, resolved from the {@link
+   * JoinHintOptions#RUNTIME_FILTER} hint or the cluster/query-level default.
+   */
+  public enum RuntimeFilterMode {
+    OFF, IN, BLOOM, AUTO;
+
+    /**
+     * Parses a hint value. Returns {@code null} for a {@code null}/empty hint (defer to the default);
+     * throws on an unrecognized value.
+     */
+    @Nullable
+    public static RuntimeFilterMode fromHint(@Nullable String hint) {
+      if (hint == null || hint.isEmpty()) {
+        return null;
+      }
+      switch (hint.toLowerCase()) {
+        case "off":
+        case "false":
+          return OFF;
+        case "in":
+          return IN;
+        case "bloom":
+          return BLOOM;
+        case "auto":
+        case "true":
+          return AUTO;
+        default:
+          throw new IllegalArgumentException("Unsupported runtime_filter hint value: " + hint
+              + " (expected one of: off, in, bloom, auto)");
+      }
     }
   }
 

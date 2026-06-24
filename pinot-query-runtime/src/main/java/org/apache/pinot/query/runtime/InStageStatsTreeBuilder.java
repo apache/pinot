@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -197,6 +198,12 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
           if (planNode instanceof MailboxReceiveNode) {
             return (MailboxReceiveNode) planNode;
           }
+        }
+      } else if (currentNode instanceof RuntimeFilterNode) {
+        // The additive INNER-join runtime filter carries its build-key pipeline breaker as input[1].
+        PlanNode planNode = currentNode.getInputs().get(1);
+        if (planNode instanceof MailboxReceiveNode) {
+          return (MailboxReceiveNode) planNode;
         }
       }
       nodeStack.addAll(currentNode.getInputs());
@@ -375,6 +382,27 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
   @Override
   public ObjectNode visitUnnest(UnnestNode node, Context context) {
     return recursiveCase(node, MultiStageOperator.Type.UNNEST, context);
+  }
+
+  @Override
+  public ObjectNode visitRuntimeFilter(RuntimeFilterNode node, Context context) {
+    // The probe leaf stage collapses RuntimeFilterNode (and the probe pipeline below input[0]) into a
+    // single LEAF operator at execution; its build-key pipeline breaker (input[1]) contributes a
+    // separate child sub-tree. This mirrors the SEMI dynamic-broadcast LEAF handling in recursiveCase,
+    // where the boundary node's actual operator type is LEAF rather than the node's own type.
+    OperatorTypeDescriptor type = _stageStats.getOperatorType(_index);
+    if (type == MultiStageOperator.Type.LEAF) {
+      int selfIndex = _index;
+      ObjectNode pipelineBreakerResultNode = extractPipelineBreakerResult(node, context);
+      if (pipelineBreakerResultNode != null) {
+        return selfNode(
+            MultiStageOperator.Type.LEAF, context, selfIndex, new JsonNode[] {pipelineBreakerResultNode}, false);
+      }
+      return selfNode(MultiStageOperator.Type.LEAF, context, _index, new JsonNode[0]);
+    }
+    // Not collapsed into a leaf (not expected for the additive INNER runtime filter, which always sits
+    // atop a leaf-pushable probe). Fall back to visiting the probe pipeline transparently.
+    return node.getInputs().get(0).visit(this, context);
   }
 
   public static class Context {
