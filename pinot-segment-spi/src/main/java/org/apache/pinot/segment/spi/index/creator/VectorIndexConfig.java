@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -50,6 +51,15 @@ public class VectorIndexConfig extends IndexConfig {
   private static final String DEFAULT_VERSION = "1";
   private static final VectorDistanceFunction DEFAULT_VECTOR_DISTANCE_FUNCTION =
       VectorDistanceFunction.COSINE;
+
+  /**
+   * Key in {@link #_properties} controlling whether the IVF vector index payload is consolidated
+   * into the segment's combined index file ({@code columns.psf}) instead of living as a separate
+   * sidecar file. Default {@code false} preserves the legacy sidecar layout. Mirrors the text
+   * index's {@code storeInSegmentFile} flag.
+   */
+  public static final String STORE_IN_SEGMENT_FILE = "storeInSegmentFile";
+  public static final boolean DEFAULT_STORE_IN_SEGMENT_FILE = false;
 
   private String _vectorIndexType;
   private int _vectorDimension;
@@ -137,6 +147,31 @@ public class VectorIndexConfig extends IndexConfig {
   public VectorIndexConfig setProperties(Map<String, String> properties) {
     _properties = properties;
     return this;
+  }
+
+  /**
+   * Whether the IVF vector index payload is consolidated into the segment's combined index file
+   * ({@code columns.psf}) rather than written as a sidecar file. Default {@code false}. Only
+   * applies to V3 segments and IVF backends; HNSW is unaffected.
+   *
+   * <p>When {@code true} the segment build still produces a transient sidecar file via the IVF
+   * creator; the {@code VectorIndexHandler} then absorbs it into {@code columns.psf} as a typed
+   * entry and deletes the sibling. The reader path is selected by this flag — flag-on reads
+   * from {@code segmentReader.getIndexFor(column, StandardIndexes.vector())}, flag-off reads
+   * the legacy sidecar mmap.</p>
+   *
+   * <p>This accessor is intentionally not a JSON property: the value is carried inside the
+   * {@code properties} map (key {@link #STORE_IN_SEGMENT_FILE}). Marking it {@link JsonIgnore}
+   * keeps the on-wire shape of {@code VectorIndexConfig} unchanged for callers that round-trip
+   * the config through Jackson.</p>
+   */
+  @JsonIgnore
+  public boolean isStoreInSegmentFile() {
+    if (_properties == null) {
+      return DEFAULT_STORE_IN_SEGMENT_FILE;
+    }
+    String value = _properties.get(STORE_IN_SEGMENT_FILE);
+    return value == null ? DEFAULT_STORE_IN_SEGMENT_FILE : Boolean.parseBoolean(value);
   }
 
   /**

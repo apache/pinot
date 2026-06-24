@@ -160,8 +160,11 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     if (type == StandardIndexes.text() && TextIndexUtils.hasTextIndex(_segmentDirectory, column)) {
       return true;
     }
-    if (type == StandardIndexes.vector()) {
-      return VectorIndexUtils.hasVectorIndex(_segmentDirectory, column);
+    // Vector index may live either as a sidecar file (legacy / storeInSegmentFile=false) or as
+    // a typed entry inside columns.psf (storeInSegmentFile=true). Check both — mirror the text
+    // pattern of "sidecar OR _columnEntries".
+    if (type == StandardIndexes.vector() && VectorIndexUtils.hasVectorIndex(_segmentDirectory, column)) {
+      return true;
     }
     IndexKey key = new IndexKey(column, type);
     return _columnEntries.containsKey(key);
@@ -502,9 +505,12 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
     }
+    // Vector index can live as a sidecar file and / or as a typed entry in columns.psf;
+    // clean both. The early-return that was here previously left the columns.psf entry
+    // dangling whenever a consolidated vector index needed to be removed (e.g. rebuild on
+    // backend-type change).
     if (indexType == StandardIndexes.vector()) {
       VectorIndexUtils.cleanupVectorIndex(_segmentDirectory, columnName);
-      return;
     }
     // Only remember to cleanup indices upon close(), if any existing
     // index gets marked for removal.
@@ -525,12 +531,14 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       }
     }
     if (type == StandardIndexes.vector()) {
+      // Vector may live as a sidecar file (legacy / storeInSegmentFile=false) or as a typed
+      // entry in columns.psf (storeInSegmentFile=true). Collect both. Removed the early-return
+      // that previously hid consolidated entries from this view.
       for (String column : _segmentMetadata.getAllColumns()) {
         if (VectorIndexUtils.hasVectorIndex(_segmentDirectory, column)) {
           columns.add(column);
         }
       }
-      return columns;
     }
     for (IndexKey indexKey : _columnEntries.keySet()) {
       if (indexKey._type == type) {

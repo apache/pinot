@@ -221,6 +221,120 @@ public class IvfReaderFailurePathTest {
   }
 
   // ---------------------------------------------------------------------------
+  // Borrowed-buffer path (ownsBuffer=false) — used when the buffer comes from columns.psf
+  // ---------------------------------------------------------------------------
+
+  /**
+   * When {@code ownsBuffer=false}, the reader must NOT close the buffer in {@link
+   * org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader#close()}.
+   * The segment directory owns the lifetime in the consolidated path.
+   */
+  @Test
+  public void testIvfFlatBorrowedBufferNotClosedByReader()
+      throws Exception {
+    File tempDir = Files.createTempDirectory("ivf_borrowed_flat_").toFile();
+    try {
+      VectorIndexConfig config = ivfFlatConfig();
+      buildIvfFlatIndex(tempDir, config);
+
+      long baseline = PinotDataBuffer.getMmapBufferCount();
+      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecar(tempDir, COLUMN, config, OWNER_LABEL);
+      try (IvfFlatVectorIndexReader reader =
+          new IvfFlatVectorIndexReader(COLUMN, buffer, config, /* ownsBuffer */ false)) {
+        Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1,
+            "construction must hold exactly one extra mmap");
+        Assert.assertEquals(reader.getNumVectors(), NUM_VECTORS);
+      }
+      Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1,
+          "borrowed buffer must survive reader.close()");
+      // Caller (the test) releases it explicitly.
+      buffer.close();
+      Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline);
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
+  }
+
+  @Test
+  public void testIvfPqBorrowedBufferNotClosedByReader()
+      throws Exception {
+    File tempDir = Files.createTempDirectory("ivf_borrowed_pq_").toFile();
+    try {
+      VectorIndexConfig config = ivfPqConfig();
+      buildIvfPqIndex(tempDir, config);
+
+      long baseline = PinotDataBuffer.getMmapBufferCount();
+      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecar(tempDir, COLUMN, config, OWNER_LABEL);
+      try (IvfPqVectorIndexReader reader =
+          new IvfPqVectorIndexReader(COLUMN, buffer, config, /* ownsBuffer */ false)) {
+        Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1);
+        Assert.assertEquals(reader.getNumVectors(), NUM_VECTORS);
+      }
+      Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1,
+          "borrowed buffer must survive reader.close()");
+      buffer.close();
+      Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline);
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
+  }
+
+  @Test
+  public void testIvfOnDiskBorrowedBufferNotClosedByReader()
+      throws Exception {
+    File tempDir = Files.createTempDirectory("ivf_borrowed_ondisk_").toFile();
+    try {
+      VectorIndexConfig config = ivfFlatConfig();
+      buildIvfFlatIndex(tempDir, config);
+
+      long baseline = PinotDataBuffer.getMmapBufferCount();
+      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecar(tempDir, COLUMN, config, OWNER_LABEL);
+      try (IvfOnDiskVectorIndexReader reader =
+          new IvfOnDiskVectorIndexReader(COLUMN, buffer, config, /* ownsBuffer */ false)) {
+        Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1);
+        Assert.assertEquals(reader.getNumVectors(), NUM_VECTORS);
+      }
+      Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1,
+          "borrowed buffer must survive reader.close()");
+      buffer.close();
+      Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline);
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
+  }
+
+  /**
+   * Constructor failure on a borrowed buffer must NOT close it either — the segment directory
+   * still owns the lifetime even if a particular reader fails to initialise.
+   */
+  @Test
+  public void testIvfFlatBorrowedBufferNotClosedOnConstructorFailure()
+      throws Exception {
+    File tempDir = Files.createTempDirectory("ivf_borrow_fail_flat_").toFile();
+    try {
+      VectorIndexConfig config = ivfFlatConfig();
+      buildIvfFlatIndex(tempDir, config);
+      File sidecar = new File(tempDir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+      File corrupted = corruptMagic(sidecar);
+
+      long baseline = PinotDataBuffer.getMmapBufferCount();
+      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(corrupted, COLUMN, OWNER_LABEL);
+      try {
+        new IvfFlatVectorIndexReader(COLUMN, buffer, config, /* ownsBuffer */ false);
+        Assert.fail("Expected RuntimeException from corrupted IVF_FLAT magic");
+      } catch (RuntimeException expected) {
+        // Expected.
+      }
+      Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1,
+          "borrowed buffer must NOT be closed when a borrowed-mode constructor fails");
+      buffer.close();
+      Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline);
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------------------
 
