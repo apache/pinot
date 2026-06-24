@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
+import java.nio.ByteOrder;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -44,6 +46,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -183,6 +186,78 @@ public class VectorIndexHandlerTest {
   }
 
   /**
+   * Reverse migration: segment has the vector index consolidated inside {@code columns.psf} and
+   * the table now wants the legacy sidecar layout ({@code storeInSegmentFile=false}). The
+   * handler must detect the mismatch on load and extract the bytes back into a sidecar file.
+   */
+  @Test
+  public void testNeedUpdateIndicesReturnsTrueWhenConsolidatedExistsButFlagWantsSidecar()
+      throws Exception {
+    // Set up a V3 segment with no sidecar file, but report the column as having a vector index
+    // via the SegmentDirectory's getColumnsWithIndex (simulating a consolidated _columnEntries
+    // entry, since the real SingleFileIndexDirectory would surface it that way).
+    File indexDir = createEmptyV3SegmentDir();
+    try {
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir, SegmentVersion.v3);
+      SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+      when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
+
+      VectorIndexHandler handler = createHandler(segmentDirectory,
+          vectorIndexConfigWithConsolidation("IVF_FLAT", /* storeInSegmentFile */ false));
+
+      assertTrue(handler.needUpdateIndices(reader),
+          "Consolidated entry + flag off => handler must re-run to extract bytes back to sidecar");
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
+   * Full extract path: the consolidated bytes inside {@code columns.psf} are streamed back to
+   * a sidecar file, the consolidated entry is dropped, and the resulting sidecar exists on disk
+   * with the expected extension and byte content.
+   */
+  @Test
+  public void testUpdateIndicesExtractsConsolidatedBytesIntoSidecar()
+      throws Exception {
+    File indexDir = createEmptyV3SegmentDir();
+    try {
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir, SegmentVersion.v3);
+      SegmentDirectory.Writer writer = mock(SegmentDirectory.Writer.class);
+      when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
+
+      // Make the writer's getIndexFor return a buffer holding a known payload, then assert the
+      // sidecar on disk contains those exact bytes.
+      byte[] expectedPayload = new byte[] {(byte) 0xAB, (byte) 0xCD, (byte) 0xEF, 0x01, 0x02, 0x03, 0x04, 0x05};
+      PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(expectedPayload.length,
+          ByteOrder.BIG_ENDIAN, "vector-extract-test");
+      try {
+        buffer.readFrom(0, expectedPayload, 0, expectedPayload.length);
+        when(writer.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector()))).thenReturn(buffer);
+
+        VectorIndexHandler handler = createHandler(segmentDirectory,
+            vectorIndexConfigWithConsolidation("IVF_FLAT", /* storeInSegmentFile */ false));
+        handler.updateIndices(writer);
+
+        verify(writer).removeIndex(eq(COLUMN), eq(StandardIndexes.vector()));
+        File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+        File extracted = new File(v3Dir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+        assertTrue(extracted.exists(), "extracted sidecar must exist at the final path");
+        byte[] actual = Files.readAllBytes(extracted.toPath());
+        assertEquals(actual, expectedPayload,
+            "extracted sidecar bytes must match the consolidated payload exactly");
+        // Temp file must have been cleaned up by rename.
+        File temp = new File(v3Dir, COLUMN + ".vector.extract-tmp");
+        assertFalse(temp.exists(), "temp extract file must be gone after rename");
+      } finally {
+        buffer.close();
+      }
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
    * Crash-recovery: if a previous absorb run committed bytes into {@code columns.psf} but then
    * died before deleting the sidecar, the next load should detect the duplicate and clean up
    * the orphan sidecar instead of failing the segment load. The
@@ -254,6 +329,20 @@ public class VectorIndexHandlerTest {
     File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     assertTrue(v3Dir.mkdir());
     FileUtils.touch(new File(v3Dir, COLUMN + suffix));
+    return indexDir;
+  }
+
+  /**
+   * V3 segment directory with no sidecar file. Used to simulate a segment whose vector payload
+   * is only present as a typed entry inside {@code columns.psf} (the consolidated form).
+   */
+  private static File createEmptyV3SegmentDir()
+      throws Exception {
+    File indexDir = new File(FileUtils.getTempDirectory(), "vector-index-handler-test-" + System.nanoTime());
+    FileUtils.deleteQuietly(indexDir);
+    assertTrue(indexDir.mkdirs());
+    File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    assertTrue(v3Dir.mkdir());
     return indexDir;
   }
 }
