@@ -36,7 +36,7 @@ import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVector
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfPqVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.vector.IvfPqVectorIndexCreator;
-import org.apache.pinot.segment.local.segment.index.vector.IvfSidecarBuffers;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 import org.apache.pinot.segment.spi.index.reader.EfSearchAware;
@@ -126,7 +126,7 @@ public final class BenchmarkVectorFeatureWorkloads {
             BenchmarkVectorIndex.measureBuild(corpus.length, () -> buildIvfFlatIndex(indexDir, corpus, config));
         long sizeBytes = BenchmarkVectorIndex.ivfIndexSize(indexDir);
         try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
-            IvfSidecarBuffers.mapSidecar(indexDir, COLUMN_NAME, config, "bench-vector"), config)) {
+            IvfCombinedBuffers.mapCombined(indexDir, COLUMN_NAME, config, "bench-vector"), config)) {
           reader.setNprobe(NPROBE);
           long[] latencies = measureLatencies(queries, query -> reader.getDocIds(query, TOP_K));
           double recall10 = measureRecall(truth, queries, query -> BenchmarkVectorIndex.bitmapToSet(reader.getDocIds(
@@ -148,7 +148,7 @@ public final class BenchmarkVectorFeatureWorkloads {
             BenchmarkVectorIndex.measureBuild(corpus.length, () -> buildIvfPqIndex(indexDir, corpus, config));
         long sizeBytes = FileUtils.sizeOfDirectory(indexDir);
         try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
-            IvfSidecarBuffers.mapSidecar(indexDir, COLUMN_NAME, config, "bench-vector"), config)) {
+            IvfCombinedBuffers.mapCombined(indexDir, COLUMN_NAME, config, "bench-vector"), config)) {
           reader.setNprobe(NPROBE);
           long[] latencies = measureLatencies(queries, query -> reader.getDocIds(query, TOP_K));
           double recall10 = measureRecall(truth, queries, query -> BenchmarkVectorIndex.bitmapToSet(reader.getDocIds(

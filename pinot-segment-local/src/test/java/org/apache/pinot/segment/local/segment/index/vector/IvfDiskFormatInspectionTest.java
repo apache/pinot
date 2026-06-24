@@ -67,7 +67,7 @@ public class IvfDiskFormatInspectionTest {
       }
 
       File indexFile = new File(tempDir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
-      Assert.assertTrue(indexFile.exists(), "IVF_FLAT sidecar file must exist");
+      Assert.assertTrue(indexFile.exists(), "IVF_FLAT combined file must exist");
       long size = indexFile.length();
       byte[] all = Files.readAllBytes(indexFile.toPath());
       System.out.printf("[ivf-flat] file=%s size=%d bytes%n", indexFile.getName(), size);
@@ -99,7 +99,7 @@ public class IvfDiskFormatInspectionTest {
       Assert.assertEquals(quantParamLen, 0, "FLAT quantizer has no params");
 
       // Now buffer-based reader must surface the same values via its public API.
-      try (PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(indexFile, COLUMN, "inspect-flat");
+      try (PinotDataBuffer buffer = IvfCombinedBuffers.mapCombinedFile(indexFile, COLUMN, "inspect-flat");
           IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN, buffer, config)) {
         System.out.printf("[ivf-flat] reader: dim=%d numVec=%d nlist=%d quantizer=%s%n",
             reader.getDimension(), reader.getNumVectors(), reader.getNlist(), reader.getQuantizerType());
@@ -154,7 +154,7 @@ public class IvfDiskFormatInspectionTest {
             "list offset " + i + " must lie between header end and offsets table");
       }
 
-      try (PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(indexFile, COLUMN, "inspect-ondisk");
+      try (PinotDataBuffer buffer = IvfCombinedBuffers.mapCombinedFile(indexFile, COLUMN, "inspect-ondisk");
           IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN, buffer, config)) {
         System.out.printf("[ivf-on-disk] reader: dim=%d numVec=%d nlist=%d%n",
             reader.getDimension(), reader.getNumVectors(), reader.getNlist());
@@ -184,7 +184,7 @@ public class IvfDiskFormatInspectionTest {
 
       File indexFile = new File(tempDir, COLUMN + IvfPqVectorIndexCreator.INDEX_FILE_EXTENSION);
       Assert.assertTrue(indexFile.exists(),
-          "IVF_PQ sidecar file must exist: " + indexFile.getAbsolutePath());
+          "IVF_PQ combined file must exist: " + indexFile.getAbsolutePath());
 
       long size = indexFile.length();
       byte[] all = Files.readAllBytes(indexFile.toPath());
@@ -203,7 +203,7 @@ public class IvfDiskFormatInspectionTest {
 
       // Read full payload via IvfPqIndexFormat from a file then from a buffer; both must agree.
       IvfPqIndexFormat.IndexData fromFile = IvfPqIndexFormat.read(indexFile);
-      try (PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(indexFile, COLUMN, "inspect-pq")) {
+      try (PinotDataBuffer buffer = IvfCombinedBuffers.mapCombinedFile(indexFile, COLUMN, "inspect-pq")) {
         IvfPqIndexFormat.IndexData fromBuffer = IvfPqIndexFormat.read(buffer);
         System.out.printf("[ivf-pq] file:   dim=%d numVec=%d nlist=%d pqM=%d pqNbits=%d%n",
             fromFile.getDimension(), fromFile.getNumVectors(), fromFile.getNlist(),
@@ -229,7 +229,7 @@ public class IvfDiskFormatInspectionTest {
       }
 
       // And the reader itself
-      try (PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(indexFile, COLUMN, "inspect-pq-reader");
+      try (PinotDataBuffer buffer = IvfCombinedBuffers.mapCombinedFile(indexFile, COLUMN, "inspect-pq-reader");
           IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN, buffer, config)) {
         System.out.printf("[ivf-pq] reader: dim=%d numVec=%d nlist=%d pqM=%d pqNbits=%d%n",
             reader.getDimension(), reader.getNumVectors(), reader.getNlist(),
@@ -287,7 +287,7 @@ public class IvfDiskFormatInspectionTest {
   /**
    * When {@code storeInSegmentFile=true}, the IVF_FLAT creator must write to the {@code
    * .vector.ivfflat.combined.index} extension instead of the legacy {@code .vector.ivfflat.index}
-   * sidecar. The on-disk bytes are byte-identical to the legacy form; only the file name differs.
+   * combined. The on-disk bytes are byte-identical to the legacy form; only the file name differs.
    * The V2→V3 converter picks up the combined extension via the standard {@code copyIndexIfExists}
    * path and packs the bytes into {@code columns.psf}.
    */
@@ -317,7 +317,7 @@ public class IvfDiskFormatInspectionTest {
       File combinedFile = new File(tempDir,
           COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
       Assert.assertFalse(legacyFile.exists(),
-          "Legacy IVF_FLAT sidecar must NOT exist when storeInSegmentFile=true");
+          "Legacy IVF_FLAT combined must NOT exist when storeInSegmentFile=true");
       Assert.assertTrue(combinedFile.exists(),
           "Combined IVF_FLAT file must exist when storeInSegmentFile=true: " + combinedFile);
 
@@ -370,7 +370,7 @@ public class IvfDiskFormatInspectionTest {
       File combinedFile = new File(tempDir,
           COLUMN + V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
       Assert.assertFalse(legacyFile.exists(),
-          "Legacy IVF_PQ sidecar must NOT exist when storeInSegmentFile=true");
+          "Legacy IVF_PQ combined must NOT exist when storeInSegmentFile=true");
       Assert.assertTrue(combinedFile.exists(),
           "Combined IVF_PQ file must exist when storeInSegmentFile=true: " + combinedFile);
 

@@ -44,7 +44,7 @@ import static org.testng.Assert.assertTrue;
  * End-to-end integration test for IVF_FLAT with {@code storeInSegmentFile=true}.
  *
  * <p>Mirrors the table-config layout in {@link IvfFlatVectorTest} but with the consolidation
- * flag turned on. The first server load absorbs the offline-built sidecar into {@code
+ * flag turned on. The first server load absorbs the offline-built combined into {@code
  * columns.psf}; subsequent queries read the typed entry directly from the segment's combined
  * index file. The single test method asserts that a {@code vectorSimilarity} query returns
  * sensible top-K ANN candidates — i.e. the consolidated read path actually executes.</p>
@@ -84,7 +84,7 @@ public class IvfFlatConsolidatedVectorTest extends CustomDataQueryClusterIntegra
                     "nlist", String.valueOf(NLIST),
                     "version", "1",
                     // Consolidation: the IVF payload is moved into columns.psf as a typed entry
-                    // after the offline build, instead of remaining as a sibling sidecar file.
+                    // after the offline build, instead of remaining as a sibling combined file.
                     "storeInSegmentFile", "true"))
                 .build()
         ))

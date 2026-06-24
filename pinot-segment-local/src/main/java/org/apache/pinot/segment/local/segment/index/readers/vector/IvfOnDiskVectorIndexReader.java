@@ -29,8 +29,8 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
-import org.apache.pinot.segment.local.segment.index.vector.IvfSidecarBuffers;
 import org.apache.pinot.segment.local.segment.index.vector.VectorQuantizationUtils;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
@@ -82,7 +82,7 @@ public class IvfOnDiskVectorIndexReader
   private final float[][] _centroids;
 
   // Backing buffer for random-access reads of inverted list data. Closed by this reader only
-  // when {@code _ownsBuffer} is true (sidecar mmap); borrowed buffers (segment-directory owned)
+  // when {@code _ownsBuffer} is true (combined mmap); borrowed buffers (segment-directory owned)
   // outlive the reader. The buffer is mapped BIG_ENDIAN to match the IVF_FLAT on-disk format.
   private final PinotDataBuffer _buffer;
   private final boolean _ownsBuffer;
@@ -211,7 +211,7 @@ public class IvfOnDiskVectorIndexReader
       // close — but only if we own it. Borrowed buffers (segment-directory owned) are released
       // by their owner.
       if (_ownsBuffer) {
-        IvfSidecarBuffers.closeQuietly(_buffer);
+        IvfCombinedBuffers.closeQuietly(_buffer);
       }
       throw e instanceof RuntimeException ? (RuntimeException) e
           : new RuntimeException("Failed to open IVF index for column: " + column, e);

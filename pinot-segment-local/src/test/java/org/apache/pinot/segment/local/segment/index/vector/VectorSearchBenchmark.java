@@ -99,7 +99,7 @@ public class VectorSearchBenchmark {
     }
 
     _ivfReader = new IvfFlatVectorIndexReader("embedding",
-        IvfSidecarBuffers.mapSidecar(_tempDir, "embedding", config, "test-vector"), config);
+        IvfCombinedBuffers.mapCombined(_tempDir, "embedding", config, "test-vector"), config);
   }
 
   @AfterClass

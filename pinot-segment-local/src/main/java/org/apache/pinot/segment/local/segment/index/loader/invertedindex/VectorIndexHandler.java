@@ -90,21 +90,21 @@ public class VectorIndexHandler extends BaseIndexHandler {
           && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
           && desiredBackend != VectorBackendType.HNSW
           && existingBackend != null
-          && hasIvfSidecar(indexDir, column)) {
-        LOGGER.info("Need to consolidate Vector sidecar into columns.psf for segment: {}, column: {}",
+          && hasIvfCombinedFile(indexDir, column)) {
+        LOGGER.info("Need to consolidate Vector sidecar file into columns.psf for segment: {}, column: {}",
             segmentName, column);
         return true;
       }
       // Migration: columns.psf -> sidecar. Fires when the operator flipped the flag from on to
       // off for a segment whose vector payload was previously absorbed. We detect this from the
       // SegmentDirectory: the column has a vector index ({@code existingColumns} contains it via
-      // {@code SingleFileIndexDirectory._columnEntries}) but no sidecar is on disk.
+      // {@code SingleFileIndexDirectory._columnEntries}) but no sidecar file is on disk.
       if (!desiredConfig.isStoreInSegmentFile()
           && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
           && desiredBackend != VectorBackendType.HNSW
           && existingBackend == null
-          && !hasIvfSidecar(indexDir, column)) {
-        LOGGER.info("Need to extract Vector consolidated entry to sidecar for segment: {}, column: {}",
+          && !hasIvfCombinedFile(indexDir, column)) {
+        LOGGER.info("Need to extract Vector consolidated entry to sidecar file for segment: {}, column: {}",
             segmentName, column);
         return true;
       }
@@ -121,45 +121,45 @@ public class VectorIndexHandler extends BaseIndexHandler {
   }
 
   /**
-   * Absorbs an IVF sidecar into {@code columns.psf} as a typed entry, then deletes the sibling.
-   * The bytes inside the sidecar are not re-interpreted — they're copied verbatim. The on-disk
+   * Absorbs an IVF sidecar file into {@code columns.psf} as a typed entry, then deletes the sibling.
+   * The bytes inside the sidecar file are not re-interpreted — they're copied verbatim. The on-disk
    * IVF header (and any later format version byte) is the contract; the reader handles version
    * dispatch.
    *
    * <p><b>Crash recovery:</b> if a prior absorb crashed between {@code newIndexFor} (which
    * committed bytes into {@code columns.psf} and added a {@code _columnEntries} entry) and the
-   * sidecar deletion, the next load will see both forms. In that case
+   * sidecar file deletion, the next load will see both forms. In that case
    * {@code SingleFileIndexDirectory.allocNewBufferInternal} rejects the duplicate key. Treat that
-   * specific failure as "already absorbed by a previous run" and clean up the orphan sidecar
+   * specific failure as "already absorbed by a previous run" and clean up the orphan sidecar file
    * instead of failing the segment load.</p>
    */
-  private void absorbSidecarIntoColumnsPsf(SegmentDirectory.Writer segmentWriter, String column,
+  private void absorbCombinedIntoColumnsPsf(SegmentDirectory.Writer segmentWriter, String column,
       VectorBackendType backendType, File indexDir)
       throws Exception {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
     // Prefer the combined-form file (freshly-written by a creator run with flag=on); fall back to
     // the legacy sidecar (segments built with flag=off that the operator now wants consolidated).
-    File combined = new File(v3Dir,
+    File combinedFile = new File(v3Dir,
         column + VectorIndexUtils.getIndexFileExtension(backendType, /* combined */ true));
-    File legacy = new File(v3Dir,
+    File legacyFile = new File(v3Dir,
         column + VectorIndexUtils.getIndexFileExtension(backendType, /* combined */ false));
-    File sidecar = combined.exists() ? combined : legacy;
-    if (!sidecar.exists()) {
-      LOGGER.warn("Expected sidecar {} not found during vector consolidation; skipping", sidecar);
+    File picked = combinedFile.exists() ? combinedFile : legacyFile;
+    if (!picked.exists()) {
+      LOGGER.warn("Expected vector index file {} not found during vector consolidation; skipping", picked);
       return;
     }
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
-    LOGGER.info("Absorbing vector sidecar into columns.psf for segment: {}, column: {} (backend={})",
+    LOGGER.info("Absorbing vector sidecar file into columns.psf for segment: {}, column: {} (backend={})",
         segmentName, column, backendType);
     try {
-      LoaderUtils.writeIndexToV3Format(segmentWriter, column, sidecar, StandardIndexes.vector());
+      LoaderUtils.writeIndexToV3Format(segmentWriter, column, picked, StandardIndexes.vector());
     } catch (RuntimeException e) {
       String msg = e.getMessage();
       if (msg != null && msg.contains("Attempt to re-create an existing index")) {
         LOGGER.warn("Vector index already present in columns.psf for segment: {}, column: {}; "
-            + "deleting orphan sidecar from a previously-crashed absorb run", segmentName, column);
-        FileUtils.deleteQuietly(sidecar);
+            + "deleting orphan sidecar file from a previously-crashed absorb run", segmentName, column);
+        FileUtils.deleteQuietly(picked);
         return;
       }
       throw e;
@@ -174,35 +174,35 @@ public class VectorIndexHandler extends BaseIndexHandler {
    * <p><b>Ordering:</b> the bytes are streamed to a temp file <em>before</em> {@code removeIndex}
    * is called, because {@code SingleFileIndexDirectory.removeIndex} for vector also runs
    * {@link VectorIndexUtils#cleanupVectorIndex(File, String)} — which would delete any file
-   * that already has the final sidecar extension. We use a {@code .vector.extract-tmp}
+   * that already has the final combined extension. We use a {@code .vector.extract-tmp}
    * extension that is <em>not</em> recognised by {@code cleanupVectorIndex}, then rename to
    * the final IVF extension after the consolidated entry is gone.</p>
    */
-  private void extractConsolidatedIntoSidecar(SegmentDirectory.Writer segmentWriter, String column,
+  private void extractConsolidatedToLegacyFile(SegmentDirectory.Writer segmentWriter, String column,
       VectorBackendType backendType, File indexDir)
       throws IOException {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
-    File finalSidecar = new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(backendType));
-    File tempSidecar = new File(v3Dir, column + ".vector.extract-tmp");
+    File finalCombined = new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(backendType));
+    File tempCombined = new File(v3Dir, column + ".vector.extract-tmp");
     // Clean any leftover from a previously-crashed extract.
-    FileUtils.deleteQuietly(tempSidecar);
+    FileUtils.deleteQuietly(tempCombined);
 
-    LOGGER.info("Extracting vector consolidated entry to sidecar for segment: {}, column: {} (backend={})",
+    LOGGER.info("Extracting vector consolidated entry to sidecar file for segment: {}, column: {} (backend={})",
         segmentName, column, backendType);
     PinotDataBuffer buffer = segmentWriter.getIndexFor(column, StandardIndexes.vector());
     long size = buffer.size();
-    streamBufferToFile(buffer, size, tempSidecar);
+    streamBufferToFile(buffer, size, tempCombined);
 
     // Remove the consolidated entry. {@code cleanupVectorIndex} runs as a side effect; it will
     // not touch our temp file because the temp extension is not in its recognised list.
     segmentWriter.removeIndex(column, StandardIndexes.vector());
 
-    if (!tempSidecar.renameTo(finalSidecar)) {
+    if (!tempCombined.renameTo(finalCombined)) {
       // Best-effort copy-and-delete fallback if rename fails (e.g. cross-FS in tests).
-      FileUtils.copyFile(tempSidecar, finalSidecar);
-      FileUtils.deleteQuietly(tempSidecar);
+      FileUtils.copyFile(tempCombined, finalCombined);
+      FileUtils.deleteQuietly(tempCombined);
     }
   }
 
@@ -235,7 +235,7 @@ public class VectorIndexHandler extends BaseIndexHandler {
    * {@code columns.psf}. HNSW directories are not treated here because HNSW does not currently
    * support consolidation.
    */
-  private boolean hasIvfSidecar(File indexDir, String column) {
+  private boolean hasIvfCombinedFile(File indexDir, String column) {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
     return new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.IVF_FLAT)).exists()
@@ -272,14 +272,14 @@ public class VectorIndexHandler extends BaseIndexHandler {
         continue;
       }
       // Backend matches, but the table now wants the IVF payload consolidated into columns.psf
-      // and a sidecar still exists. Absorb the sidecar without rebuilding — preserves the bytes
+      // and a sidecar file still exists. Absorb the sidecar without rebuilding — preserves the bytes
       // the offline build produced.
       if (desiredConfig.isStoreInSegmentFile()
           && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
           && desiredBackend != VectorBackendType.HNSW
           && existingBackend != null
-          && hasIvfSidecar(indexDir, column)) {
-        absorbSidecarIntoColumnsPsf(segmentWriter, column, desiredBackend, indexDir);
+          && hasIvfCombinedFile(indexDir, column)) {
+        absorbCombinedIntoColumnsPsf(segmentWriter, column, desiredBackend, indexDir);
         continue;
       }
       // Backend matches, but the table now wants the IVF payload back in the sidecar layout and
@@ -289,8 +289,8 @@ public class VectorIndexHandler extends BaseIndexHandler {
           && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
           && desiredBackend != VectorBackendType.HNSW
           && existingBackend == null
-          && !hasIvfSidecar(indexDir, column)) {
-        extractConsolidatedIntoSidecar(segmentWriter, column, desiredBackend, indexDir);
+          && !hasIvfCombinedFile(indexDir, column)) {
+        extractConsolidatedToLegacyFile(segmentWriter, column, desiredBackend, indexDir);
       }
     }
     for (String column : columnsToAddIdx) {
@@ -349,14 +349,14 @@ public class VectorIndexHandler extends BaseIndexHandler {
 
     // For v3 segments with storeInSegmentFile=true, absorb the freshly-written sidecar into
     // columns.psf as a typed entry and delete the sibling file. Mirrors the text-index path
-    // (TextIndexHandler.convertTextIndexToV3Format). HNSW is sidecar-only; only IVF supports
+    // (TextIndexHandler.convertTextIndexToV3Format). HNSW is combined-only; only IVF supports
     // consolidation here. The shared helper handles the crash-recovery case (duplicate-key
     // error from a previously-crashed absorb).
     if (config.isStoreInSegmentFile()
         && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
         && backendType != VectorBackendType.HNSW
         && vectorIndexFile.exists()) {
-      absorbSidecarIntoColumnsPsf(segmentWriter, columnName, backendType, indexDir);
+      absorbCombinedIntoColumnsPsf(segmentWriter, columnName, backendType, indexDir);
     }
 
     // Delete the marker file.

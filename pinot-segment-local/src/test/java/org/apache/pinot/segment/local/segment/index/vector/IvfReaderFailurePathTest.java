@@ -43,7 +43,7 @@ import org.testng.annotations.Test;
  * to {@code close()}, and the mmap would leak). This test exercises that contract end-to-end:</p>
  *
  * <ol>
- *   <li>Build a valid IVF sidecar via the unchanged creator.</li>
+ *   <li>Build a valid IVF combined via the unchanged creator.</li>
  *   <li>Produce a copy whose magic bytes are zeroed out — guaranteed to fail the magic check.</li>
  *   <li>Snapshot {@link PinotDataBuffer#getMmapBufferCount()} before mapping the corrupted file.</li>
  *   <li>Map the corrupted file (count goes up by 1) and try to construct the reader (throws).</li>
@@ -73,14 +73,14 @@ public class IvfReaderFailurePathTest {
     try {
       VectorIndexConfig config = ivfFlatConfig();
       buildIvfFlatIndex(tempDir, config);
-      File sidecar = new File(tempDir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
-      File corrupted = corruptMagic(sidecar);
+      File combined = new File(tempDir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+      File corrupted = corruptMagic(combined);
 
       // Baseline ----------------------------------------------------------------
       long baseline = PinotDataBuffer.getMmapBufferCount();
 
       // Construction must throw, and must release the mmap before propagating.
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(corrupted, COLUMN, OWNER_LABEL);
+      PinotDataBuffer buffer = IvfCombinedBuffers.mapCombinedFile(corrupted, COLUMN, OWNER_LABEL);
       Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1,
           "mmap count should have incremented after mapping corrupted file");
       try {
@@ -105,7 +105,7 @@ public class IvfReaderFailurePathTest {
       buildIvfFlatIndex(tempDir, config);
 
       long baseline = PinotDataBuffer.getMmapBufferCount();
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecar(tempDir, COLUMN, config, OWNER_LABEL);
+      PinotDataBuffer buffer = IvfCombinedBuffers.mapCombined(tempDir, COLUMN, config, OWNER_LABEL);
       try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN, buffer, config)) {
         Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1,
             "successful construction must hold exactly one extra mmap");
@@ -129,11 +129,11 @@ public class IvfReaderFailurePathTest {
     try {
       VectorIndexConfig config = ivfFlatConfig();
       buildIvfFlatIndex(tempDir, config);
-      File sidecar = new File(tempDir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
-      File corrupted = corruptMagic(sidecar);
+      File combined = new File(tempDir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+      File corrupted = corruptMagic(combined);
 
       long baseline = PinotDataBuffer.getMmapBufferCount();
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(corrupted, COLUMN, OWNER_LABEL);
+      PinotDataBuffer buffer = IvfCombinedBuffers.mapCombinedFile(corrupted, COLUMN, OWNER_LABEL);
       try {
         new IvfOnDiskVectorIndexReader(COLUMN, buffer, config);
         Assert.fail("Expected RuntimeException from corrupted IVF magic");
@@ -156,7 +156,7 @@ public class IvfReaderFailurePathTest {
       buildIvfFlatIndex(tempDir, config);
 
       long baseline = PinotDataBuffer.getMmapBufferCount();
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecar(tempDir, COLUMN, config, OWNER_LABEL);
+      PinotDataBuffer buffer = IvfCombinedBuffers.mapCombined(tempDir, COLUMN, config, OWNER_LABEL);
       try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN, buffer, config)) {
         Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1,
             "successful construction must hold exactly one extra mmap");
@@ -180,11 +180,11 @@ public class IvfReaderFailurePathTest {
     try {
       VectorIndexConfig config = ivfPqConfig();
       buildIvfPqIndex(tempDir, config);
-      File sidecar = new File(tempDir, COLUMN + IvfPqVectorIndexCreator.INDEX_FILE_EXTENSION);
-      File corrupted = corruptMagic(sidecar);
+      File combined = new File(tempDir, COLUMN + IvfPqVectorIndexCreator.INDEX_FILE_EXTENSION);
+      File corrupted = corruptMagic(combined);
 
       long baseline = PinotDataBuffer.getMmapBufferCount();
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(corrupted, COLUMN, OWNER_LABEL);
+      PinotDataBuffer buffer = IvfCombinedBuffers.mapCombinedFile(corrupted, COLUMN, OWNER_LABEL);
       try {
         new IvfPqVectorIndexReader(COLUMN, buffer, config);
         Assert.fail("Expected RuntimeException from corrupted IVF_PQ magic");
@@ -207,7 +207,7 @@ public class IvfReaderFailurePathTest {
       buildIvfPqIndex(tempDir, config);
 
       long baseline = PinotDataBuffer.getMmapBufferCount();
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecar(tempDir, COLUMN, config, OWNER_LABEL);
+      PinotDataBuffer buffer = IvfCombinedBuffers.mapCombined(tempDir, COLUMN, config, OWNER_LABEL);
       try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN, buffer, config)) {
         Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1,
             "successful construction must hold exactly one extra mmap");
@@ -238,7 +238,7 @@ public class IvfReaderFailurePathTest {
       buildIvfFlatIndex(tempDir, config);
 
       long baseline = PinotDataBuffer.getMmapBufferCount();
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecar(tempDir, COLUMN, config, OWNER_LABEL);
+      PinotDataBuffer buffer = IvfCombinedBuffers.mapCombined(tempDir, COLUMN, config, OWNER_LABEL);
       try (IvfFlatVectorIndexReader reader =
           new IvfFlatVectorIndexReader(COLUMN, buffer, config, /* ownsBuffer */ false)) {
         Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1,
@@ -264,7 +264,7 @@ public class IvfReaderFailurePathTest {
       buildIvfPqIndex(tempDir, config);
 
       long baseline = PinotDataBuffer.getMmapBufferCount();
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecar(tempDir, COLUMN, config, OWNER_LABEL);
+      PinotDataBuffer buffer = IvfCombinedBuffers.mapCombined(tempDir, COLUMN, config, OWNER_LABEL);
       try (IvfPqVectorIndexReader reader =
           new IvfPqVectorIndexReader(COLUMN, buffer, config, /* ownsBuffer */ false)) {
         Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1);
@@ -288,7 +288,7 @@ public class IvfReaderFailurePathTest {
       buildIvfFlatIndex(tempDir, config);
 
       long baseline = PinotDataBuffer.getMmapBufferCount();
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecar(tempDir, COLUMN, config, OWNER_LABEL);
+      PinotDataBuffer buffer = IvfCombinedBuffers.mapCombined(tempDir, COLUMN, config, OWNER_LABEL);
       try (IvfOnDiskVectorIndexReader reader =
           new IvfOnDiskVectorIndexReader(COLUMN, buffer, config, /* ownsBuffer */ false)) {
         Assert.assertEquals(PinotDataBuffer.getMmapBufferCount(), baseline + 1);
@@ -314,11 +314,11 @@ public class IvfReaderFailurePathTest {
     try {
       VectorIndexConfig config = ivfFlatConfig();
       buildIvfFlatIndex(tempDir, config);
-      File sidecar = new File(tempDir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
-      File corrupted = corruptMagic(sidecar);
+      File combined = new File(tempDir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+      File corrupted = corruptMagic(combined);
 
       long baseline = PinotDataBuffer.getMmapBufferCount();
-      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(corrupted, COLUMN, OWNER_LABEL);
+      PinotDataBuffer buffer = IvfCombinedBuffers.mapCombinedFile(corrupted, COLUMN, OWNER_LABEL);
       try {
         new IvfFlatVectorIndexReader(COLUMN, buffer, config, /* ownsBuffer */ false);
         Assert.fail("Expected RuntimeException from corrupted IVF_FLAT magic");

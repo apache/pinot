@@ -99,11 +99,11 @@ public class VectorIndexUtils {
   }
 
   /**
-   * Returns the on-disk file extension for an IVF/HNSW sidecar.
+   * Returns the on-disk file extension for an IVF/HNSW sidecar file.
    *
    * @param combined when {@code true}, returns the combined-form extension used when
    *                 {@code storeInSegmentFile=true} (consumed by the V2→V3 converter, then
-   *                 removed). When {@code false}, returns the legacy sidecar extension that
+   *                 removed). When {@code false}, returns the legacy file extension that
    *                 remains alongside {@code columns.psf}. HNSW does not currently have a
    *                 combined form — passing {@code combined=true} for HNSW returns the legacy
    *                 extension and is effectively a no-op flag for that backend.

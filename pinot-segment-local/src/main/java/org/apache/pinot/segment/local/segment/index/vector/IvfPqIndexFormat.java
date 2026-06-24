@@ -102,7 +102,7 @@ public final class IvfPqIndexFormat {
 
   /**
    * Reads an IVF_PQ index from a {@link PinotDataBuffer}. Used by the buffer-based reader factory
-   * (sidecar mmap today; column-buffer in tiered/storeInSegment scenarios).
+   * (combined mmap today; column-buffer in tiered/storeInSegment scenarios).
    *
    * <p>The caller retains ownership of {@code buffer}; this method does not close it.</p>
    */

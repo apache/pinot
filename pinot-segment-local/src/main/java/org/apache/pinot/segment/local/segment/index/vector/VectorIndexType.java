@@ -219,13 +219,13 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
       String column = metadata.getColumnName();
 
       if (backendType == VectorBackendType.HNSW) {
-        // HNSW still loads from the sidecar Lucene directory; buffer-backed Directory plumbing
+        // HNSW still loads from the Lucene index directory; buffer-backed Directory plumbing
         // will land in a follow-up alongside the combined-file format.
         return new HnswVectorIndexReader(column, segmentDir, metadata.getTotalDocs(), indexConfig);
       }
 
       // IVF backends accept a PinotDataBuffer; that buffer either comes from the consolidated
-      // typed entry inside columns.psf (when storeInSegmentFile=true) or from the legacy sidecar
+      // typed entry inside columns.psf (when storeInSegmentFile=true) or from the legacy combined
       // file. The chosen reader takes ownership of the buffer and is responsible for closing it
       // (including the constructor's own failure path).
       PinotDataBuffer buffer;
@@ -248,12 +248,12 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
               + "matching on-disk artifact in segment: {}", column, backendType, segmentDir);
           return null;
         }
-        buffer = IvfSidecarBuffers.mapSidecarFile(configuredIndexFile, column,
+        buffer = IvfCombinedBuffers.mapCombinedFile(configuredIndexFile, column,
             "vector-" + backendType.name().toLowerCase());
       }
 
       // Buffer ownership: when reading from columns.psf, the segment directory owns the buffer
-      // and the reader must not close it. Sidecar mmap buffers are owned by the reader.
+      // and the reader must not close it. Combined mmap buffers are owned by the reader.
       boolean ownsBuffer = !indexConfig.isStoreInSegmentFile();
       switch (backendType) {
         case IVF_FLAT:
