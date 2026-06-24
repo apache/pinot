@@ -73,6 +73,15 @@ public class V1Constants {
     public static final String VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".vector.hnsw.mapping";
     public static final String VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION = ".vector.ivfflat.index";
     public static final String VECTOR_IVF_PQ_INDEX_FILE_EXTENSION = ".vector.ivfpq.index";
+    /**
+     * Combined-form IVF file extensions. Written by the IVF creators when
+     * {@code VectorIndexConfig.storeInSegmentFile} is {@code true}; consumed (and removed) by the
+     * V2→V3 format converter, which packs the bytes into {@code columns.psf} as a typed entry via
+     * the standard {@code copyIndexIfExists} loop. Mirrors the text-index {@code .text.index}
+     * extension that signals "ready to be consolidated into the combined segment file."
+     */
+    public static final String VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION = ".vector.ivfflat.combined.index";
+    public static final String VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION = ".vector.ivfpq.combined.index";
   }
 
   public static class MetadataKeys {

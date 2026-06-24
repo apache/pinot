@@ -56,16 +56,20 @@ public class VectorIndexUtils {
     File nativeV912IndexFile = new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(nativeV912IndexFile);
 
-    // Remove the IVF_FLAT index file
+    // Remove the IVF_FLAT index file (legacy and combined-form transient siblings)
     File ivfFlatIndexFile = new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(ivfFlatIndexFile);
+    File ivfFlatCombinedFile = new File(segDir, column + Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(ivfFlatCombinedFile);
 
-    // Remove the IVF_PQ index file
+    // Remove the IVF_PQ index file (legacy and combined-form transient siblings)
     File ivfPqIndexFile = new File(segDir, column + Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(ivfPqIndexFile);
+    File ivfPqCombinedFile = new File(segDir, column + Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(ivfPqCombinedFile);
   }
 
-  static boolean hasVectorIndex(File segDir, String column) {
+  public static boolean hasVectorIndex(File segDir, String column) {
     return new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).exists()
@@ -91,16 +95,36 @@ public class VectorIndexUtils {
   }
 
   public static String getIndexFileExtension(VectorBackendType backendType) {
+    return getIndexFileExtension(backendType, /* combined */ false);
+  }
+
+  /**
+   * Returns the on-disk file extension for an IVF/HNSW sidecar.
+   *
+   * @param combined when {@code true}, returns the combined-form extension used when
+   *                 {@code storeInSegmentFile=true} (consumed by the V2→V3 converter, then
+   *                 removed). When {@code false}, returns the legacy sidecar extension that
+   *                 remains alongside {@code columns.psf}. HNSW does not currently have a
+   *                 combined form — passing {@code combined=true} for HNSW returns the legacy
+   *                 extension and is effectively a no-op flag for that backend.
+   */
+  public static String getIndexFileExtension(VectorBackendType backendType, boolean combined) {
     switch (backendType) {
       case HNSW:
         return Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
       case IVF_FLAT:
-        return Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
+        return combined
+            ? Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION
+            : Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
       case IVF_PQ:
-        return Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION;
+        return combined
+            ? Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION
+            : Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION;
       case IVF_ON_DISK:
-        // IVF_ON_DISK reuses the IVF_FLAT file format with FileChannel random-access reads
-        return Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
+        // IVF_ON_DISK reuses the IVF_FLAT file format with positional buffer reads.
+        return combined
+            ? Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION
+            : Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
       default:
         throw new IllegalStateException("Unsupported vector backend type: " + backendType);
     }

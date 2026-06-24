@@ -138,7 +138,13 @@ public class VectorIndexHandler extends BaseIndexHandler {
       throws Exception {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
-    File sidecar = new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(backendType));
+    // Prefer the combined-form file (freshly-written by a creator run with flag=on); fall back to
+    // the legacy sidecar (segments built with flag=off that the operator now wants consolidated).
+    File combined = new File(v3Dir,
+        column + VectorIndexUtils.getIndexFileExtension(backendType, /* combined */ true));
+    File legacy = new File(v3Dir,
+        column + VectorIndexUtils.getIndexFileExtension(backendType, /* combined */ false));
+    File sidecar = combined.exists() ? combined : legacy;
     if (!sidecar.exists()) {
       LOGGER.warn("Expected sidecar {} not found during vector consolidation; skipping", sidecar);
       return;
@@ -222,15 +228,22 @@ public class VectorIndexHandler extends BaseIndexHandler {
   }
 
   /**
-   * True when the column has an IVF vector sidecar file on disk in the V3 segment directory.
-   * Sibling Lucene-based HNSW directories are intentionally not treated as sidecars here because
-   * HNSW does not currently support consolidation.
+   * True when the column has an IVF vector index file on disk in the V3 segment directory — in
+   * either the legacy form (segments built with {@code storeInSegmentFile=false}) or the
+   * combined form (segments built with the flag on whose V2→V3 conversion did not pack the
+   * bytes — edge case). In both cases the handler's absorb branch can pull the bytes into
+   * {@code columns.psf}. HNSW directories are not treated here because HNSW does not currently
+   * support consolidation.
    */
   private boolean hasIvfSidecar(File indexDir, String column) {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
     return new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.IVF_FLAT)).exists()
-        || new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.IVF_PQ)).exists();
+        || new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.IVF_PQ)).exists()
+        || new File(v3Dir,
+            column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.IVF_FLAT, /* combined */ true)).exists()
+        || new File(v3Dir,
+            column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.IVF_PQ, /* combined */ true)).exists();
   }
 
   @Override
@@ -302,7 +315,11 @@ public class VectorIndexHandler extends BaseIndexHandler {
     String columnName = columnMetadata.getColumnName();
     VectorIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.vector());
     VectorBackendType backendType = config.resolveBackendType();
-    String vectorIndexFileExtension = VectorIndexUtils.getIndexFileExtension(backendType);
+    // The IVF creator (and HNSW) writes to either the legacy or combined extension based on the
+    // flag. Resolve both: the in-progress marker tracks the legacy path (file the creator wrote)
+    // and the absorb step further down knows to pick whichever extension actually exists.
+    boolean writeCombined = config.isStoreInSegmentFile() && backendType != VectorBackendType.HNSW;
+    String vectorIndexFileExtension = VectorIndexUtils.getIndexFileExtension(backendType, writeCombined);
     File inProgress = new File(segmentDirectory, columnName + vectorIndexFileExtension + ".inprogress");
     File vectorIndexFile = new File(segmentDirectory, columnName + vectorIndexFileExtension);
 
