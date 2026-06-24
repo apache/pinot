@@ -49,6 +49,7 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -219,16 +220,32 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         return null;
       }
 
+      if (backendType == VectorBackendType.HNSW) {
+        // HNSW still loads from the sidecar Lucene directory; buffer-backed Directory plumbing
+        // will land in a follow-up alongside the combined-file format.
+        return new HnswVectorIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
+      }
+
+      // IVF backends share the same sidecar-buffer plumbing; the reader chosen below takes
+      // ownership of the buffer and is responsible for closing it (including the constructor's
+      // own failure path).
+      String column = metadata.getColumnName();
+      PinotDataBuffer buffer = IvfSidecarBuffers.mapSidecarFile(configuredIndexFile, column,
+          "vector-" + backendType.name().toLowerCase());
       switch (backendType) {
-        case HNSW:
-          return new HnswVectorIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
         case IVF_FLAT:
-          return new IvfFlatVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
+          return new IvfFlatVectorIndexReader(column, buffer, indexConfig);
         case IVF_PQ:
-          return new IvfPqVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
+          return new IvfPqVectorIndexReader(column, buffer, indexConfig);
         case IVF_ON_DISK:
-          return new IvfOnDiskVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
+          return new IvfOnDiskVectorIndexReader(column, buffer, indexConfig);
         default:
+          // Close the buffer we just mapped so we don't leak the mmap on an unsupported backend.
+          try {
+            buffer.close();
+          } catch (IOException ignored) {
+            // best-effort cleanup; surface the original "unsupported" error.
+          }
           throw new IllegalStateException("Unsupported vector backend type: " + backendType);
       }
     }

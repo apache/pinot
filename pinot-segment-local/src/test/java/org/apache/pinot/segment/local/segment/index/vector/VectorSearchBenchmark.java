@@ -98,7 +98,8 @@ public class VectorSearchBenchmark {
       creator.seal();
     }
 
-    _ivfReader = new IvfFlatVectorIndexReader("embedding", _tempDir, config);
+    _ivfReader = new IvfFlatVectorIndexReader("embedding",
+        IvfSidecarBuffers.mapSidecar(_tempDir, "embedding", config, "test-vector"), config);
   }
 
   @AfterClass
