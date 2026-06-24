@@ -52,6 +52,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -60,7 +61,6 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -1639,11 +1639,16 @@ public final class TableConfigUtils {
         String column = fieldConfig.getName();
         Preconditions.checkState(seenColumns.add(column), "Duplicate FieldConfig for column: %s", column);
         Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
-
-        // Validate DELTA / DELTADELTA compression codecs compatibility
-        validateGorillaCompressionCodecIfPresent(fieldConfig, schema.getFieldSpecFor(column));
+        Preconditions.checkState(!fieldConfig.hasFieldLevelEncodingType(),
+            "FieldConfig.encodingType is deprecated for column: %s. Use fieldConfigList[].indexes.forward.encodingType "
+                + "instead.", column);
+        Preconditions.checkState(!fieldConfig.hasFieldLevelCompressionCodec(),
+            "FieldConfig.compressionCodec is deprecated for column: %s. Use "
+                + "fieldConfigList[].indexes.forward.compressionCodec instead.", column);
+        Preconditions.checkState(!fieldConfig.hasFieldLevelProperties(),
+            "FieldConfig.properties is deprecated for column: %s. Move these settings into the relevant "
+                + "fieldConfigList[].indexes.<indexName> block instead.", column);
       }
-      validateIndexingConfigAndFieldConfigListCompatibility(indexingConfig, fieldConfigs);
     }
 
     Map<String, FieldIndexConfigs> indexConfigsMap;
@@ -1658,6 +1663,7 @@ public final class TableConfigUtils {
       FieldSpec fieldSpec = schema.getFieldSpecFor(column);
       Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema", column);
       FieldIndexConfigs indexConfigs = entry.getValue();
+      validateGorillaCompressionCodecIfPresent(indexConfigs.getConfig(StandardIndexes.forward()), fieldSpec, column);
       for (IndexType<?, ?, ?> indexType : allIndexes) {
         indexType.validate(indexConfigs, fieldSpec, tableConfig);
       }
@@ -1754,29 +1760,6 @@ public final class TableConfigUtils {
         for (String key : multiColTextIndex.getPerColumnProperties().get(column).keySet()) {
           Preconditions.checkState(MultiColumnTextMetadata.isValidPerColumnProperty(key),
               "Multi-column text index doesn't allow: %s as property for column: %s", key, column);
-        }
-      }
-    }
-  }
-
-  /// Validates compatibility across [IndexingConfig] and [FieldConfig]s, ensures that:
-  /// - Columns with DICTIONARY encoding type in [FieldConfig]s are not defined as no-dictionary in [IndexingConfig]
-  private static void validateIndexingConfigAndFieldConfigListCompatibility(IndexingConfig indexingConfig,
-      List<FieldConfig> fieldConfigs) {
-    Set<String> noDictionaryColumnsFromIndexingConfig = new HashSet<>();
-    if (indexingConfig.getNoDictionaryColumns() != null) {
-      noDictionaryColumnsFromIndexingConfig.addAll(indexingConfig.getNoDictionaryColumns());
-    }
-    if (indexingConfig.getNoDictionaryConfig() != null) {
-      noDictionaryColumnsFromIndexingConfig.addAll(indexingConfig.getNoDictionaryConfig().keySet());
-    }
-    if (!noDictionaryColumnsFromIndexingConfig.isEmpty()) {
-      for (FieldConfig fieldConfig : fieldConfigs) {
-        String column = fieldConfig.getName();
-        EncodingType encodingType = fieldConfig.getEncodingType();
-        if (encodingType == EncodingType.DICTIONARY) {
-          Preconditions.checkState(!noDictionaryColumnsFromIndexingConfig.contains(column),
-              "FieldConfig encoding type is different from indexingConfig for column: %s", column);
         }
       }
     }
@@ -2095,29 +2078,35 @@ public final class TableConfigUtils {
     return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
   }
 
-  /**
-   * Helper method to extract TableConfig in updated syntax from current TableConfig.
-   * <ul>
-   *   <li>Moves all index configs to FieldConfig.indexes</li>
-   *   <li>Clean up index related configs from IndexingConfig and FieldConfig.IndexTypes</li>
-   * </ul>
-   */
+  /// Helper method to extract [TableConfig] in updated syntax from current [TableConfig].
+  ///
+  /// - Moves all index configs to `FieldConfig.indexes`
+  /// - Cleans up index related configs from [IndexingConfig] and deprecated field-level [FieldConfig] fields
   public static TableConfig createTableConfigFromOldFormat(TableConfig tableConfig, Schema schema) {
     TableConfig clone = new TableConfig(tableConfig);
     for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
       // get all the index data in new format
       indexType.convertToNewFormat(clone, schema);
     }
-    // cleanup the indexTypes field from all FieldConfig items
+    // Clean up deprecated field-level config from all FieldConfig items.
     if (clone.getFieldConfigList() != null) {
       List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
       for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
-        cleanFieldConfigList.add(
-            new FieldConfig.Builder(fieldConfig).withIndexTypes(null).withProperties(null).build());
+        cleanFieldConfigList.add(clearDeprecatedFieldConfigOptions(fieldConfig));
       }
       clone.setFieldConfigList(cleanFieldConfigList);
     }
     return clone;
+  }
+
+  @SuppressWarnings("deprecation")
+  private static FieldConfig clearDeprecatedFieldConfigOptions(FieldConfig fieldConfig) {
+    return new FieldConfig.Builder(fieldConfig)
+        .withEncodingType(null)
+        .withIndexTypes(null)
+        .withCompressionCodec(null)
+        .withProperties(null)
+        .build();
   }
 
   public static boolean isCommitTimeCompactionEnabled(TableConfig tableConfig) {
@@ -2442,20 +2431,23 @@ public final class TableConfigUtils {
     return relevantTenants.contains(tenantName);
   }
 
-  private static void validateGorillaCompressionCodecIfPresent(FieldConfig fieldConfig, FieldSpec fieldSpec) {
-    if (fieldConfig.getCompressionCodec() == null) {
+  private static void validateGorillaCompressionCodecIfPresent(ForwardIndexConfig forwardIndexConfig,
+      FieldSpec fieldSpec, String column) {
+    FieldConfig.CompressionCodec compressionCodec =
+        forwardIndexConfig != null ? forwardIndexConfig.getCompressionCodec() : null;
+    if (compressionCodec == null) {
       return;
     }
-    switch (fieldConfig.getCompressionCodec()) {
+    switch (compressionCodec) {
       case DELTA:
       case DELTADELTA:
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             "Compression codec %s can only be used on single-value columns, found multi-value column: %s",
-            fieldConfig.getCompressionCodec(), fieldConfig.getName());
+            compressionCodec, column);
         DataType storedType = fieldSpec.getDataType().getStoredType();
         Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
             "Compression codec %s can only be used on INT/LONG data types, found %s for column: %s",
-            fieldConfig.getCompressionCodec(), storedType, fieldConfig.getName());
+            compressionCodec, storedType, column);
         break;
       default:
         // no-op for other codecs

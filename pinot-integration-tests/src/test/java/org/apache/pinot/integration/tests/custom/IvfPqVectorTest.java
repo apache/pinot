@@ -19,11 +19,11 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.commons.lang3.StringUtils;
@@ -67,19 +67,20 @@ public class IvfPqVectorTest extends CustomDataQueryClusterIntegrationTest {
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
+    ObjectNode indexes = indexesWithForwardEncoding(FieldConfig.EncodingType.RAW);
+    ObjectNode vector = indexes.putObject("vector");
+    vector.put("vectorIndexType", "IVF_PQ");
+    vector.put("vectorDimension", VECTOR_DIMENSION);
+    vector.put("vectorDistanceFunction", "EUCLIDEAN");
+    vector.put("version", 1);
+    vector.putObject("properties")
+        .put("nlist", String.valueOf(NLIST))
+        .put("pqM", String.valueOf(PQ_M))
+        .put("pqNbits", String.valueOf(PQ_NBITS))
+        .put("trainSampleSize", String.valueOf(TRAIN_SAMPLE_SIZE))
+        .put("trainingSeed", "7");
     return List.of(new FieldConfig.Builder(VECTOR_COL)
-        .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withProperties(Map.of(
-            "vectorIndexType", "IVF_PQ",
-            "vectorDimension", String.valueOf(VECTOR_DIMENSION),
-            "vectorDistanceFunction", "EUCLIDEAN",
-            "version", "1",
-            "nlist", String.valueOf(NLIST),
-            "pqM", String.valueOf(PQ_M),
-            "pqNbits", String.valueOf(PQ_NBITS),
-            "trainSampleSize", String.valueOf(TRAIN_SAMPLE_SIZE),
-            "trainingSeed", "7"))
+        .withIndexes(indexes)
         .build());
   }
 

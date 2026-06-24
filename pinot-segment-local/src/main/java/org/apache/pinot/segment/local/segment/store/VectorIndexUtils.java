@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.util.Collections;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.codecs.lucene912.Lucene912Codec;
@@ -126,28 +128,30 @@ public class VectorIndexUtils {
 
   public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig) {
     IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
+    Map<String, String> properties =
+        vectorIndexConfig.getProperties() != null ? vectorIndexConfig.getProperties() : Collections.emptyMap();
 
-    double maxBufferSizeMB = Double.parseDouble(vectorIndexConfig.getProperties()
+    double maxBufferSizeMB = Double.parseDouble(properties
         .getOrDefault("maxBufferSizeMB", String.valueOf(IndexWriterConfig.DEFAULT_RAM_BUFFER_SIZE_MB)));
-    boolean commit = Boolean.parseBoolean(vectorIndexConfig.getProperties()
+    boolean commit = Boolean.parseBoolean(properties
         .getOrDefault("commit", String.valueOf(IndexWriterConfig.DEFAULT_COMMIT_ON_CLOSE)));
-    boolean useCompoundFile = Boolean.parseBoolean(vectorIndexConfig.getProperties()
+    boolean useCompoundFile = Boolean.parseBoolean(properties
         .getOrDefault("useCompoundFile", String.valueOf(IndexWriterConfig.DEFAULT_USE_COMPOUND_FILE_SYSTEM)));
     indexWriterConfig.setRAMBufferSizeMB(maxBufferSizeMB);
     indexWriterConfig.setCommitOnClose(commit);
     indexWriterConfig.setUseCompoundFile(useCompoundFile);
 
-    int maxCon = Integer.parseInt(vectorIndexConfig.getProperties()
+    int maxCon = Integer.parseInt(properties
         .getOrDefault("maxCon", String.valueOf(Lucene99HnswVectorsFormat.DEFAULT_MAX_CONN)));
-    int beamWidth = Integer.parseInt(vectorIndexConfig.getProperties()
+    int beamWidth = Integer.parseInt(properties
         .getOrDefault("beamWidth", String.valueOf(Lucene99HnswVectorsFormat.DEFAULT_BEAM_WIDTH)));
-    int maxDimensions = Integer.parseInt(vectorIndexConfig.getProperties()
+    int maxDimensions = Integer.parseInt(properties
         .getOrDefault("maxDimensions", String.valueOf(HnswVectorsFormat.DEFAULT_MAX_DIMENSIONS)));
 
     HnswVectorsFormat knnVectorsFormat =
         new HnswVectorsFormat(maxCon, beamWidth, maxDimensions);
 
-    Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(vectorIndexConfig.getProperties()
+    Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(properties
         .getOrDefault("mode", Lucene912Codec.Mode.BEST_SPEED.name()));
     indexWriterConfig.setCodec(new HnswCodec(mode, knnVectorsFormat));
     return indexWriterConfig;

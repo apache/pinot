@@ -28,7 +28,10 @@
       }
     },
     "multiColumnTextIndexConfig": {
-      "columns": ["visibility", "response"]
+      "columns": [
+        "visibility",
+        "response"
+      ]
     }
   },
   "instanceAssignmentConfigMap": {
@@ -89,31 +92,47 @@
   "fieldConfigList": [
     {
       "name": "event_json",
-      "encodingType": "RAW",
       "indexTypes": [
         "TEXT"
-      ]
+      ],
+      "indexes": {
+        "forward": {
+          "encodingType": "RAW"
+        }
+      }
     },
     {
       "name": "group_json",
-      "encodingType": "RAW",
       "indexTypes": [
         "TEXT"
-      ]
+      ],
+      "indexes": {
+        "forward": {
+          "encodingType": "RAW"
+        }
+      }
     },
     {
       "name": "member_json",
-      "encodingType": "RAW",
       "indexTypes": [
         "TEXT"
-      ]
+      ],
+      "indexes": {
+        "forward": {
+          "encodingType": "RAW"
+        }
+      }
     },
     {
       "name": "venue_json",
-      "encodingType": "RAW",
       "indexTypes": [
         "TEXT"
-      ]
+      ],
+      "indexes": {
+        "forward": {
+          "encodingType": "RAW"
+        }
+      }
     }
   ],
   "metadata": {
