@@ -17,11 +17,20 @@ rules:
     tableType: "$6"
     partition: "$7"
 # Gauges that accept the controller taskType
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|numMinionSubtasksUnknown|numMinionSubtasksDropped|numMinionSubtasksTimedOut|numMinionSubtasksAborted|percentMinionSubtasksInQueue|percentMinionSubtasksInError|tasksTrackedForTaskType)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|tasksTrackedForTaskType)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$3"
   cache: true
   labels:
     taskType: "$2"
+  # Gauges that accept tableNameWithType + controller taskType
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|numMinionSubtasksUnknown|numMinionSubtasksDropped|numMinionSubtasksTimedOut|numMinionSubtasksAborted|percentMinionSubtasksInQueue|percentMinionSubtasksInError|maxSubtaskWaitTimeMs|maxSubtaskRunningTimeMs)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$7"
+  cache: true
+  labels:
+    database: "$3"
+    table: "$2$4"
+    tableType: "$5"
+    taskType: "$6"
 # We hardcode `cronScheduleJobScheduled` and `periodicTaskError`
 # cronScheduleJobScheduled exports the label `table=${tableName}_${tableType}.
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.cronSchedulerJobScheduled\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\"><>(\\w+)"
