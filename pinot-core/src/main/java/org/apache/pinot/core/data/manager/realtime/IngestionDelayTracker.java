@@ -40,6 +40,8 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
@@ -53,7 +55,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A Class to track realtime ingestion delay for table partitions on a given server.
+ * Tracks realtime ingestion delay for table partitions on the current server.
+ * Ingestion gauges are keyed like stream consumer metrics ({@code tableNameWithType-topic-streamPartition}).
  * Highlights:
  * 1-An object of this class is hosted by each RealtimeTableDataManager.
  * 2-The object tracks ingestion delays for all partitions hosted by the current server for the given Realtime table.
@@ -132,6 +135,8 @@ public class IngestionDelayTracker {
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
   private final String _metricName;
+  @Nullable
+  private final String _consumerClientIdSuffix;
   private final RealtimeTableDataManager _realTimeTableDataManager;
   private final BooleanSupplier _isServerReadyToServeQueries;
   private final Cache<String, Boolean> _segmentsToIgnore =
@@ -176,6 +181,9 @@ public class IngestionDelayTracker {
     _serverMetrics = serverMetrics;
     _tableNameWithType = tableNameWithType;
     _metricName = tableNameWithType;
+    InstanceDataManagerConfig instanceDataManagerConfig = realtimeTableDataManager.getInstanceDataManagerConfig();
+    _consumerClientIdSuffix =
+        instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
     _realTimeTableDataManager = realtimeTableDataManager;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
 
@@ -369,27 +377,40 @@ public class IngestionDelayTracker {
     _clock = clock;
   }
 
+  /** Table key for ingestion gauges for {@code pinotPartitionId}, aligned with stream consumer metrics. */
+  private String getIngestionGaugeTableKey(int pinotPartitionId) {
+    TableConfig tableConfig = _realTimeTableDataManager.getCachedTableConfigAndSchema().getLeft();
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+    StreamConfig streamConfig = IngestionConfigUtils.getStreamConfigFromPinotPartitionId(streamConfigs,
+        pinotPartitionId);
+    int streamPartitionId =
+        IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(tableConfig, pinotPartitionId);
+    return IngestionConfigUtils.getStreamIngestionMetricTableKey(_tableNameWithType, streamConfig.getTopicName(),
+        streamPartitionId, _consumerClientIdSuffix);
+  }
+
   @VisibleForTesting
   void createMetrics(int partitionId) {
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
     StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
+    String tableKey = getIngestionGaugeTableKey(partitionId);
 
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
+      _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
           () -> getPartitionIngestionOffsetLag(partitionId));
 
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-          ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET, () -> getPartitionIngestionConsumingOffset(partitionId));
+      _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET,
+          () -> getPartitionIngestionConsumingOffset(partitionId));
 
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-          ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getLatestPartitionOffset(partitionId));
+      _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET,
+          () -> getLatestPartitionOffset(partitionId));
     }
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
+    _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_DELAY_MS,
         () -> getPartitionIngestionDelayMs(partitionId));
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> getPartitionEndToEndIngestionDelayMs(partitionId));
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-        ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS, () -> getPartitionIngestionReportingStatus(partitionId));
+    _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
+        () -> getPartitionEndToEndIngestionDelayMs(partitionId));
+    _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS,
+        () -> getPartitionIngestionReportingStatus(partitionId));
 
     LOGGER.info("Successfully created ingestion metrics for partition id: {}", partitionId);
   }
@@ -398,18 +419,16 @@ public class IngestionDelayTracker {
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
     StreamMetadataProvider streamMetadataProvider =
         _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
+    String tableKey = getIngestionGaugeTableKey(partitionId);
     // Remove all metrics associated with this partition
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
-      _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
-      _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
-      _serverMetrics.removePartitionGauge(_metricName, partitionId,
-          ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
+      _serverMetrics.removeTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
+      _serverMetrics.removeTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
+      _serverMetrics.removeTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
     }
-    _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
-    _serverMetrics.removePartitionGauge(_metricName, partitionId,
-        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
-    _serverMetrics.removePartitionGauge(_metricName, partitionId,
-        ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS);
+    _serverMetrics.removeTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_DELAY_MS);
+    _serverMetrics.removeTableGauge(tableKey, ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
+    _serverMetrics.removeTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS);
 
     LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
   }
