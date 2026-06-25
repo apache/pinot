@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Arrays;
 
 
 /**
@@ -29,9 +27,11 @@ import java.util.Map;
  *
  * <p>For single-key, uses simple last-ID tracking since data is sorted by the correlation column.
  * For multi-key, data is sorted by the primary (first) correlation column only; secondary keys
- * are tracked via a HashMap within each primary-key group.
+ * are tracked via pre-allocated flat arrays within each primary-key group.
  */
 class SortedAggregationResult {
+  private static final int INITIAL_CAPACITY = 8;
+
   final int _numSteps;
   final long[] _stepCounters;
   private final int _numKeys;
@@ -40,31 +40,23 @@ class SortedAggregationResult {
   final boolean[] _correlatedSteps;
   int _lastCorrelationId = Integer.MIN_VALUE;
 
-  // Multi-key tracking
+  // Multi-key tracking — flat arrays, pre-allocated once and reused across groups
   private int _lastPrimaryId = Integer.MIN_VALUE;
-  private Map<IntArrayList, boolean[]> _secondaryKeySteps;
-  private final IntArrayList _lookupKey;
+  private int[][] _entryKeys;
+  private boolean[][] _entrySteps;
+  private int _entryCount;
 
   SortedAggregationResult(int numSteps) {
-    _numSteps = numSteps;
-    _numKeys = 1;
-    _stepCounters = new long[_numSteps];
-    _correlatedSteps = new boolean[_numSteps];
-    _lookupKey = null;
+    this(numSteps, 1);
   }
 
   SortedAggregationResult(int numSteps, int numKeys) {
     _numSteps = numSteps;
     _numKeys = numKeys;
-    _stepCounters = new long[_numSteps];
-    if (numKeys == 1) {
-      _correlatedSteps = new boolean[_numSteps];
-      _lookupKey = null;
-    } else {
-      _correlatedSteps = null;
-      _secondaryKeySteps = new HashMap<>();
-      _lookupKey = new IntArrayList(numKeys - 1);
-    }
+    _stepCounters = new long[numSteps];
+    _correlatedSteps = numKeys == 1 ? new boolean[numSteps] : null;
+    _entryKeys = numKeys > 1 ? new int[INITIAL_CAPACITY][numKeys] : null;
+    _entrySteps = numKeys > 1 ? new boolean[INITIAL_CAPACITY][numSteps] : null;
   }
 
   public void add(int step, int correlationId) {
@@ -80,37 +72,61 @@ class SortedAggregationResult {
 
   /**
    * Multi-key add. Data must be sorted by correlationIds[0] (primary key).
-   * Secondary keys are tracked via HashMap within each primary-key group.
+   * Secondary keys are tracked via linear scan over pre-allocated flat arrays.
    *
-   * <p>Within a primary-key group, rows for the same (primary, secondary) combination may appear
-   * non-contiguously (e.g. interleaved with other secondary keys). This is handled correctly
-   * because the HashMap accumulates all step observations per secondary key regardless of row order.
+   * <p>The full correlationIds array (including the primary key at index 0) is used as the
+   * lookup key. The primary key is the same for every entry within a group, so including it
+   * is redundant but harmless — it avoids the cost of copying a sub-array.
    */
   public void addMultiKey(int step, int[] correlationIds) {
     int primaryId = correlationIds[0];
     if (primaryId != _lastPrimaryId) {
       flushMultiKeyGroup();
       _lastPrimaryId = primaryId;
-      _secondaryKeySteps.clear();
+      _entryCount = 0;
     }
 
-    _lookupKey.clear();
-    for (int k = 1; k < correlationIds.length; k++) {
-      _lookupKey.add(correlationIds[k]);
+    for (int i = 0; i < _entryCount; i++) {
+      if (keysMatch(_entryKeys[i], correlationIds)) {
+        _entrySteps[i][step] = true;
+        return;
+      }
     }
 
-    boolean[] steps = _secondaryKeySteps.get(_lookupKey);
-    if (steps == null) {
-      steps = new boolean[_numSteps];
-      _secondaryKeySteps.put(new IntArrayList(_lookupKey), steps);
+    ensureCapacity();
+    System.arraycopy(correlationIds, 0, _entryKeys[_entryCount], 0, _numKeys);
+    Arrays.fill(_entrySteps[_entryCount], false);
+    _entrySteps[_entryCount][step] = true;
+    _entryCount++;
+  }
+
+  private boolean keysMatch(int[] stored, int[] incoming) {
+    for (int i = 0; i < _numKeys; i++) {
+      if (stored[i] != incoming[i]) {
+        return false;
+      }
     }
-    steps[step] = true;
+    return true;
+  }
+
+  private void ensureCapacity() {
+    if (_entryCount < _entryKeys.length) {
+      return;
+    }
+    int oldCap = _entryKeys.length;
+    int newCap = oldCap * 2;
+    _entryKeys = Arrays.copyOf(_entryKeys, newCap);
+    _entrySteps = Arrays.copyOf(_entrySteps, newCap);
+    for (int i = oldCap; i < newCap; i++) {
+      _entryKeys[i] = new int[_numKeys];
+      _entrySteps[i] = new boolean[_numSteps];
+    }
   }
 
   private void flushMultiKeyGroup() {
-    for (boolean[] steps : _secondaryKeySteps.values()) {
+    for (int i = 0; i < _entryCount; i++) {
       for (int n = 0; n < _numSteps; n++) {
-        if (!steps[n]) {
+        if (!_entrySteps[i][n]) {
           break;
         }
         _stepCounters[n]++;
@@ -136,7 +152,7 @@ class SortedAggregationResult {
   public LongArrayList extractResult() {
     if (_numKeys > 1) {
       flushMultiKeyGroup();
-      _secondaryKeySteps.clear();
+      _entryCount = 0;
     } else {
       incrStepCounters();
     }

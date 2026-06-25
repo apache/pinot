@@ -64,8 +64,8 @@ class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIds
   }
 
   /// Converts segment-local composite dictionary IDs to hash-coded value bitmaps for cross-segment merging.
-  /// Uses {@code .hashCode()} on the length-prefix-encoded composite string — same approximation as the
-  /// single-key non-INT path in {@link #convertToValueBitmap}, so hash collisions may cause under-counting.
+  /// Combines per-column value hashes directly — no string allocation. Same approximation as the
+  /// single-key non-INT path in {@link #convertToValueBitmap}: hash collisions may cause under-counting.
   private RoaringBitmap convertCompositeToValueBitmap(DictIdsWrapper wrapper, RoaringBitmap compositeIdBitmap) {
     RoaringBitmap valueBitmap = new RoaringBitmap();
     PeekableIntIterator iterator = compositeIdBitmap.getIntIterator();
@@ -73,9 +73,33 @@ class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIds
     int[] dictIds = new int[numKeys];
     while (iterator.hasNext()) {
       wrapper.reverseCompositeId(iterator.next(), dictIds);
-      valueBitmap.add(DictIdsWrapper.toCompositeString(wrapper._dictionaries, dictIds).hashCode());
+      int hash = 1;
+      for (int k = 0; k < numKeys; k++) {
+        hash = 31 * hash + valueHashCode(wrapper._dictionaries[k], dictIds[k]);
+      }
+      valueBitmap.add(hash);
     }
     return valueBitmap;
+  }
+
+  /// Returns the hash code of a dictionary value using its native type, avoiding string conversion
+  /// for numeric types.
+  private static int valueHashCode(Dictionary dictionary, int dictId) {
+    switch (dictionary.getValueType()) {
+      case INT:
+        return Integer.hashCode(dictionary.getIntValue(dictId));
+      case LONG:
+        return Long.hashCode(dictionary.getLongValue(dictId));
+      case FLOAT:
+        return Float.hashCode(dictionary.getFloatValue(dictId));
+      case DOUBLE:
+        return Double.hashCode(dictionary.getDoubleValue(dictId));
+      case STRING:
+        return dictionary.getStringValue(dictId).hashCode();
+      default:
+        throw new IllegalArgumentException("Illegal data type for FUNNEL_COUNT aggregation function: "
+            + dictionary.getValueType());
+    }
   }
 
   /**
