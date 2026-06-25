@@ -133,6 +133,38 @@ public class SegmentDirectoryPathsTest {
   }
 
   /**
+   * When only the HNSW combined-form file exists (segment built with {@code storeInSegmentFile=true}
+   * whose absorb step has not yet run), {@code findVectorIndexIndexFile} must still find it so that
+   * the reader factory can open the index without treating a missing file as "no index".
+   */
+  @Test
+  public void testFindVectorIndexFileFindsCombinedHnswWhenLegacyDirAbsent()
+      throws Exception {
+    File indexDir = new File(SegmentDirectoryPaths.class.toString() + "_vector_hnsw_combined");
+    FileUtils.deleteQuietly(indexDir);
+    try {
+      Assert.assertTrue(indexDir.mkdirs());
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      Assert.assertTrue(v3Dir.mkdir());
+
+      File hnswCombined = new File(v3Dir,
+          "embedding" + V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
+      FileUtils.touch(hnswCombined);
+
+      Assert.assertEquals(
+          SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, "embedding", VectorBackendType.HNSW),
+          hnswCombined,
+          "findVectorIndexIndexFile must fall back to the combined HNSW extension");
+      // The no-backend overload (used by detectVectorIndexBackend) must also find it.
+      Assert.assertEquals(
+          SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, "embedding"),
+          hnswCombined);
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
    * When both legacy and combined-form IVF files exist (mixed state from a crashed toggle), the
    * legacy file is returned — preserves the prior behaviour for unchanged segments and lets the
    * reader factory keep using the well-tested legacy path.

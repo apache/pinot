@@ -229,6 +229,13 @@ public class SegmentDirectoryPaths {
       vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
       formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
     }
+    // Combined-form: a single packed file built by HnswVectorIndexCombined that bundles the
+    // Lucene HNSW directory's contents. Probed after the legacy directories so existing segments
+    // keep the pre-existing behaviour when a directory and a combined file coexist.
+    if (formatFile == null) {
+      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    }
     return formatFile;
   }
 

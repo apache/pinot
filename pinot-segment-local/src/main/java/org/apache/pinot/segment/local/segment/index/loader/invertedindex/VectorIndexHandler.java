@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
@@ -87,11 +88,12 @@ public class VectorIndexHandler extends BaseIndexHandler {
       // Migration: sidecar -> columns.psf. Fires either when the offline writer just wrote a
       // sidecar (build with flag on) or when the operator just flipped the flag from off to on
       // for an existing legacy segment. Same handler step covers both.
+      // For HNSW the "sidecar" is the combined packed file (.vector.hnsw.combined.index);
+      // for IVF it is the legacy combined extension.
       if (desiredConfig.isStoreInSegmentFile()
           && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
-          && desiredBackend != VectorBackendType.HNSW
           && existingBackend != null
-          && hasIvfCombinedFile(indexDir, column)) {
+          && hasCombinedFile(indexDir, column, desiredBackend)) {
         LOGGER.info("Need to consolidate Vector sidecar file into columns.psf for segment: {}, column: {}",
             segmentName, column);
         return true;
@@ -102,9 +104,8 @@ public class VectorIndexHandler extends BaseIndexHandler {
       // {@code SingleFileIndexDirectory._columnEntries}) but no sidecar file is on disk.
       if (!desiredConfig.isStoreInSegmentFile()
           && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
-          && desiredBackend != VectorBackendType.HNSW
           && existingBackend == null
-          && !hasIvfCombinedFile(indexDir, column)) {
+          && !hasCombinedFile(indexDir, column, desiredBackend)) {
         LOGGER.info("Need to extract Vector consolidated entry to sidecar file for segment: {}, column: {}",
             segmentName, column);
         return true;
@@ -122,10 +123,12 @@ public class VectorIndexHandler extends BaseIndexHandler {
   }
 
   /**
-   * Absorbs an IVF sidecar file into {@code columns.psf} as a typed entry, then deletes the sibling.
-   * The bytes inside the sidecar file are not re-interpreted — they're copied verbatim. The on-disk
-   * IVF header (and any later format version byte) is the contract; the reader handles version
-   * dispatch.
+   * Absorbs a vector index sidecar into {@code columns.psf} as a typed entry, then deletes the
+   * sibling. For IVF backends the bytes are copied verbatim; the on-disk IVF header is the
+   * contract and the reader handles version dispatch. For HNSW, if a combined-form file already
+   * exists (written by a creator run with the flag on), it is absorbed directly; if only the
+   * Lucene directory remains (operator just flipped the flag on an existing segment), it is first
+   * packed into a transient combined file, which is then absorbed and removed.
    *
    * <p><b>Crash recovery:</b> if a prior absorb crashed between {@code newIndexFor} (which
    * committed bytes into {@code columns.psf} and added a {@code _columnEntries} entry) and the
@@ -139,8 +142,16 @@ public class VectorIndexHandler extends BaseIndexHandler {
       throws Exception {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
-    // Prefer the combined-form file (freshly-written by a creator run with flag=on); fall back to
-    // the legacy sidecar (segments built with flag=off that the operator now wants consolidated).
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
+
+    if (backendType == VectorBackendType.HNSW) {
+      absorbHnswIntoColumnsPsf(segmentWriter, column, v3Dir, segmentName);
+      return;
+    }
+
+    // IVF path: prefer the combined-form file (freshly-written by a creator run with flag=on);
+    // fall back to the legacy sidecar (segments built with flag=off that the operator now wants
+    // consolidated).
     File combinedFile = new File(v3Dir,
         column + VectorIndexUtils.getIndexFileExtension(backendType, /* combined */ true));
     File legacyFile = new File(v3Dir,
@@ -150,7 +161,6 @@ public class VectorIndexHandler extends BaseIndexHandler {
       LOGGER.warn("Expected vector index file {} not found during vector consolidation; skipping", picked);
       return;
     }
-    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     // Crash-recovery: if a prior absorb committed bytes to columns.psf but crashed before
     // deleting the sidecar, the typed entry is already present. Detect that directly via
     // hasIndexFor + size check, rather than catching the duplicate-key exception by message.
@@ -175,16 +185,77 @@ public class VectorIndexHandler extends BaseIndexHandler {
   }
 
   /**
-   * Extracts the consolidated IVF payload from {@code columns.psf} back into a sidecar file
-   * and drops the typed entry. Used when the operator flips {@code storeInSegmentFile} from
+   * HNSW-specific absorb: packs the Lucene directory (or uses an existing combined-form file) into
+   * a single combined file and absorbs it into {@code columns.psf}.
+   *
+   * <p>If the combined-form file already exists (creator ran with the flag on and produced it),
+   * it is absorbed directly. If only the Lucene directory exists (operator just flipped the flag
+   * on an existing segment), the directory is first packed into a transient combined file, which is
+   * then absorbed and cleaned up.</p>
+   */
+  private void absorbHnswIntoColumnsPsf(SegmentDirectory.Writer segmentWriter, String column, File v3Dir,
+      String segmentName)
+      throws Exception {
+    File combinedFile = new File(v3Dir,
+        column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, /* combined */ true));
+    File hnswDir = new File(v3Dir,
+        column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, /* combined */ false));
+    boolean createdTransient = false;
+    if (!combinedFile.exists()) {
+      if (!hnswDir.exists() || !hnswDir.isDirectory()) {
+        LOGGER.warn("Expected HNSW directory or combined file for column {} not found; skipping absorb", column);
+        return;
+      }
+      // Pack the Lucene directory into a transient combined file for absorption.
+      HnswVectorIndexCombined.combineHnswIndexFiles(hnswDir, combinedFile.getAbsolutePath(), v3Dir.getParentFile(),
+          column);
+      createdTransient = true;
+    }
+
+    // Crash-recovery: check whether the typed entry already exists.
+    if (segmentWriter.hasIndexFor(column, StandardIndexes.vector())) {
+      long existingSize = segmentWriter.getIndexFor(column, StandardIndexes.vector()).size();
+      if (existingSize == combinedFile.length()) {
+        LOGGER.warn("HNSW vector index already present in columns.psf for segment: {}, column: {}; "
+            + "deleting orphan files from a previously-crashed absorb run", segmentName, column);
+        FileUtils.deleteQuietly(combinedFile);
+        // Clean up the Lucene directory regardless of createdTransient: if we packed the directory
+        // into a transient combined file in this very run, the directory still exists and must be
+        // removed to prevent hasCombinedFile from re-triggering on the next segment load.
+        if (hnswDir.exists()) {
+          FileUtils.deleteDirectory(hnswDir);
+        }
+        return;
+      }
+      throw new IOException("HNSW vector index already present in columns.psf for column: " + column
+          + " (size=" + existingSize + ") but combined file " + combinedFile.getName()
+          + " has different size " + combinedFile.length() + ". Refusing to overwrite — please remove "
+          + "the conflicting sidecar or rebuild the segment.");
+    }
+
+    LOGGER.info("Absorbing HNSW combined file into columns.psf for segment: {}, column: {}", segmentName, column);
+    LoaderUtils.writeIndexToV3Format(segmentWriter, column, combinedFile, StandardIndexes.vector());
+    // Clean up: the combined file was just absorbed; remove it and the Lucene directory if present.
+    FileUtils.deleteQuietly(combinedFile);
+    if (hnswDir.exists()) {
+      FileUtils.deleteDirectory(hnswDir);
+    }
+  }
+
+  /**
+   * Extracts the consolidated vector payload from {@code columns.psf} back into the legacy on-disk
+   * form and drops the typed entry. Used when the operator flips {@code storeInSegmentFile} from
    * {@code true} to {@code false}.
    *
-   * <p><b>Ordering:</b> the bytes are streamed to a temp file <em>before</em> {@code removeIndex}
+   * <p>For IVF backends the bytes are streamed verbatim to a sidecar file. For HNSW, the packed
+   * combined file is streamed out first, then unpacked into a Lucene directory — the inverse of
+   * the absorb path.</p>
+   *
+   * <p><b>Ordering:</b> bytes are streamed to a temp file <em>before</em> {@code removeIndex}
    * is called, because {@code SingleFileIndexDirectory.removeIndex} for vector also runs
-   * {@link VectorIndexUtils#cleanupVectorIndex(File, String)} — which would delete any file
-   * that already has the final combined extension. We use a {@code .vector.extract-tmp}
-   * extension that is <em>not</em> recognised by {@code cleanupVectorIndex}, then rename to
-   * the final IVF extension after the consolidated entry is gone.</p>
+   * {@link VectorIndexUtils#cleanupVectorIndex(File, String)}, which deletes any file with a
+   * recognised extension. The temp extension ({@code .vector.extract-tmp}) is not in that list,
+   * so the bytes survive until the consolidated entry is safely removed.</p>
    */
   private void extractConsolidatedToLegacyFile(SegmentDirectory.Writer segmentWriter, String column,
       VectorBackendType backendType, File indexDir)
@@ -192,13 +263,20 @@ public class VectorIndexHandler extends BaseIndexHandler {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
+
+    if (backendType == VectorBackendType.HNSW) {
+      extractHnswConsolidatedToDirectory(segmentWriter, column, v3Dir, segmentName);
+      return;
+    }
+
+    // IVF path: stream bytes to the legacy combined extension.
     File finalCombined = new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(backendType));
     File combinedFormFile = new File(v3Dir,
         column + VectorIndexUtils.getIndexFileExtension(backendType, /* combined */ true));
     // Defensive: extract is destructive (removeIndex calls cleanupVectorIndex, which deletes any
     // sidecar with a recognised IVF extension). If a sidecar already exists on disk we'd silently
     // clobber it. Refuse to proceed and force the operator to reconcile — this state should not
-    // arise from the handler's own paths (see hasIvfCombinedFile in needUpdateIndices) but a
+    // arise from the handler's own paths (see hasCombinedFile in needUpdateIndices) but a
     // manually-edited segment dir or a half-completed migration could produce it.
     if (finalCombined.exists()) {
       throw new IOException("Extract path expected no on-disk sidecar but found: " + finalCombined
@@ -230,6 +308,44 @@ public class VectorIndexHandler extends BaseIndexHandler {
   }
 
   /**
+   * HNSW-specific extract: streams the combined HNSW payload from {@code columns.psf} to a temp
+   * file, removes the consolidated entry, then unpacks the combined file back into a Lucene
+   * directory (the form expected by the file-backed reader).
+   */
+  private void extractHnswConsolidatedToDirectory(SegmentDirectory.Writer segmentWriter, String column,
+      File v3Dir, String segmentName)
+      throws IOException {
+    File hnswDir = new File(v3Dir,
+        column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, /* combined */ false));
+    File combinedFormFile = new File(v3Dir,
+        column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, /* combined */ true));
+    if (hnswDir.exists()) {
+      throw new IOException("Extract path expected no on-disk HNSW directory but found: " + hnswDir
+          + ". Refusing to proceed — please remove the conflicting directory manually.");
+    }
+    if (combinedFormFile.exists()) {
+      throw new IOException("Extract path expected no on-disk combined HNSW file but found: " + combinedFormFile
+          + ". Refusing to proceed — please remove the conflicting file manually.");
+    }
+    File tempCombined = new File(v3Dir, column + ".vector.extract-tmp");
+    FileUtils.deleteQuietly(tempCombined);
+
+    LOGGER.info(
+        "Extracting HNSW consolidated entry to Lucene directory for segment: {}, column: {}", segmentName, column);
+    PinotDataBuffer buffer = segmentWriter.getIndexFor(column, StandardIndexes.vector());
+    streamBufferToFile(buffer, buffer.size(), tempCombined);
+
+    segmentWriter.removeIndex(column, StandardIndexes.vector());
+
+    // Unpack the combined file back into a Lucene directory.
+    try {
+      HnswVectorIndexCombined.extractHnswIndexFiles(tempCombined, hnswDir);
+    } finally {
+      FileUtils.deleteQuietly(tempCombined);
+    }
+  }
+
+  /**
    * Streams {@code size} bytes from a {@link PinotDataBuffer} into a regular file, chunked to
    * keep heap usage bounded for large IVF payloads.
    */
@@ -251,22 +367,26 @@ public class VectorIndexHandler extends BaseIndexHandler {
   }
 
   /**
-   * True when the column has an IVF vector index file on disk in the V3 segment directory — in
-   * either the legacy form (segments built with {@code storeInSegmentFile=false}) or the
-   * combined form (segments built with the flag on whose V2→V3 conversion did not pack the
-   * bytes — edge case). In both cases the handler's absorb branch can pull the bytes into
-   * {@code columns.psf}. HNSW directories are not treated here because HNSW does not currently
-   * support consolidation.
+   * Returns {@code true} when the column has an on-disk sidecar in the V3 segment directory that
+   * can be absorbed into (or was extracted from) {@code columns.psf}. Covers both the legacy form
+   * (segments built with the flag off) and the combined form (built with the flag on).
+   *
+   * <p>For HNSW, the "sidecar" is either a Lucene directory ({@code .vector.v912.hnsw.index/})
+   * or the combined packed file ({@code .vector.hnsw.combined.index}). Either form is absorb-able.
+   * For IVF, the legacy or combined-extension single files are checked.</p>
    */
-  private boolean hasIvfCombinedFile(File indexDir, String column) {
+  private boolean hasCombinedFile(File indexDir, String column, VectorBackendType backendType) {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
-    return new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.IVF_FLAT)).exists()
-        || new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.IVF_PQ)).exists()
-        || new File(v3Dir,
-            column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.IVF_FLAT, /* combined */ true)).exists()
-        || new File(v3Dir,
-            column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.IVF_PQ, /* combined */ true)).exists();
+    if (backendType == VectorBackendType.HNSW) {
+      // Either the packed combined file or the Lucene directory is absorb-able.
+      return new File(v3Dir,
+          column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, /* combined */ true)).exists()
+          || new File(v3Dir,
+          column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, /* combined */ false)).exists();
+    }
+    return new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(backendType)).exists()
+        || new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(backendType, /* combined */ true)).exists();
   }
 
   @Override
@@ -294,25 +414,23 @@ public class VectorIndexHandler extends BaseIndexHandler {
         columnsToAddIdx.add(column);
         continue;
       }
-      // Backend matches, but the table now wants the IVF payload consolidated into columns.psf
+      // Backend matches, but the table now wants the vector payload consolidated into columns.psf
       // and a sidecar file still exists. Absorb the sidecar without rebuilding — preserves the bytes
-      // the offline build produced.
+      // the offline build produced. Works for both IVF and HNSW backends.
       if (desiredConfig.isStoreInSegmentFile()
           && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
-          && desiredBackend != VectorBackendType.HNSW
           && existingBackend != null
-          && hasIvfCombinedFile(indexDir, column)) {
+          && hasCombinedFile(indexDir, column, desiredBackend)) {
         absorbCombinedIntoColumnsPsf(segmentWriter, column, desiredBackend, indexDir);
         continue;
       }
-      // Backend matches, but the table now wants the IVF payload back in the sidecar layout and
+      // Backend matches, but the table now wants the vector payload back in the sidecar layout and
       // the segment currently has the consolidated entry only. Extract bytes from columns.psf
       // into a sidecar file, then drop the consolidated entry. Preserves the bytes (no rebuild).
       if (!desiredConfig.isStoreInSegmentFile()
           && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
-          && desiredBackend != VectorBackendType.HNSW
           && existingBackend == null
-          && !hasIvfCombinedFile(indexDir, column)) {
+          && !hasCombinedFile(indexDir, column, desiredBackend)) {
         extractConsolidatedToLegacyFile(segmentWriter, column, desiredBackend, indexDir);
       }
     }
@@ -332,22 +450,34 @@ public class VectorIndexHandler extends BaseIndexHandler {
    * Sweeps orphans left over from a prior build that targeted the OTHER extension (e.g. a crash
    * with {@code storeInSegmentFile=true} followed by a retry with the flag off). Removes the
    * other-extension {@code .inprogress} marker and any partial index file with that extension,
-   * so a later flag-flip cannot pick the residue up as if it were a complete index. HNSW is
-   * skipped — it does not currently have a combined form.
+   * so a later flag-flip cannot pick the residue up as if it were a complete index.
+   *
+   * <p>For HNSW the two forms are the Lucene directory ({@code .vector.v912.hnsw.index/}) and
+   * the combined packed file ({@code .vector.hnsw.combined.index}). The "other" form when writing
+   * combined is the legacy Lucene directory; when writing legacy it is the combined file.</p>
    */
   @VisibleForTesting
   static void cleanOrphansFromOtherExtension(File segmentDirectory, String columnName,
       VectorBackendType backendType, boolean currentWriteCombined) {
-    if (backendType == VectorBackendType.HNSW) {
-      return;
-    }
     String currentExt = VectorIndexUtils.getIndexFileExtension(backendType, currentWriteCombined);
     String otherExt = VectorIndexUtils.getIndexFileExtension(backendType, !currentWriteCombined);
     if (otherExt.equals(currentExt)) {
       return;
     }
+    // For HNSW the legacy form is a Lucene directory (non-empty); use deleteDirectory for recursive
+    // deletion. The combined file and .inprogress markers are always plain files.
     FileUtils.deleteQuietly(new File(segmentDirectory, columnName + otherExt + ".inprogress"));
-    FileUtils.deleteQuietly(new File(segmentDirectory, columnName + otherExt));
+    File otherFile = new File(segmentDirectory, columnName + otherExt);
+    if (otherFile.isDirectory()) {
+      // Recursively delete the Lucene directory (deleteQuietly silently fails on non-empty dirs).
+      try {
+        FileUtils.deleteDirectory(otherFile);
+      } catch (IOException e) {
+        LOGGER.warn("Failed to delete orphan HNSW directory: {}", otherFile, e);
+      }
+    } else {
+      FileUtils.deleteQuietly(otherFile);
+    }
   }
 
   private void createVectorIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
@@ -360,10 +490,11 @@ public class VectorIndexHandler extends BaseIndexHandler {
     String columnName = columnMetadata.getColumnName();
     VectorIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.vector());
     VectorBackendType backendType = config.resolveBackendType();
-    // The IVF creator (and HNSW) writes to either the legacy or combined extension based on the
-    // flag. Resolve both: the in-progress marker tracks the legacy path (file the creator wrote)
-    // and the absorb step further down knows to pick whichever extension actually exists.
-    boolean writeCombined = config.isStoreInSegmentFile() && backendType != VectorBackendType.HNSW;
+    // Resolve the on-disk extension (or directory name) that the creator writes to. When
+    // storeInSegmentFile=true the creator produces the combined-form directly; when false it writes
+    // the legacy form (a Lucene directory for HNSW, a flat file for IVF). The .inprogress marker
+    // tracks the same path, and the absorb step picks whichever form actually exists on disk.
+    boolean writeCombined = config.isStoreInSegmentFile();
     String vectorIndexFileExtension = VectorIndexUtils.getIndexFileExtension(backendType, writeCombined);
     File inProgress = new File(segmentDirectory, columnName + vectorIndexFileExtension + ".inprogress");
     File vectorIndexFile = new File(segmentDirectory, columnName + vectorIndexFileExtension);
@@ -396,13 +527,11 @@ public class VectorIndexHandler extends BaseIndexHandler {
 
     // For v3 segments with storeInSegmentFile=true, absorb the freshly-written sidecar into
     // columns.psf as a typed entry and delete the sibling file. Mirrors the text-index path
-    // (TextIndexHandler.convertTextIndexToV3Format). HNSW is combined-only; only IVF supports
-    // consolidation here. The shared helper handles the crash-recovery case (duplicate-key
-    // error from a previously-crashed absorb).
+    // (TextIndexHandler.convertTextIndexToV3Format). The shared helper handles crash recovery.
+    // For HNSW, close() already produced the combined file; hasCombinedFile detects it.
     if (config.isStoreInSegmentFile()
         && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
-        && backendType != VectorBackendType.HNSW
-        && vectorIndexFile.exists()) {
+        && hasCombinedFile(indexDir, columnName, backendType)) {
       absorbCombinedIntoColumnsPsf(segmentWriter, columnName, backendType, indexDir);
     }
 

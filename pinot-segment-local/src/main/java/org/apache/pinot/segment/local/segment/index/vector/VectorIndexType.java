@@ -189,7 +189,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION,
-        V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
+        V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
   }
 
   /**
@@ -219,8 +220,24 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
       String column = metadata.getColumnName();
 
       if (backendType == VectorBackendType.HNSW) {
-        // HNSW still loads from the Lucene index directory; buffer-backed Directory plumbing
-        // will land in a follow-up alongside the combined-file format.
+        if (indexConfig.isStoreInSegmentFile() && segmentReader.hasIndexFor(column, StandardIndexes.vector())) {
+          // Combined form: load the HNSW index from the typed entry inside columns.psf.
+          // The buffer is owned by the segment directory — this reader must not close it.
+          PinotDataBuffer buffer;
+          try {
+            buffer = segmentReader.getIndexFor(column, StandardIndexes.vector());
+          } catch (IOException e) {
+            throw new RuntimeException(
+                "Failed to read consolidated HNSW vector index from columns.psf for column: " + column, e);
+          }
+          if (buffer == null) {
+            LOGGER.warn("Skipping HNSW vector index reader for column: {} because storeInSegmentFile=true "
+                + "but no consolidated entry was found in columns.psf in segment: {}", column, segmentDir);
+            return null;
+          }
+          return new HnswVectorIndexReader(column, buffer, metadata.getTotalDocs(), indexConfig);
+        }
+        // Legacy path: load the HNSW index from the Lucene directory on disk.
         return new HnswVectorIndexReader(column, segmentDir, metadata.getTotalDocs(), indexConfig);
       }
 
