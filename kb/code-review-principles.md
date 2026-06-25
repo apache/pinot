@@ -1047,7 +1047,23 @@ Getters use `isXXXEnabled()` not `isEnableXXX()`. Use `==` for enum comparisons.
 - Trigger: Any PR adding boolean getters or enum comparisons
 
 **C7.12 — Modern Java idioms**
-`List.of()` over `Collections.emptyList()`. Java std lib over Guava. `computeIfAbsent()` over manual check-and-put.
+Use Java immutable collection factories for non-null literals. Checkstyle blocks
+`Collections.emptyList()`, `Collections.emptySet()`, and
+`Collections.emptyMap()`, including method references such as
+`Collections::emptyList`, `Collections::emptySet`, and `Collections::emptyMap`;
+use `List.of()`, `Set.of()`, and `Map.of()` instead. Prefer `Set.of(x)` over
+`Collections.singleton(x)`, and prefer `List.of(x)` and `Map.of(k, v)` over
+`Collections.singletonList(x)` and
+`Collections.singletonMap(k, v)` for non-null singleton literals. Do not add
+blanket bans for `Collections.singleton*`, but use those factories only when an
+element/key/value argument is intentionally null because `List.of(null)`,
+`Set.of(null)`, and `Map.of(...)` with null keys or values throw
+`NullPointerException`. Keep such null-preserving cases explicit and local.
+Before replacing empty collection factories, check whether the returned value
+flows to mutating callers; `List.of().remove(x)` throws even when `x` is absent,
+while `Collections.emptyList().remove(x)` did not. Copy at the mutating call site
+when needed. Java std lib over Guava.
+`computeIfAbsent()` over manual check-and-put.
 - Trigger: Any PR using older Java patterns
 
 **C7.13 — No final on local variables**

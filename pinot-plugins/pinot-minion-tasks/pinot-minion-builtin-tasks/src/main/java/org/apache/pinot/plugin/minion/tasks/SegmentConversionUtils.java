@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.minion.tasks;
 import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.net.URI;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -93,7 +92,7 @@ public class SegmentConversionUtils {
           return new HashSet<>(allSegmentNameList);
         }
       }
-      return Collections.emptySet();
+      return Set.of();
     }
   }
 

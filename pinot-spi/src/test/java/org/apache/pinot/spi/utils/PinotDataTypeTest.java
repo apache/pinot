@@ -41,8 +41,8 @@ import static org.testng.Assert.fail;
 
 public class PinotDataTypeTest {
   private static final PinotDataType[] SOURCE_TYPES = {
-      BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_DECIMAL, STRING, JSON,
-      BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
+      BYTE, CHARACTER, SHORT, INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, STRING, JSON,
+      BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
   };
   private static final Object[] SOURCE_VALUES = {
       (byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, BigDecimal.valueOf(123), " 123", "123 ",
@@ -50,7 +50,7 @@ public class PinotDataTypeTest {
       new Object[]{123L}, new Object[]{123f}, new Object[]{123d}, new Object[]{" 123"}
   };
   private static final PinotDataType[] DEST_TYPES =
-      {INTEGER, LONG, FLOAT, DOUBLE, BIG_DECIMAL, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
+      {INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
   private static final Object[] EXPECTED_DEST_VALUES =
       {123, 123L, 123f, 123d, BigDecimal.valueOf(123), new Object[]{123}, new Object[]{123L}, new Object[]{123f},
           new Object[]{123d}};
@@ -64,10 +64,10 @@ public class PinotDataTypeTest {
 
   // Test cases where array for MV column contains values of mixing types.
   private static final PinotDataType[] SOURCE_ARRAY_TYPES =
-      {SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
+      {SHORT_ARRAY, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
   private static final Object[] SOURCE_ARRAY_VALUES = new Object[]{(short) 123, 4, 5L, 6f, 7d, "8"};
 
-  private static final PinotDataType[] DEST_ARRAY_TYPES = {INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
+  private static final PinotDataType[] DEST_ARRAY_TYPES = {INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
   private static final Object[] EXPECTED_DEST_ARRAY_VALUES = {
       new Object[]{123, 4, 5, 6, 7, 8}, new Object[]{123L, 4L, 5L, 6L, 7L, 8L}, new Object[]{123f, 4f, 5f, 6f, 7f, 8f},
       new Object[]{123d, 4d, 5d, 6d, 7d, 8d}
@@ -128,9 +128,9 @@ public class PinotDataTypeTest {
   @DataProvider
   public Object[][] numberFormatConversionErrors() {
     return new Object[][] {
-        {INTEGER_ARRAY, LONG_ARRAY, new Object[]{"abc"}},
-        {INTEGER_ARRAY, INTEGER_ARRAY, new Object[]{"abc"}},
-        {INTEGER_ARRAY, PRIMITIVE_BOOLEAN_ARRAY, new Object[]{"abc"}}
+        {INT_ARRAY, LONG_ARRAY, new Object[]{"abc"}},
+        {INT_ARRAY, INT_ARRAY, new Object[]{"abc"}},
+        {INT_ARRAY, PRIMITIVE_BOOLEAN_ARRAY, new Object[]{"abc"}}
     };
   }
 
@@ -180,8 +180,8 @@ public class PinotDataTypeTest {
 
   @Test
   public void testBoolean() {
-    assertEquals(INTEGER.convert(true, BOOLEAN), 1);
-    assertEquals(INTEGER.convert(false, BOOLEAN), 0);
+    assertEquals(INT.convert(true, BOOLEAN), 1);
+    assertEquals(INT.convert(false, BOOLEAN), 0);
     assertEquals(LONG.convert(true, BOOLEAN), 1L);
     assertEquals(LONG.convert(false, BOOLEAN), 0L);
     assertEquals(FLOAT.convert(true, BOOLEAN), 1f);
@@ -226,7 +226,7 @@ public class PinotDataTypeTest {
     // 2022-04-14 = 19_096 days since epoch. `LocalDate` is TZ-independent — round-trips identically in any
     // JVM timezone.
     LocalDate date = LocalDate.parse("2022-04-14");
-    assertEquals(DATE.convert(19_096, INTEGER), date);
+    assertEquals(DATE.convert(19_096, INT), date);
     assertEquals(DATE.convert(19_096L, LONG), date);
     assertEquals(DATE.convert("2022-04-14", STRING), date);
     // JSON: quoted ISO-8601 string parsed via Jackson.
@@ -245,8 +245,8 @@ public class PinotDataTypeTest {
     assertEquals(DATE_ARRAY.convert(dates, DATE_ARRAY), dates);
     // STRING_ARRAY → DATE_ARRAY: per-element ISO-8601 parsing via DATE.convert.
     assertEquals(DATE_ARRAY.convert(new String[]{"2022-04-14", "2024-01-01"}, STRING_ARRAY), dates);
-    // INTEGER_ARRAY → DATE_ARRAY: per-element epoch-day decoding.
-    assertEquals(DATE_ARRAY.convert(new Integer[]{19_096, 19_723}, INTEGER_ARRAY), dates);
+    // INT_ARRAY → DATE_ARRAY: per-element epoch-day decoding.
+    assertEquals(DATE_ARRAY.convert(new Integer[]{19_096, 19_723}, INT_ARRAY), dates);
     // DATE_ARRAY → STRING_ARRAY: each element via DATE.toString.
     assertEquals(STRING_ARRAY.convert(dates, DATE_ARRAY), new String[]{"2022-04-14", "2024-01-01"});
     // Lookup: Object[] of LocalDate routes to DATE_ARRAY.
@@ -261,7 +261,7 @@ public class PinotDataTypeTest {
     // identically in any JVM timezone.
     LocalTime time = LocalTime.parse("08:51:32");
     assertEquals(TIME.convert(31_892_000L, LONG), time);
-    assertEquals(TIME.convert(31_892_000, INTEGER), time);
+    assertEquals(TIME.convert(31_892_000, INT), time);
     assertEquals(TIME.convert("08:51:32", STRING), time);
     // JSON: quoted ISO-8601 string parsed via Jackson.
     assertEquals(TIME.convert("\"08:51:32\"", JSON), time);
@@ -389,7 +389,7 @@ public class PinotDataTypeTest {
 
   @Test
   public void testGetSingleValueType() {
-    assertEquals(getSingleValueType(1), INTEGER);
+    assertEquals(getSingleValueType(1), INT);
     assertEquals(getSingleValueType(1L), LONG);
     assertEquals(getSingleValueType(1.0f), FLOAT);
     assertEquals(getSingleValueType(1.0d), DOUBLE);
@@ -419,7 +419,7 @@ public class PinotDataTypeTest {
 
   @Test
   public void testGetMultipleValueType() {
-    assertEquals(getMultiValueType(1), INTEGER_ARRAY);
+    assertEquals(getMultiValueType(1), INT_ARRAY);
     assertEquals(getMultiValueType(1L), LONG_ARRAY);
     assertEquals(getMultiValueType(1.0f), FLOAT_ARRAY);
     assertEquals(getMultiValueType(1.0d), DOUBLE_ARRAY);
@@ -465,17 +465,17 @@ public class PinotDataTypeTest {
     // Single-value types that do NOT support BYTES conversion; STRING / JSON / BYTES / BIG_DECIMAL / UUID
     // each have their own valid byte-form encoding and are tested elsewhere.
     PinotDataType[] noBytesConversion = {
-        BOOLEAN, BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, TIMESTAMP, DATE, TIME, OBJECT
+        BOOLEAN, BYTE, CHARACTER, SHORT, INT, LONG, FLOAT, DOUBLE, TIMESTAMP, DATE, TIME, OBJECT
     };
     for (PinotDataType sourceType : noBytesConversion) {
       assertInvalidConversion(null, sourceType, BYTES, UnsupportedOperationException.class);
     }
 
-    assertInvalidConversion(null, BYTES, INTEGER, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, INT, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, LONG, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, FLOAT, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, DOUBLE, UnsupportedOperationException.class);
-    assertInvalidConversion(null, BYTES, INTEGER_ARRAY, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, INT_ARRAY, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, LONG_ARRAY, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, FLOAT_ARRAY, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, DOUBLE_ARRAY, UnsupportedOperationException.class);

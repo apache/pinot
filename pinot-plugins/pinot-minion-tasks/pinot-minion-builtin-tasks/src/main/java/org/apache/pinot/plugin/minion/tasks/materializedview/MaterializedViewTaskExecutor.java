@@ -24,7 +24,6 @@ import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -275,7 +274,7 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
         LOGGER.info("No data returned for window [{}, {}) of table: {}.", windowStartMs, windowEndMs, tableName);
         if (MaterializedViewTask.TASK_MODE_OVERWRITE.equals(taskMode)) {
           validateSourceFingerprintAtCommit(configs, tableName, windowStartMs, windowEndMs, taskFingerprint);
-          replaceWindowSegments(tableName, windowStartMs, windowEndMs, Collections.emptyList(),
+          replaceWindowSegments(tableName, windowStartMs, windowEndMs, List.of(),
               uploadURL, authProvider);
         }
         postProcess(pinotTaskConfig);
@@ -457,7 +456,7 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
     }
 
     if (!segmentsFrom.isEmpty()) {
-      List<String> segmentsTo = Collections.emptyList();
+      List<String> segmentsTo = List.of();
       String lineageEntryId = SegmentConversionUtils.startSegmentReplace(
           tableName, uploadURL,
           new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo),
@@ -543,7 +542,7 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
           .forCluster(helixManager.getClusterName())
           .build();
       Map<String, String> values =
-          helixManager.getClusterManagmentTool().getConfig(scope, Collections.singletonList(configName));
+          helixManager.getClusterManagmentTool().getConfig(scope, List.of(configName));
       return values == null ? null : values.get(configName);
     } catch (Exception e) {
       LOGGER.debug("Failed to read minion cluster config '{}': {}", configName, e.getMessage());
@@ -644,7 +643,7 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(
       PinotTaskConfig pinotTaskConfig, SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(
-        SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Collections.emptyMap());
+        SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of());
   }
 
   /// Fails the task if the query result set saturated the declared `LIMIT`, since that

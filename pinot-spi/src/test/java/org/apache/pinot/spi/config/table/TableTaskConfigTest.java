@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.config.table;
 
-import java.util.Collections;
 import java.util.Map;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
@@ -29,7 +28,7 @@ public class TableTaskConfigTest {
 
   @Test
   public void testSingleArgConstructorDefaultsConcurrentSchedulingToNull() {
-    TableTaskConfig config = new TableTaskConfig(Map.of("TestTask", Collections.emptyMap()));
+    TableTaskConfig config = new TableTaskConfig(Map.of("TestTask", Map.of()));
     Assert.assertNull(config.getConcurrentSchedulingEnabled(),
         "concurrentSchedulingEnabled should default to null (inherit cluster setting)");
   }
@@ -37,15 +36,15 @@ public class TableTaskConfigTest {
   @Test
   public void testTwoArgConstructorPreservesExplicitValue() {
     TableTaskConfig trueConfig =
-        new TableTaskConfig(Map.of("TestTask", Collections.emptyMap()), Boolean.TRUE);
+        new TableTaskConfig(Map.of("TestTask", Map.of()), Boolean.TRUE);
     Assert.assertEquals(trueConfig.getConcurrentSchedulingEnabled(), Boolean.TRUE);
 
     TableTaskConfig falseConfig =
-        new TableTaskConfig(Map.of("TestTask", Collections.emptyMap()), Boolean.FALSE);
+        new TableTaskConfig(Map.of("TestTask", Map.of()), Boolean.FALSE);
     Assert.assertEquals(falseConfig.getConcurrentSchedulingEnabled(), Boolean.FALSE);
 
     TableTaskConfig nullConfig =
-        new TableTaskConfig(Map.of("TestTask", Collections.emptyMap()), null);
+        new TableTaskConfig(Map.of("TestTask", Map.of()), null);
     Assert.assertNull(nullConfig.getConcurrentSchedulingEnabled());
   }
 

@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.data.manager;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -351,6 +350,20 @@ public interface TableDataManager {
   void updateCachedTableConfigAndSchema(TableConfig config, Schema schema);
 
   /**
+   * Callback invoked when the table config or schema has actually changed (e.g. when a table config / schema refresh
+   * is delivered out of band, separate from any segment state transition or reload). This is distinct from
+   * {@link #fetchIndexLoadingConfig()}, which is also called incidentally during state transitions and reloads merely
+   * to obtain the index loading config; this callback is invoked only on a genuine config/schema change.
+   * <p>The default implementation refreshes the cached table config and schema (by fetching them from ZK), which
+   * preserves the historical behavior of the refresh path. Implementations that need to react to a config/schema
+   * change beyond refreshing the cache should override this method and additionally invoke {@code super}, or the
+   * default, to keep the cache refreshed.
+   */
+  default void onTableConfigOrSchemaRefresh() {
+    fetchIndexLoadingConfig();
+  }
+
+  /**
    * Interface to handle segment state transitions from CONSUMING to DROPPED
    *
    * @param segmentNameStr name of segment for which the state change is being handled
@@ -392,6 +405,6 @@ public interface TableDataManager {
    * Returns a mapping of partition id to primary key count. Supports both upsert and dedup enabled tables.
    */
   default Map<Integer, Long> getPartitionToPrimaryKeyCount() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 }

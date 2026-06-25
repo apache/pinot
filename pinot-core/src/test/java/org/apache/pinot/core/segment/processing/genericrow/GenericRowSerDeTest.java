@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.processing.genericrow;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -129,7 +128,7 @@ public class GenericRowSerDeTest {
     assertEquals(fieldToValueMap.get("intSV"), _row.getValue("intSV"));
     assertEquals(fieldToValueMap.get("nullSV"), _row.getValue("nullSV"));
     Set<String> nullValueFields = buffer.getNullValueFields();
-    assertEquals(nullValueFields, Collections.singleton("nullSV"));
+    assertEquals(nullValueFields, Set.of("nullSV"));
   }
 
   @Test

@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.hint.RelHint;
 
 
@@ -77,6 +78,17 @@ public class PinotHintOptions {
      *   BREAK: Break window cache build process, continue to perform WINDOW operation, results might be partial.
      */
     public static final String WINDOW_OVERFLOW_MODE = "window_overflow_mode";
+
+    /// Indicates that the input to the window is already partitioned by the window keys, so we should avoid shuffling
+    /// to repartition.
+    public static final String IS_PARTITIONED_BY_WINDOW_KEYS = "is_partitioned_by_window_keys";
+
+    @Nullable
+    public static Boolean isPartitionedByWindowKeys(Window window) {
+      String hint =
+          PinotHintStrategyTable.getHintOption(window.getHints(), WINDOW_HINT_OPTIONS, IS_PARTITIONED_BY_WINDOW_KEYS);
+      return hint != null ? Boolean.parseBoolean(hint) : null;
+    }
   }
 
   public static class JoinHintOptions {

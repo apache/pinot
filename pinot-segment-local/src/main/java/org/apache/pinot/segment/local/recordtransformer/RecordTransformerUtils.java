@@ -21,18 +21,22 @@ package org.apache.pinot.segment.local.recordtransformer;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherRegistry;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 public class RecordTransformerUtils {
@@ -42,9 +46,15 @@ public class RecordTransformerUtils {
   /// Returns a list of [RecordTransformer]s based on the given [TableConfig] and [Schema].
   /// DO NOT CHANGE THE ORDER OF THE RECORD TRANSFORMERS.
   /// The transformers returned are:
+  /// - (Optional) [DataTypeTransformer] to fix the data types of the source fields configured with
+  /// `preComplexTypeTransform = true` in `IngestionConfig#getSourceFieldConfigs()`. It precedes the pre-complex-type
+  /// [RecordEnricher]s and [ComplexTypeTransformer] so that they consume the source fields with the corrected types.
   /// - (Optional) [RecordEnricher]s to enrich the records before complex type transformation.
   /// - (Optional) [ComplexTypeTransformer] to flatten map/unnest list.
   /// - (Optional) Custom [RecordTransformer]s
+  /// - (Optional) [DataTypeTransformer] to fix the data types of the source fields configured with
+  /// `preComplexTypeTransform = false` in `IngestionConfig#getSourceFieldConfigs()`. It precedes the post-complex-type
+  /// [RecordEnricher]s and [ExpressionTransformer] so that they consume the source fields with the corrected types.
   /// - (Optional) [RecordEnricher]s to enrich the records before other transformations.
   /// - (Optional) [ExpressionTransformer] to evaluate expressions and fill the values.
   /// - (Optional) [FilterTransformer] to filter records based on custom predicates.
@@ -64,6 +74,7 @@ public class RecordTransformerUtils {
       boolean skipPostComplexTypeTransformers, boolean skipFilterTransformer) {
     List<RecordTransformer> transformers = new ArrayList<>();
     if (!skipPreComplexTypeTransformers) {
+      addSourceFieldDataTypeTransformer(tableConfig, transformers, true);
       addRecordEnricherTransformers(tableConfig, transformers, true);
     }
     if (!skipComplexTypeTransformer) {
@@ -74,6 +85,7 @@ public class RecordTransformerUtils {
     }
     Preconditions.checkState(schema != null,
         "Schema must be provided when post complex type transformers are requested");
+    addSourceFieldDataTypeTransformer(tableConfig, transformers, false);
     addRecordEnricherTransformers(tableConfig, transformers, false);
     addIfNotNoOp(transformers, new ExpressionTransformer(tableConfig, schema));
     if (!skipFilterTransformer) {
@@ -129,6 +141,29 @@ public class RecordTransformerUtils {
   private static void addIfNotNoOp(List<RecordTransformer> transformers, @Nullable RecordTransformer transformer) {
     if (transformer != null && !transformer.isNoOp()) {
       transformers.add(transformer);
+    }
+  }
+
+  private static void addSourceFieldDataTypeTransformer(TableConfig tableConfig, List<RecordTransformer> transformers,
+      boolean preComplexTypeTransform) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null) {
+      return;
+    }
+    List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
+    if (CollectionUtils.isEmpty(sourceFieldConfigs)) {
+      return;
+    }
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
+      // If pre-ComplexType transformers are requested, add only pre-ComplexType source fields. Similarly, if
+      // non pre-ComplexType transformers are requested, add only non pre-ComplexType source fields.
+      if (sourceFieldConfig.isPreComplexTypeTransform() == preComplexTypeTransform) {
+        dataTypes.put(sourceFieldConfig.getName(), sourceFieldConfig.getDataType());
+      }
+    }
+    if (!dataTypes.isEmpty()) {
+      transformers.add(new DataTypeTransformer(tableConfig, dataTypes));
     }
   }
 

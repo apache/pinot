@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.blocks;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -87,11 +86,11 @@ public class ErrorMseBlock implements MseBlock.Eos {
       extractTrace = true;
     }
     String errorMessage = extractTrace ? ExceptionUtils.consolidateExceptionMessages(e) : e.getMessage();
-    return fromMap(Collections.singletonMap(errorCode, errorMessage));
+    return fromMap(Map.of(errorCode, errorMessage));
   }
 
   public static ErrorMseBlock fromError(QueryErrorCode errorCode, String errorMessage) {
-    return fromMap(Collections.singletonMap(errorCode, errorMessage));
+    return fromMap(Map.of(errorCode, errorMessage));
   }
 
   @Override

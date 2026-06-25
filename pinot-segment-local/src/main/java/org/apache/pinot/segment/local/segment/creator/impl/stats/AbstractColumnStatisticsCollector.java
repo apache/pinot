@@ -56,13 +56,28 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   protected Comparable _previousValue = null;
 
   public AbstractColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
-    _fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
-    Preconditions.checkArgument(_fieldSpec != null, "Failed to find column: %s", column);
-    _storedType = _fieldSpec.getDataType().getStoredType();
-    _sorted = _fieldSpec.isSingleValueField();
-    _fieldConfig = statsCollectorConfig.getFieldConfigForColumn(column);
-    _partitionFunction = statsCollectorConfig.getPartitionFunction(column);
-    _partitions = _partitionFunction != null ? new HashSet<>() : null;
+    this(getRequiredFieldSpec(column, statsCollectorConfig),
+        statsCollectorConfig.getFieldConfigForColumn(column),
+        statsCollectorConfig.getPartitionFunction(column));
+  }
+
+  /// Constructs a collector directly from a [FieldSpec], without a [StatsCollectorConfig]. Lets callers
+  /// that operate outside schema-driven segment generation (e.g. OPEN_STRUCT materialized child columns,
+  /// whose synthetic columns exist in no schema) reuse the standard stats collectors.
+  public AbstractColumnStatisticsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    _fieldSpec = fieldSpec;
+    _storedType = fieldSpec.getDataType().getStoredType();
+    _sorted = fieldSpec.isSingleValueField();
+    _fieldConfig = fieldConfig;
+    _partitionFunction = partitionFunction;
+    _partitions = partitionFunction != null ? new HashSet<>() : null;
+  }
+
+  private static FieldSpec getRequiredFieldSpec(String column, StatsCollectorConfig statsCollectorConfig) {
+    FieldSpec fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
+    Preconditions.checkArgument(fieldSpec != null, "Failed to find column: %s", column);
+    return fieldSpec;
   }
 
   /**

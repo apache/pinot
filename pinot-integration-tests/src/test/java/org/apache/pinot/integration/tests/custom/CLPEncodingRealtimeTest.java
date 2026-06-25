@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests.custom;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -103,7 +102,7 @@ public class CLPEncodingRealtimeTest extends CustomDataQueryClusterIntegrationTe
 
   @Override
   protected List<String> getNoDictionaryColumns() {
-    return Collections.singletonList("logLine");
+    return List.of("logLine");
   }
 
   @Override

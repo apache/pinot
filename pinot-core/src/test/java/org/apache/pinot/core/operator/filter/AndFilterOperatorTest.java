@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
@@ -205,7 +204,7 @@ public class AndFilterOperatorTest {
         Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), EmptyFilterOperator.getInstance()), null,
         numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), Collections.emptyList());
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of());
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()),
         List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
   }
@@ -233,7 +232,7 @@ public class AndFilterOperatorTest {
 
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()),
         List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), Collections.emptyList());
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of());
   }
 
   @Test

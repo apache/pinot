@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.sql.ddl.inferer;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -206,7 +205,7 @@ public class MaterializedViewSchemaInfererTest {
         .build();
     DdlCompilationException ex = expectThrows(DdlCompilationException.class,
         () -> inferWithProperties("SELECT ts FROM src",
-            Collections.singletonMap("bucketTimePeriod", "1d"), source));
+            Map.of("bucketTimePeriod", "1d"), source));
     assertTrue(ex.getMessage().contains("timeColumnName"), ex.getMessage());
   }
 
@@ -265,7 +264,7 @@ public class MaterializedViewSchemaInfererTest {
   public void missingTableCacheProducesActionableError() {
     MaterializedViewInferenceInput input = new MaterializedViewInferenceInput(
         "SELECT ts FROM src", null, "mv",
-        Collections.singletonMap("timeColumnName", "ts"),
+        Map.of("timeColumnName", "ts"),
         /* tableCache = */ null);
     DdlCompilationException ex = expectThrows(DdlCompilationException.class,
         () -> MaterializedViewSchemaInferer.infer(input));
@@ -278,7 +277,7 @@ public class MaterializedViewSchemaInfererTest {
 
   private static List<ResolvedColumnDefinition> infer(String sql, String timeColumnName,
       Schema source) {
-    return inferWithProperties(sql, Collections.singletonMap("timeColumnName", timeColumnName),
+    return inferWithProperties(sql, Map.of("timeColumnName", timeColumnName),
         source);
   }
 
@@ -304,7 +303,7 @@ public class MaterializedViewSchemaInfererTest {
     Map<String, String> tableNameMap = new HashMap<>();
     tableNameMap.put(schemaName, schemaName);
     when(cache.getTableNameMap()).thenReturn(tableNameMap);
-    when(cache.getLogicalTableNameMap()).thenReturn(Collections.emptyMap());
+    when(cache.getLogicalTableNameMap()).thenReturn(Map.of());
     when(cache.getColumnNameMap(schemaName)).thenReturn(buildColumnNameMap(schema));
     return cache;
   }

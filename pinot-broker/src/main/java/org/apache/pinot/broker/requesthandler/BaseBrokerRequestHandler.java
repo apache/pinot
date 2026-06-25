@@ -351,6 +351,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setNumExceptions(numExceptions);
     statistics.setGroupsTrimmed(response.isGroupsTrimmed());
     statistics.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    statistics.setMseLiteLeafStageLimitReached(response.isMseLiteLeafStageLimitReached());
     statistics.setProcessingTimeMillis(response.getTimeUsedMs());
     statistics.setNumDocsScanned(response.getNumDocsScanned());
     statistics.setTotalDocs(response.getTotalDocs());

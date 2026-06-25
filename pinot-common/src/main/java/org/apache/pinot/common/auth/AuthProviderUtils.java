@@ -19,7 +19,6 @@
 package org.apache.pinot.common.auth;
 
 import java.lang.reflect.Constructor;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -124,7 +123,7 @@ public final class AuthProviderUtils {
    */
   public static List<Header> toRequestHeaders(@Nullable Map<String, Object> headers) {
     if (headers == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     return headers.entrySet().stream().filter(entry -> Objects.nonNull(entry.getValue()))
         .map(entry -> new BasicHeader(entry.getKey(), entry.getValue().toString())).collect(Collectors.toList());
@@ -137,7 +136,7 @@ public final class AuthProviderUtils {
    */
   public static List<Header> toRequestHeaders(@Nullable AuthProvider authProvider) {
     if (authProvider == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     return toRequestHeaders(authProvider.getRequestHeaders());
   }
@@ -190,7 +189,7 @@ public final class AuthProviderUtils {
    */
   public static Map<String, String> makeAuthHeadersMap(AuthProvider authProvider) {
     if (authProvider == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     return authProvider.getRequestHeaders().entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));

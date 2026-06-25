@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +80,7 @@ public class ColocatedJoinQuickStart extends MultistageEngineQuickStart {
 
   @Override
   public List<String> types() {
-    return Collections.singletonList(QUICKSTART_IDENTIFIER);
+    return List.of(QUICKSTART_IDENTIFIER);
   }
 
   @Override

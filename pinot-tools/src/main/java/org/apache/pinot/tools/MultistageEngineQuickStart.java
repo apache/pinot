@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -51,7 +50,7 @@ public class MultistageEngineQuickStart extends Quickstart {
 
   @Override
   public List<String> types() {
-    return Collections.singletonList("MULTI_STAGE");
+    return List.of("MULTI_STAGE");
   }
 
   @Override

@@ -19,7 +19,7 @@
 package org.apache.pinot.common.datablock;
 
 import com.google.common.collect.Lists;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
@@ -60,14 +60,14 @@ public class ZeroCopyDataBlockSerdeTest {
     r.nextBytes(bytes2);
 
     return new Object[][]{
-        {"empty error", MetadataBlock.newError(-1, -1, null, Collections.emptyMap())},
+        {"empty error", MetadataBlock.newError(-1, -1, null, Map.of())},
         {"error with single message", MetadataBlock.newError(3, 1, "test2", Map.of(123, "error"))},
         {
             "error with two messages", MetadataBlock.newError(3, 1, "multiple",
             Map.of(123, "error", 1234, "another error"))
         },
         {"eos empty", MetadataBlock.newEos()},
-        {"eos with empty stat", new MetadataBlock(Collections.singletonList(PinotDataBuffer.empty()))},
+        {"eos with empty stat", new MetadataBlock(List.of(PinotDataBuffer.empty()))},
         {
             "eos with several empty stats",
             new MetadataBlock(Lists.newArrayList(PinotDataBuffer.empty(), PinotDataBuffer.empty()))

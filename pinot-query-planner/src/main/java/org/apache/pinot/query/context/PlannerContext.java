@@ -19,8 +19,8 @@
 package org.apache.pinot.query.context;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Context;
@@ -73,7 +73,7 @@ public class PlannerContext implements AutoCloseable, Context {
     _envConfig = envConfig;
     _relOptPlanner = new LogicalPlanner(optProgram, this, config.getTraitDefs());
     _relTraitPlanner = new LogicalPlanner(traitProgram, this,
-        Collections.singletonList(RelDistributionTraitDef.INSTANCE));
+        List.of(RelDistributionTraitDef.INSTANCE));
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = sqlExplainFormat;
     _physicalPlannerContext = physicalPlannerContext;

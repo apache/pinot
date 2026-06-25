@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -85,8 +84,8 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       // FULL OUTER JOIN with no equi keys: use hash with empty key to explicitly route all data to one destination.
       // DispatchablePlanVisitor sets requireSingleton on the join stage so WorkerManager picks a single random
       // worker, avoiding hotspots.
-      newLeft = PinotLogicalExchange.create(left, RelDistributions.hash(Collections.emptyList()));
-      newRight = PinotLogicalExchange.create(right, RelDistributions.hash(Collections.emptyList()));
+      newLeft = PinotLogicalExchange.create(left, RelDistributions.hash(List.of()));
+      newRight = PinotLogicalExchange.create(right, RelDistributions.hash(List.of()));
     } else {
       // Hash join
       // Force pre-partitioned exchange when colocated join hint is provided

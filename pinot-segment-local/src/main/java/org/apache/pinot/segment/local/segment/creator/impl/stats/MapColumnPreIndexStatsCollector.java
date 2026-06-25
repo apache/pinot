@@ -363,7 +363,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       case BYTE:
       case CHARACTER:
       case SHORT:
-      case INTEGER:
+      case INT:
         return FieldSpec.DataType.INT;
       case LONG:
         return FieldSpec.DataType.LONG;

@@ -20,7 +20,6 @@ package org.apache.pinot.broker.routing.adaptiveserverselector;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +64,7 @@ public class AdaptiveServerSelectorTest {
             CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
         brokerConfig.getProperty(
             CommonConstants.Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS,
-            Collections.emptyList()));
+            List.of()));
     _brokerMetrics.initializeGlobalMeters();
     BrokerMetrics.register(_brokerMetrics);
   }

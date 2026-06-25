@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import java.util.Collections;
+import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
@@ -60,7 +60,7 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
     //       not yet implemented.
     // TODO: Revisit whether we should use hash distribution
     PinotLogicalSortExchange exchange =
-        PinotLogicalSortExchange.create(sort.getInput(), RelDistributions.hash(Collections.emptyList()),
+        PinotLogicalSortExchange.create(sort.getInput(), RelDistributions.hash(List.of()),
             sort.getCollation(), false, !sort.getCollation().getKeys().isEmpty());
     call.transformTo(sort.copy(sort.getTraitSet(), exchange, sort.getCollation()));
   }

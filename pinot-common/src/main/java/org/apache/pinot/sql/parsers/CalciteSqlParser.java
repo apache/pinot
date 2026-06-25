@@ -25,6 +25,8 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +35,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -94,6 +97,11 @@ public class CalciteSqlParser {
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   // TODO: Add the ability to configure the parser's maximum identifier length via configuration if needed in the future
   public static final int CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH = 1024;
+  /// The grouping-set discriminator is encoded as a 32-bit INT bitmask over the union group-by columns, so a
+  /// GROUPING SETS / ROLLUP / CUBE query may reference at most 31 distinct grouping columns.
+  public static final int MAX_GROUPING_SETS_COLUMNS = 31;
+  /// Upper bound on the number of grouping sets a single query may expand to (guards against CUBE blow-up).
+  public static final int MAX_GROUPING_SETS = 4096;
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
@@ -242,6 +250,32 @@ public class CalciteSqlParser {
         }
       }
     }
+
+    // A GROUPING SETS / ROLLUP / CUBE query must contain at least one aggregation (in SELECT, HAVING or
+    // ORDER-BY): without one the engine would execute it as a selection query and silently ignore the grouping
+    // sets. Note that GROUPING() / GROUPING_ID() are not aggregation functions. (Plain non-aggregation GROUP BY
+    // queries are rewritten to DISTINCT by NonAggregationGroupByToDistinctQueryRewriter, but that rewrite cannot
+    // represent multiple grouping sets.)
+    if (pinotQuery.getGroupingSetMasks() != null && aggregateExprCount == 0 && !hasAggregationOutsideSelect(
+        pinotQuery)) {
+      throw new SqlCompilationException(
+          "GROUP BY GROUPING SETS / ROLLUP / CUBE requires at least one aggregation function in the query");
+    }
+  }
+
+  /// Returns true if the HAVING clause or any ORDER-BY expression contains an aggregation.
+  private static boolean hasAggregationOutsideSelect(PinotQuery pinotQuery) {
+    if (pinotQuery.getHavingExpression() != null && isAggregateExpression(pinotQuery.getHavingExpression())) {
+      return true;
+    }
+    if (pinotQuery.getOrderByList() != null) {
+      for (Expression orderBy : pinotQuery.getOrderByList()) {
+        if (isAggregateExpression(orderBy)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /*
@@ -537,7 +571,7 @@ public class CalciteSqlParser {
     // GROUP-BY
     SqlNodeList groupByNodeList = selectNode.getGroup();
     if (groupByNodeList != null) {
-      pinotQuery.setGroupByList(convertSelectList(groupByNodeList));
+      setGroupByListAndGroupingSets(pinotQuery, groupByNodeList);
     }
     // HAVING
     SqlNode havingNode = selectNode.getHaving();
@@ -688,6 +722,173 @@ public class CalciteSqlParser {
       selectExpr.add(toExpression(sqlNode));
     }
     return selectExpr;
+  }
+
+  /// Converts the GROUP BY clause into {@link PinotQuery#groupByList} and (when grouping constructs are
+  /// present) {@link PinotQuery#groupingSetMasks}.
+  ///
+  /// For a plain GROUP BY (no ROLLUP / CUBE / GROUPING SETS) this behaves exactly like
+  /// {@link #convertSelectList} and leaves {@code groupingSetMasks} unset, so non-grouping-set queries are
+  /// unchanged. When grouping constructs are present, the grouping elements are cross-multiplied into the
+  /// canonical, de-duplicated list of grouping sets (standard SQL semantics, e.g.
+  /// {@code GROUP BY a, ROLLUP(b, c)} produces {@code {a,b,c}, {a,b}, {a}}); the ordered, de-duplicated
+  /// union of all participating columns is stored as {@code groupByList}, and each grouping set is stored
+  /// as a membership bitmask over that union — bit {@code i} set iff union column {@code i} participates,
+  /// a mask of {@code 0} being the grand-total set {@code ()}.
+  private static void setGroupByListAndGroupingSets(PinotQuery pinotQuery, SqlNodeList groupByNodeList) {
+    boolean hasGroupingConstruct = false;
+    for (SqlNode node : groupByNodeList) {
+      if (isGroupingConstruct(node.getKind())) {
+        hasGroupingConstruct = true;
+        break;
+      }
+    }
+    if (!hasGroupingConstruct) {
+      pinotQuery.setGroupByList(convertSelectList(groupByNodeList));
+      return;
+    }
+
+    /// Cross-multiply the grouping elements: the overall grouping sets are the union of one chosen set from
+    /// each grouping element. Start with a single empty set (the multiplicative identity).
+    List<LinkedHashSet<Expression>> combinedSets = new ArrayList<>();
+    combinedSets.add(new LinkedHashSet<>());
+    for (SqlNode element : groupByNodeList) {
+      List<List<Expression>> elementSets = parseGroupingElement(element);
+      List<LinkedHashSet<Expression>> next = new ArrayList<>(combinedSets.size() * elementSets.size());
+      for (LinkedHashSet<Expression> prefix : combinedSets) {
+        for (List<Expression> choice : elementSets) {
+          LinkedHashSet<Expression> merged = new LinkedHashSet<>(prefix);
+          merged.addAll(choice);
+          next.add(merged);
+        }
+      }
+      if (next.size() > MAX_GROUPING_SETS) {
+        throw new SqlCompilationException(
+            "GROUPING SETS / ROLLUP / CUBE expands to more than " + MAX_GROUPING_SETS + " grouping sets");
+      }
+      combinedSets = next;
+    }
+
+    /// Build the ordered, de-duplicated union of all participating columns (first-appearance order).
+    LinkedHashMap<Expression, Integer> unionIndex = new LinkedHashMap<>();
+    for (LinkedHashSet<Expression> set : combinedSets) {
+      for (Expression expr : set) {
+        unionIndex.computeIfAbsent(expr, k -> unionIndex.size());
+      }
+    }
+    if (unionIndex.size() > MAX_GROUPING_SETS_COLUMNS) {
+      throw new SqlCompilationException(
+          "GROUPING SETS / ROLLUP / CUBE support at most " + MAX_GROUPING_SETS_COLUMNS
+              + " distinct grouping columns, got " + unionIndex.size());
+    }
+    pinotQuery.setGroupByList(new ArrayList<>(unionIndex.keySet()));
+
+    /// Encode each grouping set as a membership bitmask over the union columns (bit i set iff union column i
+    /// participates), de-duplicating overlapping sets produced by CUBE/ROLLUP. A mask of 0 is the grand-total
+    /// set (). The union is capped at MAX_GROUPING_SETS_COLUMNS (31) above, so a 32-bit mask never overflows.
+    Set<Integer> seen = new HashSet<>();
+    List<Integer> groupingSetMasks = new ArrayList<>();
+    for (LinkedHashSet<Expression> set : combinedSets) {
+      int mask = 0;
+      for (Expression expr : set) {
+        mask |= 1 << unionIndex.get(expr);
+      }
+      if (seen.add(mask)) {
+        groupingSetMasks.add(mask);
+      }
+    }
+    pinotQuery.setGroupingSetMasks(groupingSetMasks);
+  }
+
+  private static boolean isGroupingConstruct(SqlKind kind) {
+    return kind == SqlKind.ROLLUP || kind == SqlKind.CUBE || kind == SqlKind.GROUPING_SETS;
+  }
+
+  /// Expands a single grouping element into the list of grouping sets it represents (each set is an ordered
+  /// list of column expressions; the empty list is the grand-total set).
+  /// - {@code ROLLUP(l1, ..., ln)} -> the n+1 prefixes {@code {l1..ln}, {l1..ln-1}, ..., {l1}, {}}
+  /// - {@code CUBE(l1, ..., ln)} -> the power set of the n levels
+  /// - {@code GROUPING SETS(g1, ..., gm)} -> the concatenation of each operand's expansion (operands may be
+  ///   nested ROLLUP/CUBE/GROUPING SETS or ordinary sets)
+  /// - an ordinary grouping element (a single column or a parenthesized list) -> a single set
+  private static List<List<Expression>> parseGroupingElement(SqlNode node) {
+    switch (node.getKind()) {
+      case ROLLUP: {
+        List<List<Expression>> levels = parseLevels((SqlCall) node);
+        List<List<Expression>> sets = new ArrayList<>(levels.size() + 1);
+        for (int numLevels = levels.size(); numLevels >= 0; numLevels--) {
+          List<Expression> set = new ArrayList<>();
+          for (int i = 0; i < numLevels; i++) {
+            set.addAll(levels.get(i));
+          }
+          sets.add(set);
+        }
+        return sets;
+      }
+      case CUBE: {
+        List<List<Expression>> levels = parseLevels((SqlCall) node);
+        int numLevels = levels.size();
+        /// Guard the shift against overflow (1L << 64 wraps to 1) before comparing against the set-count cap.
+        if (numLevels >= Integer.SIZE - 1 || (1L << numLevels) > MAX_GROUPING_SETS) {
+          throw new SqlCompilationException(
+              "CUBE expands to more than " + MAX_GROUPING_SETS + " grouping sets");
+        }
+        List<List<Expression>> sets = new ArrayList<>(1 << numLevels);
+        for (int mask = (1 << numLevels) - 1; mask >= 0; mask--) {
+          List<Expression> set = new ArrayList<>();
+          for (int i = 0; i < numLevels; i++) {
+            if ((mask & (1 << i)) != 0) {
+              set.addAll(levels.get(i));
+            }
+          }
+          sets.add(set);
+        }
+        return sets;
+      }
+      case GROUPING_SETS: {
+        List<List<Expression>> sets = new ArrayList<>();
+        for (SqlNode operand : ((SqlCall) node).getOperandList()) {
+          sets.addAll(parseGroupingElement(operand));
+        }
+        return sets;
+      }
+      default:
+        /// Ordinary grouping element: a single column expression or a parenthesized list of columns.
+        return List.of(parseLevel(node));
+    }
+  }
+
+  /// Parses each operand of a ROLLUP/CUBE call into a "level" (a level may be a single column or a
+  /// parenthesized list of columns that roll up together).
+  private static List<List<Expression>> parseLevels(SqlCall call) {
+    List<List<Expression>> levels = new ArrayList<>(call.getOperandList().size());
+    for (SqlNode operand : call.getOperandList()) {
+      levels.add(parseLevel(operand));
+    }
+    return levels;
+  }
+
+  /// Parses a single grouping level/set node into its column expressions. Handles a parenthesized list
+  /// (modeled by Calcite as either a {@link SqlNodeList} or a ROW call), and a bare single column. An empty
+  /// parenthesized list yields an empty column list (the grand-total set).
+  private static List<Expression> parseLevel(SqlNode node) {
+    if (node instanceof SqlNodeList) {
+      SqlNodeList list = (SqlNodeList) node;
+      List<Expression> columns = new ArrayList<>(list.size());
+      for (SqlNode column : list) {
+        columns.add(toExpression(column));
+      }
+      return columns;
+    }
+    if (node.getKind() == SqlKind.ROW) {
+      List<SqlNode> operands = ((SqlCall) node).getOperandList();
+      List<Expression> columns = new ArrayList<>(operands.size());
+      for (SqlNode column : operands) {
+        columns.add(toExpression(column));
+      }
+      return columns;
+    }
+    return List.of(toExpression(node));
   }
 
   private static List<Expression> convertOrderByList(SqlNodeList orderList) {

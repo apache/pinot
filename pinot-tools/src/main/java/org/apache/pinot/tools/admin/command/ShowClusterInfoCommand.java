@@ -21,7 +21,6 @@ package org.apache.pinot.tools.admin.command;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.StringWriter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -157,12 +156,12 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
         Map<String, String> serverStateMapFromIS = idealState.getInstanceStateMap(segment);
         if (serverStateMapFromIS == null) {
           LOGGER.info("Unassigned segment {} in ideal state", segment);
-          serverStateMapFromIS = Collections.emptyMap();
+          serverStateMapFromIS = Map.of();
         }
         Map<String, String> serverStateMapFromEV = externalView.getStateMap(segment);
         if (serverStateMapFromEV == null) {
           LOGGER.info("Unassigned segment {} in external view", segment);
-          serverStateMapFromEV = Collections.emptyMap();
+          serverStateMapFromEV = Map.of();
         }
 
         for (String serverName : serverStateMapFromIS.keySet()) {

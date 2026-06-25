@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -204,7 +203,7 @@ public class DataBlockBuilderTest {
       aggFunctions = new AggregationFunction[]{mock(AggregationFunction.class)};
     }
     DataBlock rowDataBlock =
-        DataBlockBuilder.buildFromColumns(Collections.singletonList(column), dataSchema, aggFunctions);
+        DataBlockBuilder.buildFromColumns(List.<Object[]>of(column), dataSchema, aggFunctions);
     assertEquals(rowDataBlock.getNumberOfRows(), numRows);
     checkEquals(type, rowDataBlock, i -> column[i]);
   }

@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.explain;
 
 import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.proto.Plan;
@@ -226,7 +225,7 @@ public class ExplainNodeSimplifier {
         Map<String, Plan.ExplainNode.AttributeValue> attributes =
             new ExplainAttributeBuilder().putLong(SEGMENTS_ATTRIBUTE, segmentCounts.get(i)).build();
         alternatives.add(new ExplainedNode(node.getStageId(), group.getDataSchema(), null,
-            Collections.singletonList(group), ALTERNATIVE, attributes));
+            List.of(group), ALTERNATIVE, attributes));
       }
       return node.withInputs(alternatives);
     }

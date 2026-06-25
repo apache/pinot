@@ -22,7 +22,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -120,7 +119,7 @@ public class PinotTaskRestletResourceTest {
     ArgumentCaptor<Map<String, String>> minionWorkerEndpointsCaptor = ArgumentCaptor.forClass(Map.class);
     when(_pinotHelixTaskResourceManager.getSubtaskOnWorkerProgress(anyString(), any(), any(),
         minionWorkerEndpointsCaptor.capture(), anyMap(), anyInt()))
-        .thenReturn(Collections.emptyMap());
+        .thenReturn(Map.of());
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
     _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", minionWorkerIds, asyncResponse);
@@ -140,7 +139,7 @@ public class PinotTaskRestletResourceTest {
   @Test
   public void testGetSubtaskWithGivenStateProgressWithException()
       throws JsonProcessingException {
-    when(_pinotHelixResourceManager.getAllMinionInstanceConfigs()).thenReturn(Collections.emptyList());
+    when(_pinotHelixResourceManager.getAllMinionInstanceConfigs()).thenReturn(List.of());
     HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
     when(httpHeaders.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
     when(_controllerConf.getMinionAdminRequestTimeoutSeconds()).thenReturn(10);

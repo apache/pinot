@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -130,7 +129,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     // Add offline table config
     TableConfig offlineTableConfig = createOfflineTableConfig();
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig());
+        Map.of("OFFLINE", createInstanceAssignmentConfig());
     offlineTableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     addTableConfig(offlineTableConfig);
     // Add realtime table config

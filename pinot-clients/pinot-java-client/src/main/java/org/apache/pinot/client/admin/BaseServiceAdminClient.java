@@ -19,7 +19,6 @@
 package org.apache.pinot.client.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +66,7 @@ abstract class BaseServiceAdminClient {
     try {
       return PinotAdminTransport.parseStringArrayNode(node);
     } catch (PinotAdminException e) {
-      return Collections.emptyList();
+      return List.of();
     }
   }
 }

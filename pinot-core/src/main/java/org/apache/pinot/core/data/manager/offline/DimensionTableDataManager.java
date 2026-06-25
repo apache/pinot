@@ -25,7 +25,6 @@ import it.unimi.dsi.fastutil.objects.Object2LongOpenCustomHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -131,8 +130,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       lookupTable.defaultReturnValue(Long.MIN_VALUE);
 
       _dimensionTable.set(
-          new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable, Collections.emptyList(),
-              Collections.emptyList(), this));
+          new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable, List.of(),
+              List.of(), this));
     } else {
       List<String> valueColumns = getValueColumns(schema.getColumnNames(), primaryKeyColumns);
 

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import java.util.Collections;
+import java.util.List;
 import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.Union;
 import org.apache.datasketches.tuple.aninteger.IntegerSketch;
@@ -39,14 +39,14 @@ public class IntegerTupleSketchValueAggregatorTest {
   @Test
   public void initialShouldParseASketch() {
     IntegerTupleSketchValueAggregator agg =
-        new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+        new IntegerTupleSketchValueAggregator(List.of(), IntegerSummary.Mode.Sum);
     assertEquals(toSketch(agg.getInitialAggregatedValue(sketchContaining("hello world", 1))).getEstimate(), 1.0);
   }
 
   @Test
   public void nullInitialShouldReturnEmptySketch() {
     IntegerTupleSketchValueAggregator agg =
-        new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+        new IntegerTupleSketchValueAggregator(List.of(), IntegerSummary.Mode.Sum);
     assertEquals(toSketch(agg.getInitialAggregatedValue(null)).getEstimate(), 0.0);
   }
 
@@ -57,7 +57,7 @@ public class IntegerTupleSketchValueAggregatorTest {
     s1.update("a", 1);
     s2.update("b", 1);
     IntegerTupleSketchValueAggregator agg =
-        new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+        new IntegerTupleSketchValueAggregator(List.of(), IntegerSummary.Mode.Sum);
     Sketch<IntegerSummary> merged = toSketch(agg.applyAggregatedValue(s1, s2));
     assertEquals(merged.getEstimate(), 2.0);
     assertEquals(agg.getMaxAggregatedValueByteSize(), 196632);
@@ -70,7 +70,7 @@ public class IntegerTupleSketchValueAggregatorTest {
     s1.update("a", 1);
     s2.update("b", 1);
     IntegerTupleSketchValueAggregator agg =
-        new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+        new IntegerTupleSketchValueAggregator(List.of(), IntegerSummary.Mode.Sum);
     Sketch<IntegerSummary> merged = toSketch(agg.applyRawValue(s1, agg.serializeAggregatedValue(s2)));
     assertEquals(merged.getEstimate(), 2.0);
     assertEquals(agg.getMaxAggregatedValueByteSize(), 196632);

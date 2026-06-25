@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -92,14 +91,14 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setSegmentPartitionConfig(new SegmentPartitionConfig(
-        Collections.singletonMap(PARTITION_COLUMN, new ColumnPartitionConfig("murmur", 2))));
+        Map.of(PARTITION_COLUMN, new ColumnPartitionConfig("murmur", 2))));
     tableConfig.setRoutingConfig(
-        new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE), null, false));
+        new RoutingConfig(null, List.of(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE), null, false));
     addTableConfig(tableConfig);
 
     // Push data into Kafka (only ingest the first Avro file)
     _partitionColumn = PARTITION_COLUMN;
-    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(0)));
+    pushAvroIntoKafka(List.of(_avroFiles.get(0)));
 
     // Wait for all documents loaded
     _countStarResult = NUM_DOCS_IN_FIRST_AVRO_FILE;
@@ -163,7 +162,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
       int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
-      assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+      assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
       numSegmentsForPartition[partitionGroupId]++;
     }
 
@@ -249,7 +248,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       throws Exception {
     // Push the second Avro file into Kafka without partitioning
     _partitionColumn = null;
-    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(1)));
+    pushAvroIntoKafka(List.of(_avroFiles.get(1)));
 
     // Wait for all documents loaded
     _countStarResult += NUM_DOCS_IN_SECOND_AVRO_FILE;
@@ -274,13 +273,13 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // For consuming segment, the partition metadata should only contain the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+        assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
       } else {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         if (sequenceNumber == 0) {
           // The partition metadata for the first completed segment should only contain the stream partition
-          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+          assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
         } else {
           // The partition metadata for the new completed segments should contain both partitions
           assertEquals(columnPartitionMetadata.getPartitions(), new HashSet<>(Arrays.asList(0, 1)));
@@ -327,7 +326,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
     // Push the third Avro file into Kafka with partitioning
     _partitionColumn = PARTITION_COLUMN;
-    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(2)));
+    pushAvroIntoKafka(List.of(_avroFiles.get(2)));
 
     // Wait for all documents loaded
     _countStarResult += NUM_DOCS_IN_THIRD_AVRO_FILE;
@@ -351,14 +350,14 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // For consuming segment, the partition metadata should only contain the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+        assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
       } else {
         // The partition metadata for the new completed segments should only contain the stream partition
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         if (sequenceNumber == 0 || sequenceNumber >= 4) {
           // The partition metadata for the first and new completed segments should only contain the stream partition
-          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+          assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
         } else {
           // The partition metadata for the completed segments containing records from the second Avro file should
           // contain both partitions

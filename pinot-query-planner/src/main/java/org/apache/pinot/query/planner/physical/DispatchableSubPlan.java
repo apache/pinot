@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.ToIntFunction;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 
@@ -147,6 +148,18 @@ public class DispatchableSubPlan {
    * Get the estimated total number of threads that will be spawned for this query (across all stages and servers).
    */
   public int getEstimatedNumQueryThreads() {
+    return getEstimatedNumQueryThreads(segment -> 1);
+  }
+
+  /**
+   * Get the estimated total number of threads that will be spawned for this query (across all stages and servers),
+   * weighting each leaf-stage segment by the number of work units it represents.
+   *
+   * <p>{@code segmentWorkUnits} maps a leaf-stage segment name to its work-unit count (default 1). A caller can
+   *  return a value that more accurately
+   *  reflects the real work the server will perform rather than the number of routed entries.
+   */
+  public int getEstimatedNumQueryThreads(ToIntFunction<String> segmentWorkUnits) {
     if (_allLeafStagesEmpty) {
       return 0;
     }
@@ -159,11 +172,12 @@ public class DispatchableSubPlan {
       } else {
         // Leaf stage
         for (Map<String, List<String>> segmentsMap : stage.getWorkerIdToSegmentsMap().values()) {
-          int numSegments = segmentsMap
-              .values()
-              .stream()
-              .mapToInt(List::size)
-              .sum();
+          int numSegments = 0;
+          for (List<String> segments : segmentsMap.values()) {
+            for (String segment : segments) {
+              numSegments += segmentWorkUnits.applyAsInt(segment);
+            }
+          }
 
           // The leaf stage operator itself spawns a thread for each server query request
           estimatedNumQueryThreads++;

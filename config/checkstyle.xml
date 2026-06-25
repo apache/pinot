@@ -357,4 +357,18 @@
     <property name="format" value="StringUtils\.replace\("/>
     <property name="message" value="StringUtils.replace() is deprecated. Use Strings.CS.replace() instead."/>
   </module>
+
+  <!-- Modern Java collection guards: use Java immutable collection factories for empty collection literals. -->
+  <module name="RegexpSingleline">
+    <property name="format" value="Collections(\.|::)emptyList\b"/>
+    <property name="message" value="java.util.Collections empty list factory is disallowed. Use List.of() instead."/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="Collections(\.|::)emptySet\b"/>
+    <property name="message" value="java.util.Collections empty set factory is disallowed. Use Set.of() instead."/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="Collections(\.|::)emptyMap\b"/>
+    <property name="message" value="java.util.Collections empty map factory is disallowed. Use Map.of() instead."/>
+  </module>
 </module>

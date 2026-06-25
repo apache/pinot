@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.materializedview.rewrite;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import org.apache.pinot.common.request.Expression;
@@ -47,7 +46,7 @@ public class AggregationSubsumptionStrategyTest {
   private MaterializedViewCacheEntry createEntry(String viewTableName, String baseTable, String definedSql) {
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         viewTableName,
-        Collections.singletonList(baseTable),
+        List.of(baseTable),
         definedSql,
         new HashMap<>(),
         null);
@@ -432,7 +431,7 @@ public class AggregationSubsumptionStrategyTest {
   public void testNullCompiledQuery() {
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         "mv_broken_OFFLINE",
-        Collections.singletonList("orders"),
+        List.of("orders"),
         null,
         new HashMap<>(),
         null);

@@ -19,7 +19,6 @@
 package org.apache.pinot.common.evaluator;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -51,7 +50,7 @@ public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
 
   @Override
   public List<String> getArguments() {
-    return Collections.singletonList(_incomingTimeColumn);
+    return List.of(_incomingTimeColumn);
   }
 
   /**

@@ -24,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,7 +100,7 @@ public class DriverUtils {
 
   public static List<String> getBrokersFromURI(URI uri) {
     String brokerUrl = String.format("%s:%d", uri.getHost(), uri.getPort());
-    List<String> brokerList = Collections.singletonList(brokerUrl);
+    List<String> brokerList = List.of(brokerUrl);
     return brokerList;
   }
 

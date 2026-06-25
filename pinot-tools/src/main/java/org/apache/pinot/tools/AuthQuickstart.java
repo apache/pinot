@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tools;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +31,7 @@ import org.apache.pinot.tools.utils.AuthUtils;
 public class AuthQuickstart extends Quickstart {
   @Override
   public List<String> types() {
-    return Collections.singletonList("AUTH");
+    return List.of("AUTH");
   }
 
   @Override

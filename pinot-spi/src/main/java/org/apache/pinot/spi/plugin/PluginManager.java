@@ -142,7 +142,7 @@ public class PluginManager {
   PluginManager() {
     // For the shaded plugins
     _registry = new HashMap<>();
-    _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
+    _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(List.of()));
 
     // for the new pinot plugins
     try {

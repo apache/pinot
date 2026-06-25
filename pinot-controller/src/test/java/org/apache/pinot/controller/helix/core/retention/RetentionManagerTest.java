@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -470,7 +469,7 @@ public class RetentionManagerTest {
 
     PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
     when(mockResourceManager.getBrokerInstancesConfigsFor(offlineTableConfig.getTableName()))
-        .thenReturn(Collections.singletonList(instanceConfig));
+        .thenReturn(List.of(instanceConfig));
 
     CompletionServiceHelper mockServiceHelper = mock(CompletionServiceHelper.class);
 
@@ -721,8 +720,7 @@ public class RetentionManagerTest {
 
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
 
-    IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(REALTIME_TABLE_NAME, replicaCount);
 
     final int kafkaPartition = 5;
     final long millisInDays = TimeUnit.DAYS.toMillis(1);
@@ -785,8 +783,7 @@ public class RetentionManagerTest {
 
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
 
-    IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(REALTIME_TABLE_NAME, replicaCount);
 
     final int kafkaPartition = 5;
     final long millisInDays = TimeUnit.DAYS.toMillis(1);

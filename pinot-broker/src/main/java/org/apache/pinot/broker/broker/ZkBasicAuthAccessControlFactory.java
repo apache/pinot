@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.broker;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
@@ -95,7 +94,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         return TableAuthorizationResult.success();
       }
 
-      return authorize(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
+      return authorize(requesterIdentity, Set.of(brokerRequest.getQuerySource().getTableName()));
     }
 
     @Override

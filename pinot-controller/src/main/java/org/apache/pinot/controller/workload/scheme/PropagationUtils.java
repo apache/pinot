@@ -81,7 +81,7 @@ public class PropagationUtils {
       TableType tableType = tableConfig.getTableType();
       try {
         String brokerTag = TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker());
-        Set<String> brokerTags = Collections.singleton(brokerTag);
+        Set<String> brokerTags = Set.of(brokerTag);
         // Gather server tags based on table type
         Set<String> serverTags = collectServerHelixTagsForTable(tenantConfig, tableType);
         Map<NodeConfig.Type, Set<String>> nodeTypeToTags = new EnumMap<>(NodeConfig.Type.class);
@@ -147,7 +147,7 @@ public class PropagationUtils {
     List<String> tablesWithType = (tableType == null)
         ? Arrays.asList(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
             TableNameBuilder.REALTIME.tableNameWithType(tableName))
-        : Collections.singletonList(tableName);
+        : List.of(tableName);
     for (String table : tablesWithType) {
       try {
         TableConfig tableConfig = pinotResourceManager.getTableConfig(table);
@@ -233,7 +233,7 @@ public class PropagationUtils {
           for (String tenant : topLevelIds) {
             Set<String> resolvedTags = TagNameUtils.isOfflineServerTag(tenant)
                     || TagNameUtils.isRealtimeServerTag(tenant) || TagNameUtils.isBrokerTag(tenant)
-                ? Collections.singleton(tenant)
+                ? Set.of(tenant)
                 : new HashSet<>(getAllPossibleHelixTagsForTenant(tenant));
             if (!Collections.disjoint(resolvedTags, filterTags)) {
               matchedConfigs.add(queryWorkloadConfig);
@@ -246,11 +246,11 @@ public class PropagationUtils {
             List<String> tablesWithType = (tableType == null)
                 ? Arrays.asList(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
                     TableNameBuilder.REALTIME.tableNameWithType(tableName))
-                : Collections.singletonList(tableName);
+                : List.of(tableName);
             for (String tableWithType : tablesWithType) {
               Set<String> resolvedTags = tableToHelixTags
-                  .getOrDefault(tableWithType, Collections.emptyMap())
-                  .getOrDefault(nodeConfig.getNodeType(), Collections.emptySet());
+                  .getOrDefault(tableWithType, Map.of())
+                  .getOrDefault(nodeConfig.getNodeType(), Set.of());
               if (!Collections.disjoint(resolvedTags, filterTags)) {
                 matchedConfigs.add(queryWorkloadConfig);
                 break;

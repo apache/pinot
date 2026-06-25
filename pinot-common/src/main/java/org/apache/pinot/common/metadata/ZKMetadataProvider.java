@@ -22,7 +22,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -636,7 +635,7 @@ public class ZKMetadataProvider {
       return tableConfigs;
     } else {
       LOGGER.warn("Path: {} does not exist", PROPERTYSTORE_TABLE_CONFIGS_PREFIX);
-      return Collections.emptyList();
+      return List.of();
     }
   }
 
@@ -741,7 +740,7 @@ public class ZKMetadataProvider {
       return segmentsZKMetadata;
     } else {
       LOGGER.warn("Path: {} does not exist", parentPath);
-      return Collections.emptyList();
+      return List.of();
     }
   }
 
@@ -757,7 +756,7 @@ public class ZKMetadataProvider {
     if (propertyStore.exists(segmentsPath, AccessOption.PERSISTENT)) {
       return propertyStore.getChildNames(segmentsPath, AccessOption.PERSISTENT);
     } else {
-      return Collections.emptyList();
+      return List.of();
     }
   }
 
@@ -879,7 +878,7 @@ public class ZKMetadataProvider {
         propertyStore.getChildren(getPropertyStoreWorkloadConfigsPrefix(), null, AccessOption.PERSISTENT,
             CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     if (znRecords == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     int numZNRecords = znRecords.size();
     List<QueryWorkloadConfig> queryWorkloadConfigs = new ArrayList<>(numZNRecords);
@@ -944,7 +943,7 @@ public class ZKMetadataProvider {
         }
       }).filter(Objects::nonNull).collect(Collectors.toList());
     } else {
-      return Collections.emptyList();
+      return List.of();
     }
   }
 

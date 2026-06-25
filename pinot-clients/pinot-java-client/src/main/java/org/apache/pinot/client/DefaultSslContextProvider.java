@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
@@ -36,7 +35,7 @@ public class DefaultSslContextProvider implements SslContextProvider {
       @Nullable SSLContext sslContext, TlsProtocols tlsProtocols) {
     builder.setUseOpenSsl(false);
 
-    List<String> enabledProtocolList = Collections.emptyList();
+    List<String> enabledProtocolList = List.of();
     if (tlsProtocols != null) {
       List<String> configuredProtocols = tlsProtocols.getEnabledProtocols();
       if (configuredProtocols != null) {

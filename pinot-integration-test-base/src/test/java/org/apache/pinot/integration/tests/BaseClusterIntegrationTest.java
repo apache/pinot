@@ -30,7 +30,6 @@ import java.sql.DriverManager;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -127,7 +126,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final String DEFAULT_SORTED_COLUMN = "Carrier";
   protected static final List<String> DEFAULT_INVERTED_INDEX_COLUMNS = Arrays.asList("FlightNum", "Origin", "Quarter");
   private static final List<String> DEFAULT_BLOOM_FILTER_COLUMNS = Arrays.asList("FlightNum", "Origin");
-  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = Collections.singletonList("Origin");
+  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = List.of("Origin");
   protected static final int DEFAULT_NUM_REPLICAS = 1;
   protected static final boolean DEFAULT_NULL_HANDLING_ENABLED = false;
 
@@ -818,7 +817,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     EmbeddedKafkaCluster cluster = new EmbeddedKafkaCluster();
     cluster.init(props);
     cluster.start();
-    _kafkaStarters = Collections.singletonList(cluster);
+    _kafkaStarters = List.of(cluster);
     try {
       waitForKafkaClusterReady(getKafkaBrokerList(), requestedBrokers, useKafkaTransaction());
     } catch (RuntimeException e) {
@@ -958,7 +957,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
     try (AdminClient adminClient = AdminClient.create(adminProps)) {
       TopicDescription topicDescription =
-          adminClient.describeTopics(Collections.singletonList(topic)).allTopicNames().get(5, TimeUnit.SECONDS)
+          adminClient.describeTopics(List.of(topic)).allTopicNames().get(5, TimeUnit.SECONDS)
               .get(topic);
       if (topicDescription.partitions().size() < expectedPartitions) {
         return false;
