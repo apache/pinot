@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -128,10 +129,10 @@ public class VectorIndexHandler extends BaseIndexHandler {
    *
    * <p><b>Crash recovery:</b> if a prior absorb crashed between {@code newIndexFor} (which
    * committed bytes into {@code columns.psf} and added a {@code _columnEntries} entry) and the
-   * sidecar file deletion, the next load will see both forms. In that case
-   * {@code SingleFileIndexDirectory.allocNewBufferInternal} rejects the duplicate key. Treat that
-   * specific failure as "already absorbed by a previous run" and clean up the orphan sidecar file
-   * instead of failing the segment load.</p>
+   * sidecar file deletion, the next load will see both forms. We detect that state upfront via
+   * {@code hasIndexFor}, verify the typed entry's size matches the sidecar's length (so we do not
+   * delete a sidecar that happens to coexist with an unrelated typed entry), and clean up the
+   * orphan sidecar instead of re-running the absorb.</p>
    */
   private void absorbCombinedIntoColumnsPsf(SegmentDirectory.Writer segmentWriter, String column,
       VectorBackendType backendType, File indexDir)
@@ -150,20 +151,27 @@ public class VectorIndexHandler extends BaseIndexHandler {
       return;
     }
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
-    LOGGER.info("Absorbing vector sidecar file into columns.psf for segment: {}, column: {} (backend={})",
-        segmentName, column, backendType);
-    try {
-      LoaderUtils.writeIndexToV3Format(segmentWriter, column, picked, StandardIndexes.vector());
-    } catch (RuntimeException e) {
-      String msg = e.getMessage();
-      if (msg != null && msg.contains("Attempt to re-create an existing index")) {
+    // Crash-recovery: if a prior absorb committed bytes to columns.psf but crashed before
+    // deleting the sidecar, the typed entry is already present. Detect that directly via
+    // hasIndexFor + size check, rather than catching the duplicate-key exception by message.
+    if (segmentWriter.hasIndexFor(column, StandardIndexes.vector())) {
+      long existingSize = segmentWriter.getIndexFor(column, StandardIndexes.vector()).size();
+      if (existingSize == picked.length()) {
         LOGGER.warn("Vector index already present in columns.psf for segment: {}, column: {}; "
             + "deleting orphan sidecar file from a previously-crashed absorb run", segmentName, column);
         FileUtils.deleteQuietly(picked);
         return;
       }
-      throw e;
+      // Size mismatch — the typed entry is from a different build than the sidecar. Refuse to
+      // proceed; an operator must reconcile manually rather than have us guess.
+      throw new IOException("Vector index already present in columns.psf for column: " + column
+          + " (size=" + existingSize + ") but sidecar file " + picked.getName()
+          + " has different size " + picked.length() + ". Refusing to overwrite — please remove "
+          + "the conflicting sidecar or rebuild the segment.");
     }
+    LOGGER.info("Absorbing vector sidecar file into columns.psf for segment: {}, column: {} (backend={})",
+        segmentName, column, backendType);
+    LoaderUtils.writeIndexToV3Format(segmentWriter, column, picked, StandardIndexes.vector());
   }
 
   /**
@@ -185,6 +193,21 @@ public class VectorIndexHandler extends BaseIndexHandler {
         _segmentDirectory.getSegmentMetadata().getVersion());
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     File finalCombined = new File(v3Dir, column + VectorIndexUtils.getIndexFileExtension(backendType));
+    File combinedFormFile = new File(v3Dir,
+        column + VectorIndexUtils.getIndexFileExtension(backendType, /* combined */ true));
+    // Defensive: extract is destructive (removeIndex calls cleanupVectorIndex, which deletes any
+    // sidecar with a recognised IVF extension). If a sidecar already exists on disk we'd silently
+    // clobber it. Refuse to proceed and force the operator to reconcile — this state should not
+    // arise from the handler's own paths (see hasIvfCombinedFile in needUpdateIndices) but a
+    // manually-edited segment dir or a half-completed migration could produce it.
+    if (finalCombined.exists()) {
+      throw new IOException("Extract path expected no on-disk sidecar but found: " + finalCombined
+          + ". Refusing to proceed — please remove the conflicting file manually.");
+    }
+    if (combinedFormFile.exists()) {
+      throw new IOException("Extract path expected no on-disk sidecar but found: " + combinedFormFile
+          + ". Refusing to proceed — please remove the conflicting file manually.");
+    }
     File tempCombined = new File(v3Dir, column + ".vector.extract-tmp");
     // Clean any leftover from a previously-crashed extract.
     FileUtils.deleteQuietly(tempCombined);
@@ -305,6 +328,28 @@ public class VectorIndexHandler extends BaseIndexHandler {
     return columnMetadata != null;
   }
 
+  /**
+   * Sweeps orphans left over from a prior build that targeted the OTHER extension (e.g. a crash
+   * with {@code storeInSegmentFile=true} followed by a retry with the flag off). Removes the
+   * other-extension {@code .inprogress} marker and any partial index file with that extension,
+   * so a later flag-flip cannot pick the residue up as if it were a complete index. HNSW is
+   * skipped — it does not currently have a combined form.
+   */
+  @VisibleForTesting
+  static void cleanOrphansFromOtherExtension(File segmentDirectory, String columnName,
+      VectorBackendType backendType, boolean currentWriteCombined) {
+    if (backendType == VectorBackendType.HNSW) {
+      return;
+    }
+    String currentExt = VectorIndexUtils.getIndexFileExtension(backendType, currentWriteCombined);
+    String otherExt = VectorIndexUtils.getIndexFileExtension(backendType, !currentWriteCombined);
+    if (otherExt.equals(currentExt)) {
+      return;
+    }
+    FileUtils.deleteQuietly(new File(segmentDirectory, columnName + otherExt + ".inprogress"));
+    FileUtils.deleteQuietly(new File(segmentDirectory, columnName + otherExt));
+  }
+
   private void createVectorIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
@@ -322,6 +367,8 @@ public class VectorIndexHandler extends BaseIndexHandler {
     String vectorIndexFileExtension = VectorIndexUtils.getIndexFileExtension(backendType, writeCombined);
     File inProgress = new File(segmentDirectory, columnName + vectorIndexFileExtension + ".inprogress");
     File vectorIndexFile = new File(segmentDirectory, columnName + vectorIndexFileExtension);
+
+    cleanOrphansFromOtherExtension(segmentDirectory, columnName, backendType, writeCombined);
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.

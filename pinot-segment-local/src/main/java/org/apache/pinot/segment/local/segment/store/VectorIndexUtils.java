@@ -69,6 +69,14 @@ public class VectorIndexUtils {
     FileUtils.deleteQuietly(ivfPqCombinedFile);
   }
 
+  /**
+   * Returns {@code true} when the V1/V2 segment directory holds a vector index file that should
+   * be preserved as a sibling during V2→V3 conversion (the converter's "skip standard copy" gate).
+   * Deliberately excludes the IVF {@code *.combined.index} extensions — those are the transient
+   * consolidated form that the converter is supposed to pack into {@code columns.psf} via the
+   * standard copy path, not sibling-copy. Callers that need to know about the combined form too
+   * should use {@link #hasCombinedFormVectorIndex} alongside this.
+   */
   public static boolean hasVectorIndex(File segDir, String column) {
     return new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION).exists()
@@ -78,6 +86,18 @@ public class VectorIndexUtils {
         || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION).exists();
+  }
+
+  /**
+   * Returns {@code true} when the V1/V2 segment directory holds an IVF vector index in the
+   * combined-form extension ({@code .vector.ivfflat.combined.index} or
+   * {@code .vector.ivfpq.combined.index}). The combined form is written by an IVF creator run
+   * with {@code storeInSegmentFile=true} and is meant to be packed into {@code columns.psf} by
+   * the V2→V3 converter, not preserved as a sibling.
+   */
+  public static boolean hasCombinedFormVectorIndex(File segDir, String column) {
+    return new File(segDir, column + Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION).exists();
   }
 
   @Nullable

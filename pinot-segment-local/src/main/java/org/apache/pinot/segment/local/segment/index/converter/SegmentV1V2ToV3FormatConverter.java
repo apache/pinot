@@ -157,12 +157,17 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
               }
               continue;
             }
-            // Vector index mirrors text: skip the standard copy when a legacy IVF combined (or
+            // Vector index mirrors text: skip the standard copy when a legacy IVF sidecar (or
             // HNSW directory) is present ({@code copyVectorIndexIfExists} handles those as
             // sibling copies). Combined .vector.ivfflat.combined.index / .ivfpq.combined.index
             // files fall through to the standard path and get packed into columns.psf.
+            // Mixed state: if both legacy and combined exist (e.g. operator toggled the flag
+            // and rebuilt without cleaning the old file), combined wins — pack it and let
+            // copyVectorIndexIfExists drop the legacy sibling so the operator gets exactly one
+            // copy of the bytes in the V3 segment.
             if (indexType == StandardIndexes.vector()) {
-              if (!VectorIndexUtils.hasVectorIndex(v2Directory, column)) {
+              boolean hasCombined = VectorIndexUtils.hasCombinedFormVectorIndex(v2Directory, column);
+              if (hasCombined || !VectorIndexUtils.hasVectorIndex(v2Directory, column)) {
                 copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
               }
               continue;
@@ -286,19 +291,35 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       }
     }
 
-    // Copy IVF_FLAT index files (single flat files, not directories)
+    // Copy IVF_FLAT index files (single flat files, not directories). Skip legacy sidecars whose
+    // matching combined-form file also exists — the combined file was already packed into
+    // columns.psf by the main loop, and copying the legacy sibling would leave two copies.
     String ivfFlatSuffix = V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
-    File[] ivfFlatIndexFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(ivfFlatSuffix));
+    String ivfFlatCombinedSuffix = V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION;
+    File[] ivfFlatIndexFiles = segmentDirectory.listFiles(
+        (dir, name) -> name.endsWith(ivfFlatSuffix) && !name.endsWith(ivfFlatCombinedSuffix));
     if (ivfFlatIndexFiles != null) {
       for (File ivfFlatFile : ivfFlatIndexFiles) {
+        String column = ivfFlatFile.getName().substring(0,
+            ivfFlatFile.getName().length() - ivfFlatSuffix.length());
+        if (new File(segmentDirectory, column + ivfFlatCombinedSuffix).exists()) {
+          continue;
+        }
         Files.copy(ivfFlatFile.toPath(), new File(v3Dir, ivfFlatFile.getName()).toPath());
       }
     }
 
     String ivfPqSuffix = V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION;
-    File[] ivfPqIndexFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(ivfPqSuffix));
+    String ivfPqCombinedSuffix = V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION;
+    File[] ivfPqIndexFiles = segmentDirectory.listFiles(
+        (dir, name) -> name.endsWith(ivfPqSuffix) && !name.endsWith(ivfPqCombinedSuffix));
     if (ivfPqIndexFiles != null) {
       for (File ivfPqFile : ivfPqIndexFiles) {
+        String column = ivfPqFile.getName().substring(0,
+            ivfPqFile.getName().length() - ivfPqSuffix.length());
+        if (new File(segmentDirectory, column + ivfPqCombinedSuffix).exists()) {
+          continue;
+        }
         Files.copy(ivfPqFile.toPath(), new File(v3Dir, ivfPqFile.getName()).toPath());
       }
     }
