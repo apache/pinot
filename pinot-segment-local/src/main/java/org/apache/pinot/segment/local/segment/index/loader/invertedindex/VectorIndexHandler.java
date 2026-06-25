@@ -200,16 +200,16 @@ public class VectorIndexHandler extends BaseIndexHandler {
         column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, /* combined */ true));
     File hnswDir = new File(v3Dir,
         column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, /* combined */ false));
-    boolean createdTransient = false;
     if (!combinedFile.exists()) {
       if (!hnswDir.exists() || !hnswDir.isDirectory()) {
         LOGGER.warn("Expected HNSW directory or combined file for column {} not found; skipping absorb", column);
         return;
       }
-      // Pack the Lucene directory into a transient combined file for absorption.
+      // Pack the Lucene directory into a transient combined file for absorption. The directory
+      // and the combined file are both cleaned up below after a successful absorb (or by the
+      // crash-recovery branch above on a subsequent retry).
       HnswVectorIndexCombined.combineHnswIndexFiles(hnswDir, combinedFile.getAbsolutePath(), v3Dir.getParentFile(),
           column);
-      createdTransient = true;
     }
 
     // Crash-recovery: check whether the typed entry already exists.
@@ -309,8 +309,13 @@ public class VectorIndexHandler extends BaseIndexHandler {
 
   /**
    * HNSW-specific extract: streams the combined HNSW payload from {@code columns.psf} to a temp
-   * file, removes the consolidated entry, then unpacks the combined file back into a Lucene
-   * directory (the form expected by the file-backed reader).
+   * file, unpacks it into a Lucene directory, and only then removes the consolidated typed entry.
+   *
+   * <p><b>Ordering rationale:</b> unpack runs <em>before</em> {@code removeIndex}. If the unpack
+   * fails mid-way, the typed entry is still present in {@code columns.psf} and the next load
+   * retries the extract — the operator does not lose the index. The reverse order would leave a
+   * crash window in which the typed entry is gone but the Lucene directory does not yet exist,
+   * leaving the segment permanently without its HNSW index until a full rebuild.</p>
    */
   private void extractHnswConsolidatedToDirectory(SegmentDirectory.Writer segmentWriter, String column,
       File v3Dir, String segmentName)
@@ -335,14 +340,26 @@ public class VectorIndexHandler extends BaseIndexHandler {
     PinotDataBuffer buffer = segmentWriter.getIndexFor(column, StandardIndexes.vector());
     streamBufferToFile(buffer, buffer.size(), tempCombined);
 
-    segmentWriter.removeIndex(column, StandardIndexes.vector());
-
-    // Unpack the combined file back into a Lucene directory.
+    // Unpack the combined file back into a Lucene directory BEFORE removing the typed entry. If
+    // unpack throws, the typed entry remains in columns.psf and the next handler run retries —
+    // no permanent loss. Best-effort clean up the half-unpacked directory so the retry's
+    // pre-flight directory-exists check still fires.
     try {
       HnswVectorIndexCombined.extractHnswIndexFiles(tempCombined, hnswDir);
-    } finally {
+    } catch (IOException | RuntimeException e) {
+      if (hnswDir.exists()) {
+        FileUtils.deleteQuietly(hnswDir);
+      }
       FileUtils.deleteQuietly(tempCombined);
+      throw e;
     }
+
+    // Unpack succeeded — the bytes are now on disk in legacy form. Remove the consolidated entry.
+    // If this throws, the segment ends up with BOTH forms; the reader factory's file-backed path
+    // (flag=false) uses the Lucene directory and ignores the orphan typed entry until the next
+    // handler run cleans it.
+    segmentWriter.removeIndex(column, StandardIndexes.vector());
+    FileUtils.deleteQuietly(tempCombined);
   }
 
   /**
