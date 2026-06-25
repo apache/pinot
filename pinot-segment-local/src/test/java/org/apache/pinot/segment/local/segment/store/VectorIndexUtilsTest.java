@@ -82,6 +82,26 @@ public class VectorIndexUtilsTest {
   }
 
   @Test
+  public void testHasVectorIndexExcludesCombinedForm()
+      throws IOException {
+    // The combined-form extension is the transient consolidated file meant to be packed into
+    // columns.psf by the V2→V3 converter — not preserved as a sibling. hasVectorIndex (used by
+    // the converter's "skip standard copy" gate) must return false when only the combined form
+    // exists so the bytes get packed instead of dropped.
+    touch(COLUMN + Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
+    Assert.assertFalse(VectorIndexUtils.hasVectorIndex(_tempDir, COLUMN));
+    Assert.assertTrue(VectorIndexUtils.hasCombinedFormVectorIndex(_tempDir, COLUMN));
+  }
+
+  @Test
+  public void testHasCombinedFormVectorIndexDetectsBothBackends()
+      throws IOException {
+    Assert.assertFalse(VectorIndexUtils.hasCombinedFormVectorIndex(_tempDir, COLUMN));
+    touch(COLUMN + Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(VectorIndexUtils.hasCombinedFormVectorIndex(_tempDir, COLUMN));
+  }
+
+  @Test
   public void testGetIndexFileExtensionMatchesBackend() {
     Assert.assertEquals(VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW),
         Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);

@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.testng.Assert;
@@ -92,6 +93,70 @@ public class SegmentDirectoryPathsTest {
       Assert.assertEquals(SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, "embedding"), hnswFile);
       Assert.assertEquals(SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, "embedding", ivfPqConfig),
           ivfPqFile);
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
+   * When only the combined-form IVF file exists on disk (segment built with
+   * {@code storeInSegmentFile=true} whose absorb has not yet run), the lookup must still find it.
+   * Without this the reader factory silently returns null on a flag rollback and ANN queries
+   * degrade to brute-force scan.
+   */
+  @Test
+  public void testFindVectorIndexFileFindsCombinedFormWhenLegacyAbsent()
+      throws Exception {
+    File indexDir = new File(SegmentDirectoryPaths.class.toString() + "_vector_combined");
+    FileUtils.deleteQuietly(indexDir);
+    try {
+      Assert.assertTrue(indexDir.mkdirs());
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      Assert.assertTrue(v3Dir.mkdir());
+
+      File ivfFlatCombined = new File(v3Dir,
+          "embedding" + V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
+      FileUtils.touch(ivfFlatCombined);
+
+      Assert.assertEquals(
+          SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, "embedding", VectorBackendType.IVF_FLAT),
+          ivfFlatCombined);
+      Assert.assertEquals(
+          SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, "embedding", VectorBackendType.IVF_ON_DISK),
+          ivfFlatCombined);
+      // The no-backend overload (used by detectVectorIndexBackend) must also find it.
+      Assert.assertEquals(SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, "embedding"),
+          ivfFlatCombined);
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
+   * When both legacy and combined-form IVF files exist (mixed state from a crashed toggle), the
+   * legacy file is returned — preserves the prior behaviour for unchanged segments and lets the
+   * reader factory keep using the well-tested legacy path.
+   */
+  @Test
+  public void testFindVectorIndexFilePrefersLegacyWhenBothExist()
+      throws Exception {
+    File indexDir = new File(SegmentDirectoryPaths.class.toString() + "_vector_mixed");
+    FileUtils.deleteQuietly(indexDir);
+    try {
+      Assert.assertTrue(indexDir.mkdirs());
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      Assert.assertTrue(v3Dir.mkdir());
+
+      File ivfPqLegacy = new File(v3Dir,
+          "embedding" + V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+      File ivfPqCombined = new File(v3Dir,
+          "embedding" + V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
+      FileUtils.touch(ivfPqLegacy);
+      FileUtils.touch(ivfPqCombined);
+
+      Assert.assertEquals(
+          SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, "embedding", VectorBackendType.IVF_PQ),
+          ivfPqLegacy);
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
