@@ -69,15 +69,114 @@ public class FragmentTypeTest {
   }
 
   @Test
-  public void testLeafWithNonSingletonReceive() {
-    // A receive node with HASH distribution (not SINGLETON) should not affect LEAF classification
+  public void testIntermediateWhenHashReceiveFromUnknownSender() {
+    // A HASH receive from a sender with no metadata (unknown/non-leaf) should return INTERMEDIATE
     MailboxReceiveNode receiveNode = new MailboxReceiveNode(1, SCHEMA, 2,
         PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
         List.of(0), null, false, false, null);
     MailboxSendNode sendNode = new MailboxSendNode(1, SCHEMA, List.of(receiveNode),
         0, PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
         List.of(0), false, null, false, "murmur");
-    assertEquals(FragmentType.classify(sendNode, true, Map.of()), FragmentType.LEAF);
+    assertEquals(FragmentType.classify(sendNode, true, Map.of()), FragmentType.INTERMEDIATE);
+  }
+
+  @Test
+  public void testLeafWithHashReceiveFromLeafSender() {
+    // A HASH receive from a leaf sender (has scanned tables) should still be LEAF
+    MailboxReceiveNode receiveNode = new MailboxReceiveNode(1, SCHEMA, 2,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        List.of(0), null, false, false, null);
+    MailboxSendNode sendNode = new MailboxSendNode(1, SCHEMA, List.of(receiveNode),
+        0, PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        List.of(0), false, null, false, "murmur");
+
+    Map<Integer, DispatchablePlanMetadata> metadataMap = new HashMap<>();
+    DispatchablePlanMetadata meta2 = new DispatchablePlanMetadata();
+    meta2.addScannedTable("factTable");
+    metadataMap.put(2, meta2);
+
+    assertEquals(FragmentType.classify(sendNode, true, metadataMap), FragmentType.LEAF);
+  }
+
+  @Test
+  public void testIntermediateWhenHashReceiveFromNonLeafSender() {
+    // A HASH receive from a non-leaf sender (no scanned tables) should return INTERMEDIATE
+    MailboxReceiveNode receiveNode = new MailboxReceiveNode(1, SCHEMA, 2,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        List.of(0), null, false, false, null);
+    MailboxSendNode sendNode = new MailboxSendNode(1, SCHEMA, List.of(receiveNode),
+        0, PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        List.of(0), false, null, false, "murmur");
+
+    Map<Integer, DispatchablePlanMetadata> metadataMap = new HashMap<>();
+    DispatchablePlanMetadata meta2 = new DispatchablePlanMetadata();
+    metadataMap.put(2, meta2);
+
+    assertEquals(FragmentType.classify(sendNode, true, metadataMap), FragmentType.INTERMEDIATE);
+  }
+
+  @Test
+  public void testIntermediateWhenBroadcastReceiveFromNonLeafSender() {
+    // A BROADCAST receive from a non-leaf sender should return INTERMEDIATE
+    MailboxReceiveNode receiveNode = new MailboxReceiveNode(1, SCHEMA, 2,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.BROADCAST_DISTRIBUTED,
+        null, null, false, false, null);
+    MailboxSendNode sendNode = new MailboxSendNode(1, SCHEMA, List.of(receiveNode),
+        0, PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        List.of(0), false, null, false, "murmur");
+
+    Map<Integer, DispatchablePlanMetadata> metadataMap = new HashMap<>();
+    DispatchablePlanMetadata meta2 = new DispatchablePlanMetadata();
+    metadataMap.put(2, meta2);
+
+    assertEquals(FragmentType.classify(sendNode, true, metadataMap), FragmentType.INTERMEDIATE);
+  }
+
+  @Test
+  public void testIntermediateWhenMixedSingletonLeafAndHashFromNonLeaf() {
+    // Stage scans table, SINGLETON from leaf, but HASH from non-leaf → INTERMEDIATE
+    MailboxReceiveNode singletonReceive = new MailboxReceiveNode(1, SCHEMA, 2,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.SINGLETON,
+        null, null, false, false, null);
+    MailboxReceiveNode hashReceive = new MailboxReceiveNode(1, SCHEMA, 3,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        List.of(0), null, false, false, null);
+    MailboxSendNode sendNode = new MailboxSendNode(1, SCHEMA, List.of(singletonReceive, hashReceive),
+        0, PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        List.of(0), false, null, false, "murmur");
+
+    Map<Integer, DispatchablePlanMetadata> metadataMap = new HashMap<>();
+    DispatchablePlanMetadata meta2 = new DispatchablePlanMetadata();
+    meta2.addScannedTable("dimTable");
+    metadataMap.put(2, meta2);
+    DispatchablePlanMetadata meta3 = new DispatchablePlanMetadata();
+    metadataMap.put(3, meta3);
+
+    assertEquals(FragmentType.classify(sendNode, true, metadataMap), FragmentType.INTERMEDIATE);
+  }
+
+  @Test
+  public void testSingletonLeafWhenAllReceivesFromLeaves() {
+    // Stage scans table, SINGLETON from leaf, HASH from leaf → SINGLETON_LEAF
+    MailboxReceiveNode singletonReceive = new MailboxReceiveNode(1, SCHEMA, 2,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.SINGLETON,
+        null, null, false, false, null);
+    MailboxReceiveNode hashReceive = new MailboxReceiveNode(1, SCHEMA, 3,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        List.of(0), null, false, false, null);
+    MailboxSendNode sendNode = new MailboxSendNode(1, SCHEMA, List.of(singletonReceive, hashReceive),
+        0, PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        List.of(0), false, null, false, "murmur");
+
+    Map<Integer, DispatchablePlanMetadata> metadataMap = new HashMap<>();
+    DispatchablePlanMetadata meta2 = new DispatchablePlanMetadata();
+    meta2.addScannedTable("dimTable");
+    metadataMap.put(2, meta2);
+    DispatchablePlanMetadata meta3 = new DispatchablePlanMetadata();
+    meta3.addScannedTable("factTable");
+    metadataMap.put(3, meta3);
+
+    assertEquals(FragmentType.classify(sendNode, true, metadataMap), FragmentType.SINGLETON_LEAF);
   }
 
   @Test

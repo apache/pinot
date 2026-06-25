@@ -50,32 +50,40 @@ public enum FragmentType {
     if (!hasScannedTable) {
       return INTERMEDIATE;
     }
-    List<Integer> singletonSenderStageIds = getSingletonReceiveSenderStageIds(root);
-    if (singletonSenderStageIds.isEmpty()) {
+    List<Integer> singletonSenders = new ArrayList<>();
+    List<Integer> nonSingletonSenders = new ArrayList<>();
+    collectReceiveSenderStageIds(root, singletonSenders, nonSingletonSenders);
+
+    boolean hasNonLeafNonSingletonSender = nonSingletonSenders.stream().anyMatch(senderStageId -> {
+      DispatchablePlanMetadata senderMeta = metadataMap.get(senderStageId);
+      return senderMeta == null || senderMeta.getScannedTables().isEmpty();
+    });
+    if (hasNonLeafNonSingletonSender) {
+      return INTERMEDIATE;
+    }
+
+    if (singletonSenders.isEmpty()) {
       return LEAF;
     }
-    boolean allSendersAreLeaves = singletonSenderStageIds.stream().allMatch(senderStageId -> {
+    boolean allSingletonSendersAreLeaves = singletonSenders.stream().allMatch(senderStageId -> {
       DispatchablePlanMetadata senderMeta = metadataMap.get(senderStageId);
       return senderMeta != null && !senderMeta.getScannedTables().isEmpty();
     });
-    return allSendersAreLeaves ? SINGLETON_LEAF : INTERMEDIATE;
+    return allSingletonSendersAreLeaves ? SINGLETON_LEAF : INTERMEDIATE;
   }
 
-  static List<Integer> getSingletonReceiveSenderStageIds(PlanNode node) {
-    List<Integer> result = new ArrayList<>();
-    collectSingletonReceiveSenderStageIds(node, result);
-    return result;
-  }
-
-  private static void collectSingletonReceiveSenderStageIds(PlanNode node, List<Integer> result) {
+  private static void collectReceiveSenderStageIds(PlanNode node,
+      List<Integer> singletonSenders, List<Integer> nonSingletonSenders) {
     if (node instanceof MailboxReceiveNode) {
       MailboxReceiveNode receiveNode = (MailboxReceiveNode) node;
       if (receiveNode.getDistributionType() == RelDistribution.Type.SINGLETON) {
-        result.add(receiveNode.getSenderStageId());
+        singletonSenders.add(receiveNode.getSenderStageId());
+      } else {
+        nonSingletonSenders.add(receiveNode.getSenderStageId());
       }
     }
     for (PlanNode input : node.getInputs()) {
-      collectSingletonReceiveSenderStageIds(input, result);
+      collectReceiveSenderStageIds(input, singletonSenders, nonSingletonSenders);
     }
   }
 }
