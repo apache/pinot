@@ -515,11 +515,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     }
 
     if (result instanceof DictIdsWrapper dictIdsWrapper) {
-      if (dictIdsWrapper._dictIdBitmap.cardinalityExceeds(getThreshold())) {
-        return convertToSketch(dictIdsWrapper);
-      } else {
-        return convertToValueSet(dictIdsWrapper);
-      }
+      return convertToValueSet(dictIdsWrapper);
     } else {
       return result;
     }
