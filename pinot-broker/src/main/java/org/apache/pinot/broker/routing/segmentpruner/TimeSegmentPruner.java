@@ -122,7 +122,13 @@ public class TimeSegmentPruner implements SegmentPruner {
     for (int idx = 0; idx < pulledSegments.size(); idx++) {
       String segment = pulledSegments.get(idx);
       ZNRecord zNrecord = znRecords.get(idx);
-      _intervalMap.computeIfAbsent(segment, k -> extractIntervalFromSegmentZKMetaZNRecord(k, zNrecord));
+      // Always update segments that have DEFAULT_INTERVAL, which covers two cases:
+      // 1. New segments not yet in the map
+      // 2. Segments that transitioned from CONSUMING (DEFAULT_INTERVAL) to COMMITTED (valid time range)
+      Interval existing = _intervalMap.get(segment);
+      if (existing == null || existing == DEFAULT_INTERVAL) {
+        _intervalMap.put(segment, extractIntervalFromSegmentZKMetaZNRecord(segment, zNrecord));
+      }
     }
     // Only insertions can change the size because computeIfAbsent never replaces an existing interval. An external
     // view change that adds and removes no segment (e.g. a replica changing state) leaves the tree correct as is.
