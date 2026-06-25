@@ -557,6 +557,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sortExchangeCopyThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD);
+    boolean defaultUnnestColumnPruning = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_UNNEST_COLUMN_PRUNING,
+        CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
     WorkerManager workerManager = QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
         ? _multiClusterWorkerManager : _workerManager;
     return QueryEnvironment.configBuilder()
@@ -568,6 +571,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .isNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(queryOptions))
         .defaultInferPartitionHint(inferPartitionHint)
         .defaultUseSpools(defaultUseSpool)
+        .defaultUnnestColumnPruning(defaultUnnestColumnPruning)
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)

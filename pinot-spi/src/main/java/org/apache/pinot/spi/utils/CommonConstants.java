@@ -552,6 +552,15 @@ public class CommonConstants {
     public static final String CONFIG_OF_SPOOLS = "pinot.broker.multistage.spools";
     public static final boolean DEFAULT_OF_SPOOLS = false;
 
+    /**
+     * Whether the multistage query engine prunes unused input (passthrough) columns - notably the unnested source
+     * array - from the UNNEST output by default. This value can always be overridden by the
+     * {@link Request.QueryOptionKey#UNNEST_COLUMN_PRUNING} query option. Keep it disabled until all servers support
+     * it (a broker emitting the smaller UNNEST schema cannot be honored by an un-upgraded server).
+     */
+    public static final String CONFIG_OF_UNNEST_COLUMN_PRUNING = "pinot.broker.multistage.unnest.column.pruning";
+    public static final boolean DEFAULT_UNNEST_COLUMN_PRUNING = false;
+
     /// Whether to only use servers for leaf stages as the workers for the intermediate stages.
     /// This value can always be overridden by [Request.QueryOptionKey#USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE].
     public static final String CONFIG_OF_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE =
@@ -816,6 +825,7 @@ public class CommonConstants {
         // from the UNNEST output when they are not referenced downstream, avoiding copying them into every exploded
         // row. Defaults to false: enabling it makes the broker emit a smaller UNNEST output schema, which an
         // un-upgraded server cannot honor, so only enable it once all servers support it.
+        // NOTE: This is a no-op under usePhysicalOptimizer (the v2 path does not go through RelToPlanNodeConverter).
         public static final String UNNEST_COLUMN_PRUNING = "unnestColumnPruning";
         /**
          * When set to true, the broker uses the long-lived {@code SubmitWithStream} bidi RPC to dispatch the query,

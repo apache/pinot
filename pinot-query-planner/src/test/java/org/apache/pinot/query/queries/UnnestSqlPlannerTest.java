@@ -21,6 +21,10 @@ package org.apache.pinot.query.queries;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.core.routing.MockRoutingManagerFactory;
+import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -29,6 +33,8 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
+import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -176,6 +182,40 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(unnestNode.getPassthroughInputIndexes(), List.of(0));
     Assert.assertEquals(unnestNode.getElementIndexes(), List.of(1, 2));
     Assert.assertEquals(unnestNode.getDataSchema().size(), 3);
+  }
+
+  @Test
+  public void testUnnestColumnPruningViaBrokerDefault() {
+    // With the broker-config default on (and no per-query SET), pruning still applies.
+    QueryEnvironment env = buildQueryEnvironment(true);
+    DispatchableSubPlan subPlan =
+        env.planQuery("SELECT e.col1, u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)");
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    Assert.assertTrue(unnestNodes.get(0).isPrunedPassthrough(),
+        "Broker-config default should enable pruning without a SET option");
+
+    // A per-query SET overrides the broker default back off.
+    DispatchableSubPlan overridden = env.planQuery(
+        "SET unnestColumnPruning=false; SELECT e.col1, u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)");
+    Assert.assertFalse(findUnnestNodes(overridden).get(0).isPrunedPassthrough(),
+        "Per-query SET should override the broker-config default");
+  }
+
+  private static QueryEnvironment buildQueryEnvironment(boolean defaultUnnestColumnPruning) {
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(1, 2);
+    TABLE_SCHEMAS.forEach((name, schema) -> factory.registerTable(schema, name));
+    SERVER1_SEGMENTS.forEach((table, segments) -> segments.forEach(s -> factory.registerSegment(1, table, s)));
+    SERVER2_SEGMENTS.forEach((table, segments) -> segments.forEach(s -> factory.registerSegment(2, table, s)));
+    RoutingManager routingManager = factory.buildRoutingManager(null);
+    TableCache tableCache = factory.buildTableCache();
+    return new QueryEnvironment(QueryEnvironment.configBuilder()
+        .requestId(-1L)
+        .database(CommonConstants.DEFAULT_DATABASE)
+        .tableCache(tableCache)
+        .workerManager(new WorkerManager("Broker_localhost", "localhost", 3, routingManager))
+        .defaultUnnestColumnPruning(defaultUnnestColumnPruning)
+        .build());
   }
 
   @Test
