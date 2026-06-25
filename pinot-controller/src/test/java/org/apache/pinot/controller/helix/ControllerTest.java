@@ -19,6 +19,9 @@
 package org.apache.pinot.controller.helix;
 import java.io.File;
 import java.io.IOException;
+import java.net.BindException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -99,7 +102,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -147,12 +149,6 @@ public class ControllerTest {
 
   protected final String _clusterName = getClass().getSimpleName();
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
-
-  protected int _nextControllerPort = 20000;
-  protected int _nextBrokerPort = _nextControllerPort + 1000;
-  protected int _nextBrokerGrpcPort = _nextBrokerPort + 500;
-  protected int _nextServerPort = _nextBrokerPort + 1000;
-  protected int _nextMinionPort = _nextServerPort + 1000;
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
@@ -234,10 +230,146 @@ public class ControllerTest {
     return null;
   }
 
+  // Each fork JVM owns a disjoint slice of the sub-ephemeral range [20000, 32000), kept below the kernel
+  // ephemeral range (32768+ on Linux) so a reserved port cannot be stolen by an outbound connection
+  // before the service binds it. Ownership is arbitrated by the OS, not by hashing or a lock file: a
+  // fork claims a slice by binding that slice's reservation port and holding the socket open for the
+  // JVM's whole life (SLICE_RESERVATION, never closed). The kernel grants exactly one binder, so the
+  // claim is a true mutex with no claim-time race, and it is released automatically when the JVM exits
+  // -- no stale state to clean up, and correct across modules and across separate `mvn -T` invocations
+  // on the same host. Within its slice a fork is the sole allocator, so nextFreePort()'s bind probe only
+  // ever races unrelated external processes, never a sibling fork. If every slice is already owned (more
+  // concurrent forks than slices) the fork falls back to the whole range and leans on the probe alone.
+  private static final int PORT_RANGE_BEGIN = 20000;
+  private static final int PORT_RANGE_END = 32000;
+  private static final int PORTS_PER_FORK = 250;
+  private static final int PORT_SLICE_COUNT = (PORT_RANGE_END - PORT_RANGE_BEGIN) / PORTS_PER_FORK;
+  // Times a server start retries on a fresh port to ride out the unavoidable probe-to-bind race.
+  private static final int PORT_BIND_RETRIES = 3;
+  // Held open for the JVM's whole life; the field exists only to keep the reservation socket from being
+  // closed or garbage-collected, so it is intentionally never read. Null when no slice was free.
+  @SuppressWarnings("unused")
+  private static final ServerSocket SLICE_RESERVATION;
+  private static final int FORK_PORT_BASE;
+  private static final int FORK_PORT_SPAN;
+  private static final AtomicInteger PORT_CURSOR;
+
+  static {
+    int pid = (int) ProcessHandle.current().pid();
+    ServerSocket reservation = null;
+    int base = PORT_RANGE_BEGIN;
+    int span = PORT_RANGE_END - PORT_RANGE_BEGIN;
+    // Probe slices in a pid-rotated order so forks starting together tend to claim different slices
+    // first instead of all contending for slice 0.
+    int start = Math.floorMod(pid, PORT_SLICE_COUNT);
+    for (int i = 0; i < PORT_SLICE_COUNT; i++) {
+      int sliceBase = PORT_RANGE_BEGIN + ((start + i) % PORT_SLICE_COUNT) * PORTS_PER_FORK;
+      // The slice's last port is its reservation port; keep it out of the allocatable span below.
+      ServerSocket socket = tryReserve(sliceBase + PORTS_PER_FORK - 1);
+      if (socket != null) {
+        reservation = socket;
+        base = sliceBase;
+        span = PORTS_PER_FORK - 1;
+        break;
+      }
+    }
+    SLICE_RESERVATION = reservation;
+    FORK_PORT_BASE = base;
+    FORK_PORT_SPAN = span;
+    // With a reserved slice this fork is the sole allocator, so a plain cursor is fine. In the
+    // no-slice-free fallback every fork shares the whole range, so seed the cursor by pid to spread
+    // their starting points instead of all probing from PORT_RANGE_BEGIN.
+    PORT_CURSOR = new AtomicInteger(reservation != null ? 0 : Math.floorMod(pid, span));
+  }
+
+  /**
+   * Binds {@code port} with {@code SO_REUSEADDR} disabled and returns the still-open socket on success,
+   * or {@code null} (closing any partially-opened socket) if the port is taken. Used to claim a port
+   * slice for the JVM's lifetime; the caller keeps the returned socket open.
+   */
+  private static ServerSocket tryReserve(int port) {
+    ServerSocket socket = null;
+    try {
+      socket = new ServerSocket();
+      socket.setReuseAddress(false);
+      socket.bind(new InetSocketAddress(port));
+      return socket;
+    } catch (IOException e) {
+      if (socket != null) {
+        try {
+          socket.close();
+        } catch (IOException ignored) {
+          // Nothing more we can do; the fd will be reclaimed on GC.
+        }
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Returns a free port that is safe to bind later in the test. Ports come from this fork's exclusively
+   * owned slice of a sub-ephemeral range (see {@link #SLICE_RESERVATION}), so a reserved port is never
+   * handed out by a concurrent fork; a no-{@code SO_REUSEADDR} bind probe additionally skips ports held
+   * by unrelated processes. A port can still be taken between the probe and the eventual bind, so callers
+   * that start a server should retry on a fresh port -- see {@link #startZkOnFreePort} and the controller
+   * start path.
+   */
+  protected static int nextFreePort() {
+    for (int attempt = 0; attempt < FORK_PORT_SPAN; attempt++) {
+      int port = FORK_PORT_BASE + Math.floorMod(PORT_CURSOR.getAndIncrement(), FORK_PORT_SPAN);
+      try (ServerSocket socket = new ServerSocket()) {
+        // No SO_REUSEADDR: a port that only passes the probe thanks to address reuse may still be
+        // unbindable by a server that does not set the option.
+        socket.setReuseAddress(false);
+        socket.bind(new InetSocketAddress(port));
+        return port;
+      } catch (IOException e) {
+        // Port is held by an unrelated process; try the next one.
+      }
+    }
+    throw new RuntimeException("Cannot allocate a free port for test in fork range [" + FORK_PORT_BASE + ", "
+        + (FORK_PORT_BASE + FORK_PORT_SPAN) + ")");
+  }
+
   public void startZk() {
     if (_zookeeperInstance == null) {
-      runWithHelixMock(() -> _zookeeperInstance = ZkStarter.startLocalZkServer());
+      runWithHelixMock(() -> _zookeeperInstance = startZkOnFreePort());
     }
+  }
+
+  /**
+   * Starts a local ZooKeeper on a {@link #nextFreePort() free port}, retrying on a fresh port only when
+   * the chosen one was taken between the probe and ZK actually binding it. Any other failure is a real
+   * error and is rethrown immediately rather than masked behind retries.
+   */
+  private static ZkStarter.ZookeeperInstance startZkOnFreePort() {
+    for (int attempt = 0; ; attempt++) {
+      int port = nextFreePort();
+      try {
+        return ZkStarter.startLocalZkServer(port);
+      } catch (RuntimeException e) {
+        if (attempt >= PORT_BIND_RETRIES - 1 || !isPortBindFailure(e)) {
+          throw e;
+        }
+      }
+    }
+  }
+
+  /**
+   * Returns true if {@code t} or one of its causes is an address-already-in-use bind failure, i.e. the
+   * port was stolen between {@link #nextFreePort()} probing it and the server binding it.
+   */
+  private static boolean isPortBindFailure(Throwable t) {
+    for (Throwable c = t; c != null; c = c.getCause()) {
+      if (c instanceof BindException) {
+        return true;
+      }
+      String message = c.getMessage();
+      if (message != null && message.contains("Address already in use")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public void startZk(int port) {
@@ -266,12 +398,11 @@ public class ControllerTest {
     properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
-    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    int controllerPort = nextFreePort();
     properties.put(ControllerConf.CONTROLLER_PORT, controllerPort);
     if (_controllerPort == 0) {
       _controllerPort = controllerPort;
     }
-    _nextControllerPort = controllerPort + 1;
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
     properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
     // Enable groovy on the controller
@@ -313,9 +444,7 @@ public class ControllerTest {
     runWithHelixMock(() -> {
       assertNull(_controllerStarter, "Controller is already started");
       assertTrue(_controllerPort > 0, "Controller port is not assigned");
-      _controllerStarter = createControllerStarter();
-      _controllerStarter.init(new PinotConfiguration(properties));
-      _controllerStarter.start();
+      startControllerWithBindRetry(properties);
       _controllerConfig = _controllerStarter.getConfig();
       _controllerBaseApiUrl = _controllerConfig.generateVipUrl();
       _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
@@ -349,6 +478,39 @@ public class ControllerTest {
       }
       assertEquals(System.getProperty("user.timezone"), "UTC");
     });
+  }
+
+  /**
+   * Creates and starts the controller, retrying on a fresh port if the HTTP server port was taken
+   * between {@link #nextFreePort()} and the bind. Only {@code start()} is retried; an {@code init()}
+   * failure is not port-related and propagates immediately. A failed starter is stopped before the
+   * retry, and {@code _controllerStarter} is left assigned only on success.
+   */
+  private void startControllerWithBindRetry(Map<String, Object> properties)
+      throws Exception {
+    for (int attempt = 0; ; attempt++) {
+      BaseControllerStarter starter = createControllerStarter();
+      starter.init(new PinotConfiguration(properties));
+      try {
+        starter.start();
+        _controllerStarter = starter;
+        return;
+      } catch (Exception e) {
+        try {
+          starter.stop();
+        } catch (Exception ignored) {
+          // Best effort: the starter failed to come up, so teardown may be partial.
+        }
+        // Only retry a lost probe-to-bind race on a fresh port; rethrow any other failure immediately
+        // so it is not masked or its latency tripled by pointless retries.
+        if (attempt >= PORT_BIND_RETRIES - 1 || !isPortBindFailure(e)) {
+          throw e;
+        }
+        int newPort = nextFreePort();
+        properties.put(ControllerConf.CONTROLLER_PORT, newPort);
+        _controllerPort = newPort;
+      }
+    }
   }
 
   public void stopController() {
@@ -514,9 +676,8 @@ public class ControllerTest {
     }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();
-    int adminPort = NetUtils.findOpenPort(_nextServerPort);
+    int adminPort = nextFreePort();
     helixAdmin.setConfig(configScope, Map.of(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
-    _nextServerPort = adminPort + 1;
     _fakeInstanceHelixManagers.add(helixManager);
   }
 
@@ -535,9 +696,8 @@ public class ControllerTest {
     }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();
-    int adminPort = NetUtils.findOpenPort(_nextServerPort);
+    int adminPort = nextFreePort();
     helixAdmin.setConfig(configScope, Map.of(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
-    _nextServerPort = adminPort + 1;
     _fakeInstanceHelixManagers.add(helixManager);
   }
 

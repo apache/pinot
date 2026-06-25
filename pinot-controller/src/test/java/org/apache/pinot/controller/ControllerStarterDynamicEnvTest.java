@@ -30,7 +30,6 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.NetUtils;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
@@ -132,12 +131,11 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
     properties.put(CONTROLLER_HOST, "HOST");
     properties.put(CONTROLLER_PORT, "PORT");
 
-    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    int controllerPort = nextFreePort();
     properties.put(ControllerConf.CONTROLLER_PORT, controllerPort);
     if (_controllerPort == 0) {
       _controllerPort = controllerPort;
     }
-    _nextControllerPort = controllerPort + 1;
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
     properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
     // Enable groovy on the controller
