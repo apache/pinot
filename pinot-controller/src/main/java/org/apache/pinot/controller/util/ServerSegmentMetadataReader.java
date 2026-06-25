@@ -282,6 +282,20 @@ public class ServerSegmentMetadataReader {
       Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
       @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
       int numSegmentsBatchPerServerRequest) {
+    return getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegmentsMap, serverToEndpoints,
+        segmentNames, timeoutMs, validDocIdsType, numSegmentsBatchPerServerRequest, false);
+  }
+
+  /**
+   * Overload that also lets the caller request the serialized validDocIds bitmap in each per-segment response entry.
+   * When {@code includeBitmaps} is true, every {@link ValidDocIdsMetadataInfo} returned by the server includes its
+   * bitmap bytes (see {@link ValidDocIdsMetadataInfo#getBitmap()}). Use sparingly — the response payload grows with
+   * the total bitmap size across the requested segments.
+   */
+  public Map<String, List<ValidDocIdsMetadataInfo>> getSegmentToValidDocIdsMetadataFromServer(String tableNameWithType,
+      Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
+      @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
+      int numSegmentsBatchPerServerRequest, boolean includeBitmaps) {
     List<Pair<String, String>> serverURLsAndBodies = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegments : serverToSegmentsMap.entrySet()) {
       List<String> segmentsForServer = serverToSegments.getValue();
@@ -301,7 +315,7 @@ public class ServerSegmentMetadataReader {
       // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
       Lists.partition(segmentsToQuery, numSegmentsBatchPerServerRequest).forEach(segmentsToQueryBatch ->
           serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQueryBatch,
-              validDocIdsType, serverToEndpoints.get(serverToSegments.getKey()))));
+              validDocIdsType, serverToEndpoints.get(serverToSegments.getKey()), includeBitmaps)));
     }
 
     BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();
@@ -482,6 +496,11 @@ public class ServerSegmentMetadataReader {
 
   private Pair<String, String> generateValidDocIdsMetadataURL(String tableNameWithType, List<String> segmentNames,
       String validDocIdsType, String endpoint) {
+    return generateValidDocIdsMetadataURL(tableNameWithType, segmentNames, validDocIdsType, endpoint, false);
+  }
+
+  private Pair<String, String> generateValidDocIdsMetadataURL(String tableNameWithType, List<String> segmentNames,
+      String validDocIdsType, String endpoint, boolean includeBitmaps) {
     tableNameWithType = encode(tableNameWithType);
     TableSegments tableSegments = new TableSegments(segmentNames);
     String jsonTableSegments;
@@ -491,11 +510,17 @@ public class ServerSegmentMetadataReader {
       LOGGER.error("Failed to convert segment names to json request body: segmentNames={}", segmentNames);
       throw new RuntimeException(e);
     }
-    String url = String.format("%s/tables/%s/validDocIdsMetadata", endpoint, tableNameWithType);
+    StringBuilder url = new StringBuilder(
+        String.format("%s/tables/%s/validDocIdsMetadata", endpoint, tableNameWithType));
+    String separator = "?";
     if (validDocIdsType != null) {
-      url = url + "?validDocIdsType=" + validDocIdsType;
+      url.append(separator).append("validDocIdsType=").append(validDocIdsType);
+      separator = "&";
     }
-    return Pair.of(url, jsonTableSegments);
+    if (includeBitmaps) {
+      url.append(separator).append("includeBitmaps=true");
+    }
+    return Pair.of(url.toString(), jsonTableSegments);
   }
 
   private String generateStaleSegmentsServerURL(String tableNameWithType, String endpoint) {
