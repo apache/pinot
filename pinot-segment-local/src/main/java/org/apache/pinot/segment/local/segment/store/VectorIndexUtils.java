@@ -67,6 +67,11 @@ public class VectorIndexUtils {
     FileUtils.deleteQuietly(ivfPqIndexFile);
     File ivfPqCombinedFile = new File(segDir, column + Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(ivfPqCombinedFile);
+
+    // Remove the HNSW combined-form transient sibling (the Lucene HNSW directories themselves are
+    // handled above via the per-version VECTOR_HNSW_INDEX_FILE_EXTENSION entries).
+    File hnswCombinedFile = new File(segDir, column + Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(hnswCombinedFile);
   }
 
   /**
@@ -97,7 +102,8 @@ public class VectorIndexUtils {
    */
   public static boolean hasCombinedFormVectorIndex(File segDir, String column) {
     return new File(segDir, column + Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION).exists();
+        || new File(segDir, column + Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION).exists();
   }
 
   @Nullable
@@ -119,19 +125,23 @@ public class VectorIndexUtils {
   }
 
   /**
-   * Returns the on-disk file extension for an IVF/HNSW sidecar file.
+   * Returns the on-disk file extension for an IVF/HNSW vector index file.
    *
    * @param combined when {@code true}, returns the combined-form extension used when
    *                 {@code storeInSegmentFile=true} (consumed by the V2→V3 converter, then
    *                 removed). When {@code false}, returns the legacy file extension that
-   *                 remains alongside {@code columns.psf}. HNSW does not currently have a
-   *                 combined form — passing {@code combined=true} for HNSW returns the legacy
-   *                 extension and is effectively a no-op flag for that backend.
+   *                 remains alongside {@code columns.psf}.
+   *                 <p>For HNSW the combined form is a single packed file that bundles the
+   *                 Lucene HNSW directory's contents (and the optional docId mapping file) using
+   *                 the same {@code LUCENE_V2} layout the text index uses; the legacy form is
+   *                 the Lucene directory itself.</p>
    */
   public static String getIndexFileExtension(VectorBackendType backendType, boolean combined) {
     switch (backendType) {
       case HNSW:
-        return Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
+        return combined
+            ? Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION
+            : Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
       case IVF_FLAT:
         return combined
             ? Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION

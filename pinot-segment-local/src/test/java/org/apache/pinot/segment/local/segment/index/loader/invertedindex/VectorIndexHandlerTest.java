@@ -455,23 +455,69 @@ public class VectorIndexHandlerTest {
   }
 
   /**
-   * HNSW has no combined-form extension, so the orphan sweep must be a no-op for HNSW. Confirms
-   * the helper does not delete any HNSW-related file when invoked with the HNSW backend.
+   * HNSW now supports a combined form, so the orphan sweep must clean the combined-form file when
+   * the current build targets the legacy directory extension (writeCombined=false). Previously
+   * this method was a no-op for HNSW; it is now active.
    */
   @Test
-  public void testCleanOrphansFromOtherExtensionIsNoOpForHnsw()
+  public void testCleanOrphansFromOtherExtensionCleansHnswCombinedOrphan()
       throws Exception {
     File segmentDir = new File(FileUtils.getTempDirectory(), "vector-orphan-hnsw-test-" + System.nanoTime());
     FileUtils.deleteQuietly(segmentDir);
     assertTrue(segmentDir.mkdirs());
     try {
-      File hnswFile = new File(segmentDir, COLUMN + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
-      FileUtils.touch(hnswFile);
+      // Simulate: a prior crash left a combined-form orphan while the current retry targets legacy.
+      File orphanCombined = new File(segmentDir,
+          COLUMN + V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
+      File orphanMarker = new File(segmentDir, orphanCombined.getName() + ".inprogress");
+      FileUtils.writeStringToFile(orphanCombined, "partial",
+          java.nio.charset.StandardCharsets.UTF_8);
+      FileUtils.touch(orphanMarker);
 
       VectorIndexHandler.cleanOrphansFromOtherExtension(segmentDir, COLUMN, VectorBackendType.HNSW,
           /* currentWriteCombined */ false);
 
-      assertTrue(hnswFile.exists(), "HNSW file must not be touched by the orphan sweep");
+      assertFalse(orphanCombined.exists(),
+          "Orphan HNSW combined file from a prior flag=true crash must be cleaned");
+      assertFalse(orphanMarker.exists(),
+          "Orphan .inprogress marker from prior flag=true crash must be cleaned");
+    } finally {
+      FileUtils.deleteQuietly(segmentDir);
+    }
+  }
+
+  /**
+   * Symmetry: crash with writeCombined=false leaves a legacy orphan Lucene directory; a retry with
+   * writeCombined=true must recursively delete it (a Lucene HNSW directory is non-empty, so
+   * deleteQuietly alone would silently fail).
+   */
+  @Test
+  public void testCleanOrphansFromOtherExtensionCleansHnswLegacyOrphan()
+      throws Exception {
+    File segmentDir = new File(FileUtils.getTempDirectory(), "vector-orphan-hnsw-legacy-test-" + System.nanoTime());
+    FileUtils.deleteQuietly(segmentDir);
+    assertTrue(segmentDir.mkdirs());
+    try {
+      // Create a non-empty HNSW Lucene directory orphan (simulates a partial prior build).
+      File orphanLegacy = new File(segmentDir,
+          COLUMN + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+      assertTrue(orphanLegacy.mkdirs());
+      // Add some files inside to make it a non-empty directory (mirrors a real Lucene dir).
+      FileUtils.writeStringToFile(new File(orphanLegacy, "segments_1"), "data",
+          java.nio.charset.StandardCharsets.UTF_8);
+      FileUtils.writeStringToFile(new File(orphanLegacy, "_0.cfs"), "cfs-data",
+          java.nio.charset.StandardCharsets.UTF_8);
+
+      File orphanMarker = new File(segmentDir, orphanLegacy.getName() + ".inprogress");
+      FileUtils.touch(orphanMarker);
+
+      VectorIndexHandler.cleanOrphansFromOtherExtension(segmentDir, COLUMN, VectorBackendType.HNSW,
+          /* currentWriteCombined */ true);
+
+      assertFalse(orphanLegacy.exists(),
+          "Orphan non-empty HNSW Lucene directory from prior flag=false crash must be recursively deleted");
+      assertFalse(orphanMarker.exists(),
+          "Orphan .inprogress marker from prior flag=false crash must be cleaned");
     } finally {
       FileUtils.deleteQuietly(segmentDir);
     }

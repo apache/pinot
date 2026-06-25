@@ -25,6 +25,7 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -68,6 +69,10 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   private final ThreadLocal<Boolean> _useRelativeDistanceOverride = new ThreadLocal<>();
   private final ThreadLocal<Boolean> _useBoundedQueueOverride = new ThreadLocal<>();
 
+  /**
+   * File-backed constructor: opens a {@link FSDirectory} from the Lucene HNSW index directory
+   * found under {@code indexDir}.
+   */
   public HnswVectorIndexReader(String column, File indexDir, int numDocs, VectorIndexConfig config) {
     _column = column;
     try {
@@ -81,6 +86,36 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
       _docIdTranslator = new HnswVectorIndexReader.DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene HNSW index reader for column {}, exception {}", column,
+          e.getMessage());
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Buffer-backed constructor: reads the HNSW index from a combined {@link PinotDataBuffer}
+   * (the {@code LUCENE_V2} packed form produced by {@code HnswVectorIndexCombined}).
+   *
+   * <p>The buffer is <em>not</em> owned by this reader — closing this reader does not close the
+   * buffer. The buffer's lifetime must exceed this reader's lifetime; the segment directory is
+   * responsible for closing it.</p>
+   *
+   * @param column      column name
+   * @param indexBuffer combined buffer in LUCENE_V2 format; not owned by this reader
+   * @param numDocs     number of documents in the segment
+   * @param config      vector index configuration
+   */
+  public HnswVectorIndexReader(String column, PinotDataBuffer indexBuffer, int numDocs, VectorIndexConfig config) {
+    _column = column;
+    try {
+      _indexDirectory = HnswVectorIndexBufferReader.createLuceneDirectory(indexBuffer, column);
+      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexSearcher = new IndexSearcher(_indexReader);
+
+      // Try to extract the mapping from the packed buffer first; build from the Lucene index if absent.
+      PinotDataBuffer mappingBuffer = HnswVectorIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
+      _docIdTranslator = new HnswVectorIndexReader.DocIdTranslator(mappingBuffer, numDocs, _indexSearcher);
+    } catch (Exception e) {
+      LOGGER.error("Failed to instantiate buffer-backed HNSW index reader for column {}, exception {}", column,
           e.getMessage());
       throw new RuntimeException(e);
     }
@@ -237,12 +272,33 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
    * are ingested during segment/index creation.
    * This class is used to map the luceneDocId (returned by the search query
    * to the collector) to corresponding pinotDocId.
+   *
+   * <p>Supports two modes:</p>
+   * <ul>
+   *   <li><b>File-backed:</b> the mapping is read from (or written to) a memory-mapped file on
+   *       disk. The buffer is owned by this translator and closed on {@link #close()}.</li>
+   *   <li><b>Buffer-backed:</b> the mapping is a view into a combined index buffer owned by the
+   *       segment directory. The translator does <em>not</em> close it on {@link #close()}, since
+   *       the caller must not close a buffer it does not own.</li>
+   *   <li><b>Heap-backed:</b> when the mapping is absent from a combined buffer, it is built in
+   *       heap memory by scanning the Lucene index. No file is created, and {@link #close()} is
+   *       a no-op for the mapping portion.</li>
+   * </ul>
    */
   static class DocIdTranslator implements Closeable {
-    final PinotDataBuffer _buffer;
+    // Non-null for file-backed mode (owned); non-null for buffer-backed mode (borrowed, not closed).
+    private final PinotDataBuffer _buffer;
+    // Non-null for heap-backed mode (built from Lucene index in buffer-backed path when no mapping
+    // was packed into the combined file).
+    private final int[] _heapMapping;
+    // True when _buffer is borrowed (from a combined index buffer); must not be closed by us.
+    private final boolean _borrowedBuffer;
 
+    /** File-backed: mapping is read from (or created at) a file beside the HNSW directory. */
     DocIdTranslator(File segmentIndexDir, String column, int numDocs, IndexSearcher indexSearcher)
         throws Exception {
+      _heapMapping = null;
+      _borrowedBuffer = false;
       int length = Integer.BYTES * numDocs;
       File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
           column + V1Constants.Indexes.VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION);
@@ -272,14 +328,57 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
       }
     }
 
+    /**
+     * Buffer-backed: the mapping is either a view into the combined index buffer, or built in heap
+     * memory by scanning the Lucene index (when the mapping was not packed into the combined file).
+     *
+     * @param mappingBuffer sub-buffer view covering the packed mapping, or {@code null} to build
+     *                      in heap by scanning the Lucene index
+     * @param numDocs       number of documents
+     * @param indexSearcher searcher over the already-opened Lucene index
+     */
+    DocIdTranslator(@Nullable PinotDataBuffer mappingBuffer, int numDocs,
+        IndexSearcher indexSearcher)
+        throws Exception {
+      if (mappingBuffer != null) {
+        // Mapping was packed: use it as a borrowed view. Do not close it on our close().
+        _buffer = mappingBuffer;
+        _heapMapping = null;
+        _borrowedBuffer = true;
+      } else {
+        // Mapping absent from combined buffer: build in heap from the Lucene index.
+        _buffer = null;
+        _borrowedBuffer = false;
+        int[] heapMapping = new int[numDocs];
+        for (int i = 0; i < numDocs; i++) {
+          try {
+            Document document = indexSearcher.doc(i);
+            heapMapping[i] =
+                Integer.parseInt(document.get(HnswVectorIndexCreator.VECTOR_INDEX_DOC_ID_COLUMN_NAME));
+          } catch (Exception e) {
+            throw new RuntimeException(
+                "Caught exception while building in-heap docId mapping for HNSW index", e);
+          }
+        }
+        _heapMapping = heapMapping;
+      }
+    }
+
     int getPinotDocId(int luceneDocId) {
+      if (_heapMapping != null) {
+        return _heapMapping[luceneDocId];
+      }
       return _buffer.getInt(luceneDocId * Integer.BYTES);
     }
 
     @Override
     public void close()
         throws IOException {
-      _buffer.close();
+      // Only close the buffer when we own it (file-backed mode). Borrowed buffers are owned by the
+      // segment directory; heap mappings need no cleanup.
+      if (_buffer != null && !_borrowedBuffer) {
+        _buffer.close();
+      }
     }
   }
 

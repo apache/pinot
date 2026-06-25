@@ -112,6 +112,27 @@ public class VectorIndexUtilsTest {
   }
 
   @Test
+  public void testGetIndexFileExtensionCombinedReturnsHnswCombined() {
+    Assert.assertEquals(VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, /* combined */ true),
+        Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
+    // Non-combined HNSW must still return the legacy extension.
+    Assert.assertEquals(VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, /* combined */ false),
+        Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+  }
+
+  @Test
+  public void testHasCombinedFormVectorIndexDetectsHnswCombined()
+      throws IOException {
+    Assert.assertFalse(VectorIndexUtils.hasCombinedFormVectorIndex(_tempDir, COLUMN));
+    touch(COLUMN + Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(VectorIndexUtils.hasCombinedFormVectorIndex(_tempDir, COLUMN),
+        "hasCombinedFormVectorIndex must return true when only HNSW combined file exists");
+    // hasVectorIndex must return false — the combined form is transient, not a sidecar.
+    Assert.assertFalse(VectorIndexUtils.hasVectorIndex(_tempDir, COLUMN),
+        "hasVectorIndex must not report the HNSW combined form as a sidecar");
+  }
+
+  @Test
   public void testToSimilarityFunctionSupportsDistanceAliases() {
     Assert.assertEquals(VectorIndexUtils.toSimilarityFunction(VectorIndexConfig.VectorDistanceFunction.COSINE),
         VectorSimilarityFunction.COSINE);
