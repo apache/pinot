@@ -83,9 +83,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   private final int _waitForPushTimeSeconds;
   private final TableSizeReader _tableSizeReader;
   private final Set<String> _tierBackendGauges = new HashSet<>();
-  // Maps tableNameWithType -> server tenant name, so stale gauges can be removed when a table changes tenant.
+  // Maps tableNameWithType -> set of compound tenant keys ("server.tenantName", "broker.tenantName",
+  // "tier.tenantName"), so stale gauges can be removed when a table's tenant assignment changes.
   // Accessed only from the single-threaded periodic task execution loop (processTable / removeMetricsForTable).
-  private final Map<String, String> _tableTenantMap = new HashMap<>();
+  private final Map<String, Set<String>> _tableTenantMap = new HashMap<>();
 
   private long _lastDisabledTableLogTimestamp = 0;
 
@@ -175,9 +176,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     if (tableConfig == null) {
       LOGGER.warn("Found null table config for table: {}. Resetting table config metrics.", tableNameWithType);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, 0);
-      String tenant = _tableTenantMap.remove(tableNameWithType);
-      if (tenant != null) {
-        _controllerMetrics.removeTableGauge(tableNameWithType, tenant, ControllerGauge.TABLE_TENANT_INFO);
+      Set<String> tenantKeys = _tableTenantMap.remove(tableNameWithType);
+      if (tenantKeys != null) {
+        for (String key : tenantKeys) {
+          _controllerMetrics.removeTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO);
+        }
       }
       return;
     }
@@ -208,25 +211,48 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   }
 
   /**
-   * Emits a {@code tableTenantInfo} gauge keyed by server tenant name so Prometheus can extract the tenant as a
-   * label and join it onto other table-scoped metrics.  Always set to {@code 1}.
-   * The gauge is registered once per unique (table, tenant) pair and only re-registered when the tenant changes,
-   * avoiding redundant metric writes on each periodic cycle.
-   * When the tenant changes, the new gauge is registered first to avoid a gap window, then the stale gauge is removed.
+   * Emits one {@code tableTenantInfo} gauge per (tenantType, tenantName) pair for a table so Prometheus can extract
+   * both as labels and join them onto other table-scoped metrics.  Every gauge is always set to {@code 1}.
+   * TenantType values: {@code "server"} (server tenant), {@code "broker"} (broker tenant), {@code "tier"} (tier
+   * server tenant).  The compound key {@code "<tenantType>.<tenantName>"} is embedded in the JMX metric name.
+   * Gauges are only written on first registration or when the tenant assignment changes, not on every periodic cycle.
+   * When assignments change, new gauges are registered before stale ones are removed to avoid a scrape-window gap.
    */
   private void updateTenantInfoGauge(String tableNameWithType, TableConfig tableConfig) {
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
-    String serverTenant =
-        (tenantConfig != null && tenantConfig.getServer() != null) ? tenantConfig.getServer()
-            : TagNameUtils.DEFAULT_TENANT_NAME;
 
-    String previousTenant = _tableTenantMap.put(tableNameWithType, serverTenant);
-    if (serverTenant.equals(previousTenant)) {
+    Set<String> newKeys = new HashSet<>();
+    String serverTenant = (tenantConfig != null && tenantConfig.getServer() != null)
+        ? tenantConfig.getServer() : TagNameUtils.DEFAULT_TENANT_NAME;
+    newKeys.add("server." + serverTenant);
+
+    String brokerTenant = (tenantConfig != null && tenantConfig.getBroker() != null)
+        ? tenantConfig.getBroker() : TagNameUtils.DEFAULT_TENANT_NAME;
+    newKeys.add("broker." + brokerTenant);
+
+    List<TierConfig> tierConfigs = tableConfig.getTierConfigsList();
+    if (tierConfigs != null) {
+      for (TierConfig tierConfig : tierConfigs) {
+        String serverTag = tierConfig.getServerTag();
+        if (serverTag != null && serverTag.contains("_")) {
+          newKeys.add("tier." + TagNameUtils.getTenantFromTag(serverTag));
+        }
+      }
+    }
+
+    Set<String> previousKeys = _tableTenantMap.put(tableNameWithType, newKeys);
+    if (newKeys.equals(previousKeys)) {
       return;
     }
-    _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, serverTenant, ControllerGauge.TABLE_TENANT_INFO, 1L);
-    if (previousTenant != null) {
-      _controllerMetrics.removeTableGauge(tableNameWithType, previousTenant, ControllerGauge.TABLE_TENANT_INFO);
+    for (String key : newKeys) {
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO, 1L);
+    }
+    if (previousKeys != null) {
+      for (String key : previousKeys) {
+        if (!newKeys.contains(key)) {
+          _controllerMetrics.removeTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO);
+        }
+      }
     }
   }
 
@@ -534,9 +560,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private void removeMetricsForTable(String tableNameWithType) {
     LOGGER.info("Removing metrics from {} given it is not a table known by Helix", tableNameWithType);
-    String tenant = _tableTenantMap.remove(tableNameWithType);
-    if (tenant != null) {
-      _controllerMetrics.removeTableGauge(tableNameWithType, tenant, ControllerGauge.TABLE_TENANT_INFO);
+    Set<String> tenantKeys = _tableTenantMap.remove(tableNameWithType);
+    if (tenantKeys != null) {
+      for (String key : tenantKeys) {
+        _controllerMetrics.removeTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO);
+      }
     }
     for (ControllerGauge metric : ControllerGauge.values()) {
       if (!metric.isGlobal()) {

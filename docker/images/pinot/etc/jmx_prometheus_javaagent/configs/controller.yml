@@ -1,16 +1,18 @@
 rules:
 # tableTenantInfo: emitted by SegmentStatusChecker as
-#   pinot.controller.tableTenantInfo.<tableNameWithType>.<serverTenant>
-# MUST appear before the generic tableNameWithType rules — the extra tenant path segment would otherwise be consumed
-# by those patterns and the tenant label would not be extracted.
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableTenantInfo\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([^\"]+)\"><>(\\w+)"
-  name: "pinot_controller_tableTenantInfo_$6"
+#   pinot.controller.tableTenantInfo.<tableNameWithType>.<tenantType>.<tenantName>
+# tenantType is one of: server, broker, tier.
+# MUST appear before the generic tableNameWithType rules — the extra path segments would otherwise be consumed
+# by those patterns and the tenantType/tenant labels would not be extracted.
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableTenantInfo\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([^.]+)\\.([^\"]+)\"><>(\\w+)"
+  name: "pinot_controller_tableTenantInfo_$7"
   cache: true
   labels:
     database: "$2"
     table: "$1$3"
     tableType: "$4"
-    tenant: "$5"
+    tenantType: "$5"
+    tenant: "$6"
 # Gauges that accept tableNameWithType
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
   name: "pinot_$1_$2_$7"
