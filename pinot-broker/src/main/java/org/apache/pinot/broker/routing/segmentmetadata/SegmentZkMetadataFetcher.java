@@ -152,5 +152,4 @@ public class SegmentZkMetadataFetcher {
     Map<String, String> stateMap = externalView.getStateMap(segment);
     return stateMap != null && stateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
   }
-
 }
