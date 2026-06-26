@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.readers.vector;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,9 +95,15 @@ public final class HnswVectorIndexBufferReader {
   /// The returned sub-buffer is a {@link PinotDataBuffer#view view} of the original buffer and
   /// shares its lifetime. The caller must not close it independently.
   ///
+  /// The view is forced to {@link ByteOrder#LITTLE_ENDIAN} regardless of the combined buffer's
+  /// order. The docId mapping is packed verbatim from the file-backed sidecar, which
+  /// {@code DocIdTranslator} always writes/reads little-endian; the enclosing {@code columns.psf}
+  /// buffer is big-endian, so an inherited-order view would byte-swap every Lucene→Pinot doc id and
+  /// corrupt ANN result translation and pre-filter matching.
+  ///
   /// @param indexBuffer combined buffer in LUCENE_V2 format
   /// @param column      column name; used to identify the mapping file entry
-  /// @return sub-buffer for the mapping bytes, or {@code null} if not present
+  /// @return little-endian sub-buffer for the mapping bytes, or {@code null} if not present
   /// @throws IOException if header parsing fails
   @Nullable
   public static PinotDataBuffer extractDocIdMappingBuffer(PinotDataBuffer indexBuffer, String column)
@@ -106,6 +113,7 @@ public final class HnswVectorIndexBufferReader {
     if (fileInfo == null) {
       return null;
     }
-    return indexBuffer.view(fileInfo.getOffset(), fileInfo.getOffset() + fileInfo.getSize());
+    return indexBuffer.view(fileInfo.getOffset(), fileInfo.getOffset() + fileInfo.getSize(),
+        ByteOrder.LITTLE_ENDIAN);
   }
 }

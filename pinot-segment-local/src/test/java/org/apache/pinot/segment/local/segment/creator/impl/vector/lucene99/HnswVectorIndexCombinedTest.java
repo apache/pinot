@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -156,6 +157,47 @@ public class HnswVectorIndexCombinedTest {
       // No mapping was packed (segmentIndexDir=null in combineHnswIndexFiles above)
       PinotDataBuffer mappingBuffer = HnswVectorIndexBufferReader.extractDocIdMappingBuffer(buffer, COLUMN);
       Assert.assertNull(mappingBuffer, "Mapping buffer must be null when no mapping was packed");
+    } finally {
+      buffer.close();
+    }
+  }
+
+  /// Regression for the consolidated-HNSW docId-mapping byte order. The mapping is packed verbatim
+  /// from the little-endian file-backed sidecar, but the enclosing {@code columns.psf} buffer is
+  /// big-endian. {@code extractDocIdMappingBuffer} must hand back a LITTLE_ENDIAN view so
+  /// {@code DocIdTranslator} reads the Lucene→Pinot doc ids unswapped.
+  @Test
+  public void testExtractDocIdMappingBufferIsLittleEndian()
+      throws Exception {
+    buildIndex(buildVectors(NUM_DOCS, DIMENSION), buildConfig(false));
+    File hnswDir = new File(_segmentDir, COLUMN + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+
+    // Write a docId mapping file (Lucene doc id -> Pinot doc id) little-endian, the order the
+    // file-backed DocIdTranslator uses.
+    int[] expected = {5, 3, 7, 1, 6, 2, 4, 0};
+    File mappingFile =
+        new File(_segmentDir, COLUMN + V1Constants.Indexes.VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+    ByteBuffer bb = ByteBuffer.allocate(expected.length * Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+    for (int v : expected) {
+      bb.putInt(v);
+    }
+    FileUtils.writeByteArrayToFile(mappingFile, bb.array());
+
+    // Pack including the mapping file.
+    File combinedFile = new File(_segmentDir, COLUMN + V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
+    HnswVectorIndexCombined.combineHnswIndexFiles(hnswDir, combinedFile.getAbsolutePath(), _segmentDir, COLUMN);
+
+    // Mmap the combined file BIG_ENDIAN to mirror the columns.psf buffer order. Without the
+    // little-endian view in extractDocIdMappingBuffer, getInt() would byte-swap every doc id.
+    PinotDataBuffer buffer = PinotDataBuffer.mapFile(combinedFile, /* readOnly */ true, 0, combinedFile.length(),
+        ByteOrder.BIG_ENDIAN, "hnsw-combined-endianness-test");
+    try {
+      PinotDataBuffer mappingBuffer = HnswVectorIndexBufferReader.extractDocIdMappingBuffer(buffer, COLUMN);
+      Assert.assertNotNull(mappingBuffer, "Mapping buffer must be present when packed");
+      for (int i = 0; i < expected.length; i++) {
+        Assert.assertEquals(mappingBuffer.getInt(i * Integer.BYTES), expected[i],
+            "docId mapping must read little-endian regardless of the enclosing buffer order");
+      }
     } finally {
       buffer.close();
     }
