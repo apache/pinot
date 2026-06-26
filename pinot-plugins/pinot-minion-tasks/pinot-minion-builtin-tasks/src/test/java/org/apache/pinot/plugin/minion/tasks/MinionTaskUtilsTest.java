@@ -331,6 +331,41 @@ public class MinionTaskUtilsTest {
         () -> MinionTaskUtils.parseValidDocIdsConsensusMode("INVALID_MODE"));
   }
 
+  @Test
+  public void testParseValidDocIdsValidationMode() {
+    // Blank/null defaults to STRICT
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode(null),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode(""),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("  "),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+
+    // Case-insensitive parsing
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("STRICT"),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("executor_only"),
+        MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("  EXECUTOR_ONLY  "),
+        MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY);
+
+    expectThrows(IllegalArgumentException.class,
+        () -> MinionTaskUtils.parseValidDocIdsValidationMode("INVALID_MODE"));
+  }
+
+  @Test
+  public void testResolveGeneratorConsensusMode() {
+    // EXECUTOR_ONLY downgrades the generator to UNSAFE regardless of the configured consensus mode.
+    for (MinionConstants.ValidDocIdsConsensusMode mode : MinionConstants.ValidDocIdsConsensusMode.values()) {
+      assertEquals(
+          MinionTaskUtils.resolveGeneratorConsensusMode(mode, MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY),
+          MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+      // STRICT keeps the configured mode.
+      assertEquals(
+          MinionTaskUtils.resolveGeneratorConsensusMode(mode, MinionConstants.ValidDocIdsValidationMode.STRICT), mode);
+    }
+  }
+
   /**
    * Builds a RoaringBitmap with {@code numDocs} valid doc ids (0..numDocs-1).
    */

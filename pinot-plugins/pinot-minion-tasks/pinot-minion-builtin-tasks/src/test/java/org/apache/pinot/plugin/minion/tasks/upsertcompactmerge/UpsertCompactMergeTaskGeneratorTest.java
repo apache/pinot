@@ -29,6 +29,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
@@ -52,6 +53,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -375,7 +377,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     SegmentSelectionResult result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(
         RAW_TABLE_NAME + "_REALTIME", taskConfigs, candidateSegmentsMap,
-        validDocIdsMetadata, alreadyMergedSegments, null);
+        validDocIdsMetadata, alreadyMergedSegments, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE, null);
 
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getSegmentsForCompactMergeByPartition());
@@ -413,11 +415,101 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     SegmentSelectionResult result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(
         RAW_TABLE_NAME + "_REALTIME", taskConfigs, candidateSegmentsMap,
-        validDocIdsMetadata, alreadyMergedSegments, null);
+        validDocIdsMetadata, alreadyMergedSegments, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE, null);
 
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getSegmentsForDeletion().size(), 1, "Should have one segment for deletion");
     Assert.assertTrue(result.getSegmentsForDeletion().contains("testTable__0__0__12345"));
+  }
+
+  /**
+   * Tests that replica consensus is enforced before a segment is selected. Uses the deletion path (a fully-invalid
+   * segment) as a clean signal: the segment is processed only when its replicas pass the consensus check.
+   */
+  @Test
+  public void testProcessValidDocIdsMetadataConsensus() {
+    Map<String, String> taskConfigs = new HashMap<>();
+    String segmentName = _completedSegment.getSegmentName();
+    long crc = _completedSegment.getCrc();
+    Map<String, SegmentZKMetadata> candidateSegmentsMap = Map.of(segmentName, _completedSegment);
+    Set<String> noMerged = Set.of();
+    // Both replicas are expected to respond.
+    Map<String, Integer> twoReplicas = Map.of(segmentName, 2);
+
+    // EQUAL: replicas agree (both fully invalid, identical empty bitmaps), so the segment is processed and deleted.
+    Map<String, List<ValidDocIdsMetadataInfo>> agree = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        metaWithBitmap(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server2")));
+    SegmentSelectionResult result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME,
+        taskConfigs, candidateSegmentsMap, agree, noMerged, twoReplicas,
+        MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
+    Assert.assertTrue(result.getSegmentsForDeletion().contains(segmentName));
+
+    // EQUAL: replicas disagree (different valid doc sets), so the segment is skipped.
+    Map<String, List<ValidDocIdsMetadataInfo>> disagree = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        metaWithBitmap(segmentName, 1, 99, 100, crc, ServiceStatus.Status.GOOD, "server2", 0)));
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, disagree, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
+    Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
+
+    // EQUAL: a CRC mismatch on any replica skips the segment.
+    Map<String, List<ValidDocIdsMetadataInfo>> crcMismatch = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        metaWithBitmap(segmentName, 0, 100, 100, crc + 1, ServiceStatus.Status.GOOD, "server2")));
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, crcMismatch, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL,
+        null);
+    Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
+
+    // EQUAL: an unhealthy server skips the segment.
+    Map<String, List<ValidDocIdsMetadataInfo>> unhealthy = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        metaWithBitmap(segmentName, 0, 100, 100, crc, ServiceStatus.Status.STARTING, "server2")));
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, unhealthy, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
+    Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
+
+    // UNSAFE: skip the CRC-mismatched replica and use the healthy one, so the segment is still processed.
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, crcMismatch, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.UNSAFE,
+        null);
+    Assert.assertTrue(result.getSegmentsForDeletion().contains(segmentName));
+
+    // MOST_VALID_DOCS: the replica with the most valid docs wins, so the fully-valid replica is chosen and the
+    // segment is not deleted (proving the all-invalid replica was not picked).
+    Map<String, List<ValidDocIdsMetadataInfo>> mostValidDocs = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        metaWithBitmap(segmentName, 100, 0, 100, crc, ServiceStatus.Status.GOOD, "server2", range(0, 100))));
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, mostValidDocs, noMerged, twoReplicas,
+        MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS, null);
+    Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
+
+    // EQUAL: only one of the two assigned replicas responded, so consensus can't be confirmed and the segment is
+    // skipped.
+    Map<String, List<ValidDocIdsMetadataInfo>> oneResponded = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1")));
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, oneResponded, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL,
+        null);
+    Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
+  }
+
+  private static ValidDocIdsMetadataInfo metaWithBitmap(String segmentName, long validDocs, long invalidDocs,
+      long totalDocs, long crc, ServiceStatus.Status serverStatus, String instanceId, int... validIds) {
+    RoaringBitmap bitmap = RoaringBitmap.bitmapOf(validIds);
+    return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc),
+        ValidDocIdsType.SNAPSHOT, 1000, System.currentTimeMillis(), instanceId, serverStatus,
+        RoaringBitmapUtils.serialize(bitmap));
+  }
+
+  private static int[] range(int fromInclusive, int toExclusive) {
+    int[] ids = new int[toExclusive - fromInclusive];
+    for (int i = 0; i < ids.length; i++) {
+      ids[i] = fromInclusive + i;
+    }
+    return ids;
   }
 
   /**

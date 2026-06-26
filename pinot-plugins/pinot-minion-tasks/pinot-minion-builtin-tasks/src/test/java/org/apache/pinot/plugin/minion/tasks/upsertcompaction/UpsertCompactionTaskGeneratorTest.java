@@ -28,6 +28,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
@@ -42,6 +45,7 @@ import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -232,13 +236,13 @@ public class UpsertCompactionTaskGeneratorTest {
     // no completed segments scenario, there shouldn't be any segment selected for compaction
     UpsertCompactionTaskGenerator.SegmentSelectionResult segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, new HashMap<>(),
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 0);
 
     // test with valid crc and thresholds
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -249,7 +253,7 @@ public class UpsertCompactionTaskGeneratorTest {
     compactionConfigs = getCompactionConfigs("60", "10");
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
     assertTrue(segmentSelectionResult.getSegmentsForCompaction().isEmpty());
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0), _completedSegment2.getSegmentName());
@@ -258,7 +262,7 @@ public class UpsertCompactionTaskGeneratorTest {
     compactionConfigs = getCompactionConfigs("0", "10");
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -269,7 +273,7 @@ public class UpsertCompactionTaskGeneratorTest {
     compactionConfigs = getCompactionConfigs("30", "0");
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -288,7 +292,7 @@ public class UpsertCompactionTaskGeneratorTest {
     });
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
 
     // completedSegment is supposed to be filtered out
     Assert.assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 0);
@@ -313,7 +317,7 @@ public class UpsertCompactionTaskGeneratorTest {
     compactionConfigs = getCompactionConfigs("30", "0");
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
     Assert.assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 2);
     Assert.assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 0);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -324,6 +328,101 @@ public class UpsertCompactionTaskGeneratorTest {
     // Check segmentCreationTimeMillis is deserialized correctly
     assertEquals(validDocIdsMetadataInfo.get("testTable__0").get(0).getSegmentCreationTimeMillis(), 1234567890L);
     assertEquals(validDocIdsMetadataInfo.get("testTable__1").get(0).getSegmentCreationTimeMillis(), 9876543210L);
+  }
+
+  @Test
+  public void testProcessValidDocIdsMetadataConsensus() {
+    Map<String, String> compactionConfigs = getCompactionConfigs("1", "10");
+    String segmentName = _completedSegment.getSegmentName();
+    long crc = _completedSegment.getCrc();
+    // Both replicas are expected to respond.
+    Map<String, Integer> twoReplicas = Map.of(segmentName, 2);
+
+    // EQUAL: replicas agree (identical bitmaps), so the segment is compacted.
+    Map<String, List<ValidDocIdsMetadataInfo>> equalReplicas = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1", range(0, 50)),
+        metaWithBitmap(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server2", range(0, 50))));
+    UpsertCompactionTaskGenerator.SegmentSelectionResult result =
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+            equalReplicas, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    assertEquals(result.getSegmentsForCompaction().size(), 1);
+
+    // EQUAL: replicas disagree (different bitmaps), so the segment is skipped entirely.
+    Map<String, List<ValidDocIdsMetadataInfo>> unequalReplicas = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1", range(0, 50)),
+        metaWithBitmap(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server2", range(1, 51))));
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+        unequalReplicas, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    assertTrue(result.getSegmentsForCompaction().isEmpty());
+    assertTrue(result.getSegmentsForDeletion().isEmpty());
+
+    // EQUAL: only one of the two assigned replicas responded, so consensus can't be confirmed and the segment is
+    // skipped.
+    Map<String, List<ValidDocIdsMetadataInfo>> oneResponded = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1", range(0, 50))));
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+        oneResponded, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    assertTrue(result.getSegmentsForCompaction().isEmpty());
+
+    // EQUAL: a CRC mismatch on any replica skips the segment.
+    Map<String, List<ValidDocIdsMetadataInfo>> crcMismatch = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1", range(0, 50)),
+        metaWithBitmap(segmentName, 50, 50, 100, crc + 1, ServiceStatus.Status.GOOD, "server2", range(0, 50))));
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+        crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    assertTrue(result.getSegmentsForCompaction().isEmpty());
+
+    // EQUAL: an unhealthy server skips the segment.
+    Map<String, List<ValidDocIdsMetadataInfo>> unhealthy = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1", range(0, 50)),
+        metaWithBitmap(segmentName, 50, 50, 100, crc, ServiceStatus.Status.STARTING, "server2", range(0, 50))));
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+        unhealthy, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    assertTrue(result.getSegmentsForCompaction().isEmpty());
+
+    // UNSAFE: skip the CRC-mismatched replica and use the healthy one. A missing replica is tolerated.
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+        crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+    assertEquals(result.getSegmentsForCompaction().size(), 1);
+
+    // MOST_VALID_DOCS is strict: a CRC-mismatched replica skips the whole segment (unlike UNSAFE).
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+        crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
+    assertTrue(result.getSegmentsForCompaction().isEmpty());
+
+    // EQUAL: a replica without a bitmap can't be verified, so the segment is skipped.
+    Map<String, List<ValidDocIdsMetadataInfo>> missingBitmap = Map.of(segmentName, List.of(
+        new ValidDocIdsMetadataInfo(segmentName, 50, 50, 100, String.valueOf(crc), ValidDocIdsType.SNAPSHOT, 1000,
+            System.currentTimeMillis(), "server1", ServiceStatus.Status.GOOD)));
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+        missingBitmap, Map.of(segmentName, 1), MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    assertTrue(result.getSegmentsForCompaction().isEmpty());
+
+    // MOST_VALID_DOCS: the replica with the most valid docs wins. Here that replica has zero invalid docs, so the
+    // segment is neither compacted nor deleted - proving the other (all-invalid) replica was not chosen.
+    Map<String, List<ValidDocIdsMetadataInfo>> mostValidDocs = Map.of(segmentName, List.of(
+        metaWithBitmap(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        metaWithBitmap(segmentName, 100, 0, 100, crc, ServiceStatus.Status.GOOD, "server2", range(0, 100))));
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+        mostValidDocs, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
+    assertTrue(result.getSegmentsForCompaction().isEmpty());
+    assertTrue(result.getSegmentsForDeletion().isEmpty());
+  }
+
+  private static ValidDocIdsMetadataInfo metaWithBitmap(String segmentName, long validDocs, long invalidDocs,
+      long totalDocs, long crc, ServiceStatus.Status serverStatus, String instanceId, int... validIds) {
+    RoaringBitmap bitmap = RoaringBitmap.bitmapOf(validIds);
+    return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc),
+        ValidDocIdsType.SNAPSHOT, 1000, System.currentTimeMillis(), instanceId, serverStatus,
+        RoaringBitmapUtils.serialize(bitmap));
+  }
+
+  private static int[] range(int fromInclusive, int toExclusive) {
+    int[] ids = new int[toExclusive - fromInclusive];
+    for (int i = 0; i < ids.length; i++) {
+      ids[i] = fromInclusive + i;
+    }
+    return ids;
   }
 
   @Test
