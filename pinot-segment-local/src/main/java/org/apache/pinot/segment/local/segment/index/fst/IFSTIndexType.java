@@ -81,7 +81,6 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
           "Cannot create IFST index on column: %s of stored type other than STRING", column);
       for (IndexType indexType : List.of(
-          StandardIndexes.bloomFilter(),
           StandardIndexes.inverted(),
           StandardIndexes.vector(),
           StandardIndexes.range(),

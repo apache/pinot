@@ -84,8 +84,6 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
       DataType storedType = fieldSpec.getDataType().getStoredType();
       Preconditions.checkState(storedType == DataType.STRING || storedType == DataType.MAP,
           "Cannot create JSON index on column: %s of stored type other than STRING or MAP", column);
-      Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot create JSON index on multi-value column: %s",
-          column);
       for (IndexType indexType : List.of(
           StandardIndexes.bloomFilter(),
           StandardIndexes.dictionary(),

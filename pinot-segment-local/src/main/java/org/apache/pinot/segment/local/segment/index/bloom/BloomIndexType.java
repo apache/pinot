@@ -78,7 +78,6 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
           fieldSpec.getName());
       for (IndexType indexType : List.of(
           StandardIndexes.vector(),
-          StandardIndexes.range(),
           StandardIndexes.json(),
           StandardIndexes.text(),
           StandardIndexes.fst(),

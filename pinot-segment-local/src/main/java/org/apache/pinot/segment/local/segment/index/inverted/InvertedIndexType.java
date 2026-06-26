@@ -88,7 +88,6 @@ public class InvertedIndexType
       Preconditions.checkState(fieldSpec.getDataType() != DataType.MAP,
           "Cannot create inverted index on MAP column: %s", column);
       for (IndexType indexType : List.of(
-          StandardIndexes.bloomFilter(),
           StandardIndexes.vector(),
           StandardIndexes.range(),
           StandardIndexes.json(),

@@ -124,7 +124,7 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
         ? new OnHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
         context.getTableNameWithType(), context.isContinueOnError(), resolution)
         : new OffHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-        context.getTableNameWithType(), context.isContinueOnError(), resolution);
+            context.getTableNameWithType(), context.isContinueOnError(), resolution);
   }
 
   @Override
@@ -134,7 +134,7 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-                                         Schema schema, TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return new H3IndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -169,7 +169,7 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
 
     @Override
     protected H3IndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-                                              H3IndexConfig indexConfig) {
+        H3IndexConfig indexConfig) {
       return new ImmutableH3IndexReader(dataBuffer);
     }
   }

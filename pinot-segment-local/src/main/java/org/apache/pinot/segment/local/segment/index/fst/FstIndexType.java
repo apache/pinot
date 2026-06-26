@@ -84,7 +84,6 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
           "Cannot create FST index on column: %s of stored type other than STRING", column);
       for (IndexType indexType : List.of(
-          StandardIndexes.bloomFilter(),
           StandardIndexes.inverted(),
           StandardIndexes.vector(),
           StandardIndexes.range(),
