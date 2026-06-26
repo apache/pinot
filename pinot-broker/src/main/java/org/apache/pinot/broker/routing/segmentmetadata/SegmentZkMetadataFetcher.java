@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -84,7 +85,11 @@ public class SegmentZkMetadataFetcher {
           listener.init(idealState, externalView, segments, znRecords);
         }
         for (int i = 0; i < numSegments; i++) {
-          if (!isConsumingInExternalView(externalView, segments.get(i))) {
+          // Only cache segments that are both non-consuming in EV AND have a committed ZNRecord.
+          // If a segment is ONLINE in EV but its ZNRecord still has startTime=-1 (brief window between
+          // server updating EV and writing ZNRecord to ZK), do not cache it so it is re-evaluated on
+          // the next onAssignmentChange once the ZNRecord is consistent.
+          if (!isConsumingInExternalView(externalView, segments.get(i)) && isCommittedZNRecord(znRecords.get(i))) {
             _onlineSegmentsCached.add(segments.get(i));
           }
         }
@@ -117,8 +122,10 @@ public class SegmentZkMetadataFetcher {
       }
       int numSegments = segments.size();
       for (int i = 0; i < numSegments; i++) {
-        // All fetched segments are non-consuming (guaranteed by the EV check above), cache them if metadata exists.
-        if (znRecords.get(i) != null) {
+        // Cache only if ZNRecord is committed (startTime >= 0). Segments that are ONLINE in EV but still
+        // have startTime=-1 in ZK (brief inconsistency between EV and ZNRecord updates) are left uncached
+        // so they are retried on the next onAssignmentChange.
+        if (isCommittedZNRecord(znRecords.get(i))) {
           _onlineSegmentsCached.add(segments.get(i));
         }
       }
@@ -138,6 +145,15 @@ public class SegmentZkMetadataFetcher {
         _onlineSegmentsCached.remove(segment);
       }
     }
+  }
+
+  /**
+   * Returns true if the ZNRecord represents a committed segment with a valid startTime.
+   * A null ZNRecord or one with startTime=-1 (consuming, or briefly inconsistent after commit)
+   * should not be cached — the segment will be re-fetched on the next onAssignmentChange.
+   */
+  private static boolean isCommittedZNRecord(@Nullable ZNRecord znRecord) {
+    return znRecord != null && znRecord.getLongField(CommonConstants.Segment.START_TIME, -1L) >= 0L;
   }
 
   /**
