@@ -35,49 +35,45 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class to pack a Lucene HNSW index directory (and its optional docId mapping file) into
- * a single combined file using the {@link LuceneCombinedTextIndexConstants#MAGIC_NUMBER LUCENE_V2}
- * layout. Mirrors {@code LuceneTextIndexCombined} — reuses the same format constants to keep a
- * single on-disk format shared across text and HNSW vector indexes.
- *
- * <p>Layout (identical to the text-index LUCENE_V2 format):</p>
- * <pre>
- * [Header]
- *   Magic "LUCENE_V2"   9 bytes
- *   Version             4 bytes (little-endian int)
- *   Total buffer size   8 bytes (little-endian long)
- *   File count          4 bytes (little-endian int)
- *   Reserved            4 bytes
- *
- * [File metadata, one entry per file]
- *   Name length         2 bytes (little-endian short)
- *   Name                variable
- *   File offset         8 bytes (little-endian long)
- *   File size           8 bytes (little-endian long)
- *
- * [File data]
- *   Raw bytes of each file concatenated in metadata order
- * </pre>
- */
+/// Utility class to pack a Lucene HNSW index directory (and its optional docId mapping file) into
+/// a single combined file using the {@link LuceneCombinedTextIndexConstants#MAGIC_NUMBER LUCENE_V2}
+/// layout. Mirrors {@code LuceneTextIndexCombined} — reuses the same format constants to keep a
+/// single on-disk format shared across text and HNSW vector indexes.
+///
+/// Layout (identical to the text-index LUCENE_V2 format):
+/// ```
+/// [Header]
+///   Magic "LUCENE_V2"   9 bytes
+///   Version             4 bytes (little-endian int)
+///   Total buffer size   8 bytes (little-endian long)
+///   File count          4 bytes (little-endian int)
+///   Reserved            4 bytes
+///
+/// [File metadata, one entry per file]
+///   Name length         2 bytes (little-endian short)
+///   Name                variable
+///   File offset         8 bytes (little-endian long)
+///   File size           8 bytes (little-endian long)
+///
+/// [File data]
+///   Raw bytes of each file concatenated in metadata order
+/// ```
 public final class HnswVectorIndexCombined {
   private static final Logger LOGGER = LoggerFactory.getLogger(HnswVectorIndexCombined.class);
 
   private HnswVectorIndexCombined() {
   }
 
-  /**
-   * Packs all files in {@code hnswIndexDir} (plus the optional docId mapping file) into a single
-   * combined file at {@code outputFilePath}.
-   *
-   * @param hnswIndexDir     the Lucene HNSW index directory to pack
-   * @param outputFilePath   destination path for the combined file
-   * @param segmentIndexDir  when non-null, the segment's top-level index directory; used to
-   *                         locate the docId mapping file for inclusion in the packed output
-   * @param column           column name; used to locate the docId mapping file when
-   *                         {@code segmentIndexDir} is provided
-   * @throws IOException if any file operations fail
-   */
+  /// Packs all files in {@code hnswIndexDir} (plus the optional docId mapping file) into a single
+  /// combined file at {@code outputFilePath}.
+  ///
+  /// @param hnswIndexDir     the Lucene HNSW index directory to pack
+  /// @param outputFilePath   destination path for the combined file
+  /// @param segmentIndexDir  when non-null, the segment's top-level index directory; used to
+  ///                         locate the docId mapping file for inclusion in the packed output
+  /// @param column           column name; used to locate the docId mapping file when
+  ///                         {@code segmentIndexDir} is provided
+  /// @throws IOException if any file operations fail
   public static void combineHnswIndexFiles(File hnswIndexDir, String outputFilePath,
       @Nullable File segmentIndexDir, @Nullable String column)
       throws IOException {
@@ -101,8 +97,12 @@ public final class HnswVectorIndexCombined {
     }
 
     File outputFile = new File(outputFilePath);
+    // TRUNCATE_EXISTING so a leftover (larger) file from a previously-crashed pack does not leave
+    // stale trailing bytes past the new payload — that would inflate the file length and break the
+    // size-based crash-recovery check in VectorIndexHandler that compares the combined file length
+    // to the columns.psf typed-entry size.
     try (FileChannel outputChannel = FileChannel.open(outputFile.toPath(), StandardOpenOption.CREATE,
-        StandardOpenOption.WRITE)) {
+        StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
       writeHeader(outputChannel, fileCount, (int) totalSize);
       long dataOffset = LuceneCombinedTextIndexConstants.getHeaderSize() + calculateMetadataSize(fileInfoMap);
       writeFileMetadata(outputChannel, fileInfoMap, dataOffset);
@@ -112,10 +112,8 @@ public final class HnswVectorIndexCombined {
     LOGGER.info("Combined {} HNSW index files into: {} ({} bytes)", fileCount, outputFilePath, totalSize);
   }
 
-  /**
-   * Collects all regular files from {@code hnswIndexDir} and optionally the docId mapping file
-   * from the segment's flat directory. Uses a {@link TreeMap} for deterministic ordering.
-   */
+  /// Collects all regular files from {@code hnswIndexDir} and optionally the docId mapping file
+  /// from the segment's flat directory. Uses a {@link TreeMap} for deterministic ordering.
   private static Map<String, FileInfo> collectFiles(File hnswIndexDir, @Nullable File segmentIndexDir,
       @Nullable String column)
       throws IOException {
@@ -145,17 +143,15 @@ public final class HnswVectorIndexCombined {
     return fileInfoMap;
   }
 
-  /**
-   * Extracts files packed inside a combined HNSW file back into a Lucene directory.
-   *
-   * <p>This is the inverse of {@link #combineHnswIndexFiles}. The docId mapping file (if present)
-   * is extracted into {@code targetDir} alongside the Lucene index files; the caller is
-   * responsible for moving it to its canonical location if needed.</p>
-   *
-   * @param combinedFile source combined file (LUCENE_V2 layout)
-   * @param targetDir    destination directory; created if absent
-   * @throws IOException if any file operations fail
-   */
+  /// Extracts files packed inside a combined HNSW file back into a Lucene directory.
+  ///
+  /// This is the inverse of {@link #combineHnswIndexFiles}. The docId mapping file (if present)
+  /// is extracted into {@code targetDir} alongside the Lucene index files; the caller is
+  /// responsible for moving it to its canonical location if needed.
+  ///
+  /// @param combinedFile source combined file (LUCENE_V2 layout)
+  /// @param targetDir    destination directory; created if absent
+  /// @throws IOException if any file operations fail
   public static void extractHnswIndexFiles(File combinedFile, File targetDir)
       throws IOException {
     if (!combinedFile.exists() || !combinedFile.isFile()) {
@@ -326,7 +322,7 @@ public final class HnswVectorIndexCombined {
     return size;
   }
 
-  /** Reads a buffer fully from the channel, throwing if EOF is reached prematurely. */
+  /// Reads a buffer fully from the channel, throwing if EOF is reached prematurely.
   private static void readFully(FileChannel channel, ByteBuffer buf)
       throws IOException {
     while (buf.hasRemaining()) {

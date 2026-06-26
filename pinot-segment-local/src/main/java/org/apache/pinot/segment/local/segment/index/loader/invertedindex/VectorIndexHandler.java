@@ -122,21 +122,21 @@ public class VectorIndexHandler extends BaseIndexHandler {
     return false;
   }
 
-  /**
-   * Absorbs a vector index sidecar into {@code columns.psf} as a typed entry, then deletes the
-   * sibling. For IVF backends the bytes are copied verbatim; the on-disk IVF header is the
-   * contract and the reader handles version dispatch. For HNSW, if a combined-form file already
-   * exists (written by a creator run with the flag on), it is absorbed directly; if only the
-   * Lucene directory remains (operator just flipped the flag on an existing segment), it is first
-   * packed into a transient combined file, which is then absorbed and removed.
-   *
-   * <p><b>Crash recovery:</b> if a prior absorb crashed between {@code newIndexFor} (which
-   * committed bytes into {@code columns.psf} and added a {@code _columnEntries} entry) and the
-   * sidecar file deletion, the next load will see both forms. We detect that state upfront via
-   * {@code hasIndexFor}, verify the typed entry's size matches the sidecar's length (so we do not
-   * delete a sidecar that happens to coexist with an unrelated typed entry), and clean up the
-   * orphan sidecar instead of re-running the absorb.</p>
-   */
+  /// Absorbs a vector index sidecar into {@code columns.psf} as a typed entry, then deletes the
+  /// sibling. For IVF backends the bytes are copied verbatim; the on-disk IVF header is the
+  /// contract and the reader handles version dispatch. For HNSW, if a combined-form file already
+  /// exists (written by a creator run with the flag on), it is absorbed directly; if only the
+  /// Lucene directory remains (operator just flipped the flag on an existing segment), it is first
+  /// packed into a transient combined file, which is then absorbed and removed.
+  ///
+  /// **Crash recovery:** if a prior absorb crashed between {@code newIndexFor} (which committed
+  /// bytes into {@code columns.psf} and added a {@code _columnEntries} entry) and the sidecar file
+  /// deletion, the next load will see both forms. We detect that state upfront via the columns.psf
+  /// typed entry ({@link VectorIndexUtils#getConsolidatedVectorEntry}), NOT via {@code hasIndexFor}
+  /// — which for vector also reports the on-disk sidecar and would therefore flag a normal
+  /// first-absorb as already-absorbed. We then verify the typed entry's size matches the sidecar's
+  /// length (so we do not delete a sidecar that happens to coexist with an unrelated typed entry),
+  /// and clean up the orphan sidecar instead of re-running the absorb.
   private void absorbCombinedIntoColumnsPsf(SegmentDirectory.Writer segmentWriter, String column,
       VectorBackendType backendType, File indexDir)
       throws Exception {
@@ -162,10 +162,13 @@ public class VectorIndexHandler extends BaseIndexHandler {
       return;
     }
     // Crash-recovery: if a prior absorb committed bytes to columns.psf but crashed before
-    // deleting the sidecar, the typed entry is already present. Detect that directly via
-    // hasIndexFor + size check, rather than catching the duplicate-key exception by message.
-    if (segmentWriter.hasIndexFor(column, StandardIndexes.vector())) {
-      long existingSize = segmentWriter.getIndexFor(column, StandardIndexes.vector()).size();
+    // deleting the sidecar, the typed entry is already present. Detect that via the columns.psf
+    // typed entry directly — NOT hasIndexFor, which for vector also reports the on-disk sidecar we
+    // are about to absorb. Using hasIndexFor here would make a normal first-absorb look
+    // already-absorbed and the subsequent getIndexFor().size() would throw.
+    PinotDataBuffer existingEntry = VectorIndexUtils.getConsolidatedVectorEntry(segmentWriter, column);
+    if (existingEntry != null) {
+      long existingSize = existingEntry.size();
       if (existingSize == picked.length()) {
         LOGGER.warn("Vector index already present in columns.psf for segment: {}, column: {}; "
             + "deleting orphan sidecar file from a previously-crashed absorb run", segmentName, column);
@@ -184,15 +187,13 @@ public class VectorIndexHandler extends BaseIndexHandler {
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, picked, StandardIndexes.vector());
   }
 
-  /**
-   * HNSW-specific absorb: packs the Lucene directory (or uses an existing combined-form file) into
-   * a single combined file and absorbs it into {@code columns.psf}.
-   *
-   * <p>If the combined-form file already exists (creator ran with the flag on and produced it),
-   * it is absorbed directly. If only the Lucene directory exists (operator just flipped the flag
-   * on an existing segment), the directory is first packed into a transient combined file, which is
-   * then absorbed and cleaned up.</p>
-   */
+  /// HNSW-specific absorb: packs the Lucene directory (or uses an existing combined-form file) into
+  /// a single combined file and absorbs it into {@code columns.psf}.
+  ///
+  /// If the combined-form file already exists (creator ran with the flag on and produced it),
+  /// it is absorbed directly. If only the Lucene directory exists (operator just flipped the flag
+  /// on an existing segment), the directory is first packed into a transient combined file, which is
+  /// then absorbed and cleaned up.
   private void absorbHnswIntoColumnsPsf(SegmentDirectory.Writer segmentWriter, String column, File v3Dir,
       String segmentName)
       throws Exception {
@@ -212,9 +213,13 @@ public class VectorIndexHandler extends BaseIndexHandler {
           column);
     }
 
-    // Crash-recovery: check whether the typed entry already exists.
-    if (segmentWriter.hasIndexFor(column, StandardIndexes.vector())) {
-      long existingSize = segmentWriter.getIndexFor(column, StandardIndexes.vector()).size();
+    // Crash-recovery: check whether the typed entry already exists. Detect it via the columns.psf
+    // typed entry directly — NOT hasIndexFor, which for vector also reports the still-present
+    // legacy Lucene directory (we pack but do not delete it above), so hasIndexFor would be true on
+    // a normal first-absorb and the subsequent getIndexFor().size() would throw.
+    PinotDataBuffer existingEntry = VectorIndexUtils.getConsolidatedVectorEntry(segmentWriter, column);
+    if (existingEntry != null) {
+      long existingSize = existingEntry.size();
       if (existingSize == combinedFile.length()) {
         LOGGER.warn("HNSW vector index already present in columns.psf for segment: {}, column: {}; "
             + "deleting orphan files from a previously-crashed absorb run", segmentName, column);
@@ -242,21 +247,19 @@ public class VectorIndexHandler extends BaseIndexHandler {
     }
   }
 
-  /**
-   * Extracts the consolidated vector payload from {@code columns.psf} back into the legacy on-disk
-   * form and drops the typed entry. Used when the operator flips {@code storeInSegmentFile} from
-   * {@code true} to {@code false}.
-   *
-   * <p>For IVF backends the bytes are streamed verbatim to a sidecar file. For HNSW, the packed
-   * combined file is streamed out first, then unpacked into a Lucene directory — the inverse of
-   * the absorb path.</p>
-   *
-   * <p><b>Ordering:</b> bytes are streamed to a temp file <em>before</em> {@code removeIndex}
-   * is called, because {@code SingleFileIndexDirectory.removeIndex} for vector also runs
-   * {@link VectorIndexUtils#cleanupVectorIndex(File, String)}, which deletes any file with a
-   * recognised extension. The temp extension ({@code .vector.extract-tmp}) is not in that list,
-   * so the bytes survive until the consolidated entry is safely removed.</p>
-   */
+  /// Extracts the consolidated vector payload from {@code columns.psf} back into the legacy on-disk
+  /// form and drops the typed entry. Used when the operator flips {@code storeInSegmentFile} from
+  /// {@code true} to {@code false}.
+  ///
+  /// For IVF backends the bytes are streamed verbatim to a sidecar file. For HNSW, the packed
+  /// combined file is streamed out first, then unpacked into a Lucene directory — the inverse of
+  /// the absorb path.
+  ///
+  /// **Ordering:** bytes are streamed to a temp file *before* {@code removeIndex}
+  /// is called, because {@code SingleFileIndexDirectory.removeIndex} for vector also runs
+  /// {@link VectorIndexUtils#cleanupVectorIndex(File, String)}, which deletes any file with a
+  /// recognised extension. The temp extension ({@code .vector.extract-tmp}) is not in that list,
+  /// so the bytes survive until the consolidated entry is safely removed.
   private void extractConsolidatedToLegacyFile(SegmentDirectory.Writer segmentWriter, String column,
       VectorBackendType backendType, File indexDir)
       throws IOException {
@@ -307,16 +310,14 @@ public class VectorIndexHandler extends BaseIndexHandler {
     }
   }
 
-  /**
-   * HNSW-specific extract: streams the combined HNSW payload from {@code columns.psf} to a temp
-   * file, unpacks it into a Lucene directory, and only then removes the consolidated typed entry.
-   *
-   * <p><b>Ordering rationale:</b> unpack runs <em>before</em> {@code removeIndex}. If the unpack
-   * fails mid-way, the typed entry is still present in {@code columns.psf} and the next load
-   * retries the extract — the operator does not lose the index. The reverse order would leave a
-   * crash window in which the typed entry is gone but the Lucene directory does not yet exist,
-   * leaving the segment permanently without its HNSW index until a full rebuild.</p>
-   */
+  /// HNSW-specific extract: streams the combined HNSW payload from {@code columns.psf} to a temp
+  /// file, unpacks it into a Lucene directory, and only then removes the consolidated typed entry.
+  ///
+  /// **Ordering rationale:** unpack runs *before* {@code removeIndex}. If the unpack
+  /// fails mid-way, the typed entry is still present in {@code columns.psf} and the next load
+  /// retries the extract — the operator does not lose the index. The reverse order would leave a
+  /// crash window in which the typed entry is gone but the Lucene directory does not yet exist,
+  /// leaving the segment permanently without its HNSW index until a full rebuild.
   private void extractHnswConsolidatedToDirectory(SegmentDirectory.Writer segmentWriter, String column,
       File v3Dir, String segmentName)
       throws IOException {
@@ -362,10 +363,8 @@ public class VectorIndexHandler extends BaseIndexHandler {
     FileUtils.deleteQuietly(tempCombined);
   }
 
-  /**
-   * Streams {@code size} bytes from a {@link PinotDataBuffer} into a regular file, chunked to
-   * keep heap usage bounded for large IVF payloads.
-   */
+  /// Streams {@code size} bytes from a {@link PinotDataBuffer} into a regular file, chunked to
+  /// keep heap usage bounded for large IVF payloads.
   private static void streamBufferToFile(PinotDataBuffer buffer, long size, File dest)
       throws IOException {
     final int chunkSize = 1 << 20; // 1 MiB
@@ -383,15 +382,13 @@ public class VectorIndexHandler extends BaseIndexHandler {
     }
   }
 
-  /**
-   * Returns {@code true} when the column has an on-disk sidecar in the V3 segment directory that
-   * can be absorbed into (or was extracted from) {@code columns.psf}. Covers both the legacy form
-   * (segments built with the flag off) and the combined form (built with the flag on).
-   *
-   * <p>For HNSW, the "sidecar" is either a Lucene directory ({@code .vector.v912.hnsw.index/})
-   * or the combined packed file ({@code .vector.hnsw.combined.index}). Either form is absorb-able.
-   * For IVF, the legacy or combined-extension single files are checked.</p>
-   */
+  /// Returns {@code true} when the column has an on-disk sidecar in the V3 segment directory that
+  /// can be absorbed into (or was extracted from) {@code columns.psf}. Covers both the legacy form
+  /// (segments built with the flag off) and the combined form (built with the flag on).
+  ///
+  /// For HNSW, the "sidecar" is either a Lucene directory ({@code .vector.v912.hnsw.index/})
+  /// or the combined packed file ({@code .vector.hnsw.combined.index}). Either form is absorb-able.
+  /// For IVF, the legacy or combined-extension single files are checked.
   private boolean hasCombinedFile(File indexDir, String column, VectorBackendType backendType) {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
@@ -463,16 +460,14 @@ public class VectorIndexHandler extends BaseIndexHandler {
     return columnMetadata != null;
   }
 
-  /**
-   * Sweeps orphans left over from a prior build that targeted the OTHER extension (e.g. a crash
-   * with {@code storeInSegmentFile=true} followed by a retry with the flag off). Removes the
-   * other-extension {@code .inprogress} marker and any partial index file with that extension,
-   * so a later flag-flip cannot pick the residue up as if it were a complete index.
-   *
-   * <p>For HNSW the two forms are the Lucene directory ({@code .vector.v912.hnsw.index/}) and
-   * the combined packed file ({@code .vector.hnsw.combined.index}). The "other" form when writing
-   * combined is the legacy Lucene directory; when writing legacy it is the combined file.</p>
-   */
+  /// Sweeps orphans left over from a prior build that targeted the OTHER extension (e.g. a crash
+  /// with {@code storeInSegmentFile=true} followed by a retry with the flag off). Removes the
+  /// other-extension {@code .inprogress} marker and any partial index file with that extension,
+  /// so a later flag-flip cannot pick the residue up as if it were a complete index.
+  ///
+  /// For HNSW the two forms are the Lucene directory ({@code .vector.v912.hnsw.index/}) and
+  /// the combined packed file ({@code .vector.hnsw.combined.index}). The "other" form when writing
+  /// combined is the legacy Lucene directory; when writing legacy it is the combined file.
   @VisibleForTesting
   static void cleanOrphansFromOtherExtension(File segmentDirectory, String columnName,
       VectorBackendType backendType, boolean currentWriteCombined) {

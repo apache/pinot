@@ -551,6 +551,43 @@ public class VectorIndexHandlerTest {
     }
   }
 
+  /// Regression: the normal "operator flips storeInSegmentFile on for an existing legacy segment"
+  /// absorb must succeed. The real {@code SingleFileIndexDirectory.hasIndexFor} reports a vector
+  /// index whenever the legacy sidecar is on disk (so the generic load path can build a reader),
+  /// even though no typed {@code columns.psf} entry exists yet — in which case {@code getIndexFor}
+  /// throws. If the crash-recovery branch trusted {@code hasIndexFor} it would mis-read this first
+  /// absorb as "already absorbed" and blow up on {@code getIndexFor().size()}. Detecting the typed
+  /// entry directly (via {@code getConsolidatedVectorEntry}) must let the absorb proceed.
+  @Test
+  public void testUpdateIndicesAbsorbsLegacySidecarWhenNoTypedEntryYet()
+      throws Exception {
+    File indexDir = createSegmentDirWithVectorIndex(V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+    try {
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir, SegmentVersion.v3);
+      SegmentDirectory.Writer writer = mock(SegmentDirectory.Writer.class);
+      when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      File sidecar = new File(v3Dir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+      // Mirror the real SingleFileIndexDirectory for a legacy-sidecar-only segment: hasIndexFor is
+      // true because the sidecar is on disk, but getIndexFor throws because no typed entry exists.
+      when(writer.hasIndexFor(eq(COLUMN), eq(StandardIndexes.vector()))).thenReturn(true);
+      when(writer.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector())))
+          .thenThrow(new RuntimeException("Could not find index for column: " + COLUMN));
+      when(writer.newIndexFor(eq(COLUMN), eq(StandardIndexes.vector()), any(Long.class)))
+          .thenReturn(PinotDataBuffer.empty());
+
+      VectorIndexHandler handler = createHandler(segmentDirectory,
+          vectorIndexConfigWithConsolidation("IVF_FLAT", /* storeInSegmentFile */ true));
+      // Must not throw: the absorb proceeds via newIndexFor and deletes the sidecar.
+      handler.updateIndices(writer);
+
+      verify(writer).newIndexFor(eq(COLUMN), eq(StandardIndexes.vector()), any(Long.class));
+      assertFalse(sidecar.exists(), "legacy sidecar must be deleted after a successful absorb");
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
   private static File createSegmentDirWithVectorIndex(String suffix)
       throws Exception {
     File indexDir = new File(FileUtils.getTempDirectory(), "vector-index-handler-test-" + System.nanoTime());
