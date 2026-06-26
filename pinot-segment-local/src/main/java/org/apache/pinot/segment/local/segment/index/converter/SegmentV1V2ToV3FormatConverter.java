@@ -162,12 +162,20 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
             // sibling copies). Combined .vector.ivfflat.combined.index / .ivfpq.combined.index
             // files fall through to the standard path and get packed into columns.psf.
             // Mixed state: if both legacy and combined exist (e.g. operator toggled the flag
-            // and rebuilt without cleaning the old file), combined wins — pack it and let
+            // and rebuilt without cleaning the old file), combined normally wins — pack it and let
             // copyVectorIndexIfExists drop the legacy sibling so the operator gets exactly one
-            // copy of the bytes in the V3 segment.
+            // copy of the bytes in the V3 segment. The one exception is a legacy HNSW Lucene
+            // *directory*: getIndexFor() resolves to it before the combined file (see
+            // findHnswVectorIndexFile), and a directory cannot be mapped as a columns.psf buffer.
+            // For that case we defer entirely to the sibling copy (which preserves the Lucene
+            // directory); the transient combined file is dropped and re-absorbed later by
+            // VectorIndexHandler if storeInSegmentFile stays on. IVF legacy+combined still packs
+            // because the legacy sidecar is a regular file sharing the same on-disk format.
             if (indexType == StandardIndexes.vector()) {
               boolean hasCombined = VectorIndexUtils.hasCombinedFormVectorIndex(v2Directory, column);
-              if (hasCombined || !VectorIndexUtils.hasVectorIndex(v2Directory, column)) {
+              File resolved = SegmentDirectoryPaths.findVectorIndexIndexFile(v2Directory, column);
+              boolean resolvesToDirectory = resolved != null && resolved.isDirectory();
+              if ((hasCombined && !resolvesToDirectory) || !VectorIndexUtils.hasVectorIndex(v2Directory, column)) {
                 copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
               }
               continue;

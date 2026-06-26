@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorInd
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfOnDiskVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfPqVectorIndexReader;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -60,20 +61,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Index type for vector columns.
- *
- * <p>Supports multiple vector index backends via the {@link VectorBackendType} enum.
- * Currently supported backends:
- * <ul>
- *   <li>{@link VectorBackendType#HNSW} - Lucene-based HNSW graph index (mutable and immutable segments)</li>
- *   <li>{@link VectorBackendType#IVF_FLAT} - Inverted file with flat vectors (immutable segments only)</li>
- *   <li>{@link VectorBackendType#IVF_PQ} - Inverted file with residual product quantization (immutable only)</li>
- * </ul>
- *
- * <p>If the {@code vectorIndexType} field is absent in the config, it defaults to HNSW for
- * backward compatibility with existing table configurations.</p>
- */
+/// Index type for vector columns.
+///
+/// Supports multiple vector index backends via the {@link VectorBackendType} enum.
+/// Currently supported backends:
+///   - {@link VectorBackendType#HNSW} - Lucene-based HNSW graph index (mutable and immutable segments)
+///   - {@link VectorBackendType#IVF_FLAT} - Inverted file with flat vectors (immutable segments only)
+///   - {@link VectorBackendType#IVF_PQ} - Inverted file with residual product quantization (immutable only)
+///
+/// If the {@code vectorIndexType} field is absent in the config, it defaults to HNSW for
+/// backward compatibility with existing table configurations.
 public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator> {
   private static final Logger LOGGER = LoggerFactory.getLogger(VectorIndexType.class);
   public static final String INDEX_DISPLAY_NAME = "vector";
@@ -193,9 +190,7 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
   }
 
-  /**
-   * Reader factory that dispatches to the correct vector index reader based on backend type.
-   */
+  /// Reader factory that dispatches to the correct vector index reader based on backend type.
   private static class ReaderFactory implements IndexReaderFactory<VectorIndexReader> {
 
     public static final VectorIndexType.ReaderFactory INSTANCE = new VectorIndexType.ReaderFactory();
@@ -220,22 +215,24 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
       String column = metadata.getColumnName();
 
       if (backendType == VectorBackendType.HNSW) {
-        if (indexConfig.isStoreInSegmentFile() && segmentReader.hasIndexFor(column, StandardIndexes.vector())) {
-          // Combined form: load the HNSW index from the typed entry inside columns.psf.
-          // The buffer is owned by the segment directory — this reader must not close it.
+        // Combined form: load the HNSW index from the typed entry inside columns.psf when one
+        // actually exists. getConsolidatedVectorEntry (unlike hasIndexFor) does not mistake the
+        // legacy Lucene directory for a packed entry, so a segment whose handler has not yet
+        // migrated falls through to the legacy path below instead of failing the whole load. The
+        // buffer is owned by the segment directory — this reader must not close it.
+        if (indexConfig.isStoreInSegmentFile()) {
           PinotDataBuffer buffer;
           try {
-            buffer = segmentReader.getIndexFor(column, StandardIndexes.vector());
+            buffer = VectorIndexUtils.getConsolidatedVectorEntry(segmentReader, column);
           } catch (IOException e) {
             throw new RuntimeException(
                 "Failed to read consolidated HNSW vector index from columns.psf for column: " + column, e);
           }
-          if (buffer == null) {
-            LOGGER.warn("Skipping HNSW vector index reader for column: {} because storeInSegmentFile=true "
-                + "but no consolidated entry was found in columns.psf in segment: {}", column, segmentDir);
-            return null;
+          if (buffer != null) {
+            return new HnswVectorIndexReader(column, buffer, metadata.getTotalDocs(), indexConfig);
           }
-          return new HnswVectorIndexReader(column, buffer, metadata.getTotalDocs(), indexConfig);
+          LOGGER.warn("storeInSegmentFile=true but no consolidated HNSW entry found in columns.psf for column: {} "
+              + "in segment: {}; falling back to the on-disk Lucene directory", column, segmentDir);
         }
         // Legacy path: load the HNSW index from the Lucene directory on disk.
         return new HnswVectorIndexReader(column, segmentDir, metadata.getTotalDocs(), indexConfig);
@@ -248,7 +245,7 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
       PinotDataBuffer buffer;
       if (indexConfig.isStoreInSegmentFile()) {
         try {
-          buffer = segmentReader.getIndexFor(column, StandardIndexes.vector());
+          buffer = VectorIndexUtils.getConsolidatedVectorEntry(segmentReader, column);
         } catch (IOException e) {
           throw new RuntimeException(
               "Failed to read consolidated vector index from columns.psf for column: " + column, e);

@@ -33,42 +33,36 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility for reading an HNSW vector index from a combined buffer ({@link PinotDataBuffer}).
- *
- * <p>The combined buffer uses the same {@code LUCENE_V2} layout as the text index (written by
- * {@code HnswVectorIndexCombined}). This class delegates header and metadata parsing to
- * {@link LuceneTextIndexBufferReader}, then constructs a {@link PinotBufferLuceneDirectory} that
- * Lucene's {@code DirectoryReader} can open without any filesystem access.</p>
- *
- * <p>Two entry-points are provided:</p>
- * <ul>
- *   <li>{@link #createLuceneDirectory} — a read-only {@link Directory} over the Lucene index
- *       files embedded in the buffer.</li>
- *   <li>{@link #extractDocIdMappingBuffer} — a sub-buffer view covering just the docId mapping
- *       bytes, or {@code null} if the mapping was not packed.</li>
- * </ul>
- */
+/// Utility for reading an HNSW vector index from a combined buffer ({@link PinotDataBuffer}).
+///
+/// The combined buffer uses the same {@code LUCENE_V2} layout as the text index (written by
+/// {@code HnswVectorIndexCombined}). This class delegates header and metadata parsing to
+/// {@link LuceneTextIndexBufferReader}, then constructs a {@link PinotBufferLuceneDirectory} that
+/// Lucene's {@code DirectoryReader} can open without any filesystem access.
+///
+/// Two entry-points are provided:
+///   - {@link #createLuceneDirectory} — a read-only {@link Directory} over the Lucene index
+///     files embedded in the buffer.
+///   - {@link #extractDocIdMappingBuffer} — a sub-buffer view covering just the docId mapping
+///     bytes, or {@code null} if the mapping was not packed.
 public final class HnswVectorIndexBufferReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(HnswVectorIndexBufferReader.class);
 
   private HnswVectorIndexBufferReader() {
   }
 
-  /**
-   * Creates a Lucene {@link Directory} that reads all Lucene index files from a combined HNSW
-   * buffer. The docId mapping file (a Pinot-only artifact with the
-   * {@link V1Constants.Indexes#VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION} suffix) is
-   * excluded from the directory view so that {@code DirectoryReader} does not see an unknown file.
-   *
-   * <p>The directory does <em>not</em> own the buffer — closing it is a no-op. The caller must
-   * keep the buffer alive for as long as the directory (and any reader opened on it) is in use.</p>
-   *
-   * @param indexBuffer combined buffer in LUCENE_V2 format
-   * @param column      column name; used to identify and exclude the mapping file
-   * @return a read-only {@link Directory} backed by the buffer
-   * @throws IOException if the buffer is malformed or the magic/version check fails
-   */
+  /// Creates a Lucene {@link Directory} that reads all Lucene index files from a combined HNSW
+  /// buffer. The docId mapping file (a Pinot-only artifact with the
+  /// {@link V1Constants.Indexes#VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION} suffix) is
+  /// excluded from the directory view so that {@code DirectoryReader} does not see an unknown file.
+  ///
+  /// The directory does *not* own the buffer — closing it is a no-op. The caller must
+  /// keep the buffer alive for as long as the directory (and any reader opened on it) is in use.
+  ///
+  /// @param indexBuffer combined buffer in LUCENE_V2 format
+  /// @param column      column name; used to identify and exclude the mapping file
+  /// @return a read-only {@link Directory} backed by the buffer
+  /// @throws IOException if the buffer is malformed or the magic/version check fails
   public static Directory createLuceneDirectory(PinotDataBuffer indexBuffer, String column)
       throws IOException {
     List<String> fileNames = LuceneTextIndexBufferReader.listFiles(indexBuffer);
@@ -91,21 +85,19 @@ public final class HnswVectorIndexBufferReader {
     return new PinotBufferLuceneDirectory(indexBuffer, fileMap, column);
   }
 
-  /**
-   * Extracts a sub-buffer covering the docId mapping bytes packed inside the combined buffer.
-   *
-   * <p>Returns {@code null} when the mapping was not included (e.g. the index was built from an
-   * in-memory segment that had not yet materialised a mapping file). The caller must build the
-   * mapping from the Lucene index in that case.</p>
-   *
-   * <p>The returned sub-buffer is a {@link PinotDataBuffer#view view} of the original buffer and
-   * shares its lifetime. The caller must not close it independently.</p>
-   *
-   * @param indexBuffer combined buffer in LUCENE_V2 format
-   * @param column      column name; used to identify the mapping file entry
-   * @return sub-buffer for the mapping bytes, or {@code null} if not present
-   * @throws IOException if header parsing fails
-   */
+  /// Extracts a sub-buffer covering the docId mapping bytes packed inside the combined buffer.
+  ///
+  /// Returns {@code null} when the mapping was not included (e.g. the index was built from an
+  /// in-memory segment that had not yet materialised a mapping file). The caller must build the
+  /// mapping from the Lucene index in that case.
+  ///
+  /// The returned sub-buffer is a {@link PinotDataBuffer#view view} of the original buffer and
+  /// shares its lifetime. The caller must not close it independently.
+  ///
+  /// @param indexBuffer combined buffer in LUCENE_V2 format
+  /// @param column      column name; used to identify the mapping file entry
+  /// @return sub-buffer for the mapping bytes, or {@code null} if not present
+  /// @throws IOException if header parsing fails
   @Nullable
   public static PinotDataBuffer extractDocIdMappingBuffer(PinotDataBuffer indexBuffer, String column)
       throws IOException {
