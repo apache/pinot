@@ -464,17 +464,20 @@ public class MinionTaskUtils {
   }
 
   /**
-   * Picks the replica whose validDocIds the generator should use for the segment, or returns {@code null} to skip it.
-   * Runs the executor's checks (CRC, server health, consensus) on the already-fetched replica metadata, so
-   * inconsistent segments are dropped before a task is scheduled rather than failed later. By mode:
+   * Picks the replica whose validDocIds the generator should use for a segment, or returns {@code null} to skip the
+   * segment. Applies the same checks the executor would (CRC match, healthy server, replica consensus) so bad
+   * segments are dropped before a task is scheduled.
+   *
+   * <p>How the replica is chosen depends on {@code consensusMode}:
    * <ul>
-   *   <li>{@code UNSAFE}: first replica with a matching CRC and a healthy server.</li>
-   *   <li>{@code EQUAL}: every replica must respond, match CRC, be healthy, and share an identical bitmap (needs
-   *       {@code includeBitmaps=true}).</li>
-   *   <li>{@code MOST_VALID_DOCS}: every replica must respond, match CRC, and be healthy; pick the one with the most
-   *       valid docs.</li>
+   *   <li>{@code UNSAFE}: the first replica with a matching CRC and a healthy server.</li>
+   *   <li>{@code EQUAL}: all replicas must match CRC, be healthy, and have an identical bitmap.</li>
+   *   <li>{@code MOST_VALID_DOCS}: all replicas must match CRC and be healthy; the one with the most valid docs
+   *       wins.</li>
    * </ul>
-   * {@code expectedReplicaCount} is how many replicas must respond for the strict modes (ignored for {@code UNSAFE}).
+   *
+   * <p>For {@code EQUAL} and {@code MOST_VALID_DOCS}, {@code expectedReplicaCount} replicas must respond, otherwise the
+   * segment is skipped; {@code UNSAFE} ignores it.
    */
   @Nullable
   public static ValidDocIdsMetadataInfo selectValidDocIdsMetadataForConsensus(String taskType, String segmentName,
