@@ -52,7 +52,10 @@ public class AuthProviderUtilsTest {
 
     Map<String, Object> headers = authProvider.getRequestHeaders();
     assertNotNull(headers, "Auth headers must be present when correct key is used");
-    assertTrue(headers.containsValue("my-secret-token"),
+    // StaticTokenAuthProvider prefixes with "Basic ", so the stored value is "Basic my-secret-token"
+    Object authHeader = headers.get("Authorization");
+    assertNotNull(authHeader, "Authorization header must be present when correct key is used");
+    assertTrue(authHeader.toString().contains("my-secret-token"),
         "Token value must appear in request headers");
   }
 
