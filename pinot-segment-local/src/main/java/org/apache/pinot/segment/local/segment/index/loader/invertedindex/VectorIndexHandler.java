@@ -240,8 +240,8 @@ public class VectorIndexHandler extends BaseIndexHandler {
 
     LOGGER.info("Absorbing HNSW combined file into columns.psf for segment: {}, column: {}", segmentName, column);
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, combinedFile, StandardIndexes.vector());
-    // Clean up: the combined file was just absorbed; remove it and the Lucene directory if present.
-    FileUtils.deleteQuietly(combinedFile);
+    // writeIndexToV3Format already force-deletes the absorbed combined file (like the IVF path above),
+    // so only the Lucene directory needs explicit cleanup here.
     if (hnswDir.exists()) {
       FileUtils.deleteDirectory(hnswDir);
     }

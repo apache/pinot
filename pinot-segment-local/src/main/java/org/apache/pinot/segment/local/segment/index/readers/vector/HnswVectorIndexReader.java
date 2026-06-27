@@ -113,7 +113,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
 
       // Try to extract the mapping from the packed buffer first; build from the Lucene index if absent.
       PinotDataBuffer mappingBuffer = HnswVectorIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
-      _docIdTranslator = new HnswVectorIndexReader.DocIdTranslator(mappingBuffer, numDocs, _indexSearcher);
+      _docIdTranslator = new DocIdTranslator(mappingBuffer, numDocs, _indexSearcher);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate buffer-backed HNSW index reader for column {}, exception {}", column,
           e.getMessage());
