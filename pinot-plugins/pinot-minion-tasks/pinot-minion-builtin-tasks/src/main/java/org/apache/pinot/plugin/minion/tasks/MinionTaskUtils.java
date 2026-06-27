@@ -472,9 +472,6 @@ public class MinionTaskUtils {
    *   - UNSAFE: the first replica with a matching CRC and a healthy server.
    *   - EQUAL: all replicas must match CRC, be healthy, and have an identical bitmap.
    *   - MOST_VALID_DOCS: all replicas must match CRC and be healthy; the one with the most valid docs wins.
-   *
-   * For EQUAL and MOST_VALID_DOCS, {@code expectedReplicaCount} replicas must respond, otherwise the segment is
-   * skipped; UNSAFE ignores it.
    */
   @Nullable
   public static ValidDocIdsMetadataInfo selectValidDocIdsMetadataForConsensus(String taskType, String segmentName,
