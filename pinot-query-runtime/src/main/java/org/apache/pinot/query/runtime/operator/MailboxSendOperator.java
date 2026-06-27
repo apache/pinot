@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Function;
@@ -116,7 +115,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
     Function<List<SendingMailbox>, Integer> statsIndexChooser = getStatsIndexChooser(ctx, node);
     return BlockExchange.getExchange(perStageSendingMailboxes, RelDistribution.Type.BROADCAST_DISTRIBUTED,
-        Collections.emptyList(), mainSplitter, statsIndexChooser, node.getHashFunction());
+        List.of(), mainSplitter, statsIndexChooser, node.getHashFunction());
   }
 
   private static Function<List<SendingMailbox>, Integer> getStatsIndexChooser(OpChainExecutionContext ctx,
@@ -198,7 +197,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return Collections.singletonList(_input);
+    return List.of(_input);
   }
 
   @Override
@@ -260,10 +259,10 @@ public class MailboxSendOperator extends MultiStageOperator {
         serializedStats = stats.serialize();
       } catch (Exception e) {
         LOGGER.warn("Failed to serialize stats", e);
-        serializedStats = Collections.emptyList();
+        serializedStats = List.of();
       }
     } else {
-      serializedStats = Collections.emptyList();
+      serializedStats = List.of();
     }
     // no need to check early terminate signal b/c the current block is already EOS
     sendMseBlock(eosBlockWithoutStats, serializedStats);

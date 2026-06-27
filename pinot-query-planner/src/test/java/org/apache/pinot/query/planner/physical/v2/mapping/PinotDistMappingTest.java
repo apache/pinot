@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.physical.v2.mapping;
 
-import java.util.Collections;
 import java.util.List;
 import org.testng.annotations.Test;
 
@@ -64,10 +63,10 @@ public class PinotDistMappingTest {
     PinotDistMapping mapping = new PinotDistMapping(5);
     mapping.add(0, 2);
     assertEquals(mapping.getTargets(0), List.of(2));
-    assertEquals(mapping.getTargets(1), Collections.emptyList());
-    assertEquals(mapping.getTargets(2), Collections.emptyList());
-    assertEquals(mapping.getTargets(3), Collections.emptyList());
-    assertEquals(mapping.getTargets(4), Collections.emptyList());
+    assertEquals(mapping.getTargets(1), List.of());
+    assertEquals(mapping.getTargets(2), List.of());
+    assertEquals(mapping.getTargets(3), List.of());
+    assertEquals(mapping.getTargets(4), List.of());
 
     // Test setting multiple mapping values.
     mapping.add(1, 3);
@@ -75,8 +74,8 @@ public class PinotDistMappingTest {
     assertEquals(mapping.getTargets(0), List.of(2));
     assertEquals(mapping.getTargets(1), List.of(3));
     assertEquals(mapping.getTargets(2), List.of(4));
-    assertEquals(mapping.getTargets(3), Collections.emptyList());
-    assertEquals(mapping.getTargets(4), Collections.emptyList());
+    assertEquals(mapping.getTargets(3), List.of());
+    assertEquals(mapping.getTargets(4), List.of());
 
     // Test setting a mapping value to an invalid index.
     assertThrows(IllegalArgumentException.class, () -> mapping.add(-1, 2));

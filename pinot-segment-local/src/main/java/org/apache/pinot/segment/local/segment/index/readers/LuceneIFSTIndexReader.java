@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.io.IOException;
-import java.util.List;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.fst.ByteSequenceOutputs;
 import org.apache.lucene.util.fst.FST;
@@ -28,6 +27,7 @@ import org.apache.pinot.segment.local.utils.fst.PinotBufferIndexInput;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcherCaseInsensitive;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.exception.QueryException;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -62,11 +62,11 @@ public class LuceneIFSTIndexReader implements TextIndexReader {
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     try {
       MutableRoaringBitmap dictIds = new MutableRoaringBitmap();
-      List<Long> matchingIds = RegexpMatcherCaseInsensitive.regexMatch(searchQuery, _ifst);
-      for (Long matchingId : matchingIds) {
-        dictIds.add(matchingId.intValue());
-      }
+      RegexpMatcherCaseInsensitive.regexMatch(searchQuery, _ifst, dictIds::add);
       return dictIds.toImmutableRoaringBitmap();
+    } catch (QueryException ex) {
+      // Let query termination exceptions (timeout, OOM-protection kill) propagate as-is.
+      throw ex;
     } catch (Exception ex) {
       LOGGER.error("Error getting matching Ids from FST", ex);
       throw new RuntimeException(ex);

@@ -19,7 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -137,7 +137,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     }
 
     // Untag the broker and update the broker resource so that it is removed from the broker resource
-    instanceClient.updateInstanceTags(brokerId, Collections.emptyList(), true);
+    instanceClient.updateInstanceTags(brokerId, List.of(), true);
 
     // Check if broker is removed from all the tables in broker resource
     brokerResourceIdealState = _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);

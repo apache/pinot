@@ -19,7 +19,6 @@
 package org.apache.pinot.materializedview.analysis;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -858,7 +857,7 @@ public final class MaterializedViewAnalyzer {
   /// metadata + Step 6) and the `materializedViewCol -> sourceExpr` map (consumed by Step 7).
   static final class PartitionExprData {
     static final PartitionExprData EMPTY =
-        new PartitionExprData(Collections.emptyMap(), Collections.emptyMap());
+        new PartitionExprData(Map.of(), Map.of());
 
     private final Map<String, String> _exprStringToMaterializedViewCol;
     private final Map<String, Expression> _materializedViewColToSourceExpr;

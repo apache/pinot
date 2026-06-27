@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tools;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +38,7 @@ public class TimeSeriesEngineAuthQuickStart extends TimeSeriesEngineQuickStart {
 
   @Override
   public List<String> types() {
-    return Collections.singletonList("TIME_SERIES_AUTH");
+    return List.of("TIME_SERIES_AUTH");
   }
 
   @Override

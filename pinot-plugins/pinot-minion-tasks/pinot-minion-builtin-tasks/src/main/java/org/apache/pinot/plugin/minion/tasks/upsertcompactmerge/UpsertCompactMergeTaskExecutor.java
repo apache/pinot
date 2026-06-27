@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -151,7 +150,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     List<File> outputSegmentDirs;
     _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
     SegmentProcessorFramework framework = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
-        recordReaderFileConfigs, Collections.emptyList(), new DefaultSegmentNumRowProvider(Integer.parseInt(
+        recordReaderFileConfigs, List.of(), new DefaultSegmentNumRowProvider(Integer.parseInt(
         configs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY))));
     outputSegmentDirs = framework.process();
     _eventObserver.notifyProgress(_pinotTaskConfig,

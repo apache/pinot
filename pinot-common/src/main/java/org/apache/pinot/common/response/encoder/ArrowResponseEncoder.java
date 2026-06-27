@@ -23,7 +23,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.arrow.memory.RootAllocator;
@@ -124,7 +123,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case BOOLEAN_ARRAY:
           // Define the inner field for a boolean element.
           List<Field> children =
-              Collections.singletonList(new Field("element", FieldType.nullable(new ArrowType.Bool()), null));
+              List.of(new Field("element", FieldType.nullable(new ArrowType.Bool()), null));
           // Define the field for the list column.
           field = new Field(colName, FieldType.nullable(new ArrowType.List()), children);
           // Create a ListVector using the field name and allocator.
@@ -135,7 +134,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case INT_ARRAY:
           // Define the inner field for an int element.
           children =
-              Collections.singletonList(new Field("element", FieldType.nullable(new ArrowType.Int(32, true)), null));
+              List.of(new Field("element", FieldType.nullable(new ArrowType.Int(32, true)), null));
           // Define the field for the list column.
           field = new Field(colName, FieldType.nullable(new ArrowType.List()), children);
           // Create a ListVector using the field name and allocator.
@@ -146,7 +145,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case LONG_ARRAY:
           // Define the inner field for a long element.
           children =
-              Collections.singletonList(new Field("element", FieldType.nullable(new ArrowType.Int(64, true)), null));
+              List.of(new Field("element", FieldType.nullable(new ArrowType.Int(64, true)), null));
           // Define the field for the list column.
           field = new Field(colName, FieldType.nullable(new ArrowType.List()), children);
           // Create a ListVector using the field name and allocator.
@@ -156,7 +155,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
           break;
         case FLOAT_ARRAY:
           // Define the inner field for a float element.
-          children = Collections.singletonList(
+          children = List.of(
               new Field("element", FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)),
                   null));
           // Define the field for the list column.
@@ -168,7 +167,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
           break;
         case DOUBLE_ARRAY:
           // Define the inner field for a double element.
-          children = Collections.singletonList(
+          children = List.of(
               new Field("element", FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)),
                   null));
           // Define the field for the list column.
@@ -183,7 +182,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case STRING_ARRAY:
         case BYTES_ARRAY:
           // Define the inner field for a string element.
-          children = Collections.singletonList(new Field("element", FieldType.nullable(new ArrowType.Utf8()), null));
+          children = List.of(new Field("element", FieldType.nullable(new ArrowType.Utf8()), null));
           // Define the field for the list column.
           field = new Field(colName, FieldType.nullable(new ArrowType.List()), children);
           // Create a ListVector using the field name and allocator.

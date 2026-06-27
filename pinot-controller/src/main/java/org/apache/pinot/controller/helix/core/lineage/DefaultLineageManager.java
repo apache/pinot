@@ -117,9 +117,14 @@ public class DefaultLineageManager implements LineageManager {
         Set<String> destinationSegments = new HashSet<>(lineageEntry.getSegmentsTo());
         destinationSegments.retainAll(segmentsForTable);
         if (destinationSegments.isEmpty()) {
-          // If the lineage state is 'IN_PROGRESS or REVERTED' and source segments are already removed, it is safe
-          // to clean up the lineage entry. Deleting lineage will allow the task scheduler to re-schedule the source
-          // segments to be merged again.
+          // If the lineage state is 'IN_PROGRESS or REVERTED' and the destination segments are no longer in the
+          // ideal state, it is safe to clean up the lineage entry. Deleting lineage will allow the task scheduler
+          // to re-schedule the source segments to be merged again.
+          // A destination segment may still have a znode lingering in the property store even though it never
+          // reached (or has already left) the ideal state — e.g. a crash between creating the destination metadata
+          // and the ideal-state update. Schedule the destination segments for deletion so such orphans are reaped
+          // along with the lineage entry. Names that have no znode are a no-op in the deletion path.
+          segmentsToDelete.addAll(lineageEntry.getSegmentsTo());
           lineageEntryIterator.remove();
         } else {
           // If the lineage state is 'IN_PROGRESS', it is safe to delete all segments from 'segmentsTo'

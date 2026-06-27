@@ -42,13 +42,19 @@ public class InstanceAssignmentConfigUtils {
   /**
    * Returns whether the COMPLETED segments should be relocated (offloaded from CONSUMING instances to COMPLETED
    * instances) for a LLC real-time table based on the given table config.
-   * <p>COMPLETED segments should be relocated iff the COMPLETED instance assignment is configured or (for
-   * backward-compatibility) COMPLETED server tag is overridden to be different from the CONSUMING server tag.
+   * <p>COMPLETED segments should be relocated iff:
+   * <ul>
+   *   <li>The COMPLETED instance assignment is configured via {@code instanceAssignmentConfigMap}, or</li>
+   *   <li>The COMPLETED instance partitions are pre-configured via {@code instancePartitionsMap} (import), or</li>
+   *   <li>(For backward-compatibility) COMPLETED server tag is overridden to be different from the CONSUMING
+   *       server tag.</li>
+   * </ul>
    */
   public static boolean shouldRelocateCompletedSegments(TableConfig tableConfig) {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     return (instanceAssignmentConfigMap != null
         && instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED.toString()) != null)
+        || InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED)
         || TagNameUtils.isRelocateCompletedSegments(tableConfig.getTenantConfig());
   }
 

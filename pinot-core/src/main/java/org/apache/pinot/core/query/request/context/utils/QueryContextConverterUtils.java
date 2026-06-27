@@ -114,6 +114,45 @@ public class QueryContextConverterUtils {
       }
     }
 
+    /// GROUP BY GROUPING SETS / ROLLUP / CUBE: the wire carries one membership bitmask per set over
+    /// groupByExpressions (the union of all grouping columns). Decode each mask into the sorted list of
+    /// participating column indexes; a mask of 0 yields the empty (grand-total) set (). Null when this is a
+    /// plain GROUP BY query.
+    List<int[]> groupingSets = null;
+    List<Integer> groupingSetMasks = pinotQuery.getGroupingSetMasks();
+    if (groupingSetMasks != null) {
+      // Guard against malformed requests (the parser always emits at least one set over a union of at most 31
+      // columns): an empty set list would silently produce empty results, and a union of more than 31 columns
+      // cannot be represented in the synthetic INT grouping-id bitmask (bit 31 is the sign bit).
+      if (groupingSetMasks.isEmpty()) {
+        throw new IllegalStateException("Grouping set masks must not be empty");
+      }
+      int numGroupByExpressions = groupByExpressions != null ? groupByExpressions.size() : 0;
+      if (numGroupByExpressions > CalciteSqlParser.MAX_GROUPING_SETS_COLUMNS) {
+        throw new IllegalStateException(
+            "Cannot use grouping sets over " + numGroupByExpressions + " group-by expressions (max: "
+                + CalciteSqlParser.MAX_GROUPING_SETS_COLUMNS + ")");
+      }
+      groupingSets = new ArrayList<>(groupingSetMasks.size());
+      for (int mask : groupingSetMasks) {
+        // Every bit must reference an existing union column, otherwise the decoded indexes would cause
+        // out-of-bounds access deep in the group key generator. The union size is capped at 31 above, so the
+        // unsigned shift also rejects negative masks (bit 31 set).
+        if ((mask >>> numGroupByExpressions) != 0) {
+          throw new IllegalStateException(
+              "Invalid grouping set mask: " + mask + " for " + numGroupByExpressions + " group-by expressions");
+        }
+        int[] indexes = new int[Integer.bitCount(mask)];
+        int idx = 0;
+        for (int bit = 0; bit < Integer.SIZE && idx < indexes.length; bit++) {
+          if ((mask & (1 << bit)) != 0) {
+            indexes[idx++] = bit;
+          }
+        }
+        groupingSets.add(indexes);
+      }
+    }
+
     // ORDER BY
     List<OrderByExpressionContext> orderByExpressions = null;
     List<Expression> orderByList = pinotQuery.getOrderByList();
@@ -174,6 +213,7 @@ public class QueryContextConverterUtils {
         .setAliasList(aliasList)
         .setFilter(filter)
         .setGroupByExpressions(groupByExpressions)
+        .setGroupingSets(groupingSets)
         .setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter)
         .setLimit(pinotQuery.getLimit())

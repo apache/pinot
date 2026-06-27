@@ -21,7 +21,6 @@ package org.apache.pinot.perf;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -113,11 +112,11 @@ public class BenchmarkColumnValueSegmentPruner {
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
       .setInvertedIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL)).setFieldConfigList(FIELD_CONFIGS)
       .setNoDictionaryColumns(List.of(RAW_INT_COL_NAME, RAW_STRING_COL_NAME)).setSortedColumn(SORTED_COL_NAME)
-      .setVarLengthDictionaryColumns(Collections.singletonList(SORTED_COL_NAME))
+      .setVarLengthDictionaryColumns(List.of(SORTED_COL_NAME))
       .setRangeIndexColumns(Arrays.asList(INT_COL_NAME, LOW_CARDINALITY_STRING_COL))
-      .setBloomFilterColumns(Collections.singletonList(SORTED_COL_NAME)).setStarTreeIndexConfigs(
-          Collections.singletonList(new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
-              Collections.singletonList(
+      .setBloomFilterColumns(List.of(SORTED_COL_NAME)).setStarTreeIndexConfigs(
+          List.of(new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
+              List.of(
                   new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
               null, Integer.MAX_VALUE))).build();
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)

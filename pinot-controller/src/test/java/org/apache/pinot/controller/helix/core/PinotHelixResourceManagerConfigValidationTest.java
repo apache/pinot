@@ -19,7 +19,7 @@
 package org.apache.pinot.controller.helix.core;
 
 import java.lang.reflect.Field;
-import java.util.Collections;
+import java.util.List;
 import java.util.TreeMap;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -52,8 +52,7 @@ public class PinotHelixResourceManagerConfigValidationTest {
   public void setUp()
       throws Exception {
     LineageManager lineageManager = Mockito.mock(LineageManager.class);
-    _resourceManager =
-        new PinotHelixResourceManager("testCluster", null, false, false, 7, false, lineageManager, null);
+    _resourceManager = new PinotHelixResourceManager("testCluster", null, false, 7, false, lineageManager, null);
 
     _helixAdmin = Mockito.mock(HelixAdmin.class);
     _helixDataAccessor = Mockito.mock(HelixDataAccessor.class);
@@ -96,7 +95,7 @@ public class PinotHelixResourceManagerConfigValidationTest {
   public void testUpdateInstanceRejectsOnValidation() {
     // getHelixInstanceConfig returns an existing config
     Instance existing =
-        new Instance("localhost", 1234, InstanceType.SERVER, Collections.singletonList("DefaultTenant_OFFLINE"), null,
+        new Instance("localhost", 1234, InstanceType.SERVER, List.of("DefaultTenant_OFFLINE"), null,
             0, 0, 0, 0, false);
     InstanceConfig existingConfig = InstanceUtils.toHelixInstanceConfig(existing);
     when(_helixDataAccessor.getProperty(any(PropertyKey.class))).thenReturn(existingConfig);
@@ -106,7 +105,7 @@ public class PinotHelixResourceManagerConfigValidationTest {
     });
 
     Instance updatedInstance =
-        new Instance("localhost", 1234, InstanceType.SERVER, Collections.singletonList("OtherTenant_OFFLINE"), null, 0,
+        new Instance("localhost", 1234, InstanceType.SERVER, List.of("OtherTenant_OFFLINE"), null, 0,
             0, 0, 0, false);
     try {
       _resourceManager.updateInstance("Server_localhost_1234", updatedInstance, false);
@@ -125,7 +124,7 @@ public class PinotHelixResourceManagerConfigValidationTest {
     TreeMap<String, Integer> pools = new TreeMap<>();
     pools.put("DefaultTenant_OFFLINE", 0);
     Instance existing =
-        new Instance("localhost", 1234, InstanceType.SERVER, Collections.singletonList("DefaultTenant_OFFLINE"), pools,
+        new Instance("localhost", 1234, InstanceType.SERVER, List.of("DefaultTenant_OFFLINE"), pools,
             0, 0, 0, 0, false);
     InstanceConfig existingConfig = InstanceUtils.toHelixInstanceConfig(existing);
     when(_helixDataAccessor.getProperty(any(PropertyKey.class))).thenReturn(existingConfig);

@@ -174,16 +174,18 @@ public class ServiceStatus {
 
     @Override
     public Status getServiceStatus() {
-      // Iterate through all callbacks, returning the first non GOOD one as the service status
+      // Iterate through all callbacks so each one is invoked (callers may wrap delegates to observe transitions),
+      // but report the first non-GOOD status encountered, matching the original contract.
+      Status firstNonGood = null;
       for (ServiceStatusCallback statusCallback : _statusCallbacks) {
         final Status serviceStatus = statusCallback.getServiceStatus();
-        if (serviceStatus != Status.GOOD) {
-          return serviceStatus;
+        if (serviceStatus != Status.GOOD && firstNonGood == null) {
+          firstNonGood = serviceStatus;
         }
       }
 
       // All callbacks report good, therefore we're good too
-      return Status.GOOD;
+      return firstNonGood == null ? Status.GOOD : firstNonGood;
     }
 
     @Override

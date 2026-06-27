@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteOrder;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -255,7 +254,7 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
       throws ReflectiveOperationException {
     Map<String, ColumnConfig> perColumnConfigs;
     if (perColumnConfig == null || perColumnConfig.isEmpty()) {
-      perColumnConfigs = Collections.emptyMap();
+      perColumnConfigs = Map.of();
     } else {
       perColumnConfigs = new HashMap<>(perColumnConfig.size());
       for (Map.Entry<String, Map<String, String>> entry : perColumnConfig.entrySet()) {

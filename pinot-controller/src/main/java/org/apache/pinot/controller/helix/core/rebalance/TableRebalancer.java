@@ -992,7 +992,7 @@ public class TableRebalancer {
       // turn the map into {server: added consuming segments}
       for (Map.Entry<String, Set<String>> entry : newServersToConsumingSegmentMap.entrySet()) {
         String server = entry.getKey();
-        entry.getValue().removeAll(existingServersToConsumingSegmentMap.getOrDefault(server, Collections.emptySet()));
+        entry.getValue().removeAll(existingServersToConsumingSegmentMap.getOrDefault(server, Set.of()));
       }
       newServersToConsumingSegmentMap.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }

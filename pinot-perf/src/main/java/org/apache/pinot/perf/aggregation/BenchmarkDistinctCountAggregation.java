@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.perf.aggregation;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -69,7 +69,7 @@ public class BenchmarkDistinctCountAggregation extends AbstractAggregationFuncti
 
   @Override
   protected AggregationFunction<?, ?> createAggregationFunction() {
-    return new DistinctCountAggregationFunction(Collections.singletonList(EXPR), _nullHandlingEnabled);
+    return new DistinctCountAggregationFunction(List.of(EXPR), _nullHandlingEnabled);
   }
 
   @Override

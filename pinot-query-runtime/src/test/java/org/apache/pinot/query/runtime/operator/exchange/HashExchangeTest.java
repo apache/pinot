@@ -54,7 +54,7 @@ public class HashExchangeTest {
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
     _block = new RowHeapDataBlock(
-        List.of(new Object[]{0}, new Object[]{1}, new Object[]{2}),
+        List.<Object[]>of(new Object[]{0}, new Object[]{1}, new Object[]{2}),
         new DataSchema(new String[]{"col1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
   }
 

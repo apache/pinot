@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -88,7 +87,7 @@ public class SegmentProcessorFramework {
       File workingDir)
       throws IOException {
     this(segmentProcessorConfig, workingDir, convertRecordReadersToRecordReaderFileConfig(recordReaders),
-        Collections.emptyList(), null);
+        List.of(), null);
   }
 
   public SegmentProcessorFramework(SegmentProcessorConfig segmentProcessorConfig, File workingDir,

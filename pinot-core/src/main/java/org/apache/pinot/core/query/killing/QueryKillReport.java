@@ -25,6 +25,7 @@ import org.apache.pinot.spi.query.QueryScanCostContext;
  * Immutable snapshot of a query-kill event
  */
 public final class QueryKillReport {
+  private final long _requestId;
   private final String _queryId;
   private final String _tableName;
   private final String _strategyName;
@@ -40,6 +41,7 @@ public final class QueryKillReport {
   /**
    * Creates a {@code QueryKillReport} by snapshotting the current state of {@code context}.
    *
+   * @param requestId        server request ID for tracing
    * @param queryId          unique identifier of the killed query
    * @param tableName        fully-qualified table name (e.g. {@code myTable_OFFLINE})
    * @param strategyName     name of the kill strategy that triggered the kill
@@ -49,8 +51,9 @@ public final class QueryKillReport {
    * @param configSource     source of the threshold config (e.g. {@code TABLE_CONFIG})
    * @param context          live scan-cost context; values are snapshotted immediately
    */
-  public QueryKillReport(String queryId, String tableName, String strategyName, String triggeringMetric,
+  public QueryKillReport(long requestId, String queryId, String tableName, String strategyName, String triggeringMetric,
       long actualValue, long thresholdValue, String configSource, QueryScanCostContext context) {
+    _requestId = requestId;
     _queryId = queryId;
     _tableName = tableName;
     _strategyName = strategyName;
@@ -66,6 +69,10 @@ public final class QueryKillReport {
   }
 
   // ----- Getters -----
+
+  public long getRequestId() {
+    return _requestId;
+  }
 
   public String getQueryId() {
     return _queryId;
@@ -121,13 +128,13 @@ public final class QueryKillReport {
    */
   public String toCustomerMessage() {
     return String.format(
-        "Query '%s' on table '%s' was killed because '%s' (%,d) exceeded the threshold (%,d) "
+        "Query '%s' (requestId=%d) on table '%s' was killed because '%s' (%,d) exceeded the threshold (%,d) "
             + "configured in %s. "
             + "At kill time: entriesScannedInFilter=%,d, docsScanned=%,d, "
             + "entriesScannedPostFilter=%,d, elapsedMs=%d. "
             + "To reduce scan cost, consider adding a missing index (e.g. inverted or range index) "
             + "on the filter columns.",
-        _queryId, _tableName, _triggeringMetric, _actualValue, _thresholdValue, _configSource,
+        _queryId, _requestId, _tableName, _triggeringMetric, _actualValue, _thresholdValue, _configSource,
         _snapshotEntriesScannedInFilter, _snapshotDocsScanned, _snapshotEntriesScannedPostFilter, _elapsedTimeMs);
   }
 
@@ -138,10 +145,10 @@ public final class QueryKillReport {
    */
   public String toInternalLogMessage() {
     return String.format(
-        "QUERY_KILLED queryId=%s table=%s strategy=%s metric=%s actual=%d threshold=%d "
+        "QUERY_KILLED requestId=%d queryId=%s table=%s strategy=%s metric=%s actual=%d threshold=%d "
             + "configSource=%s entriesScannedInFilter=%d docsScanned=%d "
             + "entriesScannedPostFilter=%d elapsedMs=%d",
-        _queryId, _tableName, _strategyName, _triggeringMetric, _actualValue, _thresholdValue,
+        _requestId, _queryId, _tableName, _strategyName, _triggeringMetric, _actualValue, _thresholdValue,
         _configSource, _snapshotEntriesScannedInFilter, _snapshotDocsScanned,
         _snapshotEntriesScannedPostFilter, _elapsedTimeMs);
   }

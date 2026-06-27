@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.aggregator;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
-import java.util.Collections;
+import java.util.List;
 import java.util.stream.IntStream;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -34,7 +34,7 @@ public class DistinctCountULLValueAggregatorTest {
 
   @Test
   public void initialShouldCreateSingleItemULL() {
-    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.emptyList());
+    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(List.of());
     assertEquals(
         Math.round(agg.getInitialAggregatedValue("hello world").getDistinctCountEstimate()),
         1.0);
@@ -47,7 +47,7 @@ public class DistinctCountULLValueAggregatorTest {
         UltraLogLogUtils.hashObject(i)
             .ifPresent(input::add)
     );
-    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.singletonList(
+    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(List.of(
         ExpressionContext.forLiteral(Literal.intValue(12))
     ));
     byte[] bytes = agg.serializeAggregatedValue(input);
@@ -66,7 +66,7 @@ public class DistinctCountULLValueAggregatorTest {
         UltraLogLogUtils.hashObject(i)
             .ifPresent(input::add)
     );
-    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.singletonList(
+    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(List.of(
         ExpressionContext.forLiteral(Literal.intValue(12))
     ));
     byte[] bytes = agg.serializeAggregatedValue(input);
@@ -82,7 +82,7 @@ public class DistinctCountULLValueAggregatorTest {
 
   @Test
   public void nullInitialShouldReturnEmptyULL() {
-    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.emptyList());
+    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(List.of());
     assertEquals(agg.getInitialAggregatedValue(null).getDistinctCountEstimate(), 0.0);
   }
 
@@ -92,7 +92,7 @@ public class DistinctCountULLValueAggregatorTest {
     IntStream.range(0, 1000).mapToObj(UltraLogLogUtils::hashObject).forEach(h -> h.ifPresent(input1::add));
     UltraLogLog input2 = UltraLogLog.create(12);
     IntStream.range(0, 1000).mapToObj(UltraLogLogUtils::hashObject).forEach(h -> h.ifPresent(input2::add));
-    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.emptyList());
+    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(List.of());
     UltraLogLog result = agg.applyAggregatedValue(input1, input2);
 
     UltraLogLog union = UltraLogLog.create(12).add(input1).add(input2);
@@ -107,7 +107,7 @@ public class DistinctCountULLValueAggregatorTest {
     UltraLogLog input2 = UltraLogLog.create(12);
     IntStream.range(0, 1000).mapToObj(UltraLogLogUtils::hashObject).forEach(h -> h.ifPresent(input2::add));
 
-    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.emptyList());
+    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(List.of());
     byte[] result2bytes = agg.serializeAggregatedValue(input2);
     UltraLogLog result = agg.applyRawValue(input1, result2bytes);
 
@@ -122,7 +122,7 @@ public class DistinctCountULLValueAggregatorTest {
 
   @Test
   public void getInitialValueShouldSupportDifferentTypes() {
-    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.emptyList());
+    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(List.of());
     assertEquals(roundedEstimate(agg.getInitialAggregatedValue(12345)), 1.0);
     assertEquals(roundedEstimate(agg.getInitialAggregatedValue(12345L)), 1.0);
     assertEquals(roundedEstimate(agg.getInitialAggregatedValue(12.345f)), 1.0);
@@ -132,7 +132,7 @@ public class DistinctCountULLValueAggregatorTest {
 
   @Test
   public void getInitialValueShouldSupportMultiValueTypes() {
-    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.emptyList());
+    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(List.of());
     Integer[] ints = {12345, 54321};
     assertEquals(roundedEstimate(agg.getInitialAggregatedValue(ints)), 2.0);
     Long[] longs = {12345L, 54321L};

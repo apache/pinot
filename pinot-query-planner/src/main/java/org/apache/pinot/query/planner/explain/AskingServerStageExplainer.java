@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.explain;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +61,7 @@ public class AskingServerStageExplainer {
 
     HashMap<PlanNode, Integer> planNodesMap = new HashMap<>();
     if (fragment.getWorkerIdToSegmentsMap().isEmpty()) {
-      PlanNode mergedNode = new ExplainedNode(stageId, schema, null, Collections.emptyList(), "PlanWithNoSegments",
+      PlanNode mergedNode = new ExplainedNode(stageId, schema, null, List.of(), "PlanWithNoSegments",
           new ExplainAttributeBuilder()
               .putString("table", fragment.getTableName())
               .build());
@@ -79,8 +78,8 @@ public class AskingServerStageExplainer {
     PlanNode mergedNode;
     switch (planNodesMap.size()) {
       case 0: {
-        mergedNode = new ExplainedNode(stageId, schema, null, Collections.emptyList(), "NoPlanInformation",
-            Collections.emptyMap());
+        mergedNode = new ExplainedNode(stageId, schema, null, List.of(), "NoPlanInformation",
+            Map.of());
         break;
       }
       case 1: {
@@ -96,11 +95,11 @@ public class AskingServerStageExplainer {
           attributes.putLong("servers", entry.getValue());
 
           inputs.add(new ExplainedNode(stageId, entry.getKey().getDataSchema(), null,
-              Collections.singletonList(entry.getKey()), ExplainNodeSimplifier.ALTERNATIVE, attributes.build()));
+              List.of(entry.getKey()), ExplainNodeSimplifier.ALTERNATIVE, attributes.build()));
         }
 
         mergedNode = new ExplainedNode(stageId, schema, null, inputs, "IntermediateCombine",
-            Collections.emptyMap());
+            Map.of());
         break;
       }
     }

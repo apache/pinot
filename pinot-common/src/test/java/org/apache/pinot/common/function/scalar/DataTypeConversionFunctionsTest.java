@@ -81,6 +81,15 @@ public class DataTypeConversionFunctionsTest {
   }
 
   @Test
+  public void testCastToIntegerLiteral() {
+    // `INTEGER` was the PinotDataType enum name before it was renamed to `INT`. It is kept as an explicit cast literal
+    // for backward compatibility so existing `CAST(x AS INTEGER)` queries keep working; both literals resolve to INT.
+    assertEquals(DataTypeConversionFunctions.cast(10L, "INTEGER"), 10);
+    assertEquals(DataTypeConversionFunctions.cast(10L, "INT"), 10);
+    assertEquals(DataTypeConversionFunctions.cast("10.0", "INTEGER"), 10);
+  }
+
+  @Test
   public void testHexDecimalToLong() {
     assertEquals(hexDecimalToLong("0"), 0L);
     assertEquals(hexDecimalToLong("1"), 1L);

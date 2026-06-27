@@ -27,8 +27,8 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -113,6 +113,6 @@ public class MmapDebugResource {
     }
 
     long memoryConsumed = realtimeTableDataManager.getStatsHistory().getLatestSegmentMemoryConsumed();
-    return ResourceUtils.convertToJsonString(Collections.singletonMap("offheapMemoryConsumed", memoryConsumed));
+    return ResourceUtils.convertToJsonString(Map.of("offheapMemoryConsumed", memoryConsumed));
   }
 }

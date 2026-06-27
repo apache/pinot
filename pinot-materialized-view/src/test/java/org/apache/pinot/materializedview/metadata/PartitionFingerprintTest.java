@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.materializedview.metadata;
 
+import com.google.common.hash.Hashing;
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.annotations.Test;
@@ -128,5 +129,43 @@ public class PartitionFingerprintTest {
     PartitionFingerprint fp = new PartitionFingerprint(3, 42L);
     assertTrue(fp.toString().contains("segmentCount=3"));
     assertTrue(fp.toString().contains("crcChecksum=42"));
+  }
+
+  @Test
+  public void testEmptyConstantHasZeroSegmentCount() {
+    assertEquals(PartitionFingerprint.EMPTY.getSegmentCount(), 0);
+  }
+
+  @Test
+  public void testEmptyConstantCrcMatchesEmptyFarmHash64() {
+    // The EMPTY constant's crc must equal what farmHashFingerprint64 produces over zero input
+    // bytes. This is the same value the scheduler / executor compute for windows with no
+    // overlapping segments, so empty-by-DELETE and empty-by-APPEND converge to byte-equal
+    // PartitionFingerprint values.
+    long expected = Hashing.farmHashFingerprint64().newHasher().hash().asLong();
+    assertEquals(PartitionFingerprint.EMPTY.getCrcChecksum(), expected);
+  }
+
+  @Test
+  public void testEmptyConstantNotEqualToZeroLiteral() {
+    // farmHash64("") is a deterministic NON-zero constant.  This guards against any future
+    // refactor that would silently swap EMPTY for `new PartitionFingerprint(0, 0L)` — which
+    // looks superficially equivalent but is byte-different and would break equals checks
+    // against existing ZK records produced by the APPEND-empty path.
+    assertNotEquals(PartitionFingerprint.EMPTY, new PartitionFingerprint(0, 0L));
+  }
+
+  @Test
+  public void testEmptyConstantIsSingleton() {
+    // The constant is a static field; hot-path callers should reuse it without allocation.
+    assertSame(PartitionFingerprint.EMPTY, PartitionFingerprint.EMPTY);
+  }
+
+  @Test
+  public void testEmptyConstantSurvivesEncodeRoundTrip() {
+    String encoded = PartitionFingerprint.EMPTY.encode();
+    PartitionFingerprint decoded = PartitionFingerprint.decode(encoded);
+    assertEquals(decoded, PartitionFingerprint.EMPTY);
+    assertEquals(decoded.getCrcChecksum(), PartitionFingerprint.EMPTY.getCrcChecksum());
   }
 }

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -248,7 +247,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
         _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
     if (columnMinMaxValueGeneratorMode == ColumnMinMaxValueGeneratorMode.NONE) {
-      return Collections.emptyList();
+      return List.of();
     }
     ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
         new ColumnMinMaxValueGenerator(_segmentDirectory.getSegmentMetadata(), null, columnMinMaxValueGeneratorMode);

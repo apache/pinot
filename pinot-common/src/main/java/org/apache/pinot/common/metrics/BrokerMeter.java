@@ -174,6 +174,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED = create(
       "BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED", "badResponses", false);
 
+  public static final BrokerMeter BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED = create(
+      "BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED", "badResponses", false);
+
   // These metrics track the cost of the query.
   public static final BrokerMeter DOCUMENTS_SCANNED = create(
       "DOCUMENTS_SCANNED", "documents", false);

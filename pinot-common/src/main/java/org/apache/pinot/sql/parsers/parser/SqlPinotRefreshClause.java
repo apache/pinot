@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.sql.parsers.parser;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlKind;
@@ -66,7 +65,7 @@ public class SqlPinotRefreshClause extends SqlCall {
 
   @Override
   public List<SqlNode> getOperandList() {
-    return Collections.singletonList(_refreshPeriod);
+    return List.of(_refreshPeriod);
   }
 
   @Override

@@ -27,7 +27,6 @@ import com.google.common.collect.HashBiMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -501,7 +500,7 @@ public class PinotHelixTaskResourceManager {
         helixJobQueueName, taskType);
     Set<String> helixJobs = workflowConfig.getJobDag().getAllNodes();
     if (helixJobs.isEmpty()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
     if (workflowContext == null) {
@@ -780,7 +779,7 @@ public class PinotHelixTaskResourceManager {
   public synchronized Map<String, PinotTaskConfig> getSubtaskConfigs(String taskName, @Nullable String subtaskNames) {
     JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
     if (jobConfig == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, TaskConfig> helixTaskConfigs = jobConfig.getTaskConfigMap();
     Map<String, PinotTaskConfig> taskConfigs = new HashMap<>(HashUtil.getHashMapCapacity(helixTaskConfigs.size()));
@@ -823,7 +822,7 @@ public class PinotHelixTaskResourceManager {
       selectedSubtasks = subtasks;
     }
     if (selectedSubtasks.isEmpty()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, Object> subtaskProgressMap = new HashMap<>();
     JobContext jobContext = _taskDriver.getJobContext(helixJobName);
@@ -983,7 +982,7 @@ public class PinotHelixTaskResourceManager {
   public synchronized Map<String, TaskCount> getTaskCounts(String taskType) {
     Set<String> tasks = getTasks(taskType);
     if (tasks == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, TaskCount> taskCounts = new TreeMap<>();
     for (String taskName : tasks) {
@@ -1020,7 +1019,7 @@ public class PinotHelixTaskResourceManager {
       @Nullable String tableNameWithType) {
     Set<String> tasks = getTasks(taskType);
     if (tasks == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     // Parse and validate comma-separated states if provided
@@ -1777,8 +1776,8 @@ public class PinotHelixTaskResourceManager {
    * Holds sets of tasks directly, making it extensible for future use cases.
    */
   public static class TasksByStatus {
-    private Set<String> _inProgressTasks = Collections.emptySet();
-    private Set<String> _recentTasks = Collections.emptySet(); // Tasks that started after timestamp (any state)
+    private Set<String> _inProgressTasks = Set.of();
+    private Set<String> _recentTasks = Set.of(); // Tasks that started after timestamp (any state)
 
     public Set<String> getInProgressTasks() {
       return _inProgressTasks;

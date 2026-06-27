@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -222,7 +221,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
   }
 
   protected Map<String, Plan.ExplainNode.AttributeValue> getExplainAttributes() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   private long getGcTimeMillis() {

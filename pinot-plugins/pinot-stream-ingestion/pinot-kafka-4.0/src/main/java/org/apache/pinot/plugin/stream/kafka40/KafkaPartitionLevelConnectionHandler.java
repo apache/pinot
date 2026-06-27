@@ -21,7 +21,7 @@ package org.apache.pinot.plugin.stream.kafka40;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -85,7 +85,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
       _consumer = createConsumer(_consumerProp, retryPolicy);
     }
     _topicPartition = new TopicPartition(_topic, _partition);
-    _consumer.assign(Collections.singletonList(_topicPartition));
+    _consumer.assign(List.of(_topicPartition));
   }
 
   private Properties buildProperties(StreamConfig streamConfig) {

@@ -22,9 +22,9 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -430,7 +430,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // maxRows budget is enforced at the combine level across segments
     String query = "SELECT DISTINCT(rawIntColumn) FROM testTable LIMIT 10000";
     BrokerResponseNative response =
-        getBrokerResponse(query, Collections.singletonMap(QueryOptionKey.MAX_ROWS_IN_DISTINCT, "5"));
+        getBrokerResponse(query, Map.of(QueryOptionKey.MAX_ROWS_IN_DISTINCT, "5"));
     assertTrue(response.isMaxRowsInDistinctReached());
     assertTrue(response.isPartialResult());
   }
@@ -443,7 +443,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // thoroughly tested by DistinctResultsBlockMergerTest. Here we just verify the query option is accepted.
     String query = "SELECT DISTINCT(rawIntColumn) FROM testTable LIMIT 200";
     BrokerResponseNative noChangeResponse = getBrokerResponse(query,
-        Collections.singletonMap(QueryOptionKey.MAX_ROWS_WITHOUT_CHANGE_IN_DISTINCT, "5000"));
+        Map.of(QueryOptionKey.MAX_ROWS_WITHOUT_CHANGE_IN_DISTINCT, "5000"));
     // The no-change flag may or may not be set depending on how the broker reduce processes
     // the duplicated DataTables. Just verify the query executes without error.
     assertTrue(noChangeResponse.getNumRowsResultSet() > 0);

@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -71,7 +70,7 @@ public class BalancedNumSegmentAssignmentStrategyTest {
     // }
     InstancePartitions instancePartitions = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
     instancePartitions.setInstances(0, 0, INSTANCES);
-    _instancePartitionsMap = Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitions);
+    _instancePartitionsMap = Map.of(InstancePartitionsType.OFFLINE, instancePartitions);
   }
 
   @Test

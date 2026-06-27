@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests.models;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -50,7 +49,7 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
   @Override
   public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   @Override

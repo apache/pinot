@@ -491,7 +491,7 @@ public class MaterializedViewMetadataCache {
     public void handleChildChange(String path, List<String> children) {
       synchronized (_cacheLock) {
         Set<String> newChildSet = CollectionUtils.isNotEmpty(children)
-            ? new HashSet<>(children) : Collections.emptySet();
+            ? new HashSet<>(children) : Set.of();
 
         /// Evict entries that are no longer present in ZK (MV table deleted).
         for (String existing : new ArrayList<>(_materializedViewEntryMap.keySet())) {
@@ -542,7 +542,7 @@ public class MaterializedViewMetadataCache {
     public void handleChildChange(String path, List<String> children) {
       synchronized (_cacheLock) {
         Set<String> newChildSet = CollectionUtils.isNotEmpty(children)
-            ? new HashSet<>(children) : Collections.emptySet();
+            ? new HashSet<>(children) : Set.of();
 
         /// Unsubscribe data listeners for runtime nodes that are no longer present.
         for (String viewTableName : _materializedViewEntryMap.keySet()) {

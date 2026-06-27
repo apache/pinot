@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
@@ -121,7 +120,7 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_childOperator);
+    return List.of(_childOperator);
   }
 
   @Override

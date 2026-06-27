@@ -24,7 +24,6 @@ import com.google.common.base.Splitter;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -79,7 +78,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     if (arguments != null) {
       _arguments = Splitter.on(ARGUMENTS_SEPARATOR).trimResults().splitToList(arguments);
     } else {
-      _arguments = Collections.emptyList();
+      _arguments = List.of();
     }
     _numArguments = _arguments.size();
     _binding = new Binding();

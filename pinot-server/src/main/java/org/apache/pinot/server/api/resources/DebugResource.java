@@ -48,13 +48,13 @@ import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
@@ -203,8 +203,13 @@ public class DebugResource {
   }
 
   private long getSegmentSize(SegmentDataManager segmentDataManager) {
-    return (segmentDataManager instanceof ImmutableSegmentDataManager) ? ((ImmutableSegment) segmentDataManager
-        .getSegment()).getSegmentSizeBytes() : 0;
+    long size = 0;
+    for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+      if (segment instanceof ImmutableSegment) {
+        size += ((ImmutableSegment) segment).getSegmentSizeBytes();
+      }
+    }
+    return size;
   }
 
   private SegmentConsumerInfo getSegmentConsumerInfo(TableDataManager tableDataManager,

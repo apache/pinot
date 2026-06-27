@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.sql.ddl.compile;
 
-import java.util.Collections;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableType;
 
@@ -34,7 +34,7 @@ public final class CompiledShowCreateTable extends CompiledDdl {
 
   public CompiledShowCreateTable(@Nullable String databaseName, String rawTableName,
       @Nullable TableType tableType) {
-    super(DdlOperation.SHOW_CREATE_TABLE, databaseName, Collections.emptyList());
+    super(DdlOperation.SHOW_CREATE_TABLE, databaseName, List.of());
     _rawTableName = rawTableName;
     _tableType = tableType;
   }

@@ -488,7 +488,7 @@ public final class PropertyMapping {
 
   private static List<String> splitCsv(String value) {
     if (value == null || value.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
     String[] parts = value.split(",");
     List<String> result = new ArrayList<>(parts.length);

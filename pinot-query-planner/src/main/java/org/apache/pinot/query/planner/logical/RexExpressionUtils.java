@@ -36,6 +36,7 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexUnknownAs;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
@@ -348,26 +349,33 @@ public class RexExpressionUtils {
     assert sarg != null;
     if (sarg.isPoints()) {
       if (leftOperand instanceof RexLiteral) {
-        return evaluateLiteralIn((RexLiteral) leftOperand, sarg.rangeSet.asRanges());
+        return evaluateLiteralIn((RexLiteral) leftOperand, sarg.rangeSet.asRanges(), sarg.nullAs);
       }
-      return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
+      RexExpression inExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
           toSearchFunctionOperands(leftOperand, sarg.rangeSet.asRanges(), dataType));
+      return addNullCheckIfRequired(leftOperand, sarg.nullAs, inExpr);
     } else if (sarg.isComplementedPoints()) {
       if (leftOperand instanceof RexLiteral) {
-        return evaluateLiteralNotIn((RexLiteral) leftOperand, sarg.rangeSet.complement().asRanges());
+        return evaluateLiteralNotIn((RexLiteral) leftOperand, sarg.rangeSet.complement().asRanges(), sarg.nullAs);
       }
-      return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
+      RexExpression notInExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
           toSearchFunctionOperands(leftOperand, sarg.rangeSet.complement().asRanges(), dataType));
+      return addNullCheckIfRequired(leftOperand, sarg.nullAs, notInExpr);
     } else {
       if (leftOperand instanceof RexLiteral) {
-        return evaluateLiteralOrRanges((RexLiteral) leftOperand, sarg.rangeSet.asRanges());
+        return evaluateLiteralOrRanges((RexLiteral) leftOperand, sarg.rangeSet.asRanges(), sarg.nullAs);
       }
-      Set<Range> ranges = sarg.rangeSet.asRanges();
-      return convertRangesToOr(dataType, leftOperand, ranges);
+      RexExpression orExpr = convertRangesToOr(dataType, leftOperand, sarg.rangeSet.asRanges());
+      return addNullCheckIfRequired(leftOperand, sarg.nullAs, orExpr);
     }
   }
 
-  private static RexExpression evaluateLiteralIn(RexLiteral leftOperand, Set<Range> ranges) {
+  private static RexExpression evaluateLiteralIn(RexLiteral leftOperand, Set<Range> ranges, RexUnknownAs nullAs) {
+    // No need to do normal evaluation if the literal is a null literal and nulls need to be included/excluded, so we
+    // can return early. Otherwise, continue with normal evaluation
+    if (leftOperand.isNull() && nullAs != RexUnknownAs.UNKNOWN) {
+      return fromRexUnknownAs(nullAs);
+    }
     Comparable leftVal = leftOperand.getValue();
     for (Range range : ranges) {
       if (range.lowerEndpoint().equals(leftVal)) {
@@ -377,7 +385,12 @@ public class RexExpressionUtils {
     return RexExpression.Literal.FALSE;
   }
 
-  private static RexExpression evaluateLiteralNotIn(RexLiteral leftOperand, Set<Range> ranges) {
+  private static RexExpression evaluateLiteralNotIn(RexLiteral leftOperand, Set<Range> ranges, RexUnknownAs nullAs) {
+    // No need to do normal evaluation if the literal is a null literal and nulls need to be included/excluded, so we
+    // can return early. Otherwise, continue with normal evaluation
+    if (leftOperand.isNull() && nullAs != RexUnknownAs.UNKNOWN) {
+      return fromRexUnknownAs(nullAs);
+    }
     Comparable leftVal = leftOperand.getValue();
     for (Range range : ranges) {
       if (range.lowerEndpoint().equals(leftVal)) {
@@ -387,7 +400,17 @@ public class RexExpressionUtils {
     return RexExpression.Literal.TRUE;
   }
 
-  private static RexExpression evaluateLiteralOrRanges(RexLiteral leftOperand, Set<Range> ranges) {
+  private static RexExpression evaluateLiteralOrRanges(RexLiteral leftOperand, Set<Range> ranges, RexUnknownAs nullAs) {
+    // No need to do normal evaluation if the literal is a null literal and nulls need to be included/excluded, so we
+    // can return early. If the literal is a null literal but nulls should be treated as unknown, we cannot continue
+    // with normal evaluation because it fails for null values and we cannot evaluate an unknown value anyway, so we
+    // return false instead
+    if (leftOperand.isNull()) {
+      if (nullAs != RexUnknownAs.UNKNOWN) {
+        return fromRexUnknownAs(nullAs);
+      }
+      return RexExpression.Literal.FALSE;
+    }
     Comparable leftVal = leftOperand.getValue();
     for (Range range : ranges) {
       if (range.contains(leftVal)) {
@@ -395,6 +418,36 @@ public class RexExpressionUtils {
       }
     }
     return RexExpression.Literal.FALSE;
+  }
+
+  private static RexExpression fromRexUnknownAs(RexUnknownAs nullAs) {
+    switch (nullAs) {
+      case TRUE:
+        return RexExpression.Literal.TRUE;
+
+      case FALSE:
+        return RexExpression.Literal.FALSE;
+
+      default:
+        throw new IllegalArgumentException("Unsupported RexUnknownAs: " + nullAs);
+    }
+  }
+
+  private static RexExpression addNullCheckIfRequired(RexNode leftOperand, RexUnknownAs nullAs, RexExpression expr) {
+    switch (nullAs) {
+      case TRUE:
+        RexExpression isNullExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IS_NULL.name(),
+            List.of(fromRexNode(leftOperand)));
+        return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.OR.name(), List.of(expr, isNullExpr));
+
+      case FALSE:
+        RexExpression isNotNullExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IS_NOT_NULL.name(),
+            List.of(fromRexNode(leftOperand)));
+        return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.AND.name(), List.of(expr, isNotNullExpr));
+
+      default:
+        return expr;
+    }
   }
 
   private static RexExpression convertRangesToOr(ColumnDataType dataType, RexNode leftOperand, Set<Range> ranges) {

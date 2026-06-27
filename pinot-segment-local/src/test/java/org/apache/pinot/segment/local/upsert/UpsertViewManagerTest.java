@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -49,14 +50,14 @@ public class UpsertViewManagerTest {
 
     SegmentContext segCtx1 = new SegmentContext(seg1);
     mgr.trackSegment(seg1);
-    assertEquals(mgr.getTrackedSegments(), Collections.singleton(seg1));
-    mgr.setSegmentContexts(Collections.singletonList(segCtx1), new HashMap<>());
+    assertEquals(mgr.getTrackedSegments(), Set.of(seg1));
+    mgr.setSegmentContexts(List.of(segCtx1), new HashMap<>());
     assertSame(segCtx1.getQueryableDocIdsSnapshot(), mutableRoaringBitmap);
 
     mgr.untrackSegment(seg1);
     assertTrue(mgr.getTrackedSegments().isEmpty());
     segCtx1 = new SegmentContext(seg1);
-    mgr.setSegmentContexts(Collections.singletonList(segCtx1), new HashMap<>());
+    mgr.setSegmentContexts(List.of(segCtx1), new HashMap<>());
     assertNull(segCtx1.getQueryableDocIdsSnapshot());
   }
 }

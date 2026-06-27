@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
@@ -33,7 +33,7 @@ public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<O
 
   @Override
   ValueAggregator<Object, Object> getValueAggregator() {
-    return new DistinctCountThetaSketchValueAggregator(Collections.emptyList());
+    return new DistinctCountThetaSketchValueAggregator(List.of());
   }
 
   @Override

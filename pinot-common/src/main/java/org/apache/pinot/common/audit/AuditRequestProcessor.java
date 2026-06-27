@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -207,7 +206,7 @@ public class AuditRequestProcessor {
   @VisibleForTesting
   static Set<String> parseAllowedHeaders(String headerList) {
     if (StringUtils.isBlank(headerList)) {
-      return Collections.emptySet();
+      return Set.of();
     }
 
     Set<String> headers = new HashSet<>();

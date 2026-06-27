@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
@@ -38,7 +38,7 @@ public class InMemorySendingMailboxTest {
     MailboxService mailboxService = Mockito.mock(MailboxService.class);
     InMemorySendingMailbox mailbox = new InMemorySendingMailbox("test-mailbox", mailboxService, Long.MAX_VALUE,
         new StatMap<>(MailboxSendOperator.StatKey.class));
-    RowHeapDataBlock block = new RowHeapDataBlock(Collections.singletonList(new Object[]{"val"}),
+    RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"val"}),
         new DataSchema(new String[]{"foo"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
 
     try (QueryThreadContext ctx = QueryThreadContext.openForMseTest()) {

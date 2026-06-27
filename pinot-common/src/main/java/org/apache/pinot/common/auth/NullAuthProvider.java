@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.auth;
 
-import java.util.Collections;
 import java.util.Map;
 import org.apache.pinot.spi.auth.AuthProvider;
 
@@ -37,7 +36,7 @@ public class NullAuthProvider implements AuthProvider {
 
   @Override
   public Map<String, Object> getRequestHeaders() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   @Override

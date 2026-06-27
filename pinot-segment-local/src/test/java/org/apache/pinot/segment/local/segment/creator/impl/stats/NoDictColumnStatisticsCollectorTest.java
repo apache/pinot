@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -50,7 +51,7 @@ public class NoDictColumnStatisticsCollectorTest {
     TableConfig tableConfig =
         new TableConfigBuilder(org.apache.pinot.spi.config.table.TableType.OFFLINE).setTableName("testTable")
             .setSegmentPartitionConfig(
-                new SegmentPartitionConfig(Collections.singletonMap("col", new ColumnPartitionConfig("murmur", 4))))
+                new SegmentPartitionConfig(Map.of("col", new ColumnPartitionConfig("murmur", 4))))
             .build();
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec("col", dataType, isSingleValue));

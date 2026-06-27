@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.materializedview.metadata;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
@@ -40,6 +41,12 @@ import java.util.Objects;
 /// unlike the prior packed `"V,10,5000,1700006400000"` string format.
 ///
 /// Thread-safety: instances are immutable after construction.
+///
+/// Construction discipline: production callers MUST go through
+/// [org.apache.pinot.materializedview.metadata.MaterializedViewPartitionManager] —
+/// the constructor is package-private so every state transition is funnelled through
+/// the manager's CAS engine.  Tests in other packages use [#forTesting] for fixture
+/// setup; the dedicated name keeps any production-side misuse obvious in code review.
 public class PartitionInfo {
   private static final String STATE_KEY = "state";
   private static final String SEGMENT_COUNT_KEY = "segmentCount";
@@ -50,10 +57,19 @@ public class PartitionInfo {
   private final PartitionFingerprint _fingerprint;
   private final long _lastRefreshTime;
 
-  public PartitionInfo(PartitionState state, PartitionFingerprint fingerprint, long lastRefreshTime) {
+  PartitionInfo(PartitionState state, PartitionFingerprint fingerprint, long lastRefreshTime) {
     _state = state;
     _fingerprint = fingerprint;
     _lastRefreshTime = lastRefreshTime;
+  }
+
+  /// Test-only factory for seeding partition fixtures in cross-package tests.  Production
+  /// code MUST NOT call this — every real state transition goes through
+  /// [org.apache.pinot.materializedview.metadata.MaterializedViewPartitionManager].
+  @VisibleForTesting
+  public static PartitionInfo forTesting(PartitionState state, PartitionFingerprint fingerprint,
+      long lastRefreshTime) {
+    return new PartitionInfo(state, fingerprint, lastRefreshTime);
   }
 
   public PartitionState getState() {

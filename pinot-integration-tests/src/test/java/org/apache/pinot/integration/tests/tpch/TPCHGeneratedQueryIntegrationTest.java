@@ -24,7 +24,7 @@ import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.SQLTimeoutException;
 import java.sql.Statement;
-import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -98,11 +98,11 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
       addSchema(schema);
       TableConfig tableConfig = createTableConfig(tableFile);
       addTableConfig(tableConfig);
-      ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
+      ClusterIntegrationTestUtils.buildSegmentsFromAvro(List.of(dataFile), tableConfig, schema, 0,
           tableSegmentDir, tarDir);
       uploadSegments(tableName, tarDir);
       // H2
-      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
+      ClusterIntegrationTestUtils.setUpH2TableWithAvro(List.of(dataFile), tableName, _h2Connection);
     }
 
     SampleColumnDataProvider sampleColumnDataProvider =

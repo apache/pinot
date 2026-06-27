@@ -39,7 +39,6 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.ClusterTest;
@@ -450,11 +449,9 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
       Map<String, PhysicalTableConfig> physicalTableConfigMap, String brokerTenant, String controllerBaseApiUrl,
       String logicalTable, String refOfflineTable, String refRealtimeTable) throws IOException {
     ControllerRequestURLBuilder urlBuilder = ControllerRequestURLBuilder.baseUrl(controllerBaseApiUrl);
-    ControllerRequestClient client = new ControllerRequestClient(urlBuilder, getHttpClient(),
-        getControllerRequestClientHeaders());
     Schema schema = createSchema(schemaFile);
     schema.setSchemaName(logicalTable);
-    client.addSchema(schema);
+    addSchemaToCluster(schema, controllerBaseApiUrl);
     LogicalTableConfig config = new LogicalTableConfigBuilder()
         .setTableName(logicalTable)
         .setBrokerTenant(brokerTenant)

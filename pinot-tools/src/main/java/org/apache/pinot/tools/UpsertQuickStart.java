@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.PinotAdministrator;
@@ -30,7 +29,7 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 public class UpsertQuickStart extends RealtimeQuickStart {
   @Override
   public List<String> types() {
-    return Collections.singletonList("UPSERT");
+    return List.of("UPSERT");
   }
 
   public static void main(String[] args)

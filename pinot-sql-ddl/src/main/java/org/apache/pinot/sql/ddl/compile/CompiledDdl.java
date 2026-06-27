@@ -34,7 +34,7 @@ public abstract class CompiledDdl {
   protected CompiledDdl(DdlOperation operation, @Nullable String databaseName, List<String> warnings) {
     _operation = operation;
     _databaseName = databaseName;
-    _warnings = warnings == null ? Collections.emptyList() : Collections.unmodifiableList(warnings);
+    _warnings = warnings == null ? List.of() : Collections.unmodifiableList(warnings);
   }
 
   public DdlOperation getOperation() {

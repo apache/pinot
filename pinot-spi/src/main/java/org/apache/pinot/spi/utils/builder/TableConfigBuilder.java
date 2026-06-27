@@ -21,7 +21,6 @@ package org.apache.pinot.spi.utils.builder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.CompletionConfig;
@@ -539,7 +538,7 @@ public class TableConfigBuilder {
     indexingConfig.setLoadMode(_loadMode);
     indexingConfig.setSegmentFormatVersion(_segmentVersion);
     if (_sortedColumn != null) {
-      indexingConfig.setSortedColumn(Collections.singletonList(_sortedColumn));
+      indexingConfig.setSortedColumn(List.of(_sortedColumn));
     }
     indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
     indexingConfig.setCreateInvertedIndexDuringSegmentGeneration(_createInvertedIndexDuringSegmentGeneration);

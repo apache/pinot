@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -82,7 +81,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
 
   @Override
   public void init(TableConfig tableConfig, Schema schema) throws Exception {
-    init(tableConfig, schema, Collections.emptyMap());
+    init(tableConfig, schema, Map.of());
   }
 
   @Override

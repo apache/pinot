@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -190,7 +189,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       return rows;
     }
     _numRowsToOffset -= rows.size();
-    return Collections.emptyList();
+    return List.of();
   }
 
   /**

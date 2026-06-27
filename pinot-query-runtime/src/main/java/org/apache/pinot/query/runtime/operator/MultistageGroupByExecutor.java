@@ -195,7 +195,7 @@ public class MultistageGroupByExecutor {
   public List<Object[]> getResult(Comparator<Object[]> comparator, int maxRows) {
     int numGroups = Math.min(_groupIdGenerator.getNumGroups(), maxRows);
     if (numGroups == 0) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     // TODO: Change it to use top-K algorithm
@@ -239,7 +239,7 @@ public class MultistageGroupByExecutor {
   public List<Object[]> getResult(int maxRows) {
     int numGroups = Math.min(_groupIdGenerator.getNumGroups(), maxRows);
     if (numGroups == 0) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     List<Object[]> rows = new ArrayList<>(numGroups);

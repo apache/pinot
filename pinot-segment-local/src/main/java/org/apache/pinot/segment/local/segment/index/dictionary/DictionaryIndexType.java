@@ -26,7 +26,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -90,7 +89,7 @@ import org.slf4j.LoggerFactory;
 public class DictionaryIndexType
     extends AbstractIndexType<DictionaryIndexConfig, Dictionary, SegmentDictionaryCreator> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryIndexType.class);
-  private static final List<String> EXTENSIONS = Collections.singletonList(V1Constants.Dict.FILE_EXTENSION);
+  private static final List<String> EXTENSIONS = List.of(V1Constants.Dict.FILE_EXTENSION);
 
   protected DictionaryIndexType() {
     super(StandardIndexes.DICTIONARY_ID);
@@ -144,7 +143,7 @@ public class DictionaryIndexType
     ColumnConfigDeserializer<DictionaryIndexConfig> fromFieldConfigs = (tableConfig, schema) -> {
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
       if (fieldConfigList == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       Map<String, DictionaryIndexConfig> result = new HashMap<>();
       for (FieldConfig fieldConfig : fieldConfigList) {

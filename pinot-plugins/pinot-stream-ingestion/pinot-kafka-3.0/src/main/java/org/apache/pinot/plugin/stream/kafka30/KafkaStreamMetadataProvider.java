@@ -186,18 +186,18 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     long offset;
     try {
       if (offsetCriteria.isLargest()) {
-        offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+        offset = _consumer.endOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
             .get(_topicPartition);
       } else if (offsetCriteria.isSmallest()) {
         offset =
-            _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+            _consumer.beginningOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
                 .get(_topicPartition);
       } else if (offsetCriteria.isPeriod()) {
-        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Collections.singletonMap(_topicPartition,
+        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Map.of(_topicPartition,
                 Clock.systemUTC().millis() - TimeUtils.convertPeriodToMillis(offsetCriteria.getOffsetString())))
             .get(_topicPartition);
         if (offsetAndTimestamp == null) {
-          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+          offset = _consumer.endOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
               .get(_topicPartition);
           LOGGER.warn(
               "initial offset type is period and its value evaluates to null hence proceeding with offset {} for "
@@ -206,10 +206,10 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
           offset = offsetAndTimestamp.offset();
         }
       } else if (offsetCriteria.isTimestamp()) {
-        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Collections.singletonMap(_topicPartition,
+        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Map.of(_topicPartition,
             TimeUtils.convertTimestampToMillis(offsetCriteria.getOffsetString()))).get(_topicPartition);
         if (offsetAndTimestamp == null) {
-          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+          offset = _consumer.endOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
               .get(_topicPartition);
           LOGGER.warn(
               "initial offset type is timestamp and its value evaluates to null hence proceeding with offset {} for "
@@ -262,7 +262,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       AdminClient adminClient = getOrCreateSharedAdminClient();
       ListTopicsResult result = adminClient.listTopics();
       if (result == null) {
-        return Collections.emptyList();
+        return List.of();
       }
       return result.names()
           .get()

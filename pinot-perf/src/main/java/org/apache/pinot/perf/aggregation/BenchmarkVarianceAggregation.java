@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.perf.aggregation;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -73,7 +72,7 @@ public class BenchmarkVarianceAggregation extends AbstractAggregationFunctionBen
 
   @Override
   protected AggregationFunction<?, ?> createAggregationFunction() {
-    return new VarianceAggregationFunction(Collections.singletonList(EXPR), true, false, _nullHandlingEnabled);
+    return new VarianceAggregationFunction(List.of(EXPR), true, false, _nullHandlingEnabled);
   }
 
   @Override

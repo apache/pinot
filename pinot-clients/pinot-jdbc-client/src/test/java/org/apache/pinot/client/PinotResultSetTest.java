@@ -24,8 +24,8 @@ import java.nio.charset.StandardCharsets;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -289,7 +289,7 @@ public class PinotResultSetTest {
 
   private ResultSetGroup getResultSet(String resourceName) {
     _dummyJsonTransport._resource = resourceName;
-    Connection connection = ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyJsonTransport);
+    Connection connection = ConnectionFactory.fromHostList(List.of("dummy"), _dummyJsonTransport);
     return connection.execute("dummy");
   }
 

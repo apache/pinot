@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -123,7 +122,7 @@ public class GroupByTrimTest {
     Operator<GroupByResultsBlock> groupByOperator =
         new GroupByPlanNode(new SegmentContext(_indexSegment), queryContext).run();
     GroupByCombineOperator combineOperator =
-        new GroupByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService);
+        new GroupByCombineOperator(List.of(groupByOperator), queryContext, _executorService);
 
     // Execute the query
     GroupByResultsBlock resultsBlock = (GroupByResultsBlock) combineOperator.nextBlock();

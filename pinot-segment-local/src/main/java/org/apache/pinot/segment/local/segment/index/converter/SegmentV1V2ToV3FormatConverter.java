@@ -26,12 +26,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
@@ -47,8 +44,6 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,15 +137,12 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
   private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, File v3Directory)
       throws Exception {
-    Map<String, Object> props = new HashMap<>();
-    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
-    PinotConfiguration configuration = new PinotConfiguration(props);
     try (SegmentDirectory v2Segment = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
-        .load(v2Directory.toURI(), new SegmentDirectoryLoaderContext.Builder().setSegmentName(v2Metadata.getName())
-            .setSegmentDirectoryConfigs(configuration).build());
+        .load(v2Directory.toURI(),
+            new SegmentDirectoryLoaderContext.Builder().setSegmentName(v2Metadata.getName()).build());
         SegmentDirectory v3Segment = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
-            .load(v3Directory.toURI(), new SegmentDirectoryLoaderContext.Builder().setSegmentName(v2Metadata.getName())
-                .setSegmentDirectoryConfigs(configuration).build())) {
+            .load(v3Directory.toURI(),
+                new SegmentDirectoryLoaderContext.Builder().setSegmentName(v2Metadata.getName()).build())) {
       try (SegmentDirectory.Reader v2DataReader = v2Segment.createReader();
           SegmentDirectory.Writer v3DataWriter = v3Segment.createWriter()) {
         for (String column : v2Metadata.getAllColumns()) {
