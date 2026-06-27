@@ -32,9 +32,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.http.Header;
-import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
-import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -235,14 +233,17 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     String segmentDownloadUrl =
         "http://localhost:" + getControllerPort() + "/segments/baseballStats_OFFLINE/" + segmentName;
 
-    URI uploadUri = URI.create("http://localhost:" + getControllerPort() + "/v2/segments");
+    // Pass tableName as a URL query parameter directly in the URI.
+    // ClassicRequestBuilder.addParameter() adds form data to the POST body, but the controller's
+    // FineGrainedAuthUtils reads uriInfo.getQueryParameters() (URL query string only), so
+    // parameters must be embedded in the URI rather than passed as form params.
+    URI uploadUri = URI.create(
+        "http://localhost:" + getControllerPort() + "/v2/segments?tableName=baseballStats");
     List<Header> authHeaders = Arrays.asList(new BasicHeader("Authorization", AUTH_TOKEN));
-    List<NameValuePair> params =
-        Arrays.asList(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, "baseballStats"));
 
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       int statusCode =
-          fileUploadDownloadClient.sendSegmentUri(uploadUri, segmentDownloadUrl, authHeaders, params,
+          fileUploadDownloadClient.sendSegmentUri(uploadUri, segmentDownloadUrl, authHeaders, null,
               HttpClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
       Assert.assertEquals(statusCode, 200,
           "Controller should successfully fetch segment from auth-protected URI using configured auth token");
