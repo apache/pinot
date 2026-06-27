@@ -37,6 +37,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.auth.AuthProviderFactory;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
@@ -107,6 +108,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   public void init(PinotConfiguration config)
       throws Exception {
     _config = new MinionConf(config.toMap());
+
     String zkAddress = _config.getZkAddress();
     String helixClusterName = _config.getHelixClusterName();
     ServiceStartableUtils.applyClusterConfig(_config, zkAddress, helixClusterName, ServiceRole.MINION);
@@ -144,6 +146,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     MinionEventObservers.init(_config, _executorService);
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+
+    // Initialize authentication provider (Vault or static token)
+    AuthProviderFactory.create(_config);
   }
 
   /// Can be overridden to apply custom configs to the minion conf.
@@ -311,12 +316,6 @@ public abstract class BaseMinionStarter implements ServiceStartable {
             () -> _helixManager.isConnected() ? 1L : 0L);
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
     minionContext.setHelixManager(_helixManager);
-    LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
-    try {
-      _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
-    } catch (Exception e) {
-      LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
-    }
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _minionAdminApplication = createMinionAdminApp();
     _minionAdminApplication.start(_listenerConfigs);
@@ -369,8 +368,6 @@ public abstract class BaseMinionStarter implements ServiceStartable {
         () -> List.of(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
-    updated |= HelixHelper.updateMaxConcurrentTasksPerInstance(instanceConfig,
-        _config.getMaxConcurrentTasksPerInstance());
     if (updated) {
       HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
     }

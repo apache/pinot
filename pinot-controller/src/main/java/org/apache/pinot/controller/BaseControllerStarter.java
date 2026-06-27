@@ -66,6 +66,7 @@ import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
+import org.apache.pinot.common.auth.AuthProviderFactory;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
@@ -248,6 +249,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
     _config = new ControllerConf(pinotConfiguration.toMap());
+
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
     _controllerMode = _config.getControllerMode();
@@ -311,6 +313,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
 
     ControllerJobTypes.init(_config);
+    // Initialize authentication provider (Vault or static token)
+    AuthProviderFactory.create(_config);
   }
 
   /// Returns the default cluster configs to be stored in ZK as Helix cluster config. These configs will then be
