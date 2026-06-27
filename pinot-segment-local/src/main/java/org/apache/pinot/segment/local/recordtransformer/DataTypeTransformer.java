@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -68,13 +67,17 @@ public class DataTypeTransformer implements RecordTransformer {
   /// Creates a [DataTypeTransformer] that converts the (non-virtual) schema columns to the data types defined in the
   /// [Schema].
   public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
-    this(tableConfig, extractSchemaDataTypes(schema));
+    this(tableConfig, extractSchemaDataTypes(schema), schema);
   }
 
   /// Creates a [DataTypeTransformer] that converts the given columns to the provided [PinotDataType]s. This is useful
   /// for fixing the data types of source fields before other transformers (such as [ExpressionTransformer]) consume
   /// them.
   public DataTypeTransformer(TableConfig tableConfig, Map<String, PinotDataType> dataTypes) {
+    this(tableConfig, dataTypes, null);
+  }
+
+  private DataTypeTransformer(TableConfig tableConfig, Map<String, PinotDataType> dataTypes, @Nullable Schema schema) {
     _dataTypes = dataTypes;
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
@@ -82,7 +85,7 @@ public class DataTypeTransformer implements RecordTransformer {
 
     // Enforce canonical-form UUID PKs only when upsert/dedup is actually enabled — a present-but-disabled config
     // (e.g., UpsertConfig with Mode.NONE) must not reject otherwise-valid rows.
-    if (tableConfig.isUpsertEnabled() || tableConfig.isDedupEnabled()) {
+    if (schema != null && (tableConfig.isUpsertEnabled() || tableConfig.isDedupEnabled())) {
       List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
       if (primaryKeyColumns != null && !primaryKeyColumns.isEmpty()) {
         Set<String> uuidPkCols = new HashSet<>();
@@ -92,7 +95,7 @@ public class DataTypeTransformer implements RecordTransformer {
             uuidPkCols.add(col);
           }
         }
-        _upsertUuidPrimaryKeyColumns = uuidPkCols.isEmpty() ? null : Collections.unmodifiableSet(uuidPkCols);
+        _upsertUuidPrimaryKeyColumns = uuidPkCols.isEmpty() ? null : Set.copyOf(uuidPkCols);
       } else {
         _upsertUuidPrimaryKeyColumns = null;
       }

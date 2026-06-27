@@ -25,7 +25,8 @@ import java.sql.Timestamp;
 import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -1219,8 +1220,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
         new ScalarTransformFunctionWrapper(FunctionInfo.fromMethod(
             ScalarTransformFunctionWrapperTest.class.getDeclaredMethod("uuidToString", UUID.class)));
     StaticUuidTransformFunction uuidTransformFunction = new StaticUuidTransformFunction(uuidValues);
-    uuidTransformFunction.init(Collections.emptyList(), Collections.emptyMap());
-    transformFunction.init(Arrays.asList(uuidTransformFunction), Collections.emptyMap());
+    uuidTransformFunction.init(List.of(), Map.of());
+    transformFunction.init(Arrays.asList(uuidTransformFunction), Map.of());
 
     assertEquals(transformFunction.getName(), "uuidToString");
     testTransformFunction(transformFunction, expectedValues);

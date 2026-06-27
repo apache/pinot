@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.function;
 
 import com.google.auto.service.AutoService;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.function.scalar.uuid.UuidConversionFunctions;
@@ -42,6 +41,6 @@ public class UuidToBytesUdf extends Udf.FromAnnotatedMethod {
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 }
