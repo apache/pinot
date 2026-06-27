@@ -21,7 +21,7 @@ package org.apache.pinot.core.query.aggregation.groupby.utils;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
+import org.apache.pinot.spi.utils.UuidKey;
 
 
 /**

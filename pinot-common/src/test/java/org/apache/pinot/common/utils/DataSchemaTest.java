@@ -222,5 +222,11 @@ public class DataSchemaTest {
     Assert.assertEquals(UUID_ARRAY.convertAndFormat(uuidArrayBytesValue), new String[]{UUID_VALUE, UUID_VALUE_2});
     byte[] bytesValue = {12, 34, 56};
     Assert.assertEquals(BYTES.format(bytesValue), BytesUtils.toHexString(bytesValue));
+
+    ByteArray firstUuidNullPlaceholder = (ByteArray) UUID.getNullPlaceholder();
+    ByteArray secondUuidNullPlaceholder = (ByteArray) UUID.getNullPlaceholder();
+    Assert.assertNotSame(firstUuidNullPlaceholder, secondUuidNullPlaceholder);
+    firstUuidNullPlaceholder.getBytes()[0] = 1;
+    Assert.assertEquals(secondUuidNullPlaceholder, new ByteArray(UuidUtils.nullUuidBytes()));
   }
 }

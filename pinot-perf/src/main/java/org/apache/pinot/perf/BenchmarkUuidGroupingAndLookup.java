@@ -27,8 +27,8 @@ import org.apache.pinot.query.runtime.operator.groupby.OneUuidKeyGroupIdGenerato
 import org.apache.pinot.query.runtime.operator.join.ObjectLookupTable;
 import org.apache.pinot.query.runtime.operator.join.UuidLookupTable;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidKey;
 import org.apache.pinot.spi.utils.UuidUtils;
-import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;

@@ -36,7 +36,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
+import org.apache.pinot.spi.utils.UuidKey;
 import org.roaringbitmap.RoaringBitmap;
 
 

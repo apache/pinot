@@ -23,7 +23,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Iterator;
 import java.util.function.ToIntFunction;
-import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
+import org.apache.pinot.spi.utils.UuidKey;
 
 
 /**

@@ -328,7 +328,7 @@ public class DataSchema {
     // does not contain this enum constant. This is safe because DataSchema serialization uses enum names (not ordinals)
     // via ColumnDataType.name() / ColumnDataType.valueOf(). If ordinal-based serialization is ever added for
     // ColumnDataType, UUID must be moved to the end of the enum (as was done for FieldSpec.DataType.UUID).
-    UUID(BYTES, NullValuePlaceHolder.INTERNAL_UUID_BYTES) {
+    UUID(BYTES, null) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.UUID);
@@ -433,6 +433,9 @@ public class DataSchema {
     }
 
     public Object getNullPlaceholder() {
+      if (this == UUID) {
+        return new ByteArray(UuidUtils.nullUuidBytes());
+      }
       return _nullPlaceholder;
     }
 

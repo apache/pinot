@@ -592,13 +592,11 @@ public class EnrichedHashJoinOperatorTest {
     assertEquals(resultRows.get(1), new Object[]{null, null, 4, "Bd"});
   }
 
-  /**
-   * Regression: {@link EnrichedHashJoinOperator} overrides {@code buildJoinedDataBlock*} from
-   * {@link HashJoinOperator}. Without re-applying {@code _rightTable.normalizeKey(...)} in the overrides, a
-   * UUID equi-join would lookup the {@link org.apache.pinot.query.runtime.operator.join.UuidLookupTable} with
-   * the raw {@code ByteArray} from the row, never match (the table is keyed by
-   * {@link org.apache.pinot.spi.utils.UuidUtils.UuidKey}), and INNER joins would silently return zero rows.
-   */
+  /// Regression: [EnrichedHashJoinOperator] overrides `buildJoinedDataBlock*` from [HashJoinOperator]. Without
+  /// re-applying `_rightTable.normalizeKey(...)` in the overrides, a UUID equi-join would look up the
+  /// [org.apache.pinot.query.runtime.operator.join.UuidLookupTable] with the raw `ByteArray` from the row and never
+  /// match because the table is keyed by [org.apache.pinot.spi.utils.UuidKey]. INNER joins would silently return
+  /// zero rows.
   @Test
   public void shouldHandleInnerJoinOnUuid() {
     _leftInput = new BlockListMultiStageOperator.Builder(UUID_CHILD_SCHEMA)

@@ -36,7 +36,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
-import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
+import org.apache.pinot.spi.utils.UuidKey;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -54,12 +54,9 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
   private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
-  /**
-   * Per-column group-key dispatch type: stored type of each column, except UUID is preserved as
-   * {@link DataType#UUID} so the on-the-fly dictionary keys on {@link org.apache.pinot.spi.utils.UuidUtils.UuidKey}
-   * instead of {@link org.apache.pinot.spi.utils.ByteArray}. For every other logical type this equals
-   * {@code logicalType.getStoredType()}.
-   */
+  /// Per-column group-key dispatch type: stored type of each column, except UUID is preserved as
+  /// [DataType#UUID] so the on-the-fly dictionary keys on [UuidKey] instead of [ByteArray]. For every other
+  /// logical type this equals `logicalType.getStoredType()`.
   private final DataType[] _dataTypes;
   private final Dictionary[] _dictionaries;
   private final ValueToIdMap[] _onTheFlyDictionaries;

@@ -40,7 +40,6 @@ public class UuidConversionFunctionsTest {
         {"550e8400-e29b-41d4-a716-44665544000"},
         {"550e8400-e29b-41d4-a716-4466554400000"},
         {"550e8400-e29b-41d4-a716-44665544000g"},
-        {"550e8400e29b41d4a716446655440000"},
         {""}
     };
   }
@@ -56,6 +55,11 @@ public class UuidConversionFunctionsTest {
   @Test
   public void testToUuidFromStringNormalizesToLowerCase() {
     assertEquals(ToUuidScalarFunction.toUuid(MIXED_CASE_UUID_VALUE), UUID.fromString(UUID_VALUE));
+  }
+
+  @Test
+  public void testToUuidFromHexString() {
+    assertEquals(ToUuidScalarFunction.toUuid(UUID_VALUE.replace("-", "")), UUID.fromString(UUID_VALUE));
   }
 
   @Test

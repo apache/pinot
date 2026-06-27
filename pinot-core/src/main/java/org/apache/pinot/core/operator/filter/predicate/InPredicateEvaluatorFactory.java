@@ -41,7 +41,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
+import org.apache.pinot.spi.utils.UuidKey;
 
 
 /**

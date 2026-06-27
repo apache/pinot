@@ -41,7 +41,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
+import org.apache.pinot.spi.utils.UuidKey;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -53,12 +53,9 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final ExpressionContext _groupByExpression;
-  /**
-   * Group-key dispatch type: stored type of the column, except UUID is preserved as {@link DataType#UUID} so the
-   * group-key map keys on {@link org.apache.pinot.spi.utils.UuidUtils.UuidKey} (two primitive longs) instead of
-   * {@link org.apache.pinot.spi.utils.ByteArray}. For every other logical type this equals
-   * {@code logicalType.getStoredType()}.
-   */
+  /// Group-key dispatch type: stored type of the column, except UUID is preserved as [DataType#UUID] so the
+  /// group-key map keys on [UuidKey] (two primitive longs) instead of [ByteArray]. For every other logical type
+  /// this equals `logicalType.getStoredType()`.
   private final DataType _dataType;
   private final Map _groupKeyMap;
   private final int _globalGroupIdUpperBound;
