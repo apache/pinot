@@ -614,7 +614,7 @@ public class EnrichedHashJoinOperatorTest {
 
     HashJoinOperator operator =
         getOperator(UUID_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(0), List.of(0),
-            Collections.emptyList(), PlanNode.NodeHint.EMPTY, null, null, null);
+            List.of(), PlanNode.NodeHint.EMPTY, null, null, null);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 1, "UUID equi-join must produce the single matching row");
@@ -641,7 +641,7 @@ public class EnrichedHashJoinOperatorTest {
 
     HashJoinOperator operator =
         getOperator(UUID_CHILD_SCHEMA, resultSchema, JoinRelType.SEMI, List.of(0), List.of(0),
-            Collections.emptyList(), PlanNode.NodeHint.EMPTY, null, null, null);
+            List.of(), PlanNode.NodeHint.EMPTY, null, null, null);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2, "SEMI-join on UUID must emit left rows whose key exists in the right table");

@@ -237,7 +237,7 @@ public class PinotDataTypeTest {
     assertEquals(UUID.convert(UUID_VALUE, OBJECT), uuid);
     assertEquals(UUID.convert(new Object[]{UUID_VALUE}, OBJECT_ARRAY), uuid);
     // Sources with no UUID interpretation fail with an explicit message
-    assertThrows(UnsupportedOperationException.class, () -> UUID.convert(1, INTEGER));
+    assertThrows(UnsupportedOperationException.class, () -> UUID.convert(1, INT));
     assertThrows(UnsupportedOperationException.class, () -> UUID.convert(1.0, DOUBLE));
   }
 
