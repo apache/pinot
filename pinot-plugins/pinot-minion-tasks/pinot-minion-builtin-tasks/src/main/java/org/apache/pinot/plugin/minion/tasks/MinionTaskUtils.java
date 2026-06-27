@@ -468,16 +468,13 @@ public class MinionTaskUtils {
    * segment. Applies the same checks the executor would (CRC match, healthy server, replica consensus) so bad
    * segments are dropped before a task is scheduled.
    *
-   * <p>How the replica is chosen depends on {@code consensusMode}:
-   * <ul>
-   *   <li>{@code UNSAFE}: the first replica with a matching CRC and a healthy server.</li>
-   *   <li>{@code EQUAL}: all replicas must match CRC, be healthy, and have an identical bitmap.</li>
-   *   <li>{@code MOST_VALID_DOCS}: all replicas must match CRC and be healthy; the one with the most valid docs
-   *       wins.</li>
-   * </ul>
+   * How the replica is chosen depends on {@code consensusMode}:
+   *   - UNSAFE: the first replica with a matching CRC and a healthy server.
+   *   - EQUAL: all replicas must match CRC, be healthy, and have an identical bitmap.
+   *   - MOST_VALID_DOCS: all replicas must match CRC and be healthy; the one with the most valid docs wins.
    *
-   * <p>For {@code EQUAL} and {@code MOST_VALID_DOCS}, {@code expectedReplicaCount} replicas must respond, otherwise the
-   * segment is skipped; {@code UNSAFE} ignores it.
+   * For EQUAL and MOST_VALID_DOCS, {@code expectedReplicaCount} replicas must respond, otherwise the segment is
+   * skipped; UNSAFE ignores it.
    */
   @Nullable
   public static ValidDocIdsMetadataInfo selectValidDocIdsMetadataForConsensus(String taskType, String segmentName,
