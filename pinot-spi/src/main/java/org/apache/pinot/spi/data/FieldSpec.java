@@ -86,11 +86,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
-  // NOTE: The nil UUID (all-zero bytes, "00000000-0000-0000-0000-000000000000") is used as the default null sentinel
-  // for UUID columns. Applications that legitimately ingest the nil UUID as a real data value cannot distinguish it
-  // from a null row unless column-based null handling is enabled (enableColumnBasedNullHandling=true in the schema).
-  // Strongly recommend enabling column-based null handling for UUID columns to avoid this ambiguity.
-  public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_UUID = UuidUtils.nullUuidBytes();
   public static final BigDecimal DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
 
   public static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
@@ -536,6 +531,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             case BYTES:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
             case UUID:
+              // The nil UUID is the default null sentinel. Tables that ingest nil UUID as a real value should enable
+              // column-based null handling to distinguish it from null rows.
               return UuidUtils.nullUuidBytes();
             case BIG_DECIMAL:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL;
