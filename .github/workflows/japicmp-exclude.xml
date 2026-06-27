@@ -15,10 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Deprecated methods intentionally removed in this release
-org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig#getSegmentPushType
-org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig#setSegmentPushType
-org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig#getSegmentPushFrequency
-org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig#setSegmentPushFrequency
-org.apache.pinot.spi.utils.builder.TableConfigBuilder#setSegmentPushType
-org.apache.pinot.spi.utils.builder.TableConfigBuilder#setSegmentPushFrequency
+# Classes with deprecated methods intentionally removed in this release.
+# Note: japicmp --exclude @file matches against fully-qualified class names only;
+# the Class#method syntax is not supported, so the entire class is excluded here.
+org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig
+org.apache.pinot.spi.utils.builder.TableConfigBuilder
