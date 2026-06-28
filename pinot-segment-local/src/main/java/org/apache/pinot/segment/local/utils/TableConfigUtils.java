@@ -1241,7 +1241,7 @@ public final class TableConfigUtils {
     }
     for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry
         : tableConfig.getInstanceAssignmentConfigMap()
-            .entrySet()) {
+        .entrySet()) {
       String instancePartitionsType = instanceAssignmentConfigMapEntry.getKey();
       InstanceAssignmentConfig instanceAssignmentConfig = instanceAssignmentConfigMapEntry.getValue();
       if (instanceAssignmentConfig.getPartitionSelector()
@@ -1706,7 +1706,7 @@ public final class TableConfigUtils {
         Preconditions.checkState(fieldSpec != null, "Failed to find sorted column: %s in schema", column);
         Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot sort on multi-value column: %s", column);
         FieldIndexConfigs indexConfigsForSortedColumn = indexConfigsMap.get(column);
-        for (IndexType indexType : List.of(StandardIndexes.bloomFilter(), StandardIndexes.inverted(),
+        for (IndexType indexType : List.of(StandardIndexes.inverted(),
             StandardIndexes.range())) {
           Preconditions.checkState(indexConfigsForSortedColumn.getConfig(indexType).isDisabled(),
               "Redundant to enable %s on a sorted column: %s", indexType.getPrettyName(), fieldSpec.getName());
