@@ -329,8 +329,8 @@ public class ServerPlanRequestUtils {
    *       range predicate (for numeric keys) to enable cheap range-based segment pruning.</li>
    *   <li>{@code AUTO} — exact {@code IN} at/below {@code maxInSize} build-key rows, else bloom.</li>
    * </ul>
-   * Build sides larger than {@code maxBuildRows} or blooms larger than {@code maxBytes} are abandoned
-   * (no filter), which is always correct.
+   * Build sides larger than {@code maxBuildRows}, or any predicate (bloom or exact {@code IN}) whose
+   * estimated serialized size exceeds {@code maxBytes}, are abandoned (no filter), which is always correct.
    */
   static void attachRuntimeFilter(PinotQuery pinotQuery, List<Integer> probeKeys, List<Integer> buildKeys,
       List<Object[]> dataContainer, DataSchema dataSchema, RuntimeFilterNode.Type type) {
@@ -389,6 +389,13 @@ public class ServerPlanRequestUtils {
     }
 
     if (!useBloom) {
+      // Apply the same footprint ceiling the bloom tier honors. The exact-IN path (IN mode, or any
+      // multi-key, or AUTO below the threshold) emits up to maxBuildRows literals per key, AND'd across
+      // keys, which can be multi-MB. Abandon if the estimated serialized size exceeds maxBytes so there is
+      // one consistent ceiling regardless of tier; dropping the filter keeps the join correct.
+      if (estimateExactInBytes(rows, buildKeys, dataSchema) > maxBytes) {
+        return;
+      }
       attachDynamicFilter(pinotQuery, probeKeys, buildKeys, rows, dataSchema);
       return;
     }
@@ -421,6 +428,52 @@ public class ServerPlanRequestUtils {
       }
     }
     return result;
+  }
+
+  /** Rough per-literal overhead (proto Expression + Literal wrapping) used by {@link #estimateExactInBytes}. */
+  private static final int IN_LITERAL_OVERHEAD_BYTES = 8;
+
+  /**
+   * Estimates the serialized footprint (in bytes) of the exact-IN predicate this build set would produce:
+   * one IN list per key over all rows. Used to abandon the exact-IN tier when it would exceed the same
+   * {@code maxBytes} ceiling the bloom tier honors. Fixed-width types are O(1); STRING/BYTES sum lengths.
+   */
+  private static long estimateExactInBytes(List<Object[]> rows, List<Integer> buildKeys, DataSchema dataSchema) {
+    int numRows = rows.size();
+    long bytes = 0;
+    for (int buildKey : buildKeys) {
+      FieldSpec.DataType storedType = dataSchema.getColumnDataType(buildKey).getStoredType().toDataType();
+      switch (storedType) {
+        case INT:
+        case FLOAT:
+          bytes += (long) numRows * (IN_LITERAL_OVERHEAD_BYTES + 4);
+          break;
+        case LONG:
+        case DOUBLE:
+          bytes += (long) numRows * (IN_LITERAL_OVERHEAD_BYTES + 8);
+          break;
+        case STRING:
+          for (Object[] row : rows) {
+            bytes += IN_LITERAL_OVERHEAD_BYTES + ((String) row[buildKey]).length();
+          }
+          break;
+        case BYTES:
+          for (Object[] row : rows) {
+            bytes += IN_LITERAL_OVERHEAD_BYTES + ((ByteArray) row[buildKey]).length();
+          }
+          break;
+        case BIG_DECIMAL:
+          // Variable-length: approximate the serialized form as the unscaled magnitude bytes plus scale.
+          for (Object[] row : rows) {
+            bytes += IN_LITERAL_OVERHEAD_BYTES + 4 + (((BigDecimal) row[buildKey]).unscaledValue().bitLength() / 8 + 1);
+          }
+          break;
+        default:
+          bytes += (long) numRows * (IN_LITERAL_OVERHEAD_BYTES + 16);
+          break;
+      }
+    }
+    return bytes;
   }
 
   /**

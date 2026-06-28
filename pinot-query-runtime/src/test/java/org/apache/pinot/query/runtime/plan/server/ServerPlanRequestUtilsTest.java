@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan.server;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.Expression;
@@ -27,7 +28,9 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.sql.FilterKind;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -56,6 +59,15 @@ public class ServerPlanRequestUtilsTest {
   private static List<Object[]> intRows(int... values) {
     List<Object[]> rows = new ArrayList<>();
     for (int value : values) {
+      rows.add(new Object[]{value});
+    }
+    return rows;
+  }
+
+  /** Wraps each scalar build-key value as a single-column build row. */
+  private static List<Object[]> rowsOf(Object... values) {
+    List<Object[]> rows = new ArrayList<>();
+    for (Object value : values) {
       rows.add(new Object[]{value});
     }
     return rows;
@@ -295,6 +307,67 @@ public class ServerPlanRequestUtilsTest {
     ServerPlanRequestUtils.attachRuntimeFilter(pinotQuery, List.of(0), List.of(0), intRows(1, 2, 3), buildSchema,
         RuntimeFilterNode.Type.BLOOM, 10000, 0.01, 1, 1000);
     assertNull(pinotQuery.getFilterExpression(), "a bloom exceeding maxBytes must abandon the filter");
+  }
+
+  /** Every storable single join-key type, with a small build set, for the exact-IN footprint cap. */
+  @DataProvider(name = "exactInCapTypes")
+  public static Object[][] exactInCapTypes() {
+    return new Object[][]{
+        {ColumnDataType.INT, rowsOf(1, 2, 3)},
+        {ColumnDataType.LONG, rowsOf(1L, 2L, 3L)},
+        {ColumnDataType.FLOAT, rowsOf(1.0f, 2.0f)},
+        {ColumnDataType.DOUBLE, rowsOf(1.0, 2.0)},
+        {ColumnDataType.STRING, rowsOf("alpha", "beta")},
+        {ColumnDataType.BYTES, rowsOf(new ByteArray(new byte[]{1}), new ByteArray(new byte[]{2}))},
+        {ColumnDataType.BIG_DECIMAL, rowsOf(new BigDecimal("1.5"), new BigDecimal("2.5"))}
+    };
+  }
+
+  @Test(dataProvider = "exactInCapTypes")
+  public void testExactInCapHonoredForEachKeyType(ColumnDataType keyType, List<Object[]> buildRows) {
+    DataSchema buildSchema = new DataSchema(new String[]{"k"}, new ColumnDataType[]{keyType});
+    // A 1-byte ceiling forces every non-empty build set over the cap; this drives estimateExactInBytes
+    // through each per-type branch (STRING/BYTES/BIG_DECIMAL walk every row) and must abandon the filter.
+    PinotQuery abandon = queryWithProbeColumns("fk");
+    ServerPlanRequestUtils.attachRuntimeFilter(abandon, List.of(0), List.of(0), buildRows, buildSchema,
+        RuntimeFilterNode.Type.IN, 10000, 0.01, 1, 1000);
+    assertNull(abandon.getFilterExpression(), "exact IN over maxBytes must abandon the filter for " + keyType);
+    // A generous ceiling keeps the same exact IN for that type.
+    PinotQuery keep = queryWithProbeColumns("fk");
+    ServerPlanRequestUtils.attachRuntimeFilter(keep, List.of(0), List.of(0), buildRows, buildSchema,
+        RuntimeFilterNode.Type.IN, 10000, 0.01, 1 << 20, 1000);
+    assertEquals(keep.getFilterExpression().getFunctionCall().getOperator(), FilterKind.IN.name(),
+        "exact IN under maxBytes must be kept for " + keyType);
+  }
+
+  @Test
+  public void testExactInCapBoundaryIsStrict() {
+    DataSchema buildSchema = new DataSchema(new String[]{"k"}, new ColumnDataType[]{ColumnDataType.INT});
+    // Three INT keys estimate to 3 * (IN_LITERAL_OVERHEAD_BYTES + 4) = 36 bytes. The guard is a strict
+    // '>' so a ceiling equal to the footprint keeps the filter and one byte under abandons it.
+    PinotQuery atLimit = queryWithProbeColumns("fk");
+    ServerPlanRequestUtils.attachRuntimeFilter(atLimit, List.of(0), List.of(0), intRows(1, 2, 3), buildSchema,
+        RuntimeFilterNode.Type.IN, 10000, 0.01, 36, 1000);
+    assertEquals(atLimit.getFilterExpression().getFunctionCall().getOperator(), FilterKind.IN.name(),
+        "footprint == maxBytes must be kept (strict > boundary)");
+    PinotQuery overLimit = queryWithProbeColumns("fk");
+    ServerPlanRequestUtils.attachRuntimeFilter(overLimit, List.of(0), List.of(0), intRows(1, 2, 3), buildSchema,
+        RuntimeFilterNode.Type.IN, 10000, 0.01, 35, 1000);
+    assertNull(overLimit.getFilterExpression(), "footprint one byte over maxBytes must abandon");
+  }
+
+  @Test
+  public void testMultiKeyExactInOverMaxBytesAbandonsFilter() {
+    PinotQuery pinotQuery = queryWithProbeColumns("fk1", "fk2");
+    DataSchema buildSchema =
+        new DataSchema(new String[]{"k1", "k2"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{1, 10L});
+    rows.add(new Object[]{2, 20L});
+    // Multi-key always uses exact IN (per key, AND'd); a tiny maxBytes must abandon the whole filter.
+    ServerPlanRequestUtils.attachRuntimeFilter(pinotQuery, List.of(0, 1), List.of(0, 1), rows, buildSchema,
+        RuntimeFilterNode.Type.AUTO, 10000, 0.01, 1, 1000);
+    assertNull(pinotQuery.getFilterExpression(), "a multi-key exact IN exceeding maxBytes must abandon the filter");
   }
 
   @Test

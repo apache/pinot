@@ -50,6 +50,7 @@ public class RuntimeFilterJoinIntegrationTest extends CustomDataQueryClusterInte
   private static final String DKEY = "dkey";     // unique DOUBLE key (id + 0.5)
   private static final String SKEY = "skey";     // STRING key, 25 distinct values (groups of 4)
   private static final String NKEY = "nkey";     // nullable LONG key (null when id % 7 == 0)
+  private static final String NANKEY = "nankey"; // DOUBLE key that is NaN for id < 3, else distinct (id + 1000)
   private static final String CAT = "cat";       // category: "rare" for id < 5, else "common"
   private static final String VAL = "val";       // INT value == id
   private static final int NUM_DOCS = 100;
@@ -80,6 +81,7 @@ public class RuntimeFilterJoinIntegrationTest extends CustomDataQueryClusterInte
         .addSingleValueDimension(DKEY, DataType.DOUBLE)
         .addSingleValueDimension(SKEY, DataType.STRING)
         .addSingleValueDimension(NKEY, DataType.LONG)
+        .addSingleValueDimension(NANKEY, DataType.DOUBLE)
         .addSingleValueDimension(CAT, DataType.STRING)
         .addMetric(VAL, DataType.INT)
         .build();
@@ -102,6 +104,8 @@ public class RuntimeFilterJoinIntegrationTest extends CustomDataQueryClusterInte
         new org.apache.avro.Schema.Field(SKEY, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null,
             null),
         new org.apache.avro.Schema.Field(NKEY, nullableLong, null, null),
+        new org.apache.avro.Schema.Field(NANKEY, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE),
+            null, null),
         new org.apache.avro.Schema.Field(CAT, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null,
             null),
         new org.apache.avro.Schema.Field(VAL, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT), null,
@@ -116,6 +120,7 @@ public class RuntimeFilterJoinIntegrationTest extends CustomDataQueryClusterInte
         record.put(DKEY, id + 0.5);
         record.put(SKEY, "key_" + (id % 25));
         record.put(NKEY, id % 7 == 0 ? null : (long) id);
+        record.put(NANKEY, id < 3 ? Double.NaN : (double) (id + 1000));
         record.put(CAT, id < NUM_RARE ? "rare" : "common");
         record.put(VAL, id);
         writers.get(id % getNumAvroFiles()).append(record);
@@ -211,6 +216,23 @@ public class RuntimeFilterJoinIntegrationTest extends CustomDataQueryClusterInte
     assertAllModesMatchBaseline("COUNT(*)",
         "FROM " + TABLE_NAME + " t1 JOIN " + TABLE_NAME + " t2 ON t1." + ID + " = t2." + LID
             + " WHERE t2." + CAT + " = 'rare'");
+  }
+
+  @Test
+  public void testNaNKeyMatchesBaseline()
+      throws Exception {
+    // NaN join keys on both sides (ids 0,1,2 have nankey = NaN); the build (t2 where id < 3) is all-NaN.
+    // Confirms the exact-IN and bloom reducers agree with the MSE hash join on NaN equality: whatever the
+    // join does with NaN = NaN, the filter must preserve it (no false negatives). If the leaf IN/bloom
+    // dropped a probe NaN row the join keeps, the on/off counts would diverge and this would fail.
+    String rest = "FROM " + TABLE_NAME + " t1 JOIN " + TABLE_NAME + " t2 ON t1." + NANKEY + " = t2." + NANKEY
+        + " WHERE t2." + ID + " < 3";
+    assertAllModesMatchBaseline("COUNT(*)", rest);
+    // Pin the regime so the parity check is not vacuous: the MSE hash join treats NaN = NaN, so the 3 NaN
+    // probe rows join the 3 NaN build rows -> 9 pairs, and the reducer preserves all of them.
+    JsonNode baseline = runMse("SELECT COUNT(*) " + rest);
+    assertEquals(baseline.get("rows").get(0).get(0).asLong(), 9L,
+        "the MSE hash join matches NaN = NaN (3 x 3); if this changes, revisit the exact-IN NaN handling");
   }
 
   @Test
