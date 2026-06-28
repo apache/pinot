@@ -101,6 +101,21 @@ public class MinionTaskUtils {
         ? MinionConstants.ValidDocIdsConsensusMode.UNSAFE : consensusMode;
   }
 
+  /**
+   * Resolves the per-server batch size for the generator's validDocIds fetch. UNSAFE keeps {@code regularBatchSize}
+   * (the no-bitmap fetch). The consensus modes fetch from every replica (and EQUAL also carries a bitmap per entry),
+   * so they use the smaller {@code validDocIdsConsensusFetchBatchSize} to keep the payload bounded.
+   */
+  public static int resolveValidDocIdsFetchBatchSize(Map<String, String> taskConfigs,
+      MinionConstants.ValidDocIdsConsensusMode consensusMode, int regularBatchSize) {
+    if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+      return regularBatchSize;
+    }
+    return Integer.parseInt(taskConfigs.getOrDefault(
+        MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY,
+        String.valueOf(MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE)));
+  }
+
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
 
   public static final String DATETIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";

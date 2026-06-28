@@ -191,10 +191,14 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       boolean includeBitmaps = consensusMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL;
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
-      // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
-      int numSegmentsBatchPerServerRequest = Integer.parseInt(
+      // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size. The
+      // consensus modes use a smaller batch (validDocIdsConsensusFetchBatchSize) since they fetch from every replica
+      // and EQUAL also carries a bitmap per entry; UNSAFE keeps the regular batch.
+      int regularBatchPerServerRequest = Integer.parseInt(
           taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
               String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
+      int numSegmentsBatchPerServerRequest =
+          MinionTaskUtils.resolveValidDocIdsFetchBatchSize(taskConfigs, consensusMode, regularBatchPerServerRequest);
 
       Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
           serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,

@@ -297,6 +297,16 @@ public class MinionConstants {
 
     /** Default: enforce in both generator and executor. */
     public static final String DEFAULT_VALID_DOC_IDS_VALIDATION_MODE = "STRICT";
+
+    /**
+     * Per-server batch size for the validDocIds fetch when generator consensus runs (EQUAL/MOST_VALID_DOCS). Kept
+     * small because consensus fetches from every replica and EQUAL also carries the serialized bitmap in each entry.
+     * Shared by UpsertCompactionTask and UpsertCompactMergeTask.
+     */
+    public static final String VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY = "validDocIdsConsensusFetchBatchSize";
+
+    /** Default consensus fetch batch size, small since all replicas respond and EQUAL includes the bitmap. */
+    public static final int DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE = 10;
   }
 
   public static class UpsertCompactMergeTask {
