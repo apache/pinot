@@ -64,7 +64,9 @@ public class TextIndexCreationTest {
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(schema.getSchemaName())
-        .addFieldConfig(new FieldConfig.Builder("txt").withIndexTypes(List.of(FieldConfig.IndexType.TEXT)).build())
+        .addFieldConfig(new FieldConfig.Builder("txt").withEncodingType(FieldConfig.EncodingType.RAW)
+            .withIndexTypes(List.of(FieldConfig.IndexType.TEXT))
+            .build())
         .setMultiColumnTextIndexConfig(new MultiColumnTextIndexConfig(List.of("txt")))
         .build();
     try {
