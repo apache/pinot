@@ -112,8 +112,8 @@ public class MinionTaskUtils {
       return regularBatchSize;
     }
     return Integer.parseInt(taskConfigs.getOrDefault(
-        MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY,
-        String.valueOf(MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE)));
+        MinionConstants.VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY,
+        String.valueOf(MinionConstants.DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE)));
   }
 
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";

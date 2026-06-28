@@ -79,9 +79,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     Map<String, String> taskConfigs =
         tableConfig.getTaskConfig() != null ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
     String consensusMode =
-        taskConfigs != null ? taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
-            UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
-            : UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
+        taskConfigs != null ? taskConfigs.getOrDefault(MinionConstants.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+            MinionConstants.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
+            : MinionConstants.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
     RoaringBitmap validDocIds =
         MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
             MINION_CONTEXT, originalSegmentCrcFromTaskGenerator, consensusMode);

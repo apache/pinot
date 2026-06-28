@@ -183,11 +183,11 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       // EQUAL consensus, so fetch them only then to keep the payload small.
       MinionConstants.ValidDocIdsConsensusMode consensusMode = MinionTaskUtils.resolveGeneratorConsensusMode(
           MinionTaskUtils.parseValidDocIdsConsensusMode(
-              taskConfigs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
-                  MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)),
+              taskConfigs.getOrDefault(MinionConstants.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+                  MinionConstants.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)),
           MinionTaskUtils.parseValidDocIdsValidationMode(
-              taskConfigs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_VALIDATION_MODE_KEY,
-                  MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_VALIDATION_MODE)));
+              taskConfigs.getOrDefault(MinionConstants.VALID_DOC_IDS_VALIDATION_MODE_KEY,
+                  MinionConstants.DEFAULT_VALID_DOC_IDS_VALIDATION_MODE)));
       boolean includeBitmaps = consensusMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL;
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a

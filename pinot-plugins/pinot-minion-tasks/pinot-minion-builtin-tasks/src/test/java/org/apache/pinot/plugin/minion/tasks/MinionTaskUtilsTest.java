@@ -370,7 +370,7 @@ public class MinionTaskUtilsTest {
   public void testResolveValidDocIdsFetchBatchSize() {
     // UNSAFE keeps the regular (no-bitmap) batch and ignores the consensus key.
     Map<String, String> withConsensusKey = Map.of(
-        MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY, "7");
+        MinionConstants.VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY, "7");
     assertEquals(MinionTaskUtils.resolveValidDocIdsFetchBatchSize(withConsensusKey,
         MinionConstants.ValidDocIdsConsensusMode.UNSAFE, 500), 500);
 
@@ -380,7 +380,7 @@ public class MinionTaskUtilsTest {
       assertEquals(MinionTaskUtils.resolveValidDocIdsFetchBatchSize(withConsensusKey, mode, 500), 7);
       // Falls back to the small default when the consensus key is absent (does not inherit the regular batch).
       assertEquals(MinionTaskUtils.resolveValidDocIdsFetchBatchSize(Map.of(), mode, 500),
-          MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE);
+          MinionConstants.DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE);
     }
   }
 

@@ -106,6 +106,28 @@ public class MinionConstants {
     STRICT, EXECUTOR_ONLY
   }
 
+  /**
+   * Valid doc ids consensus mode used by both the task generators (pre-scheduling) and the executors. UNSAFE = first
+   * server with matching CRC and GOOD status; EQUAL (default) = all replicas must have the same valid doc set;
+   * MOST_VALID_DOCS = the replica with the most valid docs.
+   */
+  public static final String VALID_DOC_IDS_CONSENSUS_MODE_KEY = "validDocIdsConsensusMode";
+  public static final String DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE = "EQUAL";
+
+  /**
+   * Whether the consensus checks run in the generator too. STRICT (default) = generator + executor; EXECUTOR_ONLY =
+   * executor only (generator skips the checks and the bitmap fetch).
+   */
+  public static final String VALID_DOC_IDS_VALIDATION_MODE_KEY = "validDocIdsValidationMode";
+  public static final String DEFAULT_VALID_DOC_IDS_VALIDATION_MODE = "STRICT";
+
+  /**
+   * Per-server batch size for the validDocIds fetch when generator consensus runs (EQUAL/MOST_VALID_DOCS). Kept small
+   * because consensus fetches from every replica and EQUAL also carries the serialized bitmap in each entry.
+   */
+  public static final String VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY = "validDocIdsConsensusFetchBatchSize";
+  public static final int DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE = 10;
+
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
     public static final String TASK_TYPE = "PurgeTask";
@@ -277,36 +299,14 @@ public class MinionConstants {
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
 
-    /**
-     * Valid doc ids consensus mode enforced by both the task generators (pre-scheduling) and the executors. Values:
-     * UNSAFE, EQUAL, MOST_VALID_DOCS. UNSAFE = use the first server with matching CRC and GOOD status; EQUAL =
-     * require all replicas to have the same valid doc set (default); MOST_VALID_DOCS = use the replica with the most
-     * valid docs. Shared by UpsertCompactionTask and UpsertCompactMergeTask.
-     */
-    public static final String VALID_DOC_IDS_CONSENSUS_MODE_KEY = "validDocIdsConsensusMode";
+    /** @deprecated moved to {@link MinionConstants#VALID_DOC_IDS_CONSENSUS_MODE_KEY}. */
+    @Deprecated
+    public static final String VALID_DOC_IDS_CONSENSUS_MODE_KEY = MinionConstants.VALID_DOC_IDS_CONSENSUS_MODE_KEY;
 
-    /** Default: equal valid doc set consensus across replicas. */
-    public static final String DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE = "EQUAL";
-
-    /**
-     * Whether the consensus checks run in the generator too. STRICT (default) = generator + executor; EXECUTOR_ONLY =
-     * executor only (generator skips the checks and the bitmap fetch). Shared by UpsertCompactionTask,
-     * UpsertCompactMergeTask, and SegmentRefreshTask.
-     */
-    public static final String VALID_DOC_IDS_VALIDATION_MODE_KEY = "validDocIdsValidationMode";
-
-    /** Default: enforce in both generator and executor. */
-    public static final String DEFAULT_VALID_DOC_IDS_VALIDATION_MODE = "STRICT";
-
-    /**
-     * Per-server batch size for the validDocIds fetch when generator consensus runs (EQUAL/MOST_VALID_DOCS). Kept
-     * small because consensus fetches from every replica and EQUAL also carries the serialized bitmap in each entry.
-     * Shared by UpsertCompactionTask and UpsertCompactMergeTask.
-     */
-    public static final String VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY = "validDocIdsConsensusFetchBatchSize";
-
-    /** Default consensus fetch batch size, small since all replicas respond and EQUAL includes the bitmap. */
-    public static final int DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE = 10;
+    /** @deprecated moved to {@link MinionConstants#DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE}. */
+    @Deprecated
+    public static final String DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE =
+        MinionConstants.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
   }
 
   public static class UpsertCompactMergeTask {
