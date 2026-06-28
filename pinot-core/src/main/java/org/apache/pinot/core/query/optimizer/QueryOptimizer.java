@@ -32,7 +32,6 @@ import org.apache.pinot.core.query.optimizer.filter.TextMatchFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.TimePredicateFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.AggregateFunctionRewriteOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
-import org.apache.pinot.core.query.optimizer.statement.StringPredicateFilterOptimizer;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -49,7 +48,7 @@ public class QueryOptimizer {
           new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
-      List.of(new StringPredicateFilterOptimizer(), new AggregateFunctionRewriteOptimizer());
+      List.of(new AggregateFunctionRewriteOptimizer());
 
   /**
    * Optimizes the given query.

@@ -191,6 +191,23 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
     );
   }
 
+  @Test(dataProvider = "allJsonColumns")
+  public void testColumnToColumnComparison(String column) {
+    // A JSON last name ("duck", "mouse", ...) is compared as a STRING against stringColumn ("daffy duck",
+    // "mickey mouse", ...). The two are never equal, so '=' matches no row and '!=' matches every row.
+    String lastName = "json_extract_scalar(" + column + ", '$.name.last', 'STRING', '')";
+    checkResult("SELECT intColumn FROM testTable WHERE " + lastName + " = stringColumn", new Object[][]{});
+    checkResult("SELECT intColumn FROM testTable WHERE " + lastName + " != stringColumn LIMIT 3",
+        new Object[][]{{1}, {2}, {3}});
+
+    // A JSON id (101, 111, 121, ... for the first rows) is compared numerically against intColumn (1, 2, 3, ...).
+    // The id is never equal to the row's intColumn, and for the leading rows it is the larger value.
+    String id = "json_extract_scalar(" + column + ", '$.id', 'INT', '0')";
+    checkResult("SELECT intColumn FROM testTable WHERE " + id + " = intColumn", new Object[][]{});
+    checkResult("SELECT intColumn FROM testTable WHERE " + id + " > intColumn LIMIT 3",
+        new Object[][]{{1}, {2}, {3}});
+  }
+
   @Test
   public void testNullAsDefaultValueWithNullHandlingEnabled() {
     checkResult(
