@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.reduce;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
@@ -67,7 +66,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     if (dataTableMap.isEmpty()) {
       DataSchema resultTableSchema =
           new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema)).getResultDataSchema();
-      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, List.of()));
       return;
     }
 
@@ -274,7 +273,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     Object[] row = postAggregationHandler.getResult(finalResults);
 
     RewriterResult resultRewriterResult =
-        ResultRewriteUtils.rewriteResult(resultDataSchema, Collections.singletonList(row));
+        ResultRewriteUtils.rewriteResult(resultDataSchema, List.<Object[]>of(row));
     resultDataSchema = resultRewriterResult.getDataSchema();
     List<Object[]> rows = resultRewriterResult.getRows();
 

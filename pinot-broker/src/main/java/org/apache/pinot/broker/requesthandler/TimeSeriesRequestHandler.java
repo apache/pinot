@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -416,7 +415,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       DataSchema schema = new DataSchema(new String[]{"QUERY", "PLAN"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
       BrokerResponseNative response = BrokerResponseNative.empty();
-      response.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[]{request.getQuery(),
+      response.setResultTable(new ResultTable(schema, List.<Object[]>of(new Object[]{request.getQuery(),
           plan})));
       return response;
     } catch (URISyntaxException e) {

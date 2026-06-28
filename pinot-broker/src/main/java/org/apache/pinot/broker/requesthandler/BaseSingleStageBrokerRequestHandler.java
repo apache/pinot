@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -271,7 +270,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   Set<ServerInstance> getRunningServers(long requestId) {
     Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
     QueryServers queryServers = _serversById.get(requestId);
-    return queryServers != null ? queryServers._servers : Collections.emptySet();
+    return queryServers != null ? queryServers._servers : Set.of();
   }
 
   @Override

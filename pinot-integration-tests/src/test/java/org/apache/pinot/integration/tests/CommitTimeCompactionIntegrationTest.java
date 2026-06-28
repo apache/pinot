@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -186,7 +185,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     TableConfig tableConfigWithCompaction =
         createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicName, getNumKafkaPartitions(),
             csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
-    tableConfigWithCompaction.getIndexingConfig().setSortedColumn(Collections.singletonList("score"));
+    tableConfigWithCompaction.getIndexingConfig().setSortedColumn(List.of("score"));
     tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfigWithCompaction);
 
@@ -198,7 +197,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     TableConfig tableConfigWithoutCompaction =
         createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicName, getNumKafkaPartitions(),
             csvDecoderProperties, upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
-    tableConfigWithoutCompaction.getIndexingConfig().setSortedColumn(Collections.singletonList("score"));
+    tableConfigWithoutCompaction.getIndexingConfig().setSortedColumn(List.of("score"));
     tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfigWithoutCompaction);
 
@@ -208,7 +207,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     TableConfig tableConfigWithCompactionAndColumnMajor =
         createCSVUpsertTableConfig(tableNameWithCompactionAndColumnMajor, kafkaTopicName, getNumKafkaPartitions(),
             csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
-    tableConfigWithCompactionAndColumnMajor.getIndexingConfig().setSortedColumn(Collections.singletonList("score"));
+    tableConfigWithCompactionAndColumnMajor.getIndexingConfig().setSortedColumn(List.of("score"));
     tableConfigWithCompactionAndColumnMajor.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(true);
     addTableConfig(tableConfigWithCompactionAndColumnMajor);
 
@@ -451,7 +450,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         .addMultiValueDimension("game", FieldSpec.DataType.STRING)  // Multi-value for UNION strategy
         .addSingleValueDimension("deleted", FieldSpec.DataType.BOOLEAN).addMetric("score", FieldSpec.DataType.FLOAT)
         .addDateTime("timestampInEpoch", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .setPrimaryKeyColumns(Collections.singletonList("playerId"));
+        .setPrimaryKeyColumns(List.of("playerId"));
 
     // Create schema for partial upsert - make game multi-value to support UNION strategy
     String tableNameWithoutCompaction = "gameScoresPartialCompactionDisabled";

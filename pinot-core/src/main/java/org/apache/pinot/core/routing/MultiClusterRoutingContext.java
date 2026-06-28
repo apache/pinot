@@ -19,7 +19,6 @@
 package org.apache.pinot.core.routing;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,7 +60,7 @@ public class MultiClusterRoutingContext {
     _tableCacheMap = tableCacheMap;
     _localRoutingManager = localRoutingManager;
     _multiClusterRoutingManager = multiClusterRoutingManager;
-    _unavailableClusters = unavailableClusters != null ? unavailableClusters : Collections.emptySet();
+    _unavailableClusters = unavailableClusters != null ? unavailableClusters : Set.of();
   }
 
   public Map<String, TableCache> getTableCacheMap() {
@@ -98,7 +97,7 @@ public class MultiClusterRoutingContext {
 
   public List<QueryProcessingException> getUnavailableClusterExceptions() {
     if (_unavailableClusters.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
     List<QueryProcessingException> exceptions = new ArrayList<>();
     for (String clusterName : _unavailableClusters) {

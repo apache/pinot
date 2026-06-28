@@ -81,7 +81,7 @@ public class ScanEntriesThresholdStrategyTest {
     QueryScanCostContext ctx = new QueryScanCostContext();
     ctx.addEntriesScannedInFilter(150_000_000);
 
-    QueryKillReport report = strategy.buildKillReport(ctx, "q1", "myTable", "cluster");
+    QueryKillReport report = strategy.buildKillReport(ctx, 1L, "q1", "myTable", "cluster");
     assertEquals(report.getTriggeringMetric(), "numEntriesScannedInFilter");
     assertEquals(report.getActualValue(), 150_000_000L);
     assertEquals(report.getThresholdValue(), 100_000_000L);
@@ -93,7 +93,7 @@ public class ScanEntriesThresholdStrategyTest {
     QueryScanCostContext ctx = new QueryScanCostContext();
     ctx.addDocsScanned(15_000_000);
 
-    QueryKillReport report = strategy.buildKillReport(ctx, "q2", "myTable", "table:myTable");
+    QueryKillReport report = strategy.buildKillReport(ctx, 2L, "q2", "myTable", "table:myTable");
     assertEquals(report.getTriggeringMetric(), "numDocsScanned");
     assertEquals(report.getActualValue(), 15_000_000L);
     assertEquals(report.getThresholdValue(), 10_000_000L);
@@ -120,6 +120,64 @@ public class ScanEntriesThresholdStrategyTest {
     ctx2.addEntriesScannedInFilter(50);
     ctx2.addDocsScanned(201);
     assertTrue(strategy.shouldTerminate(ctx2));
+  }
+
+  @Test
+  public void testAbovePostFilterThresholdKills() {
+    ScanEntriesThresholdStrategy strategy =
+        new ScanEntriesThresholdStrategy(Long.MAX_VALUE, Long.MAX_VALUE, 1000L);
+    QueryScanCostContext ctx = new QueryScanCostContext();
+    ctx.addEntriesScannedPostFilter(1001);
+    assertTrue(strategy.shouldTerminate(ctx));
+  }
+
+  @Test
+  public void testBelowPostFilterThresholdDoesNotKill() {
+    ScanEntriesThresholdStrategy strategy =
+        new ScanEntriesThresholdStrategy(Long.MAX_VALUE, Long.MAX_VALUE, 1000L);
+    QueryScanCostContext ctx = new QueryScanCostContext();
+    ctx.addEntriesScannedPostFilter(999);
+    assertFalse(strategy.shouldTerminate(ctx));
+  }
+
+  @Test
+  public void testBuildKillReportForPostFilter() {
+    ScanEntriesThresholdStrategy strategy =
+        new ScanEntriesThresholdStrategy(Long.MAX_VALUE, Long.MAX_VALUE, 5000L);
+    QueryScanCostContext ctx = new QueryScanCostContext();
+    ctx.addEntriesScannedPostFilter(7500);
+
+    QueryKillReport report = strategy.buildKillReport(ctx, 3L, "q3", "myTable", "cluster");
+    assertEquals(report.getTriggeringMetric(), "numEntriesScannedPostFilter");
+    assertEquals(report.getActualValue(), 7500L);
+    assertEquals(report.getThresholdValue(), 5000L);
+  }
+
+  @Test
+  public void testPostFilterOverrideViaForQuery() {
+    ScanEntriesThresholdStrategy strategy =
+        new ScanEntriesThresholdStrategy(100L, 200L, 300L);
+    QueryConfig queryConfig = new QueryConfig(null, null, null, null, null, null, null, null, 600L);
+
+    QueryKillingStrategy result = strategy.forQuery(queryConfig, null);
+    assertTrue(result != strategy);
+    ScanEntriesThresholdStrategy overridden = (ScanEntriesThresholdStrategy) result;
+    assertEquals(overridden.getMaxEntriesScannedInFilter(), 100L);
+    assertEquals(overridden.getMaxDocsScanned(), 200L);
+    assertEquals(overridden.getMaxEntriesScannedPostFilter(), 600L);
+  }
+
+  @Test
+  public void testPostFilterPriorityInBuildKillReport() {
+    // When both entries-in-filter and post-filter exceed, entries-in-filter takes priority
+    ScanEntriesThresholdStrategy strategy =
+        new ScanEntriesThresholdStrategy(100L, Long.MAX_VALUE, 500L);
+    QueryScanCostContext ctx = new QueryScanCostContext();
+    ctx.addEntriesScannedInFilter(200);
+    ctx.addEntriesScannedPostFilter(1000);
+
+    QueryKillReport report = strategy.buildKillReport(ctx, 4L, "q4", "myTable", "cluster");
+    assertEquals(report.getTriggeringMetric(), "numEntriesScannedInFilter");
   }
 
   // --- forQuery() table override tests ---

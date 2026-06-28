@@ -19,8 +19,8 @@
 package org.apache.pinot.common.metrics;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
@@ -60,7 +60,7 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
    * @param metricsRegistry The metric registry used to register timers and meters.
    */
   public BrokerMetrics(PinotMetricsRegistry metricsRegistry) {
-    this(metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptySet());
+    this(metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Set.of());
   }
 
   public BrokerMetrics(PinotMetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,

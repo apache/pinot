@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -91,5 +92,72 @@ public class QueryConfigScanKillingTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testZeroMaxDocsScannedThrows() {
     new QueryConfig(null, null, null, null, null, null, null, 0L, null);
+  }
+
+  @Test
+  public void testScanKillingModeDefaultsToNull() {
+    QueryConfig config = new QueryConfig(null, null, null, null, null, null, null, null, null);
+    assertNull(config.getScanKillingMode());
+  }
+
+  @Test
+  public void testScanKillingModeSetExplicitly() {
+    QueryConfig config = new QueryConfig(null, null, null, null, null, null, null, null, null, "enforce");
+    assertEquals(config.getScanKillingMode(), "enforce");
+  }
+
+  @Test
+  public void testScanKillingModeJsonRoundTrip()
+      throws Exception {
+    QueryConfig config = new QueryConfig(null, null, null, null, null, null, 500_000L, null, null, "logOnly");
+
+    String json = OBJECT_MAPPER.writeValueAsString(config);
+    QueryConfig deserialized = OBJECT_MAPPER.readValue(json, QueryConfig.class);
+
+    assertEquals(deserialized.getScanKillingMode(), "logOnly");
+    assertEquals(deserialized.getMaxEntriesScannedInFilter(), Long.valueOf(500_000L));
+  }
+
+  @Test
+  public void testScanKillingModeDeserializesFromJson()
+      throws Exception {
+    String json = "{\"maxDocsScanned\": 5000000, \"scanKillingMode\": \"disabled\"}";
+    QueryConfig config = OBJECT_MAPPER.readValue(json, QueryConfig.class);
+    assertEquals(config.getScanKillingMode(), "disabled");
+    assertEquals(config.getMaxDocsScanned(), Long.valueOf(5_000_000L));
+  }
+
+  @Test
+  public void testScanKillingModeAbsentInJsonDeserializesToNull()
+      throws Exception {
+    String json = "{\"maxDocsScanned\": 5000000}";
+    QueryConfig config = OBJECT_MAPPER.readValue(json, QueryConfig.class);
+    assertNull(config.getScanKillingMode());
+  }
+
+  @Test
+  public void testScanKillingModeStringParsesToCorrectEnum() {
+    // Verify the production parse path: getScanKillingMode() string → ScanKillingMode enum
+    QueryConfig enforce = new QueryConfig(null, null, null, null, null, null, null, null, null, "enforce");
+    assertEquals(ScanKillingMode.fromConfigValue(enforce.getScanKillingMode()), ScanKillingMode.ENFORCE);
+
+    QueryConfig logOnly = new QueryConfig(null, null, null, null, null, null, null, null, null, "logOnly");
+    assertEquals(ScanKillingMode.fromConfigValue(logOnly.getScanKillingMode()), ScanKillingMode.LOG_ONLY);
+
+    QueryConfig disabled = new QueryConfig(null, null, null, null, null, null, null, null, null, "disabled");
+    assertEquals(ScanKillingMode.fromConfigValue(disabled.getScanKillingMode()), ScanKillingMode.DISABLED);
+  }
+
+  @Test
+  public void testScanKillingModeCaseInsensitiveParsing() {
+    // fromConfigValue is case-insensitive, so "Enforce" is valid
+    QueryConfig config = new QueryConfig(null, null, null, null, null, null, null, null, null, "Enforce");
+    assertEquals(ScanKillingMode.fromConfigValue(config.getScanKillingMode()), ScanKillingMode.ENFORCE);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testInvalidScanKillingModeThrowsAtConstruction() {
+    // A completely unrecognized value fails at construction time, not silently at query time
+    new QueryConfig(null, null, null, null, null, null, null, null, null, "enforced");
   }
 }

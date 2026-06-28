@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.physical.v2.nodes;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelTraitSet;
@@ -74,7 +73,7 @@ public class PhysicalExchange extends Exchange implements PRelNode {
     super(input.unwrap().getCluster(), EMPTY_TRAIT_SET.plus(execStrategyTrait), input.unwrap(),
         ExchangeStrategy.getRelDistribution(exchangeStrategy, distributionKeys));
     _nodeId = nodeId;
-    _pRelInputs = Collections.singletonList(input);
+    _pRelInputs = List.of(input);
     _pinotDataDistribution = pinotDataDistribution;
     _distributionKeys = distributionKeys;
     _exchangeStrategy = exchangeStrategy;

@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -367,7 +366,7 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
     String url = DEFAULT_INSTANCE.getControllerBaseApiUrl() + "/sql/ddl?dryRun=" + dryRun;
     String body = "{\"sql\": " + JsonUtils.objectToString(sql) + "}";
     String response = sendPostRequest(url, body,
-        Collections.singletonMap("Content-Type", "application/json"));
+        Map.of("Content-Type", "application/json"));
     return JsonUtils.stringToJsonNode(response);
   }
 

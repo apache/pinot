@@ -26,7 +26,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
-import java.util.Collections;
+import java.util.List;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -93,7 +93,7 @@ public class GcsPinotFSNullSafetyTest {
     // existsDirectoryOrBucket calls _storage.get(BlobId with prefix ending in '/')  -> null
     // Then calls _storage.list(...) -> empty page -> returns false
     Page<Blob> emptyPage = mock(Page.class);
-    when(emptyPage.iterateAll()).thenReturn(Collections.emptyList());
+    when(emptyPage.iterateAll()).thenReturn(List.of());
     when(_mockStorage.list(anyString(), (Storage.BlobListOption[]) any())).thenReturn(emptyPage);
 
     // _storage.get for exact path (no trailing slash):
@@ -122,7 +122,7 @@ public class GcsPinotFSNullSafetyTest {
     URI dstUri = URI.create("gs://test-bucket/dst-file");
 
     Page<Blob> emptyPage = mock(Page.class);
-    when(emptyPage.iterateAll()).thenReturn(Collections.emptyList());
+    when(emptyPage.iterateAll()).thenReturn(List.of());
     when(_mockStorage.list(anyString(), (Storage.BlobListOption[]) any())).thenReturn(emptyPage);
 
     Blob mockBlob = mock(Blob.class);

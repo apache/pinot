@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -39,7 +38,7 @@ public class NotFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_filterOperator);
+    return List.of(_filterOperator);
   }
 
   @Nullable

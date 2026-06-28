@@ -226,7 +226,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
 
     public List<String> getLiterals(List<ExpressionContext> expressions) {
       List<ExpressionContext> inputExpressions =
-          find(expressions).map(exp -> exp.getFunction().getArguments()).orElseGet(Collections::emptyList);
+          find(expressions).map(exp -> exp.getFunction().getArguments()).orElseGet(List::of);
       Preconditions.checkArgument(
           inputExpressions.stream().allMatch(exp -> exp.getType() == ExpressionContext.Type.LITERAL),
           "FUNNELCOUNT: " + _name + " parameters must be literals");

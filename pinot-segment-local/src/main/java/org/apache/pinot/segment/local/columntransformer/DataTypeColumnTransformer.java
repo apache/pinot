@@ -56,7 +56,7 @@ public class DataTypeColumnTransformer implements ColumnTransformer {
     // If source and destination data types are primitive types and the same, no transformation is needed.
     if (_columnReader.isSingleValue()) {
       if (_columnReader.isInt()) {
-        return _destDataType == PinotDataType.INTEGER;
+        return _destDataType == PinotDataType.INT;
       } else if (_columnReader.isLong()) {
         return _destDataType == PinotDataType.LONG;
       } else if (_columnReader.isFloat()) {
@@ -72,7 +72,7 @@ public class DataTypeColumnTransformer implements ColumnTransformer {
       }
     } else {
       if (_columnReader.isInt()) {
-        return _destDataType == PinotDataType.INTEGER_ARRAY;
+        return _destDataType == PinotDataType.INT_ARRAY;
       } else if (_columnReader.isLong()) {
         return _destDataType == PinotDataType.LONG_ARRAY;
       } else if (_columnReader.isFloat()) {

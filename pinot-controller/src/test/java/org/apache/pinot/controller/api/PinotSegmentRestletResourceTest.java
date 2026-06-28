@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.api;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,13 +81,13 @@ public class PinotSegmentRestletResourceTest {
 
     // Now starts to replace segments.
     List<String> segmentsFrom = Arrays.asList("s0", "s1");
-    List<String> segmentsTo = Collections.singletonList("some_segment");
+    List<String> segmentsTo = List.of("some_segment");
     String segmentLineageId = resourceManager.startReplaceSegments(offlineTableName, segmentsFrom, segmentsTo, false,
         null);
 
     // Replace more segments to add another entry to segment lineage.
     segmentsFrom = Arrays.asList("s2", "s3");
-    segmentsTo = Collections.singletonList("another_segment");
+    segmentsTo = List.of("another_segment");
     String nextSegmentLineageId =
         resourceManager.startReplaceSegments(offlineTableName, segmentsFrom, segmentsTo, false, null);
 
@@ -225,7 +224,7 @@ public class PinotSegmentRestletResourceTest {
 
     // case 2: delete all remaining segments
     reply = adminClient.getSegmentClient()
-        .deleteMultipleSegments(TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), Collections.emptyList(),
+        .deleteMultipleSegments(TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), List.of(),
             null);
     assertTrue(reply.contains("All segments of table offlineTableName1_OFFLINE deleted"));
   }
@@ -235,7 +234,7 @@ public class PinotSegmentRestletResourceTest {
       throws Exception {
     Map<String, String> crcMap = adminClient.getSegmentClient().getSegmentToCrcMap(tableName);
     if (crcMap == null) {
-      crcMap = java.util.Collections.emptyMap();
+      crcMap = java.util.Map.of();
     }
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);

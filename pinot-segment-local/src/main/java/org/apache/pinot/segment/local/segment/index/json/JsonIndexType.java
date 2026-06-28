@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.json;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -58,7 +57,7 @@ import org.apache.pinot.spi.data.Schema;
 public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexReader, JsonIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "json";
   private static final List<String> EXTENSIONS =
-      Collections.singletonList(V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
 
   protected JsonIndexType() {
     super(StandardIndexes.JSON_ID);

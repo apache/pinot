@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.executor;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -124,7 +123,7 @@ public class LogicalTableExecutionInfoTest {
     tableSegments.add(mockIndexSegment(10));
     SingleTableExecutionInfo tableInfo = mockSingleTableExecutionInfo(tableSegments, null);
     LogicalTableExecutionInfo logicalTableExecutionInfo =
-        new LogicalTableExecutionInfo(Collections.singletonList(tableInfo));
+        new LogicalTableExecutionInfo(List.of(tableInfo));
 
     QueryContext queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT * FROM t WHERE 1=0 LIMIT 5");
@@ -154,7 +153,7 @@ public class LogicalTableExecutionInfoTest {
     providedContexts.put(seg2, new SegmentContext(seg2));
     SingleTableExecutionInfo tableInfo = mockSingleTableExecutionInfo(tableSegments, providedContexts);
     LogicalTableExecutionInfo logicalTableExecutionInfo =
-        new LogicalTableExecutionInfo(Collections.singletonList(tableInfo));
+        new LogicalTableExecutionInfo(List.of(tableInfo));
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM t LIMIT 5");
     TableExecutionInfo.SelectedSegmentsInfo selectedSegmentsInfo =
@@ -228,7 +227,7 @@ public class LogicalTableExecutionInfoTest {
 
     SingleTableExecutionInfo tableInfo = mockSingleTableExecutionInfo(allSegments, null);
     LogicalTableExecutionInfo logicalTableExecutionInfo =
-        new LogicalTableExecutionInfo(Collections.singletonList(tableInfo));
+        new LogicalTableExecutionInfo(List.of(tableInfo));
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT * FROM logicalTable ORDER BY " + ORDER_BY_COLUMN + " DESC LIMIT 5");

@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -86,7 +85,7 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
   protected IngestionConfig getIngestionConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(
-        new StreamIngestionConfig(Collections.singletonList(getStreamConfigMap())));
+        new StreamIngestionConfig(List.of(getStreamConfigMap())));
     return ingestionConfig;
   }
 

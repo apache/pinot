@@ -29,7 +29,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * Disabling tests as Pinot currently uses Yammer and these tests fail for for {@link DropwizardMetricsFactory}
+ * Disabling tests as Pinot currently uses Yammer and these tests fail for {@link DropwizardMetricsFactory}
  */
 @Test(enabled = false) // enabled=false on class level doesn't seem to work in intellij
 public class DropwizardControllerPrometheusMetricsTest extends ControllerPrometheusMetricsTest {

@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.CaseFormat;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -137,7 +136,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

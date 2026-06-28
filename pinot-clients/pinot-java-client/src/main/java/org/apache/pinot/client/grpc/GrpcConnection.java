@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -97,7 +96,7 @@ public class GrpcConnection implements AutoCloseable {
   private void validateConnection() {
     try {
       BrokerResponse brokerResponse =
-          BrokerResponse.fromJson(getJsonResponse(CONNECTION_VALIDATION_QUERY, Collections.emptyMap()));
+          BrokerResponse.fromJson(getJsonResponse(CONNECTION_VALIDATION_QUERY, Map.of()));
       if (brokerResponse.hasExceptions()) {
         throw new PinotClientException(
             "Failed to establish gRPC broker connection: " + brokerResponse.getExceptions());

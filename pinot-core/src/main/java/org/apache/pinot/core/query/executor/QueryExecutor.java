@@ -25,6 +25,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -71,4 +72,17 @@ public interface QueryExecutor {
   /// - For non-streaming request, the returned {@link InstanceResponseBlock} contains both data and metadata.
   InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer);
+
+  /// Executes the query with a caller-supplied [PlanMaker] override instead of the executor's
+  /// configured one, letting a caller plug in alternate segment-level plan nodes/operators for this
+  /// single execution (e.g. to produce a different result-block representation). Passing `null` uses
+  /// the configured plan maker, i.e. it is equivalent to [#execute(ServerQueryRequest, ExecutorService,
+  /// ResultsBlockStreamer)].
+  ///
+  /// The default implementation ignores the override (preserving behavior for implementations that do
+  /// not support it); [org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl] honors it.
+  default InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
+      @Nullable ResultsBlockStreamer streamer, @Nullable PlanMaker planMakerOverride) {
+    return execute(queryRequest, executorService, streamer);
+  }
 }

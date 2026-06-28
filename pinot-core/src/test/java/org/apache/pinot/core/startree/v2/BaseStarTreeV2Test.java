@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -176,14 +175,14 @@ abstract class BaseStarTreeV2Test<R, A> {
     driver.build();
 
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList(DIMENSION1, DIMENSION2), null, null,
-        Collections.singletonList(new StarTreeAggregationConfig(AGG_COL,
+        List.of(new StarTreeAggregationConfig(AGG_COL,
                 _valueAggregator.getAggregationType().getName(), null, getCompressionCodec(),
                 true, getIndexVersion(), null, null)), MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
     MultipleTreesBuilder.BuildMode buildMode =
         RANDOM.nextBoolean() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
-    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(Collections.singletonList(starTreeIndexConfig), false,
+    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(List.of(starTreeIndexConfig), false,
         indexDir, buildMode)) {
       builder.build();
     }

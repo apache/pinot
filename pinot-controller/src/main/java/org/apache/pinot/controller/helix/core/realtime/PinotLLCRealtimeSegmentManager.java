@@ -32,7 +32,6 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -387,7 +386,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
     List<StreamMetadata> streamMetadataList =
-        getNewStreamMetadataList(streamConfigs, Collections.emptyList(), idealState);
+        getNewStreamMetadataList(streamConfigs, List.of(), idealState);
     setUpNewTable(tableConfig, idealState, streamMetadataList);
   }
 
@@ -412,7 +411,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+        Map.of(InstancePartitionsType.CONSUMING, instancePartitions);
 
     long currentTimeMs = getCurrentTimeMs();
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
@@ -900,7 +899,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+        Map.of(InstancePartitionsType.CONSUMING, instancePartitions);
 
     return updateIdealStateOnSegmentCompletion(tableConfig.getTableName(), committingSegmentName,
         newConsumingSegmentName, segmentAssignment, instancePartitionsMap);
@@ -1170,8 +1169,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       }
       ColumnPartitionMetadata columnPartitionMetadata =
           new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), perStreamNumPartitions,
-              Collections.singleton(streamPartitionId), columnPartitionConfig.getFunctionConfig());
-      return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
+              Set.of(streamPartitionId), columnPartitionConfig.getFunctionConfig());
+      return new SegmentPartitionMetadata(Map.of(entry.getKey(), columnPartitionMetadata));
     } else {
       LOGGER.warn(
           "Skip persisting partition metadata because there are other than exact one partition column for table: {}",
@@ -1385,7 +1384,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     // in one of the cases and not the other.
     try {
       _helixAdmin.resetPartition(_helixManager.getClusterName(), instanceName, realtimeTableName,
-          Collections.singletonList(segmentName));
+          List.of(segmentName));
     } catch (Exception e) {
       // Ignore
     }
@@ -1496,7 +1495,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         boolean offsetsHaveToChange = offsetCriteria != null;
         if (isTableEnabled && !isTablePaused) {
           List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-              offsetsHaveToChange ? Collections.emptyList()
+              offsetsHaveToChange ? List.of()
                   // offsets from metadata are not valid anymore; fetch for all partitions
                   : getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
           // FIXME: Right now, we assume topics are sharing same offset criteria
@@ -1774,7 +1773,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+        Map.of(InstancePartitionsType.CONSUMING, instancePartitions);
 
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
     StreamPartitionMsgOffsetFactory offsetFactory =

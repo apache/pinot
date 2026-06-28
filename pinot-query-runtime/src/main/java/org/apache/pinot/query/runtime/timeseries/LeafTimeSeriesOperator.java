@@ -19,7 +19,7 @@
 package org.apache.pinot.query.runtime.timeseries;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.collections4.MapUtils;
@@ -45,7 +45,7 @@ public class LeafTimeSeriesOperator extends BaseTimeSeriesOperator {
 
   public LeafTimeSeriesOperator(TimeSeriesExecutionContext context, ServerQueryRequest serverQueryRequest,
       QueryExecutor queryExecutor, ExecutorService executorService) {
-    super(Collections.emptyList());
+    super(List.of());
     _context = context;
     _request = serverQueryRequest;
     _queryExecutor = queryExecutor;

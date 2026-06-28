@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.utils;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
@@ -42,7 +41,7 @@ public class CsvParser {
    */
   public static List<String> parse(@Nullable String input, boolean escapeComma, boolean trim) {
     if (null == input || input.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     Stream<String> tokenStream;

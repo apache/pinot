@@ -23,7 +23,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.restlet.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.common.restlet.resources.TableView;
@@ -159,7 +161,8 @@ public class PinotAdminClientTest {
   @Test
   public void testListSchemas()
       throws Exception {
-    String jsonResponse = "{\"schemas\": [\"sch1\", \"sch2\"]}";
+    /// GET /schemas returns a bare JSON array of schema names (not a {"schemas": [...]} wrapper).
+    String jsonResponse = "[\"sch1\", \"sch2\"]";
     JsonNode mockResponse = new ObjectMapper().readTree(jsonResponse);
     lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
         .thenReturn(mockResponse);
@@ -188,7 +191,7 @@ public class PinotAdminClientTest {
   @Test
   public void testAsyncListSchemas()
       throws Exception {
-    String jsonResponse = "{\"schemas\": [\"sch1\"]}";
+    String jsonResponse = "[\"sch1\"]";
     JsonNode mockResponse = new ObjectMapper().readTree(jsonResponse);
     CompletableFuture<JsonNode> jsonNodeCompletableFuture = CompletableFuture.completedFuture(mockResponse);
     lenient().when(_mockTransport.executeGetAsync(anyString(), anyString(), any(), any()))
@@ -431,5 +434,202 @@ public class PinotAdminClientTest {
     verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/rebalanceStatus/job-123"), isNull(), eq(HEADERS));
     verify(_mockTransport).executeDelete(eq(CONTROLLER_ADDRESS), eq("/clientQuery/client-query-1"), isNull(),
         eq(HEADERS));
+  }
+
+  @Test
+  public void testListLiveInstancesUsesInstancesField()
+      throws Exception {
+    /// GET /liveinstances returns an Instances wrapper serialized as {"instances": [...]}.
+    JsonNode mockResponse = new ObjectMapper().readTree("{\"instances\": [\"Server_1\", \"Broker_1\"]}");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any())).thenReturn(mockResponse);
+
+    List<String> instances = _adminClient.getInstanceClient().listLiveInstances();
+
+    assertEquals(instances, List.of("Server_1", "Broker_1"));
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/liveinstances"), isNull(), eq(HEADERS));
+  }
+
+  @Test
+  public void testValidateUpdateInstanceTagsSendsRequestBody()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("[]");
+    lenient().when(_mockTransport.executePost(anyString(), anyString(), any(), any(), any()))
+        .thenReturn(mockResponse);
+
+    _adminClient.getInstanceClient().validateUpdateInstanceTags("Server_1,Server_2", "tag1,tag2");
+
+    /// Controller reads a List<InstanceTagUpdateRequest> from the body; no query params are used.
+    List<Map<String, Object>> expectedBody = List.of(
+        Map.of("instanceName", "Server_1", "newTags", List.of("tag1", "tag2")),
+        Map.of("instanceName", "Server_2", "newTags", List.of("tag1", "tag2")));
+    verify(_mockTransport).executePost(eq(CONTROLLER_ADDRESS), eq("/instances/updateTags/validate"), eq(expectedBody),
+        isNull(), eq(HEADERS));
+  }
+
+  @Test
+  public void testCancelRebalanceParsesBareArray()
+      throws Exception {
+    /// DELETE /tables/{tableName}/rebalance returns a bare JSON array of cancelled job IDs.
+    JsonNode mockResponse = new ObjectMapper().readTree("[\"job-1\", \"job-2\"]");
+    lenient().when(_mockTransport.executeDelete(anyString(), anyString(), any(), any())).thenReturn(mockResponse);
+
+    List<String> jobIds = _adminClient.getTableClient().cancelRebalance("tbl1_OFFLINE");
+
+    assertEquals(jobIds, List.of("job-1", "job-2"));
+    verify(_mockTransport).executeDelete(eq(CONTROLLER_ADDRESS), eq("/tables/tbl1_OFFLINE/rebalance"), isNull(),
+        eq(HEADERS));
+  }
+
+  @Test
+  public void testRebalanceTableMapsDowntimeAndMinAvailableReplicas()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("{\"status\":\"OK\"}");
+    lenient().when(_mockTransport.executePost(anyString(), anyString(), any(), any(), any()))
+        .thenReturn(mockResponse);
+
+    _adminClient.getTableClient().rebalanceTable("tbl1_OFFLINE", true, 2);
+
+    verify(_mockTransport).executePost(eq(CONTROLLER_ADDRESS), eq("/tables/tbl1_OFFLINE/rebalance"), isNull(),
+        eq(Map.of("downtime", "false", "minAvailableReplicas", "2")), eq(HEADERS));
+  }
+
+  @Test
+  public void testSelectSegmentsUsesStartEndTimestampParams()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("[]");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any())).thenReturn(mockResponse);
+
+    _adminClient.getSegmentClient().selectSegments("tbl1", "OFFLINE", 100L, 200L, true);
+
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/segments/tbl1/select"),
+        eq(Map.of("startTimestamp", "100", "endTimestamp", "200", "excludeReplacedSegments", "true", "type",
+            "OFFLINE")), eq(HEADERS));
+  }
+
+  @Test
+  public void testGetZookeeperMetadataParsesBareMap()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper()
+        .readTree("{\"segment_1\":{\"segment.crc\":\"123\"},\"segment_2\":{\"segment.crc\":\"456\"}}");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any())).thenReturn(mockResponse);
+
+    Map<String, Map<String, String>> zkMetadata = _adminClient.getSegmentClient().getZookeeperMetadata("tbl1_OFFLINE");
+
+    assertEquals(zkMetadata.size(), 2);
+    assertEquals(zkMetadata.get("segment_1").get("segment.crc"), "123");
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/segments/tbl1_OFFLINE/zkmetadata"), isNull(),
+        eq(HEADERS));
+  }
+
+  @Test
+  public void testTaskEndpointsParseBareValues()
+      throws Exception {
+    ObjectMapper mapper = new ObjectMapper();
+    /// Every task endpoint resumes a bare value (array/string/int/map), not a wrapper object.
+    lenient().when(_mockTransport.executeGet(eq(CONTROLLER_ADDRESS), eq("/tasks/tasktypes"), any(), any()))
+        .thenReturn(mapper.readTree("[\"TaskA\", \"TaskB\"]"));
+    lenient().when(_mockTransport.executeGet(eq(CONTROLLER_ADDRESS), eq("/tasks/TaskA/state"), any(), any()))
+        .thenReturn(mapper.readTree("\"IN_PROGRESS\""));
+    lenient().when(_mockTransport.executeGet(eq(CONTROLLER_ADDRESS), eq("/tasks/TaskA/tasks"), any(), any()))
+        .thenReturn(mapper.readTree("[\"Task_TaskA_1\"]"));
+    lenient().when(_mockTransport.executeGet(eq(CONTROLLER_ADDRESS), eq("/tasks/TaskA/tasks/count"), any(), any()))
+        .thenReturn(mapper.readTree("5"));
+    lenient().when(_mockTransport.executeGet(eq(CONTROLLER_ADDRESS), eq("/tasks/TaskA/taskstates"), any(), any()))
+        .thenReturn(mapper.readTree("{\"Task_TaskA_1\":\"COMPLETED\"}"));
+    lenient().when(_mockTransport.executeGet(eq(CONTROLLER_ADDRESS), eq("/tasks/TaskA/tbl1_OFFLINE/state"), any(),
+        any())).thenReturn(mapper.readTree("{\"Task_TaskA_1\":\"COMPLETED\"}"));
+    lenient().when(_mockTransport.executeGet(eq(CONTROLLER_ADDRESS), eq("/tasks/subtask/Task_TaskA_1/state"), any(),
+        any())).thenReturn(mapper.readTree("{\"Task_TaskA_1_0\":\"RUNNING\"}"));
+
+    TaskAdminClient taskClient = _adminClient.getTaskClient();
+    assertEquals(taskClient.listTaskTypes(), Set.of("TaskA", "TaskB"));
+    assertEquals(taskClient.getTaskQueueState("TaskA"), TaskState.IN_PROGRESS);
+    assertEquals(taskClient.getTasks("TaskA"), Set.of("Task_TaskA_1"));
+    assertEquals(taskClient.getTasksCount("TaskA"), 5);
+    assertEquals(taskClient.getTaskStates("TaskA"), Map.of("Task_TaskA_1", TaskState.COMPLETED));
+    assertEquals(taskClient.getTaskStatesByTable("TaskA", "tbl1_OFFLINE"), Map.of("Task_TaskA_1", TaskState.COMPLETED));
+    assertEquals(taskClient.getSubtaskStates("Task_TaskA_1"), Map.of("Task_TaskA_1_0", "RUNNING"));
+  }
+
+  @Test
+  public void testGetTaskCountsUsesTableParam()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("{}");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any())).thenReturn(mockResponse);
+
+    _adminClient.getTaskClient().getTaskCounts("TaskA", "IN_PROGRESS", "tbl1_OFFLINE", null);
+
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/tasks/TaskA/taskcounts"),
+        eq(Map.of("state", "IN_PROGRESS", "table", "tbl1_OFFLINE")), eq(HEADERS));
+  }
+
+  @Test
+  public void testGetTaskDebugInfoUsesTableNameParam()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("{}");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any())).thenReturn(mockResponse);
+
+    _adminClient.getTaskClient().getTaskDebugInfo("Task_TaskA_1", 1, "tbl1_OFFLINE");
+
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/tasks/task/Task_TaskA_1/debug"),
+        eq(Map.of("verbosity", "1", "tableName", "tbl1_OFFLINE")), eq(HEADERS));
+  }
+
+  @Test
+  public void testListTenantsAsyncParsesTenantArrays()
+      throws Exception {
+    /// GET /tenants returns {"SERVER_TENANTS": [...], "BROKER_TENANTS": [...]} -- there is no flat "tenants" field.
+    JsonNode mockResponse = new ObjectMapper().readTree(
+        "{\"SERVER_TENANTS\":[\"DefaultTenant\"],\"BROKER_TENANTS\":[\"DefaultTenant\",\"brokerTenant\"]}");
+    lenient().when(_mockTransport.executeGetAsync(anyString(), anyString(), any(), any()))
+        .thenReturn(CompletableFuture.completedFuture(mockResponse));
+
+    List<String> tenants = _adminClient.getTenantClient().listTenantsAsync().get();
+
+    assertEquals(Set.copyOf(tenants), Set.of("DefaultTenant", "brokerTenant"));
+  }
+
+  @Test
+  public void testRebalanceTenantUsesIncludeExcludeTablesAndBody()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("{\"status\":\"OK\"}");
+    lenient().when(_mockTransport.executePost(anyString(), anyString(), any(), any(), any()))
+        .thenReturn(mockResponse);
+
+    _adminClient.getTenantClient().rebalanceTenant("DefaultTenant", 2, "tbl1_OFFLINE", "tbl2_OFFLINE");
+
+    /// The controller requires a TenantRebalanceConfig body; an empty object lets the query params populate it.
+    verify(_mockTransport).executePost(eq(CONTROLLER_ADDRESS), eq("/tenants/DefaultTenant/rebalance"), eq("{}"),
+        eq(Map.of("degreeOfParallelism", "2", "includeTables", "tbl1_OFFLINE", "excludeTables", "tbl2_OFFLINE")),
+        eq(HEADERS));
+  }
+
+  @Test
+  public void testListSchemaNamesEmptyArrayReturnsEmptyList()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("[]");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any())).thenReturn(mockResponse);
+
+    assertEquals(_adminClient.getSchemaClient().listSchemaNames(), List.of());
+  }
+
+  @Test(expectedExceptions = PinotAdminException.class)
+  public void testListSchemaNamesThrowsOnUnexpectedResponse()
+      throws Exception {
+    /// A non-array response (e.g. an error object) must surface as an exception, not a silently empty list.
+    JsonNode mockResponse = new ObjectMapper().readTree("{\"code\":500}");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any())).thenReturn(mockResponse);
+
+    _adminClient.getSchemaClient().listSchemaNames();
+  }
+
+  @Test
+  public void testListTenantsHandlesMissingTenantArrays()
+      throws Exception {
+    /// Defensive: a response without SERVER_TENANTS/BROKER_TENANTS must yield an empty list, not an NPE.
+    JsonNode mockResponse = new ObjectMapper().readTree("{}");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any())).thenReturn(mockResponse);
+
+    assertEquals(_adminClient.getTenantClient().listTenants(), List.of());
   }
 }

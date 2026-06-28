@@ -19,7 +19,6 @@
 package org.apache.pinot.materializedview.rewrite;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +63,7 @@ public class MaterializedViewQueryRewriteEngineTest {
       Eligibility eligibility, @Nullable MaterializedViewSplitSpec splitSpec, long watermarkMs) {
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         viewTableName,
-        Collections.singletonList(baseTable),
+        List.of(baseTable),
         definedSql,
         new HashMap<>(),
         splitSpec);
@@ -75,7 +74,7 @@ public class MaterializedViewQueryRewriteEngineTest {
       if (wm == 0L) {
         wm = 1L;
       }
-      parts = Map.of(0L, new PartitionInfo(PartitionState.VALID, new PartitionFingerprint(1, 1L), 0L));
+      parts = Map.of(0L, PartitionInfo.forTesting(PartitionState.VALID, new PartitionFingerprint(1, 1L), 0L));
     }
     return new MaterializedViewCacheEntry(definition, compiledQuery, wm, parts);
   }

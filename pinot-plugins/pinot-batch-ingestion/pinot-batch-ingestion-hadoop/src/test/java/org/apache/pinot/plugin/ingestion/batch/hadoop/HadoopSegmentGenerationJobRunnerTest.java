@@ -23,8 +23,8 @@ import com.google.gson.Gson;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -136,7 +136,7 @@ public class HadoopSegmentGenerationJobRunnerTest {
     PinotFSSpec pfsSpec = new PinotFSSpec();
     pfsSpec.setScheme("file");
     pfsSpec.setClassName(LocalPinotFS.class.getName());
-    jobSpec.setPinotFSSpecs(Collections.singletonList(pfsSpec));
+    jobSpec.setPinotFSSpecs(List.of(pfsSpec));
 
     jobSpec.setFailOnEmptySegment(true);
 

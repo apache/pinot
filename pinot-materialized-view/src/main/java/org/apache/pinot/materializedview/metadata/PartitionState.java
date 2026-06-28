@@ -21,14 +21,21 @@ package org.apache.pinot.materializedview.metadata;
 
 /// State of a materialized partition in the MV lifecycle.
 ///
-///   - `VALID` – partition is up-to-date with base table data.
-///   - `STALE` – base table data has changed since last materialization; partition
-///     needs OVERWRITE.
+///   - `VALID` – partition is up-to-date with base table data.  When the base table window
+///     is empty (no overlapping segments), the entry carries
+///     [PartitionFingerprint#EMPTY] and is still `VALID`; the broker treats those buckets
+///     as "covered by the MV with no rows".
+///   - `STALE` – base table data has changed since the partition was last materialized;
+///     the scheduler will dispatch a recompute (OVERWRITE), or DELETE if the source
+///     window is now empty.
 ///
-/// Partition expiration is modeled by **absence** from the runtime metadata's
-/// partition map, not as a separate state.  The DELETE task path removes the
-/// map entry; the broker then treats that bucket as "not covered by the MV"
-/// and routes those queries to the base table.
+/// `absent` (no entry in the partition map) is reserved for cold-start, before the first
+/// APPEND has run for that bucket.  After the first run of any task type — APPEND with
+/// data, APPEND with empty source, OVERWRITE, or DELETE — the bucket carries an entry
+/// (`VALID` with a real fingerprint, or `VALID` with [PartitionFingerprint#EMPTY]).
+/// The DELETE task explicitly does NOT remove the entry; it rewrites it to
+/// `VALID + PartitionFingerprint.EMPTY` so subsequent backfills into the now-empty
+/// window flow through the standard `VALID → STALE → OVERWRITE` cycle.
 ///
 /// Encoded as a single character (`"V"` / `"S"`) for compact ZK storage.
 public enum PartitionState {

@@ -24,7 +24,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -176,7 +175,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   protected IngestionConfig getIngestionConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(
-        new StreamIngestionConfig(Collections.singletonList(getStreamConfigMap())));
+        new StreamIngestionConfig(List.of(getStreamConfigMap())));
     return ingestionConfig;
   }
 

@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.inverted;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -62,7 +61,7 @@ public class InvertedIndexType
     extends AbstractIndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "inverted";
   private static final List<String> EXTENSIONS =
-      Collections.singletonList(V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
   protected InvertedIndexType() {
     super(StandardIndexes.INVERTED_ID);

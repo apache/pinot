@@ -292,7 +292,7 @@ public class SelectionOrderByTest {
             new Object[]{null}
         )
         .whenQuery("select myField from testTable order by myField")
-        .thenResultIs("INTEGER",
+        .thenResultIs("INT",
             "-2147483648",
             "1",
             "2",
@@ -314,7 +314,7 @@ public class SelectionOrderByTest {
             new Object[]{null}
         )
         .whenQuery("select myField from testTable order by myField")
-        .thenResultIs("INTEGER",
+        .thenResultIs("INT",
             "1",
             "2",
             "3",
@@ -336,7 +336,7 @@ public class SelectionOrderByTest {
             new Object[]{null, null}
         )
         .whenQuery("select field1, field2 from testTable2 order by field1")
-        .thenResultIs("INTEGER|INTEGER",
+        .thenResultIs("INT|INT",
             "-2147483648|-2147483648",
             "1|5",
             "2|3",
@@ -358,7 +358,7 @@ public class SelectionOrderByTest {
             new Object[]{null, 2}
         )
         .whenQuery("select field1, field2 from testTable2 order by field1")
-        .thenResultIs("INTEGER|INTEGER",
+        .thenResultIs("INT|INT",
             "1|5",
             "2|3",
             "3|4",
@@ -380,7 +380,7 @@ public class SelectionOrderByTest {
             new Object[]{null, 2}
         )
         .whenQuery("select field1, field2 from testTable2 order by field1 nulls first")
-        .thenResultIs("INTEGER|INTEGER",
+        .thenResultIs("INT|INT",
             "null|2",
             "1|5",
             "2|3",
@@ -402,7 +402,7 @@ public class SelectionOrderByTest {
             new Object[]{null, null}
         )
         .whenQuery("select field1, field2 from testTable2 order by field1 desc")
-        .thenResultIs("INTEGER|INTEGER",
+        .thenResultIs("INT|INT",
             "3|4",
             "2|3",
             "1|5",
@@ -425,7 +425,7 @@ public class SelectionOrderByTest {
             new Object[]{null, 2}
         )
         .whenQuery("select field1, field2 from testTable2 order by field1 desc")
-        .thenResultIs("INTEGER|INTEGER",
+        .thenResultIs("INT|INT",
             "null|2",
             "4|4",
             "3|0",
@@ -449,7 +449,7 @@ public class SelectionOrderByTest {
             new Object[]{null, 2}
         )
         .whenQuery("select field1, field2 from testTable2 order by field1 desc nulls last")
-        .thenResultIs("INTEGER|INTEGER",
+        .thenResultIs("INT|INT",
             "4|4",
             "3|0",
             "2|3",
@@ -473,7 +473,7 @@ public class SelectionOrderByTest {
             new Object[]{null, 2}
         )
         .whenQuery("select field1, field2 from testTable2 order by field1, field2")
-        .thenResultIs("INTEGER|INTEGER",
+        .thenResultIs("INT|INT",
             "-2147483648|2",
             "1|5",
             "2|3",
@@ -498,7 +498,7 @@ public class SelectionOrderByTest {
             new Object[]{null, 2}
         )
         .whenQuery("select field1, field2 from testTable2 order by field1, field2")
-        .thenResultIs("INTEGER|INTEGER",
+        .thenResultIs("INT|INT",
             "1|5",
             "2|3",
             "2|4",
@@ -524,7 +524,7 @@ public class SelectionOrderByTest {
             new Object[]{null, 2}
         )
         .whenQuery("select field1, field2 from testTable2 order by field1 desc, field2")
-        .thenResultIs("INTEGER|INTEGER",
+        .thenResultIs("INT|INT",
             "3|4",
             "2|3",
             "2|4",
@@ -550,7 +550,7 @@ public class SelectionOrderByTest {
             new Object[]{null, 2}
         )
         .whenQuery("select field1, field2 from testTable2 order by field1 desc, field2")
-        .thenResultIs("INTEGER|INTEGER",
+        .thenResultIs("INT|INT",
             "null|2",
             "null|4",
             "3|4",
@@ -574,7 +574,7 @@ public class SelectionOrderByTest {
             new Object[]{null}
         )
         .whenQuery("select myField from testTable order by myField offset 1")
-        .thenResultIs("INTEGER",
+        .thenResultIs("INT",
             "1",
             "2",
             "3"
@@ -595,7 +595,7 @@ public class SelectionOrderByTest {
             new Object[]{null}
         )
         .whenQuery("select myField from testTable order by myField offset 1 limit 2")
-        .thenResultIs("INTEGER",
+        .thenResultIs("INT",
             "1",
             "2"
         );
@@ -614,7 +614,7 @@ public class SelectionOrderByTest {
             new Object[]{2}
         )
         .whenQuery("select myField from testTable order by myField offset 1 limit 3")
-        .thenResultIs("INTEGER",
+        .thenResultIs("INT",
             "2",
             "3"
         );
@@ -634,7 +634,7 @@ public class SelectionOrderByTest {
             new Object[]{null}
         )
         .whenQuery("select myField from testTable order by myField offset 10")
-        .thenResultIs("INTEGER"
+        .thenResultIs("INT"
         );
   }
 

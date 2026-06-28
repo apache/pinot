@@ -38,6 +38,25 @@ public class IpAddressFunctions {
   private IpAddressFunctions() {
   }
 
+  // RFC 1918 private IPv4 ranges (10/8, 172.16/12, 192.168/16) used by isPrivateIp().
+  // Initialised once at class-load; the literals are always valid so no runtime failure is possible.
+  private static final IPAddress IPV4_PRIVATE_10;
+  private static final IPAddress IPV4_PRIVATE_172;
+  private static final IPAddress IPV4_PRIVATE_192;
+  // IPv6 Unique Local Address range fc00::/7 (covers fd00::/8 ULA and fc00::/8)
+  private static final IPAddress IPV6_ULA;
+
+  static {
+    try {
+      IPV4_PRIVATE_10 = new IPAddressString("10.0.0.0/8").toAddress().toPrefixBlock();
+      IPV4_PRIVATE_172 = new IPAddressString("172.16.0.0/12").toAddress().toPrefixBlock();
+      IPV4_PRIVATE_192 = new IPAddressString("192.168.0.0/16").toAddress().toPrefixBlock();
+      IPV6_ULA = new IPAddressString("fc00::/7").toAddress().toPrefixBlock();
+    } catch (AddressStringException e) {
+      throw new ExceptionInInitializerError(e);
+    }
+  }
+
   /**
    * Validates IP prefix prefixStr and returns IPAddress if validated
    */
@@ -332,5 +351,38 @@ public class IpAddressFunctions {
   @ScalarFunction(names = {"ipHostmask", "ip_hostmask"})
   public static String ipHostmask(String cidr) {
     return buildMask(getPrefix(cidr), true);
+  }
+
+  /**
+   * Returns whether the given IP address belongs to a private or reserved range.
+   *
+   * <p>The following ranges are considered private:
+   * <ul>
+   *   <li>IPv4 RFC 1918: {@code 10.0.0.0/8}, {@code 172.16.0.0/12}, {@code 192.168.0.0/16}</li>
+   *   <li>IPv4 loopback: {@code 127.0.0.0/8}</li>
+   *   <li>IPv4 link-local: {@code 169.254.0.0/16}</li>
+   *   <li>IPv6 loopback: {@code ::1}</li>
+   *   <li>IPv6 link-local: {@code fe80::/10}</li>
+   *   <li>IPv6 Unique Local Address (ULA): {@code fc00::/7}</li>
+   * </ul>
+   *
+   * @param ipString IP address string without a prefix length (e.g., {@code "192.168.1.1"})
+   * @return {@code true} if the address is private or reserved
+   * @throws IllegalArgumentException if the string is not a valid non-prefixed IP address
+   */
+  @ScalarFunction(names = {"isPrivateIp", "is_private_ip"})
+  public static boolean isPrivateIp(String ipString) {
+    IPAddress ip = getAddress(ipString);
+    if (ip.isPrefixed()) {
+      throw new IllegalArgumentException("IP Address " + ipString + " should not be prefixed.");
+    }
+    // isLoopback() covers 127.0.0.0/8 (IPv4) and ::1 (IPv6)
+    // isLinkLocal() covers 169.254.0.0/16 (IPv4) and fe80::/10 (IPv6)
+    return ip.isLoopback()
+        || ip.isLinkLocal()
+        || IPV4_PRIVATE_10.contains(ip)
+        || IPV4_PRIVATE_172.contains(ip)
+        || IPV4_PRIVATE_192.contains(ip)
+        || IPV6_ULA.contains(ip);
   }
 }

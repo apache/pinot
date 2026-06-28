@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -812,7 +811,7 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
       args.add(literal(DataType.STRING, bucketingTimeZone));
     }
 
-    function.init(args, Collections.emptyMap());
+    function.init(args, Map.of());
     return function;
   }
 

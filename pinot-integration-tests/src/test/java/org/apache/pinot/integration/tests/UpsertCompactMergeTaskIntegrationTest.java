@@ -23,10 +23,10 @@ import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.client.ResultSetGroup;
@@ -149,8 +149,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
 
     // Schedule the UpsertCompactMergeTask
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(REALTIME_TABLE_NAME))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)))
+            .setTablesToSchedule(Set.of(REALTIME_TABLE_NAME))
+            .setTasksToSchedule(Set.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)))
         .get(MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
 
     // Verify task is queued
@@ -189,8 +189,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
       throws Exception {
     // Test 1: Invalid configuration - scheduling tasks for non-existent table
     var result = _taskManager.scheduleTasks(new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton("nonExistentTable_REALTIME"))
-        .setTasksToSchedule(Collections.singleton(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)));
+        .setTablesToSchedule(Set.of("nonExistentTable_REALTIME"))
+        .setTasksToSchedule(Set.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)));
 
     // The task manager should return an empty result for non-existent tables rather than throw exception
     assertNull(result.get(MinionConstants.UpsertCompactMergeTask.TASK_TYPE),
@@ -210,8 +210,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     // The task generator should not generate tasks for tables without proper config
     // This is expected behavior - no tasks should be scheduled for tables without task config
     var noTaskResult = _taskManager.scheduleTasks(new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton("testTableWithoutTask_REALTIME"))
-        .setTasksToSchedule(Collections.singleton(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)));
+        .setTablesToSchedule(Set.of("testTableWithoutTask_REALTIME"))
+        .setTasksToSchedule(Set.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)));
 
     // Verify that no tasks are scheduled when table config is missing
     assertNull(noTaskResult.get(MinionConstants.UpsertCompactMergeTask.TASK_TYPE),
@@ -284,7 +284,7 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
   private TableTaskConfig getUpsertCompactMergeTaskConfig() {
     Map<String, String> taskConfigs = getDefaultTaskConfigs();
     return new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, taskConfigs));
+        Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, taskConfigs));
   }
 
   private Map<String, String> getDefaultTaskConfigs() {

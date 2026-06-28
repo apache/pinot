@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -38,7 +37,7 @@ public class NullHandlingQuickstart extends Quickstart {
 
   @Override
   public List<String> types() {
-    return Collections.singletonList("NULL_HANDLING");
+    return List.of("NULL_HANDLING");
   }
 
   @Override
@@ -51,7 +50,7 @@ public class NullHandlingQuickstart extends Quickstart {
       throws Exception {
     printStatus(Quickstart.Color.YELLOW, "***** Null handling quickstart setup complete *****");
 
-    Map<String, String> queryOptions = Collections.singletonMap("queryOptions",
+    Map<String, String> queryOptions = Map.of("queryOptions",
         CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING + "=true");
 
     printStatus(Quickstart.Color.YELLOW, "Total number of documents in the table");

@@ -42,7 +42,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
@@ -78,7 +77,7 @@ public class IndexLoadingConfig {
   private Map<String, Map<String, String>> _instanceTierConfigs;
 
   // Initialized by table config and schema
-  private List<String> _sortedColumns = Collections.emptyList();
+  private List<String> _sortedColumns = List.of();
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
@@ -313,12 +312,6 @@ public class IndexLoadingConfig {
   public String getSegmentDirectoryLoader() {
     return StringUtils.isNotBlank(_segmentDirectoryLoader) ? _segmentDirectoryLoader
         : SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME;
-  }
-
-  public PinotConfiguration getSegmentDirectoryConfigs() {
-    Map<String, Object> props = new HashMap<>();
-    props.put(READ_MODE_KEY, _readMode);
-    return new PinotConfiguration(props);
   }
 
   public String getInstanceId() {

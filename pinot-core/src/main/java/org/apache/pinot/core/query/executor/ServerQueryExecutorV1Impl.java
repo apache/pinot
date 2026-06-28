@@ -59,6 +59,8 @@ import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
+import org.apache.pinot.core.query.killing.QueryKillingManager;
+import org.apache.pinot.core.query.killing.QueryKillingStrategy;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -68,17 +70,23 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracer;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,20 +146,26 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
+    return execute(queryRequest, executorService, streamer, null);
+  }
+
+  @Override
+  public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
+      @Nullable ResultsBlockStreamer streamer, @Nullable PlanMaker planMakerOverride) {
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, executorService, streamer);
+      return executeInternal(queryRequest, executorService, streamer, planMakerOverride);
     }
     Tracer tracer = Tracing.getTracer();
     tracer.register();
     try {
-      return executeInternal(queryRequest, executorService, streamer);
+      return executeInternal(queryRequest, executorService, streamer, planMakerOverride);
     } finally {
       tracer.unregister();
     }
   }
 
   private InstanceResponseBlock executeInternal(ServerQueryRequest queryRequest, ExecutorService executorService,
-      @Nullable ResultsBlockStreamer streamer) {
+      @Nullable ResultsBlockStreamer streamer, @Nullable PlanMaker planMakerOverride) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer schedulerWaitTimer = timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     if (schedulerWaitTimer != null) {
@@ -175,6 +189,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     queryContext.setEndTimeMs(queryEndTimeMs);
 
     queryContext.setEnablePrefetch(_enablePrefetch);
+
+    // Initialize scan-based query killing for this query
+    initScanBasedKilling(queryRequest, tableNameWithType);
 
     // Query scheduler wait time already exceeds query timeout, directly return
     long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
@@ -224,7 +241,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     InstanceResponseBlock instanceResponse = null;
     try {
       instanceResponse = executeInternal(executionInfo, queryContext, timerContext, executorService, streamer,
-          queryRequest.isEnableStreaming());
+          queryRequest.isEnableStreaming(), planMakerOverride);
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       instanceResponse = new InstanceResponseBlock();
@@ -304,7 +321,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   // NOTE: This method might change indexSegments. Do not use it after calling this method.
   private InstanceResponseBlock executeInternal(TableExecutionInfo executionInfo, QueryContext queryContext,
       TimerContext timerContext, ExecutorService executorService, @Nullable ResultsBlockStreamer streamer,
-      boolean enableStreaming)
+      boolean enableStreaming, @Nullable PlanMaker planMakerOverride)
       throws Exception {
     handleSubquery(queryContext, executionInfo, timerContext, executorService);
 
@@ -315,7 +332,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     InstanceResponseBlock instanceResponse =
         execute(selectedSegmentsInfo.getIndexSegments(), queryContext, timerContext, executorService, streamer,
-            enableStreaming, selectedSegmentsInfo.getSelectedSegmentContexts());
+            enableStreaming, selectedSegmentsInfo.getSelectedSegmentContexts(), planMakerOverride);
 
     // Update the total docs in the metadata based on the un-pruned segments
     instanceResponse.addMetadata(MetadataKey.TOTAL_DOCS.getName(),
@@ -502,7 +519,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       subquery.setEndTimeMs(endTimeMs);
       // Make a clone of indexSegments because the method might modify the list
       InstanceResponseBlock instanceResponse =
-          executeInternal(executionInfo, subquery, timerContext, executorService, null, false);
+          executeInternal(executionInfo, subquery, timerContext, executorService, null, false, null);
       BaseResultsBlock resultsBlock = instanceResponse.getResultsBlock();
       Preconditions.checkState(resultsBlock instanceof AggregationResultsBlock,
           "Got unexpected results block type: %s, expecting aggregation results",
@@ -520,6 +537,50 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
   }
 
+  /**
+   * Initializes scan-based query killing for this query. Sets up a {@link QueryScanCostContext}
+   * on the current thread's {@link QueryExecutionContext} so operators can push scan deltas, and
+   * caches the resolved per-query strategy so table-level overrides are applied only once.
+   */
+  private void initScanBasedKilling(ServerQueryRequest queryRequest, String tableNameWithType) {
+    QueryKillingManager killingManager = QueryKillingManager.getInstance();
+    if (killingManager == null) {
+      return;
+    }
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    if (ctx == null) {
+      return;
+    }
+    QueryExecutionContext execCtx = ctx.getExecutionContext();
+    execCtx.setTableName(tableNameWithType);
+    execCtx.setQueryId(queryRequest.getQueryId());
+    execCtx.setQueryScanCostContext(new QueryScanCostContext());
+
+    // Resolve and cache per-query strategy (applies table-level threshold overrides)
+    QueryConfig queryConfig = null;
+    TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
+    if (tableDataManager != null) {
+      TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
+      if (tableConfig != null) {
+        queryConfig = tableConfig.getQueryConfig();
+      }
+    }
+    QueryKillingStrategy queryStrategy = killingManager.resolveQueryStrategy(queryConfig);
+    if (queryStrategy != null) {
+      execCtx.setCachedKillingStrategy(queryStrategy);
+    }
+    // Resolve and store per-table kill mode override (null = use cluster mode)
+    if (queryConfig != null && queryConfig.getScanKillingMode() != null) {
+      ScanKillingMode tableMode = ScanKillingMode.fromConfigValue(queryConfig.getScanKillingMode());
+      if (tableMode != null) {
+        execCtx.setEffectiveScanKillingMode(tableMode);
+      } else {
+        LOGGER.warn("Invalid scanKillingMode '{}' in QueryConfig for table {}, falling back to cluster mode",
+            queryConfig.getScanKillingMode(), tableNameWithType);
+      }
+    }
+  }
+
   private void addPrunerStats(InstanceResponseBlock instanceResponse, SegmentPrunerStatistics prunerStats) {
     instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(),
         String.valueOf(prunerStats.getInvalidSegments()));
@@ -530,15 +591,17 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   private Plan planCombineQuery(QueryContext queryContext, TimerContext timerContext, ExecutorService executorService,
-      @Nullable ResultsBlockStreamer streamer, List<SegmentContext> selectedSegmentContexts) {
+      @Nullable ResultsBlockStreamer streamer, List<SegmentContext> selectedSegmentContexts,
+      @Nullable PlanMaker planMakerOverride) {
     TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
 
+    PlanMaker planMaker = planMakerOverride != null ? planMakerOverride : _planMaker;
     Plan queryPlan;
     if (streamer != null) {
       queryPlan =
-          _planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService, streamer);
+          planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService, streamer);
     } else {
-      queryPlan = _planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService);
+      queryPlan = planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService);
     }
     planBuildTimer.stopAndRecord();
     return queryPlan;
@@ -546,7 +609,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private InstanceResponseBlock execute(List<IndexSegment> indexSegments, QueryContext queryContext,
       TimerContext timerContext, ExecutorService executorService, ResultsBlockStreamer streamer,
-      boolean enableStreaming, List<SegmentContext> selectedSegmentContexts)
+      boolean enableStreaming, List<SegmentContext> selectedSegmentContexts,
+      @Nullable PlanMaker planMakerOverride)
       throws TimeoutException {
     InstanceResponseBlock instanceResponse;
     @Nullable
@@ -562,7 +626,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         break;
       case NONE:
         instanceResponse = executeQuery(queryContext, timerContext, executorService, actualStreamer,
-            selectedSegmentContexts);
+            selectedSegmentContexts, planMakerOverride);
         break;
       default:
         throw new IllegalStateException("Unsupported explain mode: " + queryContext.getExplain());
@@ -572,13 +636,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private InstanceResponseBlock executeQuery(QueryContext queryContext, TimerContext timerContext,
       ExecutorService executorService, @Nullable ResultsBlockStreamer streamer,
-      List<SegmentContext> selectedSegmentContexts)
+      List<SegmentContext> selectedSegmentContexts, @Nullable PlanMaker planMakerOverride)
       throws TimeoutException {
     if (selectedSegmentContexts.isEmpty()) {
       return new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext));
     }
     InstanceResponseBlock instanceResponse;
-    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
+    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts,
+        planMakerOverride);
     // Sample to track usage of query planning, since it can be expensive for large segment lists.
     QueryThreadContext.checkTerminationAndSampleUsage("Server query planning");
 
@@ -600,7 +665,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer,
-        selectedSegmentContexts);
+        selectedSegmentContexts, null);
 
     TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
 
@@ -632,7 +697,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return new InstanceResponseBlock(explainResults);
     }
 
-    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
+    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts,
+        null);
 
     TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
     InstanceResponseBlock result = executeDescribeExplain(queryPlan, queryContext);

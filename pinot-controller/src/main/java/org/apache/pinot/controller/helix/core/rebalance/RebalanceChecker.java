@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -354,7 +353,7 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       if (nowMs - statsUpdatedAt < heartbeatTimeoutMs) {
         LOGGER.info("Rebalance job: {} is actively running with status updated at: {} within timeout: {}. Skip "
             + "retry for table: {}", jobId, statsUpdatedAt, heartbeatTimeoutMs, tableNameWithType);
-        return Collections.emptyMap();
+        return Map.of();
       }
       // The job is considered failed, but it's possible it is still running, then we might end up with more than one
       // rebalance jobs running in parallel for a table. The rebalance algorithm is idempotent, so this should be fine
@@ -366,7 +365,7 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     if (latestCompletedJob != null && latestCompletedJob.getLeft().equals(latestStartedJob.getLeft())) {
       LOGGER.info("Rebalance job: {} started most recently has already done. Skip retry for table: {}",
           latestCompletedJob.getLeft(), tableNameWithType);
-      return Collections.emptyMap();
+      return Map.of();
     }
     for (String jobId : cancelledOriginalJobs) {
       LOGGER.info("Skip original job: {} as it's cancelled", jobId);

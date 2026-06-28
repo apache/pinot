@@ -27,7 +27,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -89,8 +88,6 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.FieldSpec.MaxLengthExceedStrategy;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -901,18 +898,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   private void buildMultiColumnTextIndex(File segmentOutputDir)
       throws Exception {
     if (_config.getMultiColumnTextIndexConfig() != null) {
-      PinotConfiguration segmentDirectoryConfigs =
-          new PinotConfiguration(Map.of(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap));
-
       TableConfig tableConfig = _config.getTableConfig();
       Schema schema = _config.getSchema();
-      SegmentDirectoryLoaderContext segmentLoaderContext =
-          new SegmentDirectoryLoaderContext.Builder()
-              .setTableConfig(tableConfig)
-              .setSchema(schema)
-              .setSegmentName(_segmentName)
-              .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
-              .build();
+      SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
+          .setTableConfig(tableConfig)
+          .setSchema(schema)
+          .setSegmentName(_segmentName)
+          .build();
 
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig, schema);
 
@@ -938,19 +930,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     if (!postSegCreationIndexes.isEmpty()) {
       // Build other indexes
-      Map<String, Object> props = new HashMap<>();
-      props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap);
-      PinotConfiguration segmentDirectoryConfigs = new PinotConfiguration(props);
-
       TableConfig tableConfig = _config.getTableConfig();
       Schema schema = _config.getSchema();
-      SegmentDirectoryLoaderContext segmentLoaderContext =
-          new SegmentDirectoryLoaderContext.Builder()
-              .setTableConfig(tableConfig)
-              .setSchema(schema)
-              .setSegmentName(_segmentName)
-              .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
-              .build();
+      SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
+          .setTableConfig(tableConfig)
+          .setSchema(schema)
+          .setSegmentName(_segmentName)
+          .build();
 
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig, schema);
 

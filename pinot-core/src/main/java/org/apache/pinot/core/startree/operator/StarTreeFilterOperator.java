@@ -25,7 +25,6 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectBooleanPair;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -122,7 +121,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     _queryContext = queryContext;
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
-    _groupByColumns = groupByColumns != null ? groupByColumns : Collections.emptySet();
+    _groupByColumns = groupByColumns != null ? groupByColumns : Set.of();
     _scanStarTreeNodes = QueryOptionsUtils.isScanStarTreeNodes(_queryContext.getQueryOptions());
   }
 
@@ -146,7 +145,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   /**
@@ -365,7 +364,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     }
 
     return new StarTreeResult(matchingDocIds,
-        globalRemainingPredicateColumns != null ? globalRemainingPredicateColumns : Collections.emptySet());
+        globalRemainingPredicateColumns != null ? globalRemainingPredicateColumns : Set.of());
   }
 
   /**

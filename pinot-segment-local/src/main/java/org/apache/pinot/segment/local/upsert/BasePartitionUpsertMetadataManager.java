@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -1268,7 +1267,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _newlyAddedSegments.values().removeIf(v -> v < nowMs);
       return _newlyAddedSegments.keySet();
     }
-    return Collections.emptySet();
+    return Set.of();
   }
 
   /**

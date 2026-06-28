@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -203,7 +202,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected String _helixControllerInstanceId;
   protected String _helixParticipantInstanceId;
   protected boolean _isUpdateStateModel;
-  protected boolean _enableBatchMessageMode;
   protected ControllerConf.ControllerMode _controllerMode;
   protected HelixManager _helixControllerManager;
   protected HelixManager _helixParticipantManager;
@@ -286,7 +284,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(_hostname, _port);
     }
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
-    _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
     _serviceStatusCallbackList = new ArrayList<>();
     if (_controllerMode == ControllerConf.ControllerMode.HELIX_ONLY) {
@@ -577,8 +574,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     }
 
     // Set up Pinot cluster in Helix if needed
-    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode,
-        _config);
+    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _config);
 
     // Start all components
     initPinotFSFactory();
@@ -628,7 +624,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       try {
         HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
             .forCluster(helixClusterName).build();
-        Map<String, String> values = helixAdminForMv.getConfig(scope, Collections.singletonList(configName));
+        Map<String, String> values = helixAdminForMv.getConfig(scope, List.of(configName));
         return values == null ? null : values.get(configName);
       } catch (Exception e) {
         return null;
@@ -1048,7 +1044,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         }
       }
     }
-    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> Collections.singletonList(Helix.CONTROLLER_INSTANCE));
+    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> List.of(Helix.CONTROLLER_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
 

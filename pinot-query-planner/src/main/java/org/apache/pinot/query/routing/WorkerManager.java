@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -112,7 +111,7 @@ public class WorkerManager {
     // worker instance with identical server/mailbox port number.
     DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(0);
     metadata.setWorkerIdToServerInstanceMap(
-        Collections.singletonMap(0, new QueryServerInstance(_instanceId, _hostName, _port, _port)));
+        Map.of(0, new QueryServerInstance(_instanceId, _hostName, _port, _port)));
 
     // Two-pass assignment: leaf stages must be assigned first so that the candidate server information
     // (_nonLookupTables or _leafServerInstances) is fully populated before intermediate stages use it.

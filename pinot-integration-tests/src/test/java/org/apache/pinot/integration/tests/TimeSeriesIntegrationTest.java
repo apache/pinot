@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -342,7 +341,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   protected Map<String, String> getHeaders() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   private void runGroupedTimeSeriesQuery(String query, int expectedGroups, boolean isBrokerResponseCompatible,

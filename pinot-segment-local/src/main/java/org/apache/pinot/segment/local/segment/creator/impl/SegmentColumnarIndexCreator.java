@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -150,7 +151,7 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
     SegmentDictionaryCreator dictionaryCreator = _colIndexes.get(columnName).getDictionaryCreator();
 
-    Object defaultNullValue = fieldSpec.getDefaultNullValue();
+    PinotDataType destDataType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
     Object reuseColumnValueToIndex;
 
     // Reset column reader to start from beginning
@@ -158,15 +159,17 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
 
     int docId = 0;
     while (columnReader.hasNext()) {
-      reuseColumnValueToIndex = columnReader.next();
+      Object rawValue = columnReader.next();
 
-      // Handle null values
-      if (reuseColumnValueToIndex == null) {
-        if (nullVec != null) {
-          nullVec.setNull(docId);
-        }
-        reuseColumnValueToIndex = defaultNullValue;
+      // Record whole-value-null docs in the null-value vector BEFORE substituting the default (matching
+      // the row-major path, which marks null only for whole-value nulls). The column-major driver runs
+      // with no transform pipeline, so normalize the value the way the row-major NullValueTransformer +
+      // DataTypeTransformer would (null -> column default, coerce to the column's stored type), shared
+      // with the stats path via ColumnarValueNormalizer.
+      if (rawValue == null && nullVec != null) {
+        nullVec.setNull(docId);
       }
+      reuseColumnValueToIndex = ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, rawValue);
 
       try {
         if (fieldSpec.isSingleValueField()) {

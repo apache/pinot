@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.physical.v2;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -71,7 +70,7 @@ public class PinotDataDistribution {
     _type = type;
     _workers = workers;
     _workerHash = workerHash;
-    _hashDistributionDesc = desc == null ? Collections.emptySet() : desc;
+    _hashDistributionDesc = desc == null ? Set.of() : desc;
     _collation = collation == null ? RelCollations.EMPTY : collation;
     validate();
   }

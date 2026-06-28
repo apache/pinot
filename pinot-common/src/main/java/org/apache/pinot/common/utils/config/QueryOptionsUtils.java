@@ -21,7 +21,6 @@ package org.apache.pinot.common.utils.config;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -291,7 +290,7 @@ public class QueryOptionsUtils {
   public static List<Integer> getOrderedPreferredPools(Map<String, String> queryOptions) {
     String orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_POOLS);
     if (StringUtils.isEmpty(orderedPreferredPools)) {
-      return Collections.emptyList();
+      return List.of();
     }
     // cannot use comma as the delimiter of pool list
     // because query option use comma as the delimiter of different options
@@ -585,6 +584,12 @@ public class QueryOptionsUtils {
     String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT);
     return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT, option)
         : defaultValue;
+  }
+
+  @Nullable
+  public static Integer getLiteModeImplicitLeafStageLimit(Map<String, String> queryOptions) {
+    String val = queryOptions.get(QueryOptionKey.LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT);
+    return val != null ? Integer.parseInt(val) : null;
   }
 
   @Nullable

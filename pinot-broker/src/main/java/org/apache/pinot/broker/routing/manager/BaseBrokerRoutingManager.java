@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -39,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import org.apache.commons.collections4.CollectionUtils;
@@ -143,6 +144,14 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   @Nullable
   private Consumer<ServerInstance> _serverReenableCallback;
 
+  // Providers of extra per-table segment ZK metadata fetch listeners, registered alongside the built-in segment
+  // pruners on every table's routing entry. Each provider is invoked once per table (with the table name with type)
+  // and may return null to skip that table. Lets deployments attach routing-adjacent metadata caches that observe the
+  // same ZNRecords the routing manager already fetches, without extra ZK reads. CopyOnWriteArrayList because providers
+  // are added once at startup but iterated concurrently across per-table routing builds.
+  private final List<Function<String, SegmentZkMetadataFetchListener>> _extraFetchListenerProviders =
+      new CopyOnWriteArrayList<>();
+
   // Global read-write lock for protecting the global data structures such as _enabledServerInstanceMap,
   // _excludedServers, and _routableServerInstanceMap. Write lock must be held if any of these are modified, read lock
   // must be held otherwise
@@ -167,7 +176,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   /// servers: its `keySet()` is passed to `InstanceSelector` for per-table selection, and callers that pick workers
   /// outside of per-table instance selection (MSE intermediate-stage worker picking) read the map directly so that
   /// FailureDetector-driven exclusions are honored.
-  private volatile Map<String, ServerInstance> _routableServerInstanceMap = Collections.emptyMap();
+  private volatile Map<String, ServerInstance> _routableServerInstanceMap = Map.of();
 
   // Process assignment change timestamp. Used to check if buildRouting needs to be re-run for a given table to avoid
   // race conditions with processSegmentAssignmentChange()
@@ -207,6 +216,16 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
    */
   public void setServerReenableCallback(Consumer<ServerInstance> callback) {
     _serverReenableCallback = callback;
+  }
+
+  /**
+   * Registers a provider of an extra {@link SegmentZkMetadataFetchListener} that is attached to every table's routing
+   * entry, alongside the built-in segment pruners. The provider is invoked once per table with the table name with
+   * type and may return {@code null} to skip a table. Must be called before routing is built (i.e. before the cluster
+   * change mediator starts) so that all tables pick it up.
+   */
+  public void addSegmentZkMetadataFetchListenerProvider(Function<String, SegmentZkMetadataFetchListener> provider) {
+    _extraFetchListenerProviders.add(provider);
   }
 
   private Object getRoutingTableBuildLock(String tableNameWithType) {
@@ -541,7 +560,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     Map<String, ServerInstance> routableServerInstanceMap = new HashMap<>(_routableServerInstanceMap);
     routableServerInstanceMap.remove(instanceId);
     _routableServerInstanceMap = routableServerInstanceMap;
-    List<String> changedServers = Collections.singletonList(instanceId);
+    List<String> changedServers = List.of(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       try {
@@ -590,7 +609,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     Map<String, ServerInstance> routableServerInstanceMap = new HashMap<>(_routableServerInstanceMap);
     routableServerInstanceMap.put(instanceId, serverInstance);
     _routableServerInstanceMap = routableServerInstanceMap;
-    List<String> changedServers = Collections.singletonList(instanceId);
+    List<String> changedServers = List.of(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       try {
@@ -832,6 +851,12 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       }
       if (partitionMetadataManager != null) {
         segmentZkMetadataFetcher.register(partitionMetadataManager);
+      }
+      for (Function<String, SegmentZkMetadataFetchListener> provider : _extraFetchListenerProviders) {
+        SegmentZkMetadataFetchListener listener = provider.apply(tableNameWithType);
+        if (listener != null) {
+          segmentZkMetadataFetcher.register(listener);
+        }
       }
       segmentZkMetadataFetcher.init(idealState, externalView, preSelectedOnlineSegments);
 
@@ -1198,7 +1223,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     assert ((ReentrantReadWriteLock) _globalLock).isWriteLockedByCurrentThread()
         : "buildRoutableServerInstanceMap must be called under _globalLock.writeLock()";
     if (routableServers.isEmpty()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, ServerInstance> map = Maps.newHashMapWithExpectedSize(routableServers.size());
     for (String instanceId : routableServers) {
@@ -1463,8 +1488,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
-        return new InstanceSelector.SelectionResult(Pair.of(Collections.emptyMap(), Collections.emptyMap()),
-            Collections.emptyList(), numPrunedSegments);
+        return new InstanceSelector.SelectionResult(Pair.of(Map.of(), Map.of()),
+            List.of(), numPrunedSegments);
       }
     }
 

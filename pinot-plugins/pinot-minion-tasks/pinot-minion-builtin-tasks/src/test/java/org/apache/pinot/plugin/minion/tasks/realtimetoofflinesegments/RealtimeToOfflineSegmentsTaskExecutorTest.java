@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,12 +31,15 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskTestUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
+import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -78,14 +80,17 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   private static final String TABLE_NAME_WITH_SORTED_COL = "testTableWithSortedCol_OFFLINE";
   private static final String TABLE_NAME_EPOCH_HOURS = "testTableEpochHours_OFFLINE";
   private static final String TABLE_NAME_SDF = "testTableSDF_OFFLINE";
+  private static final String TABLE_NAME_AVG = "testTableAvg_OFFLINE";
   private static final String D1 = "d1";
   private static final String M1 = "m1";
+  private static final String M_AVG = "mavg";
   private static final String T = "t";
   private static final String T_TRX = "t_trx";
 
   private List<File> _segmentIndexDirList;
   private List<File> _segmentIndexDirListEpochHours;
   private List<File> _segmentIndexDirListSDF;
+  private List<File> _segmentIndexDirListAvg;
 
   @BeforeClass
   public void setUp()
@@ -103,13 +108,13 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
             .setSortedColumn(D1).build();
     IngestionConfig ingestionConfigEpochHours = new IngestionConfig();
     ingestionConfigEpochHours.setTransformConfigs(
-        Collections.singletonList(new TransformConfig(T_TRX, "toEpochHours(t)")));
+        List.of(new TransformConfig(T_TRX, "toEpochHours(t)")));
     TableConfig tableConfigEpochHours =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_EPOCH_HOURS).setTimeColumnName(T_TRX)
             .setSortedColumn(D1).setIngestionConfig(ingestionConfigEpochHours).build();
     IngestionConfig ingestionConfigSDF = new IngestionConfig();
     ingestionConfigSDF.setTransformConfigs(
-        Collections.singletonList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")));
+        List.of(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")));
     TableConfig tableConfigSDF =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_SDF).setTimeColumnName(T_TRX)
             .setSortedColumn(D1).setIngestionConfig(ingestionConfigSDF).build();
@@ -125,6 +130,12 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
             .addMetric(M1, FieldSpec.DataType.INT)
             .addDateTime(T_TRX, FieldSpec.DataType.INT, "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH", "1:HOURS").build();
+    TableConfig tableConfigAvg =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_AVG).setTimeColumnName(T).build();
+    Schema schemaAvg =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME_AVG).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
+            .addMetric(M_AVG, FieldSpec.DataType.BYTES)
+            .addDateTime(T, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
 
     List<String> d1 = Lists.newArrayList("foo", "bar", "foo", "foo", "bar");
     List<List<GenericRow>> rows = new ArrayList<>(NUM_SEGMENTS);
@@ -191,6 +202,29 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       _segmentIndexDirListSDF.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
     }
 
+    // create test segments with a BYTES column holding serialized AvgPair (sum + count) for AVG rollup.
+    // Two segments share dimension key "a" within the same day bucket, with unequal counts (10 and 100) so a
+    // correct merge must add sums and counts rather than average the per-segment averages.
+    _segmentIndexDirListAvg = new ArrayList<>();
+    int[][] avgRanges = {{1, 11}, {100, 200}};
+    for (int i = 0; i < avgRanges.length; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue(D1, "a");
+      row.putValue(M_AVG, createAvgPairBytes(avgRanges[i][0], avgRanges[i][1]));
+      row.putValue(T, 1600473600000L);
+      String segmentName = "segmentAvg_" + i;
+      RecordReader recordReader = new GenericRowRecordReader(List.of(row));
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfigAvg, schemaAvg);
+      config.setInstanceType(InstanceType.MINION);
+      config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
+      config.setTableName(TABLE_NAME_AVG);
+      config.setSegmentName(segmentName);
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, recordReader);
+      driver.build();
+      _segmentIndexDirListAvg.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
+    }
+
     MinionContext minionContext = MinionContext.getInstance();
     @SuppressWarnings("unchecked")
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
@@ -215,6 +249,10 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
         .thenReturn(SchemaSerDeUtils.toZNRecord(schemaEpochHours));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableSDF", null, AccessOption.PERSISTENT))
         .thenReturn(SchemaSerDeUtils.toZNRecord(schemaSDF));
+    Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_AVG, null, AccessOption.PERSISTENT))
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigAvg));
+    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableAvg", null, AccessOption.PERSISTENT))
+        .thenReturn(SchemaSerDeUtils.toZNRecord(schemaAvg));
     minionContext.setHelixPropertyStore(helixPropertyStore);
   }
 
@@ -337,6 +375,61 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     assertEquals(columnMetadataForM1.getCardinality(), 2);
     assertEquals(columnMetadataForM1.getMinValue(), 1);
     assertEquals(columnMetadataForM1.getMaxValue(), 3);
+  }
+
+  @Test
+  public void testRollupWithAvgAggregation()
+      throws Exception {
+    FileUtils.deleteQuietly(WORKING_DIR);
+
+    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
+        new RealtimeToOfflineSegmentsTaskExecutor(null, null);
+    realtimeToOfflineSegmentsTaskExecutor.setMinionEventObserver(MinionTaskTestUtils.getMinionProgressObserver());
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_AVG);
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1d");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
+    configs.put(M_AVG + MinionConstants.RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX, "avg");
+    PinotTaskConfig pinotTaskConfig =
+        new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
+
+    List<SegmentConversionResult> conversionResults =
+        realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirListAvg, WORKING_DIR);
+
+    assertEquals(conversionResults.size(), 1);
+    File resultingSegment = conversionResults.get(0).getFile();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(resultingSegment);
+    // Single (d1=a, day-bucket) group -> the two AvgPairs (counts 10 and 100) merge into one row
+    assertEquals(segmentMetadata.getTotalDocs(), 1);
+
+    AvgPair merged = readAvgPair(resultingSegment);
+    // Sum and count are added (not averaged): 55 + 14950 = 15005 over 10 + 100 = 110.
+    // Average-of-averages would wrongly give (5.5 + 149.5) / 2 = 77.5 instead of ~136.41.
+    assertEquals(merged.getSum(), 15005.0);
+    assertEquals(merged.getCount(), 110L);
+  }
+
+  private static byte[] createAvgPairBytes(int start, int end) {
+    AvgPair avgPair = new AvgPair();
+    for (int v = start; v < end; v++) {
+      avgPair.apply(v);
+    }
+    return ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair);
+  }
+
+  private static AvgPair readAvgPair(File segmentDir)
+      throws Exception {
+    PinotSegmentRecordReader reader = new PinotSegmentRecordReader();
+    reader.init(segmentDir, null, null, true);
+    try {
+      Assert.assertTrue(reader.hasNext());
+      GenericRow row = reader.next();
+      return ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize((byte[]) row.getValue(M_AVG));
+    } finally {
+      reader.close();
+    }
   }
 
   @Test

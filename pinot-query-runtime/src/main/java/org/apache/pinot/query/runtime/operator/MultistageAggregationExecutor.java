@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -109,7 +108,7 @@ public class MultistageAggregationExecutor {
     }
     // Convert the results from AggregationFunction to the desired type
     TypeUtils.convertRow(row, _resultSchema.getStoredColumnDataTypes());
-    return Collections.singletonList(row);
+    return List.<Object[]>of(row);
   }
 
   private void processAggregate(MseBlock.Data block) {

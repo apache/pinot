@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.config.provider;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -177,7 +176,7 @@ public interface TableCache extends PinotConfigProvider {
       int mapSize = expressionOverrideMap.size();
       if (mapSize == 1) {
         Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
-        return Collections.singletonMap(entry.getKey(), entry.getValue());
+        return Map.of(entry.getKey(), entry.getValue());
       } else if (mapSize > 1) {
         return expressionOverrideMap;
       }

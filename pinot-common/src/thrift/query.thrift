@@ -32,6 +32,12 @@ struct PinotQuery {
   11: optional map<string, string> queryOptions;
   12: optional bool explain;
   13: optional map<Expression, Expression> expressionOverrideHints;
+  // GROUP BY GROUPING SETS / ROLLUP / CUBE: one membership bitmask per grouping set, over groupByList. Bit i
+  // is set iff groupByList[i] participates in (is grouped by) that set; a mask of 0 is the grand-total set ().
+  // Unset for a plain GROUP BY query. Only set when grouping constructs are used, in which case groupByList (the
+  // union of all grouping columns) is capped at 31 entries so a mask always fits in an i32 (enforced at compile
+  // time by CalciteSqlParser.MAX_GROUPING_SETS_COLUMNS); plain GROUP BY queries have no such limit.
+  14: optional list<i32> groupingSetMasks;
 }
 
 struct DataSource {

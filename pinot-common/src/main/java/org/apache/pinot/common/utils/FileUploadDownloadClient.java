@@ -27,7 +27,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -558,7 +557,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   @Deprecated
   public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile)
       throws IOException, HttpErrorStatusException {
-    return addSchema(uri, schemaName, schemaFile, Collections.emptyList(), Collections.emptyList());
+    return addSchema(uri, schemaName, schemaFile, List.of(), List.of());
   }
 
   /**
@@ -652,7 +651,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
       int segmentUploadRequestTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return uploadSegmentMetadataFiles(uri, metadataFiles, Collections.emptyList(), Collections.emptyList(),
+    return uploadSegmentMetadataFiles(uri, metadataFiles, List.of(), List.of(),
         segmentUploadRequestTimeoutMs);
   }
 
@@ -711,7 +710,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
       throws IOException, HttpErrorStatusException {
     // Add table name as a request parameter
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
-    List<NameValuePair> parameters = Collections.singletonList(tableNameValuePair);
+    List<NameValuePair> parameters = List.of(tableNameValuePair);
     return uploadSegment(uri, segmentName, segmentFile, null, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
@@ -1248,7 +1247,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   @Deprecated
   public SimpleHttpResponse sendSegmentCompletionProtocolRequest(URI uri, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return sendSegmentCompletionProtocolRequest(uri, Collections.emptyList(), Collections.emptyList(), socketTimeoutMs);
+    return sendSegmentCompletionProtocolRequest(uri, List.of(), List.of(), socketTimeoutMs);
   }
 
   /**

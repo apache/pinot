@@ -25,7 +25,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -138,7 +137,7 @@ public class SelectionOperatorUtils {
       // NOTE: The data schema might be generated from DataTableBuilder.buildEmptyDataTable(), where for 'SELECT *' it
       //       contains a single column "*". In such case, return as is to build the empty selection result.
       if (numColumns == 1 && columnNames[0].equals("*")) {
-        return new ArrayList<>(Collections.singletonList("*"));
+        return new ArrayList<>(List.of("*"));
       }
 
       // Directly return all columns for selection-only queries

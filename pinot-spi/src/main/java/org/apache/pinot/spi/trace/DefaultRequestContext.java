@@ -508,6 +508,11 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public void setMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached) {
+    // No-op: not tracked in default context
+  }
+
+  @Override
   public void setNumExceptions(int numExceptions) {
     _numExceptions = numExceptions;
   }

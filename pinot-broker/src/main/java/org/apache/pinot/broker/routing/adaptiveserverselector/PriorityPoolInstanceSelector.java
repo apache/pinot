@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -178,7 +177,7 @@ public class PriorityPoolInstanceSelector {
    */
   public List<String> rank(ServerSelectionContext ctx, List<SegmentInstanceCandidate> serverCandidates) {
     if (serverCandidates == null || serverCandidates.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     // TODO: return the pos of the selected server in the input array rather than the server instance id.
