@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -4341,6 +4342,84 @@ public class TableConfigUtilsTest {
 
     List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
     assertTrue(violations.isEmpty(), "Expected no violations for non-upsert tables, but got: " + violations);
+  }
+
+  private static SegmentPartitionConfig partition(int numPartitions) {
+    return new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("Murmur", numPartitions)));
+  }
+
+  private static TableConfig partitionedTable(SegmentPartitionConfig partition, boolean upsert, boolean dedup) {
+    TableConfigBuilder builder = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setSegmentPartitionConfig(partition);
+    if (upsert) {
+      builder.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL));
+    }
+    if (dedup) {
+      builder.setDedupConfig(new DedupConfig());
+    }
+    return builder.build();
+  }
+
+  @Test
+  public void testUpsertPartitionChangeRejected() {
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(
+        partitionedTable(partition(8), true, false), partitionedTable(partition(4), true, false));
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("segmentPartitionConfig"));
+  }
+
+  @Test
+  public void testDedupPartitionChangeRejected() {
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(
+        partitionedTable(partition(8), false, true), partitionedTable(partition(4), false, true));
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("segmentPartitionConfig"));
+  }
+
+  @Test
+  public void testSamePartitionAllowed() {
+    TableConfig config = partitionedTable(partition(4), true, false);
+    assertTrue(TableConfigUtils.validateBackwardCompatibility(config, config).isEmpty());
+  }
+
+  @Test
+  public void testNonUpsertPartitionChangeAllowed() {
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(
+        partitionedTable(partition(8), false, false), partitionedTable(partition(4), false, false));
+    assertTrue(violations.isEmpty());
+  }
+
+  @Test
+  public void testAddingPartitionRejected() {
+    TableConfig existing = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
+    List<String> violations =
+        TableConfigUtils.validateBackwardCompatibility(partitionedTable(partition(4), true, false), existing);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("segmentPartitionConfig"));
+  }
+
+  @Test
+  public void testPartitionChangeAllowedWhenDisablingUpsert() {
+    TableConfig nonUpsert = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setSegmentPartitionConfig(partition(8)).build();
+    assertTrue(TableConfigUtils.validateBackwardCompatibility(nonUpsert, partitionedTable(partition(4), true, false))
+        .isEmpty());
+  }
+
+  @Test
+  public void testReorderedPartitionAllowed() {
+    // Same column partition content, only the map order differs -> not a change.
+    LinkedHashMap<String, ColumnPartitionConfig> ordered = new LinkedHashMap<>();
+    ordered.put("colA", new ColumnPartitionConfig("Murmur", 4));
+    ordered.put("colB", new ColumnPartitionConfig("Murmur", 8));
+    LinkedHashMap<String, ColumnPartitionConfig> reordered = new LinkedHashMap<>();
+    reordered.put("colB", new ColumnPartitionConfig("Murmur", 8));
+    reordered.put("colA", new ColumnPartitionConfig("Murmur", 4));
+
+    TableConfig existing = partitionedTable(new SegmentPartitionConfig(ordered), true, false);
+    TableConfig updated = partitionedTable(new SegmentPartitionConfig(reordered), true, false);
+    assertTrue(TableConfigUtils.validateBackwardCompatibility(updated, existing).isEmpty());
   }
 
   @Test

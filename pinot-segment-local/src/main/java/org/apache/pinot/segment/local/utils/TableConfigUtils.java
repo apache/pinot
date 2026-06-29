@@ -1391,6 +1391,7 @@ public final class TableConfigUtils {
     List<String> violations = new ArrayList<>();
     validateUpsertConfigUpdate(newConfig, existingConfig, violations);
     validateDedupConfigUpdate(newConfig, existingConfig, violations);
+    validatePartitionConfigUpdate(newConfig, existingConfig, violations);
     validateMaterializedViewConfigUpdate(newConfig, existingConfig, violations);
 
     return violations;
@@ -1548,6 +1549,31 @@ public final class TableConfigUtils {
       throw new IllegalStateException(String.format(
           "MaterializedViewTask is configured but definedSQL is missing or empty for table: %s",
           tableConfig.getTableName()));
+    }
+  }
+
+  /**
+   * Disallows changing segmentPartitionConfig on upsert/dedup tables, since they partition by primary key and
+   * re-partitioning would break key routing. Can be bypassed with a force update.
+   */
+  private static void validatePartitionConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
+      List<String> violations) {
+    boolean existingIsUpsertOrDedup = existingConfig.isUpsertEnabled() || existingConfig.isDedupEnabled();
+    boolean newIsUpsertOrDedup = newConfig.isUpsertEnabled() || newConfig.isDedupEnabled();
+    if (!existingIsUpsertOrDedup || !newIsUpsertOrDedup) {
+      return;
+    }
+    SegmentPartitionConfig existingPartitionConfig =
+        existingConfig.getIndexingConfig() != null ? existingConfig.getIndexingConfig().getSegmentPartitionConfig()
+            : null;
+    SegmentPartitionConfig newPartitionConfig =
+        newConfig.getIndexingConfig() != null ? newConfig.getIndexingConfig().getSegmentPartitionConfig() : null;
+    if (!Objects.equals(existingPartitionConfig, newPartitionConfig)) {
+      violations.add(String.format(
+          "segmentPartitionConfig (%s -> %s) - changing partitioning is not allowed for upsert/dedup tables as it "
+              + "breaks primary key routing",
+          existingPartitionConfig != null ? existingPartitionConfig.getColumnPartitionMap() : null,
+          newPartitionConfig != null ? newPartitionConfig.getColumnPartitionMap() : null));
     }
   }
 
