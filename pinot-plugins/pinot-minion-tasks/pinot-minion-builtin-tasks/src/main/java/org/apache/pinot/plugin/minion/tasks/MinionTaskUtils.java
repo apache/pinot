@@ -475,19 +475,10 @@ public class MinionTaskUtils {
   }
 
   /**
-   * Picks the replica whose validDocIds the generator should use for a segment, or returns {@code null} to skip the
-   * segment. Applies the same checks the executor would (CRC match, healthy server, replica consensus) so bad
-   * segments are dropped before a task is scheduled.
-   *
-   * CRC is matched by {@link #crcMatches} (segment CRC, with the data CRC as a fallback when segment CRCs differ).
-   * The executor uses the same check, so a segment accepted here isn't later rejected on CRC.
-   *
-   * How the replica is chosen depends on {@code consensusMode}:
-   *   - UNSAFE: the first replica with a matching CRC and a healthy server.
-   *   - EQUAL: all replicas must match CRC, be healthy, and report the same valid doc count. Counts (rather than
-   *     full bitmaps) are compared here to keep the generator cheap; the executor still verifies byte-identical
-   *     bitmaps before compacting.
-   *   - MOST_VALID_DOCS: all replicas must match CRC and be healthy; the one with the most valid docs wins.
+   * Picks the replica whose validDocIds the generator should use, or null to skip the segment, applying the same
+   * checks the executor would so bad segments aren't scheduled: the replica must match CRC (via {@link #crcMatches})
+   * and be on a healthy server. UNSAFE uses the first such replica, EQUAL requires all to report the same valid doc
+   * count, and MOST_VALID_DOCS picks the highest.
    */
   @Nullable
   public static ValidDocIdsMetadataInfo selectValidDocIdsMetadataForConsensus(String taskType,

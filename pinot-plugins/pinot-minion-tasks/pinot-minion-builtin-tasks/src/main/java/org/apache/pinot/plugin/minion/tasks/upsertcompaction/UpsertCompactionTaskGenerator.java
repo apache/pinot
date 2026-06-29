@@ -149,11 +149,11 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       // scheduled. With EXECUTOR_ONLY the generator skips these checks (the executor stays the gate).
       MinionConstants.ValidDocIdsConsensusMode consensusMode = MinionTaskUtils.resolveGeneratorConsensusMode(
           MinionTaskUtils.parseValidDocIdsConsensusMode(
-              taskConfigs.getOrDefault(MinionConstants.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
-                  MinionConstants.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)),
+              taskConfigs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+                  MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)),
           MinionTaskUtils.parseValidDocIdsValidationMode(
-              taskConfigs.getOrDefault(MinionConstants.VALID_DOC_IDS_VALIDATION_MODE_KEY,
-                  MinionConstants.DEFAULT_VALID_DOC_IDS_VALIDATION_MODE)));
+              taskConfigs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_VALIDATION_MODE_KEY,
+                  MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_VALIDATION_MODE)));
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
       // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.

@@ -106,21 +106,6 @@ public class MinionConstants {
     STRICT, EXECUTOR_ONLY
   }
 
-  /**
-   * Valid doc ids consensus mode used by both the task generators (pre-scheduling) and the executors. UNSAFE = first
-   * server with matching CRC and GOOD status; EQUAL (default) = all replicas must have the same valid doc set;
-   * MOST_VALID_DOCS = the replica with the most valid docs.
-   */
-  public static final String VALID_DOC_IDS_CONSENSUS_MODE_KEY = "validDocIdsConsensusMode";
-  public static final String DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE = "EQUAL";
-
-  /**
-   * Whether the consensus checks run in the generator too. STRICT (default) = generator + executor; EXECUTOR_ONLY =
-   * executor only (generator skips the checks and the bitmap fetch).
-   */
-  public static final String VALID_DOC_IDS_VALIDATION_MODE_KEY = "validDocIdsValidationMode";
-  public static final String DEFAULT_VALID_DOC_IDS_VALIDATION_MODE = "STRICT";
-
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
     public static final String TASK_TYPE = "PurgeTask";
@@ -292,14 +277,21 @@ public class MinionConstants {
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
 
-    /** @deprecated moved to {@link MinionConstants#VALID_DOC_IDS_CONSENSUS_MODE_KEY}. */
-    @Deprecated
-    public static final String VALID_DOC_IDS_CONSENSUS_MODE_KEY = MinionConstants.VALID_DOC_IDS_CONSENSUS_MODE_KEY;
+    /**
+     * Valid doc ids consensus mode used by both the task generators (pre-scheduling) and the executors. UNSAFE =
+     * first server with matching CRC and GOOD status; EQUAL (default) = all replicas must agree; MOST_VALID_DOCS =
+     * the replica with the most valid docs. Shared by UpsertCompactionTask, UpsertCompactMergeTask, and
+     * SegmentRefreshTask.
+     */
+    public static final String VALID_DOC_IDS_CONSENSUS_MODE_KEY = "validDocIdsConsensusMode";
+    public static final String DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE = "EQUAL";
 
-    /** @deprecated moved to {@link MinionConstants#DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE}. */
-    @Deprecated
-    public static final String DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE =
-        MinionConstants.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
+    /**
+     * Whether the consensus checks also run in the generator. STRICT (default) = generator + executor;
+     * EXECUTOR_ONLY = executor only. Shared by UpsertCompactionTask, UpsertCompactMergeTask, and SegmentRefreshTask.
+     */
+    public static final String VALID_DOC_IDS_VALIDATION_MODE_KEY = "validDocIdsValidationMode";
+    public static final String DEFAULT_VALID_DOC_IDS_VALIDATION_MODE = "STRICT";
   }
 
   public static class UpsertCompactMergeTask {
