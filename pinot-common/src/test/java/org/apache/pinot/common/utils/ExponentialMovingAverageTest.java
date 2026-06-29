@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -113,5 +114,19 @@ public class ExponentialMovingAverageTest {
       Thread.sleep(100);
       assertEquals(average.getAverage(), currAvg);
     }
+  }
+
+  @Test
+  public void testNullExecutorCannotEnableAutoDecay() {
+    ExponentialMovingAverage average = new ExponentialMovingAverage(1.0, -1, 0, 0.0, null);
+    average.compute(10.0);
+    assertEquals(average.getAverage(), 10.0);
+
+    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class,
+        () -> average.setAutoDecayWindowMs(10));
+    assertEquals(exception.getMessage(), "periodicTaskExecutor must not be null when autoDecayWindowMs is positive");
+
+    average.compute(20.0);
+    assertEquals(average.getAverage(), 20.0);
   }
 }

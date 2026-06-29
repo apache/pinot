@@ -32,11 +32,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.ExponentialMovingAverage;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryExecutionContext.QueryType;
@@ -73,11 +75,11 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
   // ScheduledExecutorServer for processing periodic tasks like decay.
   private ScheduledExecutorService _periodicTaskExecutor;
 
-  private double _alpha;
-  private long _autoDecayWindowMs;
+  private volatile double _alpha;
+  private volatile long _autoDecayWindowMs;
   private long _warmupDurationMs;
   private double _avgInitializationVal;
-  private int _hybridScoreExponent;
+  private volatile int _hybridScoreExponent;
   private int _hybridScoreQueueFloor;
   private volatile boolean _enableStatsMetricExport;
   private volatile long _statsMetricExportIntervalMs;
@@ -98,8 +100,9 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
 
     LOGGER.info("Initializing ServerRoutingStatsManager for Adaptive Server Selection.");
 
-    _alpha = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA,
-        AdaptiveServerSelector.DEFAULT_EWMA_ALPHA);
+    double configuredAlpha = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA,
+            AdaptiveServerSelector.DEFAULT_EWMA_ALPHA);
+    _alpha = ExponentialMovingAverage.validateAlpha(configuredAlpha);
     _autoDecayWindowMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS,
         AdaptiveServerSelector.DEFAULT_AUTODECAY_WINDOW_MS);
     _warmupDurationMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS,
@@ -134,12 +137,15 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!_isEnabled) {
+      return;
+    }
     if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT)) {
       String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT);
       if (value != null) {
         _enableStatsMetricExport = Boolean.parseBoolean(value);
       } else {
-        // Key was removed from cluster config — fall back to the static broker config value.
+        // Key was removed from cluster config; fall back to the static broker config value.
         _enableStatsMetricExport = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT,
             AdaptiveServerSelector.DEFAULT_ENABLE_STATS_METRIC_EXPORT);
       }
@@ -149,32 +155,108 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
       }
     }
     if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS)) {
-      String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
-      long newIntervalMs;
-      if (value != null) {
-        try {
-          newIntervalMs = Long.parseLong(value);
-        } catch (NumberFormatException e) {
-          LOGGER.warn("Invalid value '{}' for config '{}'; ignoring interval change", value,
-              AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
-          return;
-        }
-        if (newIntervalMs <= 0) {
-          LOGGER.warn("Non-positive value {} for config '{}'; ignoring interval change", newIntervalMs,
-              AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
-          return;
-        }
-      } else {
-        newIntervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
-            AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+      setStatsMetricExportIntervalMs(clusterConfigs);
+    }
+    if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT)) {
+      setHybridScoreExponent(clusterConfigs);
+    }
+    if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA)) {
+      setAlpha(clusterConfigs);
+    }
+    if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS)) {
+      setAutoDecayWindowMs(clusterConfigs);
+    }
+  }
+
+  private void setStatsMetricExportIntervalMs(Map<String, String> clusterConfigs) {
+    String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
+    long newIntervalMs;
+    if (value != null) {
+      try {
+        newIntervalMs = Long.parseLong(value);
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid value '{}' for config '{}'; ignoring interval change", value,
+            AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
+        return;
       }
-      if (newIntervalMs != _statsMetricExportIntervalMs) {
-        _statsMetricExportIntervalMs = newIntervalMs;
-        _metricExportFuture.cancel(false);
-        _metricExportFuture = _periodicTaskExecutor.scheduleAtFixedRate(this::exportStatsAsMetrics,
-            newIntervalMs, newIntervalMs, TimeUnit.MILLISECONDS);
-        LOGGER.info("Rescheduled adaptive server routing stats metric export with new interval {}ms.", newIntervalMs);
+      if (newIntervalMs <= 0) {
+        LOGGER.warn("Non-positive value {} for config '{}'; ignoring interval change", newIntervalMs,
+            AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
+        return;
       }
+    } else {
+      newIntervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
+          AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+    }
+    if (newIntervalMs != _statsMetricExportIntervalMs) {
+      _statsMetricExportIntervalMs = newIntervalMs;
+      _metricExportFuture.cancel(false);
+      _metricExportFuture = _periodicTaskExecutor.scheduleAtFixedRate(this::exportStatsAsMetrics,
+          newIntervalMs, newIntervalMs, TimeUnit.MILLISECONDS);
+      LOGGER.info("Rescheduled adaptive server routing stats metric export with new interval {}ms.", newIntervalMs);
+    }
+  }
+
+  private void setHybridScoreExponent(Map<String, String> clusterConfigs) {
+    String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT);
+    int newExponent;
+    try {
+      newExponent = value != null ? Integer.parseInt(value)
+          : _config.getProperty(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT,
+              AdaptiveServerSelector.DEFAULT_HYBRID_SCORE_EXPONENT);
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for {}: '{}', ignoring.",
+          AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, value);
+      return;
+    }
+    if (newExponent < 0) {
+      LOGGER.warn("Invalid value for {}: '{}', ignoring.",
+          AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, value);
+      return;
+    }
+    if (newExponent != _hybridScoreExponent) {
+      _hybridScoreExponent = newExponent;
+      updateAllEntries(entry -> entry.setHybridScoreExponent(newExponent));
+      LOGGER.info("Updated hybrid score exponent to {} and propagated to all entries.", newExponent);
+    }
+  }
+
+  private void setAlpha(Map<String, String> clusterConfigs) {
+    String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA);
+    double newAlpha;
+    try {
+      double configuredAlpha = value != null ? Double.parseDouble(value)
+          : _config.getProperty(AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA,
+              AdaptiveServerSelector.DEFAULT_EWMA_ALPHA);
+      newAlpha = ExponentialMovingAverage.validateAlpha(configuredAlpha);
+    } catch (IllegalArgumentException e) {
+      LOGGER.warn("Invalid value for {}: '{}', ignoring.",
+          AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, value);
+      return;
+    }
+    if (Double.compare(newAlpha, _alpha) != 0) {
+      _alpha = newAlpha;
+      updateAllEntries(entry -> entry.setAlpha(newAlpha));
+      LOGGER.info("Updated EWMA alpha to {} and propagated to all entries.", _alpha);
+    }
+  }
+
+  private void setAutoDecayWindowMs(Map<String, String> clusterConfigs) {
+    String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS);
+    long newWindowMs;
+    try {
+      newWindowMs = value != null ? Long.parseLong(value)
+          : _config.getProperty(AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS,
+              AdaptiveServerSelector.DEFAULT_AUTODECAY_WINDOW_MS);
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for {}: '{}', ignoring.",
+          AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, value);
+      return;
+    }
+    if (newWindowMs != _autoDecayWindowMs) {
+      _autoDecayWindowMs = newWindowMs;
+      updateAllEntries(entry -> entry.setAutoDecayWindowMs(newWindowMs));
+      LOGGER.info("Updated autodecay window to {}ms and propagated to all entries.", newWindowMs);
     }
   }
 
@@ -187,6 +269,10 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     return _statsMetricExportIntervalMs;
   }
 
+  long getAutoDecayWindowMs() {
+    return _autoDecayWindowMs;
+  }
+
   public void shutDown() {
     // As the stats are not persistent, shutdown need not wait for task termination.
     if (!_isEnabled) {
@@ -195,7 +281,12 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
 
     LOGGER.info("Shutting down ServerRoutingStatsManager.");
     _isEnabled = false;
-    _executorService.shutdownNow();
+    if (_executorService != null) {
+      _executorService.shutdownNow();
+    }
+    if (_periodicTaskExecutor != null) {
+      _periodicTaskExecutor.shutdownNow();
+    }
   }
 
   public int getQueueSize() {
@@ -500,6 +591,33 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
       return stats.computeHybridScore();
     } finally {
       stats.getServerReadLock().unlock();
+    }
+  }
+
+  /**
+   * Applies the given action to every existing {@link ServerRoutingStatsEntry} in both the SSE and MSE stats maps.
+   *
+   * Note: there is a narrow race where an entry created via computeIfAbsent concurrently with this iteration may
+   * not be visited. The only problematic ordering (entry reads old value, then updateAllEntries misses it) requires
+   * the computeIfAbsent to begin before the volatile write, which is unlikely because a config change and a server
+   * addition would have to occur at the same time.
+   */
+  private void updateAllEntries(Consumer<ServerRoutingStatsEntry> action) {
+    for (ServerRoutingStatsEntry entry : _serverQueryStatsMap.values()) {
+      entry.getServerWriteLock().lock();
+      try {
+        action.accept(entry);
+      } finally {
+        entry.getServerWriteLock().unlock();
+      }
+    }
+    for (ServerRoutingStatsEntry entry : _mseServerQueryStatsMap.values()) {
+      entry.getServerWriteLock().lock();
+      try {
+        action.accept(entry);
+      } finally {
+        entry.getServerWriteLock().unlock();
+      }
     }
   }
 

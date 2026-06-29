@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -32,14 +33,18 @@ import javax.annotation.concurrent.ThreadSafe;
  */
 @ThreadSafe
 public class ExponentialMovingAverage {
-  private final double _alpha;
-  private final long _autoDecayWindowMs;
+  private volatile double _alpha;
+  private volatile long _autoDecayWindowMs;
 
   private final long _warmUpDurationMs;
   private final long _initializationTimeMs;
 
   private volatile double _average;
-  private long _lastUpdatedTimeMs;
+  private volatile long _lastUpdatedTimeMs;
+  @Nullable
+  private final ScheduledExecutorService _periodicTaskExecutor;
+  @Nullable
+  private volatile ScheduledFuture<?> _autoDecayFuture;
 
   /**
    * Constructor
@@ -52,12 +57,12 @@ public class ExponentialMovingAverage {
    * @param warmUpDurationMs     The initial duration after initialization during which new incoming values are ignored
    *                             in the average calculation.
    * @param avgInitializationVal The default value to initialize for average.
-   * @param periodicTaskExecutor Executor to schedule periodic tasks like autoDecay.
+   * @param periodicTaskExecutor Executor to schedule periodic tasks like autoDecay; can be null only while auto-decay
+   *                             is disabled.
    */
   public ExponentialMovingAverage(double alpha, long autoDecayWindowMs, long warmUpDurationMs,
       double avgInitializationVal, @Nullable ScheduledExecutorService periodicTaskExecutor) {
-    Preconditions.checkState(alpha >= 0.0 && alpha <= 1.0, "Alpha should be between 0 and 1");
-    _alpha = alpha;
+    _alpha = validateAlpha(alpha);
     Preconditions.checkState(warmUpDurationMs >= 0, "warmUpDurationMs is negative.");
     _warmUpDurationMs = warmUpDurationMs;
     Preconditions.checkState(avgInitializationVal >= 0.0, "avgInitializationVal is negative.");
@@ -65,20 +70,9 @@ public class ExponentialMovingAverage {
 
     _initializationTimeMs = System.currentTimeMillis();
     _lastUpdatedTimeMs = 0;
+    _periodicTaskExecutor = periodicTaskExecutor;
     _autoDecayWindowMs = autoDecayWindowMs;
-
-    if (_autoDecayWindowMs > 0) {
-      // Schedule a task to automatically decay the average if updates are not performed in the last _autoDecayWindowMs.
-      Preconditions.checkState(periodicTaskExecutor != null);
-      periodicTaskExecutor.scheduleAtFixedRate(new Runnable() {
-        @Override
-        public void run() {
-          if (_lastUpdatedTimeMs > 0 && (System.currentTimeMillis() - _lastUpdatedTimeMs) > _autoDecayWindowMs) {
-            compute(0.0);
-          }
-        }
-      }, 0, _autoDecayWindowMs, TimeUnit.MILLISECONDS);
-    }
+    scheduleAutoDecayTask();
   }
 
   /**
@@ -86,6 +80,32 @@ public class ExponentialMovingAverage {
    */
   public double getAverage() {
     return _average;
+  }
+
+  /**
+   * Updates the alpha (smoothing factor) used for subsequent EMA computations.
+   * @param alpha new alpha value between 0 and 1.
+   */
+  public synchronized void setAlpha(double alpha) {
+    _alpha = validateAlpha(alpha);
+  }
+
+  /**
+   * Updates the auto-decay window. Cancels any existing periodic decay task, then reschedules only if the new window is
+   * positive. A value &lt;= 0 disables auto-decay. Throws if enabling auto-decay without a periodic task executor.
+   * @param autoDecayWindowMs new auto-decay window in milliseconds; &lt;= 0 disables auto-decay.
+   */
+  public synchronized void setAutoDecayWindowMs(long autoDecayWindowMs) {
+    if (autoDecayWindowMs == _autoDecayWindowMs) {
+      return;
+    }
+    if (autoDecayWindowMs > 0) {
+      Preconditions.checkState(_periodicTaskExecutor != null,
+          "periodicTaskExecutor must not be null when autoDecayWindowMs is positive");
+    }
+    _autoDecayWindowMs = autoDecayWindowMs;
+    cancelAutoDecayTask();
+    scheduleAutoDecayTask();
   }
 
   /**
@@ -104,5 +124,39 @@ public class ExponentialMovingAverage {
 
     _average = value * _alpha + _average * (1 - _alpha);
     return _average;
+  }
+
+  /**
+   * Validates and returns an EWMA alpha value.
+   */
+  public static double validateAlpha(double alpha) {
+    Preconditions.checkArgument(alpha >= 0.0 && alpha <= 1.0, "Alpha should be between 0 and 1");
+    return alpha;
+  }
+
+  private void scheduleAutoDecayTask() {
+    if (_autoDecayWindowMs <= 0) {
+      return;
+    }
+    Preconditions.checkState(_periodicTaskExecutor != null,
+        "periodicTaskExecutor must not be null when autoDecayWindowMs is positive");
+    _autoDecayFuture = _periodicTaskExecutor.scheduleAtFixedRate(new Runnable() {
+      @Override
+      public void run() {
+        synchronized (ExponentialMovingAverage.this) {
+          if (_autoDecayWindowMs > 0 && _lastUpdatedTimeMs > 0
+              && (System.currentTimeMillis() - _lastUpdatedTimeMs) > _autoDecayWindowMs) {
+            compute(0.0);
+          }
+        }
+      }
+    }, 0, _autoDecayWindowMs, TimeUnit.MILLISECONDS);
+  }
+
+  private void cancelAutoDecayTask() {
+    if (_autoDecayFuture != null) {
+      _autoDecayFuture.cancel(false);
+      _autoDecayFuture = null;
+    }
   }
 }
