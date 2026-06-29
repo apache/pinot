@@ -102,19 +102,19 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
     }
     for (Expression expr : userSelectList) {
       Expression stripped = MaterializedViewMatchUtils.stripAlias(expr);
-      /// Plain column reference: direct MV projection hit is sufficient.
-      if (stripped.getFunctionCall() == null) {
+      if (CalciteSqlParser.isAggregateExpression(stripped)) {
+        /// Aggregate (incl. ROUND(SUM(x))): rewritable only if a registered equivalence exists,
+        /// else rejected. No new aggregates supported here.
+        if (findEquivalentMaterializedViewEntry(stripped, viewProjectionMap) == null) {
+          return false;
+        }
+      } else {
+        /// Plain column OR scalar grouping function (e.g. DATETRUNC('DAY', ts)): a direct MV
+        /// projection hit is sufficient — the containsKey check below confirms the MV
+        /// materialized this exact expression.
         if (!viewProjectionMap.containsKey(stripped)) {
           return false;
         }
-        continue;
-      }
-      /// Aggregate function: an exact projection match is NOT enough on its own. We need an
-      /// AggregationEquivalence rule to re-aggregate the pre-computed MV column correctly.
-      /// Without a rule we would fall back to a bare column reference (e.g. AVG(revenue) →
-      /// avg_rev), which produces wrong results for non-distributive functions.
-      if (findEquivalentMaterializedViewEntry(stripped, viewProjectionMap) == null) {
-        return false;
       }
     }
     return true;
@@ -347,8 +347,8 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
       String userAlias = MaterializedViewMatchUtils.extractUserAlias(expr);
       Expression rewritten;
 
-      if (viewProjectionMap.containsKey(stripped)
-          && stripped.getFunctionCall() == null) {
+      if (!CalciteSqlParser.isAggregateExpression(stripped) && viewProjectionMap.containsKey(stripped)) {
+        /// Plain column OR scalar grouping function: project the MV column directly.
         rewritten = RequestUtils.getIdentifierExpression(viewProjectionMap.get(stripped));
       } else {
         rewritten = rewriteAggregationExpression(stripped, viewProjectionMap);
@@ -392,7 +392,8 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
 
   private Expression remapExpressionWithEquivalence(Expression expr,
       Map<Expression, String> viewProjectionMap) {
-    if (viewProjectionMap.containsKey(expr) && expr.getFunctionCall() == null) {
+    /// Plain column OR scalar grouping function with a direct MV hit: map to the MV column.
+    if (!CalciteSqlParser.isAggregateExpression(expr) && viewProjectionMap.containsKey(expr)) {
       return RequestUtils.getIdentifierExpression(viewProjectionMap.get(expr));
     }
 
