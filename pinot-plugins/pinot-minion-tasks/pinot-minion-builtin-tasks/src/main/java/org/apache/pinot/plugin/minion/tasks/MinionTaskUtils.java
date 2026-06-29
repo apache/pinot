@@ -441,11 +441,12 @@ public class MinionTaskUtils {
 
   /**
    * Get the validDocIdsType based on the upsertConfig and taskConfigs.
-   * The default value is determined by whether delete is enabled in the upsertConfig. If delete is enabled,
-   * the default value is 'snapshot_with_delete', otherwise it is 'snapshot'.
-   * If delete is enabled, we override the user-specified value to 'snapshot_with_delete' for backward compatibility
-   * except when it is 'in_memory_with_delete'.
-   * It also validates the combination of validDocIdsType, snapshot and deleteRecordColumn.
+   * The default value is 'snapshot' It validates the combination of validDocIdsType, snapshot and
+   * deleteRecordColumn:
+   * <ul>
+   *   <li>'snapshot' and 'snapshot_with_delete' require upsert snapshots to be enabled.</li>
+   *   <li>'snapshot_with_delete' and 'in_memory_with_delete' require a deleteRecordColumn to be configured.</li>
+   * </ul>
    * @param upsertConfig upsertConfig of the table
    * @param taskConfigs taskConfigs of the task
    * @param validDocIdsTypeKey the key to get validDocIdsType from taskConfigs
@@ -453,21 +454,9 @@ public class MinionTaskUtils {
    */
   public static ValidDocIdsType getValidDocIdsType(UpsertConfig upsertConfig, Map<String, String> taskConfigs,
       String validDocIdsTypeKey) {
-    boolean isDeleteEnabled = StringUtils.isNotEmpty(upsertConfig.getDeleteRecordColumn());
-    ValidDocIdsType defaultValidDocIdsType =
-        isDeleteEnabled ? ValidDocIdsType.SNAPSHOT_WITH_DELETE : ValidDocIdsType.SNAPSHOT;
     String validDocIdsTypeStr = taskConfigs.getOrDefault(validDocIdsTypeKey,
-        defaultValidDocIdsType.name()).toUpperCase();
+        ValidDocIdsType.SNAPSHOT.name()).toUpperCase();
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr);
-
-    if (isDeleteEnabled && validDocIdsType != ValidDocIdsType.SNAPSHOT_WITH_DELETE
-        && validDocIdsType != ValidDocIdsType.IN_MEMORY_WITH_DELETE) {
-      LOGGER.warn(
-          "Overriding user-specified validDocIdsType '{}' to '{}' for backward compatibility because delete is "
-              + "enabled (deleteRecordColumn='{}').",
-          validDocIdsType, ValidDocIdsType.SNAPSHOT_WITH_DELETE, upsertConfig.getDeleteRecordColumn());
-      validDocIdsType = ValidDocIdsType.SNAPSHOT_WITH_DELETE;
-    }
 
     if (validDocIdsType == ValidDocIdsType.SNAPSHOT || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
       Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
@@ -476,7 +465,7 @@ public class MinionTaskUtils {
 
     if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE
         || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
-      Preconditions.checkState(isDeleteEnabled,
+      Preconditions.checkState(StringUtils.isNotEmpty(upsertConfig.getDeleteRecordColumn()),
           "'deleteRecordColumn' must be provided with validDocIdsType: %s", validDocIdsType);
     }
     return validDocIdsType;
