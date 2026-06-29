@@ -33,14 +33,14 @@ public class ValidDocIdsMetadataInfo {
   private final long _totalInvalidDocs;
   private final long _totalDocs;
   private final String _segmentCrc;
+  // Server's data CRC (forward index + dictionary checksum); null when the server doesn't report it.
+  @Nullable
+  private final String _segmentDataCrc;
   private final ValidDocIdsType _validDocIdsType;
   private final long _segmentSizeInBytes;
   private final long _segmentCreationTimeMillis;
   private final String _instanceId;
   private final ServiceStatus.Status _serverStatus;
-  // Server's data CRC (forward index + dictionary checksum); null when the server doesn't report it.
-  @Nullable
-  private final String _segmentDataCrc;
 
   public ValidDocIdsMetadataInfo(String segmentName, long totalValidDocs, long totalInvalidDocs, long totalDocs,
       String segmentCrc, ValidDocIdsType validDocIdsType, long segmentSizeInBytes, long segmentCreationTimeMillis,

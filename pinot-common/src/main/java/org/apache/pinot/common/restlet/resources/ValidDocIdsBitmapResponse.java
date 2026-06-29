@@ -30,13 +30,13 @@ import org.apache.pinot.common.utils.ServiceStatus;
 public class ValidDocIdsBitmapResponse {
   private final String _segmentName;
   private final String _segmentCrc;
+  // Server's data CRC (forward index + dictionary checksum); null when the server doesn't report it.
+  @Nullable
+  private final String _segmentDataCrc;
   private final ValidDocIdsType _validDocIdsType;
   private final byte[] _bitmap;
   private final String _instanceId;
   private final ServiceStatus.Status _serverStatus;
-  // Server's data CRC (forward index + dictionary checksum); null when the server doesn't report it.
-  @Nullable
-  private final String _segmentDataCrc;
 
   public ValidDocIdsBitmapResponse(String segmentName, String crc, ValidDocIdsType validDocIdsType, byte[] bitmap,
       String instanceId, ServiceStatus.Status serverStatus) {
