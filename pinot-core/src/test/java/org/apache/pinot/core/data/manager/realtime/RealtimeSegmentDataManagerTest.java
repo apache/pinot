@@ -26,6 +26,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -48,13 +49,18 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -598,6 +604,109 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
     }
+  }
+
+  // When the offset matches the one in zk, for upsert tables we must not replace the CONSUMING segment with a
+  // locally-built segment whose CRC differs from the committed segment. Instead, we download the committed segment.
+  @Test
+  public void testUpsertOnlineTransitionSkipsLocalBuildOnCrcMismatch()
+      throws Exception {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    long finalOffsetValue = START_OFFSET_VALUE + 600;
+    LongMsgOffset finalOffset = new LongMsgOffset(finalOffsetValue);
+    metadata.setEndOffset(finalOffset.toString());
+
+    // Upsert table + CRC mismatch -> do not build locally, download the committed segment instead.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(true);
+      segmentDataManager._useRealBuildAndReplace = true;
+      segmentDataManager._localSegmentCrcMatchesZk = false;
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
+      segmentDataManager.setCurrentOffset(finalOffsetValue);
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+    }
+
+    // Upsert table + CRC match -> build and replace locally, no download.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(true);
+      segmentDataManager._useRealBuildAndReplace = true;
+      segmentDataManager._localSegmentCrcMatchesZk = true;
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
+      segmentDataManager.setCurrentOffset(finalOffsetValue);
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+    }
+
+    // Non-upsert table + CRC mismatch -> guard does not apply, build and replace locally, no download.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(false);
+      segmentDataManager._useRealBuildAndReplace = true;
+      segmentDataManager._localSegmentCrcMatchesZk = false;
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
+      segmentDataManager.setCurrentOffset(finalOffsetValue);
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+    }
+  }
+
+  // Exercises the real CRC comparison (on-disk SegmentMetadataImpl read + hasSameCRC) rather than the stubbed branch.
+  @Test
+  public void testIsLocalSegmentCrcMatchingZk()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._useRealCrcCheck = true;
+      File resourceDir = new File(TEMP_DIR, REALTIME_TABLE_NAME);
+      long localCrc = buildRealSegmentAndGetCrc(resourceDir, SEGMENT_NAME_STR);
+
+      SegmentZKMetadata matchingMetadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+      matchingMetadata.setCrc(localCrc);
+      Assert.assertTrue(segmentDataManager.isLocalSegmentCrcMatchingZk(matchingMetadata));
+
+      SegmentZKMetadata mismatchingMetadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+      mismatchingMetadata.setCrc(localCrc + 1);
+      Assert.assertFalse(segmentDataManager.isLocalSegmentCrcMatchingZk(mismatchingMetadata));
+    }
+  }
+
+  // When the locally-built segment cannot be read (e.g. missing/corrupt), the CRC check must report a mismatch so the
+  // ONLINE transition downloads the committed segment instead of throwing.
+  @Test
+  public void testIsLocalSegmentCrcMatchingZkTreatsUnreadableSegmentAsMismatch()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._useRealCrcCheck = true;
+      // No segment was built under the resource dir, so the metadata read fails.
+      FileUtils.deleteQuietly(new File(new File(TEMP_DIR, REALTIME_TABLE_NAME), SEGMENT_NAME_STR));
+      SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+      metadata.setCrc(12345L);
+      Assert.assertFalse(segmentDataManager.isLocalSegmentCrcMatchingZk(metadata));
+    }
+  }
+
+  private long buildRealSegmentAndGetCrc(File resourceDir, String segmentName)
+      throws Exception {
+    Schema schema = Fixtures.createSchema();
+    TableConfig tableConfig = createTableConfig();
+    SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    generatorConfig.setOutDir(resourceDir.getAbsolutePath());
+    generatorConfig.setSegmentName(segmentName);
+    List<GenericRow> rows = List.of(Fixtures.createSingleRow(1L), Fixtures.createSingleRow(2L));
+    try (GenericRowRecordReader recordReader = new GenericRowRecordReader(rows)) {
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(generatorConfig, recordReader);
+      driver.build();
+    }
+    return Long.parseLong(new SegmentMetadataImpl(new File(resourceDir, segmentName)).getCrc());
   }
 
   @Test
@@ -1166,6 +1275,12 @@ public class RealtimeSegmentDataManagerTest {
     public Field _stopReason;
     public Field _segmentBuildFailedWithDeterministicError;
     public boolean _failSegmentBuildAndReplace = false;
+    // When set, buildSegmentAndReplace runs the real implementation (including the upsert CRC guard) instead of being
+    // short-circuited, and isLocalSegmentCrcMatchingZk returns _localSegmentCrcMatchesZk.
+    public boolean _useRealBuildAndReplace = false;
+    public boolean _localSegmentCrcMatchesZk = true;
+    // When set, isLocalSegmentCrcMatchingZk runs the real on-disk metadata read + CRC comparison.
+    public boolean _useRealCrcCheck = false;
     private Field _streamMsgOffsetFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
@@ -1180,6 +1295,7 @@ public class RealtimeSegmentDataManagerTest {
     public boolean _postConsumeStoppedCalled = false;
     public Map<Integer, ConsumerCoordinator> _consumerCoordinatorMap;
     public boolean _stubConsumeLoop = true;
+    public RealtimeTableDataManager _tableDataManager;
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
 
@@ -1216,6 +1332,7 @@ public class RealtimeSegmentDataManagerTest {
       _streamMsgOffsetFactory.setAccessible(true);
       _streamMsgOffsetFactory.set(this, new LongMsgOffsetFactory());
       _timeSupplier = timeSupplier;
+      _tableDataManager = realtimeTableDataManager;
     }
 
     public String getStopReason() {
@@ -1317,10 +1434,22 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean buildSegmentAndReplace() {
+    protected boolean buildSegmentAndReplace(SegmentZKMetadata committedSegmentZKMetadata)
+        throws Exception {
       terminateLoopIfNecessary();
       _buildAndReplaceCalled = true;
+      if (_useRealBuildAndReplace) {
+        return super.buildSegmentAndReplace(committedSegmentZKMetadata);
+      }
       return !_failSegmentBuildAndReplace;
+    }
+
+    @Override
+    protected boolean isLocalSegmentCrcMatchingZk(SegmentZKMetadata committedSegmentZKMetadata) {
+      if (_useRealCrcCheck) {
+        return super.isLocalSegmentCrcMatchingZk(committedSegmentZKMetadata);
+      }
+      return _localSegmentCrcMatchesZk;
     }
 
     @Override
