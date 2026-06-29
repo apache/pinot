@@ -118,15 +118,14 @@ public class RenewableTlsUtils {
       String sslContextProtocol, SecureRandom secureRandom, boolean keyAndTrustMaterialSwappable, boolean isInsecure) {
     try {
       SSLFactory.Builder sslFactoryBuilder = SSLFactory.builder();
-      InputStream keyStoreStream = null;
-      InputStream trustStoreStream = null;
       if (keyStorePath != null) {
         Preconditions.checkNotNull(keyStorePassword, "key store password must not be null");
-        keyStoreStream = TlsUtils.makeKeyOrTrustStoreUrl(keyStorePath).openStream();
         if (keyAndTrustMaterialSwappable) {
           sslFactoryBuilder.withSwappableIdentityMaterial();
         }
-        sslFactoryBuilder.withIdentityMaterial(keyStoreStream, keyStorePassword.toCharArray(), keyStoreType);
+        try (InputStream keyStoreStream = TlsUtils.makeKeyOrTrustStoreUrl(keyStorePath).openStream()) {
+          sslFactoryBuilder.withIdentityMaterial(keyStoreStream, keyStorePassword.toCharArray(), keyStoreType);
+        }
       }
       if (isInsecure) {
         if (keyAndTrustMaterialSwappable) {
@@ -135,11 +134,12 @@ public class RenewableTlsUtils {
         sslFactoryBuilder.withUnsafeTrustMaterial();
       } else if (trustStorePath != null) {
         Preconditions.checkNotNull(trustStorePassword, "trust store password must not be null");
-        trustStoreStream = TlsUtils.makeKeyOrTrustStoreUrl(trustStorePath).openStream();
         if (keyAndTrustMaterialSwappable) {
           sslFactoryBuilder.withSwappableTrustMaterial();
         }
-        sslFactoryBuilder.withTrustMaterial(trustStoreStream, trustStorePassword.toCharArray(), trustStoreType);
+        try (InputStream trustStoreStream = TlsUtils.makeKeyOrTrustStoreUrl(trustStorePath).openStream()) {
+          sslFactoryBuilder.withTrustMaterial(trustStoreStream, trustStorePassword.toCharArray(), trustStoreType);
+        }
       }
       if (sslContextProtocol != null) {
         sslFactoryBuilder.withSslContextAlgorithm(sslContextProtocol);
@@ -148,12 +148,6 @@ public class RenewableTlsUtils {
         sslFactoryBuilder.withSecureRandom(secureRandom);
       }
       SSLFactory sslFactory = sslFactoryBuilder.build();
-      if (keyStoreStream != null) {
-        keyStoreStream.close();
-      }
-      if (trustStoreStream != null) {
-        trustStoreStream.close();
-      }
       LOGGER.info("Successfully created SSLFactory {} with key store {} and trust store {}. "
               + "Key and trust material swappable: {}",
           sslFactory, keyStorePath, trustStorePath, keyAndTrustMaterialSwappable);
