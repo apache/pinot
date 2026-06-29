@@ -41,6 +41,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.exception.TableConfigVersionConflictException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
@@ -91,6 +92,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.apache.zookeeper.data.Stat;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
@@ -1872,5 +1874,56 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     _helixResourceManager.deleteRealtimeTable(rawTableName);
     deleteSchema(rawTableName);
+  }
+
+  /// Concurrency regression test for the version-checked CAS plumbing on table-config update. Simulates the
+  /// TOCTOU window between the deprecation-validator's diff read and the subsequent write: T1 reads version `v`,
+  /// T2 commits a write that bumps the znode to `v+1`, T1 then attempts a CAS write at version `v`. The CAS must
+  /// fail with [TableConfigVersionConflictException] — preventing T1 from silently overwriting T2's changes
+  /// (which would let a deprecated key slip past T1's diff). Documented as pre-condition #2 in
+  /// [DeprecatedTableConfigValidationUtils.SOFT_LAUNCH_WARNING_ONLY]'s Javadoc.
+  @Test
+  public void testUpdateTableConfigCasConflictThrowsConflictException()
+      throws Exception {
+    String rawTableName = "casConflictTable";
+    addDummySchema(rawTableName);
+    TableConfig initialConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+        .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
+    _helixResourceManager.addTable(initialConfig);
+
+    try {
+      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+      /// T1 reads the current znode version.
+      Stat statAtRead = new Stat();
+      ZNRecord storedAtRead = ZKMetadataProvider.getTableConfigZNRecord(_helixResourceManager.getPropertyStore(),
+          tableNameWithType, statAtRead);
+      assertNotNull(storedAtRead);
+      int t1ExpectedVersion = statAtRead.getVersion();
+
+      /// T2 commits an unrelated update that bumps the znode version.
+      TableConfig t2Config = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+          .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).setNumReplicas(2).build();
+      _helixResourceManager.updateTableConfig(t2Config);
+
+      /// T1 attempts its write at the stale version. The CAS must fail with TableConfigVersionConflictException
+      /// rather than silently overwriting T2's commit or returning a generic 5xx.
+      TableConfig t1Config = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+          .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).setNumReplicas(3).build();
+      try {
+        _helixResourceManager.updateTableConfig(t1Config, t1ExpectedVersion, false);
+        fail("Expected TableConfigVersionConflictException for CAS write at stale version " + t1ExpectedVersion);
+      } catch (TableConfigVersionConflictException expected) {
+        assertTrue(expected.getMessage().contains(tableNameWithType),
+            "Conflict message should name the table: " + expected.getMessage());
+      }
+
+      /// T2's commit survives — verify by reading back the numReplicas.
+      TableConfig finalConfig = _helixResourceManager.getTableConfig(tableNameWithType);
+      assertEquals(finalConfig.getReplication(), 2,
+          "T2's commit must survive the failed T1 CAS attempt; finalConfig should reflect T2 not T1");
+    } finally {
+      _helixResourceManager.deleteOfflineTable(rawTableName);
+      deleteSchema(rawTableName);
+    }
   }
 }

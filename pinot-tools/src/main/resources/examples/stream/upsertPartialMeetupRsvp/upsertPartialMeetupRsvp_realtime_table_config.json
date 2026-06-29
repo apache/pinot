@@ -64,7 +64,9 @@
     {
       "name": "location",
       "encodingType": "RAW",
-      "indexType": "H3",
+      "indexTypes": [
+        "H3"
+      ],
       "properties": {
         "resolutions": "5"
       }

@@ -2,13 +2,11 @@
   "tableName": "clickstreamFunnel",
   "tableType": "OFFLINE",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "timeColumnName": "ts",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "30",
     "replication": "1",
-    "deletedSegmentsRetentionPeriod": "7d",
-    "minimizeDataMovement": false
+    "deletedSegmentsRetentionPeriod": "7d"
   },
   "tenants": {
     "broker": "DefaultTenant",
@@ -16,7 +14,6 @@
   },
   "tableIndexConfig": {
     "loadMode": "MMAP",
-    "createInvertedIndexDuringSegmentGeneration": true,
     "rangeIndexVersion": 2,
     "aggregateMetrics": false,
     "nullHandlingEnabled": true,
@@ -37,6 +34,9 @@
   },
   "metadata": {},
   "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    },
     "transformConfigs": [],
     "continueOnError": true,
     "rowTimeValueCheck": true,
