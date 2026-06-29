@@ -2,28 +2,37 @@
   "tableName": "fineFoodReviews",
   "tableType": "OFFLINE",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "replication": "1"
   },
-  "tenants": {
-  },
+  "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP",
-    "noDictionaryColumns": ["Text"],
-    "invertedIndexColumns": [
+    "noDictionaryColumns": [
+      "Text"
     ],
+    "invertedIndexColumns": [],
     "multiColumnTextIndexConfig": {
-      "columns": ["UserId", "ProductId", "Summary"]
+      "columns": [
+        "UserId",
+        "ProductId",
+        "Summary"
+      ]
+    }
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
     }
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   },
   "fieldConfigList": [
     {
       "encodingType": "RAW",
-      "indexType": "VECTOR",
+      "indexTypes": [
+        "VECTOR"
+      ],
       "name": "embedding",
       "properties": {
         "vectorIndexType": "HNSW",
