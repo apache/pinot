@@ -121,13 +121,6 @@ public class MinionConstants {
   public static final String VALID_DOC_IDS_VALIDATION_MODE_KEY = "validDocIdsValidationMode";
   public static final String DEFAULT_VALID_DOC_IDS_VALIDATION_MODE = "STRICT";
 
-  /**
-   * Per-server batch size for the validDocIds fetch when generator consensus runs (EQUAL/MOST_VALID_DOCS). Kept small
-   * because consensus fetches from every replica and EQUAL also carries the serialized bitmap in each entry.
-   */
-  public static final String VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY = "validDocIdsConsensusFetchBatchSize";
-  public static final int DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE = 10;
-
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
     public static final String TASK_TYPE = "PurgeTask";

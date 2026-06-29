@@ -674,24 +674,15 @@ public class TablesResource {
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
-      @ApiParam(value = "Whether to include the serialized validDocIds bitmap in each per-segment response entry. "
-          + "When true the response payload grows linearly with the number of valid doc bitmaps, so callers should "
-          + "request bitmaps only for the set of segments they actually need cross-replica consensus for.")
-      @QueryParam("includeBitmaps") @DefaultValue("false") boolean includeBitmaps,
       TableSegments tableSegments, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
-        processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType, includeBitmaps));
+        processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
   }
 
   private List<Map<String, Object>> processValidDocIdsMetadata(String tableNameWithType, List<String> segments,
       String validDocIdsType) {
-    return processValidDocIdsMetadata(tableNameWithType, segments, validDocIdsType, false);
-  }
-
-  private List<Map<String, Object>> processValidDocIdsMetadata(String tableNameWithType, List<String> segments,
-      String validDocIdsType, boolean includeBitmaps) {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
@@ -764,9 +755,6 @@ public class TablesResource {
               ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
         }
         validDocIdsMetadata.put("segmentCreationTimeMillis", indexSegment.getSegmentMetadata().getIndexCreationTime());
-        if (includeBitmaps) {
-          validDocIdsMetadata.put("bitmap", RoaringBitmapUtils.serialize(validDocIdsSnapshot));
-        }
         allValidDocIdsMetadata.add(validDocIdsMetadata);
       }
       if (nonImmutableSegmentCount > 0) {

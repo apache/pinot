@@ -146,8 +146,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           UpsertCompactionTask.VALID_DOC_IDS_TYPE);
 
       // Validate replicas before scheduling, matching the executor's checks, so inconsistent segments are never
-      // scheduled. With EXECUTOR_ONLY the generator skips these checks (the executor stays the gate). Bitmaps are
-      // only needed for EQUAL consensus, so fetch them only then to keep the payload small.
+      // scheduled. With EXECUTOR_ONLY the generator skips these checks (the executor stays the gate).
       MinionConstants.ValidDocIdsConsensusMode consensusMode = MinionTaskUtils.resolveGeneratorConsensusMode(
           MinionTaskUtils.parseValidDocIdsConsensusMode(
               taskConfigs.getOrDefault(MinionConstants.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
@@ -155,22 +154,16 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           MinionTaskUtils.parseValidDocIdsValidationMode(
               taskConfigs.getOrDefault(MinionConstants.VALID_DOC_IDS_VALIDATION_MODE_KEY,
                   MinionConstants.DEFAULT_VALID_DOC_IDS_VALIDATION_MODE)));
-      boolean includeBitmaps = consensusMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL;
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
-      // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size. The
-      // consensus modes use a smaller batch (validDocIdsConsensusFetchBatchSize) since they fetch from every replica
-      // and EQUAL also carries a bitmap per entry; UNSAFE keeps the regular batch.
-      int regularBatchPerServerRequest = Integer.parseInt(
+      // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
+      int numSegmentsBatchPerServerRequest = Integer.parseInt(
           taskConfigs.getOrDefault(UpsertCompactionTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
               String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
-      int numSegmentsBatchPerServerRequest =
-          MinionTaskUtils.resolveValidDocIdsFetchBatchSize(taskConfigs, consensusMode, regularBatchPerServerRequest);
 
       Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
           serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
-              serverToEndpoints, null, 60_000, validDocIdsType.toString(), numSegmentsBatchPerServerRequest,
-              includeBitmaps);
+              serverToEndpoints, null, 60_000, validDocIdsType.toString(), numSegmentsBatchPerServerRequest);
 
       Map<String, SegmentZKMetadata> completedSegmentsMap =
           completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));

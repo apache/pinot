@@ -101,21 +101,6 @@ public class MinionTaskUtils {
         ? MinionConstants.ValidDocIdsConsensusMode.UNSAFE : consensusMode;
   }
 
-  /**
-   * Resolves the per-server batch size for the generator's validDocIds fetch. UNSAFE keeps {@code regularBatchSize}
-   * (the no-bitmap fetch). The consensus modes fetch from every replica (and EQUAL also carries a bitmap per entry),
-   * so they use the smaller {@code validDocIdsConsensusFetchBatchSize} to keep the payload bounded.
-   */
-  public static int resolveValidDocIdsFetchBatchSize(Map<String, String> taskConfigs,
-      MinionConstants.ValidDocIdsConsensusMode consensusMode, int regularBatchSize) {
-    if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
-      return regularBatchSize;
-    }
-    return Integer.parseInt(taskConfigs.getOrDefault(
-        MinionConstants.VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY,
-        String.valueOf(MinionConstants.DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE)));
-  }
-
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
 
   public static final String DATETIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
@@ -485,7 +470,9 @@ public class MinionTaskUtils {
    *
    * How the replica is chosen depends on {@code consensusMode}:
    *   - UNSAFE: the first replica with a matching CRC and a healthy server.
-   *   - EQUAL: all replicas must match CRC, be healthy, and have an identical bitmap.
+   *   - EQUAL: all replicas must match CRC, be healthy, and report the same valid doc count. Counts (rather than
+   *     full bitmaps) are compared here to keep the generator cheap; the executor still verifies byte-identical
+   *     bitmaps before compacting.
    *   - MOST_VALID_DOCS: all replicas must match CRC and be healthy; the one with the most valid docs wins.
    */
   @Nullable
@@ -550,19 +537,12 @@ public class MinionTaskUtils {
     }
 
     if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL) {
+      // Require every replica to report the same valid doc count. Comparing counts (rather than the full bitmaps)
+      // keeps the generator cheap - it avoids serializing a bitmap per replica back to the controller.
       ValidDocIdsMetadataInfo first = usableReplicas.get(0);
-      RoaringBitmap consensusBitmap = deserializeBitmapOrNull(first);
-      if (consensusBitmap == null) {
-        // No bitmap means EQUAL can't be verified - skip rather than risk an inconsistent task. Make sure the
-        // metadata was fetched with includeBitmaps=true.
-        LOGGER.warn("Missing validDocIds bitmap for segment: {} from server: {}, cannot verify EQUAL consensus, "
-            + "skipping segment for {}", segmentName, first.getInstanceId(), taskType);
-        return null;
-      }
       for (int i = 1; i < usableReplicas.size(); i++) {
-        RoaringBitmap bitmap = deserializeBitmapOrNull(usableReplicas.get(i));
-        if (bitmap == null || !bitmap.equals(consensusBitmap)) {
-          LOGGER.warn("Replicas disagree on validDocIds for segment: {}, skipping segment for {}", segmentName,
+        if (usableReplicas.get(i).getTotalValidDocs() != first.getTotalValidDocs()) {
+          LOGGER.warn("Replicas disagree on valid doc count for segment: {}, skipping segment for {}", segmentName,
               taskType);
           return null;
         }
@@ -578,15 +558,6 @@ public class MinionTaskUtils {
       }
     }
     return chosen;
-  }
-
-  @Nullable
-  private static RoaringBitmap deserializeBitmapOrNull(ValidDocIdsMetadataInfo info) {
-    byte[] bitmap = info.getBitmap();
-    if (bitmap == null || bitmap.length == 0) {
-      return null;
-    }
-    return RoaringBitmapUtils.deserialize(bitmap);
   }
 
   public static String toUTCString(long epochMillis) {

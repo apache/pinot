@@ -399,44 +399,12 @@ public class TablesResourceTest extends BaseResourceTest {
         ((ImmutableSegmentImpl) segment).getSegmentSizeBytes());
     Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
-    // bitmap field is omitted by default (includeBitmaps was not requested).
-    Assert.assertFalse(validDocIdsMetadata.has("bitmap"),
-        "Bitmap should not be included by default to keep response payloads small");
 
     // Verify server status information
     Assert.assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
     String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
     Assert.assertNotNull(serverStatus, "Server status should not be null");
     Assert.assertEquals(serverStatus, "NOT_STARTED", serverStatus);
-  }
-
-  @Test
-  public void testValidDocIdsMetadataPostWithIncludeBitmaps()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-
-    List<String> segments = List.of(segment.getSegmentName());
-    TableSegments tableSegments = new TableSegments(segments);
-    String validDocIdsMetadataPath = "/tables/" + REALTIME_TABLE_NAME + "/validDocIdsMetadata";
-    String response = _webTarget.path(validDocIdsMetadataPath)
-        .queryParam("includeBitmaps", "true")
-        .request()
-        .post(Entity.json(tableSegments), String.class);
-    JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
-
-    // The metadata counts are still emitted alongside the bitmap.
-    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
-
-    // The bitmap should now be present and its cardinality must match totalValidDocs.
-    Assert.assertTrue(validDocIdsMetadata.has("bitmap"),
-        "Bitmap field should be included when includeBitmaps=true");
-    byte[] bitmapBytes = validDocIdsMetadata.get("bitmap").binaryValue();
-    Assert.assertNotNull(bitmapBytes);
-    org.roaringbitmap.RoaringBitmap bitmap = new org.roaringbitmap.RoaringBitmap();
-    bitmap.deserialize(java.nio.ByteBuffer.wrap(bitmapBytes));
-    Assert.assertEquals(bitmap.getCardinality(), 8,
-        "Deserialized bitmap cardinality must equal totalValidDocs");
   }
 
   @Test

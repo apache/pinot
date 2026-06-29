@@ -366,24 +366,6 @@ public class MinionTaskUtilsTest {
     }
   }
 
-  @Test
-  public void testResolveValidDocIdsFetchBatchSize() {
-    // UNSAFE keeps the regular (no-bitmap) batch and ignores the consensus key.
-    Map<String, String> withConsensusKey = Map.of(
-        MinionConstants.VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE_KEY, "7");
-    assertEquals(MinionTaskUtils.resolveValidDocIdsFetchBatchSize(withConsensusKey,
-        MinionConstants.ValidDocIdsConsensusMode.UNSAFE, 500), 500);
-
-    // The consensus modes use the configured consensus batch size.
-    for (MinionConstants.ValidDocIdsConsensusMode mode : List.of(
-        MinionConstants.ValidDocIdsConsensusMode.EQUAL, MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS)) {
-      assertEquals(MinionTaskUtils.resolveValidDocIdsFetchBatchSize(withConsensusKey, mode, 500), 7);
-      // Falls back to the small default when the consensus key is absent (does not inherit the regular batch).
-      assertEquals(MinionTaskUtils.resolveValidDocIdsFetchBatchSize(Map.of(), mode, 500),
-          MinionConstants.DEFAULT_VALID_DOC_IDS_CONSENSUS_FETCH_BATCH_SIZE);
-    }
-  }
-
   /**
    * Builds a RoaringBitmap with {@code numDocs} valid doc ids (0..numDocs-1).
    */
