@@ -28,7 +28,9 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.hint.RelHint;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -70,6 +72,23 @@ public class PhysicalAggregate extends Aggregate implements PRelNode {
       @Nullable List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
     return new PhysicalAggregate(getCluster(), traitSet, getHints(), groupSet, groupSets, aggCalls, _nodeId,
         (PRelNode) input, _pinotDataDistribution, _leafStage, _aggType, _leafReturnFinalResult, _collations, _limit);
+  }
+
+  /// Whether this LEAF aggregate must synthesize the {@code $groupingId} discriminator column — the v2 physical
+  /// counterpart of {@link org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate#emitsGroupingId()}. A LEAF
+  /// grouping-set aggregate appends {@code $groupingId} after the union group-by columns so the final stage can group
+  /// on it (the per-set row expansion itself happens at runtime in the RepeatOperator).
+  public boolean emitsGroupingId() {
+    return _aggType == AggregateNode.AggType.LEAF && getGroupType() != Group.SIMPLE;
+  }
+
+  @Override
+  protected RelDataType deriveRowType() {
+    RelDataType rowType = super.deriveRowType();
+    if (!emitsGroupingId()) {
+      return rowType;
+    }
+    return GroupingSets.appendGroupingIdColumn(getCluster().getTypeFactory(), rowType, getGroupCount());
   }
 
   @Override

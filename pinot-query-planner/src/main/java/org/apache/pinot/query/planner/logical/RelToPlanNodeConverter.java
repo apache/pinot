@@ -22,7 +22,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptTable;
@@ -30,6 +32,7 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.JoinInfo;
@@ -58,6 +61,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
@@ -706,6 +710,29 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), node.getCollation().getFieldCollations(), fetch, offset);
   }
 
+  /// Encodes each grouping set as a membership bitmask over the union group-by columns ({@code groupSet.asList()}),
+  /// mirroring the single-stage engine's {@code PinotQuery.groupingSetMasks} so the per-set expansion can be pushed
+  /// down to the single-stage (leaf) engine. Returns an empty list for a plain GROUP BY (SIMPLE).
+  public static List<Integer> computeGroupingSetMasks(Aggregate node) {
+    if (node.getGroupType() == Aggregate.Group.SIMPLE) {
+      return List.of();
+    }
+    List<Integer> union = node.getGroupSet().asList();
+    Map<Integer, Integer> unionIndex = new HashMap<>();
+    for (int i = 0; i < union.size(); i++) {
+      unionIndex.put(union.get(i), i);
+    }
+    List<Integer> masks = new ArrayList<>(node.getGroupSets().size());
+    for (ImmutableBitSet set : node.getGroupSets()) {
+      int mask = 0;
+      for (int bit : set) {
+        mask |= 1 << unionIndex.get(bit);
+      }
+      masks.add(mask);
+    }
+    return masks;
+  }
+
   private AggregateNode convertLogicalAggregate(PinotLogicalAggregate node) {
     List<AggregateCall> aggregateCalls = node.getAggCallList();
     int numAggregates = aggregateCalls.size();
@@ -717,7 +744,7 @@ public final class RelToPlanNodeConverter {
     }
     return new AggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
-        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit());
+        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(), computeGroupingSetMasks(node));
   }
 
   private ProjectNode convertLogicalProject(LogicalProject node) {

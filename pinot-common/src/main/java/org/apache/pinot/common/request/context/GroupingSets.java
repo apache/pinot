@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.common.request.context;
 
+import java.util.List;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.sql.type.SqlTypeName;
+
 /// Engine-agnostic conventions for GROUP BY GROUPING SETS / ROLLUP / CUBE, shared so both query engines
 /// agree on the discriminator column and the GROUPING()/GROUPING_ID() semantics.
 ///
@@ -35,6 +41,28 @@ public class GroupingSets {
   /// appended after the union group-by columns in intermediate results and dropped from the user-facing
   /// result (never projected unless referenced via GROUPING()/GROUPING_ID()).
   public static final String GROUPING_ID_COLUMN = "$groupingId";
+
+  /// The grouping-id discriminator is a 32-bit INT bitmask over the union group-by columns, so a grouping-set query
+  /// may reference at most 31 distinct grouping columns (bit 31 is the sign bit).
+  public static final int MAX_GROUPING_SET_COLUMNS = 31;
+
+  /// Returns the LEAF row type for a grouping-set aggregate: the synthetic {@link #GROUPING_ID_COLUMN} INT column
+  /// inserted right after the {@code groupCount} union group-by columns, i.e. {@code [group keys..., $groupingId,
+  /// aggregates...]}. Both query engines share this single layout so the multi-stage final stage can group on
+  /// {@code $groupingId}; keeping it here prevents the two planner {@code deriveRowType()} overrides from drifting.
+  public static RelDataType appendGroupingIdColumn(RelDataTypeFactory typeFactory, RelDataType rowType,
+      int groupCount) {
+    RelDataTypeFactory.Builder builder = typeFactory.builder();
+    List<RelDataTypeField> fields = rowType.getFieldList();
+    for (int i = 0; i < groupCount; i++) {
+      builder.add(fields.get(i));
+    }
+    builder.add(GROUPING_ID_COLUMN, typeFactory.createSqlType(SqlTypeName.INTEGER));
+    for (int i = groupCount; i < fields.size(); i++) {
+      builder.add(fields.get(i));
+    }
+    return builder.build();
+  }
 
   /// Computes the {@code GROUPING(args...)} / {@code GROUPING_ID(args...)} value from a row's grouping-id
   /// bitmask. For each argument column (identified by its index in the union of grouping columns) the
