@@ -291,6 +291,50 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testReplaceSegmentOnReloadRebuildsFromSnapshot()
+      throws Exception {
+    // Upsert + metadata TTL with snapshots enabled: a reload must rebuild upsert metadata from the validDocIds
+    // snapshot (valid docs only), so docs invalidated since the segment was first loaded are not resurrected.
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    String segmentName = "reload_snapshot_segment";
+    int[] primaryKeys = new int[]{10, 30, 40};
+    int[] timestamps = new int[]{1500, 3500, 4000};
+
+    // Initial load of the segment with 3 valid docs.
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment1 = createRealSegment(segmentName, primaryKeys, timestamps, validDocIds1);
+    upsertMetadataManager.addSegment(segment1);
+    assertEquals(recordLocationMap.size(), 3);
+
+    // Reload: a fresh copy of the same segment that carries a validDocIds snapshot marking only docs {0, 2} valid
+    // (doc 1 / PK 30 was invalidated). The reload must rebuild from the snapshot, not rescan all docs.
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment2 = createRealSegment(segmentName, primaryKeys, timestamps, validDocIds2);
+    ThreadSafeMutableRoaringBitmap snapshot = new ThreadSafeMutableRoaringBitmap();
+    snapshot.add(0);
+    snapshot.add(2);
+    segment2.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, snapshot.getBytesAndCardinality());
+
+    upsertMetadataManager.replaceSegment(segment2, segment1);
+
+    // PK 30 (doc 1) is not resurrected; only PK 10 and PK 40 remain, now in the reloaded segment.
+    assertEquals(recordLocationMap.size(), 2);
+    checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 40, segment2, 2, 4000, HashFunction.NONE);
+    assertNull(recordLocationMap.get(HashUtils.hashPrimaryKey(makePrimaryKey(30), HashFunction.NONE)));
+    assertEquals(segment2.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 2);
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+    segment1.destroy();
+    segment2.destroy();
+  }
+
+  @Test
   public void testGetQueryableDocIds() {
     _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN);
 
