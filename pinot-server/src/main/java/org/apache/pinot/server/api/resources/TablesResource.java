@@ -574,7 +574,7 @@ public class TablesResource {
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
           finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(),
-          status);
+          status, getReportableDataCrc(tableNameWithType, segmentName, indexSegment.getSegmentMetadata().getDataCrc()));
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
@@ -747,6 +747,11 @@ public class TablesResource {
         validDocIdsMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
+        String reportableDataCrc = getReportableDataCrc(tableNameWithType, segmentDataManager.getSegmentName(),
+            indexSegment.getSegmentMetadata().getDataCrc());
+        if (reportableDataCrc != null) {
+          validDocIdsMetadata.put("segmentDataCrc", reportableDataCrc);
+        }
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
         validDocIdsMetadata.put("serverStatus", status);
         validDocIdsMetadata.put("instanceId", _serverInstance.getInstanceDataManager().getInstanceId());
@@ -772,6 +777,22 @@ public class TablesResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+  }
+
+  /**
+   * Returns the segment's data CRC to report, or null when it shouldn't be matched on data CRC. Only segments
+   * committed from a consuming segment carry a trusted data CRC (isUseDataCrc), so callers fall back to the full
+   * segment CRC otherwise. Reporting null keeps the generator and executor consistent on which segments use data
+   * CRC, since neither has the ZK useDataCrc flag.
+   */
+  @Nullable
+  private String getReportableDataCrc(String tableNameWithType, String segmentName, String dataCrc) {
+    SegmentZKMetadata zkMetadata = ZKMetadataProvider.getSegmentZKMetadata(
+        _serverInstance.getHelixManager().getHelixPropertyStore(), tableNameWithType, segmentName);
+    if (zkMetadata == null || !zkMetadata.isUseDataCrc() || dataCrc == null || Long.parseLong(dataCrc) < 0) {
+      return null;
+    }
+    return dataCrc;
   }
 
   private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,

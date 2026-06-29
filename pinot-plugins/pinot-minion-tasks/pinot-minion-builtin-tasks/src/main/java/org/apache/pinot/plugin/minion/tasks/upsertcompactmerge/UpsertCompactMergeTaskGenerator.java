@@ -322,7 +322,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       // segment should be skipped so we never schedule a task the executor would later reject.
       List<ValidDocIdsMetadataInfo> replicas = validDocIdsMetadataInfoMap.get(segmentName);
       ValidDocIdsMetadataInfo validDocIdsMetadata = MinionTaskUtils.selectValidDocIdsMetadataForConsensus(
-          MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segmentName, segment.getCrc(), replicas,
+          MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segment, replicas,
           segmentToReplicaCount.getOrDefault(segmentName, replicas.size()), consensusMode);
       if (validDocIdsMetadata == null) {
         continue;

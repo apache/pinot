@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ServiceStatus;
 
 
@@ -35,14 +38,26 @@ public class ValidDocIdsMetadataInfo {
   private final long _segmentCreationTimeMillis;
   private final String _instanceId;
   private final ServiceStatus.Status _serverStatus;
+  // Server's data CRC (forward index + dictionary checksum); null when the server doesn't report it.
+  @Nullable
+  private final String _segmentDataCrc;
 
+  public ValidDocIdsMetadataInfo(String segmentName, long totalValidDocs, long totalInvalidDocs, long totalDocs,
+      String segmentCrc, ValidDocIdsType validDocIdsType, long segmentSizeInBytes, long segmentCreationTimeMillis,
+      String instanceId, ServiceStatus.Status serverStatus) {
+    this(segmentName, totalValidDocs, totalInvalidDocs, totalDocs, segmentCrc, validDocIdsType, segmentSizeInBytes,
+        segmentCreationTimeMillis, instanceId, serverStatus, null);
+  }
+
+  @JsonCreator
   public ValidDocIdsMetadataInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("totalValidDocs") long totalValidDocs, @JsonProperty("totalInvalidDocs") long totalInvalidDocs,
       @JsonProperty("totalDocs") long totalDocs, @JsonProperty("segmentCrc") String segmentCrc,
       @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
       @JsonProperty("segmentSizeInBytes") long segmentSizeInBytes,
       @JsonProperty("segmentCreationTimeMillis") long segmentCreationTimeMillis,
-      @JsonProperty("instanceId") String instanceId, @JsonProperty("serverStatus") ServiceStatus.Status serverStatus) {
+      @JsonProperty("instanceId") String instanceId, @JsonProperty("serverStatus") ServiceStatus.Status serverStatus,
+      @JsonProperty("segmentDataCrc") @Nullable String segmentDataCrc) {
     _segmentName = segmentName;
     _totalValidDocs = totalValidDocs;
     _totalInvalidDocs = totalInvalidDocs;
@@ -53,6 +68,7 @@ public class ValidDocIdsMetadataInfo {
     _segmentCreationTimeMillis = segmentCreationTimeMillis;
     _instanceId = instanceId;
     _serverStatus = serverStatus;
+    _segmentDataCrc = segmentDataCrc;
   }
 
   public String getSegmentName() {
@@ -93,5 +109,12 @@ public class ValidDocIdsMetadataInfo {
 
   public ServiceStatus.Status getServerStatus() {
     return _serverStatus;
+  }
+
+  /** Server's data CRC, or null if not reported. Omitted from the payload when null. */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  public String getSegmentDataCrc() {
+    return _segmentDataCrc;
   }
 }

@@ -397,12 +397,42 @@ public class UpsertCompactionTaskGeneratorTest {
         mostValidDocs, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
     assertTrue(result.getSegmentsForDeletion().isEmpty());
+
+    // Data CRC: when the segment CRC differs (e.g. an index/metadata-only change) the data CRC is compared as a
+    // fallback, so a segment whose data CRC still matches is accepted.
+    SegmentZKMetadata dataCrcSegment = new SegmentZKMetadata(segmentName);
+    dataCrcSegment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    dataCrcSegment.setTotalDocs(100L);
+    dataCrcSegment.setCrc(1000);
+    dataCrcSegment.setUseDataCrc(true);
+    dataCrcSegment.setDataCrc(5000);
+    Map<String, SegmentZKMetadata> dataCrcMap = Map.of(segmentName, dataCrcSegment);
+    Map<String, List<ValidDocIdsMetadataInfo>> dataCrcMatch = Map.of(segmentName, List.of(
+        metaWithDataCrc(segmentName, 50, 50, 100, 2000, "5000", ServiceStatus.Status.GOOD, "server1"),
+        metaWithDataCrc(segmentName, 50, 50, 100, 2000, "5000", ServiceStatus.Status.GOOD, "server2")));
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, dataCrcMap, dataCrcMatch,
+        twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    assertEquals(result.getSegmentsForCompaction().size(), 1);
+
+    // Both segment CRC and data CRC differ from ZK -> skipped (the data-CRC fallback doesn't match either).
+    Map<String, List<ValidDocIdsMetadataInfo>> dataCrcMismatch = Map.of(segmentName, List.of(
+        metaWithDataCrc(segmentName, 50, 50, 100, 2000, "9999", ServiceStatus.Status.GOOD, "server1"),
+        metaWithDataCrc(segmentName, 50, 50, 100, 2000, "9999", ServiceStatus.Status.GOOD, "server2")));
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, dataCrcMap, dataCrcMismatch,
+        twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    assertTrue(result.getSegmentsForCompaction().isEmpty());
   }
 
   private static ValidDocIdsMetadataInfo meta(String segmentName, long validDocs, long invalidDocs, long totalDocs,
       long crc, ServiceStatus.Status serverStatus, String instanceId) {
     return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc),
         ValidDocIdsType.SNAPSHOT, 1000, System.currentTimeMillis(), instanceId, serverStatus);
+  }
+
+  private static ValidDocIdsMetadataInfo metaWithDataCrc(String segmentName, long validDocs, long invalidDocs,
+      long totalDocs, long crc, String dataCrc, ServiceStatus.Status serverStatus, String instanceId) {
+    return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc),
+        ValidDocIdsType.SNAPSHOT, 1000, System.currentTimeMillis(), instanceId, serverStatus, dataCrc);
   }
 
   @Test
