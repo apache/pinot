@@ -408,6 +408,27 @@ public abstract class AbstractMetricsTest {
   }
 
   @Test
+  public void testPartitionTopicGauges() {
+    ControllerMetrics controllerMetrics = buildTestMetrics();
+    String table = "test_table";
+    int partitionId = 7;
+    String topicName = "test_topic";
+
+    controllerMetrics.setOrUpdatePartitionTopicGauge(table, partitionId, topicName, ControllerGauge.VERSION, () -> 1L);
+    Assert.assertEquals(
+        getGaugeValue(controllerMetrics,
+            ControllerGauge.VERSION.getGaugeName() + "." + table + "." + partitionId + "." + topicName), 1);
+
+    controllerMetrics.setOrUpdatePartitionTopicGauge(table, partitionId, topicName, ControllerGauge.VERSION, () -> 2L);
+    Assert.assertEquals(
+        getGaugeValue(controllerMetrics,
+            ControllerGauge.VERSION.getGaugeName() + "." + table + "." + partitionId + "." + topicName), 2);
+
+    controllerMetrics.removePartitionTopicGauge(table, partitionId, topicName, ControllerGauge.VERSION);
+    Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+  }
+
+  @Test
   public void testAddCallbackGauges() {
     ControllerMetrics controllerMetrics = buildTestMetrics();
     String table = "test_table";

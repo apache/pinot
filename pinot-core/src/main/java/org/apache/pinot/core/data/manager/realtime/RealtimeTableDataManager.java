@@ -407,7 +407,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * Returns all partitionGroupIds for the partitions hosted by this server for current table.
    * @apiNote this involves Zookeeper read and should not be used frequently due to efficiency concerns.
    */
-  public Set<Integer> getHostedPartitionsGroupIds() {
+  public Set<Integer> getHostedConsumingPartitionsGroupIds() {
     Set<Integer> partitionsHostedByThisServer = new HashSet<>();
     List<String> segments = TableStateUtils.getSegmentsInGivenStateForThisInstance(_helixManager, _tableNameWithType,
         CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
