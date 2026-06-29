@@ -64,6 +64,8 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
@@ -574,7 +576,8 @@ public class TablesResource {
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
           finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(),
-          status, getReportableDataCrc(tableNameWithType, segmentName, indexSegment.getSegmentMetadata().getDataCrc()));
+          status, getReportableDataCrc(getSegmentZKMetadataOrNull(tableNameWithType, segmentName),
+              indexSegment.getSegmentMetadata().getDataCrc()));
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
@@ -705,6 +708,7 @@ public class TablesResource {
       ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
 
       List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
+      Map<String, SegmentZKMetadata> segmentZKMetadataMap = getSegmentZKMetadataMap(tableNameWithType);
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentDataManager.getSegment();
         if (indexSegment == null) {
@@ -747,7 +751,8 @@ public class TablesResource {
         validDocIdsMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
-        String reportableDataCrc = getReportableDataCrc(tableNameWithType, segmentDataManager.getSegmentName(),
+        String reportableDataCrc = getReportableDataCrc(
+            segmentZKMetadataMap.get(segmentDataManager.getSegmentName()),
             indexSegment.getSegmentMetadata().getDataCrc());
         if (reportableDataCrc != null) {
           validDocIdsMetadata.put("segmentDataCrc", reportableDataCrc);
@@ -786,13 +791,31 @@ public class TablesResource {
    * CRC, since neither has the ZK useDataCrc flag.
    */
   @Nullable
-  private String getReportableDataCrc(String tableNameWithType, String segmentName, String dataCrc) {
-    SegmentZKMetadata zkMetadata = ZKMetadataProvider.getSegmentZKMetadata(
-        _serverInstance.getHelixManager().getHelixPropertyStore(), tableNameWithType, segmentName);
+  private static String getReportableDataCrc(@Nullable SegmentZKMetadata zkMetadata, String dataCrc) {
     if (zkMetadata == null || !zkMetadata.isUseDataCrc() || dataCrc == null || Long.parseLong(dataCrc) < 0) {
       return null;
     }
     return dataCrc;
+  }
+
+  /** All segment ZK metadata for the table, keyed by segment name. Empty when the property store isn't available. */
+  private Map<String, SegmentZKMetadata> getSegmentZKMetadataMap(String tableNameWithType) {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _serverInstance.getHelixManager().getHelixPropertyStore();
+    if (propertyStore == null) {
+      return Map.of();
+    }
+    Map<String, SegmentZKMetadata> zkMetadataMap = new HashMap<>();
+    for (SegmentZKMetadata zkMetadata : ZKMetadataProvider.getSegmentsZKMetadata(propertyStore, tableNameWithType)) {
+      zkMetadataMap.put(zkMetadata.getSegmentName(), zkMetadata);
+    }
+    return zkMetadataMap;
+  }
+
+  @Nullable
+  private SegmentZKMetadata getSegmentZKMetadataOrNull(String tableNameWithType, String segmentName) {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _serverInstance.getHelixManager().getHelixPropertyStore();
+    return propertyStore == null ? null
+        : ZKMetadataProvider.getSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
   }
 
   private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
