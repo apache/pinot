@@ -158,12 +158,10 @@ public class VarianceAggregationFunction extends NullableSingleInputAggregationF
 
   @Override
   public VarianceTuple merge(VarianceTuple intermediateResult1, VarianceTuple intermediateResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateResult1 == null) {
-        return intermediateResult2;
-      } else if (intermediateResult2 == null) {
-        return intermediateResult1;
-      }
+    if (intermediateResult1 == null) {
+      return intermediateResult2;
+    } else if (intermediateResult2 == null) {
+      return intermediateResult1;
     }
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
