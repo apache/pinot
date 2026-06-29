@@ -82,6 +82,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   AUDIT_REQUEST_FAILURES("failures", true),
   AUDIT_RESPONSE_FAILURES("failures", true),
   AUDIT_REQUEST_PAYLOAD_TRUNCATED("count", true),
+  // Page cache warmup metrics
+  PAGE_CACHE_WARMUP_REQUESTS("pageCacheWarmupRequests", true),
+  PAGE_CACHE_WARMUP_REQUEST_ERRORS("pageCacheWarmupRequestErrors", true),
   // Upsert compact merge task metrics
   UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false),
   // Query workload propagation metrics

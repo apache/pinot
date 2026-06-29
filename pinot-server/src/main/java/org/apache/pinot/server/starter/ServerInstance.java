@@ -51,6 +51,7 @@ import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.conf.ServerConf;
+import org.apache.pinot.server.warmup.PageCacheWarmupServerQueryExecutor;
 import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -82,6 +83,7 @@ public class ServerInstance {
   private final WorkerQueryServer _workerQueryServer;
   private final ChannelHandler _instanceRequestHandler;
   private final ServerMetrics _serverMetrics = ServerMetrics.get();
+  private final PageCacheWarmupServerQueryExecutor _pageCacheWarmupServerQueryExecutor;
 
   private boolean _dataManagerStarted = false;
   private boolean _queryServerStarted = false;
@@ -189,6 +191,8 @@ public class ServerInstance {
       }
     }
     TransformFunctionFactory.init(transformFunctionClasses);
+    _pageCacheWarmupServerQueryExecutor = new PageCacheWarmupServerQueryExecutor(_instanceDataManager, _queryScheduler,
+        serverConf.getPinotConfig(), _helixManager);
 
     LOGGER.info("Finish initializing server instance");
   }
@@ -313,6 +317,10 @@ public class ServerInstance {
 
   public QueryScheduler getQueryScheduler() {
     return _queryScheduler;
+  }
+
+  public PageCacheWarmupServerQueryExecutor getPageCacheWarmupServerQueryExecutor() {
+    return _pageCacheWarmupServerQueryExecutor;
   }
 
   @Nullable
