@@ -296,7 +296,7 @@
     <fmpp.version>0.9.16</fmpp.version>
 
     <!-- Solve conflicts and vulnerabilities -->
-    <kerby.version>2.1.1</kerby.version>
+    <kerby.version>2.1.2</kerby.version>
     <jline.version>4.2.1</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.6</jettison.version>
