@@ -25,7 +25,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT FROMDATETIME( '1997-02-01 00:00:00', 'yyyy-MM-dd HH:mm:ss') FROM d",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[1997-02-01 00:00:00])",
+          "\nLogicalProject(EXPR$0=[1997-02-01 00:00:00:TIMESTAMP(3)])",
           "\n  PinotLogicalTableScan(table=[[default, d]])",
           "\n"
         ]
@@ -45,7 +45,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT timestampDiff(DAY, CAST(ts as TIMESTAMP), CAST(dateTrunc('MONTH', FROMDATETIME('1997-02-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')) as TIMESTAMP)) FROM d",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($7):TIMESTAMP(0) NOT NULL, 1997-02-01 00:00:00)])",
+          "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($7):TIMESTAMP(3) NOT NULL, 1997-02-01 00:00:00:TIMESTAMP(3))])",
           "\n  PinotLogicalTableScan(table=[[default, d]])",
           "\n"
         ]
@@ -55,7 +55,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM d WHERE CAST(ts AS TIMESTAMP) = FROMDATETIME('2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')",
         "output": [
           "Execution Plan",
-          "\nLogicalFilter(condition=[=(CAST($7):TIMESTAMP(0) NOT NULL, 2019-01-01 00:00:00)])",
+          "\nLogicalFilter(condition=[=(CAST($7):TIMESTAMP(3) NOT NULL, 2019-01-01 00:00:00)])",
           "\n  PinotLogicalTableScan(table=[[default, d]])",
           "\n"
         ]

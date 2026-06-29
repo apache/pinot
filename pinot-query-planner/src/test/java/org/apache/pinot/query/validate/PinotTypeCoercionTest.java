@@ -120,7 +120,11 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
     String plan = explain("SELECT ts_timestamp FROM a WHERE ts_timestamp > NOW() - 1000");
     assertFalse(plan.contains("CAST(" + TS_TIMESTAMP_ORD + ")"),
         "TIMESTAMP column should not be wrapped in CAST when right-hand side is constant. Got:\n" + plan);
-    assertTrue(plan.matches("(?s).*>\\(\\" + TS_TIMESTAMP_ORD + ", \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\).*"),
+    // The fractional part is optional here: NOW()/ago() produce non-deterministic millis that may land on a whole
+    // second (rendered without a fractional part). The deterministic millis-preservation guard is in
+    // testTimestampColumnVsSubSecondLiteralPreservesMillis below.
+    assertTrue(
+        plan.matches("(?s).*>\\(\\" + TS_TIMESTAMP_ORD + ", \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(\\.\\d+)?\\).*"),
         "Right-hand side should be constant-folded to a TIMESTAMP literal. Got:\n" + plan);
   }
 
@@ -174,7 +178,11 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
     String plan = explain("SELECT ts_timestamp FROM a WHERE ts_timestamp > ago('PT5M')");
     assertFalse(plan.contains("CAST(" + TS_TIMESTAMP_ORD + ")"),
         "TIMESTAMP column should not be wrapped in CAST when compared to ago(...). Got:\n" + plan);
-    assertTrue(plan.matches("(?s).*>\\(\\" + TS_TIMESTAMP_ORD + ", \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\).*"),
+    // The fractional part is optional here: NOW()/ago() produce non-deterministic millis that may land on a whole
+    // second (rendered without a fractional part). The deterministic millis-preservation guard is in
+    // testTimestampColumnVsSubSecondLiteralPreservesMillis below.
+    assertTrue(
+        plan.matches("(?s).*>\\(\\" + TS_TIMESTAMP_ORD + ", \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(\\.\\d+)?\\).*"),
         "Right-hand side should be constant-folded to a TIMESTAMP literal. Got:\n" + plan);
   }
 
@@ -189,5 +197,25 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
     // literal. We do not change arithmetic coercion here.
     assertTrue(plan.contains("CAST(" + TS_TIMESTAMP_ORD + "):BIGINT"),
         "TIMESTAMP column must be cast to BIGINT for binary arithmetic. Got:\n" + plan);
+  }
+
+  /**
+   * Regression test for issue #18881: a TIMESTAMP column compared to a sub-second epoch-millis literal must preserve
+   * the millisecond component. With Calcite's default TIMESTAMP precision of 0, the implicit literal-to-TIMESTAMP cast
+   * added by {@link PinotTypeCoercion#binaryComparisonCoercion} folded through {@code RexBuilder.clean ->
+   * TimestampString.round(0)}, truncating the literal to whole seconds — so {@code ts = 1761667561482} silently became
+   * {@code ts = 1761667561000} and matched no rows. Pinot's {@code TypeSystem} now pins TIMESTAMP to precision 3, so
+   * the folded literal keeps its millis. The column must also stay unwrapped (the property #18396 added).
+   */
+  @Test
+  public void testTimestampColumnVsSubSecondLiteralPreservesMillis() {
+    // 1761667561482 ms has a non-zero sub-second component (.482). The rendered wall-clock date/seconds depend on the
+    // JVM default time zone, but the fractional-second part is time-zone invariant, so we assert only on ".482".
+    String plan = explain("SELECT ts_timestamp FROM a WHERE ts_timestamp = 1761667561482");
+    assertFalse(plan.contains("CAST(" + TS_TIMESTAMP_ORD + ")"),
+        "TIMESTAMP column should not be wrapped in CAST. Got:\n" + plan);
+    assertTrue(
+        plan.matches("(?s).*=\\(\\" + TS_TIMESTAMP_ORD + ", \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.482\\).*"),
+        "Sub-second literal must fold preserving millis (.482), not truncate to whole seconds. Got:\n" + plan);
   }
 }
