@@ -438,6 +438,22 @@ public class StreamConfig {
     return Boolean.TRUE.equals(_backfillTopic);
   }
 
+  public boolean isOffsetAutoResetPaused() {
+    return Boolean.parseBoolean(_streamConfigMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_PAUSE));
+  }
+
+  public int getOffsetAutoResetMaxSegmentsBeforeSkip() {
+    String val = _streamConfigMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_MAX_SEGMENTS_BEFORE_SKIP);
+    if (val == null) {
+      return -1;
+    }
+    try {
+      return Integer.parseInt(val);
+    } catch (NumberFormatException e) {
+      return -1;
+    }
+  }
+
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
