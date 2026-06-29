@@ -75,9 +75,10 @@ import org.slf4j.LoggerFactory;
 
 @ThreadSafe
 public abstract class BasePartitionUpsertMetadataManager implements PartitionUpsertMetadataManager {
-  protected static final long OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS = TimeUnit.MINUTES.toNanos(1);
   // The special value to indicate the largest comparison value is not set yet, and allow negative comparison values.
-  protected static final double TTL_WATERMARK_NOT_SET = Double.NEGATIVE_INFINITY;
+  public static final double TTL_WATERMARK_NOT_SET = Double.NEGATIVE_INFINITY;
+
+  protected static final long OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS = TimeUnit.MINUTES.toNanos(1);
 
   protected final String _tableNameWithType;
   protected final TableType _tableType;
