@@ -26,7 +26,7 @@ import org.apache.pinot.spi.metrics.PinotMeter;
  * Enumeration containing all the meters exposed by the Pinot server.
  */
 public enum ServerMeter implements AbstractMetrics.Meter {
-  QUERIES("queries", true),
+  QUERIES("queries", false),
   UNCAUGHT_EXCEPTIONS("exceptions", true),
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", true),
   RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
