@@ -33,6 +33,12 @@ public class AggregateNode extends BasePlanNode {
   private final AggType _aggType;
   private final boolean _leafReturnFinalResult;
 
+  /// GROUP BY GROUPING SETS / ROLLUP / CUBE: one membership bitmask per grouping set, over _groupKeys (the union of
+  /// all grouping columns). Bit i is set iff _groupKeys[i] participates in (is grouped by) that set; a mask of 0 is
+  /// the grand-total set (). Empty for a plain GROUP BY. Mirrors the single-stage engine's PinotQuery.groupingSetMasks
+  /// so the per-set row expansion can be pushed down to the single-stage (leaf) engine.
+  private final List<Integer> _groupingSets;
+
   // The following fields are set when group trim is enabled, and are extracted from the Sort on top of this Aggregate.
   // The group trim behavior at leaf stage is shared with single-stage engine.
   private final List<RelFieldCollation> _collations;
@@ -41,6 +47,14 @@ public class AggregateNode extends BasePlanNode {
   public AggregateNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
       List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, List<Integer> groupKeys, AggType aggType,
       boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations, int limit) {
+    this(stageId, dataSchema, nodeHint, inputs, aggCalls, filterArgs, groupKeys, aggType, leafReturnFinalResult,
+        collations, limit, List.of());
+  }
+
+  public AggregateNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
+      List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, List<Integer> groupKeys, AggType aggType,
+      boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations, int limit,
+      List<Integer> groupingSets) {
     super(stageId, dataSchema, nodeHint, inputs);
     _aggCalls = aggCalls;
     _filterArgs = filterArgs;
@@ -49,6 +63,7 @@ public class AggregateNode extends BasePlanNode {
     _leafReturnFinalResult = leafReturnFinalResult;
     _collations = collations != null ? collations : List.of();
     _limit = limit;
+    _groupingSets = groupingSets;
   }
 
   public List<RexExpression.FunctionCall> getAggCalls() {
@@ -69,6 +84,16 @@ public class AggregateNode extends BasePlanNode {
 
   public boolean isLeafReturnFinalResult() {
     return _leafReturnFinalResult;
+  }
+
+  /// One membership bitmask per grouping set over {@link #getGroupKeys()}, or empty for a plain GROUP BY.
+  public List<Integer> getGroupingSets() {
+    return _groupingSets;
+  }
+
+  /// Whether this is a GROUP BY GROUPING SETS / ROLLUP / CUBE aggregate.
+  public boolean isGroupingSets() {
+    return !_groupingSets.isEmpty();
   }
 
   public List<RelFieldCollation> getCollations() {
@@ -92,7 +117,7 @@ public class AggregateNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new AggregateNode(_stageId, _dataSchema, _nodeHint, inputs, _aggCalls, _filterArgs, _groupKeys, _aggType,
-        _leafReturnFinalResult, _collations, _limit);
+        _leafReturnFinalResult, _collations, _limit, _groupingSets);
   }
 
   @Override
@@ -109,13 +134,14 @@ public class AggregateNode extends BasePlanNode {
     AggregateNode that = (AggregateNode) o;
     return _leafReturnFinalResult == that._leafReturnFinalResult && _limit == that._limit && Objects.equals(_aggCalls,
         that._aggCalls) && Objects.equals(_filterArgs, that._filterArgs) && Objects.equals(_groupKeys, that._groupKeys)
-        && _aggType == that._aggType && Objects.equals(_collations, that._collations);
+        && _aggType == that._aggType && Objects.equals(_collations, that._collations) && Objects.equals(_groupingSets,
+        that._groupingSets);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _aggCalls, _filterArgs, _groupKeys, _aggType, _leafReturnFinalResult,
-        _collations, _limit);
+        _collations, _limit, _groupingSets);
   }
 
   /**

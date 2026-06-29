@@ -102,6 +102,7 @@ public class PlanNodeSerializer {
           .setLeafReturnFinalResult(node.isLeafReturnFinalResult())
           .addAllCollations(convertCollations(node.getCollations()))
           .setLimit(node.getLimit())
+          .addAllGroupingSets(node.getGroupingSets())
           .build();
       builder.setAggregateNode(aggregateNode);
       return null;

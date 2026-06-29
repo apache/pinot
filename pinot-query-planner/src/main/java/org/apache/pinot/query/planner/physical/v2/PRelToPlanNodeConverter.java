@@ -201,6 +201,8 @@ public class PRelToPlanNodeConverter {
   }
 
   public static AggregateNode convertAggregate(PhysicalAggregate node) {
+    /// GROUP BY GROUPING SETS / ROLLUP / CUBE is split by AggregatePushdownRule (LEAF carrying the grouping sets +
+    /// $groupingId, FINAL grouping on $groupingId); the masks below carry to the runtime RepeatOperator.
     List<AggregateCall> aggregateCalls = node.getAggCallList();
     int numAggregates = aggregateCalls.size();
     List<RexExpression.FunctionCall> functionCalls = new ArrayList<>(numAggregates);
@@ -211,7 +213,8 @@ public class PRelToPlanNodeConverter {
     }
     return new AggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         new ArrayList<>(), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
-        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit());
+        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(),
+        RelToPlanNodeConverter.computeGroupingSetMasks(node));
   }
 
   public static ProjectNode convertProject(Project node) {

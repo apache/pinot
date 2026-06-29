@@ -27,6 +27,8 @@ import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -113,5 +115,18 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     assertEquals(roundTripped.get(1).getProjectAndResultSchema().getProject(),
         List.of(new RexExpression.InputRef(1)));
     assertEquals(roundTripped.get(1).getProjectAndResultSchema().getSchema(), projectResultSchema);
+  }
+
+  @Test
+  public void testAggregateGroupingSetsSerDe() {
+    /// The grouping-set masks (over the union group keys) must survive serialization to the worker. ROLLUP(g0, g1)
+    /// over the union {g0, g1} expands to masks {0b11, 0b01, 0b00}.
+    DataSchema schema = new DataSchema(new String[]{"g0", "g1", "sum"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    AggregateNode node = new AggregateNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(), List.of(), List.of(),
+        List.of(0, 1), AggType.DIRECT, false, List.of(), 0, List.of(0b11, 0b01, 0b00));
+    AggregateNode deserialized = (AggregateNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertEquals(deserialized.getGroupingSets(), List.of(0b11, 0b01, 0b00));
+    assertEquals(deserialized, node);
   }
 }

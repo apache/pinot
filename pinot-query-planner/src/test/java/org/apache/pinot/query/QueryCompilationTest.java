@@ -144,6 +144,23 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testGroupingSetsSupportedInMultiStage() {
+    /// GROUP BY GROUPING SETS / ROLLUP / CUBE plan successfully in the multi-stage engine: the per-set expansion is
+    /// pushed down to the single-stage leaf. They must not throw, nor silently collapse to a plain GROUP BY (which
+    /// would drop the subtotal/grand-total rows). GROUPING() / GROUPING_ID() and the explicit GROUPING SETS tuple
+    /// syntax are included.
+    List<String> queries = List.of(
+        "SELECT col1, SUM(col3) FROM a GROUP BY ROLLUP(col1)",
+        "SELECT col1, col2, SUM(col3) FROM a GROUP BY CUBE(col1, col2)",
+        "SELECT col1, col2, SUM(col3) FROM a GROUP BY GROUPING SETS ((col1), (col2))",
+        "SELECT col1, col2, SUM(col3) FROM a GROUP BY GROUPING SETS ((col1, col2), (col1), ())",
+        "SELECT col1, GROUPING(col1), GROUPING_ID(col1, col2), SUM(col3) FROM a GROUP BY ROLLUP(col1, col2)");
+    for (String sql : queries) {
+      assertNotNull(_queryEnvironment.planQuery(sql), "expected a multi-stage plan for: " + sql);
+    }
+  }
+
+  @Test
   public void testUnsignedLiteralCastIsFolded() {
     // Companion to testUnsignedTypeCastIsAccepted using literal (constant-foldable) casts, so the unsigned
     // literal-folding branch in PinotEvaluateLiteralRule#convertRexCall (which normalizes an unsigned cast to its

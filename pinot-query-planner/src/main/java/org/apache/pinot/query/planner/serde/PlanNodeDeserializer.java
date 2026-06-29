@@ -98,7 +98,8 @@ public class PlanNodeDeserializer {
         extractInputs(protoNode), convertFunctionCalls(protoAggregateNode.getAggCallsList()),
         protoAggregateNode.getFilterArgsList(), protoAggregateNode.getGroupKeysList(),
         convertAggType(protoAggregateNode.getAggType()), protoAggregateNode.getLeafReturnFinalResult(),
-        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit());
+        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit(),
+        protoAggregateNode.getGroupingSetsList());
   }
 
   private static FilterNode deserializeFilterNode(Plan.PlanNode protoNode) {
