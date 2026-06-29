@@ -274,6 +274,9 @@ public class BootstrapTableTool {
       throws Exception {
     final List<Map<String, String>> batchConfigsMaps =
         tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps();
+    if (batchConfigsMaps == null) {
+      return;
+    }
     for (Map<String, String> batchConfigsMap : batchConfigsMaps) {
       String inputDirURI = batchConfigsMap.get(BatchConfigProperties.INPUT_DIR_URI);
       if (!new File(inputDirURI).exists()) {
