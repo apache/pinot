@@ -61,6 +61,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
   DEDUP_PRELOAD_FAILURE("count", false),
+  DEDUP_REMOVE_EXPIRED_PRIMARY_KEYS_COUNT("keys", false),
   UPSERT_KEYS_IN_WRONG_SEGMENT("rows", false),
   PARTIAL_UPSERT_OUT_OF_ORDER("rows", false),
   PARTIAL_UPSERT_KEYS_NOT_REPLACED("rows", false),

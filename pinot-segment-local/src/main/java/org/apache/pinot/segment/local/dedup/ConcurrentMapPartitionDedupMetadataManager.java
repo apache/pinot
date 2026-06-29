@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -105,7 +106,16 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   @Override
   protected void doRemoveExpiredPrimaryKeys() {
     double smallestTimeToKeep = _largestSeenTime.get() - _metadataTTL;
+    int sizeBefore = _primaryKeyToSegmentAndTimeMap.size();
     _primaryKeyToSegmentAndTimeMap.entrySet().removeIf(entry -> entry.getValue().getRight() < smallestTimeToKeep);
+    int sizeAfter = _primaryKeyToSegmentAndTimeMap.size();
+    int keysRemoved = sizeBefore - sizeAfter;
+    if (keysRemoved > 0) {
+      _logger.debug("Removed {} expired primary keys from partition: {}, remaining: {}", keysRemoved, _partitionId,
+          sizeAfter);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DEDUP_REMOVE_EXPIRED_PRIMARY_KEYS_COUNT,
+          keysRemoved);
+    }
   }
 
   @Override

@@ -45,6 +45,12 @@ public class DedupConfig extends BaseJsonConfig {
   @Nullable
   private String _dedupTimeColumn;
 
+  @JsonPropertyDescription("Interval in seconds for realtime TTL cleanup of dedup metadata. When set to 0 (default), "
+      + "realtime cleanup is disabled and metadata is only cleaned up during segment commit. When set to a value > 0, "
+      + "a background thread will periodically remove expired primary keys at the specified interval to reduce memory "
+      + "usage. This does not impact ingestion performance as cleanup happens asynchronously.")
+  private double _realtimeTTLCleanupIntervalSeconds = 0;
+
   @JsonPropertyDescription("Whether to preload segments for fast dedup metadata recovery. Available values are "
       + "ENABLE, DISABLE and DEFAULT (use instance level default behavior).")
   private Enablement _preload = Enablement.DEFAULT;
@@ -125,6 +131,14 @@ public class DedupConfig extends BaseJsonConfig {
 
   public void setDedupTimeColumn(@Nullable String dedupTimeColumn) {
     _dedupTimeColumn = dedupTimeColumn;
+  }
+
+  public double getRealtimeTTLCleanupIntervalSeconds() {
+    return _realtimeTTLCleanupIntervalSeconds;
+  }
+
+  public void setRealtimeTTLCleanupIntervalSeconds(double realtimeTTLCleanupIntervalSeconds) {
+    _realtimeTTLCleanupIntervalSeconds = realtimeTTLCleanupIntervalSeconds;
   }
 
   public Enablement getPreload() {
