@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.DeprecatedConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
@@ -131,6 +133,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// @deprecated Use `segmentIngestionFrequency` from
   ///     [org.apache.pinot.spi.config.table.ingestion.IngestionConfig#getBatchIngestionConfig()]
   @Deprecated
+  @DeprecatedConfig(replacement = "Use 'ingestionConfig.batchIngestionConfig.segmentIngestionFrequency' instead.",
+      since = "0.8.0")
   public String getSegmentPushFrequency() {
     return _segmentPushFrequency;
   }
@@ -143,6 +147,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// @deprecated Use `segmentIngestionType` from
   ///     [org.apache.pinot.spi.config.table.ingestion.IngestionConfig#getBatchIngestionConfig()]
   @Deprecated
+  @DeprecatedConfig(replacement = "Use 'ingestionConfig.batchIngestionConfig.segmentIngestionType' instead.",
+      since = "0.8.0")
   public String getSegmentPushType() {
     return _segmentPushType;
   }
@@ -166,6 +172,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   ///
   /// Will be deleted in future version of Pinot
   @Deprecated
+  @DeprecatedConfig(replacement = "Use 'segmentsConfig.replication' instead.", since = "1.1.0")
   public String getReplicasPerPartition() {
     return _replicasPerPartition;
   }
@@ -180,6 +187,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   /// @deprecated Use [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] instead.
   @Deprecated
+  @DeprecatedConfig(replacement = "Use 'segmentAssignmentConfigMap' instead.", since = "1.3.0")
   public ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
     return _replicaGroupStrategyConfig;
   }
@@ -215,6 +223,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   /// @deprecated Use [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] instead
   @Deprecated
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @DeprecatedConfig(replacement = "Use 'instanceAssignmentConfigMap' instead.", since = "1.3.0")
   public boolean isMinimizeDataMovement() {
     return _minimizeDataMovement;
   }

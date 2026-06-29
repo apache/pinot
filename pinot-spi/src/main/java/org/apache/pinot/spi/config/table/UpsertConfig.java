@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
 import java.util.List;
@@ -26,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.DeprecatedConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.Enablement;
 
@@ -353,6 +355,8 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   @Deprecated
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @DeprecatedConfig(replacement = "Use 'upsertConfig.snapshot' instead.", since = "1.4.0")
   public boolean isEnableSnapshot() {
     return _enableSnapshot;
   }
@@ -366,6 +370,8 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   @Deprecated
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @DeprecatedConfig(replacement = "Use 'upsertConfig.preload' instead.", since = "1.4.0")
   public boolean isEnablePreload() {
     return _enablePreload;
   }
@@ -379,6 +385,10 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   @Deprecated
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @DeprecatedConfig(
+      replacement = "Use 'ingestionConfig.streamIngestionConfig.parallelSegmentConsumptionPolicy' instead.",
+      since = "1.4.0")
   public boolean isAllowPartialUpsertConsumptionDuringCommit() {
     return _allowPartialUpsertConsumptionDuringCommit;
   }

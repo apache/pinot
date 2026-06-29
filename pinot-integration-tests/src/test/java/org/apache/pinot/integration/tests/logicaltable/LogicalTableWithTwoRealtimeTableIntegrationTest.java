@@ -39,6 +39,7 @@ import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -131,7 +132,7 @@ public class LogicalTableWithTwoRealtimeTableIntegrationTest extends BaseLogical
     String tableName = REALTIME_TABLE_NAMES.get(tableIndex);
     Integer partitionId = REALTIME_TABLE_PARTITIONS.get(tableName);
     tableConfig.setTableName(tableName);
-    Map<String, String> streamConfigs = new HashMap<>(tableConfig.getIndexingConfig().getStreamConfigs());
+    Map<String, String> streamConfigs = new HashMap<>(IngestionConfigUtils.getFirstStreamConfigMap(tableConfig));
     streamConfigs.put("stream.kafka.partition.ids", String.valueOf(partitionId));
 
     tableConfig.getIndexingConfig().setStreamConfigs(null);
