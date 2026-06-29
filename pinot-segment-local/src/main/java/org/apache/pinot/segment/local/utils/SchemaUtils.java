@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -165,9 +164,14 @@ public class SchemaUtils {
         validateMultiValueCompatibility(fieldSpec);
       }
     }
-    Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
+    // Compute the intersection in a fresh set so the error message lists the actual conflicting columns and we do not
+    // mutate transformedColumns. Previously, Set#retainAll's boolean return value was passed as the format argument,
+    // producing a useless "Columns: true ..." message.
+    Set<String> chainedTransformColumns = new HashSet<>(transformedColumns);
+    chainedTransformColumns.retainAll(argumentColumns);
+    Preconditions.checkState(chainedTransformColumns.isEmpty(),
         "Columns: %s are a result of transformations, and cannot be used as arguments to other transform functions",
-        transformedColumns.retainAll(argumentColumns));
+        chainedTransformColumns);
     if (schema.getPrimaryKeyColumns() != null) {
       for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
         Preconditions.checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn),
