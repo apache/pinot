@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.DeprecatedConfig;
 
 
 public class FieldConfig extends BaseJsonConfig {
@@ -200,8 +201,14 @@ public class FieldConfig extends BaseJsonConfig {
     return _encodingType;
   }
 
+  /// `@JsonIgnore` is intentionally NOT applied here. Stripping `indexType` from the serialised view would
+  /// break the deprecation diff on update: a user resubmitting the same body with `indexType: "INVERTED"` would
+  /// see it as "newly introduced" because the round-tripped stored bean would only carry `indexTypes`. Keeping
+  /// the field in the wire shape preserves the pre-`@DeprecatedConfig` behaviour for back-compat callers; the
+  /// soft-launch warning is still emitted on every input that uses the deprecated form.
   @Nullable
   @Deprecated
+  @DeprecatedConfig(replacement = "Use 'fieldConfigList[].indexTypes' instead.", since = "0.9.0")
   public IndexType getIndexType() {
     return !_indexTypes.isEmpty() ? _indexTypes.get(0) : null;
   }

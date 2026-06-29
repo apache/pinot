@@ -63,6 +63,7 @@ import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -140,11 +141,11 @@ public class RealtimeSegmentDataManagerTest {
       tableConfig.setUpsertConfig(null);
     }
     if (maxRows != null) {
-      tableConfig.getIndexingConfig().getStreamConfigs()
+      IngestionConfigUtils.getFirstStreamConfigMap(tableConfig)
           .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, maxRows);
     }
     if (maxDuration != null) {
-      tableConfig.getIndexingConfig().getStreamConfigs()
+      IngestionConfigUtils.getFirstStreamConfigMap(tableConfig)
           .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, maxDuration);
     }
     if (tableConfig.getIngestionConfig() == null) {
@@ -306,7 +307,7 @@ public class RealtimeSegmentDataManagerTest {
   public void testCommitAfterCatchupWithPeriodOffset()
       throws Exception {
     TableConfig tableConfig = createTableConfig();
-    tableConfig.getIndexingConfig().getStreamConfigs().put(
+    IngestionConfigUtils.getFirstStreamConfigMap(tableConfig).put(
         StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
             "fakeStream"), "2d");
     FakeRealtimeSegmentDataManager segmentDataManager =
@@ -353,7 +354,7 @@ public class RealtimeSegmentDataManagerTest {
   public void testCommitAfterCatchupWithTimestampOffset()
       throws Exception {
     TableConfig tableConfig = createTableConfig();
-    tableConfig.getIndexingConfig().getStreamConfigs().put(
+    IngestionConfigUtils.getFirstStreamConfigMap(tableConfig).put(
         StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
             "fakeStream"), Instant.now().toString());
     FakeRealtimeSegmentDataManager segmentDataManager =

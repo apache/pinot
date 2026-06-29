@@ -2,14 +2,12 @@
   "tableName": "dailySales",
   "tableType": "REALTIME",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "timeColumnName": "daysSinceEpoch",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "50000",
     "replication": "1"
   },
-  "tenants": {
-  },
+  "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP",
     "noDictionaryColumns": [
@@ -51,7 +49,6 @@
     ]
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   }
 }
