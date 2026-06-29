@@ -121,6 +121,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
     long queryArrivalTimeMs = System.currentTimeMillis();
     int requestSize = msg.readableBytes();
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
     byte[] requestBytes = new byte[requestSize];
     msg.readBytes(requestBytes);
@@ -129,7 +130,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       InstanceRequest instanceRequest = new InstanceRequest();
       THREAD_LOCAL_T_DESERIALIZER.get().deserialize(instanceRequest, requestBytes);
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
-      _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES, 1);
+      _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES_ON_TABLE, 1);
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
     } catch (Exception e) {
