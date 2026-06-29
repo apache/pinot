@@ -34,6 +34,10 @@ public class TypeSystem extends RelDataTypeSystemImpl {
   private static final int MAX_DECIMAL_SCALE = 1000;
   private static final int MAX_DECIMAL_PRECISION = 2000;
 
+  // Pinot stores TIMESTAMP as epoch-millis (LONG), i.e. millisecond precision (3 fractional digits). This is also
+  // Calcite's MAX_DATETIME_PRECISION, so 3 is both the default and the max for TIMESTAMP and no clamping occurs.
+  private static final int TIMESTAMP_PRECISION_MILLIS = 3;
+
   /**
    * Default precision for derived arithmetic decimal types(plus/multiply/divide/mod). We won't allow the return
    * precision to be larger than this value majorly due to the following reasons:
@@ -84,7 +88,16 @@ public class TypeSystem extends RelDataTypeSystemImpl {
 
   @Override
   public int getDefaultPrecision(SqlTypeName typeName) {
-    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_PRECISION : super.getDefaultPrecision(typeName);
+    if (typeName == SqlTypeName.DECIMAL) {
+      return MAX_DECIMAL_PRECISION;
+    }
+    if (typeName == SqlTypeName.TIMESTAMP) {
+      // Calcite's default TIMESTAMP precision is 0 (whole seconds), which truncates sub-second epoch-millis literals
+      // during constant folding (RexBuilder.clean -> TimestampString.round). Pin it to millisecond precision so folded
+      // TIMESTAMP literals preserve millis and round-trip Pinot's LONG storage. See issue #18881.
+      return TIMESTAMP_PRECISION_MILLIS;
+    }
+    return super.getDefaultPrecision(typeName);
   }
 
   @Override

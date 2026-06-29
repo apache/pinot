@@ -1003,9 +1003,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode results = resultTable.get("rows").get(0);
     assertEquals(results.get(0).asInt(), 1);
     long nowResult = results.get(1).asLong();
-    // Timestamp granularity is seconds
-    assertTrue(nowResult >= ((queryStartTimeMs / 1000) * 1000));
-    assertTrue(nowResult <= ((queryEndTimeMs / 1000) * 1000));
+    // now() returns millisecond-precision epoch millis, consistent with the single-stage engine (issue #18881)
+    assertTrue(nowResult >= queryStartTimeMs);
+    assertTrue(nowResult <= queryEndTimeMs);
     long oneHourAgoResult = results.get(2).asLong();
     assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
     assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
@@ -1017,8 +1017,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     String dateTimeResult = results.get(4).asText();
     assertTrue(dateTimeResult.equals(queryStartTimeDay) || dateTimeResult.equals(queryEndTimeDay));
     nowResult = results.get(5).asLong();
-    assertTrue(nowResult >= ((queryStartTimeMs / 1000) * 1000));
-    assertTrue(nowResult <= ((queryEndTimeMs / 1000) * 1000));
+    assertTrue(nowResult >= queryStartTimeMs);
+    assertTrue(nowResult <= queryEndTimeMs);
     oneHourAgoResult = results.get(6).asLong();
     assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
     assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));

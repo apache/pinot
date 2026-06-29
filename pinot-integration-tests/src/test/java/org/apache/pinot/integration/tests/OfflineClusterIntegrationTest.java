@@ -1440,9 +1440,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode results = resultTable.get("rows").get(0);
     assertEquals(results.get(0).asInt(), 1);
     long nowResult = results.get(1).asLong();
-    // Timestamp granularity is seconds
-    assertTrue(nowResult >= ((queryStartTimeMs / 1000) * 1000));
-    assertTrue(nowResult <= ((queryEndTimeMs / 1000) * 1000));
+    // now() returns millisecond-precision epoch millis, consistent with the single-stage engine (issue #18881)
+    assertTrue(nowResult >= queryStartTimeMs);
+    assertTrue(nowResult <= queryEndTimeMs);
     long oneHourAgoResult = results.get(2).asLong();
     assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
     assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
