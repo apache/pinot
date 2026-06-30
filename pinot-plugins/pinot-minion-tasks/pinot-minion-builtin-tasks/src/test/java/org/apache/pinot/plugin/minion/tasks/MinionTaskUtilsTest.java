@@ -367,27 +367,18 @@ public class MinionTaskUtilsTest {
     }
   }
 
-  /**
-   * Builds a RoaringBitmap with {@code numDocs} valid doc ids (0..numDocs-1).
-   */
   @Test
   public void testCrcMatches() {
-    // Segment CRC equal -> match (data CRC not consulted).
     assertTrue(MinionTaskUtils.crcMatches(1000, 5000, 1000, 9999));
-    // Segment CRC differs but data CRC present on both sides and equal -> match (data-CRC fallback).
     assertTrue(MinionTaskUtils.crcMatches(1000, 5000, 2000, 5000));
-    // Segment CRC differs, data CRC present but differs -> no match.
     assertFalse(MinionTaskUtils.crcMatches(1000, 5000, 2000, 9999));
-    // Segment CRC differs, data CRC missing on one side -> fall back to segment CRC -> no match.
     assertFalse(MinionTaskUtils.crcMatches(1000, 5000, 2000, -1));
     assertFalse(MinionTaskUtils.crcMatches(1000, -1, 2000, 5000));
-    // Segment CRC differs, no data CRC anywhere -> no match.
     assertFalse(MinionTaskUtils.crcMatches(1000, -1, 2000, -1));
   }
 
   @Test
   public void testExecutorDataCrcFallbackMatch() {
-    // Server's segment CRC differs from expected, but the data CRC matches -> the bitmap is used.
     List<Object> responses = List.of(makeResponse("seg1", "2000", "5000", "server1", makeBitmap(4)));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000",
         "5000", "UNSAFE", responses, new String[]{"server1"}, this);
@@ -397,7 +388,6 @@ public class MinionTaskUtilsTest {
 
   @Test
   public void testExecutorDataCrcMismatchSkips() {
-    // Both segment CRC and data CRC differ -> the server is skipped, no matching bitmap found.
     List<Object> responses = List.of(makeResponse("seg1", "2000", "9999", "server1", makeBitmap(4)));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000",
         "5000", "UNSAFE", responses, new String[]{"server1"}, this);

@@ -333,10 +333,8 @@ public class UpsertCompactionTaskGeneratorTest {
     Map<String, String> compactionConfigs = getCompactionConfigs("1", "10");
     String segmentName = _completedSegment.getSegmentName();
     long crc = _completedSegment.getCrc();
-    // Both replicas are expected to respond.
     Map<String, Integer> twoReplicas = Map.of(segmentName, 2);
 
-    // EQUAL: replicas agree on the valid doc count, so the segment is compacted.
     Map<String, List<ValidDocIdsMetadataInfo>> equalReplicas = Map.of(segmentName, List.of(
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server2")));
@@ -345,7 +343,6 @@ public class UpsertCompactionTaskGeneratorTest {
             equalReplicas, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
     assertEquals(result.getSegmentsForCompaction().size(), 1);
 
-    // EQUAL: replicas disagree on the valid doc count, so the segment is skipped entirely.
     Map<String, List<ValidDocIdsMetadataInfo>> unequalReplicas = Map.of(segmentName, List.of(
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 60, 40, 100, crc, ServiceStatus.Status.GOOD, "server2")));
@@ -354,15 +351,12 @@ public class UpsertCompactionTaskGeneratorTest {
     assertTrue(result.getSegmentsForCompaction().isEmpty());
     assertTrue(result.getSegmentsForDeletion().isEmpty());
 
-    // EQUAL: only one of the two assigned replicas responded, so consensus can't be confirmed and the segment is
-    // skipped.
     Map<String, List<ValidDocIdsMetadataInfo>> oneResponded = Map.of(segmentName, List.of(
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1")));
     result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
         oneResponded, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
 
-    // EQUAL: a CRC mismatch on any replica skips the segment.
     Map<String, List<ValidDocIdsMetadataInfo>> crcMismatch = Map.of(segmentName, List.of(
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 50, 50, 100, crc + 1, ServiceStatus.Status.GOOD, "server2")));
@@ -370,7 +364,6 @@ public class UpsertCompactionTaskGeneratorTest {
         crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
 
-    // EQUAL: an unhealthy server skips the segment.
     Map<String, List<ValidDocIdsMetadataInfo>> unhealthy = Map.of(segmentName, List.of(
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.STARTING, "server2")));
@@ -378,18 +371,14 @@ public class UpsertCompactionTaskGeneratorTest {
         unhealthy, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
 
-    // UNSAFE: skip the CRC-mismatched replica and use the healthy one. A missing replica is tolerated.
     result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
         crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
     assertEquals(result.getSegmentsForCompaction().size(), 1);
 
-    // MOST_VALID_DOCS is strict: a CRC-mismatched replica skips the whole segment (unlike UNSAFE).
     result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
         crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
 
-    // MOST_VALID_DOCS: the replica with the most valid docs wins. Here that replica has zero invalid docs, so the
-    // segment is neither compacted nor deleted - proving the other (all-invalid) replica was not chosen.
     Map<String, List<ValidDocIdsMetadataInfo>> mostValidDocs = Map.of(segmentName, List.of(
         meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 100, 0, 100, crc, ServiceStatus.Status.GOOD, "server2")));
@@ -398,8 +387,6 @@ public class UpsertCompactionTaskGeneratorTest {
     assertTrue(result.getSegmentsForCompaction().isEmpty());
     assertTrue(result.getSegmentsForDeletion().isEmpty());
 
-    // Data CRC: when the segment CRC differs (e.g. an index/metadata-only change) the data CRC is compared as a
-    // fallback, so a segment whose data CRC still matches is accepted.
     SegmentZKMetadata dataCrcSegment = new SegmentZKMetadata(segmentName);
     dataCrcSegment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     dataCrcSegment.setTotalDocs(100L);
@@ -414,7 +401,6 @@ public class UpsertCompactionTaskGeneratorTest {
         twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
     assertEquals(result.getSegmentsForCompaction().size(), 1);
 
-    // Both segment CRC and data CRC differ from ZK -> skipped (the data-CRC fallback doesn't match either).
     Map<String, List<ValidDocIdsMetadataInfo>> dataCrcMismatch = Map.of(segmentName, List.of(
         metaWithDataCrc(segmentName, 50, 50, 100, 2000, "9999", ServiceStatus.Status.GOOD, "server1"),
         metaWithDataCrc(segmentName, 50, 50, 100, 2000, "9999", ServiceStatus.Status.GOOD, "server2")));

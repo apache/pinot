@@ -431,10 +431,8 @@ public class UpsertCompactMergeTaskGeneratorTest {
     long crc = _completedSegment.getCrc();
     Map<String, SegmentZKMetadata> candidateSegmentsMap = Map.of(segmentName, _completedSegment);
     Set<String> noMerged = Set.of();
-    // Both replicas are expected to respond.
     Map<String, Integer> twoReplicas = Map.of(segmentName, 2);
 
-    // EQUAL: replicas agree (both fully invalid, identical empty bitmaps), so the segment is processed and deleted.
     Map<String, List<ValidDocIdsMetadataInfo>> agree = Map.of(segmentName, List.of(
         meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server2")));
@@ -443,7 +441,6 @@ public class UpsertCompactMergeTaskGeneratorTest {
         MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
     Assert.assertTrue(result.getSegmentsForDeletion().contains(segmentName));
 
-    // EQUAL: replicas disagree on the valid doc count, so the segment is skipped.
     Map<String, List<ValidDocIdsMetadataInfo>> disagree = Map.of(segmentName, List.of(
         meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 1, 99, 100, crc, ServiceStatus.Status.GOOD, "server2")));
@@ -451,7 +448,6 @@ public class UpsertCompactMergeTaskGeneratorTest {
         candidateSegmentsMap, disagree, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
     Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
 
-    // EQUAL: a CRC mismatch on any replica skips the segment.
     Map<String, List<ValidDocIdsMetadataInfo>> crcMismatch = Map.of(segmentName, List.of(
         meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 0, 100, 100, crc + 1, ServiceStatus.Status.GOOD, "server2")));
@@ -460,7 +456,6 @@ public class UpsertCompactMergeTaskGeneratorTest {
         null);
     Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
 
-    // EQUAL: an unhealthy server skips the segment.
     Map<String, List<ValidDocIdsMetadataInfo>> unhealthy = Map.of(segmentName, List.of(
         meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.STARTING, "server2")));
@@ -468,14 +463,11 @@ public class UpsertCompactMergeTaskGeneratorTest {
         candidateSegmentsMap, unhealthy, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
     Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
 
-    // UNSAFE: skip the CRC-mismatched replica and use the healthy one, so the segment is still processed.
     result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
         candidateSegmentsMap, crcMismatch, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.UNSAFE,
         null);
     Assert.assertTrue(result.getSegmentsForDeletion().contains(segmentName));
 
-    // MOST_VALID_DOCS: the replica with the most valid docs wins, so the fully-valid replica is chosen and the
-    // segment is not deleted (proving the all-invalid replica was not picked).
     Map<String, List<ValidDocIdsMetadataInfo>> mostValidDocs = Map.of(segmentName, List.of(
         meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 100, 0, 100, crc, ServiceStatus.Status.GOOD, "server2")));
@@ -484,8 +476,6 @@ public class UpsertCompactMergeTaskGeneratorTest {
         MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS, null);
     Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
 
-    // EQUAL: only one of the two assigned replicas responded, so consensus can't be confirmed and the segment is
-    // skipped.
     Map<String, List<ValidDocIdsMetadataInfo>> oneResponded = Map.of(segmentName, List.of(
         meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1")));
     result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
