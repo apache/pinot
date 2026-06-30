@@ -74,7 +74,7 @@ import org.slf4j.LoggerFactory;
 public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
-  /** Parses the validDocIdsConsensusMode config string. Blank/null defaults to {@code EQUAL}. */
+  /// Parses the validDocIdsConsensusMode config string. Blank/null defaults to `EQUAL`.
   public static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsConsensusMode(String value) {
     if (value == null || value.isBlank()) {
       return MinionConstants.ValidDocIdsConsensusMode.EQUAL;
@@ -82,7 +82,7 @@ public class MinionTaskUtils {
     return MinionConstants.ValidDocIdsConsensusMode.valueOf(value.toUpperCase().trim());
   }
 
-  /** Parses the validDocIdsValidationMode config string. Blank/null defaults to {@code STRICT}. */
+  /// Parses the validDocIdsValidationMode config string. Blank/null defaults to `STRICT`.
   public static MinionConstants.ValidDocIdsValidationMode parseValidDocIdsValidationMode(String value) {
     if (value == null || value.isBlank()) {
       return MinionConstants.ValidDocIdsValidationMode.STRICT;
@@ -90,11 +90,9 @@ public class MinionTaskUtils {
     return MinionConstants.ValidDocIdsValidationMode.valueOf(value.toUpperCase().trim());
   }
 
-  /**
-   * Resolves the consensus mode the generator should apply, given the configured consensus mode and validation mode.
-   * EXECUTOR_ONLY downgrades the generator to UNSAFE (lenient pick, no bitmaps, no cross-replica enforcement) so the
-   * executor stays the sole gate; STRICT keeps the configured mode.
-   */
+  /// Resolves the consensus mode the generator should apply, given the configured consensus mode and validation
+  /// mode. EXECUTOR_ONLY downgrades the generator to UNSAFE (lenient pick, no bitmaps, no cross-replica enforcement)
+  /// so the executor stays the sole gate; STRICT keeps the configured mode.
   public static MinionConstants.ValidDocIdsConsensusMode resolveGeneratorConsensusMode(
       MinionConstants.ValidDocIdsConsensusMode consensusMode,
       MinionConstants.ValidDocIdsValidationMode validationMode) {
@@ -350,7 +348,7 @@ public class MinionTaskUtils {
         expectedCrc, null, comparisonModeStr);
   }
 
-  /** Variant that also matches on the expected data CRC; see {@link #crcMatches}. */
+  /// Variant that also matches on the expected data CRC; see [#crcMatches].
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, @Nullable String expectedDataCrc,
       String comparisonModeStr) {
@@ -460,10 +458,8 @@ public class MinionTaskUtils {
     return maxCardinalityMap;
   }
 
-  /**
-   * Counts how many servers host each segment (its online replica count) from a server-to-segments map, so callers
-   * can tell whether every assigned replica responded.
-   */
+  /// Counts how many servers host each segment (its online replica count) from a server-to-segments map, so callers
+  /// can tell whether every assigned replica responded.
   public static Map<String, Integer> getSegmentToReplicaCount(Map<String, List<String>> serverToSegments) {
     Map<String, Integer> segmentToReplicaCount = new HashMap<>();
     for (List<String> segments : serverToSegments.values()) {
@@ -474,12 +470,10 @@ public class MinionTaskUtils {
     return segmentToReplicaCount;
   }
 
-  /**
-   * Picks the replica whose validDocIds the generator should use, or null to skip the segment, applying the same
-   * checks the executor would so bad segments aren't scheduled: the replica must match CRC (via {@link #crcMatches})
-   * and be on a healthy server. UNSAFE uses the first such replica, EQUAL requires all to report the same valid doc
-   * count, and MOST_VALID_DOCS picks the highest.
-   */
+  /// Picks the replica whose validDocIds the generator should use, or null to skip the segment, applying the same
+  /// checks the executor would so bad segments aren't scheduled: the replica must match CRC (via [#crcMatches]) and
+  /// be on a healthy server. UNSAFE uses the first such replica, EQUAL requires all to report the same valid doc
+  /// count, and MOST_VALID_DOCS picks the highest.
   @Nullable
   public static ValidDocIdsMetadataInfo selectValidDocIdsMetadataForConsensus(String taskType,
       SegmentZKMetadata segmentZKMetadata, @Nullable List<ValidDocIdsMetadataInfo> replicas, int expectedReplicaCount,
@@ -567,13 +561,11 @@ public class MinionTaskUtils {
     return chosen;
   }
 
-  /**
-   * Whether two segment copies hold the same data. Matches on the full segment CRC, or - when those differ - on the
-   * data CRC (a checksum over only the forward index and dictionary, so index/metadata-only changes don't affect it)
-   * when both copies report one ({@code >= 0}). A negative data CRC means "not reported". Mirrors the logic of
-   * {@code BaseTableDataManager.hasSameCRC} and is used by both the generator's pre-scheduling check and the
-   * executor's per-server check.
-   */
+  /// Whether two segment copies hold the same data. Matches on the full segment CRC, or - when those differ - on the
+  /// data CRC (a checksum over only the forward index and dictionary, so index/metadata-only changes don't affect
+  /// it) when both copies report one (`>= 0`). A negative data CRC means "not reported". Mirrors the logic of
+  /// `BaseTableDataManager.hasSameCRC` and is used by both the generator's pre-scheduling check and the executor's
+  /// per-server check.
   @VisibleForTesting
   static boolean crcMatches(long segmentCrc, long dataCrc, long otherSegmentCrc, long otherDataCrc) {
     if (segmentCrc == otherSegmentCrc) {
@@ -582,7 +574,7 @@ public class MinionTaskUtils {
     return dataCrc >= 0 && otherDataCrc >= 0 && dataCrc == otherDataCrc;
   }
 
-  /** Parses a CRC string, returning {@code -1} ("unavailable") when it is null or unparseable. */
+  /// Parses a CRC string, returning `-1` ("unavailable") when it is null or unparseable.
   private static long parseCrc(@Nullable String crc) {
     if (crc == null) {
       return -1;

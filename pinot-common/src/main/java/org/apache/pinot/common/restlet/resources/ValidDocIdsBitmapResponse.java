@@ -82,7 +82,7 @@ public class ValidDocIdsBitmapResponse {
     return _serverStatus;
   }
 
-  /** Server's data CRC, or null if not reported. Omitted from the payload when null. */
+  /// Server's data CRC, or null if not reported. Omitted from the payload when null.
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
   public String getSegmentDataCrc() {

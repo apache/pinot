@@ -784,12 +784,10 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Returns the segment's data CRC to report, or null when it shouldn't be matched on data CRC. Only segments
-   * committed from a consuming segment carry a trusted data CRC (isUseDataCrc), so callers fall back to the full
-   * segment CRC otherwise. Reporting null keeps the generator and executor consistent on which segments use data
-   * CRC, since neither has the ZK useDataCrc flag.
-   */
+  /// Returns the segment's data CRC to report, or null when it shouldn't be matched on data CRC. Only segments
+  /// committed from a consuming segment carry a trusted data CRC (isUseDataCrc), so callers fall back to the full
+  /// segment CRC otherwise. Reporting null keeps the generator and executor consistent on which segments use data
+  /// CRC, since neither has the ZK useDataCrc flag.
   @Nullable
   private static String getReportableDataCrc(@Nullable SegmentZKMetadata zkMetadata, String dataCrc) {
     if (zkMetadata == null || !zkMetadata.isUseDataCrc() || dataCrc == null || Long.parseLong(dataCrc) < 0) {
@@ -798,7 +796,7 @@ public class TablesResource {
     return dataCrc;
   }
 
-  /** All segment ZK metadata for the table, keyed by segment name. Empty when the property store isn't available. */
+  /// All segment ZK metadata for the table, keyed by segment name. Empty when the property store isn't available.
   private Map<String, SegmentZKMetadata> getSegmentZKMetadataMap(String tableNameWithType) {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _serverInstance.getHelixManager().getHelixPropertyStore();
     if (propertyStore == null) {
