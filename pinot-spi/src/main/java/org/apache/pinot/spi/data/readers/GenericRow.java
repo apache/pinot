@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -50,6 +52,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *  MV: Object[] or List of Byte, Character, Short, Integer, Long, Float, Double, String
  *  We should not be using Boolean, Byte, Character and Short to keep it simple
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class GenericRow implements Serializable {
 
   /// This key is used by [org.apache.pinot.spi.stream.StreamMessageDecoder] to handle the case of single stream message
@@ -140,11 +143,19 @@ public class GenericRow implements Serializable {
   /// Returns `true` if the row has been marked as incomplete.
   /// A row is marked as incomplete when errors occurred during record transform, and default/null value has been put in
   /// place of original value.
+  ///
+  /// `@JsonIgnore`: this is in-process derived state, not part of the wire contract. Including it
+  /// in the JSON serialized to other services (e.g., the INSERT INTO controller endpoint) leaks
+  /// internal flags and breaks deserializers that don't tolerate unknown properties.
+  @JsonIgnore
   public boolean isIncomplete() {
     return _incomplete;
   }
 
   /// Returns `true` if the row has been sanitized by SanitizationTransformer.
+  ///
+  /// `@JsonIgnore`: see {@link #isIncomplete()} — derived state, not wire contract.
+  @JsonIgnore
   public boolean isSanitized() {
     return _sanitized;
   }
