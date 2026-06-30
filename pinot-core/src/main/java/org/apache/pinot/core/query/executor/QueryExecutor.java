@@ -43,6 +43,15 @@ public interface QueryExecutor {
 
   InstanceDataManager getInstanceDataManager();
 
+  /// Returns the configuration this executor was initialized with (the subset of server config with
+  /// prefix `pinot.server.query.executor`). Callers that build a per-execution [PlanMaker] override
+  /// can initialize it with the same settings the executor's own plan maker uses, so the override
+  /// honors limits such as `max.execution.threads` and the group-by trim sizes. The default returns
+  /// an empty configuration for implementations that do not track their init config.
+  default PinotConfiguration getQueryExecutorConfig() {
+    return new PinotConfiguration();
+  }
+
   /**
    * Starts the query executor.
    * <p>Should be called only once after query executor gets initialized but before calling any other method.
