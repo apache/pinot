@@ -19,13 +19,25 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntFunction;
+import org.apache.arrow.vector.BigIntVector;
+import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.Float4Vector;
+import org.apache.arrow.vector.Float8Vector;
+import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.VarBinaryVector;
+import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.dictionary.DictionaryProvider.MapDictionaryProvider;
+import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -133,45 +145,82 @@ public final class ArrowBlock implements MseBlock.Data {
     int numRows = getNumRows();
     int numCols = _dataBlock.getNumberOfColumns();
     DataSchema schema = getDataSchema();
-    // Dispatch on Pinot's stored column type (not on the Arrow vector's  class) so the row-heap
-    // cells carry the types downstream expects
+    // Dispatch on Pinot's stored column type (not the Arrow vector class) so the row-heap cells carry the
+    // types downstream expects, and decide the type once per column. Each case then runs a tight per-row
+    // loop that reads the typed vector directly, instead of re-evaluating the switch and re-fetching the
+    // vector for every cell (the row-oriented shape this used to have).
     ColumnDataType[] storedTypes = schema.getStoredColumnDataTypes();
     VectorSchemaRoot root = _dataBlock.getRoot();
     Object[][] rows = new Object[numRows][numCols];
     for (int colIdx = 0; colIdx < numCols; colIdx++) {
       FieldVector vector = root.getVector(colIdx);
-      ColumnDataType storedType = storedTypes[colIdx];
-      for (int row = 0; row < numRows; row++) {
-        if (vector.isNull(row)) {
-          continue;
+      switch (storedTypes[colIdx]) {
+        case INT:
+          // BOOLEAN is stored as INT but backed by a BitVector; plain INT uses an IntVector. Both get()s
+          // return int, boxed to Integer.
+          if (vector instanceof BitVector) {
+            fillColumn(rows, colIdx, vector, numRows, ((BitVector) vector)::get);
+          } else {
+            fillColumn(rows, colIdx, vector, numRows, ((IntVector) vector)::get);
+          }
+          break;
+        case LONG:
+          // TIMESTAMP is also stored as LONG (a BigIntVector).
+          fillColumn(rows, colIdx, vector, numRows, ((BigIntVector) vector)::get);
+          break;
+        case FLOAT:
+          fillColumn(rows, colIdx, vector, numRows, ((Float4Vector) vector)::get);
+          break;
+        case DOUBLE:
+          fillColumn(rows, colIdx, vector, numRows, ((Float8Vector) vector)::get);
+          break;
+        case STRING:
+          writeStringColumn(rows, colIdx, vector, numRows);
+          break;
+        case BYTES: {
+          VarBinaryVector v = (VarBinaryVector) vector;
+          fillColumn(rows, colIdx, vector, numRows, row -> new ByteArray(v.get(row)));
+          break;
         }
-        switch (storedType) {
-          case INT:
-            rows[row][colIdx] = _dataBlock.getInt(row, colIdx);
-            break;
-          case LONG:
-            rows[row][colIdx] = _dataBlock.getLong(row, colIdx);
-            break;
-          case FLOAT:
-            rows[row][colIdx] = _dataBlock.getFloat(row, colIdx);
-            break;
-          case DOUBLE:
-            rows[row][colIdx] = _dataBlock.getDouble(row, colIdx);
-            break;
-          case STRING:
-            rows[row][colIdx] = _dataBlock.getString(row, colIdx);
-            break;
-          case BYTES:
-            rows[row][colIdx] = _dataBlock.getBytes(row, colIdx);
-            break;
-          default:
-            throw new UnsupportedOperationException(
-                "ArrowBlock.asRowHeap does not support column stored type " + storedType
-                    + " (column '" + schema.getColumnName(colIdx) + "')");
-        }
+        default:
+          throw new UnsupportedOperationException(
+              "ArrowBlock.asRowHeap does not support column stored type " + storedTypes[colIdx]
+                  + " (column '" + schema.getColumnName(colIdx) + "')");
       }
     }
     return new RowHeapDataBlock(Arrays.asList(rows), schema);
+  }
+
+  private static void fillColumn(Object[][] rows, int colIdx, FieldVector vector, int numRows,
+      IntFunction<Object> reader) {
+    for (int row = 0; row < numRows; row++) {
+      if (!vector.isNull(row)) {
+        rows[row][colIdx] = reader.apply(row);
+      }
+    }
+  }
+
+  /**
+   * Materializes a STRING/JSON column into {@code rows}. Both layouts {@link ArrowDataBlock} can produce are
+   * handled: a plain {@link VarCharVector}, or a dictionary-encoded integer index vector whose values live in
+   * the block's dictionary provider.
+   */
+  private void writeStringColumn(Object[][] rows, int colIdx, FieldVector vector, int numRows) {
+    DictionaryEncoding encoding = vector.getField().getDictionary();
+    if (encoding == null) {
+      VarCharVector v = (VarCharVector) vector;
+      fillColumn(rows, colIdx, vector, numRows, row -> new String(v.get(row), StandardCharsets.UTF_8));
+      return;
+    }
+    MapDictionaryProvider provider = _dataBlock.getDictionaryProvider();
+    if (provider == null) {
+      throw new IllegalStateException(
+          "Column at index " + colIdx + " is dictionary-encoded but the block carries no dictionary provider");
+    }
+    IntVector indices = (IntVector) vector;
+    VarCharVector dictionary = (VarCharVector) provider.lookup(encoding.getId()).getVector();
+    fillColumn(rows, colIdx, vector, numRows,
+        row -> new String(dictionary.get(indices.get(row)), StandardCharsets.UTF_8));
   }
 
   /**

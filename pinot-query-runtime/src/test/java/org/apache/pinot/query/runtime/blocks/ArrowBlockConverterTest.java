@@ -22,6 +22,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -190,6 +192,68 @@ public class ArrowBlockConverterTest {
   }
 
   @Test
+  public void testAsRowHeapPlainStringColumn() {
+    // All-distinct strings are stored as a plain VarCharVector (no dictionary). This exercises the
+    // non-dictionary branch of ArrowBlock.asRowHeap's string handling — testRoundTripViaAsRowHeap hits the
+    // dictionary branch (its "Alice"/"Bob" column is low-cardinality), so this guards the other path.
+    DataSchema schema = new DataSchema(new String[]{"s"}, new ColumnDataType[]{ColumnDataType.STRING});
+    RowHeapDataBlock source = new RowHeapDataBlock(
+        rows(new Object[]{"a"}, new Object[]{"b"}, new Object[]{"c"}), schema);
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(source, _allocator);
+    try {
+      assertNull(arrowBlock.getDataBlock().getRoot().getVector(0).getField().getDictionary(),
+          "all-distinct string column must be stored plain (no dictionary)");
+      List<Object[]> out = arrowBlock.asRowHeap().getRows();
+      assertEquals(out.get(0)[0], "a");
+      assertEquals(out.get(1)[0], "b");
+      assertEquals(out.get(2)[0], "c");
+    } finally {
+      arrowBlock.release();
+    }
+  }
+
+  @Test
+  public void testDirectBufferWriteMultiByteValidity() {
+    // The direct-buffer writers set the validity buffer in bulk and clear null bits across byte boundaries, so
+    // exercise a column wider than one validity byte (20 rows = 3 bytes) with nulls straddling byte boundaries
+    // (rows 0, 7, 8, 15, 16, 19). A 3-row round-trip can't catch a multi-byte validity bug. Covers every type
+    // the converter writes directly: numerics (INT/LONG/FLOAT/DOUBLE), BOOLEAN (BitVector bit-writes), and
+    // TIMESTAMP (stored as LONG), verified end-to-end through asRowHeap.
+    int numRows = 20;
+    DataSchema schema = new DataSchema(new String[]{"i", "l", "f", "d", "bool", "ts"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
+            ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP});
+    Set<Integer> nullRows = Set.of(0, 7, 8, 15, 16, 19);
+    List<Object[]> in = new ArrayList<>(numRows);
+    for (int row = 0; row < numRows; row++) {
+      in.add(nullRows.contains(row) ? new Object[]{null, null, null, null, null, null}
+          : new Object[]{row, (long) row * 10, row + 0.5f, row + 0.25, row % 2, 1_700_000_000_000L + row});
+    }
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(new RowHeapDataBlock(in, schema), _allocator);
+    try {
+      List<Object[]> out = arrowBlock.asRowHeap().getRows();
+      assertEquals(out.size(), numRows);
+      for (int row = 0; row < numRows; row++) {
+        Object[] r = out.get(row);
+        if (nullRows.contains(row)) {
+          for (int col = 0; col < schema.size(); col++) {
+            assertNull(r[col], "row " + row + " col " + col + " must be null");
+          }
+        } else {
+          assertEquals(r[0], Integer.valueOf(row));
+          assertEquals(r[1], Long.valueOf((long) row * 10));
+          assertEquals(r[2], Float.valueOf(row + 0.5f));
+          assertEquals(r[3], Double.valueOf(row + 0.25));
+          assertEquals(r[4], Integer.valueOf(row % 2), "BOOLEAN -> Integer at row " + row);
+          assertEquals(r[5], Long.valueOf(1_700_000_000_000L + row), "TIMESTAMP -> Long at row " + row);
+        }
+      }
+    } finally {
+      arrowBlock.release();
+    }
+  }
+
+  @Test
   public void testConverterHandlesSerializedDataBlockInput() {
     // Feed a SerializedDataBlock directly so the converter's serialized-columnar input path is
     // exercised without going through the RowHeap → asSerialized bridge internally.
@@ -220,7 +284,7 @@ public class ArrowBlockConverterTest {
   public void testEmptyBlock() {
     DataSchema schema = new DataSchema(new String[]{"id"},
         new ColumnDataType[]{ColumnDataType.INT});
-    RowHeapDataBlock rowBlock = new RowHeapDataBlock(Collections.emptyList(), schema);
+    RowHeapDataBlock rowBlock = new RowHeapDataBlock(List.of(), schema);
 
     ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
     try {
@@ -265,7 +329,7 @@ public class ArrowBlockConverterTest {
     // Each unsupported column type must throw UnsupportedOperationException whose message names the
     // offending type — callers rely on the message to identify which column failed.
     assertUnsupported(ColumnDataType.INT_ARRAY, new int[]{1, 2, 3}, "INT_ARRAY");
-    assertUnsupported(ColumnDataType.MAP, Collections.emptyMap(), "MAP");
+    assertUnsupported(ColumnDataType.MAP, Map.of(), "MAP");
     assertUnsupported(ColumnDataType.BIG_DECIMAL, new BigDecimal("1.0"), "BIG_DECIMAL");
   }
 

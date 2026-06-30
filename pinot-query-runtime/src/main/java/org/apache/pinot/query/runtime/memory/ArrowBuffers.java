@@ -19,10 +19,13 @@
 package org.apache.pinot.query.runtime.memory;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.arrow.memory.BoundsChecking;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -85,6 +88,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * unique names.
  */
 public class ArrowBuffers implements AutoCloseable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ArrowBuffers.class);
+
   // Conservative default Arrow memory budget — applied to both the JVM-wide root limit and the per-query
   // child ceiling when neither is configured.
   private static final long DEFAULT_ALLOCATOR_LIMIT_BYTES = 1024L * 1024 * 1024;
@@ -143,7 +148,14 @@ public class ArrowBuffers implements AutoCloseable {
         config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_INITIAL_RESERVATION, 0L);
     long childLimit = config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_CHILD_LIMIT,
         DEFAULT_ALLOCATOR_LIMIT_BYTES);
-    return new ArrowBuffers(true, new RootAllocator(limit), initialReservation, childLimit);
+    RootAllocator root = new RootAllocator(limit);
+    // Arrow's bounds checking — it's a static-final read once when Arrow's
+    // BoundsChecking class loads. To flip this after perf validation
+    if (BoundsChecking.BOUNDS_CHECKING_ENABLED) {
+      LOGGER.warn("Arrow is enabled but Arrow bounds checking is on, so the columnar off-heap write path cannot "
+          + "vectorize (correctness is unaffected)");
+    }
+    return new ArrowBuffers(true, root, initialReservation, childLimit);
   }
 
   /** Returns {@code true} if Arrow execution is enabled. Production code must gate Arrow work on this. */

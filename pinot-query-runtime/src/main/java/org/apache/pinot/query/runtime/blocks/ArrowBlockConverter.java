@@ -24,9 +24,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.BitVector;
+import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float4Vector;
 import org.apache.arrow.vector.Float8Vector;
@@ -41,12 +43,12 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
+import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -76,7 +78,7 @@ public final class ArrowBlockConverter {
     // Validate the schema before forcing serialization — a RowHeapDataBlock with an unsupported
     // column (MAP, BIG_DECIMAL, etc.) should fail fast without paying asSerialized()'s full
     // row-to-buffer materialization cost.
-    buildArrowSchema(schema);
+    validateColumnTypesSupported(schema);
     DataBlock dataBlock = block.asSerialized().getDataBlock();
     return fromDataBlock(dataBlock, schema, allocator);
   }
@@ -127,39 +129,27 @@ public final class ArrowBlockConverter {
     }
   }
 
-  private static Schema buildArrowSchema(DataSchema schema) {
-    List<Field> fields = new ArrayList<>(schema.size());
+  private static void validateColumnTypesSupported(DataSchema schema) {
     String[] names = schema.getColumnNames();
     ColumnDataType[] types = schema.getColumnDataTypes();
     for (int i = 0; i < names.length; i++) {
-      fields.add(buildArrowField(names[i], types[i]));
+      buildArrowField(names[i], types[i]);
     }
-    return new Schema(fields);
   }
 
   private static Field buildArrowField(String name, ColumnDataType type) {
-    switch (type) {
-      case BOOLEAN:
-        return Field.nullable(name, new ArrowType.Bool());
-      case INT:
-        return Field.nullable(name, new ArrowType.Int(32, true));
-      case LONG:
-      case TIMESTAMP:
-        return Field.nullable(name, new ArrowType.Int(64, true));
-      case FLOAT:
-        return Field.nullable(name, new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE));
-      case DOUBLE:
-        return Field.nullable(name, new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE));
-      case STRING:
-      case JSON:
-        return Field.nullable(name, new ArrowType.Utf8());
-      case BYTES:
-        return Field.nullable(name, new ArrowType.Binary());
-      default:
-        throw new UnsupportedOperationException(
-            "Arrow block conversion does not yet support column type " + type
-                + " (column '" + name + "')");
-    }
+    return switch (type) {
+      case BOOLEAN -> Field.nullable(name, new ArrowType.Bool());
+      case INT -> Field.nullable(name, new ArrowType.Int(32, true));
+      case LONG, TIMESTAMP -> Field.nullable(name, new ArrowType.Int(64, true));
+      case FLOAT -> Field.nullable(name, new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE));
+      case DOUBLE -> Field.nullable(name, new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE));
+      case STRING, JSON -> Field.nullable(name, new ArrowType.Utf8());
+      case BYTES -> Field.nullable(name, new ArrowType.Binary());
+      default -> throw new UnsupportedOperationException(
+          "Arrow block conversion does not yet support column type " + type
+              + " (column '" + name + "')");
+    };
   }
 
   // ----- column writers -----
@@ -207,40 +197,38 @@ public final class ArrowBlockConverter {
   private static void writeBitColumn(DataBlock dataBlock, BitVector vector, ColumnDataType storedType, int colId,
       int numRows, @Nullable RoaringBitmap nullBitmap) {
     int[] values = DataBlockExtractUtils.extractIntColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
-    // Hoist the null check out of the loop so the no-null fast path is a tight, autovectorizable loop.
-    if (nullBitmap == null) {
-      for (int row = 0; row < numRows; row++) {
-        vector.set(row, values[row]);
-      }
-    } else {
-      for (int row = 0; row < numRows; row++) {
-        if (nullBitmap.contains(row)) {
-          vector.setNull(row);
-        } else {
-          vector.set(row, values[row]);
-        }
+    // A BitVector packs each boolean into a single data-buffer bit, so there is no fixed-width value buffer to
+    // sweep — booleans cannot use the vectorizable setX path the numeric writers use, and the data bits are
+    // written one at a time. Validity is still set in bulk via writeValidity, so the shape matches the others
+    // (every index in [0, numRows) is written; the validity bit, cleared below, is what marks a row null).
+    ArrowBuf dataBuffer = vector.getDataBuffer();
+    for (int row = 0; row < numRows; row++) {
+      if (values[row] != 0) {
+        BitVectorHelper.setBit(dataBuffer, row);
+      } else {
+        BitVectorHelper.unsetBit(dataBuffer, row);
       }
     }
+    writeValidity(vector, numRows, nullBitmap);
     vector.setValueCount(numRows);
   }
 
+  // Fixed-width numeric writers. These bypass the per-element FixedWidthVector.set(index, value) API (which
+  // interleaves a validity-bit write with every value write, touching null slots twice) and instead sweep the
+  // value buffer in one tight setX loop, then set validity in bulk via writeValidity. Keeping the value loop
+  // branch-free and free of validity bookkeeping is what lets the JIT vectorize it.
+  //
+  // Two preconditions make the unconditional value sweep safe: writeColumn has already allocateNew()'d the
+  // vector to capacity numRows (so every index is in-bounds), and the extractors fill null slots with a 0
+  // placeholder (so writing them is harmless — the validity bit, cleared below, is what marks a row null).
   private static void writeIntColumn(DataBlock dataBlock, IntVector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
     int[] values = DataBlockExtractUtils.extractIntColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
-    // Hoist the null check out of the loop so the no-null fast path is a tight, autovectorizable loop.
-    if (nullBitmap == null) {
-      for (int row = 0; row < numRows; row++) {
-        vector.set(row, values[row]);
-      }
-    } else {
-      for (int row = 0; row < numRows; row++) {
-        if (nullBitmap.contains(row)) {
-          vector.setNull(row);
-        } else {
-          vector.set(row, values[row]);
-        }
-      }
+    ArrowBuf dataBuffer = vector.getDataBuffer();
+    for (int row = 0; row < numRows; row++) {
+      dataBuffer.setInt((long) row * IntVector.TYPE_WIDTH, values[row]);
     }
+    writeValidity(vector, numRows, nullBitmap);
     vector.setValueCount(numRows);
   }
 
@@ -248,40 +236,22 @@ public final class ArrowBlockConverter {
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
     float[] values = DataBlockExtractUtils.extractFloatColumn(
         ColumnDataType.FLOAT.toDataType(), dataBlock, colId, nullBitmap);
-    // Hoist the null check out of the loop so the no-null fast path is a tight, autovectorizable loop.
-    if (nullBitmap == null) {
-      for (int row = 0; row < numRows; row++) {
-        vector.set(row, values[row]);
-      }
-    } else {
-      for (int row = 0; row < numRows; row++) {
-        if (nullBitmap.contains(row)) {
-          vector.setNull(row);
-        } else {
-          vector.set(row, values[row]);
-        }
-      }
+    ArrowBuf dataBuffer = vector.getDataBuffer();
+    for (int row = 0; row < numRows; row++) {
+      dataBuffer.setFloat((long) row * Float4Vector.TYPE_WIDTH, values[row]);
     }
+    writeValidity(vector, numRows, nullBitmap);
     vector.setValueCount(numRows);
   }
 
   private static void writeLongColumn(DataBlock dataBlock, BigIntVector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
     long[] values = DataBlockExtractUtils.extractLongColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
-    // Hoist the null check out of the loop so the no-null fast path is a tight, autovectorizable loop.
-    if (nullBitmap == null) {
-      for (int row = 0; row < numRows; row++) {
-        vector.set(row, values[row]);
-      }
-    } else {
-      for (int row = 0; row < numRows; row++) {
-        if (nullBitmap.contains(row)) {
-          vector.setNull(row);
-        } else {
-          vector.set(row, values[row]);
-        }
-      }
+    ArrowBuf dataBuffer = vector.getDataBuffer();
+    for (int row = 0; row < numRows; row++) {
+      dataBuffer.setLong((long) row * BigIntVector.TYPE_WIDTH, values[row]);
     }
+    writeValidity(vector, numRows, nullBitmap);
     vector.setValueCount(numRows);
   }
 
@@ -289,21 +259,28 @@ public final class ArrowBlockConverter {
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
     double[] values = DataBlockExtractUtils.extractDoubleColumn(
         ColumnDataType.DOUBLE.toDataType(), dataBlock, colId, nullBitmap);
-    // Hoist the null check out of the loop so the no-null fast path is a tight, autovectorizable loop.
-    if (nullBitmap == null) {
-      for (int row = 0; row < numRows; row++) {
-        vector.set(row, values[row]);
-      }
-    } else {
-      for (int row = 0; row < numRows; row++) {
-        if (nullBitmap.contains(row)) {
-          vector.setNull(row);
-        } else {
-          vector.set(row, values[row]);
-        }
-      }
+    ArrowBuf dataBuffer = vector.getDataBuffer();
+    for (int row = 0; row < numRows; row++) {
+      dataBuffer.setDouble((long) row * Float8Vector.TYPE_WIDTH, values[row]);
     }
+    writeValidity(vector, numRows, nullBitmap);
     vector.setValueCount(numRows);
+  }
+
+  /**
+   * Sets the validity buffer for a directly-written fixed-width column: marks every row in {@code [0, numRows)}
+   * valid in one byte-wise sweep, then clears the bit for each null row via the bitmap's batch iterator. Setting
+   * trailing bits past {@code numRows} in the final byte is harmless — they are never read. Keeping validity out
+   * of the value loop is what lets the value loop stay vectorizable.
+   */
+  private static void writeValidity(FieldVector vector, int numRows, @Nullable RoaringBitmap nullBitmap) {
+    ArrowBuf validityBuffer = vector.getValidityBuffer();
+    // Mark every row valid with a single ranged fill (sets the validity bytes to 0xFF); trailing bits past
+    // numRows in the final byte are never read. Then clear the bit for each null row via the batch iterator.
+    validityBuffer.setOne(0, BitVectorHelper.getValidityBufferSizeFromCount(numRows));
+    if (nullBitmap != null) {
+      nullBitmap.forEach((IntConsumer) row -> BitVectorHelper.unsetBit(validityBuffer, row));
+    }
   }
 
   /**

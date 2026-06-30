@@ -94,6 +94,17 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
     return _root;
   }
 
+  /**
+   * Returns the per-column dictionary provider for the dictionary-encoded (STRING/JSON) columns, or
+   * {@code null} if no column in this block is dictionary-encoded. Exposed for the wrapping
+   * {@code ArrowBlock} so a column-oriented reader (e.g. {@code asRowHeap}) can resolve a column's
+   * dictionary once instead of per row.
+   */
+  @Nullable
+  public MapDictionaryProvider getDictionaryProvider() {
+    return _dictionaryProvider;
+  }
+
   // ----- DataBlock interface -----
 
   @Override
@@ -166,6 +177,7 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
   }
 
   @Override
+  // TODO: Explore if Text can be used here instead, to evaluate after operator changes.
   public String getString(int rowId, int colId) {
     FieldVector vector = _root.getVector(colId);
     DictionaryEncoding encoding = vector.getField().getDictionary();
@@ -190,6 +202,7 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
     return bytes == null ? null : new ByteArray(bytes);
   }
 
+  // TODO: To support array columns in future PRs
   @Override
   public int[] getIntArray(int rowId, int colId) {
     throw new UnsupportedOperationException("Array columns are not supported on ArrowDataBlock yet");
@@ -211,7 +224,17 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
   }
 
   @Override
+  public BigDecimal[] getBigDecimalArray(int rowId, int colId) {
+    throw new UnsupportedOperationException("Array columns are not supported on ArrowDataBlock yet");
+  }
+
+  @Override
   public String[] getStringArray(int rowId, int colId) {
+    throw new UnsupportedOperationException("Array columns are not supported on ArrowDataBlock yet");
+  }
+
+  @Override
+  public ByteArray[] getBytesArray(int rowId, int colId) {
     throw new UnsupportedOperationException("Array columns are not supported on ArrowDataBlock yet");
   }
 
@@ -248,6 +271,12 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
     return Type.ARROW;
   }
 
+  // The three accessors below expose BaseDataBlock's serialization layout — a flat fixed-size buffer, a flat
+  // variable-size buffer, and one global String[] dictionary shared across columns. The DataBlock interface
+  // itself documents them as abstraction leaks.
+  // Arrow has no such layout: data lives in a columnar VectorSchemaRoot (no flat byte buffers), and string
+  // dictionaries are per-column Arrow DictionaryEncoding, not a single global String[]. There is therefore
+  // no equivalent value to return, so these throw.
   @Nullable
   @Override
   public String[] getStringDictionary() {
