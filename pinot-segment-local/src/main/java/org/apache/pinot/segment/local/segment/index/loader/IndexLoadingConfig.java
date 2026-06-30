@@ -414,6 +414,10 @@ public class IndexLoadingConfig {
     return map == null ? null : Collections.unmodifiableMap(map);
   }
 
+  // NOTE: entries added here are written directly into _indexConfigsByColName. Any later call that
+  // sets _dirty = true (e.g. setSegmentTier, addKnownColumns) will trigger refreshIndexConfigs()
+  // and rebuild the map from scratch, wiping these entries. Callers must ensure no dirty-flag
+  // mutations happen between this call and the point where the configs are consumed.
   public void addOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
     if (_indexConfigsByColName == null || _dirty) {
       refreshIndexConfigs();

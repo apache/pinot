@@ -60,7 +60,11 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   private final PinotDataBufferMemoryManager _memoryManager;
   private final int _capacity;
 
-  // Volatile for lock-free reader access; writer always holds the consuming-thread lock.
+  // Volatile copy-on-write: the writer (consuming thread) creates a fresh HashMap copy and publishes
+  // atomically via volatile write (see allocateKeyColumn). Readers see a consistent snapshot of the
+  // entire map. ConcurrentHashMap is NOT appropriate here — it would allow readers to observe
+  // partially-updated state during a put. Single-writer is guaranteed by the Pinot consuming thread
+  // model (one thread per partition).
   private volatile Map<String, MutableKeyColumn> _keyColumns = new HashMap<>();
 
   public MutableOpenStructIndex(String openStructColumn, ComplexFieldSpec fieldSpec,
@@ -110,7 +114,8 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         if (resolvedType == null) {
           continue;
         }
-        Object coerced = tryCoerce(key, rawValue, resolvedType);
+        PinotDataType destType = ColumnDataType.fromDataTypeSV(resolvedType).toPinotDataType();
+        Object coerced = tryCoerce(key, rawValue, destType);
         if (coerced == null) {
           continue;
         }
@@ -119,8 +124,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         continue;
       }
 
-      DataType storedType = keyCol.getStoredType();
-      Object coerced = tryCoerce(key, rawValue, storedType);
+      Object coerced = tryCoerce(key, rawValue, keyCol.getDestType());
       if (coerced == null) {
         continue;
       }
@@ -152,14 +156,13 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   /// the entry. Note: a successful coerce of a "null"-shaped raw value would also return null —
   /// but callers gate on rawValue != null before reaching here.
   @Nullable
-  private Object tryCoerce(String key, Object rawValue, DataType storedType) {
+  private Object tryCoerce(String key, Object rawValue, PinotDataType destType) {
     try {
       PinotDataType sourceType = PinotDataType.getSingleValueType(rawValue);
-      PinotDataType destType = ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
       return destType.convert(rawValue, sourceType);
     } catch (Exception e) {
       LOGGER.warn("OPEN_STRUCT '{}': coercion failed for key '{}' to {}. Skipping.",
-          _openStructColumn, key, storedType, e);
+          _openStructColumn, key, destType, e);
       return null;
     }
   }

@@ -27,7 +27,9 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeInvert
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -43,6 +45,7 @@ public class MutableKeyColumn implements Closeable {
 
   private final String _key;
   private final DataType _storedType;
+  private final PinotDataType _destType;
   private final MutableForwardIndex _forwardIndex;
   private final MutableRoaringBitmap _presenceBitmap;
   private final MutableDictionary _dictionary;
@@ -56,6 +59,7 @@ public class MutableKeyColumn implements Closeable {
       String allocationContext) {
     _key = key;
     _storedType = storedType;
+    _destType = ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
     _presenceBitmap = new MutableRoaringBitmap();
     _invertedIndex = new RealtimeInvertedIndex();
 
@@ -75,6 +79,10 @@ public class MutableKeyColumn implements Closeable {
 
   public DataType getStoredType() {
     return _storedType;
+  }
+
+  public PinotDataType getDestType() {
+    return _destType;
   }
 
   public MutableForwardIndex getForwardIndex() {

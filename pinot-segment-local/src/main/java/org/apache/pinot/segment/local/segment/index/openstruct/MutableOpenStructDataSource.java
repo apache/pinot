@@ -84,8 +84,9 @@ public class MutableOpenStructDataSource extends BaseDataSource implements OpenS
 
   @Override
   public Map<String, DataSource> getDataSources() {
+    Map<String, MutableKeyColumn> snapshot = _index.getKeyColumns();
     Map<String, DataSource> result = new HashMap<>();
-    for (String key : _index.getKeys()) {
+    for (String key : snapshot.keySet()) {
       DataSource ds = getDataSource(key);
       if (ds != null) {
         result.put(key, ds);

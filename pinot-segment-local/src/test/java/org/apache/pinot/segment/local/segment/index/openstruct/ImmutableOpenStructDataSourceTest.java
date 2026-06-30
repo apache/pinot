@@ -18,15 +18,22 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -196,5 +203,112 @@ public class ImmutableOpenStructDataSourceTest {
     assertNotNull(ds.getIndexContainer());
     assertTrue(ds.isFullyMaterialized());
     assertSame(ds.getDataSource("clicks"), clicksDs);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static DataSource mockDenseDataSource(DataType storedType, Object valueAtDoc0, boolean nullAtDoc1) {
+    DataSource ds = mock(DataSource.class);
+    ForwardIndexReader fwdReader = mock(ForwardIndexReader.class);
+    ForwardIndexReaderContext ctx = mock(ForwardIndexReaderContext.class);
+    when(fwdReader.createContext()).thenReturn(ctx);
+    when(fwdReader.getStoredType()).thenReturn(storedType);
+
+    Dictionary dictionary = mock(Dictionary.class);
+    when(fwdReader.getDictId(eq(0), eq(ctx))).thenReturn(42);
+    when(dictionary.get(42)).thenReturn(valueAtDoc0);
+    when(ds.getDictionary()).thenReturn(dictionary);
+
+    when(ds.getForwardIndex()).thenReturn(fwdReader);
+
+    NullValueVectorReader nullReader = mock(NullValueVectorReader.class);
+    when(nullReader.isNull(0)).thenReturn(false);
+    when(nullReader.isNull(1)).thenReturn(nullAtDoc1);
+    when(ds.getNullValueVector()).thenReturn(nullReader);
+
+    return ds;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static DataSource mockSparseDataSource(String jsonAtDoc0, boolean nullAtDoc1) {
+    DataSource ds = mock(DataSource.class);
+    ForwardIndexReader fwdReader = mock(ForwardIndexReader.class);
+    ForwardIndexReaderContext ctx = mock(ForwardIndexReaderContext.class);
+    when(fwdReader.createContext()).thenReturn(ctx);
+    when(fwdReader.getStoredType()).thenReturn(DataType.STRING);
+    when(fwdReader.getString(eq(0), eq(ctx))).thenReturn(jsonAtDoc0);
+    when(fwdReader.getString(eq(1), eq(ctx))).thenReturn("");
+    when(ds.getForwardIndex()).thenReturn(fwdReader);
+    when(ds.getDictionary()).thenReturn(null);
+
+    NullValueVectorReader nullReader = mock(NullValueVectorReader.class);
+    when(nullReader.isNull(0)).thenReturn(false);
+    when(nullReader.isNull(1)).thenReturn(nullAtDoc1);
+    when(ds.getNullValueVector()).thenReturn(nullReader);
+
+    return ds;
+  }
+
+  @Test
+  public void testGetMapValueDenseOnly() {
+    DataSource clicksDs = mockDenseDataSource(DataType.INT, 10, true);
+    DataSource nameDs = mockDenseDataSource(DataType.STRING, "hello", false);
+
+    Map<String, DataSource> perKey = new HashMap<>();
+    perKey.put("clicks", clicksDs);
+    perKey.put("name", nameDs);
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), perKey, null, 2);
+
+    Map<String, Object> doc0 = ds.getMapValue(0);
+    assertNotNull(doc0);
+    assertEquals(doc0.get("clicks"), 10);
+    assertEquals(doc0.get("name"), "hello");
+  }
+
+  @Test
+  public void testGetMapValueNullDoc() {
+    DataSource clicksDs = mockDenseDataSource(DataType.INT, 10, true);
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), Map.of("clicks", clicksDs), null, 2);
+
+    // doc 1 has null for clicks → no keys → null map
+    Map<String, Object> doc1 = ds.getMapValue(1);
+    assertNull(doc1);
+  }
+
+  @Test
+  public void testGetMapValueWithSparse() {
+    DataSource clicksDs = mockDenseDataSource(DataType.INT, 10, true);
+    DataSource sparseDs = mockSparseDataSource("{\"rare_key\":\"val\"}", true);
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), Map.of("clicks", clicksDs), sparseDs, 2);
+
+    Map<String, Object> doc0 = ds.getMapValue(0);
+    assertNotNull(doc0);
+    assertEquals(doc0.get("clicks"), 10);
+    assertEquals(doc0.get("rare_key"), "val");
+  }
+
+  @Test
+  public void testGetMapValueSparseOnlyNullDoc() {
+    DataSource sparseDs = mockSparseDataSource("{\"rare_key\":\"val\"}", true);
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), Map.of(), sparseDs, 2);
+
+    // doc 1: sparse is null
+    Map<String, Object> doc1 = ds.getMapValue(1);
+    assertNull(doc1);
+  }
+
+  @Test
+  public void testGetMapValueEmptySegment() {
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), Map.of(), null, 0);
+
+    assertNull(ds.getMapValue(0));
   }
 }

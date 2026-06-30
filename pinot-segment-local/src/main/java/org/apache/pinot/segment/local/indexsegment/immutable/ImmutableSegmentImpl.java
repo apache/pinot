@@ -137,6 +137,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       for (String parent : openStructParents) {
         FieldSpec fieldSpec = schema != null ? schema.getFieldSpecFor(parent) : null;
         if (!(fieldSpec instanceof ComplexFieldSpec)) {
+          LOGGER.warn("Skipping OPEN_STRUCT parent column '{}': schema is {} or fieldSpec is {} "
+                  + "(expected ComplexFieldSpec). Dense/sparse child data on disk will not be queryable.",
+              parent, schema != null ? "present" : "null",
+              fieldSpec != null ? fieldSpec.getClass().getSimpleName() : "null");
           continue;
         }
         _dataSources.put(parent, new ImmutableOpenStructDataSource((ComplexFieldSpec) fieldSpec,
