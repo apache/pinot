@@ -37,6 +37,9 @@ image:
   tag: latest # 1.0.0, 0.12.1, latest
   pullPolicy: Always # Use IfNotPresent when you pinged a version of image tag
 
+controllerImage: {}
+brokerImage: {}
+serverImage: {}
 minionImage: {}
 
 cluster:
