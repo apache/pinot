@@ -341,6 +341,13 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     if (_resultType != null) {
       return;
     }
+    // Inspect the logical type first so a UUID column reports ColumnDataType.UUID (and the broker renders canonical
+    // RFC-4122 strings) rather than collapsing to BYTES (which would render hex). All other dispatch keys off the
+    // stored type, matching the BYTES/STRING storage convention.
+    if (bvs.getValueType() == FieldSpec.DataType.UUID) {
+      _resultType = ColumnDataType.UUID;
+      return;
+    }
     switch (bvs.getValueType().getStoredType()) {
       case INT:
         _resultType = ColumnDataType.INT;
