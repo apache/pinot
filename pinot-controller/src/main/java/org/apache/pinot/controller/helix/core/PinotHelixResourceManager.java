@@ -61,6 +61,7 @@ import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
@@ -99,6 +100,7 @@ import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
+import org.apache.pinot.common.exception.TableConfigVersionConflictException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -2497,9 +2499,27 @@ public class PinotHelixResourceManager {
    */
   public void updateTableConfig(TableConfig tableConfig, boolean force)
       throws IOException, TableConfigBackwardIncompatibleException {
+    updateTableConfig(tableConfig, -1, force);
+  }
+
+  /// Validate the table config and update it with a version-checked CAS write. Callers that pre-read the stored
+  /// config (e.g. the deprecation-validator diff path) can pass the version they observed so a concurrent write
+  /// fails the CAS rather than silently overwriting the other writer's changes.
+  ///
+  /// @param tableConfig the table config to update
+  /// @param expectedVersion the expected ZK znode version, or -1 to skip the version check
+  /// @param force if true, allows upsert/dedup config changes with a warning
+  /// @throws IOException if validation fails
+  /// @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
+  /// @throws TableConfigVersionConflictException (unchecked) if expectedVersion is set and a concurrent writer
+  ///         bumped or deleted the znode between the caller's read and this write. Callers SHOULD surface this
+  ///         as HTTP 409 CONFLICT so the client can re-read and retry. Unchecked to preserve the prior binary
+  ///         contract of `updateTableConfig(TableConfig, boolean)` for external callers.
+  public void updateTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
+      throws IOException, TableConfigBackwardIncompatibleException {
     validateTableTenantConfig(tableConfig);
     validateTableTaskMinionInstanceTagConfig(tableConfig);
-    setExistingTableConfig(tableConfig, -1, force);
+    setExistingTableConfig(tableConfig, expectedVersion, force);
   }
 
   /**
@@ -2619,11 +2639,51 @@ public class PinotHelixResourceManager {
    * @param expectedVersion the expected version (-1 to ignore version check)
    * @param force if true, allows upsert/dedup config changes with a warning
    * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
+   * @throws TableConfigVersionConflictException (unchecked) if expectedVersion is set (non-negative) and the CAS
+   *         write fails because a concurrent writer bumped the znode version or deleted the znode. Callers SHOULD
+   *         surface this as HTTP 409 so the client can re-read and retry. Differentiated from a generic ZK error
+   *         so REST callers do not have to parse exception messages. Unchecked to preserve binary compatibility
+   *         with pre-existing callers compiled against the prior signature.
    */
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
       throws TableConfigBackwardIncompatibleException {
     String tableNameWithType = tableConfig.getTableName();
-    TableConfig existingTableConfig = getTableConfig(tableNameWithType);
+    /// In CAS mode (expectedVersion >= 0) the pre-flight read serves two purposes:
+    ///   (1) Optimisation: short-circuit to TableConfigVersionConflictException when this read already shows the
+    ///       znode is past expectedVersion. The atomicity-essential CAS happens at ZKMetadataProvider.setTableConfig
+    ///       below — a concurrent writer landing between this read and that write will still be caught by the
+    ///       write-time CAS. The early throw avoids running back-compat validation against a snapshot we already
+    ///       know is doomed to fail the CAS, and gives the caller a precise 409 rather than a misleading 400.
+    ///   (2) Single-snapshot consistency: feed the SAME (existingConfig, statV) snapshot into the back-compat
+    ///       validation that follows. Doing two independent reads (one here for the version, one via
+    ///       getTableConfig() below) opened a window where back-compat ran against a fresher snapshot than the
+    ///       caller's expectedVersion intent. Reusing the pair keeps a single TableConfig instance driving both
+    ///       decisions on the in-method evaluation; the write-time CAS remains the only atomicity boundary.
+    /// In non-CAS mode (expectedVersion == -1) the legacy `getTableConfig(tableNameWithType)` path is retained
+    /// for back-compat with existing callers (PinotDdlRestletResource, RealtimeOffsetAutoResetKafkaHandler, etc.)
+    /// that do not pre-read a version.
+    TableConfig existingTableConfig;
+    if (expectedVersion >= 0) {
+      ImmutablePair<TableConfig, Stat> withStat =
+          ZKMetadataProvider.getTableConfigWithStat(_propertyStore, tableNameWithType);
+      if (withStat == null) {
+        /// Concurrent-delete race: caller pre-read the znode at version `expectedVersion`, then a concurrent
+        /// deleter removed it before we got here. Distinguish from a regular version-mismatch so the message
+        /// says "deleted" rather than "modified". This avoids the controller silently re-creating the table at
+        /// expectedVersion (Lazarus pattern) when the operator's intent was to delete it.
+        throw new TableConfigVersionConflictException(
+            "Table config for " + tableNameWithType + " was deleted concurrently (expected version "
+                + expectedVersion + "); re-create the table explicitly or abort the update");
+      }
+      if (withStat.getRight().getVersion() != expectedVersion) {
+        throw new TableConfigVersionConflictException(
+            "Table config for " + tableNameWithType + " was modified by a concurrent writer (expected version "
+                + expectedVersion + ", current " + withStat.getRight().getVersion() + ")");
+      }
+      existingTableConfig = withStat.getLeft();
+    } else {
+      existingTableConfig = getTableConfig(tableNameWithType);
+    }
     if (existingTableConfig != null) {
       List<String> violations = TableConfigUtils.validateBackwardCompatibility(tableConfig, existingTableConfig);
       if (!violations.isEmpty()) {
@@ -2642,6 +2702,14 @@ public class PinotHelixResourceManager {
     }
 
     if (!ZKMetadataProvider.setTableConfig(_propertyStore, tableConfig, expectedVersion)) {
+      /// Disambiguate CAS-conflict (concurrent writer bumped the znode version) from a generic ZK failure so
+      /// callers can return HTTP 409 with retry guidance instead of a 500. expectedVersion < 0 means "no version
+      /// check requested" — any failure in that mode is treated as a generic ZK error.
+      if (expectedVersion >= 0) {
+        throw new TableConfigVersionConflictException(
+            "Table config for " + tableNameWithType + " was modified by a concurrent writer (expected version "
+                + expectedVersion + ")");
+      }
       throw new RuntimeException(
           "Failed to update table config in Zookeeper for table: " + tableNameWithType + " with" + " expected version: "
               + expectedVersion);
