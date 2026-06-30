@@ -313,11 +313,30 @@ public class VectorIndexHandler extends BaseIndexHandler {
   /// HNSW-specific extract: streams the combined HNSW payload from {@code columns.psf} to a temp
   /// file, unpacks it into a Lucene directory, and only then removes the consolidated typed entry.
   ///
-  /// **Ordering rationale:** unpack runs *before* {@code removeIndex}. If the unpack
+  /// **Ordering rationale:** the bytes are unpacked *before* {@code removeIndex}. If the unpack
   /// fails mid-way, the typed entry is still present in {@code columns.psf} and the next load
   /// retries the extract — the operator does not lose the index. The reverse order would leave a
   /// crash window in which the typed entry is gone but the Lucene directory does not yet exist,
   /// leaving the segment permanently without its HNSW index until a full rebuild.
+  ///
+  /// **Why unpack into a temp directory, then move:** {@code SingleFileIndexDirectory.removeIndex}
+  /// for vector runs {@link VectorIndexUtils#cleanupVectorIndex(File, String)} as a side effect,
+  /// which {@code deleteQuietly}s a fixed list of exact {@code column + <extension>} paths — one of
+  /// which is the legacy {@code .vector.v912.hnsw.index} directory we are recreating. Unpacking
+  /// straight into that final directory would let the {@code removeIndex} below wipe the bytes we
+  /// just wrote. So we unpack into a temp directory and move it into place after cleanup. This is
+  /// the same temp-then-rename shape the IVF extract path ({@link #extractConsolidatedToLegacyFile})
+  /// uses for the same reason. **Invariant:** the temp name must never equal any
+  /// {@code column + <extension>} that {@code cleanupVectorIndex} deletes — keep the
+  /// {@code .extract-tmp*} suffixes out of {@link VectorIndexUtils#cleanupVectorIndex} if extensions
+  /// are ever added there.
+  ///
+  /// **Crash windows:** the typed entry's removal is only persisted on {@code close()}, so a crash
+  /// between {@code removeIndex} and the move still leaves the entry in {@code columns.psf} and the
+  /// next load retries the extract. A crash *after* the move but before {@code close()} leaves the
+  /// Lucene directory in place (usable) plus an orphan typed entry in {@code columns.psf}; the
+  /// {@code storeInSegmentFile=false} reader path uses the directory and ignores the orphan, so this
+  /// is a harmless leak of consolidated bytes, not data loss or a wrong result.
   private void extractHnswConsolidatedToDirectory(SegmentDirectory.Writer segmentWriter, String column,
       File v3Dir, String segmentName)
       throws IOException {
@@ -334,32 +353,49 @@ public class VectorIndexHandler extends BaseIndexHandler {
           + ". Refusing to proceed — please remove the conflicting file manually.");
     }
     File tempCombined = new File(v3Dir, column + ".vector.extract-tmp");
+    // Temp unpack directory; this exact name is deliberately not one of the column+extension paths
+    // cleanupVectorIndex (run by removeIndex below) deletes, so it is left untouched.
+    File tempHnswDir = new File(v3Dir, column + ".vector.hnsw.extract-tmp-dir");
+    // Clean leftovers from a previously-crashed extract (deleteQuietly recurses into directories).
     FileUtils.deleteQuietly(tempCombined);
+    FileUtils.deleteQuietly(tempHnswDir);
 
     LOGGER.info(
         "Extracting HNSW consolidated entry to Lucene directory for segment: {}, column: {}", segmentName, column);
     PinotDataBuffer buffer = segmentWriter.getIndexFor(column, StandardIndexes.vector());
     streamBufferToFile(buffer, buffer.size(), tempCombined);
 
-    // Unpack the combined file back into a Lucene directory BEFORE removing the typed entry. If
-    // unpack throws, the typed entry remains in columns.psf and the next handler run retries —
-    // no permanent loss. Best-effort clean up the half-unpacked directory so the retry's
-    // pre-flight directory-exists check still fires.
+    // Unpack the combined file into the TEMP directory BEFORE removing the typed entry. If unpack
+    // throws, the typed entry remains in columns.psf and the next handler run retries — no
+    // permanent loss. Best-effort clean up the half-unpacked temp directory.
     try {
-      HnswVectorIndexCombined.extractHnswIndexFiles(tempCombined, hnswDir);
+      HnswVectorIndexCombined.extractHnswIndexFiles(tempCombined, tempHnswDir);
     } catch (IOException | RuntimeException e) {
-      if (hnswDir.exists()) {
-        FileUtils.deleteQuietly(hnswDir);
-      }
+      FileUtils.deleteQuietly(tempHnswDir);
       FileUtils.deleteQuietly(tempCombined);
       throw e;
     }
 
-    // Unpack succeeded — the bytes are now on disk in legacy form. Remove the consolidated entry.
-    // If this throws, the segment ends up with BOTH forms; the reader factory's file-backed path
-    // (flag=false) uses the Lucene directory and ignores the orphan typed entry until the next
-    // handler run cleans it.
+    // Drop the consolidated entry. cleanupVectorIndex runs as a side effect but only deletes the
+    // fixed column+extension paths, not our temp directory, so the unpacked bytes survive.
     segmentWriter.removeIndex(column, StandardIndexes.vector());
+
+    // Move the unpacked Lucene directory into its final legacy location AFTER cleanup so it is not
+    // deleted. tempHnswDir and hnswDir share v3Dir, so this is an in-directory rename; the
+    // copy-and-delete fallback covers the rare case where rename fails.
+    try {
+      FileUtils.moveDirectory(tempHnswDir, hnswDir);
+    } catch (IOException e) {
+      try {
+        FileUtils.copyDirectory(tempHnswDir, hnswDir);
+      } catch (IOException copyError) {
+        // Clean the partial copy so the retry's pre-flight directory-exists check is not tripped.
+        FileUtils.deleteQuietly(hnswDir);
+        copyError.addSuppressed(e);
+        throw copyError;
+      }
+      FileUtils.deleteQuietly(tempHnswDir);
+    }
     FileUtils.deleteQuietly(tempCombined);
   }
 

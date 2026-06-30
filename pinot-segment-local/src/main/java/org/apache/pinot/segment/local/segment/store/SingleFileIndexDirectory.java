@@ -79,6 +79,13 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private static final long MAGIC_MARKER = 0xdeadbeefdeafbeadL;
   private static final int MAGIC_MARKER_SIZE_BYTES = 8;
 
+  /// Prefix of the {@link RuntimeException} message thrown when a requested index is absent from the
+  /// segment directory. Single source of truth: {@link FilePerIndexDirectory} reuses it for the same
+  /// signal, and {@code VectorIndexUtils#getConsolidatedVectorEntry} matches against it (in the same
+  /// package) to distinguish "no consolidated entry yet" from a genuine failure. Keep them wired to
+  /// this constant rather than re-typing the literal so the produce/match sides cannot drift apart.
+  static final String INDEX_NOT_FOUND_MESSAGE_PREFIX = "Could not find index for column";
+
   // Max size of buffer we want to allocate
   // ByteBuffer limits the size to 2GB - (some platform dependent size)
   // This breaks the abstraction with PinotDataBuffer....a workaround for
@@ -175,7 +182,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     IndexEntry entry = _columnEntries.get(key);
     if (entry == null || entry._buffer == null) {
       throw new RuntimeException(
-          "Could not find index for column: " + column + ", type: " + type + ", segment: " + _segmentDirectory
+          INDEX_NOT_FOUND_MESSAGE_PREFIX + ": " + column + ", type: " + type + ", segment: " + _segmentDirectory
               .toString());
     }
     return entry._buffer;

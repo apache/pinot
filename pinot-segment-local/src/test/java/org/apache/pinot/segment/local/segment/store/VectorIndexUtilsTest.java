@@ -23,12 +23,19 @@ import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -144,6 +151,70 @@ public class VectorIndexUtilsTest {
         VectorSimilarityFunction.EUCLIDEAN);
     Assert.assertEquals(VectorIndexUtils.toSimilarityFunction(VectorIndexConfig.VectorDistanceFunction.L2),
         VectorSimilarityFunction.EUCLIDEAN);
+  }
+
+  @Test
+  public void testGetConsolidatedVectorEntryReturnsNullWhenEntryMissing()
+      throws IOException {
+    SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+    // Real "absent typed entry" signal, built from the shared prefix the store classes throw.
+    when(reader.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector())))
+        .thenThrow(new RuntimeException(
+            SingleFileIndexDirectory.INDEX_NOT_FOUND_MESSAGE_PREFIX + ": " + COLUMN + ", type: vector"));
+    Assert.assertNull(VectorIndexUtils.getConsolidatedVectorEntry(reader, COLUMN),
+        "missing typed entry must map to null");
+  }
+
+  @Test
+  public void testGetConsolidatedVectorEntryRethrowsUnexpectedRuntimeException()
+      throws IOException {
+    SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+    // A non-"absent" RuntimeException (e.g. corruption) must propagate, not be masked as absent.
+    when(reader.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector())))
+        .thenThrow(new RuntimeException("Inconsistent data read. Index data file is possibly corrupted"));
+    try {
+      VectorIndexUtils.getConsolidatedVectorEntry(reader, COLUMN);
+      Assert.fail("corruption RuntimeException must propagate, not be swallowed as 'absent'");
+    } catch (RuntimeException expected) {
+      Assert.assertTrue(expected.getMessage().contains("possibly corrupted"),
+          "original error must be preserved; got: " + expected.getMessage());
+    }
+  }
+
+  @Test
+  public void testGetConsolidatedVectorEntryReturnsBufferWhenPresent()
+      throws IOException {
+    SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+    PinotDataBuffer buffer = PinotDataBuffer.empty();
+    when(reader.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector()))).thenReturn(buffer);
+    Assert.assertSame(VectorIndexUtils.getConsolidatedVectorEntry(reader, COLUMN), buffer,
+        "present typed entry must be returned as-is");
+  }
+
+  /**
+   * The HNSW extract path unpacks into temp artifacts ({@code .vector.extract-tmp},
+   * {@code .vector.hnsw.extract-tmp-dir}) and relies on {@code removeIndex} → {@code cleanupVectorIndex}
+   * NOT deleting them. Pin that invariant against the real cleanup, independent of the handler's stub.
+   */
+  @Test
+  public void testCleanupVectorIndexLeavesExtractTempArtifacts()
+      throws IOException {
+    // A recognised artifact that cleanup must delete (modelling the legacy Lucene directory as a dir).
+    File hnswDir = new File(_tempDir, COLUMN + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(hnswDir.mkdir());
+    FileUtils.touch(new File(hnswDir, "segments_1"));
+    // Temp artifacts the extract path uses; their names are not in cleanup's delete list.
+    File tempFile = new File(_tempDir, COLUMN + ".vector.extract-tmp");
+    FileUtils.touch(tempFile);
+    File tempDir = new File(_tempDir, COLUMN + ".vector.hnsw.extract-tmp-dir");
+    Assert.assertTrue(tempDir.mkdir());
+    FileUtils.touch(new File(tempDir, "segments_1"));
+
+    VectorIndexUtils.cleanupVectorIndex(_tempDir, COLUMN);
+
+    Assert.assertFalse(hnswDir.exists(), "recognised legacy HNSW directory must be deleted");
+    Assert.assertTrue(tempFile.exists(), "temp extract file must survive cleanup");
+    Assert.assertTrue(tempDir.isDirectory(), "temp extract directory must survive cleanup");
   }
 
   private void touch(String fileName)

@@ -226,6 +226,13 @@ public final class HnswVectorIndexCombined {
           long srcOffset = fileOffsets[i];
           while (remaining > 0) {
             long transferred = inputChannel.transferTo(srcOffset, remaining, outChannel);
+            if (transferred <= 0) {
+              // transferTo returns 0 when srcOffset is at/after EOF (corrupt offsets/sizes in the
+              // header). Bail out instead of spinning forever on a malformed combined file.
+              throw new IOException("Truncated or corrupt combined HNSW file: expected " + fileSize
+                  + " bytes for " + fileNames[i] + " at offset " + fileOffsets[i] + " but " + remaining
+                  + " bytes remain unreadable in " + combinedFile);
+            }
             srcOffset += transferred;
             remaining -= transferred;
           }
