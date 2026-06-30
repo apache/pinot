@@ -41,13 +41,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * Arrow memory (operators, mailbox services, etc.) receives this object by constructor injection and asks
  * it for a per-query child allocator via {@link #newQueryAllocator(String)}.
  *
- * <h2>Why not a singleton?</h2>
- *
- * Each Pinot component (server, broker) creates exactly one {@code ArrowBuffers} instance at startup and
- * closes it at shutdown. Passing it explicitly — rather than using a {@code getInstance()} global — keeps
- * the dependency visible, makes tests trivial (create a fresh instance per test), and avoids the usual
- * singleton problems (hidden state, initialization order, leaks between test runs).
- *
  * <h2>Child allocator tree</h2>
  *
  * Arrow organizes memory as a tree. The root has a total budget; children carve out sub-budgets:
@@ -92,6 +85,10 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * unique names.
  */
 public class ArrowBuffers implements AutoCloseable {
+  // Conservative default Arrow memory budget — applied to both the JVM-wide root limit and the per-query
+  // child ceiling when neither is configured.
+  private static final long DEFAULT_ALLOCATOR_LIMIT_BYTES = 1024L * 1024 * 1024;
+
   private final boolean _enabled;
 
   // Process-wide Arrow allocator. Parent of every per-query child allocator. Its limit is the total
@@ -140,11 +137,12 @@ public class ArrowBuffers implements AutoCloseable {
       // Disabled: build a zero-sized root so fields stay non-null, but allocator methods will throw.
       return new ArrowBuffers(false, new RootAllocator(0), 0, Long.MAX_VALUE);
     }
-    long limit = config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_MAX_SIZE, Long.MAX_VALUE);
+    long limit =
+        config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_MAX_SIZE, DEFAULT_ALLOCATOR_LIMIT_BYTES);
     long initialReservation =
         config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_INITIAL_RESERVATION, 0L);
-    long childLimit =
-        config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_CHILD_LIMIT, Long.MAX_VALUE);
+    long childLimit = config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_CHILD_LIMIT,
+        DEFAULT_ALLOCATOR_LIMIT_BYTES);
     return new ArrowBuffers(true, new RootAllocator(limit), initialReservation, childLimit);
   }
 
