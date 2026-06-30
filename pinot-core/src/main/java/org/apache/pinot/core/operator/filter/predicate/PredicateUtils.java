@@ -32,8 +32,10 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 public class PredicateUtils {
@@ -53,6 +55,10 @@ public class PredicateUtils {
         return getStoredBooleanValue(value);
       case TIMESTAMP:
         return getStoredTimestampValue(value);
+      case UUID:
+        // UUID values in range predicates are UUID strings (e.g. "550e8400-...").
+        // BYTES dictionaries store raw bytes and look up entries via hex-encoded strings.
+        return BytesUtils.toHexString(UuidUtils.toBytes(value));
       default:
         return value;
     }
@@ -179,6 +185,15 @@ public class PredicateUtils {
       case BYTES:
         ByteArray[] bytesValues = inPredicate.getBytesValues();
         for (ByteArray value : bytesValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case UUID:
+        ByteArray[] uuidValues = inPredicate.getUuidValues();
+        for (ByteArray value : uuidValues) {
           int dictId = dictionary.indexOf(value);
           if (dictId >= 0) {
             dictIdSet.add(dictId);

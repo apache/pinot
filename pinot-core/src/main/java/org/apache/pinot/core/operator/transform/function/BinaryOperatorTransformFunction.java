@@ -110,15 +110,16 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     DataType leftDataType = _leftTransformFunction.getResultMetadata().getDataType();
+    DataType rightDataType = _rightTransformFunction.getResultMetadata().getDataType();
     _leftStoredType = leftDataType.getStoredType();
-    _rightStoredType = _rightTransformFunction.getResultMetadata().getDataType().getStoredType();
+    _rightStoredType = rightDataType.getStoredType();
 
     // Data type check: left and right types should be compatible.
     if (_leftStoredType == DataType.BYTES || _rightStoredType == DataType.BYTES) {
       Preconditions.checkState(_leftStoredType == _rightStoredType, String.format(
           "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform "
-              + "Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
-          _rightTransformFunction.getName(), _rightStoredType));
+              + "Function [%s] result type is [%s]]", getTransformFunctionDisplayName(_leftTransformFunction),
+          _leftStoredType, getTransformFunctionDisplayName(_rightTransformFunction), _rightStoredType));
     }
 
     // Create predicate evaluator when the right side is a literal
@@ -697,8 +698,15 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private IllegalStateException illegalState() {
     throw new IllegalStateException(String.format(
         "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
-            + "Transform Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
-        _rightTransformFunction.getName(), _rightStoredType));
+            + "Transform Function [%s] result type is [%s]]", getTransformFunctionDisplayName(_leftTransformFunction),
+        _leftStoredType, getTransformFunctionDisplayName(_rightTransformFunction), _rightStoredType));
+  }
+
+  private static String getTransformFunctionDisplayName(TransformFunction transformFunction) {
+    if (transformFunction instanceof IdentifierTransformFunction) {
+      return ((IdentifierTransformFunction) transformFunction).getColumnName();
+    }
+    return transformFunction.getName();
   }
 
   private void fillResultString(ValueBlock valueBlock, int length) {
@@ -712,8 +720,10 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillResultBytes(ValueBlock valueBlock, int length) {
     byte[][] leftBytesValues = _leftTransformFunction.transformToBytesValuesSV(valueBlock);
     byte[][] rightBytesValues = _rightTransformFunction.transformToBytesValuesSV(valueBlock);
+    // ByteArray.compare is unsigned byte-wise lexicographic; for canonical 16-byte big-endian UUIDs this is
+    // equivalent to UuidUtils.compare's unsigned 64-bit-word ordering, so a single comparator handles both.
     for (int i = 0; i < length; i++) {
-      _intValuesSV[i] = getIntResult((ByteArray.compare(leftBytesValues[i], rightBytesValues[i])));
+      _intValuesSV[i] = getIntResult(ByteArray.compare(leftBytesValues[i], rightBytesValues[i]));
     }
   }
 
