@@ -23,6 +23,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
+import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -200,5 +208,83 @@ public class DataTypeTransformerTest {
       // Expected
     }
     assertEqualsNoOrder((Object[]) DataTypeTransformerUtils.standardize(COLUMN, values, false), expectedValues);
+  }
+
+  /**
+   * Verifies that non-canonical (uppercase) UUID strings in upsert/dedup primary key columns are rejected,
+   * while canonical lowercase UUIDs are accepted, and non-primary-key UUID columns are unaffected.
+   */
+  @Test
+  public void testUuidUpsertPrimaryKeyCanonicalValidation() {
+    String uuidCol = "uuidPk";
+    String nonPkUuidCol = "uuidOther";
+    String canonicalUuid = "550e8400-e29b-41d4-a716-446655440000";
+    String uppercaseUuid = "550E8400-E29B-41D4-A716-446655440000";
+
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(uuidCol, FieldSpec.DataType.UUID)
+        .addSingleValueDimension(nonPkUuidCol, FieldSpec.DataType.UUID)
+        .setPrimaryKeyColumns(List.of(uuidCol))
+        .build();
+    TableConfig upsertTableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testUpsertUuid")
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .build();
+
+    DataTypeTransformer upsertTransformer = new DataTypeTransformer(upsertTableConfig, schema);
+
+    // Canonical lowercase UUID primary key: accepted
+    GenericRow canonicalRow = new GenericRow();
+    canonicalRow.putValue(uuidCol, canonicalUuid);
+    canonicalRow.putValue(nonPkUuidCol, canonicalUuid);
+    upsertTransformer.transform(canonicalRow); // must not throw
+
+    // Non-canonical uppercase UUID primary key: rejected
+    GenericRow uppercaseRow = new GenericRow();
+    uppercaseRow.putValue(uuidCol, uppercaseUuid);
+    uppercaseRow.putValue(nonPkUuidCol, canonicalUuid);
+    try {
+      upsertTransformer.transform(uppercaseRow);
+      fail("Expected RuntimeException for non-canonical UUID primary key in upsert table");
+    } catch (RuntimeException e) {
+      // Expected: DataTypeTransformer wraps the IllegalArgumentException in a RuntimeException
+    }
+
+    // Non-canonical uppercase UUID in a NON-primary-key column: accepted (no restriction)
+    GenericRow nonPkUppercaseRow = new GenericRow();
+    nonPkUppercaseRow.putValue(uuidCol, canonicalUuid);
+    nonPkUppercaseRow.putValue(nonPkUuidCol, uppercaseUuid);
+    upsertTransformer.transform(nonPkUppercaseRow); // must not throw
+
+    // For a non-upsert table, non-canonical UUID in primary-key column is also accepted
+    TableConfig offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testOfflineUuid").build();
+    DataTypeTransformer offlineTransformer = new DataTypeTransformer(offlineTableConfig, schema);
+    GenericRow offlineUppercaseRow = new GenericRow();
+    offlineUppercaseRow.putValue(uuidCol, uppercaseUuid);
+    offlineUppercaseRow.putValue(nonPkUuidCol, uppercaseUuid);
+    offlineTransformer.transform(offlineUppercaseRow); // must not throw
+
+    // A present-but-disabled upsert config (Mode.NONE) must not enforce the canonical-PK restriction
+    TableConfig disabledUpsertTableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testDisabledUpsertUuid")
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.NONE))
+        .build();
+    DataTypeTransformer disabledUpsertTransformer = new DataTypeTransformer(disabledUpsertTableConfig, schema);
+    GenericRow disabledUpsertUppercaseRow = new GenericRow();
+    disabledUpsertUppercaseRow.putValue(uuidCol, uppercaseUuid);
+    disabledUpsertUppercaseRow.putValue(nonPkUuidCol, canonicalUuid);
+    disabledUpsertTransformer.transform(disabledUpsertUppercaseRow); // must not throw
+
+    // A present-but-disabled dedup config must not enforce the canonical-PK restriction either
+    TableConfig disabledDedupTableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testDisabledDedupUuid")
+        .setDedupConfig(new DedupConfig(false, null))
+        .build();
+    DataTypeTransformer disabledDedupTransformer = new DataTypeTransformer(disabledDedupTableConfig, schema);
+    GenericRow disabledDedupUppercaseRow = new GenericRow();
+    disabledDedupUppercaseRow.putValue(uuidCol, uppercaseUuid);
+    disabledDedupUppercaseRow.putValue(nonPkUuidCol, canonicalUuid);
+    disabledDedupTransformer.transform(disabledDedupUppercaseRow); // must not throw
   }
 }
