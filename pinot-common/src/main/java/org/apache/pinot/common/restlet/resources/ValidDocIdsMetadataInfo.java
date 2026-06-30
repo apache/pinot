@@ -63,12 +63,12 @@ public class ValidDocIdsMetadataInfo {
     _totalInvalidDocs = totalInvalidDocs;
     _totalDocs = totalDocs;
     _segmentCrc = segmentCrc;
+    _segmentDataCrc = segmentDataCrc;
     _validDocIdsType = validDocIdsType;
     _segmentSizeInBytes = segmentSizeInBytes;
     _segmentCreationTimeMillis = segmentCreationTimeMillis;
     _instanceId = instanceId;
     _serverStatus = serverStatus;
-    _segmentDataCrc = segmentDataCrc;
   }
 
   public String getSegmentName() {

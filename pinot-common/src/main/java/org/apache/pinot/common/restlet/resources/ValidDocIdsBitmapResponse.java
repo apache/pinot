@@ -51,11 +51,11 @@ public class ValidDocIdsBitmapResponse {
       @JsonProperty("segmentDataCrc") @Nullable String segmentDataCrc) {
     _segmentName = segmentName;
     _segmentCrc = crc;
+    _segmentDataCrc = segmentDataCrc;
     _validDocIdsType = validDocIdsType;
     _bitmap = bitmap;
     _instanceId = instanceId;
     _serverStatus = serverStatus;
-    _segmentDataCrc = segmentDataCrc;
   }
 
   public String getSegmentName() {

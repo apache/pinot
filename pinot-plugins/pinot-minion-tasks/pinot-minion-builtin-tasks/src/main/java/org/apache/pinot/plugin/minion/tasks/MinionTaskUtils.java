@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
@@ -467,7 +468,7 @@ public class MinionTaskUtils {
       SegmentZKMetadata segmentZKMetadata, @Nullable List<ValidDocIdsMetadataInfo> replicas, int expectedReplicaCount,
       MinionConstants.ValidDocIdsConsensusMode consensusMode) {
     String segmentName = segmentZKMetadata.getSegmentName();
-    if (replicas == null || replicas.isEmpty()) {
+    if (CollectionUtils.isEmpty(replicas)) {
       return null;
     }
     boolean unsafe = consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE;

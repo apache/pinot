@@ -92,16 +92,14 @@ public class MinionConstants {
    */
   public static final String SEGMENT_DOWNLOAD_PARALLELISM = "segmentDownloadParallelism";
 
-  /** Valid doc ids consensus mode enforced by both the task generators (pre-scheduling) and the executors. */
+  /// Valid doc ids consensus mode enforced by both the task generators (pre-scheduling) and the executors.
   public enum ValidDocIdsConsensusMode {
     UNSAFE, EQUAL, MOST_VALID_DOCS
   }
 
-  /**
-   * Where validDocIds consensus is enforced. STRICT (default) runs the checks in both the task generator
-   * (pre-scheduling) and the executor; EXECUTOR_ONLY skips the generator-side checks and leaves the executor as the
-   * sole gate.
-   */
+  /// Where validDocIds consensus is enforced. STRICT (default) runs the checks in both the task generator
+  /// (pre-scheduling) and the executor; EXECUTOR_ONLY skips the generator-side checks and leaves the executor as the
+  /// sole gate.
   public enum ValidDocIdsValidationMode {
     STRICT, EXECUTOR_ONLY
   }
