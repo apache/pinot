@@ -456,12 +456,16 @@ public class StringFunctions {
 
   /**
    * @param input UUID serialized to bytes
-   * @return String representation of UUID
-   * returns bytes and null on exception
+   * @return canonical String representation of the UUID, or {@code null} if the input is null or not a valid
+   * 16-byte UUID (preserves the pre-existing null-on-exception contract).
    */
   @ScalarFunction
   public static String fromUUIDBytes(byte[] input) {
-    return UuidUtils.fromBytes(input).toString();
+    try {
+      return UuidUtils.toString(input);
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   /**
