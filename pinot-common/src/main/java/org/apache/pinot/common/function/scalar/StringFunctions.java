@@ -455,13 +455,12 @@ public class StringFunctions {
   }
 
   /**
-   * @param input UUID serialized to bytes
-   * @return String representation of UUID
-   * returns bytes and null on exception
+   * @param input UUID serialized to its 16-byte form
+   * @return canonical RFC 4122 String representation of the UUID
    */
   @ScalarFunction
   public static String fromUUIDBytes(byte[] input) {
-    return UuidUtils.fromBytes(input).toString();
+    return UuidUtils.toString(input);
   }
 
   /**
