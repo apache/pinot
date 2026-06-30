@@ -284,10 +284,6 @@ public class ServerSegmentMetadataReader {
       @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
       int numSegmentsBatchPerServerRequest) {
     List<Pair<String, String>> serverURLsAndBodies = new ArrayList<>();
-    // Expected replica count per segment, tallied from the server-to-segments assignment as we build the requests. A
-    // replica that fails to respond is simply absent from the metadata below, so callers compare the responder count
-    // against this to tell when not all replicas replied. Only segments passing the segmentNames filter are tallied,
-    // but every server hosting such a segment is counted, so each tallied count is exact.
     Map<String, Integer> segmentToExpectedReplicaCount = new HashMap<>();
     for (Map.Entry<String, List<String>> serverToSegments : serverToSegmentsMap.entrySet()) {
       List<String> segmentsForServer = serverToSegments.getValue();
