@@ -258,10 +258,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
     @Override
     public DataBlock visit(ArrowBlock block, List<DataBuffer> serializedStats) {
       // No operator currently produces ArrowBlocks, so the gRPC sender is never invoked with one.
-      // When ArrowBlocks start flowing to this mailbox, they should travel via Arrow Flight (zero-copy,
-      // allocator-to-allocator transfer) rather than being flattened through the gRPC DataBlock path.
+      // Phase 3 (wire protocol) turns this stub into the Arrow IPC path: the block's VectorSchemaRoot is
+      // serialized to Arrow IPC bytes and carried over the existing gRPC mailbox unchanged — one edge copy,
+      // not zero-copy. Arrow Flight (allocator-to-allocator zero-copy) is a deferred alternative.
       throw new UnsupportedOperationException(
-          "GrpcSendingMailbox does not support ArrowBlocks; Arrow transport will go via Flight");
+          "GrpcSendingMailbox does not yet support ArrowBlocks; Arrow IPC over gRPC lands in the wire phase");
     }
 
     @Override

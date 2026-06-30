@@ -20,7 +20,9 @@ package org.apache.pinot.query.runtime.blocks;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
@@ -32,9 +34,13 @@ import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.dictionary.Dictionary;
+import org.apache.arrow.vector.dictionary.DictionaryProvider.MapDictionaryProvider;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -48,7 +54,9 @@ import org.roaringbitmap.RoaringBitmap;
  * Converts a legacy {@link DataBlock} (row-heap or serialized columnar) into an {@link ArrowBlock}.
  *
  * <p>Each column is extracted using {@link DataBlockExtractUtils} and written column-by-column into the appropriate
- * Arrow vector. String columns are stored as plain {@code VarCharVector} (no dictionary encoding) for simplicity.
+ * Arrow vector. STRING/JSON columns are dictionary-encoded (an integer index vector plus a per-column dictionary
+ * held in a {@link MapDictionaryProvider}) so low-cardinality columns avoid storing repeated values; an all-distinct
+ * column falls back to a plain {@code VarCharVector} since a dictionary would only add overhead there.
  */
 public final class ArrowBlockConverter {
   private ArrowBlockConverter() {
@@ -81,23 +89,41 @@ public final class ArrowBlockConverter {
   public static ArrowBlock fromDataBlock(DataBlock dataBlock, DataSchema schema, BufferAllocator allocator) {
     int numRows = dataBlock.getNumberOfRows();
     int numCols = schema.size();
+    ColumnDataType[] columnTypes = schema.getColumnDataTypes();
     ColumnDataType[] storedTypes = schema.getStoredColumnDataTypes();
 
-    Schema arrowSchema = buildArrowSchema(schema);
-    VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, allocator);
-    // Close the root on any failure during population so partially-allocated off-heap buffers
-    // don't leak for the lifetime of the allocator.
+    // Build each column vector explicitly (rather than VectorSchemaRoot.create) so STRING/JSON columns can
+    // be dictionary-encoded. On any failure mid-build, close the vectors built so far and the dictionary
+    // provider so partially-allocated off-heap buffers don't leak for the lifetime of the allocator.
+    List<FieldVector> vectors = new ArrayList<>(numCols);
+    MapDictionaryProvider dictionaryProvider = new MapDictionaryProvider();
+    boolean success = false;
     try {
       for (int colId = 0; colId < numCols; colId++) {
-        FieldVector vector = root.getVector(colId);
         RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
-        writeColumn(dataBlock, vector, storedTypes[colId], colId, numRows, nullBitmap);
+        String columnName = schema.getColumnName(colId);
+        ColumnDataType columnType = columnTypes[colId];
+        if (columnType == ColumnDataType.STRING || columnType == ColumnDataType.JSON) {
+          vectors.add(buildStringColumn(dataBlock, columnName, colId, numRows, nullBitmap, dictionaryProvider,
+              allocator));
+        } else {
+          FieldVector vector = buildArrowField(columnName, columnType).createVector(allocator);
+          writeColumn(dataBlock, vector, storedTypes[colId], colId, numRows, nullBitmap);
+          vectors.add(vector);
+        }
       }
+      VectorSchemaRoot root = new VectorSchemaRoot(vectors);
       root.setRowCount(numRows);
-      return new ArrowBlock(new ArrowDataBlock(root, schema));
-    } catch (Throwable t) {
-      root.close();
-      throw t;
+      ArrowBlock block = new ArrowBlock(new ArrowDataBlock(root, schema, dictionaryProvider));
+      success = true;
+      return block;
+    } finally {
+      if (!success) {
+        for (FieldVector vector : vectors) {
+          vector.close();
+        }
+        dictionaryProvider.close();
+      }
     }
   }
 
@@ -168,15 +194,12 @@ public final class ArrowBlockConverter {
       case DOUBLE:
         writeDoubleColumn(dataBlock, (Float8Vector) vector, colId, numRows, nullBitmap);
         break;
-      case STRING:
-      case JSON:
-        writeStringColumn(dataBlock, (VarCharVector) vector, storedType, colId, numRows, nullBitmap);
-        break;
       case BYTES:
         writeBytesColumn(dataBlock, (VarBinaryVector) vector, colId, numRows, nullBitmap);
         break;
       default:
-        // Should never be reached — buildArrowField already rejects unsupported types.
+        // STRING/JSON are dictionary-encoded by buildStringColumn and never reach here; anything else was
+        // already rejected by buildArrowField.
         throw new UnsupportedOperationException("Arrow block conversion does not support type " + storedType);
     }
   }
@@ -184,11 +207,18 @@ public final class ArrowBlockConverter {
   private static void writeBitColumn(DataBlock dataBlock, BitVector vector, ColumnDataType storedType, int colId,
       int numRows, @Nullable RoaringBitmap nullBitmap) {
     int[] values = DataBlockExtractUtils.extractIntColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
-    for (int row = 0; row < numRows; row++) {
-      if (nullBitmap != null && nullBitmap.contains(row)) {
-        vector.setNull(row);
-      } else {
+    // Hoist the null check out of the loop so the no-null fast path is a tight, autovectorizable loop.
+    if (nullBitmap == null) {
+      for (int row = 0; row < numRows; row++) {
         vector.set(row, values[row]);
+      }
+    } else {
+      for (int row = 0; row < numRows; row++) {
+        if (nullBitmap.contains(row)) {
+          vector.setNull(row);
+        } else {
+          vector.set(row, values[row]);
+        }
       }
     }
     vector.setValueCount(numRows);
@@ -197,11 +227,18 @@ public final class ArrowBlockConverter {
   private static void writeIntColumn(DataBlock dataBlock, IntVector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
     int[] values = DataBlockExtractUtils.extractIntColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
-    for (int row = 0; row < numRows; row++) {
-      if (nullBitmap != null && nullBitmap.contains(row)) {
-        vector.setNull(row);
-      } else {
+    // Hoist the null check out of the loop so the no-null fast path is a tight, autovectorizable loop.
+    if (nullBitmap == null) {
+      for (int row = 0; row < numRows; row++) {
         vector.set(row, values[row]);
+      }
+    } else {
+      for (int row = 0; row < numRows; row++) {
+        if (nullBitmap.contains(row)) {
+          vector.setNull(row);
+        } else {
+          vector.set(row, values[row]);
+        }
       }
     }
     vector.setValueCount(numRows);
@@ -211,11 +248,18 @@ public final class ArrowBlockConverter {
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
     float[] values = DataBlockExtractUtils.extractFloatColumn(
         ColumnDataType.FLOAT.toDataType(), dataBlock, colId, nullBitmap);
-    for (int row = 0; row < numRows; row++) {
-      if (nullBitmap != null && nullBitmap.contains(row)) {
-        vector.setNull(row);
-      } else {
+    // Hoist the null check out of the loop so the no-null fast path is a tight, autovectorizable loop.
+    if (nullBitmap == null) {
+      for (int row = 0; row < numRows; row++) {
         vector.set(row, values[row]);
+      }
+    } else {
+      for (int row = 0; row < numRows; row++) {
+        if (nullBitmap.contains(row)) {
+          vector.setNull(row);
+        } else {
+          vector.set(row, values[row]);
+        }
       }
     }
     vector.setValueCount(numRows);
@@ -224,11 +268,18 @@ public final class ArrowBlockConverter {
   private static void writeLongColumn(DataBlock dataBlock, BigIntVector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
     long[] values = DataBlockExtractUtils.extractLongColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
-    for (int row = 0; row < numRows; row++) {
-      if (nullBitmap != null && nullBitmap.contains(row)) {
-        vector.setNull(row);
-      } else {
+    // Hoist the null check out of the loop so the no-null fast path is a tight, autovectorizable loop.
+    if (nullBitmap == null) {
+      for (int row = 0; row < numRows; row++) {
         vector.set(row, values[row]);
+      }
+    } else {
+      for (int row = 0; row < numRows; row++) {
+        if (nullBitmap.contains(row)) {
+          vector.setNull(row);
+        } else {
+          vector.set(row, values[row]);
+        }
       }
     }
     vector.setValueCount(numRows);
@@ -238,24 +289,120 @@ public final class ArrowBlockConverter {
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
     double[] values = DataBlockExtractUtils.extractDoubleColumn(
         ColumnDataType.DOUBLE.toDataType(), dataBlock, colId, nullBitmap);
-    for (int row = 0; row < numRows; row++) {
-      if (nullBitmap != null && nullBitmap.contains(row)) {
-        vector.setNull(row);
-      } else {
+    // Hoist the null check out of the loop so the no-null fast path is a tight, autovectorizable loop.
+    if (nullBitmap == null) {
+      for (int row = 0; row < numRows; row++) {
         vector.set(row, values[row]);
+      }
+    } else {
+      for (int row = 0; row < numRows; row++) {
+        if (nullBitmap.contains(row)) {
+          vector.setNull(row);
+        } else {
+          vector.set(row, values[row]);
+        }
       }
     }
     vector.setValueCount(numRows);
   }
 
-  private static void writeStringColumn(DataBlock dataBlock, VarCharVector vector, ColumnDataType storedType,
-      int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
-    String[] values = DataBlockExtractUtils.extractStringColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
+  /**
+   * Builds the Arrow vector for a STRING/JSON column. The column is dictionary-encoded — an integer index
+   * {@link IntVector} whose field carries a {@link DictionaryEncoding}, with the distinct values registered
+   * in {@code dictionaryProvider} under a per-column id ({@code colId}, unique within the block). An
+   * all-distinct (or all-null/empty) column is stored as a plain {@link VarCharVector} instead, since a
+   * dictionary would only add an index vector on top of the same values. Returns the vector to place in the
+   * {@link VectorSchemaRoot}; the read path branches on the field's encoding.
+   */
+  private static FieldVector buildStringColumn(DataBlock dataBlock, String name, int colId, int numRows,
+      @Nullable RoaringBitmap nullBitmap, MapDictionaryProvider dictionaryProvider, BufferAllocator allocator) {
+    String[] values =
+        DataBlockExtractUtils.extractStringColumn(ColumnDataType.STRING.toDataType(), dataBlock, colId, nullBitmap);
+
+    // Map each distinct non-null value to a dictionary index, in first-seen order.
+    Map<String, Integer> valueToIndex = new LinkedHashMap<>();
     for (int row = 0; row < numRows; row++) {
       if (nullBitmap != null && nullBitmap.contains(row)) {
-        vector.setNull(row);
+        continue;
+      }
+      valueToIndex.computeIfAbsent(values[row], k -> valueToIndex.size());
+    }
+    int distinct = valueToIndex.size();
+
+    if (distinct == numRows || distinct == 0) {
+      // All-distinct (dictionary is pure overhead) or all-null/empty: store a plain VarCharVector.
+      VarCharVector plain = new VarCharVector(name, allocator);
+      try {
+        plain.setInitialCapacity(numRows);
+        plain.allocateNew();
+        writeVarChar(plain, values, numRows, nullBitmap);
+        return plain;
+      } catch (Throwable t) {
+        plain.close();
+        throw t;
+      }
+    }
+
+    VarCharVector dictionaryVector = new VarCharVector(name + "_dict", allocator);
+    boolean dictionaryRegistered = false;
+    IntVector indices = null;
+    try {
+      dictionaryVector.setInitialCapacity(distinct);
+      dictionaryVector.allocateNew();
+      for (Map.Entry<String, Integer> entry : valueToIndex.entrySet()) {
+        dictionaryVector.setSafe(entry.getValue(), entry.getKey().getBytes(StandardCharsets.UTF_8));
+      }
+      dictionaryVector.setValueCount(distinct);
+
+      // colId is unique within the block, so each dictionary-encoded column gets a distinct dictionary id —
+      // this is what avoids the apache/pinot#18207 bug where every column shared dictionary id 0.
+      DictionaryEncoding encoding = new DictionaryEncoding(colId, false, new ArrowType.Int(32, true));
+      dictionaryProvider.put(new Dictionary(dictionaryVector, encoding));
+      dictionaryRegistered = true;
+
+      indices = (IntVector) new Field(name, new FieldType(true, new ArrowType.Int(32, true), encoding), null)
+          .createVector(allocator);
+      indices.allocateNew(numRows);
+      if (nullBitmap == null) {
+        for (int row = 0; row < numRows; row++) {
+          indices.set(row, valueToIndex.get(values[row]));
+        }
       } else {
+        for (int row = 0; row < numRows; row++) {
+          if (nullBitmap.contains(row)) {
+            indices.setNull(row);
+          } else {
+            indices.set(row, valueToIndex.get(values[row]));
+          }
+        }
+      }
+      indices.setValueCount(numRows);
+      return indices;
+    } catch (Throwable t) {
+      if (indices != null) {
+        indices.close();
+      }
+      // Once registered, the dictionary vector is owned by the provider and closed by the caller's cleanup.
+      if (!dictionaryRegistered) {
+        dictionaryVector.close();
+      }
+      throw t;
+    }
+  }
+
+  private static void writeVarChar(VarCharVector vector, String[] values, int numRows,
+      @Nullable RoaringBitmap nullBitmap) {
+    if (nullBitmap == null) {
+      for (int row = 0; row < numRows; row++) {
         vector.setSafe(row, values[row].getBytes(StandardCharsets.UTF_8));
+      }
+    } else {
+      for (int row = 0; row < numRows; row++) {
+        if (nullBitmap.contains(row)) {
+          vector.setNull(row);
+        } else {
+          vector.setSafe(row, values[row].getBytes(StandardCharsets.UTF_8));
+        }
       }
     }
     vector.setValueCount(numRows);
@@ -263,12 +410,17 @@ public final class ArrowBlockConverter {
 
   private static void writeBytesColumn(DataBlock dataBlock, VarBinaryVector vector, int colId,
       int numRows, @Nullable RoaringBitmap nullBitmap) {
-    for (int row = 0; row < numRows; row++) {
-      if (nullBitmap != null && nullBitmap.contains(row)) {
-        vector.setNull(row);
-      } else {
-        byte[] bytes = dataBlock.getBytes(row, colId).getBytes();
-        vector.setSafe(row, bytes);
+    if (nullBitmap == null) {
+      for (int row = 0; row < numRows; row++) {
+        vector.setSafe(row, dataBlock.getBytes(row, colId).getBytes());
+      }
+    } else {
+      for (int row = 0; row < numRows; row++) {
+        if (nullBitmap.contains(row)) {
+          vector.setNull(row);
+        } else {
+          vector.setSafe(row, dataBlock.getBytes(row, colId).getBytes());
+        }
       }
     }
     vector.setValueCount(numRows);

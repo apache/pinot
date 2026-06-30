@@ -333,6 +333,107 @@ public class ArrowBlockConverterTest {
     expectThrows(IllegalStateException.class, block::retain);
   }
 
+  @Test
+  public void testLowCardinalityStringColumnIsDictionaryEncoded() {
+    // 4 rows, 2 distinct values -> the stored column carries a DictionaryEncoding and decodes correctly.
+    DataSchema schema = new DataSchema(new String[]{"s"}, new ColumnDataType[]{ColumnDataType.STRING});
+    RowHeapDataBlock rowBlock = new RowHeapDataBlock(
+        rows(new Object[]{"a"}, new Object[]{"b"}, new Object[]{"a"}, new Object[]{"b"}), schema);
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    try {
+      assertNotNull(arrowBlock.getDataBlock().getRoot().getVector(0).getField().getDictionary(),
+          "low-cardinality string column must be dictionary-encoded");
+      DataBlock db = arrowBlock.getDataBlock();
+      assertEquals(db.getString(0, 0), "a");
+      assertEquals(db.getString(1, 0), "b");
+      assertEquals(db.getString(2, 0), "a");
+      assertEquals(db.getString(3, 0), "b");
+    } finally {
+      arrowBlock.release();
+    }
+  }
+
+  @Test
+  public void testAllDistinctStringColumnStoredPlain() {
+    // All values distinct -> a dictionary is pure overhead, so the column is stored as a plain VarCharVector.
+    DataSchema schema = new DataSchema(new String[]{"s"}, new ColumnDataType[]{ColumnDataType.STRING});
+    RowHeapDataBlock rowBlock = new RowHeapDataBlock(
+        rows(new Object[]{"a"}, new Object[]{"b"}, new Object[]{"c"}), schema);
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    try {
+      assertNull(arrowBlock.getDataBlock().getRoot().getVector(0).getField().getDictionary(),
+          "all-distinct string column must be stored plain (no dictionary)");
+      DataBlock db = arrowBlock.getDataBlock();
+      assertEquals(db.getString(0, 0), "a");
+      assertEquals(db.getString(1, 0), "b");
+      assertEquals(db.getString(2, 0), "c");
+    } finally {
+      arrowBlock.release();
+    }
+  }
+
+  @Test
+  public void testMultipleStringColumnsGetDistinctDictionaryIds() {
+    // Regression guard for apache/pinot#18207: two dictionary-encoded columns must use distinct dictionary
+    // ids, otherwise the second column would decode against the first column's dictionary.
+    DataSchema schema = new DataSchema(new String[]{"s1", "s2"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
+    RowHeapDataBlock rowBlock = new RowHeapDataBlock(rows(
+        new Object[]{"red", "circle"},
+        new Object[]{"green", "square"},
+        new Object[]{"red", "circle"}), schema);
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    try {
+      long id0 = arrowBlock.getDataBlock().getRoot().getVector(0).getField().getDictionary().getId();
+      long id1 = arrowBlock.getDataBlock().getRoot().getVector(1).getField().getDictionary().getId();
+      assertTrue(id0 != id1, "each dictionary-encoded column must have a distinct dictionary id");
+      DataBlock db = arrowBlock.getDataBlock();
+      assertEquals(db.getString(0, 0), "red");
+      assertEquals(db.getString(1, 0), "green");
+      assertEquals(db.getString(0, 1), "circle");
+      assertEquals(db.getString(1, 1), "square");
+      assertEquals(db.getString(2, 1), "circle");
+    } finally {
+      arrowBlock.release();
+    }
+  }
+
+  @Test
+  public void testDictionaryEncodedColumnNullsRoundTrip() {
+    DataSchema schema = new DataSchema(new String[]{"s"}, new ColumnDataType[]{ColumnDataType.STRING});
+    RowHeapDataBlock rowBlock = new RowHeapDataBlock(
+        rows(new Object[]{"a"}, new Object[]{null}, new Object[]{"a"}, new Object[]{"b"}), schema);
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    try {
+      assertNotNull(arrowBlock.getDataBlock().getRoot().getVector(0).getField().getDictionary());
+      DataBlock db = arrowBlock.getDataBlock();
+      assertEquals(db.getString(0, 0), "a");
+      assertNull(db.getString(1, 0));
+      assertEquals(db.getString(2, 0), "a");
+      assertEquals(db.getString(3, 0), "b");
+      RoaringBitmap nullIds = db.getNullRowIds(0);
+      assertNotNull(nullIds);
+      assertTrue(nullIds.contains(1));
+      assertFalse(nullIds.contains(0));
+    } finally {
+      arrowBlock.release();
+    }
+  }
+
+  @Test
+  public void testDictionaryBuffersFreedOnRelease() {
+    // The dictionary vectors are extra off-heap buffers on top of the index vector; releasing the block
+    // must free both, or the allocator close in tearDown would throw.
+    DataSchema schema = new DataSchema(new String[]{"s"}, new ColumnDataType[]{ColumnDataType.STRING});
+    RowHeapDataBlock rowBlock = new RowHeapDataBlock(
+        rows(new Object[]{"a"}, new Object[]{"b"}, new Object[]{"a"}), schema);
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    assertTrue(_allocator.getAllocatedMemory() > 0, "dictionary + index buffers must be allocated");
+    arrowBlock.release();
+    assertEquals(_allocator.getAllocatedMemory(), 0,
+        "releasing the block must free the index vector and the dictionary buffers");
+  }
+
   // ----- helpers -----
 
   private void assertUnsupported(ColumnDataType type, Object value, String typeNameInMessage) {

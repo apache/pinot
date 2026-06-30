@@ -26,14 +26,18 @@ import java.util.Map;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.BitVector;
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float4Vector;
 import org.apache.arrow.vector.Float8Vector;
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.dictionary.Dictionary;
+import org.apache.arrow.vector.dictionary.DictionaryProvider.MapDictionaryProvider;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -246,6 +250,45 @@ public class ArrowDataBlockTest {
         assertTrue(s.contains("\"numCols\": 4"));
       }
     }
+  }
+
+  @Test
+  public void testDictionaryEncodedStringColumnReadAndClose() {
+    // Build a dictionary-encoded STRING column manually: an integer index vector whose field carries a
+    // DictionaryEncoding, plus the distinct values in a dictionary vector held by a provider. Verify the
+    // 3-arg constructor decodes it and that close() frees both the index and the dictionary buffers.
+    DictionaryEncoding encoding = new DictionaryEncoding(7, false, new ArrowType.Int(32, true));
+    VarCharVector dictVector = new VarCharVector("s_dict", _allocator);
+    dictVector.allocateNew(2);
+    dictVector.setSafe(0, "x".getBytes(StandardCharsets.UTF_8));
+    dictVector.setSafe(1, "y".getBytes(StandardCharsets.UTF_8));
+    dictVector.setValueCount(2);
+    MapDictionaryProvider provider = new MapDictionaryProvider();
+    provider.put(new Dictionary(dictVector, encoding));
+
+    IntVector indices = (IntVector) new Field("s", new FieldType(true, new ArrowType.Int(32, true), encoding), null)
+        .createVector(_allocator);
+    indices.allocateNew(3);
+    indices.set(0, 0);     // -> "x"
+    indices.setNull(1);    // -> null
+    indices.set(2, 1);     // -> "y"
+    indices.setValueCount(3);
+
+    VectorSchemaRoot root = new VectorSchemaRoot(Arrays.asList((FieldVector) indices));
+    root.setRowCount(3);
+    DataSchema schema = new DataSchema(new String[]{"s"}, new ColumnDataType[]{ColumnDataType.STRING});
+
+    ArrowDataBlock block = new ArrowDataBlock(root, schema, provider);
+    assertEquals(block.getString(0, 0), "x");
+    assertNull(block.getString(1, 0));
+    assertEquals(block.getString(2, 0), "y");
+    RoaringBitmap nulls = block.getNullRowIds(0);
+    assertNotNull(nulls);
+    assertTrue(nulls.contains(1));
+    assertFalse(nulls.contains(0));
+
+    block.close();
+    assertEquals(_allocator.getAllocatedMemory(), 0, "dictionary + index buffers must be freed on close");
   }
 
   // ----- helpers -----

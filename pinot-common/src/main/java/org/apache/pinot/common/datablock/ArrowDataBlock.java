@@ -21,6 +21,7 @@ package org.apache.pinot.common.datablock;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +36,8 @@ import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.dictionary.DictionaryProvider.MapDictionaryProvider;
+import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.DataSchema;
@@ -47,13 +50,18 @@ import org.roaringbitmap.RoaringBitmap;
  * A {@link DataBlock} backed by an Apache Arrow {@link VectorSchemaRoot}.
  *
  * <p>Primitive types use their native Arrow vector types (e.g. {@code IntVector}, {@code BigIntVector}).
- * String columns are stored as plain {@code VarCharVector}.
+ * STRING/JSON columns are dictionary-encoded: the stored column is an integer index {@link IntVector}
+ * whose field carries a {@link DictionaryEncoding}, and the distinct values live in a separate dictionary
+ * vector held by {@code _dictionaryProvider}. High-cardinality (all-distinct) string columns fall back to
+ * a plain {@code VarCharVector} (no encoding); {@link #getString} branches on the field's encoding to read
+ * either layout.
  *
  * <p><b>Lifetime:</b> this is the low-level columnar container; block-level reference counting lives one
  * layer up on {@code org.apache.pinot.query.runtime.blocks.ArrowBlock}, which wraps this type for the
- * multi-stage runtime. {@link #close()} unconditionally frees the underlying {@link VectorSchemaRoot}
- * (which in turn decrements Arrow's buffer-level refcounts); it is the primitive that
- * {@code ArrowBlock.release()} invokes once its reference count reaches 0, and must be called at most once.
+ * multi-stage runtime. {@link #close()} unconditionally frees the underlying {@link VectorSchemaRoot} and
+ * the dictionary vectors (both of which decrement Arrow's buffer-level refcounts); it is the primitive
+ * that {@code ArrowBlock.release()} invokes once its reference count reaches 0, and must be called at
+ * most once.
  *
  * <p>{@link #getStringDictionary()}, {@link #getFixedData()}, and {@link #getVarSizeData()} throw
  * {@link UnsupportedOperationException} — they're part of {@link DataBlock}'s legacy abstraction that assumes
@@ -63,10 +71,19 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
   private final VectorSchemaRoot _root;
   private final Map<Integer, String> _errCodeToExceptionMap;
   private final DataSchema _dataSchema;
+  // Holds the dictionary vectors for any dictionary-encoded (STRING/JSON) columns; null when no column is
+  // dictionary-encoded. The dictionary vectors are off-heap and are freed by close().
+  @Nullable
+  private final MapDictionaryProvider _dictionaryProvider;
 
   public ArrowDataBlock(VectorSchemaRoot root, DataSchema schema) {
+    this(root, schema, null);
+  }
+
+  public ArrowDataBlock(VectorSchemaRoot root, DataSchema schema, @Nullable MapDictionaryProvider dictionaryProvider) {
     _root = root;
     _dataSchema = schema;
+    _dictionaryProvider = dictionaryProvider;
     _errCodeToExceptionMap = new HashMap<>();
   }
 
@@ -151,8 +168,21 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
 
   @Override
   public String getString(int rowId, int colId) {
-    Object value = ((VarCharVector) _root.getVector(colId)).getObject(rowId);
-    return value == null ? null : value.toString();
+    FieldVector vector = _root.getVector(colId);
+    DictionaryEncoding encoding = vector.getField().getDictionary();
+    if (encoding == null) {
+      // Plain VarCharVector. Read the raw bytes directly (avoids the intermediate Text wrapper that
+      // getObject() allocates); get(int) throws on null slots, so null-check first.
+      VarCharVector varChar = (VarCharVector) vector;
+      return varChar.isNull(rowId) ? null : new String(varChar.get(rowId), StandardCharsets.UTF_8);
+    }
+    // Dictionary-encoded: the column is an integer index vector; the value lives in the dictionary.
+    IntVector indices = (IntVector) vector;
+    if (indices.isNull(rowId)) {
+      return null;
+    }
+    VarCharVector dictionary = (VarCharVector) _dictionaryProvider.lookup(encoding.getId()).getVector();
+    return new String(dictionary.get(indices.get(rowId)), StandardCharsets.UTF_8);
   }
 
   @Override
@@ -250,6 +280,10 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
 
   @Override
   public void close() {
+    // Free the dictionary vectors before the root; both hold off-heap buffers under the query allocator.
+    if (_dictionaryProvider != null) {
+      _dictionaryProvider.close();
+    }
     _root.close();
   }
 }

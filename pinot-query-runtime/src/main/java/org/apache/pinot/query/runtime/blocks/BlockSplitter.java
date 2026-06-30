@@ -97,11 +97,11 @@ public interface BlockSplitter {
     @Override
     public Iterator<MseBlock.Data> visit(ArrowBlock block, Integer maxBlockSize) {
       // No operator currently produces ArrowBlocks, so the splitter is never invoked with one.
-      // A real splitter (Arrow vector slicing) will be added alongside the first operator that
-      // produces ArrowBlocks, at which point the allocator-ownership contract for sliced blocks
-      // can be designed against a concrete call site.
+      // Phase 3 (wire protocol): IPC-serialize the ArrowBlock and let the existing byte-level chunking
+      // split the serialized payload, preserving the mailbox chunk-size guarantees. (A later optimization
+      // can split at Arrow row-batch boundaries.)
       throw new UnsupportedOperationException(
-          "BlockSplitter does not yet support ArrowBlocks; Arrow path is not wired into any operator");
+          "BlockSplitter does not yet support ArrowBlocks; Arrow chunking lands in the wire phase");
     }
   }
 }
