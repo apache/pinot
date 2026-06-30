@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.creator.impl;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -170,7 +169,7 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
   private static void indexOpenStructDoc(OpenStructDataSource dataSource, int docId, List<IndexCreator> creators)
       throws IOException {
     Map<String, Object> value = dataSource.getMapValue(docId);
-    Object toIndex = value != null ? value : Collections.emptyMap();
+    Object toIndex = value != null ? value : Map.of();
     for (IndexCreator creator : creators) {
       creator.add(toIndex, -1);
     }
