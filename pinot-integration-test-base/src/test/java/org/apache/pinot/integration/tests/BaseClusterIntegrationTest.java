@@ -126,7 +126,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final String DEFAULT_SORTED_COLUMN = "Carrier";
   protected static final List<String> DEFAULT_INVERTED_INDEX_COLUMNS = Arrays.asList("FlightNum", "Origin", "Quarter");
   private static final List<String> DEFAULT_BLOOM_FILTER_COLUMNS = Arrays.asList("FlightNum", "Origin");
-  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = List.of("Origin");
+  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = List.of("ArrDelay");
   protected static final int DEFAULT_NUM_REPLICAS = 1;
   protected static final boolean DEFAULT_NULL_HANDLING_ENABLED = false;
 

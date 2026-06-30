@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.range;
 
 import com.google.common.base.Preconditions;
@@ -96,6 +95,19 @@ public class RangeIndexType
           "Cannot create range index version %s on column: %s with RAW forward index and dictionary; "
               + "use BitSliced range index version %s instead",
           RangeIndexCreator.VERSION, column, BitSlicedRangeIndexCreator.VERSION);
+      for (IndexType indexType : List.of(
+          StandardIndexes.bloomFilter(),
+          StandardIndexes.inverted(),
+          StandardIndexes.vector(),
+          StandardIndexes.json(),
+          StandardIndexes.text(),
+          StandardIndexes.fst(),
+          StandardIndexes.h3(),
+          StandardIndexes.ifst())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both range index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 

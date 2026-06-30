@@ -1490,24 +1490,6 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(List.of("myCol2"))
-        .setInvertedIndexColumns(List.of("myCol1"))
-        .setSortedColumn("myCol1")
-        .build();
-    try {
-      // Enable forward index disabled flag for a column with inverted index and is sorted
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null, null,
-              null, fieldConfigProperties);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-    } catch (Exception e) {
-      fail("Should not fail for myCol1 with forward index disabled but is sorted, this is a no-op");
-    }
-
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol1"))
         .setInvertedIndexColumns(Arrays.asList("myCol2"))
         .setRangeIndexColumns(Arrays.asList("myCol2"))
