@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +31,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -46,6 +48,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -254,6 +257,72 @@ public class VectorIndexHandlerTest {
         // Temp file must have been cleaned up by rename.
         File temp = new File(v3Dir, COLUMN + ".vector.extract-tmp");
         assertFalse(temp.exists(), "temp extract file must be gone after rename");
+      } finally {
+        buffer.close();
+      }
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
+   * Regression: the HNSW extract path (columns.psf → Lucene directory, on {@code storeInSegmentFile}
+   * flip to {@code false}) must leave a usable Lucene directory behind. {@code removeIndex} for
+   * vector runs {@code VectorIndexUtils.cleanupVectorIndex} as a side effect, which recursively
+   * deletes any sibling matching a recognised vector extension — including the legacy
+   * {@code .vector.v912.hnsw.index} directory. If the unpack lands straight in that final directory,
+   * {@code removeIndex} wipes it and the migration finishes with no HNSW artifact. The handler must
+   * unpack into a temp directory and move it into place only after cleanup.
+   */
+  @Test
+  public void testUpdateIndicesExtractHnswPreservesDirectoryAfterCleanup()
+      throws Exception {
+    File indexDir = createEmptyV3SegmentDir();
+    try {
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      // Build a real combined HNSW payload from a fake source dir (the extract copies bytes; it does
+      // not need a valid Lucene index for this test). Capture the bytes, then drop the scratch files.
+      File srcDir = new File(v3Dir, "src-hnsw");
+      assertTrue(srcDir.mkdirs());
+      Files.write(new File(srcDir, "_0.cfe").toPath(), "lucene-file-one".getBytes(StandardCharsets.UTF_8));
+      Files.write(new File(srcDir, "segments_1").toPath(), "lucene-file-two".getBytes(StandardCharsets.UTF_8));
+      File scratchCombined = new File(v3Dir, COLUMN + ".vector.hnsw.scratch");
+      HnswVectorIndexCombined.combineHnswIndexFiles(srcDir, scratchCombined.getAbsolutePath(), null, null);
+      byte[] combinedBytes = Files.readAllBytes(scratchCombined.toPath());
+      FileUtils.deleteDirectory(srcDir);
+      FileUtils.deleteQuietly(scratchCombined);
+
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir, SegmentVersion.v3);
+      SegmentDirectory.Writer writer = mock(SegmentDirectory.Writer.class);
+      when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
+
+      PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(combinedBytes.length,
+          ByteOrder.BIG_ENDIAN, "hnsw-extract-test");
+      try {
+        buffer.readFrom(0, combinedBytes, 0, combinedBytes.length);
+        when(writer.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector()))).thenReturn(buffer);
+        // Mirror the part of the real SingleFileIndexDirectory.removeIndex that bites here:
+        // cleanupVectorIndex recursively deletes the legacy .vector.v912.hnsw.index directory.
+        doAnswer(inv -> {
+          FileUtils.deleteQuietly(
+              new File(v3Dir, COLUMN + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION));
+          return null;
+        }).when(writer).removeIndex(eq(COLUMN), eq(StandardIndexes.vector()));
+
+        // storeInSegmentFile flipped off, no sidecar on disk yet => the handler extracts to a dir.
+        VectorIndexHandler handler = createHandler(segmentDirectory,
+            vectorIndexConfigWithConsolidation("HNSW", /* storeInSegmentFile */ false));
+        handler.updateIndices(writer);
+
+        verify(writer).removeIndex(eq(COLUMN), eq(StandardIndexes.vector()));
+        File hnswDir = new File(v3Dir, COLUMN + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+        assertTrue(hnswDir.isDirectory(), "unpacked Lucene directory must survive removeIndex cleanup");
+        String[] unpacked = hnswDir.list();
+        assertTrue(unpacked != null && unpacked.length >= 2,
+            "unpacked directory must retain the packed files, found: "
+                + (unpacked == null ? "null" : unpacked.length));
+        assertFalse(new File(v3Dir, COLUMN + ".vector.hnsw.extract-tmp-dir").exists(),
+            "temp unpack directory must be moved away");
       } finally {
         buffer.close();
       }

@@ -237,11 +237,13 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         return new HnswVectorIndexReader(column, segmentDir, metadata.getTotalDocs(), indexConfig);
       }
 
-      // IVF backends accept a PinotDataBuffer; that buffer either comes from the consolidated
-      // typed entry inside columns.psf (when storeInSegmentFile=true) or from the legacy combined
-      // file. The chosen reader takes ownership of the buffer and is responsible for closing it
-      // (including the constructor's own failure path).
-      PinotDataBuffer buffer;
+      // IVF backends accept a PinotDataBuffer that comes from one of two places:
+      //   - the consolidated typed entry inside columns.psf (storeInSegmentFile=true, post-absorb);
+      //   - an on-disk sidecar/combined file (storeInSegmentFile=false, OR =true before the handler
+      //     has absorbed a pre-existing legacy sidecar into columns.psf).
+      // Ownership follows the source: a columns.psf buffer is owned by the segment directory and the
+      // reader must NOT close it; a sidecar mmap buffer is owned by the reader.
+      PinotDataBuffer buffer = null;
       if (indexConfig.isStoreInSegmentFile()) {
         try {
           buffer = VectorIndexUtils.getConsolidatedVectorEntry(segmentReader, column);
@@ -249,25 +251,28 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
           throw new RuntimeException(
               "Failed to read consolidated vector index from columns.psf for column: " + column, e);
         }
-        if (buffer == null) {
-          LOGGER.warn("Skipping vector index reader for column: {} because storeInSegmentFile=true "
-              + "but no consolidated entry was found in columns.psf in segment: {}", column, segmentDir);
-          return null;
-        }
+      }
+      boolean ownsBuffer;
+      if (buffer != null) {
+        // Consolidated entry inside columns.psf — owned by the segment directory.
+        ownsBuffer = false;
       } else {
+        // Fall back to the on-disk artifact. For storeInSegmentFile=true this keeps the index usable
+        // while a legacy sidecar still awaits absorption (mirrors the HNSW path above, which falls
+        // back to its Lucene directory) instead of silently disabling the index and forcing an exact
+        // scan until migration completes.
         File configuredIndexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, column, indexConfig);
         if (configuredIndexFile == null || !configuredIndexFile.exists()) {
-          LOGGER.warn("Skipping vector index reader for column: {} because configured backend {} does not have a "
-              + "matching on-disk artifact in segment: {}", column, backendType, segmentDir);
+          LOGGER.warn("Skipping vector index reader for column: {} because backend {} has neither a consolidated "
+              + "columns.psf entry nor a matching on-disk artifact in segment: {}", column, backendType, segmentDir);
           return null;
         }
         buffer = IvfCombinedBuffers.mapCombinedFile(configuredIndexFile, column,
             "vector-" + backendType.name().toLowerCase());
+        // Sidecar mmap buffer — owned by the reader.
+        ownsBuffer = true;
       }
 
-      // Buffer ownership: when reading from columns.psf, the segment directory owns the buffer
-      // and the reader must not close it. Combined mmap buffers are owned by the reader.
-      boolean ownsBuffer = !indexConfig.isStoreInSegmentFile();
       switch (backendType) {
         case IVF_FLAT:
           return new IvfFlatVectorIndexReader(column, buffer, indexConfig, ownsBuffer);
@@ -276,10 +281,9 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         case IVF_ON_DISK:
           return new IvfOnDiskVectorIndexReader(column, buffer, indexConfig, ownsBuffer);
         default:
-          // Close the buffer we just mapped so we don't leak the mmap on an unsupported backend.
-          // (Only applies to the sidecar branch; the columns.psf path's buffer is owned by the
-          // segment directory and we should not close it here.)
-          if (!indexConfig.isStoreInSegmentFile()) {
+          // Close the buffer only if we own it (a sidecar mmap). A columns.psf buffer is owned by the
+          // segment directory and must not be closed here.
+          if (ownsBuffer) {
             try {
               buffer.close();
             } catch (IOException ignored) {

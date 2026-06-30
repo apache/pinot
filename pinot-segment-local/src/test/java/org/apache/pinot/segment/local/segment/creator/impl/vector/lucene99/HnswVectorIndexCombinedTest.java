@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Map;
@@ -138,6 +139,36 @@ public class HnswVectorIndexCombinedTest {
     } finally {
       reader.close();
       fsDir.close();
+    }
+  }
+
+  /**
+   * A truncated/corrupt combined file (whose header advertises more data than is present) must fail
+   * fast instead of spinning forever in the {@code transferTo} extraction loop. Dropping the final
+   * byte leaves the header/metadata intact but makes the last packed file one byte short, so
+   * {@code transferTo} hits EOF with bytes still outstanding.
+   */
+  @Test
+  public void testExtractThrowsOnTruncatedCombinedFile()
+      throws Exception {
+    VectorIndexConfig config = buildConfig(false);
+    buildIndex(buildVectors(NUM_DOCS, DIMENSION), config);
+    File hnswDir = new File(_segmentDir, COLUMN + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    File combinedFile = new File(_segmentDir, COLUMN + V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
+    HnswVectorIndexCombined.combineHnswIndexFiles(hnswDir, combinedFile.getAbsolutePath(), null, null);
+    Assert.assertTrue(combinedFile.length() > 1, "combined file must be non-trivial");
+
+    try (RandomAccessFile raf = new RandomAccessFile(combinedFile, "rw")) {
+      raf.setLength(combinedFile.length() - 1);
+    }
+
+    File extractDir = new File(_segmentDir, "extracted-truncated-" + COLUMN);
+    try {
+      HnswVectorIndexCombined.extractHnswIndexFiles(combinedFile, extractDir);
+      Assert.fail("Expected IOException for a truncated combined HNSW file");
+    } catch (IOException expected) {
+      Assert.assertTrue(expected.getMessage().contains("Truncated or corrupt"),
+          "error must identify the corruption; got: " + expected.getMessage());
     }
   }
 

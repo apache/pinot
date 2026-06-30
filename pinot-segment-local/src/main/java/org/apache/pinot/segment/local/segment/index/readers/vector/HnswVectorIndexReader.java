@@ -115,8 +115,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
       PinotDataBuffer mappingBuffer = HnswVectorIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
       _docIdTranslator = new DocIdTranslator(mappingBuffer, numDocs, _indexSearcher);
     } catch (Exception e) {
-      LOGGER.error("Failed to instantiate buffer-backed HNSW index reader for column {}, exception {}", column,
-          e.getMessage());
+      LOGGER.error("Failed to instantiate buffer-backed HNSW index reader for column {}", column, e);
       throw new RuntimeException(e);
     }
   }

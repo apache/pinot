@@ -111,11 +111,18 @@ public class VectorIndexUtils {
   ///
   /// Unlike {@link SegmentDirectory.Reader#hasIndexFor}, this does NOT report a legacy on-disk
   /// sidecar (an IVF flat file or an HNSW Lucene directory) as a match — only a real packed
-  /// `_columnEntries` slot counts. {@code SingleFileIndexDirectory} signals an absent typed slot by
-  /// throwing an unchecked exception from {@code getIndexFor}; that is mapped to {@code null} here,
-  /// while genuine I/O failures propagate. Callers use this to tell "a prior absorb already
-  /// committed bytes" (crash recovery) apart from "first absorb of an existing sidecar", and to
-  /// select the {@code columns.psf} read path only when the consolidated entry truly exists.
+  /// `_columnEntries` slot counts. The store implementations that back {@code getIndexFor}
+  /// ({@link SingleFileIndexDirectory} for V3 and {@link FilePerIndexDirectory} for V1/V2) both
+  /// signal an absent slot by throwing an unchecked exception whose message starts with
+  /// {@link SingleFileIndexDirectory#INDEX_NOT_FOUND_MESSAGE_PREFIX} (the shared constant both
+  /// classes build their message from); that is mapped to {@code null} here. Any other
+  /// {@code RuntimeException} (e.g. a corruption marker) is rethrown rather than masked as "absent",
+  /// so the migration / crash-recovery paths do not proceed on a broken segment. Genuine
+  /// {@link IOException}s also propagate.
+  ///
+  /// Callers use this to tell "a prior absorb already committed bytes" (crash recovery) apart from
+  /// "first absorb of an existing sidecar", and to select the {@code columns.psf} read path only
+  /// when the consolidated entry truly exists.
   ///
   /// The returned buffer is owned by the segment directory and must NOT be closed by the caller.
   @Nullable
@@ -124,7 +131,13 @@ public class VectorIndexUtils {
     try {
       return reader.getIndexFor(column, StandardIndexes.vector());
     } catch (RuntimeException e) {
-      return null;
+      String message = e.getMessage();
+      if (message != null && message.startsWith(SingleFileIndexDirectory.INDEX_NOT_FOUND_MESSAGE_PREFIX)) {
+        // No typed entry in columns.psf yet — the expected "not consolidated" case.
+        return null;
+      }
+      // Anything else (corruption, unexpected state) must not be silently treated as "absent".
+      throw e;
     }
   }
 
