@@ -360,15 +360,17 @@ public class ColumnMinMaxValueGenerator {
           break;
         }
         case BYTES: {
+          // ByteArray.compare is unsigned byte-wise lexicographic; for canonical 16-byte big-endian UUIDs this is
+          // identical to UuidUtils.compare's unsigned 64-bit-word ordering, so a single comparator is sufficient.
           byte[] min = null;
           byte[] max = null;
           if (isSingleValue) {
             for (int docId = 0; docId < numDocs; docId++) {
               byte[] value = rawIndexReader.getBytes(docId, readerContext);
-              if (min == null || ByteArray.compare(value, min) > 0) {
+              if (min == null || ByteArray.compare(value, min) < 0) {
                 min = value;
               }
-              if (max == null || ByteArray.compare(value, max) < 0) {
+              if (max == null || ByteArray.compare(value, max) > 0) {
                 max = value;
               }
             }
@@ -376,10 +378,10 @@ public class ColumnMinMaxValueGenerator {
             for (int docId = 0; docId < numDocs; docId++) {
               byte[][] values = rawIndexReader.getBytesMV(docId, readerContext);
               for (byte[] value : values) {
-                if (min == null || ByteArray.compare(value, min) > 0) {
+                if (min == null || ByteArray.compare(value, min) < 0) {
                   min = value;
                 }
-                if (max == null || ByteArray.compare(value, max) < 0) {
+                if (max == null || ByteArray.compare(value, max) > 0) {
                   max = value;
                 }
               }
