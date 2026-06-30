@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,7 +98,7 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
 
   @Override
   public Map<String, String> getMetadata() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   @Override
