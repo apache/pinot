@@ -38,17 +38,12 @@ public class ValidDocIdsBitmapResponse {
   private final String _instanceId;
   private final ServiceStatus.Status _serverStatus;
 
-  public ValidDocIdsBitmapResponse(String segmentName, String crc, ValidDocIdsType validDocIdsType, byte[] bitmap,
-      String instanceId, ServiceStatus.Status serverStatus) {
-    this(segmentName, crc, validDocIdsType, bitmap, instanceId, serverStatus, null);
-  }
-
   @JsonCreator
   public ValidDocIdsBitmapResponse(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("segmentCrc") String crc, @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
-      @JsonProperty("bitmap") byte[] bitmap, @JsonProperty("instanceId") String instanceId,
-      @JsonProperty("serverStatus") ServiceStatus.Status serverStatus,
-      @JsonProperty("segmentDataCrc") @Nullable String segmentDataCrc) {
+      @JsonProperty("segmentCrc") String crc, @JsonProperty("segmentDataCrc") @Nullable String segmentDataCrc,
+      @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType, @JsonProperty("bitmap") byte[] bitmap,
+      @JsonProperty("instanceId") String instanceId,
+      @JsonProperty("serverStatus") ServiceStatus.Status serverStatus) {
     _segmentName = segmentName;
     _segmentCrc = crc;
     _segmentDataCrc = segmentDataCrc;
@@ -66,6 +61,13 @@ public class ValidDocIdsBitmapResponse {
     return _segmentCrc;
   }
 
+  /// Server's data CRC, or null if not reported. Omitted from the payload when null.
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  public String getSegmentDataCrc() {
+    return _segmentDataCrc;
+  }
+
   public ValidDocIdsType getValidDocIdsType() {
     return _validDocIdsType;
   }
@@ -80,12 +82,5 @@ public class ValidDocIdsBitmapResponse {
 
   public ServiceStatus.Status getServerStatus() {
     return _serverStatus;
-  }
-
-  /// Server's data CRC, or null if not reported. Omitted from the payload when null.
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  @Nullable
-  public String getSegmentDataCrc() {
-    return _segmentDataCrc;
   }
 }

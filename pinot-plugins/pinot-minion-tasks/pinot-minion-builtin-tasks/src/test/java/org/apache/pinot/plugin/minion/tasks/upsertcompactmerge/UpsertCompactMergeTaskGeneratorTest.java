@@ -363,11 +363,11 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadata = new HashMap<>();
     validDocIdsMetadata.put("testTable__0__0__12345", Arrays.asList(
-        new ValidDocIdsMetadataInfo("testTable__0__0__12345", 90, 10, 100, "1000",
+        new ValidDocIdsMetadataInfo("testTable__0__0__12345", 90, 10, 100, "1000", null,
             ValidDocIdsType.SNAPSHOT, 100000, System.currentTimeMillis(), "server1",
             ServiceStatus.Status.GOOD)));
     validDocIdsMetadata.put("testTable__0__1__12346", Arrays.asList(
-        new ValidDocIdsMetadataInfo("testTable__0__1__12346", 8, 2, 10, "2000",
+        new ValidDocIdsMetadataInfo("testTable__0__1__12346", 8, 2, 10, "2000", null,
             ValidDocIdsType.SNAPSHOT, 10000, System.currentTimeMillis(), "server1",
             ServiceStatus.Status.GOOD)));
 
@@ -401,11 +401,11 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadata = new HashMap<>();
     // Segment with 0 valid docs - should be marked for deletion
     validDocIdsMetadata.put("testTable__0__0__12345", Arrays.asList(
-        new ValidDocIdsMetadataInfo("testTable__0__0__12345", 0, 100, 100, "1000",
+        new ValidDocIdsMetadataInfo("testTable__0__0__12345", 0, 100, 100, "1000", null,
             ValidDocIdsType.SNAPSHOT, 100000, System.currentTimeMillis(), "server1",
             ServiceStatus.Status.GOOD)));
     validDocIdsMetadata.put("testTable__0__1__12346", Arrays.asList(
-        new ValidDocIdsMetadataInfo("testTable__0__1__12346", 8, 2, 10, "2000",
+        new ValidDocIdsMetadataInfo("testTable__0__1__12346", 8, 2, 10, "2000", null,
             ValidDocIdsType.SNAPSHOT, 10000, System.currentTimeMillis(), "server1",
             ServiceStatus.Status.GOOD)));
 
@@ -486,7 +486,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
   private static ValidDocIdsMetadataInfo meta(String segmentName, long validDocs, long invalidDocs, long totalDocs,
       long crc, ServiceStatus.Status serverStatus, String instanceId) {
-    return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc),
+    return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc), null,
         ValidDocIdsType.SNAPSHOT, 1000, System.currentTimeMillis(), instanceId, serverStatus);
   }
 

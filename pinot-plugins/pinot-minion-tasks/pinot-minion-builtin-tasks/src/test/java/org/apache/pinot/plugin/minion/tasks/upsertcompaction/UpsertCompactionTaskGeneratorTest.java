@@ -411,14 +411,14 @@ public class UpsertCompactionTaskGeneratorTest {
 
   private static ValidDocIdsMetadataInfo meta(String segmentName, long validDocs, long invalidDocs, long totalDocs,
       long crc, ServiceStatus.Status serverStatus, String instanceId) {
-    return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc),
+    return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc), null,
         ValidDocIdsType.SNAPSHOT, 1000, System.currentTimeMillis(), instanceId, serverStatus);
   }
 
   private static ValidDocIdsMetadataInfo metaWithDataCrc(String segmentName, long validDocs, long invalidDocs,
       long totalDocs, long crc, String dataCrc, ServiceStatus.Status serverStatus, String instanceId) {
-    return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc),
-        ValidDocIdsType.SNAPSHOT, 1000, System.currentTimeMillis(), instanceId, serverStatus, dataCrc);
+    return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc), dataCrc,
+        ValidDocIdsType.SNAPSHOT, 1000, System.currentTimeMillis(), instanceId, serverStatus);
   }
 
   @Test

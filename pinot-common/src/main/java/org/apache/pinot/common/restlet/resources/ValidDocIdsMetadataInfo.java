@@ -42,22 +42,16 @@ public class ValidDocIdsMetadataInfo {
   private final String _instanceId;
   private final ServiceStatus.Status _serverStatus;
 
-  public ValidDocIdsMetadataInfo(String segmentName, long totalValidDocs, long totalInvalidDocs, long totalDocs,
-      String segmentCrc, ValidDocIdsType validDocIdsType, long segmentSizeInBytes, long segmentCreationTimeMillis,
-      String instanceId, ServiceStatus.Status serverStatus) {
-    this(segmentName, totalValidDocs, totalInvalidDocs, totalDocs, segmentCrc, validDocIdsType, segmentSizeInBytes,
-        segmentCreationTimeMillis, instanceId, serverStatus, null);
-  }
-
   @JsonCreator
   public ValidDocIdsMetadataInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("totalValidDocs") long totalValidDocs, @JsonProperty("totalInvalidDocs") long totalInvalidDocs,
       @JsonProperty("totalDocs") long totalDocs, @JsonProperty("segmentCrc") String segmentCrc,
+      @JsonProperty("segmentDataCrc") @Nullable String segmentDataCrc,
       @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
       @JsonProperty("segmentSizeInBytes") long segmentSizeInBytes,
       @JsonProperty("segmentCreationTimeMillis") long segmentCreationTimeMillis,
-      @JsonProperty("instanceId") String instanceId, @JsonProperty("serverStatus") ServiceStatus.Status serverStatus,
-      @JsonProperty("segmentDataCrc") @Nullable String segmentDataCrc) {
+      @JsonProperty("instanceId") String instanceId,
+      @JsonProperty("serverStatus") ServiceStatus.Status serverStatus) {
     _segmentName = segmentName;
     _totalValidDocs = totalValidDocs;
     _totalInvalidDocs = totalInvalidDocs;
@@ -91,6 +85,13 @@ public class ValidDocIdsMetadataInfo {
     return _segmentCrc;
   }
 
+  /// Server's data CRC, or null if not reported. Omitted from the payload when null.
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  public String getSegmentDataCrc() {
+    return _segmentDataCrc;
+  }
+
   public ValidDocIdsType getValidDocIdsType() {
     return _validDocIdsType;
   }
@@ -109,12 +110,5 @@ public class ValidDocIdsMetadataInfo {
 
   public ServiceStatus.Status getServerStatus() {
     return _serverStatus;
-  }
-
-  /// Server's data CRC, or null if not reported. Omitted from the payload when null.
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  @Nullable
-  public String getSegmentDataCrc() {
-    return _segmentDataCrc;
   }
 }

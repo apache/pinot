@@ -407,14 +407,14 @@ public class MinionTaskUtilsTest {
    */
   private static ValidDocIdsBitmapResponse makeResponse(String segmentName, String crc, String instanceId,
       RoaringBitmap bitmap) {
-    return new ValidDocIdsBitmapResponse(segmentName, crc, ValidDocIdsType.SNAPSHOT,
+    return new ValidDocIdsBitmapResponse(segmentName, crc, null, ValidDocIdsType.SNAPSHOT,
         RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD);
   }
 
   private static ValidDocIdsBitmapResponse makeResponse(String segmentName, String crc, String dataCrc,
       String instanceId, RoaringBitmap bitmap) {
-    return new ValidDocIdsBitmapResponse(segmentName, crc, ValidDocIdsType.SNAPSHOT,
-        RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD, dataCrc);
+    return new ValidDocIdsBitmapResponse(segmentName, crc, dataCrc, ValidDocIdsType.SNAPSHOT,
+        RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD);
   }
 
   /**
