@@ -60,10 +60,11 @@ ENV MAVEN_CONFIG=/opt/.m2
 # install thrift — version matches libthrift in Pinot's pom.xml
 RUN echo "Building Thrift for $(uname -m) architecture..." && \
   wget https://archive.apache.org/dist/thrift/0.22.0/thrift-0.22.0.tar.gz -O /tmp/thrift-0.22.0.tar.gz && \
-  wget https://archive.apache.org/dist/thrift/0.22.0/thrift-0.22.0.tar.gz.sha512 -O /tmp/thrift-0.22.0.tar.gz.sha512 && \
-  echo "$(cat /tmp/thrift-0.22.0.tar.gz.sha512)  /tmp/thrift-0.22.0.tar.gz" | sha512sum -c - && \
-  tar xfz /tmp/thrift-0.22.0.tar.gz --directory /tmp && \
-  cd /tmp/thrift-0.22.0 && \
+  wget https://archive.apache.org/dist/thrift/0.22.0/thrift-0.22.0.tar.gz.sha256 -O /tmp/thrift-0.22.0.tar.gz.sha256 && \
+  cd /tmp && \
+  sha256sum -c thrift-0.22.0.tar.gz.sha256 && \
+  tar xfz thrift-0.22.0.tar.gz && \
+  cd thrift-0.22.0 && \
   echo "Configuring Thrift..." && \
   ./configure --with-cpp=no --with-c_glib=no --with-java=yes --with-python=no --with-ruby=no --with-erlang=no --with-go=no --with-nodejs=no --with-php=no && \
   echo "Building Thrift..." && \
