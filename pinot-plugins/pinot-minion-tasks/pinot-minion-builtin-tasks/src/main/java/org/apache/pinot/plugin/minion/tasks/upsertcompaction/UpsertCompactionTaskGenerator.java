@@ -161,22 +161,18 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           taskConfigs.getOrDefault(UpsertCompactionTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
               String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
 
-      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
+      ServerSegmentMetadataReader.ValidDocIdsMetadataResult validDocIdsMetadataResult =
           serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
               serverToEndpoints, null, 60_000, validDocIdsType.toString(), numSegmentsBatchPerServerRequest);
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
+          validDocIdsMetadataResult.getSegmentToMetadata();
 
       Map<String, SegmentZKMetadata> completedSegmentsMap =
           completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
 
-      // Expected replica count per segment (from the External View), so consensus can skip a segment when not all
-      // of its replicas responded. Only the strict modes use it; UNSAFE never checks it.
-      Map<String, Integer> segmentToReplicaCount =
-          consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE ? Map.of()
-              : MinionTaskUtils.getSegmentToReplicaCount(serverToSegments);
-
       SegmentSelectionResult segmentSelectionResult =
-          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList, segmentToReplicaCount,
-              consensusMode);
+          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList,
+              validDocIdsMetadataResult.getSegmentToExpectedReplicaCount(), consensusMode);
       int skippedSegmentsCount = validDocIdsMetadataList.size()
               - segmentSelectionResult.getSegmentsForCompaction().size()
               - segmentSelectionResult.getSegmentsForDeletion().size();

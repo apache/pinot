@@ -194,24 +194,21 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
           taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
               String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
 
-      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
+      ServerSegmentMetadataReader.ValidDocIdsMetadataResult validDocIdsMetadataResult =
           serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
               serverToEndpoints, null, 60_000, ValidDocIdsType.SNAPSHOT.toString(), numSegmentsBatchPerServerRequest);
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
+          validDocIdsMetadataResult.getSegmentToMetadata();
 
       Map<String, SegmentZKMetadata> candidateSegmentsMap =
           candidateSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
 
       Set<String> alreadyMergedSegments = getAlreadyMergedSegments(allSegments);
 
-      // Expected replica count per segment (from the External View), so consensus can skip a segment when not all
-      // of its replicas responded. Only the strict modes use it; UNSAFE never checks it.
-      Map<String, Integer> segmentToReplicaCount =
-          consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE ? Map.of()
-              : MinionTaskUtils.getSegmentToReplicaCount(serverToSegments);
-
       SegmentSelectionResult segmentSelectionResult =
           processValidDocIdsMetadata(tableNameWithType, taskConfigs, candidateSegmentsMap, validDocIdsMetadataList,
-              alreadyMergedSegments, segmentToReplicaCount, consensusMode, _clusterInfoAccessor.getControllerMetrics());
+              alreadyMergedSegments, validDocIdsMetadataResult.getSegmentToExpectedReplicaCount(), consensusMode,
+              _clusterInfoAccessor.getControllerMetrics());
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),

@@ -76,7 +76,7 @@ public class MinionTaskUtils {
 
   /// Parses the validDocIdsConsensusMode config string. Blank/null defaults to `EQUAL`.
   public static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsConsensusMode(String value) {
-    if (value == null || value.isBlank()) {
+    if (StringUtils.isBlank(value)) {
       return MinionConstants.ValidDocIdsConsensusMode.EQUAL;
     }
     return MinionConstants.ValidDocIdsConsensusMode.valueOf(value.toUpperCase().trim());
@@ -84,7 +84,7 @@ public class MinionTaskUtils {
 
   /// Parses the validDocIdsValidationMode config string. Blank/null defaults to `STRICT`.
   public static MinionConstants.ValidDocIdsValidationMode parseValidDocIdsValidationMode(String value) {
-    if (value == null || value.isBlank()) {
+    if (StringUtils.isBlank(value)) {
       return MinionConstants.ValidDocIdsValidationMode.STRICT;
     }
     return MinionConstants.ValidDocIdsValidationMode.valueOf(value.toUpperCase().trim());
@@ -456,18 +456,6 @@ public class MinionTaskUtils {
           maxCard, segmentName, servers.size());
     }
     return maxCardinalityMap;
-  }
-
-  /// Counts how many servers host each segment (its online replica count) from a server-to-segments map, so callers
-  /// can tell whether every assigned replica responded.
-  public static Map<String, Integer> getSegmentToReplicaCount(Map<String, List<String>> serverToSegments) {
-    Map<String, Integer> segmentToReplicaCount = new HashMap<>();
-    for (List<String> segments : serverToSegments.values()) {
-      for (String segment : segments) {
-        segmentToReplicaCount.merge(segment, 1, Integer::sum);
-      }
-    }
-    return segmentToReplicaCount;
   }
 
   /// Picks the replica whose validDocIds the generator should use, or null to skip the segment, applying the same

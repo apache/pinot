@@ -267,8 +267,9 @@ public class ServerSegmentMetadataReader {
       @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
       int numSegmentsBatchPerServerRequest) {
     return getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegmentsMap, serverToEndpoints,
-        segmentNames, timeoutMs, validDocIdsType, numSegmentsBatchPerServerRequest).values().stream()
-        .filter(list -> list != null && !list.isEmpty()).map(list -> list.get(0)).collect(Collectors.toList());
+        segmentNames, timeoutMs, validDocIdsType, numSegmentsBatchPerServerRequest).getSegmentToMetadata().values()
+        .stream().filter(list -> list != null && !list.isEmpty()).map(list -> list.get(0))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -276,13 +277,17 @@ public class ServerSegmentMetadataReader {
    * This method will pick all servers that hosts the target segment and fetch the segment metadata result and
    * return as a list.
    *
-   * @return map of segment name to list of valid doc id metadata where each element is every server's metadata.
+   * @return the per-segment metadata from every responding server, plus the expected replica count per segment.
    */
-  public Map<String, List<ValidDocIdsMetadataInfo>> getSegmentToValidDocIdsMetadataFromServer(String tableNameWithType,
+  public ValidDocIdsMetadataResult getSegmentToValidDocIdsMetadataFromServer(String tableNameWithType,
       Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
       @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
       int numSegmentsBatchPerServerRequest) {
     List<Pair<String, String>> serverURLsAndBodies = new ArrayList<>();
+    // Expected replica count per segment, tallied from the server-to-segments assignment as we build the requests. A
+    // replica that fails to respond is simply absent from the metadata below, so callers compare the responder count
+    // against this to tell when not all replicas replied.
+    Map<String, Integer> segmentToExpectedReplicaCount = new HashMap<>();
     for (Map.Entry<String, List<String>> serverToSegments : serverToSegmentsMap.entrySet()) {
       List<String> segmentsForServer = serverToSegments.getValue();
       List<String> segmentsToQuery = new ArrayList<>();
@@ -295,6 +300,9 @@ public class ServerSegmentMetadataReader {
             segmentsToQuery.add(segment);
           }
         }
+      }
+      for (String segment : segmentsToQuery) {
+        segmentToExpectedReplicaCount.merge(segment, 1, Integer::sum);
       }
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
@@ -352,7 +360,29 @@ public class ServerSegmentMetadataReader {
 
     LOGGER.info("Retrieved validDocIds metadata for {} segments from {} server requests.",
         validDocIdsMetadataInfos.size(), returnedServerRequestsCount);
-    return validDocIdsMetadataInfos;
+    return new ValidDocIdsMetadataResult(validDocIdsMetadataInfos, segmentToExpectedReplicaCount);
+  }
+
+  /// Result of [#getSegmentToValidDocIdsMetadataFromServer]: the per-segment metadata from every responding server,
+  /// plus the expected replica count per segment (how many servers host it). The count lets callers detect a replica
+  /// that did not respond, since a missing replica is simply absent from the metadata.
+  public static class ValidDocIdsMetadataResult {
+    private final Map<String, List<ValidDocIdsMetadataInfo>> _segmentToMetadata;
+    private final Map<String, Integer> _segmentToExpectedReplicaCount;
+
+    public ValidDocIdsMetadataResult(Map<String, List<ValidDocIdsMetadataInfo>> segmentToMetadata,
+        Map<String, Integer> segmentToExpectedReplicaCount) {
+      _segmentToMetadata = segmentToMetadata;
+      _segmentToExpectedReplicaCount = segmentToExpectedReplicaCount;
+    }
+
+    public Map<String, List<ValidDocIdsMetadataInfo>> getSegmentToMetadata() {
+      return _segmentToMetadata;
+    }
+
+    public Map<String, Integer> getSegmentToExpectedReplicaCount() {
+      return _segmentToExpectedReplicaCount;
+    }
   }
 
   /**
