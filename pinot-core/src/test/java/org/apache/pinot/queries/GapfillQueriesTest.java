@@ -39,6 +39,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -4275,6 +4276,23 @@ public class GapfillQueriesTest extends BaseQueriesTest {
       Assert.assertEquals(expectedOccupiedSlotsCounts1[i], gapFillRows1.get(i)[1]);
       start += dateTimeGranularity.granularityToMillis();
     }
+  }
+
+  @Test
+  public void testGapfillThrowsOnTimeseriesOnColumnNotInSelect() {
+    // lotId is in TIMESERIESON but intentionally omitted from the SELECT list.
+    // Previously this caused a silent NPE (auto-unboxing a null Integer from the indexes map);
+    // now it must throw a BadQueryRequestException with a clear message.
+    String query = "SELECT GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+        + "    '2021-11-07 4:00:00.000', '2021-11-07 12:00:00.000', '1:HOURS', "
+        + "    FILL(isOccupied, 'FILL_DEFAULT_VALUE'), "
+        + "    TIMESERIESON(lotId)) AS time_col, isOccupied "
+        + "FROM parkingData "
+        + "WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "LIMIT 200";
+    Assert.assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query));
   }
 
   @AfterClass

@@ -68,14 +68,14 @@ public class DistinctSumAggregationFunctionTest extends AbstractAggregationFunct
             "null"
         )
         .whenQuery("select myField, DISTINCT_SUM(myField) from testTable group by myField order by myField")
-        .thenResultIs("INTEGER | DOUBLE",
+        .thenResultIs("INT | DOUBLE",
             "-2147483648 | " + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT,
             "1           | 1",
             "2           | 2"
         )
         .whenQueryWithNullHandlingEnabled(
             "select myField, DISTINCT_SUM(myField) from testTable  group by myField order by myField")
-        .thenResultIs("INTEGER | DOUBLE",
+        .thenResultIs("INT | DOUBLE",
             "1    | 1",
             "2    | 2",
             "null | null"

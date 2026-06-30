@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.auth;
 
-import java.util.Collections;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -37,16 +36,20 @@ public class StaticTokenAuthProvider implements AuthProvider {
 
   public StaticTokenAuthProvider(String token) {
     _taskToken = token;
-    _requestHeaders = Collections.singletonMap(HttpHeaders.AUTHORIZATION, token);
+    _requestHeaders = Map.of(HttpHeaders.AUTHORIZATION, token);
   }
 
   public StaticTokenAuthProvider(AuthConfig authConfig) {
     String header = AuthProviderUtils.getOrDefault(authConfig, HEADER, HttpHeaders.AUTHORIZATION);
     String prefix = AuthProviderUtils.getOrDefault(authConfig, PREFIX, "Basic");
-    String userToken = authConfig.getProperties().get(TOKEN).toString();
+    Object tokenValue = authConfig.getProperties().get(TOKEN);
+    if (tokenValue == null) {
+      throw new IllegalArgumentException("Missing required auth config property: " + TOKEN);
+    }
+    String userToken = tokenValue.toString();
 
     _taskToken = makeToken(prefix, userToken);
-    _requestHeaders = Collections.singletonMap(header, _taskToken);
+    _requestHeaders = Map.of(header, _taskToken);
   }
 
   @Override

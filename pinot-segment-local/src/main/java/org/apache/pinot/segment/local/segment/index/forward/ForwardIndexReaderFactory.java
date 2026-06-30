@@ -47,6 +47,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -74,7 +75,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
   }
 
   public ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    if (metadata.hasDictionary()) {
+    if (metadata.getForwardIndexEncoding() == FieldConfig.EncodingType.DICTIONARY) {
       if (metadata.isSingleValue()) {
         if (metadata.isSorted()) {
           return new SortedIndexReaderImpl(dataBuffer, metadata.getCardinality());

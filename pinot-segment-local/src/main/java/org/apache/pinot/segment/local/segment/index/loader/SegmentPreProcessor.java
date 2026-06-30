@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -34,7 +33,7 @@ import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.Col
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnHandler;
 import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.LegacyRawValueInvertedIndexCleanup;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
@@ -113,6 +112,12 @@ public class SegmentPreProcessor implements AutoCloseable {
     removeInvertedIndexTempFiles(indexDir);
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
+      // Backward-compat shim: invalidate any legacy raw-value embedded-dictionary inverted indexes left over from
+      // PR #17060 (reverted by PR #18410) so the standard handlers can rebuild them in the dict-id format. Must
+      // run before any handler that may try to read the inverted-index buffer. Safe to delete after Pinot 1.7;
+      // see [LegacyRawValueInvertedIndexCleanup] javadoc for the full sunset checklist.
+      LegacyRawValueInvertedIndexCleanup.removeLegacyRawValueInvertedIndexes(segmentWriter);
+
       // Update default columns according to the schema.
       DefaultColumnHandler defaultColumnHandler =
           DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, segmentMetadata, _indexLoadingConfig,
@@ -124,9 +129,14 @@ public class SegmentPreProcessor implements AutoCloseable {
       List<IndexHandler> indexHandlers = new ArrayList<>();
 
       // We cannot just create all the index handlers in a random order.
-      // Specifically, ForwardIndexHandler needs to be executed first. This is because it modifies the segment metadata
-      // while rewriting forward index to create a dictionary. Some other handlers (like the range one) assume that
-      // metadata was already been modified by ForwardIndexHandler.
+      // Specifically, ForwardIndexHandler MUST run first. It is the only handler that:
+      //   (a) creates the shared dictionary for a RAW forward index column when a secondary index requires one
+      //       (ENABLE_DICTIONARY operation in ForwardIndexHandler.createDictionaryForRawForwardIndex);
+      //   (b) updates the segment metadata's HAS_DICTIONARY / FORWARD_INDEX_ENCODING properties accordingly.
+      // The InvertedIndexHandler / RangeIndexHandler / FSTIndexHandler then read the freshly-reloaded metadata and
+      // build dict-id-based indexes on top of the new shared dictionary. If this order is violated, downstream
+      // handlers fail with an IllegalStateException because the dictionary they require does not yet exist.
+      // Any future change to handler scheduling MUST preserve: ForwardIndexHandler → reloadMetadata → other handlers.
       IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
       indexHandlers.add(forwardHandler);
       forwardHandler.updateIndices(segmentWriter);
@@ -237,7 +247,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
         _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
     if (columnMinMaxValueGeneratorMode == ColumnMinMaxValueGeneratorMode.NONE) {
-      return Collections.emptyList();
+      return List.of();
     }
     ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
         new ColumnMinMaxValueGenerator(_segmentDirectory.getSegmentMetadata(), null, columnMinMaxValueGeneratorMode);
@@ -387,8 +397,9 @@ public class SegmentPreProcessor implements AutoCloseable {
         StarTreeBuilderUtils.removeStarTrees(indexDir);
       } else {
         // NOTE: Always use OFF_HEAP mode on server side.
+        // Pass _indexLoadingConfig so downstream readers can resolve table-level configs we set
         MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
-            MultipleTreesBuilder.BuildMode.OFF_HEAP);
+            MultipleTreesBuilder.BuildMode.OFF_HEAP, _indexLoadingConfig);
         // We don't create the builder using the try-with-resources pattern because builder.close() performs
         // some clean-up steps to roll back the star-tree index to the previous state if it exists. If this goes wrong
         // the star-tree index can be in an inconsistent state. To prevent that, when builder.close() throws an

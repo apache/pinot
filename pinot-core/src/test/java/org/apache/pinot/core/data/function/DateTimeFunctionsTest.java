@@ -20,15 +20,16 @@ package org.apache.pinot.core.data.function;
 
 import com.google.common.collect.Lists;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
+import org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
-import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -309,8 +310,30 @@ public class DateTimeFunctionsTest {
         row114, -1L
     });
 
+    // fromDateTime on a DST spring-forward gap: 2010-04-30 00:00 did not exist in Africa/Cairo because the
+    // clock sprang forward to 01:00. Instead of throwing, the scalar should shift forward past the gap and
+    // return the first valid instant (01:00 EEST). Using a historical date keeps this test stable against
+    // future tzdata updates.
+    GenericRow row115 = new GenericRow();
+    row115.putValue("dateTime", "2010-04-30");
+    long cairoDstGapExpected =
+        new DateTime(2010, 4, 30, 1, 0, 0, 0, DateTimeZone.forID("Africa/Cairo")).getMillis();
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd', 'Africa/Cairo')", Lists.newArrayList("dateTime"), row115,
+        cairoDstGapExpected
+    });
+
+    // Same DST gap through the defaultVal overload: the fix resolves a valid instant rather than silently
+    // falling through to the default sentinel.
+    GenericRow row116 = new GenericRow();
+    row116.putValue("dateTime", "2010-04-30");
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd', 'Africa/Cairo', -1)", Lists.newArrayList("dateTime"), row116,
+        cairoDstGapExpected
+    });
+
     // timezone_hour and timezone_minute
-    List<String> expectedArguments = Collections.singletonList("tz");
+    List<String> expectedArguments = List.of("tz");
     GenericRow row120 = new GenericRow();
     row120.putValue("tz", "UTC");
     inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row120, 0});
@@ -350,7 +373,7 @@ public class DateTimeFunctionsTest {
     inputs.add(new Object[]{"timezone_minute(tz, 1656685381000)", expectedArguments, row125, 0});
 
     // Convenience extraction functions
-    expectedArguments = Collections.singletonList("millis");
+    expectedArguments = List.of("millis");
     GenericRow row130 = new GenericRow();
     // Sat May 23 2020 22:23:13.123 UTC
     row130.putValue("millis", 1590272593123L);
@@ -729,6 +752,30 @@ public class DateTimeFunctionsTest {
   }
 
   @Test
+  public void testDateTimeConvertRecordExtractorDateTypes() {
+    // The RecordExtractor contract decodes date-related logical types into TIMESTAMP -> java.sql.Timestamp,
+    // DATE -> java.time.LocalDate, TIME -> java.time.LocalTime. These reach dateTimeConvert as the raw object
+    // and are coerced via PinotDataType the same way FunctionInvoker.convertTypes does: EPOCH / TIMESTAMP input
+    // is read as LONG, SIMPLE_DATE_FORMAT input is read as STRING. (The raw-mode Integer / Long forms are already
+    // covered by the numeric cases above.)
+
+    // TIMESTAMP -> epoch millis (Timestamp#getTime)
+    testDateTimeConvert(new Timestamp(1505898960000L), "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS", 1505898960000L);
+    testDateTimeConvert(new Timestamp(1505898960000L), "TIMESTAMP", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS",
+        "20170920");
+
+    // DATE -> days since epoch (LocalDate#toEpochDay)
+    testDateTimeConvert(LocalDate.of(2017, 9, 20), "1:DAYS:EPOCH", "1:MILLISECONDS:EPOCH", "1:DAYS", 1505865600000L);
+    testDateTimeConvert(LocalDate.of(2017, 9, 20), "1:DAYS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS",
+        "20170920");
+
+    // TIME -> millis since midnight (LocalTime#toNanoOfDay / 1_000_000)
+    testDateTimeConvert(LocalTime.of(2, 16, 0), "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS",
+        8160000L);
+  }
+
+  @Test
   private void testTimestampAdd() {
     long currentTimestamp = System.currentTimeMillis();
     long timestampHalfHourBack = currentTimestamp - (30 * 60 * 1000);
@@ -737,7 +784,7 @@ public class DateTimeFunctionsTest {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timestamp10DaysAgo);
 
-    List<String> arguments = Collections.singletonList("timeCol");
+    List<String> arguments = List.of("timeCol");
 
     testFunction("timestampAdd(DAY, 10, timeCol)", arguments, row, currentTimestamp);
 
@@ -774,7 +821,7 @@ public class DateTimeFunctionsTest {
       String outputGranularityStr, Object expectedResult) {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timeValue);
-    List<String> arguments = Collections.singletonList("timeCol");
+    List<String> arguments = List.of("timeCol");
     testDateFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult);
   }
@@ -783,7 +830,7 @@ public class DateTimeFunctionsTest {
       String outputGranularityStr, String bucketingTz, Object expectedResult) {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timeValue);
-    List<String> arguments = Collections.singletonList("timeCol");
+    List<String> arguments = List.of("timeCol");
     testDateFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr, bucketingTz), arguments, row, expectedResult == null ? null : expectedResult);
   }
@@ -818,7 +865,7 @@ public class DateTimeFunctionsTest {
   @Test
   public void testSleepFunction() {
     long startTime = System.currentTimeMillis();
-    testFunction("sleep(50)", Collections.emptyList(), new GenericRow(), result -> {
+    testFunction("sleep(50)", List.of(), new GenericRow(), result -> {
       assertTrue((long) result >= 50);
     });
     long endTime = System.currentTimeMillis();

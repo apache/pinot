@@ -119,10 +119,28 @@ public class RexExpressionToProtoExpression {
           literalBuilder.setDoubleArray(
               Expressions.DoubleArray.newBuilder().addAllValues(DoubleArrayList.wrap((double[]) value)).build());
           break;
+        case BIG_DECIMAL_ARRAY: {
+          BigDecimal[] bigDecimalArray = (BigDecimal[]) value;
+          Expressions.BytesArray.Builder builder = Expressions.BytesArray.newBuilder();
+          for (BigDecimal bigDecimal : bigDecimalArray) {
+            builder.addValues(ByteString.copyFrom(BigDecimalUtils.serialize(bigDecimal)));
+          }
+          literalBuilder.setBytesArray(builder.build());
+          break;
+        }
         case STRING_ARRAY:
           literalBuilder.setStringArray(
               Expressions.StringArray.newBuilder().addAllValues(Arrays.asList((String[]) value)).build());
           break;
+        case BYTES_ARRAY: {
+          ByteArray[] bytesArray = (ByteArray[]) value;
+          Expressions.BytesArray.Builder builder = Expressions.BytesArray.newBuilder();
+          for (ByteArray byteArray : bytesArray) {
+            builder.addValues(ByteString.copyFrom(byteArray.getBytes()));
+          }
+          literalBuilder.setBytesArray(builder.build());
+          break;
+        }
         default:
           throw new IllegalStateException("Unsupported ColumnDataType: " + dataType);
       }
@@ -162,6 +180,8 @@ public class RexExpressionToProtoExpression {
         return Expressions.ColumnDataType.FLOAT_ARRAY;
       case DOUBLE_ARRAY:
         return Expressions.ColumnDataType.DOUBLE_ARRAY;
+      case BIG_DECIMAL_ARRAY:
+        return Expressions.ColumnDataType.BIG_DECIMAL_ARRAY;
       case BOOLEAN_ARRAY:
         return Expressions.ColumnDataType.BOOLEAN_ARRAY;
       case TIMESTAMP_ARRAY:

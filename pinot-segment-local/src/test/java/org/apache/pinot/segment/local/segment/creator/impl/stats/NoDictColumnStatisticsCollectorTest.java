@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -50,7 +51,7 @@ public class NoDictColumnStatisticsCollectorTest {
     TableConfig tableConfig =
         new TableConfigBuilder(org.apache.pinot.spi.config.table.TableType.OFFLINE).setTableName("testTable")
             .setSegmentPartitionConfig(
-                new SegmentPartitionConfig(Collections.singletonMap("col", new ColumnPartitionConfig("murmur", 4))))
+                new SegmentPartitionConfig(Map.of("col", new ColumnPartitionConfig("murmur", 4))))
             .build();
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec("col", dataType, isSingleValue));
@@ -68,12 +69,12 @@ public class NoDictColumnStatisticsCollectorTest {
         // Sorted data (INT, LONG, FLOAT, DOUBLE)
         {DataType.INT, new Object[]{5, 5, 10, 20}, true}, {DataType.LONG, new Object[]{1L, 1L, 15L, 25L}, true},
         {DataType.FLOAT, new Object[]{1.5f, 1.5f, 3.5f, 7.5f}, true}, {DataType.DOUBLE, new Object[]{2.5, 2.5, 4.5,
-        8.5}, true},
+          8.5}, true},
 
         // Unsorted data (INT, LONG, FLOAT, DOUBLE)
         {DataType.INT, new Object[]{10, 5, 20, 5}, false}, {DataType.LONG, new Object[]{15L, 1L, 25L, 1L}, false},
         {DataType.FLOAT, new Object[]{3.5f, 1.5f, 7.5f, 1.5f}, false}, {DataType.DOUBLE, new Object[]{4.5, 2.5, 8.5,
-        2.5}, false}
+          2.5}, false}
     };
   }
 
@@ -445,15 +446,13 @@ public class NoDictColumnStatisticsCollectorTest {
   }
 
   private void runRandomizedTest(Random random, int iteration) {
-    // Randomly select data type (excluding BIG_DECIMAL for MV as it's unsupported)
     DataType[] supportedTypes = {
         DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.BIG_DECIMAL, DataType.STRING,
         DataType.BYTES
     };
     DataType dataType = supportedTypes[random.nextInt(supportedTypes.length)];
 
-    // Randomly choose single vs multi-value (skip MV for BIG_DECIMAL)
-    boolean isSingleValue = dataType == DataType.BIG_DECIMAL || random.nextBoolean();
+    boolean isSingleValue = random.nextBoolean();
 
     // Randomly choose cardinality level
     CardinalityLevel cardinalityLevel = CardinalityLevel.values()[random.nextInt(CardinalityLevel.values().length)];

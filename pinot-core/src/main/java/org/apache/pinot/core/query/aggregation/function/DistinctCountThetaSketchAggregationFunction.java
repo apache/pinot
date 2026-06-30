@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,9 +126,9 @@ public class DistinctCountThetaSketchAggregationFunction
     if (numArguments < 4) {
       // Simple union without post-aggregation
 
-      _inputExpressions = Collections.singletonList(_expression);
+      _inputExpressions = List.of(_expression);
       _includeDefaultSketch = true;
-      _filterEvaluators = Collections.emptyList();
+      _filterEvaluators = List.of();
       _postAggregationExpression = ExpressionContext.forIdentifier(DEFAULT_SKETCH_IDENTIFIER);
     } else {
       // Union with post-aggregation
@@ -1551,7 +1550,8 @@ public class DistinctCountThetaSketchAggregationFunction
       DataType valueType = valueTypes[_expressionIndex];
       Object valueArray = valueArrays[_expressionIndex];
       if (_predicateEvaluator == null) {
-        _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(_predicate, null, valueType);
+        // Intermediate-result predicate evaluation has no DataSource — pass null to take the raw-value path.
+        _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(_predicate, null, valueType, null);
       }
       if (singleValue) {
         switch (valueType) {

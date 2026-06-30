@@ -44,24 +44,40 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public abstract class AbstractColumnStatisticsCollector implements ColumnStatistics {
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
   protected final FieldSpec _fieldSpec;
-  protected final DataType _valueType;
+  protected final DataType _storedType;
   protected final FieldConfig _fieldConfig;
   protected final PartitionFunction _partitionFunction;
   protected final Set<Integer> _partitions;
 
+  protected int _totalDocs = 0;
   protected int _totalNumberOfEntries = 0;
   protected int _maxNumberOfMultiValues = 0;
   protected boolean _sorted;
   protected Comparable _previousValue = null;
 
   public AbstractColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
-    _fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
-    Preconditions.checkArgument(_fieldSpec != null, "Failed to find column: %s", column);
-    _valueType = _fieldSpec.getDataType().getStoredType();
-    _sorted = _fieldSpec.isSingleValueField();
-    _fieldConfig = statsCollectorConfig.getFieldConfigForColumn(column);
-    _partitionFunction = statsCollectorConfig.getPartitionFunction(column);
-    _partitions = _partitionFunction != null ? new HashSet<>() : null;
+    this(getRequiredFieldSpec(column, statsCollectorConfig),
+        statsCollectorConfig.getFieldConfigForColumn(column),
+        statsCollectorConfig.getPartitionFunction(column));
+  }
+
+  /// Constructs a collector directly from a [FieldSpec], without a [StatsCollectorConfig]. Lets callers
+  /// that operate outside schema-driven segment generation (e.g. OPEN_STRUCT materialized child columns,
+  /// whose synthetic columns exist in no schema) reuse the standard stats collectors.
+  public AbstractColumnStatisticsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    _fieldSpec = fieldSpec;
+    _storedType = fieldSpec.getDataType().getStoredType();
+    _sorted = fieldSpec.isSingleValueField();
+    _fieldConfig = fieldConfig;
+    _partitionFunction = partitionFunction;
+    _partitions = partitionFunction != null ? new HashSet<>() : null;
+  }
+
+  private static FieldSpec getRequiredFieldSpec(String column, StatsCollectorConfig statsCollectorConfig) {
+    FieldSpec fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
+    Preconditions.checkArgument(fieldSpec != null, "Failed to find column: %s", column);
+    return fieldSpec;
   }
 
   /**
@@ -111,8 +127,13 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   }
 
   @Override
-  public DataType getValueType() {
-    return _valueType;
+  public DataType getStoredType() {
+    return _storedType;
+  }
+
+  @Override
+  public int getTotalDocs() {
+    return _totalDocs;
   }
 
   @Override

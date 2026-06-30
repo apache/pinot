@@ -24,7 +24,9 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -63,9 +65,8 @@ public class FilterMvTransformFunction extends BaseTransformFunction {
           "The first argument of filterMv transform function must be a multi-valued column or a transform function");
     }
     _mainTransformFunction = firstArgument;
-    _resultMetadata = _mainTransformFunction.getResultMetadata();
-    _dictionary = _mainTransformFunction.getDictionary();
-    _dataType = _resultMetadata.getDataType();
+    TransformResultMetadata innerMetadata = _mainTransformFunction.getResultMetadata();
+    _dataType = innerMetadata.getDataType();
 
     TransformFunction predicateArgument = arguments.get(1);
     if (!(predicateArgument instanceof LiteralTransformFunction) || !predicateArgument.getResultMetadata()
@@ -74,7 +75,26 @@ public class FilterMvTransformFunction extends BaseTransformFunction {
           "The second argument of filterMv transform function must be a single-valued string literal");
     }
     String predicate = ((LiteralTransformFunction) predicateArgument).getStringLiteral();
+    // IdentifierTransformFunction always exposes the column dictionary if one exists, but the dict-id
+    // matching path requires forward.getDictIdMV() to actually serve dict ids cheaply. RAW forward indexes
+    // throw UnsupportedOperationException from getDictIdMV — so when the inner Identifier wraps a RAW
+    // forward column (with or without a shared dictionary), drop the dictionary here so filterMv falls
+    // back to per-value raw matching.
+    _dictionary = dictionaryUsableForFilterMv(firstArgument, columnContextMap);
     _predicateEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, _dataType, _dictionary);
+    _resultMetadata = new TransformResultMetadata(_dataType, innerMetadata.isSingleValue(), _dictionary != null);
+  }
+
+  @Nullable
+  private static Dictionary dictionaryUsableForFilterMv(TransformFunction inner,
+      Map<String, ColumnContext> columnContextMap) {
+    Dictionary dictionary = inner.getDictionary();
+    if (dictionary == null || !(inner instanceof IdentifierTransformFunction)) {
+      return dictionary;
+    }
+    DataSource dataSource = columnContextMap.get(((IdentifierTransformFunction) inner).getColumnName()).getDataSource();
+    ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
+    return (forwardIndex != null && forwardIndex.isDictionaryEncoded()) ? dictionary : null;
   }
 
   @Override
@@ -90,9 +110,6 @@ public class FilterMvTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[][] transformToDictIdsMV(ValueBlock valueBlock) {
-    if (_dictionary == null) {
-      return super.transformToDictIdsMV(valueBlock);
-    }
     int length = valueBlock.getNumDocs();
     if (_dictIdsMV == null || _dictIdsMV.length < length) {
       _dictIdsMV = new int[length][];

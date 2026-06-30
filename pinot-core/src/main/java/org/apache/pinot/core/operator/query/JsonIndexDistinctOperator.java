@@ -18,23 +18,20 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.CaseFormat;
+import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -50,411 +47,196 @@ import org.apache.pinot.core.query.distinct.table.LongDistinctTable;
 import org.apache.pinot.core.query.distinct.table.StringDistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Distinct operator for the scalar {@code jsonExtractIndex(column, path, type[, defaultValue])} form.
- *
- * <p>Execution flow:
- * 1. Push a same-path {@code JSON_MATCH} predicate into the JSON-index lookup when it cannot match missing paths.
- * 2. Convert matching flattened doc ids back to segment doc ids.
- * 3. Apply any remaining row-level filter and materialize DISTINCT results, including missing-path handling.
- */
+/// Distinct operator for `jsonExtractIndex(column, path, type[, defaultValue[, filterJsonExpression]])`.
+///
+/// Supports both SV (e.g. `STRING`) and MV (e.g. `STRING_ARRAY`) result types — DISTINCT collapses MV array elements
+/// to scalar rows, matching the scan-based `SELECT DISTINCT mvCol` convention. The 4-arg default is a single value
+/// for SV; for MV it's a JSON array whose elements are each added to the distinct set when no doc matches the path.
+///
+/// Execution flow:
+/// 1. Pass the optional 5-arg `filterJsonExpression` directly to the JSON-index lookup (matches
+///    `JsonExtractIndexTransformFunction`'s convention).
+/// 2. Convert matching flattened doc ids back to segment doc ids.
+/// 3. Apply any remaining row-level WHERE filter and materialize DISTINCT results, including missing-path handling.
 public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT_JSON_INDEX";
   private static final String FUNCTION_NAME = "jsonExtractIndex";
 
-  private final IndexSegment _indexSegment;
-  private final SegmentContext _segmentContext;
-  private final QueryContext _queryContext;
-  private final BaseFilterOperator _filterOperator;
-
-  private int _numEntriesExamined = 0;
-  private long _numEntriesScannedInFilter = 0;
-
-  public JsonIndexDistinctOperator(IndexSegment indexSegment, SegmentContext segmentContext,
-      QueryContext queryContext, BaseFilterOperator filterOperator) {
-    _indexSegment = indexSegment;
-    _segmentContext = segmentContext;
-    _queryContext = queryContext;
-    _filterOperator = filterOperator;
+  /// Returns true if the expression is a `jsonExtractIndex` function call. All other validation (argument count/types,
+  /// column existence, JSON index presence, path support) happens inside the operator's constructor and matches what
+  /// the scan-based fallback (`JsonExtractIndexTransformFunction`) would surface during its own `init`.
+  public static boolean canUseJsonIndexDistinct(ExpressionContext expr) {
+    return expr.getType() == ExpressionContext.Type.FUNCTION && FUNCTION_NAME.equalsIgnoreCase(
+        expr.getFunction().getFunctionName());
   }
 
-  @Override
-  protected DistinctResultsBlock getNextBlock() {
-    List<ExpressionContext> expressions = _queryContext.getSelectExpressions();
+  private final IndexSegment _indexSegment;
+  private final int _totalDocs;
+  private final QueryContext _queryContext;
+  private final BaseFilterOperator _filterOperator;
+  private final ExpressionContext _expression;
+  private final boolean _skipMissingPath;
+  private final JsonIndexReader _jsonIndexReader;
+  private final String _jsonPathString;
+  private final DataType _dataType;
+  @Nullable
+  private final String[] _defaultValueLiterals;
+  @Nullable
+  private final String _filterJsonExpression;
+  private final DataSchema _dataSchema;
+  @Nullable
+  private final OrderByExpressionContext _orderByExpression;
+
+  private int _numDocsScanned = 0;
+  private long _numEntriesScannedInFilter = 0;
+  private int _numEntriesExaminedPostFilter = 0;
+
+  public JsonIndexDistinctOperator(IndexSegment indexSegment, QueryContext queryContext,
+      BaseFilterOperator filterOperator) {
+    _indexSegment = indexSegment;
+    _totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
+    _queryContext = queryContext;
+    _filterOperator = filterOperator;
+    List<ExpressionContext> expressions = queryContext.getSelectExpressions();
     if (expressions.size() != 1) {
       throw new IllegalStateException("JsonIndexDistinctOperator supports single expression only");
     }
+    _expression = expressions.get(0);
+    _skipMissingPath = QueryOptionsUtils.isJsonIndexDistinctSkipMissingPath(queryContext.getQueryOptions());
 
-    ExpressionContext expr = expressions.get(0);
-    ParsedJsonExtractIndex parsed = parseJsonExtractIndex(expr);
-    if (parsed == null) {
-      throw new IllegalStateException("Expected 3/4-arg scalar jsonExtractIndex expression");
+    // Mirrors the arguments handling logic in `JsonExtractIndexTransformFunction`
+
+    List<ExpressionContext> arguments = _expression.getFunction().getArguments();
+    int numArguments = arguments.size();
+    // Check that there are exactly 3 or 4 or 5 arguments
+    if (numArguments < 3 || numArguments > 5) {
+      throw new IllegalArgumentException(
+          "Expected 3/4/5 arguments for jsonExtractIndex(jsonFieldName, 'jsonPath', 'resultsType',"
+              + " ['defaultValue'], ['jsonFilterExpression'])");
     }
 
-    DataSource dataSource = _indexSegment.getDataSource(parsed._columnName, _queryContext.getSchema());
-    JsonIndexReader jsonIndexReader = getJsonIndexReader(dataSource);
-    if (jsonIndexReader == null) {
-      throw new IllegalStateException("Column " + parsed._columnName + " has no JSON index");
-    }
-
-    String pushedDownFilterJson = extractSamePathJsonMatchFilter(parsed, _queryContext.getFilter());
-    boolean filterFullyPushedDown = pushedDownFilterJson != null
-        && isOnlySamePathJsonMatchFilter(parsed, _queryContext.getFilter())
-        && !jsonMatchFilterCanMatchMissingPath(pushedDownFilterJson);
-
-    // Fast path: when the filter is fully pushed down into the JSON index, we only need the distinct value strings.
-    // This avoids reading posting lists, building per-value bitmaps, and converting flattened doc IDs.
-    if (filterFullyPushedDown) {
-      Set<String> distinctValues = jsonIndexReader.getMatchingDistinctValues(
-          parsed._jsonPathString, pushedDownFilterJson);
-      return buildDistinctResultsFromValues(expr, parsed, distinctValues);
-    }
-
-    // Evaluate the filter first so we can skip the (potentially expensive) index map when no docs match.
-    RoaringBitmap filteredDocIds = buildFilteredDocIds();
-    if (filteredDocIds != null && filteredDocIds.isEmpty()) {
-      ColumnDataType earlyColumnDataType = ColumnDataType.fromDataTypeSV(parsed._dataType);
-      DataSchema earlyDataSchema = new DataSchema(
-          new String[]{expr.toString()},
-          new ColumnDataType[]{earlyColumnDataType});
-      OrderByExpressionContext earlyOrderBy = _queryContext.getOrderByExpressions() != null
-          ? _queryContext.getOrderByExpressions().get(0) : null;
-      return new DistinctResultsBlock(
-          createDistinctTable(earlyDataSchema, parsed._dataType, earlyOrderBy), _queryContext);
-    }
-
-    // All other WHERE filters remain row-level and are applied after converting flattened doc IDs to real doc IDs.
-    Map<String, RoaringBitmap> valueToMatchingDocs =
-        jsonIndexReader.getMatchingFlattenedDocsMap(parsed._jsonPathString, pushedDownFilterJson);
-
-    // Always single-value (MV _ARRAY is rejected in parseJsonExtractIndex)
-    jsonIndexReader.convertFlattenedDocIdsToDocIds(valueToMatchingDocs);
-    return buildDistinctResultsBlock(expr, parsed, valueToMatchingDocs, filteredDocIds,
-        filteredDocIds == null);
-  }
-
-  private DistinctResultsBlock buildDistinctResultsFromValues(ExpressionContext expr, ParsedJsonExtractIndex parsed,
-      Set<String> distinctValues) {
-    ColumnDataType columnDataType = ColumnDataType.fromDataTypeSV(parsed._dataType);
-    DataSchema dataSchema = new DataSchema(
-        new String[]{expr.toString()},
-        new ColumnDataType[]{columnDataType});
-    OrderByExpressionContext orderByExpression = _queryContext.getOrderByExpressions() != null
-        ? _queryContext.getOrderByExpressions().get(0) : null;
-    DistinctTable distinctTable = createDistinctTable(dataSchema, parsed._dataType, orderByExpression);
-    int limit = _queryContext.getLimit();
-
-    for (String value : distinctValues) {
-      _numEntriesExamined++;
-      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numEntriesExamined, EXPLAIN_NAME);
-
-      boolean done = addValueToDistinctTable(distinctTable, value, parsed._dataType, orderByExpression);
-      if (done) {
-        break;
+    ExpressionContext firstArgument = arguments.get(0);
+    if (firstArgument.getType() == ExpressionContext.Type.IDENTIFIER) {
+      DataSource dataSource = indexSegment.getDataSource(firstArgument.getIdentifier());
+      _jsonIndexReader = getJsonIndexReader(dataSource);
+      if (_jsonIndexReader == null) {
+        throw new IllegalStateException("jsonExtractIndex can only be applied on a column with JSON index");
       }
-      if (orderByExpression == null && distinctTable.hasLimit() && distinctTable.size() >= limit) {
-        break;
-      }
-    }
-
-    return new DistinctResultsBlock(distinctTable, _queryContext);
-  }
-
-  private DistinctResultsBlock buildDistinctResultsBlock(ExpressionContext expr, ParsedJsonExtractIndex parsed,
-      Map<String, RoaringBitmap> valueToMatchingDocs, @Nullable RoaringBitmap filteredDocIds,
-      boolean allDocsSelected) {
-    ColumnDataType columnDataType = ColumnDataType.fromDataTypeSV(parsed._dataType);
-    DataSchema dataSchema = new DataSchema(
-        new String[]{expr.toString()},
-        new ColumnDataType[]{columnDataType});
-    OrderByExpressionContext orderByExpression = _queryContext.getOrderByExpressions() != null
-        ? _queryContext.getOrderByExpressions().get(0) : null;
-    DistinctTable distinctTable = createDistinctTable(dataSchema, parsed._dataType, orderByExpression);
-
-    int limit = _queryContext.getLimit();
-    int totalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    RoaringBitmap coveredDocs = allDocsSelected ? new RoaringBitmap() : null;
-    RoaringBitmap remainingDocs = filteredDocIds != null ? filteredDocIds.clone() : null;
-    boolean allDocsCovered = filteredDocIds == null ? !allDocsSelected || totalDocs == 0 : filteredDocIds.isEmpty();
-    boolean earlyBreak = false;
-
-    for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
-      _numEntriesExamined++;
-      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numEntriesExamined, EXPLAIN_NAME);
-
-      String value = entry.getKey();
-      RoaringBitmap docIds = entry.getValue();
-
-      boolean includeValue;
-      if (filteredDocIds == null) {
-        includeValue = true;
-        if (!allDocsCovered && allDocsSelected) {
-          coveredDocs.or(docIds);
-          if (coveredDocs.getLongCardinality() >= totalDocs) {
-            allDocsCovered = true;
-          }
-        }
-      } else {
-        includeValue = RoaringBitmap.intersects(docIds, filteredDocIds);
-        // Remove matched docs from remaining set in-place (no allocation per value).
-        if (!allDocsCovered && includeValue) {
-          remainingDocs.andNot(docIds);
-          if (remainingDocs.isEmpty()) {
-            allDocsCovered = true;
-          }
-        }
-      }
-
-      if (includeValue) {
-        boolean done = addValueToDistinctTable(distinctTable, value, parsed._dataType, orderByExpression);
-        if (done) {
-          earlyBreak = true;
-          break;
-        }
-      }
-
-      if (orderByExpression == null && distinctTable.hasLimit() && distinctTable.size() >= limit) {
-        earlyBreak = true;
-        break;
-      }
-    }
-
-    if (!earlyBreak && !allDocsCovered) {
-      handleMissingDocs(distinctTable, parsed, orderByExpression);
-    }
-
-    return new DistinctResultsBlock(distinctTable, _queryContext);
-  }
-
-  private void handleMissingDocs(DistinctTable distinctTable, ParsedJsonExtractIndex parsed,
-      @Nullable OrderByExpressionContext orderByExpression) {
-    if (parsed._defaultValueLiteral != null) {
-      addValueToDistinctTable(distinctTable, parsed._defaultValueLiteral, parsed._dataType, orderByExpression);
-    } else if (_queryContext.isNullHandlingEnabled()) {
-      distinctTable.addNull();
     } else {
-      throw new RuntimeException(
-          String.format("Illegal Json Path: [%s], for some docIds in segment [%s]",
-              parsed._jsonPathString, _indexSegment.getSegmentName()));
+      throw new IllegalArgumentException("jsonExtractIndex can only be applied to a raw column");
     }
-  }
 
-  @Nullable
-  private static String extractSamePathJsonMatchFilter(ParsedJsonExtractIndex parsed, @Nullable FilterContext filter) {
-    if (filter == null) {
-      return null;
+    ExpressionContext secondArgument = arguments.get(1);
+    if (secondArgument.getType() != ExpressionContext.Type.LITERAL) {
+      throw new IllegalArgumentException("JSON path argument must be a literal");
     }
-    switch (filter.getType()) {
-      case PREDICATE:
-        return extractSamePathJsonMatchFilter(parsed, filter.getPredicate());
-      case AND:
-        String matchingFilter = null;
-        for (FilterContext child : filter.getChildren()) {
-          String childFilter = extractSamePathJsonMatchFilter(parsed, child);
-          if (childFilter == null) {
-            continue;
-          }
-          if (matchingFilter != null) {
-            return null;
-          }
-          matchingFilter = childFilter;
-        }
-        return matchingFilter;
-      default:
-        return null;
-    }
-  }
-
-  private static boolean isOnlySamePathJsonMatchFilter(ParsedJsonExtractIndex parsed, @Nullable FilterContext filter) {
-    if (filter == null || filter.getType() != FilterContext.Type.PREDICATE) {
-      return false;
-    }
-    return extractSamePathJsonMatchFilter(parsed, filter.getPredicate()) != null;
-  }
-
-  private static boolean jsonMatchFilterCanMatchMissingPath(String filterJsonString) {
+    _jsonPathString = secondArgument.getLiteral().getStringValue();
     try {
-      FilterContext filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterJsonString));
-      return filter.getType() == FilterContext.Type.PREDICATE
-          && filter.getPredicate().getType() == Predicate.Type.IS_NULL;
+      JsonPathCache.INSTANCE.getOrCompute(_jsonPathString);
     } catch (Exception e) {
-      return false;
+      throw new IllegalArgumentException("JSON path argument is not a valid JSON path");
     }
-  }
 
-  @Nullable
-  private static String extractSamePathJsonMatchFilter(ParsedJsonExtractIndex parsed, Predicate predicate) {
-    if (!(predicate instanceof JsonMatchPredicate)) {
-      return null;
+    ExpressionContext thirdArgument = arguments.get(2);
+    if (thirdArgument.getType() != ExpressionContext.Type.LITERAL) {
+      throw new IllegalArgumentException("Result type argument must be a literal");
     }
-    ExpressionContext lhs = predicate.getLhs();
-    if (lhs.getType() != ExpressionContext.Type.IDENTIFIER
-        || !parsed._columnName.equals(lhs.getIdentifier())) {
-      return null;
+    String resultsType = thirdArgument.getLiteral().getStringValue().toUpperCase();
+    boolean isSingleValue = !resultsType.endsWith("_ARRAY");
+    if (isSingleValue && _jsonPathString.contains("[*]")) {
+      throw new IllegalArgumentException(
+          "[*] syntax in json path is unsupported for singleValue field json_extract_index");
     }
-    String filterJsonString = ((JsonMatchPredicate) predicate).getValue();
-    int start = filterJsonString.indexOf('"');
-    if (start < 0) {
-      return null;
+    String dataTypeName = isSingleValue ? resultsType : resultsType.substring(0, resultsType.length() - 6);
+    try {
+      _dataType = DataType.valueOf(dataTypeName);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Unknown jsonExtractIndex result type: " + resultsType);
     }
-    int end = filterJsonString.indexOf('"', start + 1);
-    if (end < 0) {
-      return null;
-    }
-    String filterPath = filterJsonString.substring(start + 1, end);
-    return parsed._jsonPathString.equals(filterPath) ? filterJsonString : null;
-  }
-
-  private DistinctTable createDistinctTable(DataSchema dataSchema, FieldSpec.DataType dataType,
-      @Nullable OrderByExpressionContext orderByExpression) {
-    int limit = _queryContext.getLimit();
-    boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
-    switch (dataType) {
+    switch (_dataType) {
       case INT:
-        return new IntDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
       case LONG:
-        return new LongDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
       case FLOAT:
-        return new FloatDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
       case DOUBLE:
-        return new DoubleDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
       case BIG_DECIMAL:
-        return new BigDecimalDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
       case STRING:
-        return new StringDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+        break;
       default:
-        throw new IllegalStateException("Unsupported data type for JSON index distinct: " + dataType);
+        throw new IllegalArgumentException("Unsupported jsonExtractIndex result type for distinct: " + _dataType);
     }
-  }
 
-  private static boolean addValueToDistinctTable(DistinctTable distinctTable, String stringValue,
-      FieldSpec.DataType dataType, @Nullable OrderByExpressionContext orderByExpression) {
-    switch (dataType) {
-      case INT:
-        return addToTable((IntDistinctTable) distinctTable, Integer.parseInt(stringValue), orderByExpression);
-      case LONG:
-        return addToTable((LongDistinctTable) distinctTable, Long.parseLong(stringValue), orderByExpression);
-      case FLOAT:
-        return addToTable((FloatDistinctTable) distinctTable, Float.parseFloat(stringValue), orderByExpression);
-      case DOUBLE:
-        return addToTable((DoubleDistinctTable) distinctTable, Double.parseDouble(stringValue), orderByExpression);
-      case BIG_DECIMAL:
-        return addToTable((BigDecimalDistinctTable) distinctTable, new BigDecimal(stringValue), orderByExpression);
-      case STRING:
-        return addToTable((StringDistinctTable) distinctTable, stringValue, orderByExpression);
-      default:
-        throw new IllegalStateException("Unsupported data type for JSON index distinct: " + dataType);
-    }
-  }
-
-  private static boolean addToTable(IntDistinctTable table, int value,
-      @Nullable OrderByExpressionContext orderByExpression) {
-    if (table.hasLimit()) {
-      if (orderByExpression != null) {
-        table.addWithOrderBy(value);
-        return false;
+    // With _skipMissingPath, the 4-arg default is never used at runtime (handleMissingDocs is bypassed), so don't
+    // parse or validate it — accept any literal shape and ignore it.
+    if (numArguments >= 4 && !_skipMissingPath) {
+      ExpressionContext fourthArgument = arguments.get(3);
+      if (fourthArgument.getType() != ExpressionContext.Type.LITERAL) {
+        throw new IllegalArgumentException("Default value must be a literal");
+      }
+      String defaultLiteral = fourthArgument.getLiteral().getStringValue();
+      if (isSingleValue) {
+        try {
+          _dataType.convert(defaultLiteral);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Default value '" + defaultLiteral + "' is not a valid " + _dataType);
+        }
+        _defaultValueLiterals = new String[]{defaultLiteral};
       } else {
-        return table.addWithoutOrderBy(value);
+        try {
+          JsonNode mvArray = JsonUtils.stringToJsonNode(defaultLiteral);
+          if (!mvArray.isArray()) {
+            throw new IllegalArgumentException("Default value must be a valid JSON array");
+          }
+          String[] literals = new String[mvArray.size()];
+          for (int i = 0; i < mvArray.size(); i++) {
+            literals[i] = mvArray.get(i).asText();
+            try {
+              _dataType.convert(literals[i]);
+            } catch (Exception e) {
+              throw new IllegalArgumentException("Default value '" + literals[i] + "' is not a valid " + _dataType);
+            }
+          }
+          _defaultValueLiterals = literals;
+        } catch (IOException e) {
+          throw new IllegalArgumentException("Default value must be a valid JSON array");
+        }
       }
     } else {
-      table.addUnbounded(value);
-      return false;
+      _defaultValueLiterals = null;
     }
-  }
 
-  private static boolean addToTable(LongDistinctTable table, long value,
-      @Nullable OrderByExpressionContext orderByExpression) {
-    if (table.hasLimit()) {
-      if (orderByExpression != null) {
-        table.addWithOrderBy(value);
-        return false;
-      } else {
-        return table.addWithoutOrderBy(value);
+    if (numArguments == 5) {
+      ExpressionContext fifthArgument = arguments.get(4);
+      if (fifthArgument.getType() != ExpressionContext.Type.LITERAL) {
+        throw new IllegalArgumentException("JSON path filter argument must be a literal");
       }
+      _filterJsonExpression = fifthArgument.getLiteral().getStringValue();
     } else {
-      table.addUnbounded(value);
-      return false;
+      _filterJsonExpression = null;
     }
-  }
 
-  private static boolean addToTable(FloatDistinctTable table, float value,
-      @Nullable OrderByExpressionContext orderByExpression) {
-    if (table.hasLimit()) {
-      if (orderByExpression != null) {
-        table.addWithOrderBy(value);
-        return false;
-      } else {
-        return table.addWithoutOrderBy(value);
-      }
-    } else {
-      table.addUnbounded(value);
-      return false;
-    }
-  }
-
-  private static boolean addToTable(DoubleDistinctTable table, double value,
-      @Nullable OrderByExpressionContext orderByExpression) {
-    if (table.hasLimit()) {
-      if (orderByExpression != null) {
-        table.addWithOrderBy(value);
-        return false;
-      } else {
-        return table.addWithoutOrderBy(value);
-      }
-    } else {
-      table.addUnbounded(value);
-      return false;
-    }
-  }
-
-  private static boolean addToTable(BigDecimalDistinctTable table, BigDecimal value,
-      @Nullable OrderByExpressionContext orderByExpression) {
-    if (table.hasLimit()) {
-      if (orderByExpression != null) {
-        table.addWithOrderBy(value);
-        return false;
-      } else {
-        return table.addWithoutOrderBy(value);
-      }
-    } else {
-      table.addUnbounded(value);
-      return false;
-    }
-  }
-
-  private static boolean addToTable(StringDistinctTable table, String value,
-      @Nullable OrderByExpressionContext orderByExpression) {
-    if (table.hasLimit()) {
-      if (orderByExpression != null) {
-        table.addWithOrderBy(value);
-        return false;
-      } else {
-        return table.addWithoutOrderBy(value);
-      }
-    } else {
-      table.addUnbounded(value);
-      return false;
-    }
+    _dataSchema = new DataSchema(new String[]{_expression.toString()},
+        new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_dataType)});
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    _orderByExpression = orderByExpressions != null ? orderByExpressions.get(0) : null;
   }
 
   @Nullable
   private static JsonIndexReader getJsonIndexReader(DataSource dataSource) {
     JsonIndexReader reader = dataSource.getJsonIndex();
+    // TODO: rework
     if (reader == null) {
-      Optional<IndexType<?, ?, ?>> compositeIndex =
-          IndexService.getInstance().getOptional("composite_json_index");
+      Optional<IndexType<?, ?, ?>> compositeIndex = IndexService.getInstance().getOptional("composite_json_index");
       if (compositeIndex.isPresent()) {
         reader = (JsonIndexReader) dataSource.getIndex(compositeIndex.get());
       }
@@ -462,104 +244,199 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
     return reader;
   }
 
-  @Nullable
-  private RoaringBitmap buildFilteredDocIds() {
+  @Override
+  protected DistinctResultsBlock getNextBlock() {
+    // Evaluate the filter first so we can skip the (potentially expensive) index map when no docs match.
     BaseFilterOperator.FilteredDocIds filteredDocIds = _filterOperator.getFilteredDocIds();
-    _numEntriesScannedInFilter = filteredDocIds.getNumEntriesScannedInFilter();
     ImmutableRoaringBitmap docIds = filteredDocIds.getDocIds();
-    return docIds != null ? docIds.toRoaringBitmap() : null;
+    _numDocsScanned = docIds != null ? docIds.getCardinality() : _totalDocs;
+    _numEntriesScannedInFilter = filteredDocIds.getNumEntriesScannedInFilter();
+    if (_numDocsScanned == 0) {
+      return new DistinctResultsBlock(createDistinctTable(), _queryContext);
+    }
+
+    // The 5-arg form's filter literal is pushed into the JSON index; WHERE-clause filters remain row-level and are
+    // applied after converting flattened doc IDs to real doc IDs.
+    Map<String, RoaringBitmap> valueToMatchingDocs =
+        _jsonIndexReader.getMatchingFlattenedDocsMap(_jsonPathString, _filterJsonExpression);
+    _jsonIndexReader.convertFlattenedDocIdsToDocIds(valueToMatchingDocs);
+    return buildDistinctResultsBlock(valueToMatchingDocs, docIds != null ? docIds.toRoaringBitmap() : null);
   }
 
-  @Nullable
-  private static ParsedJsonExtractIndex parseJsonExtractIndex(ExpressionContext expr) {
-    if (expr.getType() != ExpressionContext.Type.FUNCTION) {
-      return null;
-    }
-    if (!FUNCTION_NAME.equalsIgnoreCase(expr.getFunction().getFunctionName())) {
-      return null;
-    }
-    List<ExpressionContext> args = expr.getFunction().getArguments();
-    if (args.size() != 3 && args.size() != 4) {
-      return null;
-    }
-    if (args.get(0).getType() != ExpressionContext.Type.IDENTIFIER) {
-      return null;
-    }
-    if (args.get(1).getType() != ExpressionContext.Type.LITERAL
-        || args.get(2).getType() != ExpressionContext.Type.LITERAL
-        || (args.size() == 4 && args.get(3).getType() != ExpressionContext.Type.LITERAL)) {
-      return null;
-    }
+  private DistinctResultsBlock buildDistinctResultsBlock(Map<String, RoaringBitmap> valueToMatchingDocs,
+      @Nullable RoaringBitmap filteredDocIds) {
+    DistinctTable distinctTable = createDistinctTable();
 
-    String columnName = args.get(0).getIdentifier();
-    String jsonPathString = args.get(1).getLiteral().getStringValue();
-    String resultsType = args.get(2).getLiteral().getStringValue().toUpperCase();
-    // Only single-value types are supported; MV (_ARRAY) would have incorrect flattened-to-real
-    // docId intersection since convertFlattenedDocIdsToDocIds is skipped for MV.
-    if (resultsType.endsWith("_ARRAY")) {
-      return null;
-    }
-    if (jsonPathString.contains("[*]")) {
-      return null;
-    }
+    // With _skipMissingPath, handleMissingDocs is bypassed — no need to track which docs are still uncovered, so
+    // skip the bitmap allocation and per-iteration `andNot` work entirely.
+    boolean allDocsCovered = _skipMissingPath;
+    RoaringBitmap remainingDocs = _skipMissingPath ? null
+        : (filteredDocIds != null ? filteredDocIds.clone() : RoaringBitmap.bitmapOfRange(0L, _totalDocs));
+    boolean earlyBreak = false;
 
-    FieldSpec.DataType dataType;
-    try {
-      dataType = FieldSpec.DataType.valueOf(resultsType);
-    } catch (IllegalArgumentException e) {
-      return null;
-    }
-    // Only types with a corresponding DistinctTable implementation are supported
-    switch (dataType) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-      case BIG_DECIMAL:
-      case STRING:
+    for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numEntriesExaminedPostFilter++, EXPLAIN_NAME);
+
+      String value = entry.getKey();
+      RoaringBitmap docIds = entry.getValue();
+
+      // Unfiltered always includes; filtered must intersect the original filter set (not the shrinking
+      // `remainingDocs`, since a value can still belong to the result after all filtered docs are covered).
+      boolean includeValue = filteredDocIds == null || RoaringBitmap.intersects(docIds, filteredDocIds);
+
+      if (!allDocsCovered && includeValue) {
+        remainingDocs.andNot(docIds);
+        if (remainingDocs.isEmpty()) {
+          allDocsCovered = true;
+        }
+      }
+
+      // addValueToDistinctTable returns true exactly when the table has reached its LIMIT (no-ORDER-BY case);
+      // for ORDER-BY or unbounded LIMIT it always returns false. So no separate size check is needed.
+      if (includeValue && addValueToDistinctTable(distinctTable, value)) {
+        earlyBreak = true;
         break;
-      default:
-        return null;
-    }
-
-    try {
-      JsonPathCache.INSTANCE.getOrCompute(jsonPathString);
-    } catch (Exception e) {
-      return null;
-    }
-
-    String defaultValueLiteral = null;
-    if (args.size() == 4) {
-      defaultValueLiteral = args.get(3).getLiteral().getStringValue();
-      try {
-        dataType.convert(defaultValueLiteral);
-      } catch (Exception e) {
-        return null;
       }
     }
 
-    return new ParsedJsonExtractIndex(columnName, jsonPathString, dataType, defaultValueLiteral);
+    if (!earlyBreak && !allDocsCovered) {
+      handleMissingDocs(distinctTable);
+    }
+
+    return new DistinctResultsBlock(distinctTable, _queryContext);
   }
 
-  private static final class ParsedJsonExtractIndex {
-    final String _columnName;
-    final String _jsonPathString;
-    final FieldSpec.DataType _dataType;
-    @Nullable
-    final String _defaultValueLiteral;
+  private DistinctTable createDistinctTable() {
+    int limit = _queryContext.getLimit();
+    boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+    switch (_dataType) {
+      case INT:
+        return new IntDistinctTable(_dataSchema, limit, nullHandlingEnabled, _orderByExpression);
+      case LONG:
+        return new LongDistinctTable(_dataSchema, limit, nullHandlingEnabled, _orderByExpression);
+      case FLOAT:
+        return new FloatDistinctTable(_dataSchema, limit, nullHandlingEnabled, _orderByExpression);
+      case DOUBLE:
+        return new DoubleDistinctTable(_dataSchema, limit, nullHandlingEnabled, _orderByExpression);
+      case BIG_DECIMAL:
+        return new BigDecimalDistinctTable(_dataSchema, limit, nullHandlingEnabled, _orderByExpression);
+      case STRING:
+        return new StringDistinctTable(_dataSchema, limit, nullHandlingEnabled, _orderByExpression);
+      default:
+        throw new IllegalStateException("Unsupported data type for JSON index distinct: " + _dataType);
+    }
+  }
 
-    ParsedJsonExtractIndex(String columnName, String jsonPathString, FieldSpec.DataType dataType,
-        @Nullable String defaultValueLiteral) {
-      _columnName = columnName;
-      _jsonPathString = jsonPathString;
-      _dataType = dataType;
-      _defaultValueLiteral = defaultValueLiteral;
+  private boolean addValueToDistinctTable(DistinctTable distinctTable, String stringValue) {
+    switch (_dataType) {
+      case INT:
+        return addToTable((IntDistinctTable) distinctTable, Integer.parseInt(stringValue));
+      case LONG:
+        return addToTable((LongDistinctTable) distinctTable, Long.parseLong(stringValue));
+      case FLOAT:
+        return addToTable((FloatDistinctTable) distinctTable, Float.parseFloat(stringValue));
+      case DOUBLE:
+        return addToTable((DoubleDistinctTable) distinctTable, Double.parseDouble(stringValue));
+      case BIG_DECIMAL:
+        return addToTable((BigDecimalDistinctTable) distinctTable, new BigDecimal(stringValue));
+      case STRING:
+        return addToTable((StringDistinctTable) distinctTable, stringValue);
+      default:
+        throw new IllegalStateException("Unsupported data type for JSON index distinct: " + _dataType);
+    }
+  }
+
+  private boolean addToTable(IntDistinctTable table, int value) {
+    if (!table.hasLimit()) {
+      table.addUnbounded(value);
+      return false;
+    }
+    if (_orderByExpression != null) {
+      table.addWithOrderBy(value);
+      return false;
+    }
+    return table.addWithoutOrderBy(value);
+  }
+
+  private boolean addToTable(LongDistinctTable table, long value) {
+    if (!table.hasLimit()) {
+      table.addUnbounded(value);
+      return false;
+    }
+    if (_orderByExpression != null) {
+      table.addWithOrderBy(value);
+      return false;
+    }
+    return table.addWithoutOrderBy(value);
+  }
+
+  private boolean addToTable(FloatDistinctTable table, float value) {
+    if (!table.hasLimit()) {
+      table.addUnbounded(value);
+      return false;
+    }
+    if (_orderByExpression != null) {
+      table.addWithOrderBy(value);
+      return false;
+    }
+    return table.addWithoutOrderBy(value);
+  }
+
+  private boolean addToTable(DoubleDistinctTable table, double value) {
+    if (!table.hasLimit()) {
+      table.addUnbounded(value);
+      return false;
+    }
+    if (_orderByExpression != null) {
+      table.addWithOrderBy(value);
+      return false;
+    }
+    return table.addWithoutOrderBy(value);
+  }
+
+  private boolean addToTable(BigDecimalDistinctTable table, BigDecimal value) {
+    if (!table.hasLimit()) {
+      table.addUnbounded(value);
+      return false;
+    }
+    if (_orderByExpression != null) {
+      table.addWithOrderBy(value);
+      return false;
+    }
+    return table.addWithoutOrderBy(value);
+  }
+
+  private boolean addToTable(StringDistinctTable table, String value) {
+    if (!table.hasLimit()) {
+      table.addUnbounded(value);
+      return false;
+    }
+    if (_orderByExpression != null) {
+      table.addWithOrderBy(value);
+      return false;
+    }
+    return table.addWithoutOrderBy(value);
+  }
+
+  private void handleMissingDocs(DistinctTable distinctTable) {
+    if (_defaultValueLiterals != null) {
+      for (String literal : _defaultValueLiterals) {
+        if (addValueToDistinctTable(distinctTable, literal)) {
+          return;
+        }
+      }
+    } else if (_queryContext.isNullHandlingEnabled()) {
+      distinctTable.addNull();
+    } else {
+      throw new RuntimeException(
+          String.format("Illegal Json Path: [%s], for some docIds in segment [%s]", _jsonPathString,
+              _indexSegment.getSegmentName()));
     }
   }
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_filterOperator);
+    return List.of(_filterOperator);
   }
 
   @Override
@@ -569,16 +446,16 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    // Index-only operator: no docs scanned, no entries scanned post-filter.
-    // Filter-phase stats are tracked when buildFilteredDocIds falls back to DocIdSetPlanNode.
-    return new ExecutionStatistics(0, _numEntriesScannedInFilter, 0, numTotalDocs);
+    // - numDocsScanned tracks the matching docs
+    // - numEntriesScannedInFilter tracks work done while materializing the exact filter bitmap
+    // - numEntriesScannedPostFilter tracks values examined
+    return new ExecutionStatistics(_numDocsScanned, _numEntriesScannedInFilter, _numEntriesExaminedPostFilter,
+        _totalDocs);
   }
 
   @Override
   public String toExplainString() {
-    List<ExpressionContext> expressions = _queryContext.getSelectExpressions();
-    return EXPLAIN_NAME + "(keyColumns:" + (expressions.isEmpty() ? "" : expressions.get(0).toString()) + ")";
+    return EXPLAIN_NAME + "(keyColumns:" + _expression + ")";
   }
 
   @Override
@@ -589,34 +466,6 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
     super.explainAttributes(attributeBuilder);
-    List<ExpressionContext> selectExpressions = _queryContext.getSelectExpressions();
-    if (!selectExpressions.isEmpty()) {
-      attributeBuilder.putStringList("keyColumns",
-          List.of(selectExpressions.get(0).toString()));
-    }
-  }
-
-  /**
-   * Returns true if the expression is the 3/4-arg scalar jsonExtractIndex form on a column with JSON index and the
-   * path is indexed. For OSS JSON index all paths are indexed. For composite JSON index, only paths in
-   * invertedIndexConfigs are indexed per key.
-   */
-  public static boolean canUseJsonIndexDistinct(IndexSegment indexSegment, ExpressionContext expr) {
-    ParsedJsonExtractIndex parsed = parseJsonExtractIndex(expr);
-    if (parsed == null) {
-      return false;
-    }
-    DataSource dataSource = indexSegment.getDataSourceNullable(parsed._columnName);
-    if (dataSource == null) {
-      return false;
-    }
-    JsonIndexReader reader = getJsonIndexReader(dataSource);
-    if (reader == null) {
-      return false;
-    }
-    if (!reader.isPathIndexed(parsed._jsonPathString)) {
-      return false;
-    }
-    return true;
+    attributeBuilder.putStringList("keyColumns", List.of(_expression.toString()));
   }
 }

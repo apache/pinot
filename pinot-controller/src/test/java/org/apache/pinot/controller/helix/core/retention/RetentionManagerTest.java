@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -90,6 +89,13 @@ public class RetentionManagerTest {
   // Variables for real file test
   private Path _tempDir;
   private File _tableDir;
+
+  protected RetentionManager createRetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
+      LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
+      BrokerServiceHelper brokerServiceHelper) {
+    return new RetentionManager(pinotHelixResourceManager, leadControllerManager, config, controllerMetrics,
+        brokerServiceHelper);
+  }
 
   @BeforeMethod
   public void setUp() throws Exception {
@@ -202,7 +208,7 @@ public class RetentionManagerTest {
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(mockResourceManager, conf, null, null);
     RetentionManager retentionManager =
-        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+        createRetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
             brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
@@ -403,7 +409,7 @@ public class RetentionManagerTest {
     PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(mockResourceManager, conf, null, null);
-    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf,
+    RetentionManager retentionManager = createRetentionManager(pinotHelixResourceManager, leadControllerManager, conf,
         controllerMetrics, brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
@@ -463,7 +469,7 @@ public class RetentionManagerTest {
 
     PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
     when(mockResourceManager.getBrokerInstancesConfigsFor(offlineTableConfig.getTableName()))
-        .thenReturn(Collections.singletonList(instanceConfig));
+        .thenReturn(List.of(instanceConfig));
 
     CompletionServiceHelper mockServiceHelper = mock(CompletionServiceHelper.class);
 
@@ -495,7 +501,7 @@ public class RetentionManagerTest {
 
     // test
     RetentionManager retentionManager =
-        new RetentionManager(mockPinotHelixResourceManager, null, controllerConf, mock(ControllerMetrics.class),
+        createRetentionManager(mockPinotHelixResourceManager, null, controllerConf, mock(ControllerMetrics.class),
             brokerServiceHelper);
     retentionManager.manageRetentionForHybridTable(realtimeTableConfig, offlineTableConfig);
 
@@ -613,7 +619,7 @@ public class RetentionManagerTest {
     PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(mockResourceManager, conf, null, null);
-    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf,
+    RetentionManager retentionManager = createRetentionManager(pinotHelixResourceManager, leadControllerManager, conf,
         controllerMetrics, brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
@@ -651,7 +657,7 @@ public class RetentionManagerTest {
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(mockResourceManager, conf, null, null);
     RetentionManager retentionManager =
-        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+        createRetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
             brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
@@ -698,7 +704,7 @@ public class RetentionManagerTest {
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(mockResourceManager, conf, null, null);
     RetentionManager retentionManager =
-        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+        createRetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
             brokerServiceHelper);
 
     retentionManager.findUntrackedSegmentsToDeleteFromDeepstore("table1_REALTIME", null, segmentsToExclude, null);
@@ -714,8 +720,7 @@ public class RetentionManagerTest {
 
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
 
-    IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(REALTIME_TABLE_NAME, replicaCount);
 
     final int kafkaPartition = 5;
     final long millisInDays = TimeUnit.DAYS.toMillis(1);
@@ -778,8 +783,7 @@ public class RetentionManagerTest {
 
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
 
-    IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(REALTIME_TABLE_NAME, replicaCount);
 
     final int kafkaPartition = 5;
     final long millisInDays = TimeUnit.DAYS.toMillis(1);
@@ -808,6 +812,7 @@ public class RetentionManagerTest {
     when(pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(segmentsZKMetadata);
     when(pinotHelixResourceManager.getHelixClusterName()).thenReturn(HELIX_CLUSTER_NAME);
     when(pinotHelixResourceManager.getLastLLCCompletedSegments(REALTIME_TABLE_NAME)).thenCallRealMethod();
+    when(pinotHelixResourceManager.getLastLLCCompletedSegments(anyList())).thenCallRealMethod();
 
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     when(helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, REALTIME_TABLE_NAME)).thenReturn(idealState);
@@ -858,6 +863,109 @@ public class RetentionManagerTest {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Test
+  public void testCreationTimeFallbackOnChange() {
+    ControllerConf conf = new ControllerConf();
+    conf.setRetentionControllerFrequencyInSeconds(0);
+    conf.setDeletedSegmentsRetentionInDays(0);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
+    RetentionManager retentionManager =
+        createRetentionManager(mockResourceManager, mock(LeadControllerManager.class), conf, controllerMetrics,
+            brokerServiceHelper);
+
+    // Default should be false
+    assertFalse(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Simulate cluster config change to enable
+    String configKey = ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK;
+    Map<String, String> clusterConfigs = new HashMap<>();
+    clusterConfigs.put(configKey, "true");
+    retentionManager.onChange(Set.of(configKey), clusterConfigs);
+    assertTrue(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Simulate cluster config change to disable
+    clusterConfigs.put(configKey, "false");
+    retentionManager.onChange(Set.of(configKey), clusterConfigs);
+    assertFalse(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Invalid value should keep current value
+    clusterConfigs.put(configKey, "invalid");
+    retentionManager.onChange(Set.of(configKey), clusterConfigs);
+    assertFalse(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Simulate config key deletion (null value) while feature is enabled — should revert to default (false)
+    clusterConfigs.put(configKey, "true");
+    retentionManager.onChange(Set.of(configKey), clusterConfigs);
+    assertTrue(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Now delete the config key: changedConfigs contains the key, but clusterConfigs.get() returns null
+    Map<String, String> configsWithDeletedKey = new HashMap<>();
+    configsWithDeletedKey.put(configKey, null);
+    retentionManager.onChange(Set.of(configKey), configsWithDeletedKey);
+    assertFalse(retentionManager.isRetentionCreationTimeFallbackEnabled());
+  }
+
+  @Test
+  public void testRetentionWithInvalidEndTimeAndCreationTimeFallback() {
+    long now = System.currentTimeMillis();
+    // Creation time must exceed the table's retention period (365 days) to be purgeable
+    long fourHundredDaysAgoMs = now - TimeUnit.DAYS.toMillis(400);
+
+    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
+
+    // Segment with invalid end time but old creation time — should be deleted when fallback is enabled
+    SegmentZKMetadata invalidEndTimeSeg = mock(SegmentZKMetadata.class);
+    when(invalidEndTimeSeg.getSegmentName()).thenReturn("seg_invalid_endtime");
+    when(invalidEndTimeSeg.getEndTimeMs()).thenReturn(-1L);
+    when(invalidEndTimeSeg.getCreationTime()).thenReturn(fourHundredDaysAgoMs);
+    when(invalidEndTimeSeg.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.DONE);
+    segmentsZKMetadata.add(invalidEndTimeSeg);
+
+    // Segment with valid end time that is recent — should NOT be deleted
+    SegmentZKMetadata recentSeg = mock(SegmentZKMetadata.class);
+    when(recentSeg.getSegmentName()).thenReturn("seg_recent");
+    when(recentSeg.getEndTimeMs()).thenReturn(now);
+    when(recentSeg.getCreationTime()).thenReturn(now);
+    when(recentSeg.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.DONE);
+    segmentsZKMetadata.add(recentSeg);
+
+    final TableConfig tableConfig = createOfflineTableConfig();
+    List<String> expectedDeletedSegments = List.of("seg_invalid_endtime");
+
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+
+    setupPinotHelixResourceManager(tableConfig, expectedDeletedSegments, pinotHelixResourceManager,
+        leadControllerManager);
+
+    when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
+    when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
+
+    // Test with fallback ENABLED
+    ControllerConf conf = new ControllerConf();
+    conf.setRetentionControllerFrequencyInSeconds(0);
+    conf.setDeletedSegmentsRetentionInDays(0);
+    conf.setProperty(ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK, "true");
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
+    RetentionManager retentionManager =
+        createRetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+            brokerServiceHelper);
+    retentionManager.start();
+    retentionManager.run();
+
+    // Verify deleteSegments is called — setupPinotHelixResourceManager's doAnswer
+    // already asserts the correct segments via TestNG assertions
+    verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
   }
 
   public static class FakePinotFs extends LocalPinotFS {

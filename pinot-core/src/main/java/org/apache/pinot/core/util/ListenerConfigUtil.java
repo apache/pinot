@@ -64,6 +64,8 @@ public final class ListenerConfigUtil {
   private static final String DEFAULT_HOST = "0.0.0.0";
   private static final String DOT_ACCESS_PROTOCOLS = ".access.protocols";
   private static final String DOT_ACCESS_THREAD_POOL = ".http.server.thread.pool";
+  private static final String DOT_MAX_HTTP_HEADER_SIZE = ".http.server.max.http.header.size";
+  private static final String DOT_MAX_REQUEST_HEADERS = ".http.server.max.request.headers";
 
   private ListenerConfigUtil() {
     // left blank
@@ -101,7 +103,8 @@ public final class ListenerConfigUtil {
     if (portString != null) {
       listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(portString),
           CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(controllerConf,
-          "pinot.controller")));
+          "pinot.controller"), getMaxHttpHeaderSize(controllerConf, "pinot.controller"),
+          getMaxRequestHeaders(controllerConf, "pinot.controller")));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(controllerConf, "controller.tls");
@@ -114,11 +117,14 @@ public final class ListenerConfigUtil {
 
   public static List<ListenerConfig> buildBrokerConfigs(PinotConfiguration brokerConf) {
     List<ListenerConfig> listeners = new ArrayList<>();
+    // Build thread pool config once and reuse for all broker listeners using the same namespace
+    HttpServerThreadPoolConfig threadPoolConfig = buildServerThreadPoolConfig(brokerConf, "pinot.broker");
 
     String queryPortString = brokerConf.getProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT);
     if (queryPortString != null) {
       listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(queryPortString),
-          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(brokerConf, "pinot.broker")));
+          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), threadPoolConfig,
+          getMaxHttpHeaderSize(brokerConf, "pinot.broker"), getMaxRequestHeaders(brokerConf, "pinot.broker")));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(brokerConf, CommonConstants.Broker.BROKER_TLS_PREFIX);
@@ -129,7 +135,16 @@ public final class ListenerConfigUtil {
     if (listeners.isEmpty()) {
       listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST,
           CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig(),
-          buildServerThreadPoolConfig(brokerConf, "pinot.broker")));
+          threadPoolConfig,
+          getMaxHttpHeaderSize(brokerConf, "pinot.broker"), getMaxRequestHeaders(brokerConf, "pinot.broker")));
+    }
+
+    // Admin API port support
+    String adminPortString = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ADMIN_API_PORT);
+    if (adminPortString != null) {
+      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminPortString),
+          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), threadPoolConfig,
+          getMaxHttpHeaderSize(brokerConf, "pinot.broker"), getMaxRequestHeaders(brokerConf, "pinot.broker")));
     }
 
     return listeners;
@@ -142,7 +157,8 @@ public final class ListenerConfigUtil {
     if (adminApiPortString != null) {
       listeners.add(
           new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminApiPortString),
-              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(serverConf, "pinot.server")));
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(serverConf, "pinot.server"),
+              getMaxHttpHeaderSize(serverConf, "pinot.server"), getMaxRequestHeaders(serverConf, "pinot.server")));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(serverConf, CommonConstants.Server.SERVER_TLS_PREFIX);
@@ -153,7 +169,8 @@ public final class ListenerConfigUtil {
     if (listeners.isEmpty()) {
       listeners.add(
           new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
-              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(serverConf, "pinot.server")));
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(serverConf, "pinot.server"),
+              getMaxHttpHeaderSize(serverConf, "pinot.server"), getMaxRequestHeaders(serverConf, "pinot.server")));
     }
 
     return listeners;
@@ -165,7 +182,8 @@ public final class ListenerConfigUtil {
     String portString = minionConf.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT);
     if (portString != null) {
       listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(portString),
-          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(minionConf, "pinot.minion")));
+          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(minionConf, "pinot.minion"),
+          getMaxHttpHeaderSize(minionConf, "pinot.minion"), getMaxRequestHeaders(minionConf, "pinot.minion")));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(minionConf, CommonConstants.Minion.MINION_TLS_PREFIX);
@@ -175,7 +193,8 @@ public final class ListenerConfigUtil {
     if (listeners.isEmpty()) {
       listeners.add(
           new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, CommonConstants.Minion.DEFAULT_HELIX_PORT,
-              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(minionConf, "pinot.minion")));
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(minionConf, "pinot.minion"),
+              getMaxHttpHeaderSize(minionConf, "pinot.minion"), getMaxRequestHeaders(minionConf, "pinot.minion")));
     }
 
     return listeners;
@@ -189,7 +208,8 @@ public final class ListenerConfigUtil {
         getPort(config.getProperty(protocolNamespace + ".port")),
         getProtocol(config.getProperty(protocolNamespace + ".protocol"), name),
         TlsUtils.extractTlsConfig(config, protocolNamespace + ".tls", tlsConfig),
-        buildServerThreadPoolConfig(config, namespace));
+        buildServerThreadPoolConfig(config, namespace),
+        getMaxHttpHeaderSize(config, namespace), getMaxRequestHeaders(config, namespace));
   }
 
   private static String getHost(String configuredHost) {
@@ -242,6 +262,13 @@ public final class ListenerConfigUtil {
         .setCorePoolSize(listenerConfig.getThreadPoolConfig().getCorePoolSize())
         .setMaxPoolSize(listenerConfig.getThreadPoolConfig().getMaxPoolSize());
 
+    if (listenerConfig.getMaxHttpHeaderSize() > 0) {
+      listener.setMaxHttpHeaderSize(listenerConfig.getMaxHttpHeaderSize());
+    }
+    if (listenerConfig.getMaxRequestHeaders() > 0) {
+      listener.setMaxRequestHeaders(listenerConfig.getMaxRequestHeaders());
+    }
+
     if (CommonConstants.HTTPS_PROTOCOL.equals(listenerConfig.getProtocol())) {
       listener.setSecure(true);
       listener.setSSLEngineConfig(buildSSLEngineConfigurator(listenerConfig.getTlsConfig()));
@@ -285,6 +312,14 @@ public final class ListenerConfigUtil {
       threadPoolConfig.setMaxPoolSize(maxPoolSize);
     }
     return threadPoolConfig;
+  }
+
+  private static int getMaxHttpHeaderSize(PinotConfiguration config, String namespace) {
+    return config.getProperty(namespace + DOT_MAX_HTTP_HEADER_SIZE, -1);
+  }
+
+  private static int getMaxRequestHeaders(PinotConfiguration config, String namespace) {
+    return config.getProperty(namespace + DOT_MAX_REQUEST_HEADERS, -1);
   }
 
   public static String toString(Collection<? extends ListenerConfig> listenerConfigs) {

@@ -31,6 +31,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.data.manager.realtime.ServerIngestionOomProtectionManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -75,8 +76,9 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
       SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      BooleanSupplier isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh,
-      ServerReloadJobStatusCache reloadJobStatusCache) {
+      BooleanSupplier isServerReadyToConsumeData, BooleanSupplier isServerReadyToServeQueries,
+      ServerIngestionOomProtectionManager.ServerThrottleState serverIngestionOomProtectionThrottleState,
+      boolean enableAsyncSegmentRefresh, ServerReloadJobStatusCache reloadJobStatusCache) {
     TableDataManager tableDataManager;
     switch (tableConfig.getTableType()) {
       case OFFLINE:
@@ -94,7 +96,8 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
                   + "configured the segmentstore uri. Configure the server config %s",
               StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE, CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI));
         }
-        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToServeQueries);
+        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToConsumeData,
+            isServerReadyToServeQueries, serverIngestionOomProtectionThrottleState);
         break;
       default:
         throw new IllegalStateException();

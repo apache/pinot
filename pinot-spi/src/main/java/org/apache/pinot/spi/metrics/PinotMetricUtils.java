@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -89,7 +88,8 @@ public class PinotMetricUtils {
           LOGGER.info("Trying to init PinotMetricsFactory: {} and MetricsFactory: {}", clazz, annotation);
           if (annotation.enabled()) {
             try {
-              PinotMetricsFactory pinotMetricsFactory = (PinotMetricsFactory) clazz.newInstance();
+              PinotMetricsFactory pinotMetricsFactory =
+                  (PinotMetricsFactory) clazz.getDeclaredConstructor().newInstance();
               pinotMetricsFactory.init(metricsConfiguration);
               registerMetricsFactory(pinotMetricsFactory);
             } catch (Exception e) {
@@ -187,7 +187,7 @@ public class PinotMetricUtils {
 
   @VisibleForTesting
   public static PinotMetricsRegistry getPinotMetricsRegistry() {
-    return getPinotMetricsRegistry(new PinotConfiguration(Collections.emptyMap()));
+    return getPinotMetricsRegistry(new PinotConfiguration(Map.of()));
   }
 
   /**

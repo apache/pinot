@@ -20,21 +20,20 @@ package org.apache.pinot.segment.local.function;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.base.Preconditions;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
-public class GroovyStaticAnalyzerConfig {
-  private final List<String> _allowedReceivers;
-  private final List<String> _allowedImports;
-  private final List<String> _allowedStaticImports;
-  private final List<String> _disallowedMethodNames;
-  private final boolean _methodDefinitionAllowed;
-
+/**
+ * Deprecated forwarding wrapper for the legacy Groovy static analyzer config type name.
+ *
+ * <p>This value object is immutable and thread-safe.
+ *
+ * <p>TODO: Delete this shim after Pinot 1.6.0 is released.
+ *
+ * @deprecated Use {@link org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig} instead.
+ */
+@Deprecated
+public class GroovyStaticAnalyzerConfig extends org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig {
   public GroovyStaticAnalyzerConfig(
       @JsonProperty("allowedReceivers")
       List<String> allowedReceivers,
@@ -46,93 +45,35 @@ public class GroovyStaticAnalyzerConfig {
       List<String> disallowedMethodNames,
       @JsonProperty("methodDefinitionAllowed")
       boolean methodDefinitionAllowed) {
-    _allowedImports = allowedImports;
-    _allowedReceivers = allowedReceivers;
-    _allowedStaticImports = allowedStaticImports;
-    _disallowedMethodNames = disallowedMethodNames;
-    _methodDefinitionAllowed = methodDefinitionAllowed;
+    super(allowedReceivers, allowedImports, allowedStaticImports, disallowedMethodNames, methodDefinitionAllowed);
   }
 
-  @JsonProperty("allowedReceivers")
-  public List<String> getAllowedReceivers() {
-    return _allowedReceivers;
-  }
-
-  @JsonProperty("allowedImports")
-  public List<String> getAllowedImports() {
-    return _allowedImports;
-  }
-
-  @JsonProperty("allowedStaticImports")
-  public List<String> getAllowedStaticImports() {
-    return _allowedStaticImports;
-  }
-
-  @JsonProperty("disallowedMethodNames")
-  public List<String> getDisallowedMethodNames() {
-    return _disallowedMethodNames;
-  }
-
-  @JsonProperty("methodDefinitionAllowed")
-  public boolean isMethodDefinitionAllowed() {
-    return _methodDefinitionAllowed;
-  }
-
-  public String toJson() throws JsonProcessingException {
-    return JsonUtils.objectToString(this);
-  }
-
-  public static GroovyStaticAnalyzerConfig fromJson(String configJson) throws JsonProcessingException {
-    Preconditions.checkState(StringUtils.isNotBlank(configJson), "Empty groovySecurityConfiguration JSON string");
-
-    return JsonUtils.stringToObject(configJson, GroovyStaticAnalyzerConfig.class);
+  public static GroovyStaticAnalyzerConfig fromJson(String configJson)
+      throws JsonProcessingException {
+    org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig config =
+        org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.fromJson(configJson);
+    return copy(config);
   }
 
   public static List<Class> getDefaultAllowedTypes() {
-    return List.of(
-        Integer.class,
-        Float.class,
-        Long.class,
-        Double.class,
-        String.class,
-        Object.class,
-        Byte.class,
-        BigDecimal.class,
-        BigInteger.class,
-        Integer.TYPE,
-        Long.TYPE,
-        Float.TYPE,
-        Double.TYPE,
-        Byte.TYPE
-    );
+    return org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.getDefaultAllowedTypes();
   }
 
   public static List<String> getDefaultAllowedReceivers() {
-    return List.of(
-        String.class.getName(),
-        Math.class.getName(),
-        java.util.List.class.getName(),
-        Object.class.getName(),
-        java.util.Map.class.getName()
-    );
+    return org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers();
   }
 
   public static List<String> getDefaultAllowedImports() {
-    return List.of(
-        Math.class.getName(),
-        java.util.List.class.getName(),
-        String.class.getName(),
-        java.util.Map.class.getName()
-    );
+    return org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.getDefaultAllowedImports();
   }
 
   public static GroovyStaticAnalyzerConfig createDefault() {
-    return new GroovyStaticAnalyzerConfig(
-        GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
-        GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
-        GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
-        List.of("execute", "invoke"),
-        false
-    );
+    return copy(org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.createDefault());
+  }
+
+  private static GroovyStaticAnalyzerConfig copy(
+      org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig config) {
+    return new GroovyStaticAnalyzerConfig(config.getAllowedReceivers(), config.getAllowedImports(),
+        config.getAllowedStaticImports(), config.getDisallowedMethodNames(), config.isMethodDefinitionAllowed());
   }
 }

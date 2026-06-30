@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -350,7 +349,7 @@ public class SegmentOp extends BaseOp {
     final Set<String> segmentState =
         getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()
             .filter(k -> k.getKey().equals(_segmentName)).flatMap(x -> x.getValue().values().stream())
-            .collect(Collectors.toSet()) : Collections.emptySet();
+            .collect(Collectors.toSet()) : Set.of();
 
     if (segmentState.contains(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR)) {
       return -1;

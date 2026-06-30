@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.failuredetector;
 
-import java.util.Collections;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -26,7 +25,7 @@ import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -53,7 +52,7 @@ public class ConnectionFailureDetectorTest {
     config.setProperty(Broker.FailureDetector.CONFIG_OF_TYPE, Broker.FailureDetector.Type.CONNECTION.name());
     config.setProperty(Broker.FailureDetector.CONFIG_OF_RETRY_INITIAL_DELAY_MS, 100);
     config.setProperty(Broker.FailureDetector.CONFIG_OF_RETRY_DELAY_FACTOR, 1);
-    _brokerMetrics = new BrokerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    _brokerMetrics = new BrokerMetrics(new NoopPinotMetricsRegistry());
     _failureDetector = FailureDetectorFactory.getFailureDetector(config, _brokerMetrics);
     assertTrue(_failureDetector instanceof ConnectionFailureDetector);
     _healthyServerNotifier = new HealthyServerNotifier();
@@ -66,18 +65,18 @@ public class ConnectionFailureDetectorTest {
   @Test
   public void testConnectionFailure() {
     // No unhealthy servers initially
-    verify(Collections.emptySet(), 0, 0);
+    verify(Set.of(), 0, 0);
 
     _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
-    verify(Collections.singleton(INSTANCE_ID), 1, 0);
+    verify(Set.of(INSTANCE_ID), 1, 0);
 
     // Mark server unhealthy again should have no effect
     _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
-    verify(Collections.singleton(INSTANCE_ID), 1, 0);
+    verify(Set.of(INSTANCE_ID), 1, 0);
 
     // Mark server healthy should remove it from the unhealthy servers and trigger a callback
     _failureDetector.markServerHealthy(INSTANCE_ID, HOST_NAME);
-    verify(Collections.emptySet(), 1, 1);
+    verify(Set.of(), 1, 1);
   }
 
   @Test
@@ -86,14 +85,14 @@ public class ConnectionFailureDetectorTest {
     _failureDetector.registerUnhealthyServerRetrier(_unhealthyServerRetrier);
 
     _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
-    verify(Collections.singleton(INSTANCE_ID), 1, 0);
+    verify(Set.of(INSTANCE_ID), 1, 0);
 
     // Should get 10 retries in 1s, then remove the failed server from the unhealthy servers.
     // Wait for up to 5s to avoid flakiness
     TestUtils.waitForCondition(aVoid -> {
       int numRetries = _unhealthyServerRetrier._retryUnhealthyServerCalled;
       if (numRetries < Broker.FailureDetector.DEFAULT_MAX_RETRIES) {
-        assertEquals(_failureDetector.getUnhealthyServers(), Collections.singleton(INSTANCE_ID));
+        assertEquals(_failureDetector.getUnhealthyServers(), Set.of(INSTANCE_ID));
         assertEquals(MetricValueUtils.getGlobalGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS), 1);
         return false;
       }
@@ -113,14 +112,14 @@ public class ConnectionFailureDetectorTest {
     _failureDetector.registerUnhealthyServerRetrier(_unhealthyServerRetrier);
 
     _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
-    verify(Collections.singleton(INSTANCE_ID), 1, 0);
+    verify(Set.of(INSTANCE_ID), 1, 0);
 
     TestUtils.waitForCondition(aVoid -> {
       int numRetries = _unhealthyServerRetrier._retryUnhealthyServerCalled;
       if (numRetries < 7) {
         // Avoid test flakiness by not making these assertions close to the end of the expected retry period
         if (numRetries > 0 && numRetries <= 5) {
-          assertEquals(_failureDetector.getUnhealthyServers(), Collections.singleton(INSTANCE_ID));
+          assertEquals(_failureDetector.getUnhealthyServers(), Set.of(INSTANCE_ID));
           assertEquals(MetricValueUtils.getGlobalGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS), 1);
         }
         return false;
@@ -152,7 +151,7 @@ public class ConnectionFailureDetectorTest {
     _failureDetector.registerUnhealthyServerRetrier(instanceId -> FailureDetector.ServerState.UNKNOWN);
 
     _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
-    verify(Collections.singleton(INSTANCE_ID), 1, 0);
+    verify(Set.of(INSTANCE_ID), 1, 0);
 
     // Should retry until both unhealthy server retriers return that the server is healthy
     TestUtils.waitForCondition(aVoid -> {
@@ -160,7 +159,7 @@ public class ConnectionFailureDetectorTest {
       if (numRetries < 8) {
         // Avoid test flakiness by not making these assertions close to the end of the expected retry period
         if (numRetries > 0 && numRetries <= 5) {
-          assertEquals(_failureDetector.getUnhealthyServers(), Collections.singleton(INSTANCE_ID));
+          assertEquals(_failureDetector.getUnhealthyServers(), Set.of(INSTANCE_ID));
           assertEquals(MetricValueUtils.getGlobalGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS), 1);
         }
         return false;

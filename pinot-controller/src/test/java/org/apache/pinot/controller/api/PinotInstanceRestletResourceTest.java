@@ -23,13 +23,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminValidationException;
 import org.apache.pinot.controller.api.resources.InstanceTagUpdateRequest;
 import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -49,6 +49,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /**
@@ -82,7 +83,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
     // Create broker and server instances with tags and pools
     Instance brokerInstance2 =
-        new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null, 0, 0, 0, 0,
+        new Instance("2.3.4.5", 1234, InstanceType.BROKER, List.of("tag_BROKER"), null, 0, 0, 0, 0,
             false);
     adminClient.getInstanceClient().createInstance(brokerInstance2.toJsonString());
     Map<String, Integer> serverPools = new TreeMap<>();
@@ -122,13 +123,13 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     // Test PUT instance API
     String newBrokerTag = "new-broker-tag";
     Instance newBrokerInstance =
-        new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null, 0, 0, 0, 0,
+        new Instance("1.2.3.4", 1234, InstanceType.BROKER, List.of(newBrokerTag), null, 0, 0, 0, 0,
             false);
     String brokerInstanceId = "Broker_1.2.3.4_1234";
     adminClient.getInstanceClient().updateInstance(brokerInstanceId, newBrokerInstance.toJsonString());
     String newServerTag = "new-server-tag";
     Instance newServerInstance =
-        new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null, 28090, 28091,
+        new Instance("1.2.3.4", 2345, InstanceType.SERVER, List.of(newServerTag), null, 28090, 28091,
             28092, 28093, true);
     String serverInstanceId = "Server_1.2.3.4_2345";
     adminClient.getInstanceClient().updateInstance(serverInstanceId, newServerInstance.toJsonString());
@@ -293,7 +294,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     // Create a minion instance with minion_untagged tag
     Instance minionInstance =
         new Instance("minion1.test.com", 9514, InstanceType.MINION,
-            Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE),
+            List.of(Helix.UNTAGGED_MINION_INSTANCE),
             null, 0, 0, 0, 0, false);
     adminClient.getInstanceClient().createInstance(minionInstance.toJsonString());
     String minionInstanceId = "Minion_minion1.test.com_9514";
@@ -390,7 +391,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     // Try to drain a broker instance (should fail)
     String brokerInstanceId = "Broker_localhost_1234";
     Instance brokerInstance =
-        new Instance("localhost", 1234, InstanceType.BROKER, Collections.singletonList("broker_tag"), null, 0, 0, 0, 0,
+        new Instance("localhost", 1234, InstanceType.BROKER, List.of("broker_tag"), null, 0, 0, 0, 0,
             false);
     adminClient.getInstanceClient().createInstance(brokerInstance.toJsonString());
 
@@ -435,6 +436,117 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
     // Cleanup
     adminClient.getInstanceClient().dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testQueriesDisableOnServerInstance()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    Instance serverInstance =
+        new Instance("queryroute.test.com", 20000, InstanceType.SERVER, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(serverInstance.toJsonString());
+    String instanceId = "Server_queryroute.test.com_20000";
+    try {
+      // Queries routed by default
+      checkInstanceInfo(adminClient, instanceId, "queryroute.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, false);
+
+      // Disable query routing via toggleInstanceState
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_DISABLE");
+      checkInstanceInfo(adminClient, instanceId, "queryroute.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, true);
+
+      // Re-enable query routing via toggleInstanceState
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_ENABLE");
+      checkInstanceInfo(adminClient, instanceId, "queryroute.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, false);
+    } finally {
+      adminClient.getInstanceClient().dropInstance(instanceId);
+    }
+  }
+
+  @Test
+  public void testUpdateInstancePreservesQueriesDisabled()
+      throws Exception {
+    // Regression test: a generic PUT /instances/{name} with the request body's queriesDisabled defaulted
+    // to false must NOT clobber an operationally-set queriesDisabled=true (operator workflow:
+    //   1. operator calls QUERIES_DISABLE to remove server from broker routing,
+    //   2. some automation later updates host/tags/ports via PUT /instances/{name},
+    //   3. server must remain out of routing).
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    Instance serverInstance =
+        new Instance("preserve.test.com", 20000, InstanceType.SERVER, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(serverInstance.toJsonString());
+    String instanceId = "Server_preserve.test.com_20000";
+    try {
+      // Set queriesDisabled=true via the dedicated state API.
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_DISABLE");
+      checkInstanceInfo(adminClient, instanceId, "preserve.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, true);
+
+      // PUT /instances/{name} with a request body where queriesDisabled defaults to false (legacy operator path).
+      Instance updateBody =
+          new Instance("preserve.test.com", 20000, InstanceType.SERVER, null, null, 0, 0, 0, 0, false);
+      adminClient.getInstanceClient().updateInstance(instanceId, updateBody.toJsonString());
+
+      // queriesDisabled must still be true (operational flag preserved).
+      checkInstanceInfo(adminClient, instanceId, "preserve.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, true);
+
+      // Operator can still clear the flag via the dedicated state API.
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_ENABLE");
+      checkInstanceInfo(adminClient, instanceId, "preserve.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, false);
+    } finally {
+      adminClient.getInstanceClient().dropInstance(instanceId);
+    }
+  }
+
+  @Test
+  public void testQueriesDisableOnNonServerInstanceFails()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    // Broker instance
+    Instance brokerInstance =
+        new Instance("queryroute-broker.test.com", 30000, InstanceType.BROKER, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(brokerInstance.toJsonString());
+    String brokerId = "Broker_queryroute-broker.test.com_30000";
+    try {
+      // Expect HTTP 400 BAD_REQUEST surfaced as PinotAdminValidationException; verify the message
+      // identifies the failing precondition so a future regression that throws a generic 500 fails this test.
+      PinotAdminValidationException ex = expectThrows(PinotAdminValidationException.class,
+          () -> adminClient.getInstanceClient().updateInstanceState(brokerId, "QUERIES_DISABLE"));
+      assertTrue(ex.getMessage().contains("status: 400"),
+          "Expected HTTP 400 BAD_REQUEST, got: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains("only applies to server instances"),
+          "Expected message to mention server-only precondition, got: " + ex.getMessage());
+    } finally {
+      adminClient.getInstanceClient().dropInstance(brokerId);
+    }
+  }
+
+  @Test
+  public void testQueriesDisableOnMinionInstanceFails()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    Instance minionInstance =
+        new Instance("queryroute-minion.test.com", 9520, InstanceType.MINION, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(minionInstance.toJsonString());
+    String minionId = "Minion_queryroute-minion.test.com_9520";
+    try {
+      PinotAdminValidationException ex = expectThrows(PinotAdminValidationException.class,
+          () -> adminClient.getInstanceClient().updateInstanceState(minionId, "QUERIES_DISABLE"));
+      assertTrue(ex.getMessage().contains("status: 400"),
+          "Expected HTTP 400 BAD_REQUEST, got: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains("only applies to server instances"),
+          "Expected message to mention server-only precondition, got: " + ex.getMessage());
+    } finally {
+      adminClient.getInstanceClient().dropInstance(minionId);
+    }
   }
 
   @AfterClass

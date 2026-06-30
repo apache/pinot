@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -55,11 +54,21 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
   private final FieldSpec.DataType _parameterType;
 
-  static boolean canEvaluate(PredicateEvaluator predicateEvaluator, DataSource dataSource) {
-    Predicate.Type type = predicateEvaluator.getPredicateType();
+  public static boolean canEvaluate(PredicateEvaluator predicateEvaluator, DataSource dataSource) {
     RangeIndexReader<?> rangeIndex = dataSource.getRangeIndex();
-    return rangeIndex != null && (type == Predicate.Type.RANGE || (type == Predicate.Type.EQ
-        && dataSource.getRangeIndex().isExact()));
+    if (rangeIndex == null) {
+      return false;
+    }
+    // Range-index format mirrors the column's dictionary state at index build/rebuild time: if the
+    // dictionary exists the range stores dict IDs (RangeIndexCreator/BitSlicedRangeIndexCreator both
+    // switch on hasDictionary), so the evaluator must also be dict-based to compare against the index.
+    // Dropping into this operator with a raw-value evaluator on a dict-built range silently returns
+    // wrong matches (raw values compared against dict IDs); fall through to scan instead.
+    if (dataSource.getDictionary() != null && !predicateEvaluator.isDictionaryBased()) {
+      return false;
+    }
+    Predicate.Type type = predicateEvaluator.getPredicateType();
+    return type == Predicate.Type.RANGE || (type == Predicate.Type.EQ && rangeIndex.isExact());
   }
 
   @SuppressWarnings("unchecked")
@@ -221,7 +230,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

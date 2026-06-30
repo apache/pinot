@@ -35,8 +35,8 @@ import org.apache.pinot.core.common.Block;
 /// A MseBlock itself is not very useful, as they have almost no methods.
 /// Instead, they are used as a common sub-interface for [data][Data] and [end-of-stream][Eos] blocks,
 /// which are then subclassed to provide the actual functionality.
-/// This pattern follows the principles of Java 17 sealed interfaces and the intention is implement them as such once
-/// Pinot source code is migrated to Java 17 or newer, specially in Java 21 where pattern matching can also be used,
+/// This pattern follows the principles of sealed interfaces.
+/// Pinot now targets Java 21, so a follow-up could model these blocks with sealed interfaces and pattern matching,
 /// removing the need for the [Visitor] pattern.
 ///
 /// Meanwhile, the API force callers to do some castings, but it is a trade-off to have a more robust and maintainable

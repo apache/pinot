@@ -74,6 +74,7 @@ import org.apache.pinot.segment.local.upsert.ComparisonColumns;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
+import org.apache.pinot.segment.local.upsert.UpsertViewManager;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.IdMap;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -294,7 +295,7 @@ public class MutableSegmentImpl implements MutableSegment {
     // and no metrics have dictionary. If not enabled, the map returned is null.
     _recordIdMap = enableMetricsAggregationIfPossible(config);
 
-    Map<String, Pair<String, ValueAggregator>> metricsAggregators = Collections.emptyMap();
+    Map<String, Pair<String, ValueAggregator>> metricsAggregators = Map.of();
     if (_recordIdMap != null) {
       metricsAggregators = getMetricsAggregators(config);
     }
@@ -502,7 +503,7 @@ public class MutableSegmentImpl implements MutableSegment {
     } else if (CollectionUtils.isNotEmpty(segmentConfig.getIngestionAggregationConfigs())) {
       return fromAggregationConfig(segmentConfig);
     } else {
-      return Collections.emptyMap();
+      return Map.of();
     }
   }
 
@@ -515,7 +516,7 @@ public class MutableSegmentImpl implements MutableSegment {
         Maps.newHashMapWithExpectedSize(metricNames.size());
     for (String metricName : metricNames) {
       columnNameToAggregator.put(metricName, Pair.of(metricName,
-          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.emptyList())));
+          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, List.of())));
     }
     return columnNameToAggregator;
   }
@@ -601,7 +602,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
     if (_partitionColumn != null) {
-      return new SegmentPartitionConfig(Collections.singletonMap(_partitionColumn,
+      return new SegmentPartitionConfig(Map.of(_partitionColumn,
           new ColumnPartitionConfig(_partitionFunction.getName(), _partitionFunction.getNumPartitions(),
               _partitionFunction.getFunctionConfig())));
     } else {
@@ -1251,6 +1252,27 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
+  public boolean hasNoQueryableDocs() {
+    if (_partitionUpsertMetadataManager == null) {
+      return false;
+    }
+    UpsertViewManager viewManager = _partitionUpsertMetadataManager.getUpsertViewManager();
+    if (viewManager != null) {
+      MutableRoaringBitmap queryableDocIdsSnapshot = viewManager.getQueryableDocIdsSnapshot(this);
+      if (queryableDocIdsSnapshot != null) {
+        return queryableDocIdsSnapshot.isEmpty();
+      }
+      return false;
+    }
+    ThreadSafeMutableRoaringBitmap queryableDocIds = getQueryableDocIds();
+    if (queryableDocIds != null) {
+      return queryableDocIds.isEmpty();
+    }
+    ThreadSafeMutableRoaringBitmap validDocIds = getValidDocIds();
+    return validDocIds != null && validDocIds.isEmpty();
+  }
+
+  @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
       recordReader.init(this);
@@ -1336,6 +1358,7 @@ public class MutableSegmentImpl implements MutableSegment {
     for (IndexContainer indexContainer : _indexContainerMap.values()) {
       indexContainer.close();
     }
+    _indexContainerMap.clear();
 
     if (_multiColumnTextIndex != null) {
       try {

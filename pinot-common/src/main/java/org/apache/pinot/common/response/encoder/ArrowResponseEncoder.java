@@ -23,7 +23,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.arrow.memory.RootAllocator;
@@ -103,11 +102,11 @@ public class ArrowResponseEncoder implements ResponseEncoder {
               new Field(colName, FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)), null);
           vector = new Float8Vector(colName, ALLOCATOR);
           break;
+        case BIG_DECIMAL:
         case TIMESTAMP:
         case STRING:
-        case BYTES:
-        case BIG_DECIMAL:
         case JSON:
+        case BYTES:
         case OBJECT:
           field = new Field(colName, FieldType.nullable(new ArrowType.Utf8()), null);
           vector = new VarCharVector(colName, ALLOCATOR);
@@ -124,7 +123,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case BOOLEAN_ARRAY:
           // Define the inner field for a boolean element.
           List<Field> children =
-              Collections.singletonList(new Field("element", FieldType.nullable(new ArrowType.Bool()), null));
+              List.of(new Field("element", FieldType.nullable(new ArrowType.Bool()), null));
           // Define the field for the list column.
           field = new Field(colName, FieldType.nullable(new ArrowType.List()), children);
           // Create a ListVector using the field name and allocator.
@@ -135,7 +134,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case INT_ARRAY:
           // Define the inner field for an int element.
           children =
-              Collections.singletonList(new Field("element", FieldType.nullable(new ArrowType.Int(32, true)), null));
+              List.of(new Field("element", FieldType.nullable(new ArrowType.Int(32, true)), null));
           // Define the field for the list column.
           field = new Field(colName, FieldType.nullable(new ArrowType.List()), children);
           // Create a ListVector using the field name and allocator.
@@ -146,7 +145,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case LONG_ARRAY:
           // Define the inner field for a long element.
           children =
-              Collections.singletonList(new Field("element", FieldType.nullable(new ArrowType.Int(64, true)), null));
+              List.of(new Field("element", FieldType.nullable(new ArrowType.Int(64, true)), null));
           // Define the field for the list column.
           field = new Field(colName, FieldType.nullable(new ArrowType.List()), children);
           // Create a ListVector using the field name and allocator.
@@ -156,7 +155,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
           break;
         case FLOAT_ARRAY:
           // Define the inner field for a float element.
-          children = Collections.singletonList(
+          children = List.of(
               new Field("element", FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)),
                   null));
           // Define the field for the list column.
@@ -168,7 +167,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
           break;
         case DOUBLE_ARRAY:
           // Define the inner field for a double element.
-          children = Collections.singletonList(
+          children = List.of(
               new Field("element", FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)),
                   null));
           // Define the field for the list column.
@@ -178,11 +177,12 @@ public class ArrowResponseEncoder implements ResponseEncoder {
           // Initialize its children from the defined field.
           vector.initializeChildrenFromFields(children);
           break;
+        case BIG_DECIMAL_ARRAY:
         case TIMESTAMP_ARRAY:
         case STRING_ARRAY:
         case BYTES_ARRAY:
           // Define the inner field for a string element.
-          children = Collections.singletonList(new Field("element", FieldType.nullable(new ArrowType.Utf8()), null));
+          children = List.of(new Field("element", FieldType.nullable(new ArrowType.Utf8()), null));
           // Define the field for the list column.
           field = new Field(colName, FieldType.nullable(new ArrowType.List()), children);
           // Create a ListVector using the field name and allocator.
@@ -229,11 +229,11 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case DOUBLE:
               ((Float8Vector) vector).setSafe(rowIndex, ((Number) value).doubleValue());
               break;
+            case BIG_DECIMAL:
             case TIMESTAMP:
             case STRING:
-            case BYTES:
-            case BIG_DECIMAL:
             case JSON:
+            case BYTES:
             case OBJECT:
               byte[] bytes = ((String) value).getBytes(StandardCharsets.UTF_8);
               ((VarCharVector) vector).setSafe(rowIndex, bytes);
@@ -341,6 +341,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
               // Finalize the list entry by indicating the number of elements added.
               doubleArrayVector.endValue(rowIndex, doubleArray.length);
               break;
+            case BIG_DECIMAL_ARRAY:
             case TIMESTAMP_ARRAY:
             case STRING_ARRAY:
             case BYTES_ARRAY:
@@ -405,11 +406,11 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case BOOLEAN:
               row[col] = ((BitVector) vector).get(i) == 1;
               break;
+            case BIG_DECIMAL:
             case TIMESTAMP:
             case STRING:
-            case BYTES:
-            case BIG_DECIMAL:
             case JSON:
+            case BYTES:
             case OBJECT:
               row[col] = new String(((VarCharVector) vector).get(i), StandardCharsets.UTF_8);
               break;
@@ -464,6 +465,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
               }
               row[col] = doubleArray;
               break;
+            case BIG_DECIMAL_ARRAY:
             case TIMESTAMP_ARRAY:
             case STRING_ARRAY:
             case BYTES_ARRAY:

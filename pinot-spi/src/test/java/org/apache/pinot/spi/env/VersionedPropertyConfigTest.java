@@ -107,7 +107,7 @@ public class VersionedPropertyConfigTest {
 
   @Test
   //Test requires 'segment-metadata-without-version-header.properties' sample segment metadata file in resources folder
-  public void testOldSegmentMetadataBackwardCompatability()
+  public void testOldSegmentMetadataBackwardCompatibility()
       throws ConfigurationException {
     File oldSegmentProperties = new File(
         Objects.requireNonNull(
@@ -182,7 +182,7 @@ public class VersionedPropertyConfigTest {
 
     // setting the random value of the test keys
     for (String key: keysArray) {
-      configuration.setProperty(key, RandomStringUtils.randomAscii(5));
+      configuration.setProperty(key, RandomStringUtils.secure().nextAscii(5));
 
       // setting it at the key level as well for testing
       if (setDifferentSeparator) {

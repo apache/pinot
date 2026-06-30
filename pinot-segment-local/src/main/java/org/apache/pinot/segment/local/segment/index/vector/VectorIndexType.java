@@ -161,6 +161,18 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
   }
 
   @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, VectorIndexConfig indexConfig) {
+    // Vector index is built directly from vector values; it does not depend on a dictionary.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, VectorIndexConfig indexConfig) {
+    // Vector index payload is derived from raw vector values, independent of dictionary representation.
+    return false;
+  }
+
+  @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     // NOTE: IVF_ON_DISK intentionally reuses the IVF_FLAT file extension since it reads the
     // same on-disk format via FileChannel rather than memory-mapped I/O.

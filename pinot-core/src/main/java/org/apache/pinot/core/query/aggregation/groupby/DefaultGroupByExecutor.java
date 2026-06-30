@@ -87,9 +87,15 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     for (ExpressionContext groupByExpression : groupByExpressions) {
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       hasMVGroupByExpression |= !columnContext.isSingleValue();
-      hasNoDictionaryGroupByExpression |= columnContext.getDictionary() == null;
+      // A column with EncodingType.RAW + explicit dictionaryIndex has a non-null dictionary but a RAW forward
+      // index that throws on readDictIds; route those through the no-dict GROUP BY generator via the explicit
+      // isDictionaryEncoded() flag rather than gating on dictionary nullness alone.
+      hasNoDictionaryGroupByExpression |= !columnContext.isDictionaryEncoded();
     }
-    _hasMVGroupByExpression = hasMVGroupByExpression;
+    /// Grouping-set queries expand each row into one group per grouping set, so they always use the
+    /// multi-value (int[][]) executor path even though the union group-by columns are single-valued.
+    boolean groupingSets = queryContext.isGroupingSets();
+    _hasMVGroupByExpression = hasMVGroupByExpression || groupingSets;
 
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
@@ -100,6 +106,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
     if (groupKeyGenerator != null) {
       _groupKeyGenerator = groupKeyGenerator;
+    } else if (groupingSets) {
+      _groupKeyGenerator = new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions,
+          queryContext.getGroupingSets(), numGroupsLimit, _nullHandlingEnabled);
     } else {
       if (hasNoDictionaryGroupByExpression || _nullHandlingEnabled) {
         if (groupByExpressions.length == 1) {

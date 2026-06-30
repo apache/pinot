@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,7 +107,7 @@ public class IndexConfigDeserializer {
     return (tableConfig, schema) -> {
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
       if (fieldConfigList == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       Map<String, C> result = new HashMap<>();
       for (FieldConfig fieldConfig : fieldConfigList) {
@@ -126,7 +125,7 @@ public class IndexConfigDeserializer {
     return (tableConfig, schema) -> {
       Collection<T> col = extract.apply(tableConfig);
       if (col == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       Map<String, C> result = new HashMap<>();
       for (T temp : col) {
@@ -141,7 +140,7 @@ public class IndexConfigDeserializer {
     return (tableConfig, schema) -> {
       Map<K, T> map = extract.apply(tableConfig);
       if (map == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       Map<String, C> result = new HashMap<>();
       for (Map.Entry<K, T> entry : map.entrySet()) {
@@ -161,7 +160,7 @@ public class IndexConfigDeserializer {
     return (tableConfig, schema) -> {
       Map<String, C> result = extract.apply(tableConfig);
       if (result == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       return result;
     };

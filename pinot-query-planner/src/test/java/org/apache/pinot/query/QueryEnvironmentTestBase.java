@@ -21,11 +21,11 @@ package org.apache.pinot.query;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -62,8 +62,8 @@ public class QueryEnvironmentTestBase {
       String tableName = e.getKey();
       String partitionColumn = e.getValue();
       List<List<String>> partitionIdToSegmentsMap = new ArrayList<>(PARTITION_COUNT);
-      partitionIdToSegmentsMap.add(SERVER1_SEGMENTS.getOrDefault(tableName, Collections.emptyList()));
-      partitionIdToSegmentsMap.add(SERVER2_SEGMENTS.getOrDefault(tableName, Collections.emptyList()));
+      partitionIdToSegmentsMap.add(SERVER1_SEGMENTS.getOrDefault(tableName, List.of()));
+      partitionIdToSegmentsMap.add(SERVER2_SEGMENTS.getOrDefault(tableName, List.of()));
       for (int i = 2; i < PARTITION_COUNT; i++) {
         partitionIdToSegmentsMap.add(new ArrayList<>());
       }
@@ -252,7 +252,7 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'DOUBLE_ARRAY') FROM a"},
         new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'STRING_ARRAY') FROM a"},
         new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp BETWEEN TIMESTAMP '2016-01-01 00:00:00' AND "
-            + "TIMESTAMP '2016-01-01 10:00:00'"},
+              + "TIMESTAMP '2016-01-01 10:00:00'"},
         new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp >= CAST(1454284798000 AS TIMESTAMP)"},
         new Object[]{"SELECT TIMESTAMPADD(day, 10, NOW()) FROM a"},
         new Object[]{"SELECT ts_timestamp - CAST(123456789 AS TIMESTAMP) FROM a"},
@@ -322,11 +322,11 @@ public class QueryEnvironmentTestBase {
         PartitionInfo[] partitionIdToInfoMap = new PartitionInfo[numPartitions];
         for (int i = 0; i < numPartitions; i++) {
           String hostname = i < (numPartitions / 2) ? hostname1 : hostname2;
-          partitionIdToInfoMap[i] = new PartitionInfo(Collections.singleton(hostname), partitionIdToSegmentsMap.get(i));
+          partitionIdToInfoMap[i] = new PartitionInfo(Set.of(hostname), partitionIdToSegmentsMap.get(i));
         }
         TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo =
             new TablePartitionReplicatedServersInfo(tableNameWithType, partitionColumn, "Hashcode", numPartitions,
-                partitionIdToInfoMap, Collections.emptyList());
+                partitionIdToInfoMap, List.of());
         partitionInfoMap.put(tableNameWithType, tablePartitionReplicatedServersInfo);
       }
     }

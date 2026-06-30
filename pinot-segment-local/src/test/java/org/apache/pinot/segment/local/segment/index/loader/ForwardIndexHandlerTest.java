@@ -32,14 +32,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
+import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -58,12 +60,13 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -77,6 +80,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
+@SuppressWarnings("rawtypes")
 public class ForwardIndexHandlerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
@@ -230,9 +234,9 @@ public class ForwardIndexHandlerTest {
   private static final List<String> FORWARD_INDEX_DISABLED_RAW_COLUMNS =
       List.of(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER, DIM_RAW_MV_FORWARD_INDEX_DISABLED_INTEGER);
 
-  private static final List<CompressionCodec> RAW_COMPRESSION_TYPES =
-      Arrays.stream(CompressionCodec.values()).filter(CompressionCodec::isApplicableToRawIndex)
-          .collect(Collectors.toList());
+  private static final List<CompressionCodec> RAW_COMPRESSION_TYPES = Arrays.stream(CompressionCodec.values())
+      .filter(CompressionCodec::isApplicableToRawIndex)
+      .toList();
 
   //@formatter:off
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
@@ -298,8 +302,6 @@ public class ForwardIndexHandlerTest {
   //@formatter:on
 
   private static final Random RANDOM = new Random();
-  private static int _cardinalityOfSvEntries;
-  private static int _cardinalityOfMvEntries;
 
   private static final List<GenericRow> TEST_DATA;
 
@@ -328,8 +330,6 @@ public class ForwardIndexHandlerTest {
     Long[][] tempMVLongRowsForwardIndexDisabled = new Long[numRows][maxNumberOfMVEntries];
     byte[][][] tempMVByteRowsForwardIndexDisabled = new byte[numRows][maxNumberOfMVEntries][];
 
-    _cardinalityOfSvEntries = 1; // Start with 1 to account for static "testRow" entry
-    _cardinalityOfMvEntries = maxNumberOfMVEntries + 1; // Add 1 to account for static "testRow" entry
     for (int i = 0; i < numRows; i++) {
       // Adding a fixed value to check for filter queries
       if (i % 10 == 0) {
@@ -355,7 +355,6 @@ public class ForwardIndexHandlerTest {
         tempLongRows[i] = (long) i;
         tempBytesRows[i] = str.getBytes();
         tempBigDecimalRows[i] = BigDecimal.valueOf(i);
-        _cardinalityOfSvEntries += 1;
 
         // Avoid creating empty arrays.
         // To test total cardinality, for atleast 1 row, have the number of MV entries = maxNumberOfMVEntries
@@ -653,7 +652,8 @@ public class ForwardIndexHandlerTest {
       assertEquals(computeOperations(),
           Map.of(METRIC_LZ4_INTEGER, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY)));
 
-      // TEST5: Enable Dictionary for sorted column.
+      // TEST5: Sorted column currently configured as RAW. Removing RAW config means the new config expects a
+      // dictionary, so ForwardIndexHandler should detect ENABLE_DICTIONARY.
       resetIndexConfigs();
       _noDictionaryColumns.remove(DIM_RAW_SORTED_INTEGER);
       _fieldConfigMap.remove(DIM_RAW_SORTED_INTEGER);
@@ -681,11 +681,15 @@ public class ForwardIndexHandlerTest {
       assertEquals(computeOperations(),
           Map.of(DIM_DICT_MV_BYTES, List.of(ForwardIndexHandler.Operation.DISABLE_DICTIONARY)));
 
-      // TEST3: Disable dictionary and enable inverted index. Should be a no-op.
+      // TEST3: Disable dictionary and enable inverted index on a previously dict-encoded column. The inverted
+      // index requires a dictionary, so the auto-keep-dictionary-when-required-by-index logic keeps the dict.
+      // The forward index encoding still has to flip from DICT to RAW per the user's noDictionaryColumns
+      // request, so ENABLE_RAW_FORWARD_INDEX is queued (the encoding-flip handler keeps the dictionary).
       resetIndexConfigs();
       _noDictionaryColumns.add(DIM_DICT_STRING);
       _invertedIndexColumns.add(DIM_DICT_STRING);
-      assertTrue(computeOperations().isEmpty());
+      assertEquals(computeOperations(),
+          Map.of(DIM_DICT_STRING, List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX)));
     }
   }
 
@@ -878,8 +882,10 @@ public class ForwardIndexHandlerTest {
             + "testSegment or refresh / back-fill the forward index");
       }
 
-      // TEST13: Disable dictionary on a column that already has forward index disabled and inverted index enabled with
-      // a range index
+      // TEST13: Disable dictionary on a column that already has forward index disabled and inverted index
+      // enabled with a range index. The new config still has inverted index enabled, which requires a
+      // dictionary — so the auto-keep-dictionary-when-required-by-index logic prevents removing the dict at
+      // all. The range Preconditions never fires because no DISABLE_DICTIONARY operation is ever queued.
       resetIndexConfigs();
       _noDictionaryColumns.add(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
       _rangeIndexColumns.add(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
@@ -887,15 +893,10 @@ public class ForwardIndexHandlerTest {
           new FieldConfig(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER, FieldConfig.EncodingType.RAW,
               List.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), CompressionCodec.LZ4,
               Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
-      try {
-        computeOperations();
-        fail("Disabling dictionary on forward index disabled column with inverted index and a range index "
-            + "is not possible");
-      } catch (IllegalStateException e) {
-        assertEquals(e.getMessage(), "Must disable range index (enabled) to disable the dictionary for a "
-            + "forwardIndexDisabled column: DIM_SV_FORWARD_INDEX_DISABLED_INTEGER of segment: testSegment or refresh "
-            + "/ back-fill the forward index");
-      }
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertFalse(ops.containsKey(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER),
+          "Dictionary must stay because the new config still requires it for the inverted index; "
+              + "no operation should be queued.");
     }
   }
 
@@ -916,13 +917,15 @@ public class ForwardIndexHandlerTest {
       _invertedIndexColumns.remove(column);
       _fieldConfigMap.put(column,
           new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.LZ4, null));
-      assertEquals(computeOperations(), Map.of(column, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+      assertEquals(computeOperations(),
+          Map.of(column, List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX)));
 
       // TEST2: Enable forward index in dictionary format for a column with forward index disabled
       resetIndexConfigs();
       _fieldConfigMap.remove(DIM_SV_FORWARD_INDEX_DISABLED_BYTES);
       assertEquals(computeOperations(),
-          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_BYTES, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_BYTES,
+              List.of(ForwardIndexHandler.Operation.ENABLE_DICT_FORWARD_INDEX)));
 
       // TEST3: Enable forward index in raw format for a column with forward index disabled. Remove column from inverted
       // index as well (inverted index needs dictionary)
@@ -933,7 +936,8 @@ public class ForwardIndexHandlerTest {
           new FieldConfig(DIM_MV_FORWARD_INDEX_DISABLED_INTEGER, FieldConfig.EncodingType.RAW, List.of(),
               CompressionCodec.LZ4, null));
       assertEquals(computeOperations(),
-          Map.of(DIM_MV_FORWARD_INDEX_DISABLED_INTEGER, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+          Map.of(DIM_MV_FORWARD_INDEX_DISABLED_INTEGER,
+              List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX)));
 
       // TEST4: Enable forward index in dictionary format for two columns with forward index disabled. Disable inverted
       // index for one of them
@@ -942,8 +946,8 @@ public class ForwardIndexHandlerTest {
       _fieldConfigMap.remove(DIM_SV_FORWARD_INDEX_DISABLED_LONG);
       _fieldConfigMap.remove(DIM_MV_FORWARD_INDEX_DISABLED_STRING);
       assertEquals(computeOperations(),
-          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX),
-              DIM_MV_FORWARD_INDEX_DISABLED_STRING, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_DICT_FORWARD_INDEX),
+              DIM_MV_FORWARD_INDEX_DISABLED_STRING, List.of(ForwardIndexHandler.Operation.ENABLE_DICT_FORWARD_INDEX)));
 
       // TEST5: Enable forward index in raw format for two columns with forward index disabled. Remove column from
       // inverted index as well (inverted index needs dictionary)
@@ -959,8 +963,8 @@ public class ForwardIndexHandlerTest {
           new FieldConfig(DIM_MV_FORWARD_INDEX_DISABLED_LONG, FieldConfig.EncodingType.RAW, List.of(),
               CompressionCodec.LZ4, null));
       assertEquals(computeOperations(),
-          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_STRING, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX),
-              DIM_MV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_STRING, List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX),
+              DIM_MV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX)));
 
       // TEST6: Enable forward index in dictionary format and one in raw format for columns with forward index disabled
       resetIndexConfigs();
@@ -971,8 +975,8 @@ public class ForwardIndexHandlerTest {
               CompressionCodec.LZ4, null));
       _fieldConfigMap.remove(DIM_SV_FORWARD_INDEX_DISABLED_BYTES);
       assertEquals(computeOperations(),
-          Map.of(DIM_MV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX),
-              DIM_SV_FORWARD_INDEX_DISABLED_BYTES, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+          Map.of(DIM_MV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX),
+              DIM_SV_FORWARD_INDEX_DISABLED_BYTES, List.of(ForwardIndexHandler.Operation.ENABLE_DICT_FORWARD_INDEX)));
 
       // TEST7: Enable forward index for a raw column with forward index disabled and keep it as raw
       resetIndexConfigs();
@@ -992,6 +996,9 @@ public class ForwardIndexHandlerTest {
   public void testChangeCompressionForSingleColumn()
       throws Exception {
     for (String column : RAW_COLUMNS_WITH_FORWARD_INDEX) {
+      if (RAW_SORTED_COLUMNS.contains(column)) {
+        continue;
+      }
       // For every noDictionaryColumn, change the compressionType to all available types, one by one.
       for (CompressionCodec compressionType : RAW_COMPRESSION_TYPES) {
         SegmentMetadataImpl existingSegmentMetadata;
@@ -1023,11 +1030,7 @@ public class ForwardIndexHandlerTest {
 
         // Validate metadata properties. Nothing should change when a forwardIndex is rewritten for compressionType
         // change.
-        validateMetadataProperties(column, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-            metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-            metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-            metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(),
-            metadata.getMaxValue(), false);
+        validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column), metadata);
       }
     }
   }
@@ -1035,9 +1038,8 @@ public class ForwardIndexHandlerTest {
   @Test
   public void testChangeCompressionAndIndexVersion()
       throws Exception {
-    List<String> columns = new ArrayList<>(RAW_SNAPPY_COLUMNS.size() + RAW_SORTED_COLUMNS.size());
+    List<String> columns = new ArrayList<>(RAW_SNAPPY_COLUMNS.size());
     columns.addAll(RAW_SNAPPY_COLUMNS);
-    columns.addAll(RAW_SORTED_COLUMNS);
     for (String column : columns) {
       // Convert from SNAPPY v2 to LZ4 v4
       SegmentMetadataImpl existingSegmentMetadata;
@@ -1048,9 +1050,10 @@ public class ForwardIndexHandlerTest {
         _writer = writer;
 
         existingSegmentMetadata = segmentDirectory.getSegmentMetadata();
-        ForwardIndexConfig forwardIndexConfig =
-            new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.LZ4).withRawIndexWriterVersion(4)
-                .build();
+        ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+            .withCompressionCodec(CompressionCodec.LZ4)
+            .withRawIndexWriterVersion(4)
+            .build();
         ObjectNode indexes = JsonUtils.newObjectNode();
         indexes.set("forward", forwardIndexConfig.toJsonNode());
         FieldConfig fieldConfig =
@@ -1072,11 +1075,7 @@ public class ForwardIndexHandlerTest {
 
       // Validate metadata properties. Nothing should change when a forwardIndex is rewritten for compressionType
       // change.
-      validateMetadataProperties(column, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-          metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-          metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-          metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(),
-          metadata.getMaxValue(), false);
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column), metadata);
 
       // Convert it back
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
@@ -1099,11 +1098,7 @@ public class ForwardIndexHandlerTest {
 
       // Validate metadata properties. Nothing should change when a forwardIndex is rewritten for compressionType
       // change.
-      validateMetadataProperties(column, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-          metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-          metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-          metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(),
-          metadata.getMaxValue(), false);
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column), metadata);
     }
   }
 
@@ -1194,33 +1189,25 @@ public class ForwardIndexHandlerTest {
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
     }
 
-    ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column1);
-    testIndexExists(column1, StandardIndexes.forward());
-    validateIndexMap(column1, false, false);
-    validateForwardIndex(column1, newCompressionType, metadata.isSorted());
-    // Validate metadata properties. Nothing should change when a forwardIndex is rewritten for compressionType
-    // change.
-    validateMetadataProperties(column1, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-        metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-        metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-        metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(), metadata.getMaxValue(),
-        false);
-
-    metadata = existingSegmentMetadata.getColumnMetadataFor(column2);
-    testIndexExists(column2, StandardIndexes.forward());
-    validateIndexMap(column2, false, false);
-    validateForwardIndex(column2, newCompressionType, metadata.isSorted());
-    validateMetadataProperties(column2, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-        metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-        metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-        metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(), metadata.getMaxValue(),
-        false);
+    SegmentMetadataImpl newSegmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    for (String column : List.of(column1, column2)) {
+      ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
+      testIndexExists(column, StandardIndexes.forward());
+      validateIndexMap(column, false, false);
+      validateForwardIndex(column, newCompressionType, metadata.isSorted());
+      // Validate metadata properties. Nothing should change when a forwardIndex is rewritten for compressionType
+      // change.
+      validateMetadataProperties(newSegmentMetadata.getColumnMetadataFor(column), metadata);
+    }
   }
 
   @Test
   public void testEnableDictionaryForSingleColumn()
       throws Exception {
     for (String column : RAW_COLUMNS_WITH_FORWARD_INDEX) {
+      if (RAW_SORTED_COLUMNS.contains(column)) {
+        continue;
+      }
       SegmentMetadataImpl existingSegmentMetadata;
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
@@ -1229,7 +1216,14 @@ public class ForwardIndexHandlerTest {
         existingSegmentMetadata = segmentDirectory.getSegmentMetadata();
 
         _noDictionaryColumns.remove(column);
-        _fieldConfigMap.remove(column);
+        FieldConfig existingFieldConfig = _fieldConfigMap.get(column);
+        // Explicitly add dictionary config since RAW encoding alone disables dictionary
+        ObjectNode dictIndexes = JsonUtils.newObjectNode();
+        dictIndexes.set("dictionary", JsonUtils.newObjectNode());
+        _fieldConfigMap.put(column,
+            new FieldConfig(column, FieldConfig.EncodingType.RAW, null,
+                List.of(FieldConfig.IndexType.INVERTED),
+                existingFieldConfig.getCompressionCodec(), null, dictIndexes, null, null));
         updateIndices();
         // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
       }
@@ -1238,25 +1232,338 @@ public class ForwardIndexHandlerTest {
       testIndexExists(column, StandardIndexes.forward());
       testIndexExists(column, StandardIndexes.dictionary());
       validateIndexMap(column, true, false);
-      validateForwardIndex(column, null, metadata.isSorted());
-
-      // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-      int dictionaryElementSize = 0;
-      DataType dataType = metadata.getDataType();
-      if (dataType == DataType.STRING || dataType == DataType.BYTES) {
-        // This value is based on the rows in createTestData().
-        dictionaryElementSize = 7;
-      } else if (dataType == DataType.BIG_DECIMAL) {
-        dictionaryElementSize = 4;
+      if (metadata.isSorted()) {
+        validateForwardIndex(column, null, true);
+      } else {
+        validateForwardIndex(column, getExpectedRawCompressionCodec(column), false, true);
       }
-      int expectedCardinality = column.equals(DIM_MV_PASS_THROUGH_INTEGER) || column.equals(DIM_MV_PASS_THROUGH_LONG)
-          ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
-      // DIM_RAW_SORTED_INTEGER has all unique values
-      expectedCardinality = column.equals(DIM_RAW_SORTED_INTEGER) ? TEST_DATA.size() : expectedCardinality;
-      validateMetadataProperties(column, true, dictionaryElementSize, expectedCardinality,
-          metadata.getTotalDocs(), dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-          metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-          metadata.getMinValue(), metadata.getMaxValue(), false);
+
+      // In column metadata, nothing other than hasDictionary and bitsPerElement should change.
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column), metadata, true);
+    }
+  }
+
+  @Test
+  public void testEnableDictionaryAndInvertedIndexKeepsRawForward()
+      throws Exception {
+    String column = DIM_ZSTANDARD_STRING;
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _invertedIndexColumns.add(column);
+      // Explicitly enable dictionary for this RAW column while keeping RAW forward encoding.
+      // Must remove from noDictionaryColumns to avoid ConfigDeclaredTwiceException.
+      _noDictionaryColumns.remove(column);
+      ObjectNode rawDictIndexes = JsonUtils.newObjectNode();
+      rawDictIndexes.set("dictionary", JsonUtils.newObjectNode());
+      FieldConfig existingConfig = _fieldConfigMap.get(column);
+      _fieldConfigMap.put(column,
+          new FieldConfig(column, FieldConfig.EncodingType.RAW, null,
+              List.of(FieldConfig.IndexType.INVERTED),
+              existingConfig != null ? existingConfig.getCompressionCodec() : null,
+              null, rawDictIndexes, null, null));
+
+      ForwardIndexHandler forwardIndexHandler = createForwardIndexHandler();
+      assertEquals(forwardIndexHandler.computeOperations(writer),
+          Map.of(column, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY)));
+      assertTrue(forwardIndexHandler.needUpdateIndices(writer));
+      forwardIndexHandler.updateIndices(writer);
+      forwardIndexHandler.postUpdateIndicesCleanup(writer);
+
+      InvertedIndexHandler invertedIndexHandler = new InvertedIndexHandler(segmentDirectory,
+          createIndexLoadingConfig().getFieldIndexConfigByColName(), createTableConfig(), SCHEMA);
+      assertTrue(invertedIndexHandler.needUpdateIndices(writer));
+      invertedIndexHandler.updateIndices(writer);
+      invertedIndexHandler.postUpdateIndicesCleanup(writer);
+    }
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertTrue(columnMetadata.hasDictionary());
+      assertEquals(columnMetadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+      assertTrue(reader.hasIndexFor(column, StandardIndexes.dictionary()));
+      assertTrue(reader.hasIndexFor(column, StandardIndexes.inverted()));
+
+      FieldIndexConfigs fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
+      IndexReaderFactory<ForwardIndexReader> forwardReaderFactory = StandardIndexes.forward().getReaderFactory();
+      try (ForwardIndexReader<?> forwardIndexReader =
+          forwardReaderFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata)) {
+        assertFalse(forwardIndexReader.isDictionaryEncoded());
+        assertEquals(forwardIndexReader.getCompressionType(), ChunkCompressionType.ZSTANDARD);
+      }
+
+      try (Dictionary dictionary = DictionaryIndexType.read(reader, columnMetadata)) {
+        assertEquals(dictionary.length(), columnMetadata.getCardinality());
+      }
+
+      IndexReaderFactory<InvertedIndexReader> invertedReaderFactory = StandardIndexes.inverted().getReaderFactory();
+      try (InvertedIndexReader<?> invertedIndexReader =
+          invertedReaderFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata)) {
+        assertTrue(invertedIndexReader instanceof BitmapInvertedIndexReader);
+      }
+    }
+  }
+
+  /**
+   * End-to-end "enable dictionary on a RAW column with a range index" scenario.
+   *
+   * <p>{@link org.apache.pinot.segment.local.segment.index.range.RangeIndexType#requiresDictionary} returns
+   * {@code true}: a range index is always built over dictionary IDs. A user who wants a range index on a RAW
+   * forward column must opt in to a shared standalone dictionary by adding {@code indexes.dictionary: {}} to the
+   * column's {@code FieldConfig}; on segment reload, {@code ForwardIndexHandler.ENABLE_DICTIONARY} materializes
+   * the dictionary on disk and {@link RangeIndexHandler} then builds the range index over those dict IDs.
+   *
+   * <p>This test pins down the full handler chain: starting from a RAW column with no dictionary and no range
+   * index, after the config change and one reload pass the column ends up with {@code hasDictionary=true} (forward
+   * index still RAW-encoded), a dictionary file on disk, and a freshly built dict-id-based range index. If a
+   * future change re-orders handlers, drops range from {@code DICTIONARY_BASED_INDEXES_TO_REWRITE}, or breaks the
+   * RAW-with-shared-dict path in either handler, this test catches the regression.
+   */
+  @Test
+  public void testEnableDictionaryAndRangeOnRawForwardColumn()
+      throws Exception {
+    String column = METRIC_LZ4_INTEGER;
+    SegmentMetadataImpl existingSegmentMetadata;
+
+    // Pre-condition: column starts as RAW (no dictionary, no range index). A range index on a no-dictionary column
+    // is no longer a valid configuration; a user reaching this state migrates by adding both the explicit
+    // dictionary and the range index in the same reload.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      existingSegmentMetadata = segmentDirectory.getSegmentMetadata();
+      ColumnMetadata columnMetadata = existingSegmentMetadata.getColumnMetadataFor(column);
+      assertFalse(columnMetadata.hasDictionary(),
+          "Pre-condition: column should start without a dictionary");
+      assertFalse(reader.hasIndexFor(column, StandardIndexes.range()),
+          "Pre-condition: column should start without a range index");
+    }
+
+    // Update config: opt-in to a shared dictionary (RAW + indexes.dictionary: {}) and add a range index.
+    _noDictionaryColumns.remove(column);
+    _rangeIndexColumns.add(column);
+    FieldConfig existingFieldConfig = _fieldConfigMap.get(column);
+    ObjectNode dictIndexes = JsonUtils.newObjectNode();
+    dictIndexes.set("dictionary", JsonUtils.newObjectNode());
+    _fieldConfigMap.put(column,
+        new FieldConfig(column, FieldConfig.EncodingType.RAW, null, null,
+            existingFieldConfig != null ? existingFieldConfig.getCompressionCodec() : null, null, dictIndexes,
+            null, null));
+
+    // Step 1: ForwardIndexHandler emits ENABLE_DICTIONARY, materializing a standalone dictionary on the RAW column.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      ForwardIndexHandler forwardIndexHandler = createForwardIndexHandler();
+      assertEquals(forwardIndexHandler.computeOperations(writer),
+          Map.of(column, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY)));
+      forwardIndexHandler.updateIndices(writer);
+      forwardIndexHandler.postUpdateIndicesCleanup(writer);
+    }
+
+    // Verify: dictionary on disk, forward index still RAW-encoded, no range index yet.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertTrue(columnMetadata.hasDictionary(), "Dictionary should be enabled after ENABLE_DICTIONARY");
+      assertEquals(columnMetadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW,
+          "Forward index should remain RAW-encoded");
+      assertTrue(reader.hasIndexFor(column, StandardIndexes.dictionary()));
+      assertFalse(reader.hasIndexFor(column, StandardIndexes.range()),
+          "RangeIndexHandler has not run yet, so the range index should not exist");
+    }
+
+    // Step 2: RangeIndexHandler now sees columnMetadata.hasDictionary() == true and builds the range index over
+    // dict IDs (reading raw forward values and looking each up in the shared dictionary).
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(segmentDirectory, createIndexLoadingConfig());
+      assertTrue(rangeIndexHandler.needUpdateIndices(writer),
+          "RangeIndexHandler should detect the new range index in the config");
+      rangeIndexHandler.updateIndices(writer);
+      rangeIndexHandler.postUpdateIndicesCleanup(writer);
+    }
+
+    // Final state: dict + range present, forward index still RAW-encoded.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertTrue(columnMetadata.hasDictionary());
+      assertEquals(columnMetadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+      assertTrue(reader.hasIndexFor(column, StandardIndexes.range()),
+          "Range index should be built by RangeIndexHandler over the new dictionary");
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column),
+          existingSegmentMetadata.getColumnMetadataFor(column), true);
+    }
+  }
+
+  /**
+   * Symmetric "disable dictionary on a column with a range index" scenario, under the new contract that a range
+   * index always requires a dictionary. The valid migration path is to drop the range index in the same reload as
+   * the dictionary; otherwise the table-config validation rejects the change.
+   *
+   * <p>This test asserts the handler chain for the supported flow: starting from a dict-encoded column with a
+   * range index, removing the column from both the dictionary set and the {@code rangeIndexColumns} set causes
+   * {@code ForwardIndexHandler.DISABLE_DICTIONARY} to drop the dictionary and (via
+   * {@code removeDictRelatedIndexes}) the now-stale range index. {@code RangeIndexHandler} then sees the column
+   * is no longer requested and stays a no-op.
+   */
+  @Test
+  public void testDisableDictionaryAndRangeIndexTogether()
+      throws Exception {
+    String column = DIM_DICT_INTEGER;
+    SegmentMetadataImpl existingSegmentMetadata;
+
+    // Step 1: build a dict-id-based range index on the dict-encoded column.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      existingSegmentMetadata = segmentDirectory.getSegmentMetadata();
+
+      _rangeIndexColumns.add(column);
+      RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(segmentDirectory, createIndexLoadingConfig());
+      assertTrue(rangeIndexHandler.needUpdateIndices(writer));
+      rangeIndexHandler.updateIndices(writer);
+      rangeIndexHandler.postUpdateIndicesCleanup(writer);
+    }
+
+    // Pre-condition: column has dict + range; range was built in the dict-id-based variant.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertTrue(columnMetadata.hasDictionary(), "Pre-condition: column should have a dictionary");
+      assertTrue(reader.hasIndexFor(column, StandardIndexes.range()),
+          "Pre-condition: dict-id-based range index should exist");
+    }
+
+    // Step 2: disable dictionary AND remove range index from the config (the only valid migration under the new
+    // contract). ForwardIndexHandler emits DISABLE_DICTIONARY and via removeDictRelatedIndexes also drops the
+    // now-stale range index.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _noDictionaryColumns.add(column);
+      _rangeIndexColumns.remove(column);
+
+      ForwardIndexHandler forwardIndexHandler = createForwardIndexHandler();
+      assertEquals(forwardIndexHandler.computeOperations(writer),
+          Map.of(column, List.of(ForwardIndexHandler.Operation.DISABLE_DICTIONARY)));
+      forwardIndexHandler.updateIndices(writer);
+      forwardIndexHandler.postUpdateIndicesCleanup(writer);
+    }
+
+    // Verify: dict and range are both gone after ForwardIndexHandler's DISABLE_DICTIONARY pass.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertFalse(columnMetadata.hasDictionary(), "Dictionary should be disabled after DISABLE_DICTIONARY");
+      assertFalse(reader.hasIndexFor(column, StandardIndexes.dictionary()));
+      assertFalse(reader.hasIndexFor(column, StandardIndexes.range()),
+          "Stale dict-id-based range index must be removed when dictionary is disabled");
+    }
+
+    // Step 3: RangeIndexHandler is a no-op because the column is no longer in the range-index list.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(segmentDirectory, createIndexLoadingConfig());
+      assertFalse(rangeIndexHandler.needUpdateIndices(writer),
+          "RangeIndexHandler should not need updates after the range index was removed from the config");
+    }
+
+    // Final state: dict gone, range gone, forward index regenerated as raw.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertFalse(columnMetadata.hasDictionary());
+      assertFalse(reader.hasIndexFor(column, StandardIndexes.range()));
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column),
+          existingSegmentMetadata.getColumnMetadataFor(column), false);
+    }
+  }
+
+  /**
+   * Pins down the handler-ordering contract documented on InvertedIndexHandler: the dictionary file (created by
+   * ForwardIndexHandler under the ENABLE_DICTIONARY operation for a RAW forward column with an inverted index)
+   * must already exist on disk before InvertedIndexHandler attempts to build the dict-id-based inverted index.
+   *
+   * <p>If a future change reorders handlers so InvertedIndexHandler runs before ForwardIndexHandler, the
+   * Preconditions.checkState(columnMetadata.hasDictionary(), ...) inside InvertedIndexHandler.createInvertedIndex
+   * ForColumn fires and this test catches the regression.
+   */
+  @Test
+  public void testHandlerOrderingForwardBeforeInvertedOnRawWithDictRequired()
+      throws Exception {
+    String column = DIM_ZSTANDARD_STRING;
+
+    // Configure: RAW forward index + explicit dictionary + inverted index. ForwardIndexHandler must emit
+    // ENABLE_DICTIONARY (creating a shared dictionary on the RAW column); InvertedIndexHandler must then build
+    // the inverted index on top of that dictionary.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _invertedIndexColumns.add(column);
+      _noDictionaryColumns.remove(column);
+      ObjectNode rawDictIndexes = JsonUtils.newObjectNode();
+      rawDictIndexes.set("dictionary", JsonUtils.newObjectNode());
+      FieldConfig existingConfig = _fieldConfigMap.get(column);
+      _fieldConfigMap.put(column,
+          new FieldConfig(column, FieldConfig.EncodingType.RAW, null, List.of(FieldConfig.IndexType.INVERTED),
+              existingConfig != null ? existingConfig.getCompressionCodec() : null, null, rawDictIndexes, null,
+              null));
+
+      // Step 1: ForwardIndexHandler must run first (matching SegmentPreProcessor's ordering).
+      ForwardIndexHandler forwardIndexHandler = createForwardIndexHandler();
+      assertEquals(forwardIndexHandler.computeOperations(writer),
+          Map.of(column, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY)));
+      forwardIndexHandler.updateIndices(writer);
+      forwardIndexHandler.postUpdateIndicesCleanup(writer);
+    }
+
+    // Verify ForwardIndexHandler created the dictionary on disk and updated metadata.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertTrue(columnMetadata.hasDictionary(),
+          "Pre-condition for InvertedIndexHandler: dictionary must exist after ForwardIndexHandler runs");
+      assertTrue(reader.hasIndexFor(column, StandardIndexes.dictionary()));
+    }
+
+    // Step 2: InvertedIndexHandler runs next, sees the freshly-created dictionary, and builds the inverted index.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      InvertedIndexHandler invertedIndexHandler = new InvertedIndexHandler(segmentDirectory,
+          createIndexLoadingConfig().getFieldIndexConfigByColName(), createTableConfig(), SCHEMA);
+      assertTrue(invertedIndexHandler.needUpdateIndices(writer));
+      invertedIndexHandler.updateIndices(writer);
+      invertedIndexHandler.postUpdateIndicesCleanup(writer);
+    }
+
+    // Final state: dict + raw forward + inverted index, all consistent.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertTrue(columnMetadata.hasDictionary());
+      assertEquals(columnMetadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+      assertTrue(reader.hasIndexFor(column, StandardIndexes.inverted()));
     }
   }
 
@@ -1265,6 +1572,9 @@ public class ForwardIndexHandlerTest {
       throws Exception {
     String column1 = RAW_COLUMNS_WITH_FORWARD_INDEX.get(RANDOM.nextInt(RAW_COLUMNS_WITH_FORWARD_INDEX.size()));
     String column2 = RAW_COLUMNS_WITH_FORWARD_INDEX.get(RANDOM.nextInt(RAW_COLUMNS_WITH_FORWARD_INDEX.size()));
+    if (RAW_SORTED_COLUMNS.contains(column1) || RAW_SORTED_COLUMNS.contains(column2)) {
+      return;
+    }
     SegmentMetadataImpl existingSegmentMetadata;
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
@@ -1274,8 +1584,20 @@ public class ForwardIndexHandlerTest {
 
       _noDictionaryColumns.remove(column1);
       _noDictionaryColumns.remove(column2);
-      _fieldConfigMap.remove(column1);
-      _fieldConfigMap.remove(column2);
+      FieldConfig existingFieldConfig1 = _fieldConfigMap.get(column1);
+      ObjectNode dictIndexes1 = JsonUtils.newObjectNode();
+      dictIndexes1.set("dictionary", JsonUtils.newObjectNode());
+      _fieldConfigMap.put(column1,
+          new FieldConfig(column1, FieldConfig.EncodingType.RAW, null,
+              List.of(FieldConfig.IndexType.INVERTED),
+              existingFieldConfig1.getCompressionCodec(), null, dictIndexes1, null, null));
+      FieldConfig existingFieldConfig2 = _fieldConfigMap.get(column2);
+      ObjectNode dictIndexes2 = JsonUtils.newObjectNode();
+      dictIndexes2.set("dictionary", JsonUtils.newObjectNode());
+      _fieldConfigMap.put(column2,
+          new FieldConfig(column2, FieldConfig.EncodingType.RAW, null,
+              List.of(FieldConfig.IndexType.INVERTED),
+              existingFieldConfig2.getCompressionCodec(), null, dictIndexes2, null, null));
       updateIndices();
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
     }
@@ -1285,48 +1607,26 @@ public class ForwardIndexHandlerTest {
     testIndexExists(column1, StandardIndexes.forward());
     testIndexExists(column1, StandardIndexes.dictionary());
     validateIndexMap(column1, true, false);
-    validateForwardIndex(column1, null, metadata.isSorted());
-    // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-    int dictionaryElementSize = 0;
-    DataType dataType = metadata.getDataType();
-    if (dataType == DataType.STRING || dataType == DataType.BYTES) {
-      // This value is based on the rows in createTestData().
-      dictionaryElementSize = 7;
-    } else if (dataType == DataType.BIG_DECIMAL) {
-      dictionaryElementSize = 4;
+    if (metadata.isSorted()) {
+      validateForwardIndex(column1, null, true);
+    } else {
+      validateForwardIndex(column1, getExpectedRawCompressionCodec(column1), false, true);
     }
-    int expectedCardinality = column1.equals(DIM_MV_PASS_THROUGH_INTEGER) || column1.equals(DIM_MV_PASS_THROUGH_LONG)
-        ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
-    // DIM_RAW_SORTED_INTEGER has all unique values
-    expectedCardinality = column1.equals(DIM_RAW_SORTED_INTEGER) ? TEST_DATA.size() : expectedCardinality;
-    validateMetadataProperties(column1, true, dictionaryElementSize, expectedCardinality, metadata.getTotalDocs(),
-        dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), false);
+    // In column metadata, nothing other than hasDictionary and bitsPerElement should change.
+    validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column1), metadata, true);
 
     // Col2 validation.
     metadata = existingSegmentMetadata.getColumnMetadataFor(column2);
     testIndexExists(column2, StandardIndexes.forward());
     testIndexExists(column2, StandardIndexes.dictionary());
     validateIndexMap(column2, true, false);
-    validateForwardIndex(column2, null, metadata.isSorted());
-    // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-    dictionaryElementSize = 0;
-    dataType = metadata.getDataType();
-    if (dataType == DataType.STRING || dataType == DataType.BYTES) {
-      // This value is based on the rows in createTestData().
-      dictionaryElementSize = 7;
-    } else if (dataType == DataType.BIG_DECIMAL) {
-      dictionaryElementSize = 4;
+    if (metadata.isSorted()) {
+      validateForwardIndex(column2, null, true);
+    } else {
+      validateForwardIndex(column2, getExpectedRawCompressionCodec(column2), false, true);
     }
-    expectedCardinality = column2.equals(DIM_MV_PASS_THROUGH_INTEGER) || column2.equals(DIM_MV_PASS_THROUGH_LONG)
-        ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
-    // DIM_RAW_SORTED_INTEGER has all unique values
-    expectedCardinality = column2.equals(DIM_RAW_SORTED_INTEGER) ? TEST_DATA.size() : expectedCardinality;
-    validateMetadataProperties(column2, true, dictionaryElementSize, expectedCardinality, metadata.getTotalDocs(),
-        dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), false);
+    // In column metadata, nothing other than hasDictionary and bitsPerElement should change.
+    validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column2), metadata, true);
   }
 
   @Test
@@ -1350,12 +1650,8 @@ public class ForwardIndexHandlerTest {
       validateIndexesForForwardIndexDisabledColumns(column);
 
       // In column metadata, nothing should change.
-      ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
-      validateMetadataProperties(column, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-          metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-          metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-          metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(),
-          metadata.getMaxValue(), false);
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column),
+          existingSegmentMetadata.getColumnMetadataFor(column));
     }
   }
 
@@ -1381,27 +1677,14 @@ public class ForwardIndexHandlerTest {
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
     }
 
-    // Col1 validation.
-    validateIndexMap(column1, true, true);
-    validateIndexesForForwardIndexDisabledColumns(column1);
-    // In column metadata, nothing should change.
-    ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column1);
-    validateMetadataProperties(column1, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-        metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-        metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-        metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(), metadata.getMaxValue(),
-        false);
-
-    // Col2 validation.
-    validateIndexMap(column2, true, true);
-    validateIndexesForForwardIndexDisabledColumns(column2);
-    // In column metadata, nothing should change.
-    metadata = existingSegmentMetadata.getColumnMetadataFor(column2);
-    validateMetadataProperties(column2, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-        metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-        metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-        metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(), metadata.getMaxValue(),
-        false);
+    SegmentMetadataImpl newSegmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    for (String column : List.of(column1, column2)) {
+      validateIndexMap(column, true, true);
+      validateIndexesForForwardIndexDisabledColumns(column);
+      // In column metadata, nothing should change.
+      validateMetadataProperties(newSegmentMetadata.getColumnMetadataFor(column),
+          existingSegmentMetadata.getColumnMetadataFor(column));
+    }
   }
 
   @Test
@@ -1426,11 +1709,8 @@ public class ForwardIndexHandlerTest {
       // All the columns are dimensions. So default compression type is LZ4.
       validateForwardIndex(column, CompressionCodec.LZ4, metadata.isSorted());
 
-      // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-      validateMetadataProperties(column, false, 0, metadata.getCardinality(), metadata.getTotalDocs(),
-          metadata.getDataType(), metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-          metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-          metadata.getMinValue(), metadata.getMaxValue(), false);
+      // In column metadata, nothing other than hasDictionary and bitsPerElement should change.
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column), metadata, false);
     }
   }
 
@@ -1456,10 +1736,8 @@ public class ForwardIndexHandlerTest {
     testIndexExists(DIM_RAW_SORTED_INTEGER, StandardIndexes.dictionary());
     validateIndexMap(DIM_RAW_SORTED_INTEGER, true, false);
     validateForwardIndex(DIM_RAW_SORTED_INTEGER, null, true);
-    validateMetadataProperties(DIM_RAW_SORTED_INTEGER, true, 0, TEST_DATA.size(), dictMetadata.getTotalDocs(),
-        dictMetadata.getDataType(), dictMetadata.getFieldType(), true, dictMetadata.isSingleValue(),
-        dictMetadata.getMaxNumberOfMultiValues(), dictMetadata.getTotalNumberOfEntries(),
-        dictMetadata.isAutoGenerated(), dictMetadata.getMinValue(), dictMetadata.getMaxValue(), false);
+    validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(DIM_RAW_SORTED_INTEGER),
+        dictMetadata, true);
 
     // Step 2: Disable dictionary for the sorted column again (convert back to raw).
     SegmentMetadataImpl existingSegmentMetadata;
@@ -1482,10 +1760,8 @@ public class ForwardIndexHandlerTest {
     testIndexExists(DIM_RAW_SORTED_INTEGER, StandardIndexes.forward());
     validateIndexMap(DIM_RAW_SORTED_INTEGER, false, false);
     validateForwardIndex(DIM_RAW_SORTED_INTEGER, CompressionCodec.SNAPPY, true);
-    validateMetadataProperties(DIM_RAW_SORTED_INTEGER, false, 0, TEST_DATA.size(), metadata.getTotalDocs(),
-        metadata.getDataType(), metadata.getFieldType(), true, metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), false);
+    validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(DIM_RAW_SORTED_INTEGER),
+        metadata, false);
   }
 
   @Test
@@ -1508,31 +1784,16 @@ public class ForwardIndexHandlerTest {
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
     }
 
-    // Column1 validation.
-    ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column1);
-    testIndexExists(column1, StandardIndexes.forward());
-    validateIndexMap(column1, false, false);
-    // All the columns are dimensions. So default compression type is LZ4.
-    validateForwardIndex(column1, CompressionCodec.LZ4, metadata.isSorted());
-
-    // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-    validateMetadataProperties(column1, false, 0, metadata.getCardinality(), metadata.getTotalDocs(),
-        metadata.getDataType(), metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), false);
-
-    // Column2 validation.
-    metadata = existingSegmentMetadata.getColumnMetadataFor(column2);
-    testIndexExists(column2, StandardIndexes.forward());
-    validateIndexMap(column2, false, false);
-    // All the columns are dimensions. So default compression type is LZ4.
-    validateForwardIndex(column2, CompressionCodec.LZ4, metadata.isSorted());
-
-    // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-    validateMetadataProperties(column2, false, 0, metadata.getCardinality(), metadata.getTotalDocs(),
-        metadata.getDataType(), metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), false);
+    SegmentMetadataImpl newSegmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    for (String column : List.of(column1, column2)) {
+      ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
+      testIndexExists(column, StandardIndexes.forward());
+      validateIndexMap(column, false, false);
+      // All the columns are dimensions. So default compression type is LZ4.
+      validateForwardIndex(column, CompressionCodec.LZ4, metadata.isSorted());
+      // In column metadata, nothing other than hasDictionary and bitsPerElement should change.
+      validateMetadataProperties(newSegmentMetadata.getColumnMetadataFor(column), metadata, false);
+    }
   }
 
   @Test
@@ -1562,22 +1823,9 @@ public class ForwardIndexHandlerTest {
       validateIndexMap(column, true, true);
       validateIndexesForForwardIndexDisabledColumns(column);
 
-      // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-      int dictionaryElementSize = 0;
-      ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
-      DataType dataType = metadata.getDataType();
-      if (dataType == DataType.STRING || dataType == DataType.BYTES) {
-        // This value is based on the rows in createTestData().
-        dictionaryElementSize = 7;
-      } else if (dataType == DataType.BIG_DECIMAL) {
-        dictionaryElementSize = 4;
-      }
-      int expectedCardinality = column.equals(DIM_MV_PASS_THROUGH_INTEGER) || column.equals(DIM_MV_PASS_THROUGH_LONG)
-          ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
-      validateMetadataProperties(column, true, dictionaryElementSize, expectedCardinality,
-          metadata.getTotalDocs(), dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-          metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-          metadata.getMinValue(), metadata.getMaxValue(), false);
+      // In column metadata, nothing other than hasDictionary and bitsPerElement should change.
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column),
+          existingSegmentMetadata.getColumnMetadataFor(column), true);
     }
   }
 
@@ -1607,45 +1855,14 @@ public class ForwardIndexHandlerTest {
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
     }
 
-    // Col1 validation.
-    validateIndexMap(column1, true, true);
-    validateIndexesForForwardIndexDisabledColumns(column1);
-    // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-    int dictionaryElementSize = 0;
-    ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column1);
-    DataType dataType = metadata.getDataType();
-    if (dataType == DataType.STRING || dataType == DataType.BYTES) {
-      // This value is based on the rows in createTestData().
-      dictionaryElementSize = 7;
-    } else if (dataType == DataType.BIG_DECIMAL) {
-      dictionaryElementSize = 4;
+    SegmentMetadataImpl newSegmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    for (String column : List.of(column1, column2)) {
+      validateIndexMap(column, true, true);
+      validateIndexesForForwardIndexDisabledColumns(column);
+      // In column metadata, nothing other than hasDictionary and bitsPerElement should change.
+      validateMetadataProperties(newSegmentMetadata.getColumnMetadataFor(column),
+          existingSegmentMetadata.getColumnMetadataFor(column), true);
     }
-    int expectedCardinality = column1.equals(DIM_MV_PASS_THROUGH_INTEGER) || column1.equals(DIM_MV_PASS_THROUGH_LONG)
-        ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
-    validateMetadataProperties(column1, true, dictionaryElementSize, expectedCardinality, metadata.getTotalDocs(),
-        dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), false);
-
-    // Col2 validation.
-    validateIndexMap(column2, true, true);
-    validateIndexesForForwardIndexDisabledColumns(column2);
-    // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-    dictionaryElementSize = 0;
-    metadata = existingSegmentMetadata.getColumnMetadataFor(column2);
-    dataType = metadata.getDataType();
-    if (dataType == DataType.STRING || dataType == DataType.BYTES) {
-      // This value is based on the rows in createTestData().
-      dictionaryElementSize = 7;
-    } else if (dataType == DataType.BIG_DECIMAL) {
-      dictionaryElementSize = 4;
-    }
-    expectedCardinality = column2.equals(DIM_MV_PASS_THROUGH_INTEGER) || column2.equals(DIM_MV_PASS_THROUGH_LONG)
-        ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
-    validateMetadataProperties(column2, true, dictionaryElementSize, expectedCardinality, metadata.getTotalDocs(),
-        dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), false);
   }
 
   @Test
@@ -1672,13 +1889,9 @@ public class ForwardIndexHandlerTest {
       validateIndexMap(column, false, true);
       validateIndexesForForwardIndexDisabledColumns(column);
 
-      // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-      ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
-      DataType dataType = metadata.getDataType();
-      validateMetadataProperties(column, false, 0, metadata.getCardinality(), metadata.getTotalDocs(), dataType,
-          metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-          metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(),
-          metadata.getMaxValue(), false);
+      // In column metadata, nothing other than hasDictionary and bitsPerElement should change.
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column),
+          existingSegmentMetadata.getColumnMetadataFor(column), false);
     }
   }
 
@@ -1707,22 +1920,9 @@ public class ForwardIndexHandlerTest {
       validateIndexMap(column, true, true);
       validateIndexesForForwardIndexDisabledColumns(column);
 
-      // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
-      ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
-      DataType dataType = metadata.getDataType();
-      int dictionaryElementSize = 0;
-      if (dataType == DataType.STRING || dataType == DataType.BYTES) {
-        // This value is based on the rows in createTestData().
-        dictionaryElementSize = 7;
-      } else if (dataType == DataType.BIG_DECIMAL) {
-        dictionaryElementSize = 4;
-      }
-      int expectedCardinality = column.equals(DIM_MV_PASS_THROUGH_INTEGER) || column.equals(DIM_MV_PASS_THROUGH_LONG)
-          ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
-      validateMetadataProperties(column, true, dictionaryElementSize, expectedCardinality,
-          metadata.getTotalDocs(), dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-          metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-          metadata.getMinValue(), metadata.getMaxValue(), false);
+      // In column metadata, nothing other than hasDictionary and bitsPerElement should change.
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column),
+          existingSegmentMetadata.getColumnMetadataFor(column), true);
     }
   }
 
@@ -1747,13 +1947,8 @@ public class ForwardIndexHandlerTest {
       ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
       validateIndexMap(column, true, false);
       validateForwardIndex(column, null, metadata.isSorted());
-
       // In column metadata, nothing should change.
-      validateMetadataProperties(column, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-          metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-          metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-          metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(),
-          metadata.getMaxValue(), false);
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column), metadata);
     }
   }
 
@@ -1775,27 +1970,14 @@ public class ForwardIndexHandlerTest {
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
     }
 
-    // Col1 validation.
-    ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column1);
-    validateIndexMap(column1, true, false);
-    validateForwardIndex(column1, null, metadata.isSorted());
-    // In column metadata, nothing should change.
-    validateMetadataProperties(column1, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-        metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-        metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-        metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(), metadata.getMaxValue(),
-        false);
-
-    // Col2 validation.
-    metadata = existingSegmentMetadata.getColumnMetadataFor(column2);
-    validateIndexMap(column2, true, false);
-    validateForwardIndex(column2, null, metadata.isSorted());
-    // In column metadata, nothing should change.
-    validateMetadataProperties(column2, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-        metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-        metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-        metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(), metadata.getMaxValue(),
-        false);
+    SegmentMetadataImpl newSegmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    for (String column : List.of(column1, column2)) {
+      ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
+      validateIndexMap(column, true, false);
+      validateForwardIndex(column, null, metadata.isSorted());
+      // In column metadata, nothing should change.
+      validateMetadataProperties(newSegmentMetadata.getColumnMetadataFor(column), metadata);
+    }
   }
 
   @Test
@@ -1821,11 +2003,7 @@ public class ForwardIndexHandlerTest {
     validateForwardIndex(column, null, metadata.isSorted());
     // In column metadata, some values can change since MV columns with duplicates lose the duplicates on forward index
     // regeneration.
-    validateMetadataProperties(column, metadata.hasDictionary(), metadata.getColumnMaxLength(),
-        metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(), metadata.getFieldType(),
-        metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-        metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(), metadata.getMaxValue(),
-        true);
+    validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column), metadata, null, true);
   }
 
   @Test
@@ -1850,25 +2028,14 @@ public class ForwardIndexHandlerTest {
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
     }
 
-    // Col1 validation.
-    ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column1);
-    validateIndexMap(column1, false, false);
-    validateForwardIndex(column1, CompressionCodec.LZ4, metadata.isSorted());
-    // In column metadata, nothing should change.
-    validateMetadataProperties(column1, false, 0, metadata.getCardinality(), metadata.getTotalDocs(),
-        metadata.getDataType(), metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), false);
-
-    // Col2 validation.
-    metadata = existingSegmentMetadata.getColumnMetadataFor(column2);
-    validateIndexMap(column2, false, false);
-    validateForwardIndex(column2, CompressionCodec.LZ4, metadata.isSorted());
-    // In column metadata, nothing should change.
-    validateMetadataProperties(column2, false, 0, metadata.getCardinality(), metadata.getTotalDocs(),
-        metadata.getDataType(), metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), false);
+    SegmentMetadataImpl newSegmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    for (String column : List.of(column1, column2)) {
+      ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
+      validateIndexMap(column, false, false);
+      validateForwardIndex(column, CompressionCodec.LZ4, metadata.isSorted());
+      // In column metadata, nothing should change.
+      validateMetadataProperties(newSegmentMetadata.getColumnMetadataFor(column), metadata, false);
+    }
   }
 
   @Test
@@ -1896,10 +2063,7 @@ public class ForwardIndexHandlerTest {
     validateForwardIndex(column, CompressionCodec.LZ4, metadata.isSorted());
     // In column metadata, some values can change since MV columns with duplicates lose the duplicates on forward index
     // regeneration.
-    validateMetadataProperties(column, false, 0, metadata.getCardinality(), metadata.getTotalDocs(),
-        metadata.getDataType(), metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), true);
+    validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column), metadata, false, true);
   }
 
   @Test
@@ -1925,18 +2089,15 @@ public class ForwardIndexHandlerTest {
       ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
       validateIndexMap(column, false, false);
       validateForwardIndex(column, CompressionCodec.LZ4, metadata.isSorted());
-
       // In column metadata, nothing should change.
-      validateMetadataProperties(column, false, 0, metadata.getCardinality(), metadata.getTotalDocs(),
-          metadata.getDataType(), metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-          metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-          metadata.getMinValue(), metadata.getMaxValue(), false);
+      validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column), metadata, false);
     }
   }
 
   @Test
   public void testEnableForwardIndexForInvertedIndexDisabledColumn()
       throws Exception {
+    String column = DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX;
     SegmentMetadataImpl existingSegmentMetadata;
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
@@ -1944,28 +2105,24 @@ public class ForwardIndexHandlerTest {
       _writer = writer;
       existingSegmentMetadata = segmentDirectory.getSegmentMetadata();
 
-      _fieldConfigMap.remove(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
+      _fieldConfigMap.remove(column);
       updateIndices();
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
     }
 
     // Validate nothing has changed
-    validateIndexMap(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX, true, true);
-    validateIndexesForForwardIndexDisabledColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
-
+    validateIndexMap(column, true, true);
+    validateIndexesForForwardIndexDisabledColumns(column);
     // In column metadata, nothing should change.
-    ColumnMetadata metadata =
-        existingSegmentMetadata.getColumnMetadataFor(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
-    validateMetadataProperties(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX, metadata.hasDictionary(),
-        metadata.getColumnMaxLength(), metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(),
-        metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-        metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(), metadata.getMaxValue(),
-        false);
+    validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column),
+        existingSegmentMetadata.getColumnMetadataFor(column));
   }
 
   @Test
   public void testEnableForwardIndexForDictionaryDisabledColumns()
       throws Exception {
+    String column1 = DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER;
+    String column2 = DIM_RAW_MV_FORWARD_INDEX_DISABLED_INTEGER;
     SegmentMetadataImpl existingSegmentMetadata;
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
@@ -1973,31 +2130,21 @@ public class ForwardIndexHandlerTest {
       _writer = writer;
       existingSegmentMetadata = segmentDirectory.getSegmentMetadata();
 
-      _fieldConfigMap.remove(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
-      _fieldConfigMap.remove(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX);
+      _fieldConfigMap.remove(column1);
+      _fieldConfigMap.remove(column2);
       updateIndices();
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
     }
 
-    // Validate nothing has changed
-    validateIndexMap(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER, false, true);
-    validateIndexesForForwardIndexDisabledColumns(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER);
-    validateIndexMap(DIM_RAW_MV_FORWARD_INDEX_DISABLED_INTEGER, false, true);
-    validateIndexesForForwardIndexDisabledColumns(DIM_RAW_MV_FORWARD_INDEX_DISABLED_INTEGER);
-
-    // In column metadata, nothing should change.
-    ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER);
-    validateMetadataProperties(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER, metadata.hasDictionary(),
-        metadata.getColumnMaxLength(), metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(),
-        metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-        metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(), metadata.getMaxValue(),
-        false);
-    metadata = existingSegmentMetadata.getColumnMetadataFor(DIM_RAW_MV_FORWARD_INDEX_DISABLED_INTEGER);
-    validateMetadataProperties(DIM_RAW_MV_FORWARD_INDEX_DISABLED_INTEGER, metadata.hasDictionary(),
-        metadata.getColumnMaxLength(), metadata.getCardinality(), metadata.getTotalDocs(), metadata.getDataType(),
-        metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(), metadata.getMaxNumberOfMultiValues(),
-        metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(), metadata.getMinValue(), metadata.getMaxValue(),
-        false);
+    SegmentMetadataImpl newMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    for (String column : List.of(column1, column2)) {
+      // Validate nothing has changed
+      validateIndexMap(column, false, true);
+      validateIndexesForForwardIndexDisabledColumns(column);
+      // In column metadata, nothing should change.
+      validateMetadataProperties(newMetadata.getColumnMetadataFor(column),
+          existingSegmentMetadata.getColumnMetadataFor(column));
+    }
   }
 
   @Test
@@ -2034,17 +2181,8 @@ public class ForwardIndexHandlerTest {
 
     // In column metadata, some values can change since MV columns with duplicates lose the duplicates on forward index
     // regeneration.
-    ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
-    validateMetadataProperties(column, true, 7, metadata.getCardinality(), metadata.getTotalDocs(),
-        metadata.getDataType(), metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
-        metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
-        metadata.getMinValue(), metadata.getMaxValue(), true);
-
-    // Validate that all the duplicates are removed
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
-    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-    assertEquals(columnMetadata.getMaxNumberOfMultiValues(), 1);
-    assertEquals(columnMetadata.getTotalNumberOfEntries(), metadata.getTotalDocs());
+    validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column),
+        existingSegmentMetadata.getColumnMetadataFor(column), null, true);
   }
 
   @Test
@@ -2109,19 +2247,32 @@ public class ForwardIndexHandlerTest {
       throws IOException, ConfigurationException {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-      validateForwardIndex(segmentDirectory, reader, columnName, expectedCompressionType, isSorted);
+      validateForwardIndex(segmentDirectory, reader, columnName, expectedCompressionType, isSorted,
+          expectedCompressionType == null);
+    } catch (IndexReaderConstraintException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void validateForwardIndex(String columnName, @Nullable CompressionCodec expectedCompressionType,
+      boolean isSorted, boolean expectDictionary)
+      throws IOException, ConfigurationException {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      validateForwardIndex(segmentDirectory, reader, columnName, expectedCompressionType, isSorted, expectDictionary);
     } catch (IndexReaderConstraintException e) {
       throw new RuntimeException(e);
     }
   }
 
   private void validateForwardIndex(SegmentDirectory segmentDirectory, SegmentDirectory.Reader reader,
-      String columnName, @Nullable CompressionCodec expectedCompressionType, boolean isSorted)
+      String columnName, @Nullable CompressionCodec expectedCompressionType, boolean isSorted,
+      boolean expectDictionary)
       throws IOException, IndexReaderConstraintException {
     ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(columnName);
     boolean isSingleValue = columnMetadata.isSingleValue();
 
-    if (expectedCompressionType == null) {
+    if (expectDictionary) {
       assertTrue(reader.hasIndexFor(columnName, StandardIndexes.dictionary()));
     } else {
       assertFalse(reader.hasIndexFor(columnName, StandardIndexes.dictionary()));
@@ -2143,11 +2294,18 @@ public class ForwardIndexHandlerTest {
     try (ForwardIndexReader<?> forwardIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
         columnMetadata)) {
       Dictionary dictionary = null;
-      if (columnMetadata.hasDictionary()) {
+      if (expectDictionary && forwardIndexReader.isDictionaryEncoded()) {
         dictionary = DictionaryIndexType.read(reader, columnMetadata);
       }
-      PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(forwardIndexReader, dictionary, null,
-          columnMetadata.getMaxNumberOfMultiValues());
+      PinotSegmentColumnReader columnReader =
+          new PinotSegmentColumnReader(columnMetadata.getColumnName(), forwardIndexReader, dictionary, null,
+              columnMetadata.getMaxNumberOfMultiValues());
+
+      if (expectDictionary && !forwardIndexReader.isDictionaryEncoded()) {
+        try (Dictionary loadedDictionary = DictionaryIndexType.read(reader, columnMetadata)) {
+          assertEquals(loadedDictionary.length(), columnMetadata.getCardinality());
+        }
+      }
 
       for (int rowIdx = 0; rowIdx < columnMetadata.getTotalDocs(); rowIdx++) {
         // For MV forward index disabled columns cannot do this validation as we had to create a unique set of elements
@@ -2283,6 +2441,25 @@ public class ForwardIndexHandlerTest {
     }
   }
 
+  private CompressionCodec getExpectedRawCompressionCodec(String columnName) {
+    if (RAW_SNAPPY_COLUMNS.contains(columnName)) {
+      return CompressionCodec.SNAPPY;
+    }
+    if (RAW_ZSTANDARD_COLUMNS.contains(columnName)) {
+      return CompressionCodec.ZSTANDARD;
+    }
+    if (RAW_PASS_THROUGH_COLUMNS.contains(columnName)) {
+      return CompressionCodec.PASS_THROUGH;
+    }
+    if (RAW_LZ4_COLUMNS.contains(columnName)) {
+      return CompressionCodec.LZ4;
+    }
+    if (RAW_GZIP_COLUMNS.contains(columnName)) {
+      return CompressionCodec.GZIP;
+    }
+    throw new IllegalArgumentException("Unexpected raw column: " + columnName);
+  }
+
   private void testIndexExists(String columnName, IndexType<?, ?, ?> indexType)
       throws Exception {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
@@ -2315,50 +2492,193 @@ public class ForwardIndexHandlerTest {
     }
   }
 
-  private void validateMetadataProperties(String column, boolean hasDictionary, int dictionaryElementSize,
-      int cardinality, int totalDocs, DataType dataType, FieldSpec.FieldType fieldType, boolean isSorted,
-      boolean isSingleValue, int maxNumberOfMVEntries, int totalNumberOfEntries, boolean isAutoGenerated,
-      Comparable<?> minValue, Comparable<?> maxValue, boolean isRegeneratedMVColumnWithDuplicates)
-      throws IOException, ConfigurationException {
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
-    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
+  private void validateMetadataProperties(ColumnMetadata actual, ColumnMetadata expected) {
+    validateMetadataProperties(actual, expected, null);
+  }
 
-    assertEquals(columnMetadata.hasDictionary(), hasDictionary, column);
-    assertEquals(columnMetadata.getColumnMaxLength(), dictionaryElementSize, column);
-    assertEquals(columnMetadata.getCardinality(), cardinality, column);
-    assertEquals(columnMetadata.getTotalDocs(), totalDocs, column);
-    assertEquals(columnMetadata.getDataType(), dataType, column);
-    assertEquals(columnMetadata.getFieldType(), fieldType);
-    assertEquals(columnMetadata.isSorted(), isSorted);
-    assertEquals(columnMetadata.isSingleValue(), isSingleValue);
+  private void validateMetadataProperties(ColumnMetadata actual, ColumnMetadata expected,
+      @Nullable Boolean enableDictionary) {
+    validateMetadataProperties(actual, expected, enableDictionary, false);
+  }
+
+  private void validateMetadataProperties(ColumnMetadata actual, ColumnMetadata expected,
+      @Nullable Boolean enableDictionary, boolean isRegeneratedMVColumnWithDuplicates) {
+    assertEquals(actual.getFieldSpec(), expected.getFieldSpec());
+    assertEquals(actual.getTotalDocs(), expected.getTotalDocs());
+    assertEquals(actual.getCardinality(), expected.getCardinality());
+    assertEquals(actual.isSorted(), expected.isSorted());
+    assertEquals(actual.getMinValue(), expected.getMinValue());
+    assertEquals(actual.getMaxValue(), expected.getMaxValue());
+    assertEquals(actual.isMinMaxValueInvalid(), expected.isMinMaxValueInvalid());
+    assertEquals(actual.getLengthOfShortestElement(), expected.getLengthOfShortestElement());
+    assertEquals(actual.getLengthOfLongestElement(), expected.getLengthOfLongestElement());
+    assertEquals(actual.isAscii(), expected.isAscii());
+    assertEquals(actual.getPartitionFunction(), expected.getPartitionFunction());
+    assertEquals(actual.getPartitions(), expected.getPartitions());
+    assertEquals(actual.isAutoGenerated(), expected.isAutoGenerated());
+    if (enableDictionary != null) {
+      if (enableDictionary) {
+        assertTrue(actual.hasDictionary());
+        assertEquals(actual.getBitsPerElement(), PinotDataBitSet.getNumBitsPerValue(actual.getCardinality() - 1));
+      } else {
+        assertFalse(actual.hasDictionary());
+        assertEquals(actual.getBitsPerElement(), ColumnMetadata.UNAVAILABLE);
+      }
+    } else {
+      assertEquals(actual.hasDictionary(), expected.hasDictionary());
+      assertEquals(actual.getBitsPerElement(), expected.getBitsPerElement());
+    }
     if (isRegeneratedMVColumnWithDuplicates) {
       // For MV columns with duplicates within a row, the duplicates are removed when regenerating the forward index.
       // Thus the metadata might not match depending on how many duplicates were found. Relax these metadata checks
-      assertTrue(MV_FORWARD_INDEX_DISABLED_DUPLICATES_COLUMNS.contains(column));
+      assertTrue(MV_FORWARD_INDEX_DISABLED_DUPLICATES_COLUMNS.contains(actual.getColumnName()));
+      DataType dataType = expected.getDataType();
       if (dataType == DataType.STRING || dataType == DataType.BYTES) {
         // Every entry is duplicated within the row so total number of entries matches number of docs and max number of
         // MVs per row is 1
-        assertEquals(columnMetadata.getMaxNumberOfMultiValues(), 1);
-        assertEquals(columnMetadata.getTotalNumberOfEntries(), totalDocs);
+        assertEquals(actual.getTotalNumberOfEntries(), expected.getTotalDocs());
+        assertEquals(actual.getMaxNumberOfMultiValues(), 1);
       } else {
         // Cannot check for exact numbers as it will vary depending on number of entries generated per row
-        assertTrue(columnMetadata.getMaxNumberOfMultiValues() <= maxNumberOfMVEntries);
-        assertTrue(columnMetadata.getTotalNumberOfEntries() <= totalNumberOfEntries);
+        assertTrue(actual.getTotalNumberOfEntries() <= expected.getTotalNumberOfEntries());
+        assertTrue(actual.getMaxNumberOfMultiValues() <= expected.getMaxNumberOfMultiValues());
       }
     } else {
-      assertEquals(columnMetadata.getMaxNumberOfMultiValues(), maxNumberOfMVEntries);
-      assertEquals(columnMetadata.getTotalNumberOfEntries(), totalNumberOfEntries);
+      assertEquals(actual.getTotalNumberOfEntries(), expected.getTotalNumberOfEntries());
+      assertEquals(actual.getMaxNumberOfMultiValues(), expected.getMaxNumberOfMultiValues());
     }
-    assertEquals(columnMetadata.isAutoGenerated(), isAutoGenerated);
-    assertEquals(columnMetadata.getMinValue(), minValue);
-    assertEquals(columnMetadata.getMaxValue(), maxValue);
+  }
+
+  @Test
+  public void testBackfillMissingStats()
+      throws Exception {
+    // For each var-length column, strip the 1.6.0-era stats from metadata to simulate a pre-1.6.0 segment, then
+    // trigger a compression change. The pre-pass in `ForwardIndexHandler.updateIndices` should backfill the
+    // missing stats from a column scan before any per-op handler runs.
+    for (String column : List.of(DIM_SNAPPY_STRING, DIM_MV_PASS_THROUGH_STRING)) {
+      ColumnMetadata expected;
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+          SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+        _segmentDirectory = segmentDirectory;
+        _writer = writer;
+        expected = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        boolean isSingleValue = expected.isSingleValue();
+
+        // Strip the 1.6.0-era stats: shortest/longest, isAscii (STRING only), and maxRowLengthInBytes (MV only).
+        Map<String, String> stripped = new HashMap<>();
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.LENGTH_OF_SHORTEST_ELEMENT), null);
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.LENGTH_OF_LONGEST_ELEMENT), null);
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.IS_ASCII), null);
+        if (!isSingleValue) {
+          stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+              V1Constants.MetadataKeys.Column.MAX_ROW_LENGTH_IN_BYTES), null);
+        }
+        SegmentMetadataUtils.updateMetadataProperties(segmentDirectory, stripped);
+        ColumnMetadata afterStrip = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        assertTrue(afterStrip.getLengthOfShortestElement() < 0);
+        if (!isSingleValue) {
+          assertTrue(afterStrip.getMaxRowLengthInBytes() < 0);
+        }
+
+        // Trigger a compression change to drive `updateIndices`, which runs the backfill pre-pass.
+        _fieldConfigMap.put(column,
+            new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.LZ4, null));
+        updateIndices();
+      }
+
+      // Reopen and verify the stats were backfilled to the values the original (pre-strip) build produced.
+      ColumnMetadata actual = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column);
+      assertEquals(actual.getLengthOfShortestElement(), expected.getLengthOfShortestElement());
+      assertEquals(actual.getLengthOfLongestElement(), expected.getLengthOfLongestElement());
+      assertEquals(actual.isAscii(), expected.isAscii());
+      assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
+    }
+  }
+
+  @Test
+  public void testBackfillMissingStatsForMvViaMaxRowLengthTrigger()
+      throws Exception {
+    // The pre-pass uses `getMaxRowLengthInBytes() >= 0` (not `getLengthOfShortestElement() >= 0`) as the trigger
+    // for MV columns, because `MAX_ROW_LENGTH_IN_BYTES` was added after the other 1.6.0 keys. A segment that
+    // already has shortest/longest but is missing only `MAX_ROW_LENGTH_IN_BYTES` should still get backfilled.
+    String column = DIM_MV_PASS_THROUGH_STRING;
+    ColumnMetadata expected;
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      expected = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+
+      // Strip only MAX_ROW_LENGTH_IN_BYTES; shortest/longest/isAscii stay.
+      Map<String, String> stripped = new HashMap<>();
+      stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+          V1Constants.MetadataKeys.Column.MAX_ROW_LENGTH_IN_BYTES), null);
+      SegmentMetadataUtils.updateMetadataProperties(segmentDirectory, stripped);
+      ColumnMetadata afterStrip = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertTrue(afterStrip.getMaxRowLengthInBytes() < 0);
+      assertTrue(afterStrip.getLengthOfShortestElement() >= 0);
+
+      _fieldConfigMap.put(column,
+          new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.LZ4, null));
+      updateIndices();
+    }
+
+    ColumnMetadata actual = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column);
+    assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
+  }
+
+  @Test
+  public void testBackfillFromInvertedIndexRebuild()
+      throws Exception {
+    // For a forward-index-disabled var-length column, strip the 1.6.0-era stats and then re-enable the forward
+    // index. The InvertedIndexAndDictionaryBasedForwardIndexCreator rebuild path tracks per-element stats inline
+    // from the dictionary and persists them as part of the metadata update.
+    for (String column : List.of(DIM_SV_FORWARD_INDEX_DISABLED_STRING, DIM_MV_FORWARD_INDEX_DISABLED_STRING)) {
+      ColumnMetadata expected;
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+          SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+        _segmentDirectory = segmentDirectory;
+        _writer = writer;
+        expected = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        boolean isSingleValue = expected.isSingleValue();
+
+        Map<String, String> stripped = new HashMap<>();
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.LENGTH_OF_SHORTEST_ELEMENT), null);
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.LENGTH_OF_LONGEST_ELEMENT), null);
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.IS_ASCII), null);
+        if (!isSingleValue) {
+          stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+              V1Constants.MetadataKeys.Column.MAX_ROW_LENGTH_IN_BYTES), null);
+        }
+        SegmentMetadataUtils.updateMetadataProperties(segmentDirectory, stripped);
+
+        // Drop FORWARD_INDEX_DISABLED from the field config so `updateIndices` runs ENABLE_DICT_FORWARD_INDEX,
+        // which rebuilds the forward index via `InvertedIndexAndDictionaryBasedForwardIndexCreator`.
+        _fieldConfigMap.remove(column);
+        updateIndices();
+      }
+
+      ColumnMetadata actual = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column);
+      assertEquals(actual.getLengthOfShortestElement(), expected.getLengthOfShortestElement());
+      assertEquals(actual.getLengthOfLongestElement(), expected.getLengthOfLongestElement());
+      assertEquals(actual.isAscii(), expected.isAscii());
+      if (!expected.isSingleValue()) {
+        assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
+      }
+    }
   }
 
   private FieldIndexConfigs createFieldIndexConfigsFromMetadata(ColumnMetadata columnMetadata) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
 
     // Add forward index config
-    ForwardIndexConfig forwardIndexConfig = ForwardIndexConfig.getDefault();
+    ForwardIndexConfig forwardIndexConfig = ForwardIndexConfig.getDefault(columnMetadata.getForwardIndexEncoding());
     builder.add(StandardIndexes.forward(), forwardIndexConfig);
 
     // Add dictionary config if the column has dictionary

@@ -313,7 +313,8 @@ public class PinotInstanceAssignmentRestletResource {
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
     try {
       LOGGER.info("Persisting instance partitions: {}", instancePartitions);
-      InstancePartitionsUtils.persistInstancePartitions(_resourceManager.getPropertyStore(), instancePartitions);
+      InstancePartitionsUtils.persistInstancePartitions(_resourceManager.getPropertyStore(), instancePartitions,
+          _resourceManager.getQueryWorkloadManager());
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions",
           Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -344,17 +345,17 @@ public class PinotInstanceAssignmentRestletResource {
     if (tableType != TableType.REALTIME) {
       if (InstancePartitionsType.OFFLINE.getInstancePartitionsName(rawTableName).equals(instancePartitionsName)) {
         persistInstancePartitionsHelper(instancePartitions);
-        return Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(), instancePartitions);
+        return Map.of(InstancePartitionsType.OFFLINE.toString(), instancePartitions);
       }
     }
     if (tableType != TableType.OFFLINE) {
       if (InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName).equals(instancePartitionsName)) {
         persistInstancePartitionsHelper(instancePartitions);
-        return Collections.singletonMap(InstancePartitionsType.CONSUMING.toString(), instancePartitions);
+        return Map.of(InstancePartitionsType.CONSUMING.toString(), instancePartitions);
       }
       if (InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName).equals(instancePartitionsName)) {
         persistInstancePartitionsHelper(instancePartitions);
-        return Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(), instancePartitions);
+        return Map.of(InstancePartitionsType.COMPLETED.toString(), instancePartitions);
       }
     }
 
@@ -367,7 +368,7 @@ public class PinotInstanceAssignmentRestletResource {
           if (InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(), tierConfig.getName())
               .equals(instancePartitionsName)) {
             persistInstancePartitionsHelper(instancePartitions);
-            return Collections.singletonMap(tierConfig.getName(), instancePartitions);
+            return Map.of(tierConfig.getName(), instancePartitions);
           }
         }
       }

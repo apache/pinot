@@ -88,7 +88,7 @@ Apache Pinot is a real-time distributed OLAP datastore for low-latency analytics
 - **assembly-descriptor**: Maven assembly descriptor for plugin packaging.
 
 ## Build commands
-- **JDK**: Use JDK 11+ (CI runs 11/21); code targets Java 11.
+- **JDK**: Use JDK 21+ for Pinot services and the default build; client and SPI artifacts still target Java 11 bytecode.
 - **Default build**: `./mvnw clean install`
 - **Fast dev build**: `./mvnw verify -Ppinot-fastdev`
 - **Full binary/shaded build**: `./mvnw clean install -DskipTests -Pbin-dist -Pbuild-shaded-jar`
@@ -106,20 +106,38 @@ Apache Pinot is a real-time distributed OLAP datastore for low-latency analytics
 
 ## Coding conventions
 - Add class-level Javadoc for new classes; describe behavior and thread-safety.
-- Use Javadoc comments (`/** ... */` or `///` syntax); code targets Java 11.
+- Use Javadoc comments (`/** ... */` or `///` syntax); service code targets Java 21 by default.
 - Keep Apache 2.0 license headers on all new source files.
 - Preserve backward compatibility across mixed-version broker/server/controller.
 - Prefer imports over fully qualified class names (e.g., use `import com.foo.Bar` and refer to `Bar`, not `com.foo.Bar` inline).
+- Prefer `List.of()`, `Set.of()`, and `Map.of()` for non-null immutable collection literals. Checkstyle blocks
+  `Collections.emptyList()`, `Collections.emptySet()`, and `Collections.emptyMap()`; use `List.of()`, `Set.of()`, and
+  `Map.of()` instead. Do not add blanket bans for `Collections.singleton*`; use them only when an element/key/value
+  argument is intentionally null because `List.of(null)`, `Set.of(null)`, and `Map.of(...)` with null keys or values
+  throw `NullPointerException`. Before replacing empty collection factories, check whether the value flows to
+  mutating callers. See
+  `kb/code-review-principles.md` C7.12.
 - Prefer targeted unit tests; use integration tests when behavior crosses roles.
+- Avoid deprecated APIs in new code. If you must reference one (e.g., for backward-compat serialization or to test the deprecated path), justify it with a comment.
+
+## Commit messages
+- Do not include `Co-authored-by` trailers that reference AI tools (e.g., Claude, Copilot).
+  - **Why**: These trailers propagate into squash-merge commits on GitHub, making the project history appear AI-authored rather than human-authored.
+  - **Fix**: Omit the `Co-authored-by` line entirely when committing.
 
 ## Pre-commit checks
-Before pushing a commit, always run the following checks on the affected modules and fix any failures:
+Before pushing a commit, run the following checks on the affected modules and fix any failures:
 1. `./mvnw spotless:apply -pl <module>` — auto-format code.
 2. `./mvnw checkstyle:check -pl <module>` — validate style conformance.
 3. `./mvnw license:format -pl <module>` — add missing license headers to new files.
 4. `./mvnw license:check -pl <module>` — verify all files have correct license headers.
 
 Do not push until all four checks pass cleanly.
+
+Additionally, run the compiler warning check and fix what you can:
+5. `./mvnw test-compile -pl <module> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true` — review warnings (deprecation, unchecked, etc.) in your changed code and fix where possible.
+
+Claude Code users can invoke `/precommit` to automate all of the above.
 
 ## Change guidance
 - **Query changes** often touch broker planning and server execution; verify both.

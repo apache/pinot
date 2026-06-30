@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -96,7 +95,7 @@ public class PulsarConfig {
     _populateMetadata = Boolean.parseBoolean(getConfigValue(streamConfigMap, StreamConfigProperties.METADATA_POPULATE));
     String metadataFieldsToExtractCSV = getConfigValueOrDefault(streamConfigMap, METADATA_FIELDS, "");
     if (StringUtils.isBlank(metadataFieldsToExtractCSV) || !_populateMetadata) {
-      _metadataFields = Collections.emptySet();
+      _metadataFields = Set.of();
     } else {
       _metadataFields = parseConfigStringToEnumSet(metadataFieldsToExtractCSV);
     }

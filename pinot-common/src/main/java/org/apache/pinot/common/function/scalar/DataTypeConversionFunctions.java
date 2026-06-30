@@ -21,13 +21,13 @@ package org.apache.pinot.common.function.scalar;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.Base64;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
-import static org.apache.pinot.common.utils.PinotDataType.*;
+import static org.apache.pinot.spi.utils.PinotDataType.*;
 
 
 /**
@@ -41,19 +41,31 @@ public class DataTypeConversionFunctions {
   public static Object cast(Object value, String targetTypeLiteral) {
     Class<?> clazz = value.getClass();
     // TODO: Support cast for MV
-    Preconditions.checkArgument(!clazz.isArray() | clazz == byte[].class, "%s must not be an array type", clazz);
-    PinotDataType sourceType = PinotDataType.getSingleValueType(clazz);
+    Preconditions.checkArgument(!clazz.isArray() || clazz == byte[].class, "%s must not be an array type", clazz);
+    PinotDataType sourceType = PinotDataType.getSingleValueType(value);
     String transformed = targetTypeLiteral.toUpperCase();
     PinotDataType targetDataType;
     switch (transformed) {
       case "BIGINT":
+      // Calcite 1.41+ (CALCITE-1466) makes unsigned integer types parseable under BABEL in the single-stage path too.
+      // Pinot has no unsigned storage, so map the supported ones to the narrowest signed type that holds their range,
+      // mirroring the multi-stage RelToPlanNodeConverter: UTINYINT/USMALLINT -> INT, UINTEGER -> LONG.
+      case "UINTEGER":
         targetDataType = LONG;
         break;
+      // UBIGINT (0..2^64-1) has no signed type wide enough to hold its full range, so reject it rather than silently
+      // wrapping values above Long.MAX_VALUE (mirrors RelToPlanNodeConverter.convertToColumnDataType).
+      case "UBIGINT":
+        throw new IllegalArgumentException(
+            "Unsigned BIGINT (BIGINT UNSIGNED) is not supported: Pinot has no type that can represent the full "
+                + "unsigned 64-bit range. CAST to BIGINT or DECIMAL instead.");
       case "DECIMAL":
         targetDataType = BIG_DECIMAL;
         break;
-      case "INT":
-        targetDataType = INTEGER;
+      case "INTEGER":
+      case "UTINYINT":
+      case "USMALLINT":
+        targetDataType = INT;
         break;
       case "VARBINARY":
         targetDataType = BYTES;
@@ -69,9 +81,9 @@ public class DataTypeConversionFunctions {
         }
         break;
     }
-    if (sourceType == STRING && (targetDataType == INTEGER || targetDataType == LONG)) {
+    if (sourceType == STRING && (targetDataType == INT || targetDataType == LONG)) {
       String stringValue = value.toString().trim();
-      if (targetDataType == INTEGER) {
+      if (targetDataType == INT) {
         try {
           return Integer.parseInt(stringValue);
         } catch (NumberFormatException e) {

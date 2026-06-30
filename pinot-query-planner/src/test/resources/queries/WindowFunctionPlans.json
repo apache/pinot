@@ -6,7 +6,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER() FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2])",
@@ -59,7 +59,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER() FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -85,7 +85,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], sum=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -99,7 +99,7 @@
         "notes": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2])",
@@ -145,7 +145,7 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], $1=[$2])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n        LogicalWindow(window#0=[window(aggs [SUM($1)])])",
           "\n          PinotLogicalExchange(distribution=[hash])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
@@ -174,10 +174,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), SUM(a.col3) OVER() FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -187,8 +187,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER() FROM a WHERE a.col3 > 10",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)])",
-          "\n  LogicalWindow(window#0=[window(aggs [SUM($1), COUNT($1)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
+          "\n  LogicalWindow(window#0=[window(aggs [AVG($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[>($2, 10)])",
@@ -214,10 +214,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), MIN(a.col3) OVER() FROM a where a.col1 IN ('foo', 'bar')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -228,7 +228,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER() FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -243,7 +243,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, MIN(a.col3) OVER() FROM a GROUP BY a.col1, a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
@@ -258,7 +258,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), MIN(a.col3) OVER() FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
@@ -273,8 +273,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3), AVG(a.col3) OVER() FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)])",
-          "\n  LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
+          "\n  LogicalWindow(window#0=[window(aggs [AVG($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
           "\n        PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -291,8 +291,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$2], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], col3=[$0])",
-          "\n      LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
+          "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[$2], col3=[$0])",
+          "\n      LogicalWindow(window#0=[window(aggs [AVG($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
           "\n            PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -325,7 +325,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(), COUNT(a.col2) OVER() FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -338,7 +338,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(), COUNT(a.col2) OVER() FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$3], $2=[$4])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -352,7 +352,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$3], $2=[$4])",
+          "\nLogicalProject(col1=[$0], sum=[$3], count=[$4])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -366,7 +366,7 @@
         "notes": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0), MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2])",
@@ -381,7 +381,7 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], $1=[$3], $2=[$4])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n      LogicalWindow(window#0=[window(aggs [SUM($2), COUNT($1)])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -397,7 +397,7 @@
           "\nLogicalSort(offset=[0], fetch=[100])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[100])",
-          "\n      LogicalProject(col1=[$0], $1=[$3], $2=[$4])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n        LogicalWindow(window#0=[window(aggs [SUM($2), COUNT($1)])])",
           "\n          PinotLogicalExchange(distribution=[hash])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -413,7 +413,7 @@
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalSort(sort0=[$0], dir0=[ASC], fetch=[10])",
-          "\n      LogicalProject(col1=[$0], $1=[$3], $2=[$4])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n        LogicalWindow(window#0=[window(aggs [SUM($2), COUNT($1)])])",
           "\n          PinotLogicalExchange(distribution=[hash])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -426,10 +426,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), SUM(a.col3) OVER(), MAX(a.col3) OVER() FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2], $2=[$3])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0), MAX($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -439,8 +439,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(), COUNT(a.col1) OVER() FROM a WHERE a.col3 > 100",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(aggs [AVG($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[>($2, 100)])",
@@ -453,10 +453,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT LENGTH(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(), MAX(a.col3) OVER() FROM a where a.col1 NOT IN ('foo', 'bar', 'baz')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2], $2=[$3])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0), MAX($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalProject(col3=[$2], $1=[LENGTH(CONCAT($0, _UTF-8' ', $1))])",
+          "\n      LogicalProject(col3=[$2], EXPR$0=[LENGTH(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -471,7 +471,7 @@
           "\nLogicalProject(EXPR$0=[$0], EXPR$1=[$1], EXPR$2=[$1])",
           "\n  LogicalWindow(window#0=[window(rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalProject($0=[LENGTH(CONCAT($0, _UTF-8' ', $1))])",
+          "\n      LogicalProject(EXPR$0=[LENGTH(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -482,7 +482,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(), SUM(a.col3) OVER() FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0), SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -497,7 +497,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, MIN(a.col3) OVER(), COUNT(a.col1) OVER() FROM a GROUP BY a.col1, a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2], $2=[$3])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
@@ -512,7 +512,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), MIN(a.col3) OVER(), MAX(a.col3) OVER() FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$1], $1=[$2], $2=[$3])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0), MAX($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
@@ -527,8 +527,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3), AVG(a.col3) OVER(), SUM(a.col3) OVER() FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$2])",
-          "\n  LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(aggs [AVG($0), SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
           "\n        PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -545,8 +545,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$3], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$2], col3=[$0])",
-          "\n      LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
+          "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3], col3=[$0])",
+          "\n      LogicalWindow(window#0=[window(aggs [AVG($0), SUM($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
           "\n            PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -561,7 +561,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(PARTITION BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -574,7 +574,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(partition {0} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1])",
@@ -588,7 +588,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(sum=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -601,8 +601,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} aggs [AVG($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -614,8 +614,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(PARTITION BY a.col2) AS avg FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0], avg=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], avg=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} aggs [AVG($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -628,7 +628,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], row_num=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -642,7 +642,7 @@
         "notes": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -673,8 +673,8 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n        LogicalWindow(window#0=[window(partition {1} aggs [SUM($2), COUNT($2)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n        LogicalWindow(window#0=[window(partition {1} aggs [AVG($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -718,10 +718,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), COUNT(a.col2) OVER(PARTITION BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {1} aggs [COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[SUBSTR($0, 0, 2)])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -731,10 +731,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), ROW_NUMBER() OVER(PARTITION BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col3=[$2], $1=[SUBSTR($0, 0, 2)])",
+          "\n      LogicalProject(col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -744,8 +744,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(PARTITION BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col2=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)])",
-          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1)])])",
+          "\nLogicalProject(col2=[$0], EXPR$1=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [AVG($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
@@ -758,10 +758,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), AVG(a.col3) OVER(PARTITION BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1)])])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [AVG($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -772,8 +772,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($2):DOUBLE NOT NULL, $3)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} aggs [SUM($0), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {1} aggs [AVG($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -785,7 +785,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(partition {0} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
@@ -798,7 +798,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -813,7 +813,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, MIN(a.col3) OVER(PARTITION BY a.col1) FROM a GROUP BY a.col1, a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
@@ -843,7 +843,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), MIN(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
@@ -858,8 +858,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3), AVG(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)])",
-          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [AVG($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
           "\n        PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -876,8 +876,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$2], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], col3=[$0])",
-          "\n      LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0)])])",
+          "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[$2], col3=[$0])",
+          "\n      LogicalWindow(window#0=[window(partition {0} aggs [AVG($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
           "\n            PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -892,7 +892,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1), COUNT(a.col2) OVER(PARTITION BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -906,7 +906,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(max=[$3], count=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -919,8 +919,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1), MIN(a.col3) OVER(PARTITION BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [AVG($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -932,8 +932,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(PARTITION BY a.col1) AS avg, MIN(a.col3) OVER(PARTITION BY a.col1) AS min FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0], avg=[/(CAST($2):DOUBLE NOT NULL, $3)], min=[$4])",
-          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\nLogicalProject(col1=[$0], avg=[$2], min=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [AVG($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -946,7 +946,7 @@
         "notes": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -961,7 +961,7 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], $1=[$3], $2=[$4])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), MAX($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -977,8 +977,8 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n        LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n        LogicalWindow(window#0=[window(partition {0} aggs [AVG($1), MIN($1)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -993,7 +993,7 @@
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalSort(sort0=[$0], dir0=[ASC], fetch=[10])",
-          "\n      LogicalProject(col1=[$0], $1=[$3], $2=[$4])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n        LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), MAX($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -1008,7 +1008,7 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], $1=[$3], $2=[$4])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), MAX($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -1023,8 +1023,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), COUNT($2)])])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), AVG($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n            PinotLogicalTableScan(table=[[default, a]])",
@@ -1039,7 +1039,7 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], $1=[$2], $2=[$3])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n      LogicalWindow(window#0=[window(partition {0, 1} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER(), ROW_NUMBER()])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
@@ -1054,8 +1054,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($4):DOUBLE NOT NULL, $5)])",
-          "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), SUM($2), COUNT($2)])])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), AVG($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n            PinotLogicalTableScan(table=[[default, a]])",
@@ -1069,8 +1069,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$3], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)], col2=[$1])",
-          "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), COUNT($2)])])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4], col2=[$1])",
+          "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), AVG($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n            PinotLogicalTableScan(table=[[default, a]])",
@@ -1082,10 +1082,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), SUM(a.col3) OVER(PARTITION BY a.col2), MAX(a.col3) OVER(PARTITION BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[REVERSE($0)])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[REVERSE($0)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1095,8 +1095,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1), COUNT(a.col1) OVER(PARTITION BY a.col1) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [AVG($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
@@ -1109,10 +1109,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(PARTITION BY a.col1), MAX(a.col3) OVER(PARTITION BY a.col1) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($1), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n      LogicalProject(col1=[$0], col3=[$2], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -1123,8 +1123,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2))), COUNT(a.col1) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2))) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$1=[$5])",
-          "\n  LogicalWindow(window#0=[window(partition {2} aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {2} aggs [AVG($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[2]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -1136,7 +1136,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col3), COUNT(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($0), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -1151,8 +1151,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, MIN(a.col3) OVER(PARTITION BY a.col1), AVG(a.col3) OVER(PARTITION BY a.col1) FROM a GROUP BY a.col1, a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($1), SUM($1), COUNT($1)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($1), AVG($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
@@ -1166,7 +1166,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), MIN(a.col3) OVER(PARTITION BY a.col3), SUM(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$1], $1=[$2], $2=[$3])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($0), SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
@@ -1181,8 +1181,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3), AVG(a.col3) OVER(PARTITION BY a.col3), MAX(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0), MAX($0)])])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [AVG($0), MAX($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
           "\n        PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -1199,8 +1199,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$3], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4], col3=[$0])",
-          "\n      LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0), MAX($0)])])",
+          "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3], col3=[$0])",
+          "\n      LogicalWindow(window#0=[window(partition {0} aggs [AVG($0), MAX($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
           "\n            PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
@@ -1215,7 +1215,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -1228,7 +1228,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT RANK() OVER(ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1])",
@@ -1242,7 +1242,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(sum=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -1255,8 +1255,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(order by [1] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [1] aggs [AVG($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -1268,7 +1268,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, DENSE_RANK() OVER(ORDER BY a.col2 DESC) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1 DESC] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -1281,7 +1281,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, ROW_NUMBER() OVER(ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -1296,7 +1296,7 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], $1=[$2])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n      LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
@@ -1311,7 +1311,7 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], $1=[$2])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
@@ -1356,7 +1356,7 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$1], dir0=[DESC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], $1=[$2])",
+          "\n    LogicalProject(col1=[$0], row_number=[$2])",
           "\n      LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
@@ -1371,7 +1371,7 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$1], dir0=[DESC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], $1=[$2])",
+          "\n    LogicalProject(col1=[$0], rank=[$2])",
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
@@ -1386,7 +1386,7 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$1], dir0=[DESC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], $1=[$2])",
+          "\n    LogicalProject(col1=[$0], dense_rank=[$2])",
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [DENSE_RANK()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
@@ -1399,8 +1399,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(ORDER BY a.col2) AS avg FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0], avg=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(order by [1] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], avg=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [1] aggs [AVG($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -1413,7 +1413,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], row_number=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -1427,7 +1427,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], rank=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -1440,7 +1440,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(ORDER BY a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MAX($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -1471,8 +1471,8 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n        LogicalWindow(window#0=[window(order by [1] aggs [SUM($2), COUNT($2)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n        LogicalWindow(window#0=[window(order by [1] aggs [AVG($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -1487,7 +1487,7 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], $1=[$2])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n        LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
@@ -1503,7 +1503,7 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], $1=[$2])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n        LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
@@ -1548,10 +1548,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), COUNT(a.col2) OVER(ORDER BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[SUBSTR($0, 0, 2)])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1561,10 +1561,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), RANK() OVER(ORDER BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col3=[$2], $1=[SUBSTR($0, 0, 2)])",
+          "\n      LogicalProject(col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1574,8 +1574,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(ORDER BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col2=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)])",
-          "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\nLogicalProject(col2=[$0], EXPR$1=[$2])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [AVG($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
@@ -1601,10 +1601,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), AVG(a.col3) OVER(ORDER BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [AVG($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -1615,10 +1615,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), ROW_NUMBER() OVER(ORDER BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], $1=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -1629,10 +1629,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), RANK() OVER(ORDER BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], $1=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -1643,8 +1643,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($2):DOUBLE NOT NULL, $3)])",
-          "\n  LogicalWindow(window#0=[window(order by [1] aggs [SUM($0), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$2])",
+          "\n  LogicalWindow(window#0=[window(order by [1] aggs [AVG($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -1656,7 +1656,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
@@ -1669,7 +1669,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT DENSE_RANK() OVER(ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
@@ -1682,7 +1682,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(ORDER BY a.col1), COUNT(a.col2) OVER(ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -1695,7 +1695,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT RANK() OVER(ORDER BY a.col1), DENSE_RANK() OVER(ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK(), DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0])",
@@ -1709,7 +1709,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(max=[$3], count=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -1722,8 +1722,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(ORDER BY a.col1), MIN(a.col3) OVER(ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [AVG($1), MIN($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -1735,7 +1735,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col3, DENSE_RANK() OVER(ORDER BY a.col1), RANK() OVER(ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col3=[$1], $1=[$2], $2=[$3])",
+          "\nLogicalProject(col3=[$1], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK(), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -1748,8 +1748,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(ORDER BY a.col1) AS avg, MIN(a.col3) OVER(ORDER BY a.col1) AS min FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0], avg=[/(CAST($2):DOUBLE NOT NULL, $3)], min=[$4])",
-          "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\nLogicalProject(col1=[$0], avg=[$2], min=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [AVG($1), MIN($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -1761,7 +1761,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, DENSE_RANK() OVER(ORDER BY a.col1) AS dense_rank, MIN(a.col3) OVER(ORDER BY a.col1) AS min FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2], $2=[$3])",
+          "\nLogicalProject(col1=[$0], dense_rank=[$2], min=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK(), MIN($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -1774,7 +1774,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), MIN(a.col3) OVER(ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [COUNT($1), MIN($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -1787,7 +1787,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), RANK() OVER(ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [COUNT($1), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -1802,8 +1802,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[DESC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n      LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [SUM($2), COUNT($2)])])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n      LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [SUM($2), AVG($2)])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n            PinotLogicalTableScan(table=[[default, a]])",
@@ -1817,8 +1817,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[DESC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($4):DOUBLE NOT NULL, $5)])",
-          "\n      LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [RANK(), SUM($2), COUNT($2)])])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n      LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [RANK(), AVG($2)])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n            PinotLogicalTableScan(table=[[default, a]])",
@@ -1833,8 +1833,8 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n        LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n        LogicalWindow(window#0=[window(order by [0] aggs [AVG($1), MIN($1)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -1849,8 +1849,8 @@
           "\nLogicalSort(sort0=[$0], dir0=[DESC], offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n        LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [SUM($2), COUNT($2)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n        LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [SUM($2), AVG($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -1878,10 +1878,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), SUM(a.col3) OVER(ORDER BY a.col2), MAX(a.col3) OVER(ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), MAX($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[REVERSE($0)])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[REVERSE($0)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1895,7 +1895,7 @@
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], $1=[REVERSE($0)])",
+          "\n      LogicalProject(col2=[$1], EXPR$0=[REVERSE($0)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1905,10 +1905,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), DENSE_RANK() OVER(ORDER BY a.col2), RANK() OVER(ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2], $2=[$3])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK(), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], $1=[REVERSE($0)])",
+          "\n      LogicalProject(col2=[$1], EXPR$0=[REVERSE($0)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1918,8 +1918,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(ORDER BY a.col1), COUNT(a.col1) OVER(ORDER BY a.col1) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [AVG($1), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
@@ -1932,10 +1932,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(ORDER BY a.col1), MAX(a.col3) OVER(ORDER BY a.col1) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MIN($1), MAX($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n      LogicalProject(col1=[$0], col3=[$2], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -1946,10 +1946,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), RANK() OVER(ORDER BY a.col1), DENSE_RANK() OVER(ORDER BY a.col1) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2], $2=[$3])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK(), DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], $1=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n      LogicalProject(col1=[$0], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -1960,8 +1960,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))), COUNT(a.col1) OVER(ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$1=[$5])",
-          "\n  LogicalWindow(window#0=[window(order by [2] aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
+          "\n  LogicalWindow(window#0=[window(order by [2] aggs [AVG($1), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -1973,7 +1973,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT DENSE_RANK() OVER(ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))), COUNT(a.col1) OVER(ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [DENSE_RANK(), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], $1=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
@@ -1986,7 +1986,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -1999,7 +1999,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT RANK() OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1])",
@@ -2013,7 +2013,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(sum=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -2027,7 +2027,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(row_number=[$1])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1])",
@@ -2040,8 +2040,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [AVG($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2053,7 +2053,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -2066,7 +2066,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, DENSE_RANK() OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -2079,8 +2079,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) AS avg FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0], avg=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], avg=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [AVG($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2093,7 +2093,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], rank=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -2106,7 +2106,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -2152,8 +2152,8 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n        LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($2), COUNT($2)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n        LogicalWindow(window#0=[window(partition {1} order by [1] aggs [AVG($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -2213,10 +2213,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), COUNT(a.col2) OVER(PARTITION BY a.col3 ORDER BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[SUBSTR($0, 0, 2)])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2226,8 +2226,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col2=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\nLogicalProject(col2=[$0], EXPR$1=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [AVG($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
@@ -2266,10 +2266,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [AVG($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -2280,10 +2280,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), RANK() OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col2=[$1], $1=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -2294,8 +2294,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($2):DOUBLE NOT NULL, $3)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($0), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [AVG($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2307,7 +2307,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT DENSE_RANK() OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
@@ -2320,8 +2320,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 DESC) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [1 DESC] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1 DESC] aggs [AVG($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2333,7 +2333,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col2 DESC) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -2346,8 +2346,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 NULLS FIRST) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [1 ASC-nulls-first] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1 ASC-nulls-first] aggs [AVG($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2359,8 +2359,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 DESC NULLS LAST) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [1 DESC-nulls-last] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1 DESC-nulls-last] aggs [AVG($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2372,7 +2372,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1), COUNT(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -2385,7 +2385,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT DENSE_RANK() OVER(PARTITION BY a.col1 ORDER BY a.col1), COUNT(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [DENSE_RANK(), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -2399,7 +2399,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(max=[$3], count=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -2412,8 +2412,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [AVG($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2437,8 +2437,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1) AS avg, MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1) AS min FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0], avg=[/(CAST($2):DOUBLE NOT NULL, $3)], min=[$4])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\nLogicalProject(col1=[$0], avg=[$2], min=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [AVG($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2450,7 +2450,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -2463,7 +2463,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), DENSE_RANK() OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [COUNT($1), DENSE_RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
@@ -2478,8 +2478,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)], col2=[$1])",
-          "\n      LogicalWindow(window#0=[window(partition {0, 1} order by [1, 0] aggs [SUM($2), COUNT($2)])])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4], col2=[$1])",
+          "\n      LogicalWindow(window#0=[window(partition {0, 1} order by [1, 0] aggs [SUM($2), AVG($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n            PinotLogicalTableScan(table=[[default, a]])",
@@ -2509,8 +2509,8 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n        LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n        LogicalWindow(window#0=[window(partition {0} order by [0] aggs [AVG($1), MIN($1)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -2525,8 +2525,8 @@
           "\nLogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[ASC], offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[ASC], fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)], col2=[$1])",
-          "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [1, 0] aggs [SUM($2), COUNT($2)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4], col2=[$1])",
+          "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [1, 0] aggs [SUM($2), AVG($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -2554,10 +2554,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2), MAX(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[REVERSE($0)])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[REVERSE($0)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2567,8 +2567,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1), COUNT(a.col1) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [AVG($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
@@ -2594,10 +2594,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MIN($1), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n      LogicalProject(col1=[$0], col3=[$2], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -2608,10 +2608,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), DENSE_RANK() OVER(PARTITION BY a.col1 ORDER BY a.col1), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [DENSE_RANK(), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n      LogicalProject(col1=[$0], col3=[$2], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -2622,8 +2622,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))), COUNT(a.col1) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$1=[$5])",
-          "\n  LogicalWindow(window#0=[window(partition {2} order by [2] aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [2] aggs [AVG($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[2]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2649,7 +2649,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT RANK() OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))), DENSE_RANK() OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [RANK(), DENSE_RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject($0=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
@@ -2662,8 +2662,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 DESC), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 DESC) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [0 DESC] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0 DESC] aggs [AVG($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2675,8 +2675,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 NULLS FIRST), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 NULLS FIRST) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [0 ASC-nulls-first] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0 ASC-nulls-first] aggs [AVG($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2688,8 +2688,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 DESC NULLS LAST), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 DESC NULLS LAST) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [0 DESC-nulls-last] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0 DESC-nulls-last] aggs [AVG($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2701,8 +2701,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(EXPR$0=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2714,7 +2714,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT RANK() OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -2727,8 +2727,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) AS avg FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(avg=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2740,7 +2740,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col1) AS row_number FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(row_number=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -2753,8 +2753,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2766,7 +2766,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -2779,7 +2779,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, DENSE_RANK() OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -2792,8 +2792,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) AS avg FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0], avg=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col1=[$0], avg=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -2805,7 +2805,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3])",
+          "\nLogicalProject(EXPR$0=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MAX($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -2866,8 +2866,8 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n        LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3])",
+          "\n        LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -2911,10 +2911,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), COUNT(a.col2) OVER(PARTITION BY a.col3 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {2} order by [0] aggs [COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[SUBSTR($0, 0, 2)])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2924,8 +2924,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col2=[$1], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(col2=[$1], EXPR$1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [AVG($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
@@ -2938,7 +2938,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, RANK() OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col2=[$1], $1=[$2])",
+          "\nLogicalProject(col2=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -2952,10 +2952,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[/(CAST($4):DOUBLE NOT NULL, $5)])",
-          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -2966,10 +2966,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], $2=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -2980,10 +2980,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), RANK() OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], $2=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -2994,8 +2994,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY REVERSE(a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(partition {2} order by [1] aggs [SUM($0), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [1] aggs [AVG($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col3=[$2], $1=[REVERSE($1)], $2=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -3007,7 +3007,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY REVERSE(a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject($0=[REVERSE($1)], $1=[CONCAT($0, _UTF-8'-', $1)])",
@@ -3020,7 +3020,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT DENSE_RANK() OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY REVERSE(a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject($0=[REVERSE($1)], $1=[CONCAT($0, _UTF-8'-', $1)])",
@@ -3033,7 +3033,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3), COUNT(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -3046,7 +3046,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3), DENSE_RANK() OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MAX($1), DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -3060,7 +3060,7 @@
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(max=[$3], count=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -3073,8 +3073,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$2=[$5])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2), MIN($2)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [AVG($2), MIN($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -3086,7 +3086,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, DENSE_RANK() OVER(PARTITION BY a.col1 ORDER BY a.col2), RANK() OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2], $2=[$3])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [DENSE_RANK(), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -3099,8 +3099,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) AS avg, MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) AS min FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0], avg=[/(CAST($3):DOUBLE NOT NULL, $4)], min=[$5])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2), MIN($2)])])",
+          "\nLogicalProject(col1=[$0], avg=[$3], min=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [AVG($2), MIN($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -3112,7 +3112,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [COUNT($2), MIN($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -3125,7 +3125,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), DENSE_RANK() OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [COUNT($2), DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -3140,8 +3140,8 @@
           "Execution Plan",
           "\nLogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[DESC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)], col2=[$1])",
-          "\n      LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [SUM($2), COUNT($2)])])",
+          "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4], col2=[$1])",
+          "\n      LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [SUM($2), AVG($2)])])",
           "\n        PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n            PinotLogicalTableScan(table=[[default, a]])",
@@ -3171,8 +3171,8 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$2=[$5])",
-          "\n        LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2), MIN($2)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n        LogicalWindow(window#0=[window(partition {0} order by [1] aggs [AVG($2), MIN($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -3187,8 +3187,8 @@
           "\nLogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[DESC], offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[DESC], fetch=[10])",
-          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)], col2=[$1])",
-          "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [SUM($2), COUNT($2)])])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4], col2=[$1])",
+          "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [SUM($2), AVG($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              PinotLogicalTableScan(table=[[default, a]])",
@@ -3216,10 +3216,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1), MAX(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4], $2=[$5])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4], EXPR$2=[$5])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), MAX($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[REVERSE($0)])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[REVERSE($0)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3229,8 +3229,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2), COUNT(a.col1) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$2=[$5])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2), COUNT($0)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [AVG($2), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
@@ -3257,7 +3257,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, RANK() OVER(PARTITION BY a.col1 ORDER BY a.col2), DENSE_RANK() OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], $1=[$2], $2=[$3])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [RANK(), DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
@@ -3271,10 +3271,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4], $2=[$5])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4], EXPR$2=[$5])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MIN($2), MAX($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -3285,10 +3285,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), DENSE_RANK() OVER(PARTITION BY a.col1 ORDER BY a.col2), RANK() OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [DENSE_RANK(), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -3299,8 +3299,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY CONCAT(a.col1, '-', a.col2)), COUNT(a.col1) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($4):DOUBLE NOT NULL, $5)], EXPR$1=[$6])",
-          "\n  LogicalWindow(window#0=[window(partition {3} order by [2] aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\nLogicalProject(EXPR$0=[$4], EXPR$1=[$5])",
+          "\n  LogicalWindow(window#0=[window(partition {3} order by [2] aggs [AVG($1), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[3]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)], $3=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -3312,8 +3312,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY CONCAT(a.col1, '-', a.col2)), RANK() OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$1=[$5])",
-          "\n  LogicalWindow(window#0=[window(partition {2} order by [1] aggs [SUM($0), COUNT($0), RANK()])])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [1] aggs [AVG($0), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -3325,7 +3325,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col1, SUM(a.col3) OVER (PARTITION BY a.col1) FROM a JOIN b ON a.col1 = b.col2",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], col10=[$2], $2=[$3])",
+          "\nLogicalProject(col1=[$0], col10=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$1], col10=[$2])",
@@ -3344,8 +3344,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, COUNT(*), AVG(a.col3) OVER(ORDER BY COUNT(*) desc, a.col1 asc) from a GROUP BY a.col1, a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)])",
-          "\n  LogicalWindow(window#0=[window(order by [2 DESC, 0] aggs [SUM($1), COUNT($1)])])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [2 DESC, 0] aggs [AVG($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[2 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
@@ -3389,7 +3389,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, COUNT(*), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY COUNT(*) desc, a.col1 asc) from a GROUP BY a.col1, a.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[$2], $2=[$3])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2 DESC, 0] aggs [MAX($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
@@ -3404,7 +3404,7 @@
         "sql": "EXPLAIN PLAN FOR WITH windowfunc AS (SELECT a.col1, ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col3) as rownum from a) SELECT a.col1, a.rownum FROM windowfunc AS a where a.rownum < 5",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], w0$o0=[$3])",
+          "\nLogicalProject(col1=[$0], rownum=[$3])",
           "\n  LogicalFilter(condition=[<($3, 5)])",
           "\n    LogicalWindow(window#0=[window(partition {1} order by [2] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
@@ -3418,7 +3418,7 @@
         "sql": "EXPLAIN PLAN FOR WITH windowfunc AS (SELECT a.col1, RANK() OVER(PARTITION BY a.col2 ORDER BY a.col3) as rank, DENSE_RANK() OVER(PARTITION BY a.col2 ORDER BY a.col3) as dense_rank from a) SELECT a.col1, a.rank, a.dense_rank FROM windowfunc AS a where a.dense_rank < 5",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], w0$o0=[$3], w0$o1=[$4])",
+          "\nLogicalProject(col1=[$0], rank=[$3], dense_rank=[$4])",
           "\n  LogicalFilter(condition=[<($4, 5)])",
           "\n    LogicalWindow(window#0=[window(partition {1} order by [2] aggs [RANK(), DENSE_RANK()])])",
           "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
@@ -3505,7 +3505,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT LAG(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3])",
+          "\nLogicalProject(EXPR$0=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [LAG($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -3518,7 +3518,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT LEAD(a.col2, 2) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3])",
+          "\nLogicalProject(EXPR$0=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [LEAD($1, 2)])], constants=[[2]])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
@@ -3531,8 +3531,8 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3 ROWS BETWEEN 5 PRECEDING AND 10 FOLLOWING) FROM a WHERE a.col3 >= 0",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST(CASE(>($2, 0), $3, null:BIGINT)):DOUBLE, $2)])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between 5 PRECEDING and 10 FOLLOWING aggs [COUNT($1), SUM($1)])], constants=[[5, 10]])",
+          "\nLogicalProject(EXPR$0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between 5 PRECEDING and 10 FOLLOWING aggs [AVG($1)])], constants=[[5, 10]])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[>=($2, 0)])",
@@ -3545,7 +3545,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$1])",
+          "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(order by [0] range between UNBOUNDED PRECEDING and UNBOUNDED FOLLOWING aggs [MIN($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col3=[$2])",
@@ -3558,7 +3558,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3, a.col1 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1, 0] range between UNBOUNDED PRECEDING and UNBOUNDED FOLLOWING aggs [MIN($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -3571,7 +3571,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT FIRST_VALUE(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] range between UNBOUNDED PRECEDING and UNBOUNDED FOLLOWING aggs [FIRST_VALUE($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -3585,7 +3585,7 @@
         "notes": "LogicalWindow in Calcite doesn't currently include the IGNORE NULLS / RESPECT NULLS option in the explain output",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2])",
+          "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [LAST_VALUE($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
@@ -3604,7 +3604,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalWindow(window#0=[window(partition {1} order by [2] aggs [MIN($2)])])",
@@ -3619,7 +3619,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(PARTITION BY a.col2), SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalWindow(window#0=[window(partition {0} aggs [COUNT($1)])])",
@@ -3634,10 +3634,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(), MAX(a.col3) OVER(PARTITION BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$1=[$4])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalWindow(window#0=[window(aggs [SUM($1), COUNT($1)])])",
+          "\n      LogicalWindow(window#0=[window(aggs [AVG($1)])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col2=[$1], col3=[$2])",
           "\n            PinotLogicalTableScan(table=[[default, a]])",
@@ -3649,7 +3649,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ORDER BY a.col2), MIN(a.col3) OVER(PARTITION BY a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalWindow(window#0=[window(order by [0] aggs [SUM($1)])])",
@@ -3664,13 +3664,39 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ORDER BY a.col2, a.col1), MIN(a.col3) OVER(ORDER BY a.col1, a.col2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0, 1] aggs [MIN($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalWindow(window#0=[window(order by [1, 0] aggs [SUM($2)])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "SUM window function on MV LONG column plans natively",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(mcol2) OVER (PARTITION BY col1) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], mcol2=[$8])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "AVG window function on MV LONG column uses native AVG (no SUM/COUNT reduction)",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(mcol2) OVER (PARTITION BY col1) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [AVG($1)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], mcol2=[$8])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
           "\n"
         ]
       }

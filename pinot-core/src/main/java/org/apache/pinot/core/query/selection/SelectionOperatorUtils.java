@@ -25,7 +25,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -138,7 +137,7 @@ public class SelectionOperatorUtils {
       // NOTE: The data schema might be generated from DataTableBuilder.buildEmptyDataTable(), where for 'SELECT *' it
       //       contains a single column "*". In such case, return as is to build the empty selection result.
       if (numColumns == 1 && columnNames[0].equals("*")) {
-        return new ArrayList<>(Collections.singletonList("*"));
+        return new ArrayList<>(List.of("*"));
       }
 
       // Directly return all columns for selection-only queries
@@ -437,8 +436,14 @@ public class SelectionOperatorUtils {
           case DOUBLE_ARRAY:
             dataTableBuilder.setColumn(i, (double[]) columnValue);
             break;
+          case BIG_DECIMAL_ARRAY:
+            dataTableBuilder.setColumn(i, (BigDecimal[]) columnValue);
+            break;
           case STRING_ARRAY:
             dataTableBuilder.setColumn(i, (String[]) columnValue);
+            break;
+          case BYTES_ARRAY:
+            dataTableBuilder.setColumn(i, (ByteArray[]) columnValue);
             break;
 
           default:
@@ -514,8 +519,14 @@ public class SelectionOperatorUtils {
         case DOUBLE_ARRAY:
           row[i] = dataTable.getDoubleArray(rowId, i);
           break;
+        case BIG_DECIMAL_ARRAY:
+          row[i] = dataTable.getBigDecimalArray(rowId, i);
+          break;
         case STRING_ARRAY:
           row[i] = dataTable.getStringArray(rowId, i);
+          break;
+        case BYTES_ARRAY:
+          row[i] = dataTable.getBytesArray(rowId, i);
           break;
 
         default:

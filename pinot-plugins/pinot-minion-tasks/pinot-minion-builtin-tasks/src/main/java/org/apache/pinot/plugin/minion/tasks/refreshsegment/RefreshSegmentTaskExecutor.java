@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.refreshsegment;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -43,7 +42,6 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.Obfuscator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +64,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     _eventObserver.notifyProgress(pinotTaskConfig, "Refreshing segment: " + indexDir);
 
     // We set _taskStartTime before fetching the tableConfig. Task Generation relies on tableConfig/Schema updates
-    // happening after the last processed time. So we explicity use the timestamp before fetching tableConfig as the
+    // happening after the last processed time. So we explicitly use the timestamp before fetching tableConfig as the
     // processedTime.
     _taskStartTime = System.currentTimeMillis();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -83,15 +81,14 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    PinotConfiguration segmentDirectoryConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
-    SegmentDirectoryLoaderContext segmentLoaderContext =
-        new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
-            .setSchema(schema)
-            .setInstanceId(indexLoadingConfig.getInstanceId())
-            .setSegmentName(segmentMetadata.getName())
-            .setSegmentCrc(segmentMetadata.getCrc())
-            .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
-            .build();
+    SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
+        .setReadMode(indexLoadingConfig.getReadMode())
+        .setTableConfig(indexLoadingConfig.getTableConfig())
+        .setSchema(schema)
+        .setInstanceId(indexLoadingConfig.getInstanceId())
+        .setSegmentName(segmentMetadata.getName())
+        .setSegmentCrc(segmentMetadata.getCrc())
+        .build();
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
 
@@ -126,7 +123,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
           refreshColumnSet.add(column);
         }
 
-        // TODO: Maybe we can support singleValue to multi-value conversions are supproted and vice-versa.
+        // TODO: support single-value to multi-value column conversions and vice-versa.
       } else {
         refreshColumnSet.add(column);
       }
@@ -209,7 +206,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-        Collections.singletonMap(MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
+        Map.of(MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             MinionTaskUtils.toUTCString(_taskStartTime)));
   }
 }

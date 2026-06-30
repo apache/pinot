@@ -19,10 +19,10 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -174,8 +174,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
 
   @Test(dataProvider = "scenarios")
   void aggrSvSelfWithoutNull(Scenario scenario) {
-    PinotDataType pinotDataType = scenario._dataType == FieldSpec.DataType.INT
-        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario._dataType.name());
+    PinotDataType pinotDataType = PinotDataType.valueOf(scenario._dataType.name());
 
     Object defaultNullValue;
     switch (scenario._dataType) {
@@ -213,8 +212,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
 
   @Test(dataProvider = "scenarios")
   void aggrSvSelfWithNull(Scenario scenario) {
-    PinotDataType pinotDataType = scenario._dataType == FieldSpec.DataType.INT
-        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario._dataType.name());
+    PinotDataType pinotDataType = PinotDataType.valueOf(scenario._dataType.name());
 
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField",

@@ -22,8 +22,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -216,16 +216,14 @@ public class ControllerTest {
     return _httpClient;
   }
 
-  /**
-   * Retrieves the headers to be used for the `ControllerRequestClient`.
-   *
-   * <p>This method returns an empty map, indicating that no custom headers
-   * are set by default for the `ControllerRequestClient`.
-   *
-   * @return A map of headers (key-value pairs) to be used for the `ControllerRequestClient`.
-   */
-  protected Map<String, String> getControllerRequestClientHeaders() {
-    return Collections.emptyMap();
+  /// Retrieves the headers to be used for the [PinotAdminClient].
+  ///
+  /// This method returns an empty map, indicating that no custom headers
+  /// are set by default for the [PinotAdminClient].
+  ///
+  /// @return A map of headers (key-value pairs) to be used for the [PinotAdminClient].
+  protected Map<String, String> getAdminClientHeaders() {
+    return Map.of();
   }
 
   /**
@@ -758,7 +756,7 @@ public class ControllerTest {
       if (sslContext != null) {
         org.apache.pinot.common.utils.tls.TlsUtils.setSslContext(sslContext);
       }
-      _pinotAdminClient = new PinotAdminClient(controllerAddress, properties, getControllerRequestClientHeaders(),
+      _pinotAdminClient = new PinotAdminClient(controllerAddress, properties, getAdminClientHeaders(),
           sslContext);
       return _pinotAdminClient;
     } catch (PinotClientException e) {
@@ -789,7 +787,7 @@ public class ControllerTest {
 
   public static Schema createDummySchemaWithPrimaryKey(String tableName) {
     Schema schema = createDummySchema(tableName);
-    schema.setPrimaryKeyColumns(Collections.singletonList("dimA"));
+    schema.setPrimaryKeyColumns(List.of("dimA"));
     return schema;
   }
 
@@ -1347,7 +1345,7 @@ public class ControllerTest {
 
   public static String sendGetRequestRaw(String urlString)
       throws IOException {
-    return IOUtils.toString(new URL(urlString).openStream());
+    return IOUtils.toString(new URL(urlString).openStream(), StandardCharsets.UTF_8);
   }
 
   /**
@@ -1374,7 +1372,7 @@ public class ControllerTest {
 
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
-    return sendPostRequest(urlString, payload, Collections.emptyMap());
+    return sendPostRequest(urlString, payload, Map.of());
   }
 
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
@@ -1399,7 +1397,7 @@ public class ControllerTest {
       throws IOException {
     try {
       SimpleHttpResponse resp =
-          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, Collections.emptyMap());
+          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, Map.of());
       return Pair.of(resp.getStatusCode(), constructResponse(resp));
     } catch (URISyntaxException e) {
       throw new IOException(e);
@@ -1426,7 +1424,7 @@ public class ControllerTest {
 
   public static String sendPutRequest(String urlString, String payload)
       throws IOException {
-    return sendPutRequest(urlString, payload, Collections.emptyMap());
+    return sendPutRequest(urlString, payload, Map.of());
   }
 
   public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
@@ -1442,7 +1440,7 @@ public class ControllerTest {
 
   public static String sendDeleteRequest(String urlString)
       throws IOException {
-    return sendDeleteRequest(urlString, Collections.emptyMap());
+    return sendDeleteRequest(urlString, Map.of());
   }
 
   public static String sendDeleteRequest(String urlString, Map<String, String> headers)
@@ -1462,7 +1460,7 @@ public class ControllerTest {
 
   public static SimpleHttpResponse sendMultipartPostRequest(String url, String body)
       throws IOException {
-    return sendMultipartPostRequest(url, body, Collections.emptyMap());
+    return sendMultipartPostRequest(url, body, Map.of());
   }
 
   public static SimpleHttpResponse sendMultipartPostRequest(String url, String body, Map<String, String> headers)
@@ -1640,11 +1638,11 @@ public class ControllerTest {
 
     // In a single tenant cluster, only the default tenant should exist
     assertEquals(_helixResourceManager.getAllBrokerTenantNames(),
-        Collections.singleton(TagNameUtils.DEFAULT_TENANT_NAME));
+        Set.of(TagNameUtils.DEFAULT_TENANT_NAME));
     assertEquals(_helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME).size(),
         DEFAULT_NUM_BROKER_INSTANCES);
     assertEquals(_helixResourceManager.getAllServerTenantNames(),
-        Collections.singleton(TagNameUtils.DEFAULT_TENANT_NAME));
+        Set.of(TagNameUtils.DEFAULT_TENANT_NAME));
     assertEquals(_helixResourceManager.getAllInstancesForServerTenant(TagNameUtils.DEFAULT_TENANT_NAME).size(),
         DEFAULT_NUM_SERVER_INSTANCES);
 

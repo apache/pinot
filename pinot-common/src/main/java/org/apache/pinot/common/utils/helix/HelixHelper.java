@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils.helix;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +46,7 @@ import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.common.workload.WorkloadChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -125,7 +125,7 @@ public class HelixHelper {
     Set<String> tablesForBrokerTag;
     int numBrokerTags = brokerTags.size();
     if (numBrokerTags == 0) {
-      tablesForBrokerTag = Collections.emptySet();
+      tablesForBrokerTag = Set.of();
     } else if (numBrokerTags == 1) {
       tablesForBrokerTag = getTablesForBrokerTag(helixManager, brokerTags.get(0));
     } else {
@@ -154,6 +154,35 @@ public class HelixHelper {
       }
       return idealState;
     });
+  }
+
+  /**
+   * Updates broker resource ideal state for the given broker with the given broker tags. Optional {@code tablesAdded}
+   * and {@code tablesRemoved} can be provided to track the tables added/removed during the update.
+   *
+   * <p>This accepts a {@link org.apache.pinot.common.workload.WorkloadChangeListener} to notify
+   * when broker resource changes, enabling workload propagation. This is expected to be only called
+   * from pinot-controller, where the listener is registered.</p>
+   */
+  public static void updateBrokerResource(HelixManager helixManager, String brokerId, List<String> brokerTags,
+      @Nullable List<String> tablesAdded, @Nullable List<String> tablesRemoved,
+      @Nullable WorkloadChangeListener listener) {
+    updateBrokerResource(helixManager, brokerId, brokerTags, tablesAdded, tablesRemoved);
+    if (listener != null) {
+      listener.onBrokerResourceChanged(tablesAdded, tablesRemoved);
+    }
+  }
+
+  public static void updateBrokerResource(HelixManager helixManager, String tableNameWithType,
+      Map<String, String> instancesStateMap, @Nullable WorkloadChangeListener listener) {
+    updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
+      assert idealState != null;
+      idealState.getRecord().getMapFields().put(tableNameWithType, instancesStateMap);
+      return idealState;
+    });
+    if (listener != null) {
+      listener.onBrokerResourceChanged(List.of(tableNameWithType), null);
+    }
   }
 
   /**
@@ -324,11 +353,13 @@ public class HelixHelper {
    */
   public static Set<String> getOfflineInstanceFromExternalView(ExternalView resourceExternalView) {
     Set<String> instanceSet = new HashSet<String>();
-    for (String partition : resourceExternalView.getPartitionSet()) {
-      Map<String, String> stateMap = resourceExternalView.getStateMap(partition);
-      for (String instance : stateMap.keySet()) {
-        if (stateMap.get(instance).equalsIgnoreCase(OFFLINE)) {
-          instanceSet.add(instance);
+    if (resourceExternalView != null) {
+      for (String partition : resourceExternalView.getPartitionSet()) {
+        Map<String, String> stateMap = resourceExternalView.getStateMap(partition);
+        for (String instance : stateMap.keySet()) {
+          if (stateMap.get(instance).equalsIgnoreCase(OFFLINE)) {
+            instanceSet.add(instance);
+          }
         }
       }
     }
@@ -627,7 +658,7 @@ public class HelixHelper {
    * Adds default tags to the instance config if no tag exists, returns {@code true} if the default tags are added,
    * {@code false} otherwise.
    * <p>The {@code defaultTagsSupplier} is a function which is only invoked when the instance does not have any tag.
-   * E.g. () -> Collections.singletonList("DefaultTenant_BROKER").
+   * E.g. () -> List.of("DefaultTenant_BROKER").
    */
   public static boolean addDefaultTags(InstanceConfig instanceConfig, Supplier<List<String>> defaultTagsSupplier) {
     List<String> instanceTags = instanceConfig.getTags();

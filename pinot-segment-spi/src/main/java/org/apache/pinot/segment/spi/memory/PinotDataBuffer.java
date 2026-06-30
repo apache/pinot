@@ -27,7 +27,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -330,7 +329,7 @@ public abstract class PinotDataBuffer implements DataBuffer {
 
   public static List<String> getBufferInfo() {
     if (BUFFER_CONTEXT_MAP.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     List<String> bufferInfo = new ArrayList<>(BUFFER_CONTEXT_MAP.size());
@@ -346,7 +345,7 @@ public abstract class PinotDataBuffer implements DataBuffer {
       try {
         buffer.close();
       } catch (IOException e) {
-        e.printStackTrace();
+        LOGGER.error("Failed to close PinotDataBuffer", e);
       }
     }
     BUFFER_CONTEXT_MAP.clear();

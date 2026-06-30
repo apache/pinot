@@ -583,6 +583,16 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
           }
         }
         break;
+      case BIG_DECIMAL:
+        BigDecimal[] bigDecimalValueBuffer = new BigDecimal[maxNumValuesPerMVEntry];
+        for (int i = 0; i < length; i++) {
+          int numValues = getBigDecimalMV(docIds[i], bigDecimalValueBuffer, context);
+          values[i] = new int[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = bigDecimalValueBuffer[j].intValue();
+          }
+        }
+        break;
       case STRING:
         String[] stringValueBuffer = new String[maxNumValuesPerMVEntry];
         for (int i = 0; i < length; i++) {
@@ -640,6 +650,16 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
           values[i] = new long[numValues];
           for (int j = 0; j < numValues; j++) {
             values[i][j] = (long) doubleValueBuffer[j];
+          }
+        }
+        break;
+      case BIG_DECIMAL:
+        BigDecimal[] bigDecimalValueBuffer = new BigDecimal[maxNumValuesPerMVEntry];
+        for (int i = 0; i < length; i++) {
+          int numValues = getBigDecimalMV(docIds[i], bigDecimalValueBuffer, context);
+          values[i] = new long[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = bigDecimalValueBuffer[j].longValue();
           }
         }
         break;
@@ -703,6 +723,16 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
           }
         }
         break;
+      case BIG_DECIMAL:
+        BigDecimal[] bigDecimalValueBuffer = new BigDecimal[maxNumValuesPerMVEntry];
+        for (int i = 0; i < length; i++) {
+          int numValues = getBigDecimalMV(docIds[i], bigDecimalValueBuffer, context);
+          values[i] = new float[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = bigDecimalValueBuffer[j].floatValue();
+          }
+        }
+        break;
       case STRING:
         String[] stringValueBuffer = new String[maxNumValuesPerMVEntry];
         for (int i = 0; i < length; i++) {
@@ -761,6 +791,16 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
       case DOUBLE:
         for (int i = 0; i < length; i++) {
           values[i] = getDoubleMV(docIds[i], context);
+        }
+        break;
+      case BIG_DECIMAL:
+        BigDecimal[] bigDecimalValueBuffer = new BigDecimal[maxNumValuesPerMVEntry];
+        for (int i = 0; i < length; i++) {
+          int numValues = getBigDecimalMV(docIds[i], bigDecimalValueBuffer, context);
+          values[i] = new double[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = bigDecimalValueBuffer[j].doubleValue();
+          }
         }
         break;
       case STRING:
@@ -828,11 +868,101 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
           }
         }
         break;
+      case BIG_DECIMAL:
+        BigDecimal[] bigDecimalValueBuffer = new BigDecimal[maxNumValuesPerMVEntry];
+        for (int i = 0; i < length; i++) {
+          int numValues = getBigDecimalMV(docIds[i], bigDecimalValueBuffer, context);
+          values[i] = new String[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = bigDecimalValueBuffer[j].toPlainString();
+          }
+        }
+        break;
       case STRING:
         for (int i = 0; i < length; i++) {
           values[i] = getStringMV(docIds[i], context);
         }
         break;
+      default:
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getStoredType());
+    }
+  }
+
+  /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param maxNumValuesPerMVEntry Maximum number of values per MV entry
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesMV(int[] docIds, int length, int maxNumValuesPerMVEntry, BigDecimal[][] values, T context) {
+    switch (getStoredType()) {
+      case INT: {
+        int[] valueBuffer = new int[maxNumValuesPerMVEntry];
+        for (int i = 0; i < length; i++) {
+          int numValues = getIntMV(docIds[i], valueBuffer, context);
+          BigDecimal[] row = new BigDecimal[numValues];
+          for (int j = 0; j < numValues; j++) {
+            row[j] = BigDecimal.valueOf(valueBuffer[j]);
+          }
+          values[i] = row;
+        }
+        break;
+      }
+      case LONG: {
+        long[] valueBuffer = new long[maxNumValuesPerMVEntry];
+        for (int i = 0; i < length; i++) {
+          int numValues = getLongMV(docIds[i], valueBuffer, context);
+          BigDecimal[] row = new BigDecimal[numValues];
+          for (int j = 0; j < numValues; j++) {
+            row[j] = BigDecimal.valueOf(valueBuffer[j]);
+          }
+          values[i] = row;
+        }
+        break;
+      }
+      case FLOAT: {
+        float[] valueBuffer = new float[maxNumValuesPerMVEntry];
+        for (int i = 0; i < length; i++) {
+          int numValues = getFloatMV(docIds[i], valueBuffer, context);
+          BigDecimal[] row = new BigDecimal[numValues];
+          for (int j = 0; j < numValues; j++) {
+            row[j] = BigDecimal.valueOf(valueBuffer[j]);
+          }
+          values[i] = row;
+        }
+        break;
+      }
+      case DOUBLE: {
+        double[] valueBuffer = new double[maxNumValuesPerMVEntry];
+        for (int i = 0; i < length; i++) {
+          int numValues = getDoubleMV(docIds[i], valueBuffer, context);
+          BigDecimal[] row = new BigDecimal[numValues];
+          for (int j = 0; j < numValues; j++) {
+            row[j] = BigDecimal.valueOf(valueBuffer[j]);
+          }
+          values[i] = row;
+        }
+        break;
+      }
+      case BIG_DECIMAL:
+        for (int i = 0; i < length; i++) {
+          values[i] = getBigDecimalMV(docIds[i], context);
+        }
+        break;
+      case STRING: {
+        String[] valueBuffer = new String[maxNumValuesPerMVEntry];
+        for (int i = 0; i < length; i++) {
+          int numValues = getStringMV(docIds[i], valueBuffer, context);
+          BigDecimal[] row = new BigDecimal[numValues];
+          for (int j = 0; j < numValues; j++) {
+            row[j] = new BigDecimal(valueBuffer[j]);
+          }
+          values[i] = row;
+        }
+        break;
+      }
       default:
         throw new IllegalArgumentException("readValuesMV not supported for type " + getStoredType());
     }
@@ -949,6 +1079,31 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @return DOUBLE values at the given document id
    */
   default double[] getDoubleMV(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads the BIG_DECIMAL type multi-value at the given document id into the passed in value buffer (the buffer size
+   * must be enough to hold all the values for the multi-value entry) and returns the number of values within the
+   * multi-value entry.
+   *
+   * @param docId Document id
+   * @param valueBuffer Value buffer
+   * @param context Reader context
+   * @return Number of values within the multi-value entry
+   */
+  default int getBigDecimalMV(int docId, BigDecimal[] valueBuffer, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads the BIG_DECIMAL type multi-value at the given document id.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return BIG_DECIMAL values at the given document id
+   */
+  default BigDecimal[] getBigDecimalMV(int docId, T context) {
     throw new UnsupportedOperationException();
   }
 

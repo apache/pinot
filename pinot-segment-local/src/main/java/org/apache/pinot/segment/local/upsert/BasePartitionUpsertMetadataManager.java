@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -76,9 +75,10 @@ import org.slf4j.LoggerFactory;
 
 @ThreadSafe
 public abstract class BasePartitionUpsertMetadataManager implements PartitionUpsertMetadataManager {
-  protected static final long OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS = TimeUnit.MINUTES.toNanos(1);
   // The special value to indicate the largest comparison value is not set yet, and allow negative comparison values.
-  protected static final double TTL_WATERMARK_NOT_SET = Double.NEGATIVE_INFINITY;
+  public static final double TTL_WATERMARK_NOT_SET = Double.NEGATIVE_INFINITY;
+
+  protected static final long OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS = TimeUnit.MINUTES.toNanos(1);
 
   protected final String _tableNameWithType;
   protected final TableType _tableType;
@@ -437,7 +437,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (validDocIds.isEmpty()) {
       _logger.info("Skip preloading segment: {} without valid doc, current primary key count: {}",
           segment.getSegmentName(), getNumPrimaryKeys());
-      segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), null);
+      ThreadSafeMutableRoaringBitmap queryableDocIds =
+          (_deleteRecordColumn == null) ? null : new ThreadSafeMutableRoaringBitmap();
+      segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), queryableDocIds);
       return;
     }
     if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
@@ -492,17 +494,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (queryableDocIds == null && _deleteRecordColumn != null) {
       queryableDocIds = new ThreadSafeMutableRoaringBitmap();
     }
-    addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
-  }
-
-  protected void addOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
-      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
-      @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
-    if (_partialUpsertHandler != null) {
-      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
-    }
-    doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, oldSegment,
-        validDocIdsForOldSegment);
+    doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
   }
 
   protected abstract void doAddOrReplaceSegment(ImmutableSegmentImpl segment,
@@ -512,7 +504,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected void addSegmentWithoutUpsert(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
-    addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
+    doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
   }
 
   /**
@@ -620,8 +612,30 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       // we can't skip segment even if it's out of TTL as its validDocIds bitmap is not updated yet.
     }
     try (UpsertUtils.RecordInfoReader recordInfoReader = createRecordInfoReader(segment)) {
-      Iterator<RecordInfo> recordInfoIterator =
-          UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
+      // Reload-only fast path for an upsert + TTL table. The incoming segment carries a validDocIds snapshot ONLY when
+      // the reload flow placed it there (see BaseTableDataManager.reloadSegment); segment commits and uploads always
+      // build a fresh segment without one and fall through to the full scan below, unaffected. Rebuilding from just the
+      // snapshot's valid docs avoids resurrecting primary keys already expired/deleted by TTL.
+      MutableRoaringBitmap validDocIdsSnapshot = null;
+      if (isTTLEnabled() && segment instanceof ImmutableSegmentImpl) {
+        validDocIdsSnapshot =
+            ((ImmutableSegmentImpl) segment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+      }
+      Iterator<RecordInfo> recordInfoIterator;
+      if (validDocIdsSnapshot != null) {
+        // Rebuild from the snapshot's docIds as-is. On a forceDownload reload with a CRC mismatch the snapshot may have
+        // been taken on a different copy of the segment, so its docIds are not guaranteed to map to the same rows here;
+        // the operator accepted that risk by requesting forceDownload.
+        _logger.info("Replacing segment: {} on reload using validDocIds snapshot with {} valid docs (snapshot docIds "
+            + "are used as-is and assumed to map to this segment)", segmentName, validDocIdsSnapshot.getCardinality());
+        recordInfoIterator = UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIdsSnapshot);
+      } else {
+        // No validDocIds snapshot on the incoming segment: rebuild by scanning all docs in the segment.
+        _logger.info("Replacing segment: {} using all {} docs (no validDocIds snapshot available)", segmentName,
+            segment.getSegmentMetadata().getTotalDocs());
+        recordInfoIterator =
+            UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
+      }
       replaceSegment(segment, null, null, recordInfoIterator, oldSegment);
     } catch (Exception e) {
       throw new RuntimeException(
@@ -666,8 +680,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (queryableDocIds == null && _deleteRecordColumn != null) {
         queryableDocIds = new ThreadSafeMutableRoaringBitmap();
       }
-      addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator, oldSegment,
-          validDocIdsForOldSegment);
+      doAddOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
+          oldSegment, validDocIdsForOldSegment);
     }
     if (_upsertViewManager != null) {
       // When using consistency mode, the old segment's bitmap is updated in place, so we get the validDocIds after
@@ -1239,6 +1253,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       throws IOException {
   }
 
+  @Nullable
+  @Override
   public UpsertViewManager getUpsertViewManager() {
     return _upsertViewManager;
   }
@@ -1274,7 +1290,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _newlyAddedSegments.values().removeIf(v -> v < nowMs);
       return _newlyAddedSegments.keySet();
     }
-    return Collections.emptySet();
+    return Set.of();
   }
 
   /**

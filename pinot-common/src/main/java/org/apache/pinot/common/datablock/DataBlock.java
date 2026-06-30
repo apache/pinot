@@ -83,7 +83,11 @@ public interface DataBlock {
 
   double[] getDoubleArray(int rowId, int colId);
 
+  BigDecimal[] getBigDecimalArray(int rowId, int colId);
+
   String[] getStringArray(int rowId, int colId);
+
+  ByteArray[] getBytesArray(int rowId, int colId);
 
   Map<String, Object> getMap(int rowId, int colId);
 

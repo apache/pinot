@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +52,7 @@ public class DynamicBrokerSelectorTest {
       throws Exception {
     openMocks(this);
     Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
-    tableToBrokerListMap.put("table1", Collections.singletonList("broker1"));
+    tableToBrokerListMap.put("table1", List.of("broker1"));
     when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
     _dynamicBrokerSelectorUnderTest = Mockito.spy(new DynamicBrokerSelector(ZK_SERVER) {
       @Override
@@ -108,8 +107,8 @@ public class DynamicBrokerSelectorTest {
     assertEquals("broker1", result);
 
     Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
-    tableToBrokerListMap.put("table1", Collections.singletonList("broker1"));
-    tableToBrokerListMap.put("db1.table1", Collections.singletonList("broker2"));
+    tableToBrokerListMap.put("table1", List.of("broker1"));
+    tableToBrokerListMap.put("db1.table1", List.of("broker2"));
     when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
     result = _dynamicBrokerSelectorUnderTest.selectBroker("db1.table1");
@@ -127,7 +126,7 @@ public class DynamicBrokerSelectorTest {
 
   @Test
   public void testSelectBrokerForNullTableAndEmptyBrokerListRef() {
-    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(Collections.emptyMap());
+    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(Map.of());
     _dynamicBrokerSelectorUnderTest.handleDataChange("dummy-data-path", "dummy-date");
 
     String result = _dynamicBrokerSelectorUnderTest.selectBroker(null);
@@ -137,7 +136,7 @@ public class DynamicBrokerSelectorTest {
 
   @Test
   public void testSelectBrokerForNonNullTableAndEmptyBrokerListRef() {
-    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(Collections.emptyMap());
+    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(Map.of());
     _dynamicBrokerSelectorUnderTest.handleDataChange("dummy-data-path", "dummy-date");
 
     String result = _dynamicBrokerSelectorUnderTest.selectBroker("dummyTableName");
@@ -160,7 +159,7 @@ public class DynamicBrokerSelectorTest {
   @Test
   public void testSelectBrokerWithInvalidTable() {
     Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
-    tableToBrokerListMap.put("table1", Collections.singletonList("broker1"));
+    tableToBrokerListMap.put("table1", List.of("broker1"));
     when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
     String result = _dynamicBrokerSelectorUnderTest.selectBroker("invalidTable");
@@ -170,7 +169,7 @@ public class DynamicBrokerSelectorTest {
   @Test
   public void testSelectBrokerWithTwoTablesOneInvalid() {
     Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
-    tableToBrokerListMap.put("table1", Collections.singletonList("broker1"));
+    tableToBrokerListMap.put("table1", List.of("broker1"));
     when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
     String result = _dynamicBrokerSelectorUnderTest.selectBroker("table1", "invalidTable");

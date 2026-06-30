@@ -52,8 +52,9 @@ public class ForwardIndexCreatorFactory {
     String columnName = fieldSpec.getName();
     int numTotalDocs = context.getTotalDocs();
 
-    if (context.hasDictionary()) {
-      // Dictionary enabled columns
+    if (indexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
+      // Dictionary-encoded forward index requires a dictionary to translate dict ids to values.
+      assert context.hasDictionary();
       int cardinality = context.getCardinality();
       if (fieldSpec.isSingleValueField()) {
         if (context.isSorted()) {
@@ -70,7 +71,7 @@ public class ForwardIndexCreatorFactory {
         }
       }
     } else {
-      // Dictionary disabled columns
+      // Raw forward index
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
         // CLP (V1) uses hard-coded chunk compressor which is set to `PassThrough`
@@ -96,11 +97,11 @@ public class ForwardIndexCreatorFactory {
       int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
       if (fieldSpec.isSingleValueField()) {
         return getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
+            context.getLengthOfLongestElement(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
             targetDocsPerChunk);
       } else {
         return getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
+            context.getMaxNumberOfMultiValues(), deriveNumDocsPerChunk, writerVersion,
             context.getMaxRowLengthInBytes(), targetMaxChunkSize, targetDocsPerChunk);
       }
     }
@@ -149,6 +150,7 @@ public class ForwardIndexCreatorFactory {
         return new MultiValueFixedByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
             maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
             targetDocsPerChunk);
+      case BIG_DECIMAL:
       case STRING:
       case BYTES:
         return new MultiValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,

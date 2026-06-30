@@ -168,6 +168,36 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testCountWithGivenOrNullSalary(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE salary = 4398214 OR salary IS NULL";
+
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode count = rows.get(0).get(0);
+    assertEquals(count.asInt(), 57);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCountWithDifferentOrNullSalary(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE salary != 46314 OR salary IS NULL";
+
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode count = rows.get(0).get(0);
+    assertEquals(count.asInt(), 99);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testCaseWithNullSalary(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);

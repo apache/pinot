@@ -31,10 +31,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.function.FunctionUtils;
-import org.apache.pinot.common.utils.PinotDataType;
-import org.apache.pinot.segment.local.function.FunctionEvaluator;
-import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.BaseSegmentCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
@@ -42,6 +40,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSorted
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
@@ -75,12 +74,15 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -526,7 +528,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata information to the metadata properties.
     BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, totalDocs, fieldSpec, true,
-        dictionaryElementSize, true);
+        dictionaryElementSize, FieldConfig.EncodingType.DICTIONARY, true);
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
@@ -599,9 +601,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             nullValueVectorCreator.setNull(i);
           }
         } else if (outputValueType == null) {
-          Class<?> outputValueClass = outputValue.getClass();
-          outputValueType = FunctionUtils.getArgumentType(outputValueClass);
-          Preconditions.checkState(outputValueType != null, "Unsupported output value class: %s", outputValueClass);
+          outputValueType = FunctionUtils.getArgumentType(outputValue);
         }
 
         outputValues[i] = outputValue;
@@ -689,17 +689,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case BIG_DECIMAL: {
           for (int i = 0; i < numDocs; i++) {
-            Preconditions.checkState(isSingleValue, "MV BIG_DECIMAL is not supported");
-
-            // Skip type conversion if output value is already the required type. If outputValueType is null, that
-            // means the transform function returned null for all docs and in that case outputValue will be the
-            // default null value for the field type
-            if (outputValueType != null && !(outputValues[i] instanceof BigDecimal)) {
-              outputValues[i] = outputValueType.toBigDecimal(outputValues[i]);
-            }
+            outputValues[i] = getBigDecimalOutputValue(outputValues[i], isSingleValue, outputValueType,
+                (BigDecimal) fieldSpec.getDefaultNullValue());
           }
           statsCollector = !useNoDictColumnStatsCollector
-              ? new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              ? new BigDecimalColumnPreIndexStatsCollector(column, statsCollectorConfig)
               : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
@@ -1020,6 +1014,40 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
   /**
    * Helper method to convert the output of a transform function to the appropriate type for an SV or MV
+   * {@link FieldSpec.DataType#BIG_DECIMAL} field
+   *
+   * @param outputValue the output of the transform function
+   * @param isSingleValue true if the field (column) is single-valued
+   * @param outputValueType the output value type for the transform function; can be null (in which case,
+   *                        the {@code outputValue} should be the field's default null value)
+   * @param defaultNullValue the default null value for the field
+   * @return the converted output value (either a BigDecimal or a BigDecimal[])
+   */
+  private Object getBigDecimalOutputValue(Object outputValue, boolean isSingleValue, PinotDataType outputValueType,
+      BigDecimal defaultNullValue) {
+    if (isSingleValue) {
+      // Skip type conversion if output value is already the required type. The outputValueType is guaranteed to be
+      // non-null if outputValue is not the default null value
+      if (outputValue instanceof BigDecimal) {
+        return outputValue;
+      } else {
+        return outputValueType.toBigDecimal(outputValue);
+      }
+    } else {
+      if (outputValue instanceof BigDecimal) {
+        return new BigDecimal[]{(BigDecimal) outputValue};
+      } else {
+        BigDecimal[] values = outputValueType.toBigDecimalArray(outputValue);
+        if (values.length == 0) {
+          values = new BigDecimal[]{defaultNullValue};
+        }
+        return values;
+      }
+    }
+  }
+
+  /**
+   * Helper method to convert the output of a transform function to the appropriate type for an SV or MV
    * {@link FieldSpec.DataType#BYTES} field
    *
    * @param outputValue the output of the transform function
@@ -1070,7 +1098,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       boolean isSingleValue = fieldSpec.isSingleValueField();
 
       try (
-          ForwardIndexCreator forwardIndexCreator = getForwardIndexCreator(fieldSpec, columnStatistics, numDocs, column,
+          ForwardIndexCreator forwardIndexCreator = getForwardIndexCreator(columnStatistics, column,
               true)) {
         if (isSingleValue) {
           for (Object outputValue : outputValues) {
@@ -1083,7 +1111,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         // Add the column metadata
         BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, numDocs, fieldSpec, true,
-            dictionaryCreator.getNumBytesPerEntry(), true);
+            dictionaryCreator.getNumBytesPerEntry(), FieldConfig.EncodingType.DICTIONARY, true);
       }
     }
   }
@@ -1100,7 +1128,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     boolean isSingleValue = fieldSpec.isSingleValueField();
 
     try (ForwardIndexCreator forwardIndexCreator
-        = getForwardIndexCreator(fieldSpec, columnStatistics, numDocs, column, false)) {
+        = getForwardIndexCreator(columnStatistics, column, false)) {
       if (isSingleValue) {
         for (Object outputValue : outputValues) {
           switch (fieldSpec.getDataType().getStoredType()) {
@@ -1149,6 +1177,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             case DOUBLE:
               forwardIndexCreator.putDoubleMV((double[]) outputValue);
               break;
+            case BIG_DECIMAL:
+              forwardIndexCreator.putBigDecimalMV((BigDecimal[]) outputValue);
+              break;
             case STRING:
               forwardIndexCreator.putStringMV((String[]) outputValue);
               break;
@@ -1165,23 +1196,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata
     BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, numDocs, fieldSpec, false,
-        0, true);
+        0, FieldConfig.EncodingType.RAW, true);
   }
 
-  private ForwardIndexCreator getForwardIndexCreator(FieldSpec fieldSpec, ColumnStatistics columnStatistics,
-      int numDocs, String column, boolean hasDictionary)
+  private ForwardIndexCreator getForwardIndexCreator(ColumnStatistics columnStatistics,
+      String column, boolean hasDictionary)
       throws Exception {
-
-    IndexCreationContext indexCreationContext = IndexCreationContext.builder()
-        .withIndexDir(_indexDir)
-        .withFieldSpec(fieldSpec)
-        .withColumnStatistics(columnStatistics)
-        .withTotalDocs(numDocs)
-        .withDictionary(hasDictionary)
-        .withTableNameWithType(_tableConfig.getTableName())
-        .withContinueOnError(_tableConfig.getIngestionConfig() != null
-            && _tableConfig.getIngestionConfig().isContinueOnError())
-        .build();
+    IndexCreationContext indexCreationContext =
+        new IndexCreationContext.Builder(_indexDir, _tableConfig, columnStatistics, hasDictionary).build();
 
     ForwardIndexConfig forwardIndexConfig = null;
     FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
@@ -1189,7 +1211,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
     }
     if (forwardIndexConfig == null) {
-      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null, null);
+      forwardIndexConfig = ForwardIndexConfig.getDefault(
+          hasDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW);
     }
     return StandardIndexes.forward().createIndexCreator(indexCreationContext, forwardIndexConfig);
   }
@@ -1205,7 +1228,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
       IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
       FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
-          .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
+          .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault(columnMetadata.getForwardIndexEncoding()))
           .build();
       _forwardIndexReader = readerFactory.createIndexReader(_segmentWriter, fieldIndexConfigs, columnMetadata);
       if (columnMetadata.hasDictionary()) {
@@ -1213,8 +1236,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       } else {
         _dictionary = null;
       }
-      _columnReader = new PinotSegmentColumnReader(_forwardIndexReader, _dictionary, null,
-          columnMetadata.getMaxNumberOfMultiValues());
+      _columnReader = new PinotSegmentColumnReader(columnMetadata.getColumnName(), _forwardIndexReader, _dictionary,
+          null, columnMetadata.getMaxNumberOfMultiValues());
     }
 
     Object getValue(int docId) {

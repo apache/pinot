@@ -28,7 +28,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -541,7 +540,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     setUseMultiStageQueryEngine(false);
     TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
 
-    MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(Collections.emptyList(), null, null);
+    MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(List.of(), null, null);
     tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
 
     try {

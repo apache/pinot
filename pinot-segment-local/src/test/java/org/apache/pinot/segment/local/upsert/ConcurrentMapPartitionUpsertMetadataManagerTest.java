@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.upsert;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +70,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
@@ -85,6 +85,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -92,8 +93,8 @@ import static org.testng.Assert.*;
 public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
-  private static final List<String> PRIMARY_KEY_COLUMNS = Collections.singletonList("pk");
-  private static final List<String> COMPARISON_COLUMNS = Collections.singletonList("timeCol");
+  private static final List<String> PRIMARY_KEY_COLUMNS = List.of("pk");
+  private static final List<String> COMPARISON_COLUMNS = List.of("timeCol");
   private static final String DELETE_RECORD_COLUMN = "deleteCol";
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), "ConcurrentMapPartitionUpsertMetadataManagerTest");
@@ -290,6 +291,50 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testReplaceSegmentOnReloadRebuildsFromSnapshot()
+      throws Exception {
+    // Upsert + metadata TTL with snapshots enabled: a reload must rebuild upsert metadata from the validDocIds
+    // snapshot (valid docs only), so docs invalidated since the segment was first loaded are not resurrected.
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    String segmentName = "reload_snapshot_segment";
+    int[] primaryKeys = new int[]{10, 30, 40};
+    int[] timestamps = new int[]{1500, 3500, 4000};
+
+    // Initial load of the segment with 3 valid docs.
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment1 = createRealSegment(segmentName, primaryKeys, timestamps, validDocIds1);
+    upsertMetadataManager.addSegment(segment1);
+    assertEquals(recordLocationMap.size(), 3);
+
+    // Reload: a fresh copy of the same segment that carries a validDocIds snapshot marking only docs {0, 2} valid
+    // (doc 1 / PK 30 was invalidated). The reload must rebuild from the snapshot, not rescan all docs.
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment2 = createRealSegment(segmentName, primaryKeys, timestamps, validDocIds2);
+    ThreadSafeMutableRoaringBitmap snapshot = new ThreadSafeMutableRoaringBitmap();
+    snapshot.add(0);
+    snapshot.add(2);
+    segment2.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, snapshot.getBytesAndCardinality());
+
+    upsertMetadataManager.replaceSegment(segment2, segment1);
+
+    // PK 30 (doc 1) is not resurrected; only PK 10 and PK 40 remain, now in the reloaded segment.
+    assertEquals(recordLocationMap.size(), 2);
+    checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 40, segment2, 2, 4000, HashFunction.NONE);
+    assertNull(recordLocationMap.get(HashUtils.hashPrimaryKey(makePrimaryKey(30), HashFunction.NONE)));
+    assertEquals(segment2.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 2);
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+    segment1.destroy();
+    segment2.destroy();
+  }
+
+  @Test
   public void testGetQueryableDocIds() {
     _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN);
 
@@ -460,7 +505,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
 
     // Stop the metadata manager
     upsertMetadataManager.stop();
@@ -471,7 +516,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(recordLocationMap.size(), 1);
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
 
     // Close the metadata manager
     upsertMetadataManager.close();
@@ -778,7 +823,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
     assertEquals(queryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 3});
     assertTrue(newQueryableDocIds1.getMutableRoaringBitmap().isEmpty());
 
@@ -791,7 +836,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(recordLocationMap.size(), 1);
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
     assertTrue(newQueryableDocIds1.getMutableRoaringBitmap().isEmpty());
 
     // Close the metadata manager
@@ -1007,9 +1052,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
-      this.put(comparisonColumns.get(0), columnMetadata);
-    }});
-    when(columnMetadata.getMaxValue()).thenReturn(endTime);
+        this.put(comparisonColumns.get(0), columnMetadata);
+      }});
+    doReturn(endTime).when(columnMetadata).getMaxValue();
     if (snapshot != null) {
       when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(snapshot);
     } else {
@@ -1354,6 +1399,64 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       assertFalse(recordLocationMap.containsKey(HashUtils.hashPrimaryKey(makePrimaryKey(key), hashFunction)),
           String.valueOf(key));
     }
+  }
+
+  /**
+   * Regression test: when preloading an immutable segment whose validDocIds snapshot is empty and the table is
+   * configured with a deleteRecordColumn, doPreloadSegment's fast path must initialize queryableDocIds to an
+   * empty bitmap (not null). Passing null would set _queryableDocIds = null on the segment, causing subsequent
+   * doTakeSnapshot rounds to skip persisting the queryableDocIds bitmap file and leaving the on-disk snapshot
+   * frozen at its pre-restart contents.
+   */
+  @Test
+  public void testPreloadSegmentEmptyValidDocIdsWithDeleteColumn() {
+    _contextBuilder.setEnableSnapshot(true).setDeleteRecordColumn(DELETE_RECORD_COLUMN);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+
+    ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
+    when(segment.getSegmentName()).thenReturn("emptyValidDocIdsSegment");
+    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(
+        new MutableRoaringBitmap());
+
+    upsertMetadataManager.preloadSegment(segment);
+
+    ArgumentCaptor<ThreadSafeMutableRoaringBitmap> validDocIdsCaptor =
+        ArgumentCaptor.forClass(ThreadSafeMutableRoaringBitmap.class);
+    ArgumentCaptor<ThreadSafeMutableRoaringBitmap> queryableDocIdsCaptor =
+        ArgumentCaptor.forClass(ThreadSafeMutableRoaringBitmap.class);
+    verify(segment).enableUpsert(eq(upsertMetadataManager), validDocIdsCaptor.capture(),
+        queryableDocIdsCaptor.capture());
+    assertNotNull(validDocIdsCaptor.getValue());
+    assertTrue(validDocIdsCaptor.getValue().getMutableRoaringBitmap().isEmpty());
+    assertNotNull(queryableDocIdsCaptor.getValue(),
+        "queryableDocIds must be non-null when deleteRecordColumn is configured");
+    assertTrue(queryableDocIdsCaptor.getValue().getMutableRoaringBitmap().isEmpty());
+  }
+
+  /**
+   * Companion to {@link #testPreloadSegmentEmptyValidDocIdsWithDeleteColumn}: when deleteRecordColumn is not
+   * configured, the fast path should still pass null for queryableDocIds since queryable tracking is disabled.
+   */
+  @Test
+  public void testPreloadSegmentEmptyValidDocIdsWithoutDeleteColumn() {
+    _contextBuilder.setEnableSnapshot(true);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+
+    ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
+    when(segment.getSegmentName()).thenReturn("emptyValidDocIdsSegment");
+    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(
+        new MutableRoaringBitmap());
+
+    upsertMetadataManager.preloadSegment(segment);
+
+    ArgumentCaptor<ThreadSafeMutableRoaringBitmap> queryableDocIdsCaptor =
+        ArgumentCaptor.forClass(ThreadSafeMutableRoaringBitmap.class);
+    verify(segment).enableUpsert(eq(upsertMetadataManager), any(ThreadSafeMutableRoaringBitmap.class),
+        queryableDocIdsCaptor.capture());
+    assertNull(queryableDocIdsCaptor.getValue(),
+        "queryableDocIds must be null when deleteRecordColumn is not configured");
   }
 
   @Test
@@ -1792,8 +1895,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
       when(segmentMetadata.getTotalDocs()).thenReturn(deleteFlags.length);
       when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
-        this.put(COMPARISON_COLUMNS.get(0), columnMetadata);
-      }});
+          this.put(COMPARISON_COLUMNS.get(0), columnMetadata);
+        }});
 
       ImmutableSegmentImpl segment =
           mockImmutableSegmentWithSegmentMetadata(1, new ThreadSafeMutableRoaringBitmap(), null, null, segmentMetadata,

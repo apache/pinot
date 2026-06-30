@@ -44,7 +44,7 @@ public class SegmentFetcherFactoryTest {
   @Test
   public void testDefaultSegmentFetcherFactory() {
     assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTP_PROTOCOL).getClass(), HttpSegmentFetcher.class);
-    assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTPS_PROTOCOL).getClass(), HttpSegmentFetcher.class);
+    assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTPS_PROTOCOL).getClass(), HttpsSegmentFetcher.class);
     assertEquals(SegmentFetcherFactory.getSegmentFetcher(FILE_PROTOCOL).getClass(), PinotFSSegmentFetcher.class);
     assertEquals(SegmentFetcherFactory.getSegmentFetcher("foo").getClass(), PinotFSSegmentFetcher.class);
   }

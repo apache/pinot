@@ -61,11 +61,11 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   private static final Duration REPOSITORY_CLEANUP_INTERVAL = Duration.ofDays(1);
   private static final ScheduledExecutorService REPOSITORY_CLEANUP_EXECUTOR =
       Executors.newSingleThreadScheduledExecutor(
-      runnable -> {
-        Thread thread = new Thread(runnable, "pinot-jfr-repository-cleaner");
-        thread.setDaemon(true);
-        return thread;
-      });
+        runnable -> {
+          Thread thread = new Thread(runnable, "pinot-jfr-repository-cleaner");
+          thread.setDaemon(true);
+          return thread;
+        });
 
   /// Key that controls whether to enable continuous JFR recording.
   public static final String ENABLED = "enabled";

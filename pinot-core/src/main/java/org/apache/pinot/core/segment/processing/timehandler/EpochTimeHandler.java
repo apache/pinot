@@ -38,9 +38,19 @@ public class EpochTimeHandler implements TimeHandler {
 
   private final long _roundBucketMs;
   private final long _partitionBucketMs;
+  private final boolean _storeOriginalTimeField;
 
   public EpochTimeHandler(DateTimeFieldSpec fieldSpec, long startTimeMs, long endTimeMs, boolean negateWindowFilter,
       long roundBucketMs, long partitionBucketMs) {
+    this(fieldSpec, startTimeMs, endTimeMs, negateWindowFilter, roundBucketMs, partitionBucketMs, false);
+  }
+
+  /// Creates the time handler. When `storeOriginalTimeField` is `true`, [#handleTime] stores the original
+  /// (pre-rounding) time value in millis into the hidden [#ORIGINAL_TIME_MS_COLUMN] field of the row before
+  /// rounding the time column, so that order sensitive aggregations (FIRSTWITHTIME/LASTWITHTIME) can order the
+  /// rows by the original time.
+  public EpochTimeHandler(DateTimeFieldSpec fieldSpec, long startTimeMs, long endTimeMs, boolean negateWindowFilter,
+      long roundBucketMs, long partitionBucketMs, boolean storeOriginalTimeField) {
     _timeColumn = fieldSpec.getName();
     _dataType = fieldSpec.getDataType();
     _formatSpec = fieldSpec.getFormatSpec();
@@ -49,6 +59,7 @@ public class EpochTimeHandler implements TimeHandler {
     _negateWindowFilter = negateWindowFilter;
     _roundBucketMs = roundBucketMs;
     _partitionBucketMs = partitionBucketMs;
+    _storeOriginalTimeField = storeOriginalTimeField;
   }
 
   @Nullable
@@ -59,6 +70,9 @@ public class EpochTimeHandler implements TimeHandler {
       if (outsideTimeWindow != _negateWindowFilter) {
         return null;
       }
+    }
+    if (_storeOriginalTimeField) {
+      row.putValue(ORIGINAL_TIME_MS_COLUMN, timeMs);
     }
     if (_roundBucketMs > 0) {
       timeMs = (timeMs / _roundBucketMs) * _roundBucketMs;

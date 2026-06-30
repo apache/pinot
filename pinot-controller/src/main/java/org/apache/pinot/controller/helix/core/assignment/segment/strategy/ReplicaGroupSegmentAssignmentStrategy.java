@@ -33,37 +33,43 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupSegmentAssignmentStrategy.class);
 
-  private HelixManager _helixManager;
-  private String _tableName;
-  private String _partitionColumn;
-  private int _replication;
+  protected HelixManager _helixManager;
+  protected TableConfig _tableConfig;
+  protected String _tableName;
+  protected String _partitionColumn;
+  protected int _replication;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
     _helixManager = helixManager;
+    _tableConfig = tableConfig;
     _tableName = tableConfig.getTableName();
     SegmentsValidationAndRetentionConfig validationAndRetentionConfig = tableConfig.getValidationConfig();
     Preconditions.checkState(validationAndRetentionConfig != null, "segmentsConfig is null");
     _replication = tableConfig.getReplication();
     _partitionColumn = TableConfigUtils.getPartitionColumn(tableConfig);
     if (_partitionColumn == null) {
-      LOGGER.info("Initialized ReplicaGroupSegmentAssignmentStrategy "
-          + "with replication: {} without partition column for table: {} ", _replication, _tableName);
+      LOGGER.info("Initialized {} "
+              + "with replication: {} without partition column for table: {} ", this.getClass().getSimpleName(),
+          _replication, _tableName);
     } else {
-      LOGGER.info("Initialized ReplicaGroupSegmentAssignmentStrategy "
-          + "with replication: {} and partition column: {} for table: {}", _replication, _partitionColumn, _tableName);
+      LOGGER.info("Initialized {} "
+              + "with replication: {} and partition column: {} for table: {}", this.getClass().getSimpleName(),
+          _replication, _partitionColumn, _tableName);
     }
   }
 
   /**
    * Assigns the segment for the replica-group based segment assignment strategy and returns the assigned instances.
+   * Assign to the instance with the least number of segments for each replica-group.
    */
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
@@ -74,9 +80,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
     if (numPartitions == 1) {
       partitionId = 0;
     } else {
-      partitionId =
-          SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableName, _helixManager, _partitionColumn)
-              % numPartitions;
+      partitionId = getPartitionIdFromSegmentName(segmentName, numPartitions);
     }
     return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);
   }
@@ -103,9 +107,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
     } else {
       Map<Integer, List<String>> instancePartitionIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numPartitions);
       for (String segmentName : currentAssignment.keySet()) {
-        int instancePartitionId =
-            SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableName, _helixManager, _partitionColumn)
-                % numPartitions;
+        int instancePartitionId = getPartitionIdFromSegmentName(segmentName, numPartitions);
         instancePartitionIdToSegmentsMap.computeIfAbsent(instancePartitionId, k -> new ArrayList<>()).add(segmentName);
       }
 
@@ -122,13 +124,23 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
     }
   }
 
+  private int getPartitionIdFromSegmentName(String segmentName, int numPartitions) {
+    int rawPartitionId =
+        SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableName, _helixManager, _partitionColumn);
+    // For multi-stream realtime tables, translate the Pinot partition ID (which encodes stream index and stream
+    // partition as streamIndex * 10000 + streamPartitionId) to the stream partition id before computing the slot.
+    // getStreamPartitionIdFromPinotPartitionId is a no-op for offline tables and single-stream realtime tables.
+    rawPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_tableConfig, rawPartitionId);
+    return rawPartitionId % numPartitions;
+  }
+
   /**
    * Helper method to check whether the number of replica-groups matches the table replication for replica-group based
    * instance partitions. Log a warning if they do not match and use the one inside the instance partitions. The
    * mismatch can happen when table is not configured correctly (table replication and numReplicaGroups does not match
    * or replication changed without reassigning instances).
    */
-  private static void checkReplication(InstancePartitions instancePartitions, int replication, String tableName) {
+  protected static void checkReplication(InstancePartitions instancePartitions, int replication, String tableName) {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups != replication) {
       LOGGER.warn(

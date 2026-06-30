@@ -60,6 +60,9 @@ public class DispatchablePlanContext {
 
   private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap = new HashMap<>();
   private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap = new HashMap<>();
+  private long _numSegmentsPrunedByBroker;
+  private int _leafStagesAssigned;
+  private int _leafStagesEmpty;
 
 
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
@@ -128,6 +131,32 @@ public class DispatchablePlanContext {
 
   public Map<Integer, PlanNode> getDispatchablePlanStageRootMap() {
     return _dispatchablePlanStageRootMap;
+  }
+
+  public long getNumSegmentsPrunedByBroker() {
+    return _numSegmentsPrunedByBroker;
+  }
+
+  public void addNumSegmentsPrunedByBroker(long count) {
+    _numSegmentsPrunedByBroker += count;
+  }
+
+  public void recordLeafStageAssigned() {
+    _leafStagesAssigned++;
+  }
+
+  public void recordLeafStageEmpty() {
+    _leafStagesEmpty++;
+  }
+
+  /**
+   * Returns true when at least one non-replicated leaf stage was processed during worker
+   * assignment, and every such leaf stage ended up with zero workers (e.g. all segments
+   * pruned by broker, or the table has no segments). Replicated leaves (dim tables) are
+   * excluded because they return early in WorkerManager before reaching the tracking code.
+   */
+  public boolean isAllNonReplicatedLeafStagesEmpty() {
+    return _leafStagesAssigned > 0 && _leafStagesAssigned == _leafStagesEmpty;
   }
 
   public Map<Integer, DispatchablePlanFragment> constructDispatchablePlanFragmentMap(PlanFragment subPlanRoot) {

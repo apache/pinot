@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -76,7 +75,7 @@ public class DimensionTableIntegrationTest extends BaseClusterIntegrationTest {
         .setSchemaName(getTableName())
         .addSingleValueDimension(LONG_COL, FieldSpec.DataType.LONG)
         .addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
-        .setPrimaryKeyColumns(Collections.singletonList(LONG_COL))
+        .setPrimaryKeyColumns(List.of(LONG_COL))
         .build();
   }
 

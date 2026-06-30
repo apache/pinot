@@ -28,7 +28,6 @@ import java.nio.BufferOverflowException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +68,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -267,6 +267,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final BooleanSupplier _isReadyToConsumeData;
+  private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
   private volatile State _state;
@@ -444,6 +445,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  private boolean shouldStopWaitingForOomProtection() {
+    if (_shouldStop || _state != State.INITIAL_CONSUMING) {
+      return true;
+    }
+    return now() >= _consumeEndTime || _numRowsIndexed >= _segmentMaxRowCount || _endOfPartitionGroup
+        || _forceCommitMessageReceived || !canAddMore();
+  }
+
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
     _consecutiveErrorCount++;
@@ -483,6 +492,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     while (!_shouldStop && !endCriteriaReached()) {
+      if (_state == State.INITIAL_CONSUMING && _serverIngestionOomProtectionManager != null) {
+        boolean waitedForOomProtection =
+            _serverIngestionOomProtectionManager.waitIfProtectionNeeded(this::shouldStopWaitingForOomProtection);
+        if (_shouldStop || endCriteriaReached()) {
+          break;
+        }
+        if (waitedForOomProtection) {
+          _idleTimer.markStreamCreated();
+        }
+      }
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
@@ -762,6 +781,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _realtimeSegment.canAddMore();
   }
 
+  @VisibleForTesting
+  void setServerIngestionOomProtectionManager(
+      ServerIngestionOomProtectionManager serverIngestionOomProtectionManager) {
+    _serverIngestionOomProtectionManager = serverIngestionOomProtectionManager;
+  }
+
   public class PartitionConsumer implements Runnable {
     public void run() {
       long initialConsumptionEnd = 0L;
@@ -1016,7 +1041,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 TimeUnit.MILLISECONDS.toSeconds(now() - initialConsumptionEnd));
       }
       // There is a race condition that the destroy() method can be called which ends up calling stop on the consumer.
-      // The destroy() method does not wait for the thread to terminate (and reasonably so, we dont want to wait
+      // The destroy() method does not wait for the thread to terminate (and reasonably so, we don't want to wait
       // forever).
       // Since the _shouldStop variable is set to true only in stop() method, we know that the metric will be destroyed,
       // so it is ok not to mark it non-consuming, as the main thread will clean up this metric in destroy() method
@@ -1104,7 +1129,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Returns the current offset for the partition group.
    */
   public Map<String, String> getPartitionToCurrentOffset() {
-    return Collections.singletonMap(String.valueOf(_partitionGroupId), _currentOffset.toString());
+    return Map.of(String.valueOf(_partitionGroupId), _currentOffset.toString());
   }
 
   /**
@@ -1127,7 +1152,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public Map<String, ConsumerPartitionState> getConsumerPartitionState(
       @Nullable StreamPartitionMsgOffset latestMsgOffset) {
     String partitionGroupId = String.valueOf(_partitionGroupId);
-    return Collections.singletonMap(partitionGroupId,
+    return Map.of(partitionGroupId,
         new ConsumerPartitionState(partitionGroupId, getCurrentOffset(), getLastConsumedTimestamp(), latestMsgOffset,
             _lastRowMetadata));
   }
@@ -1742,6 +1767,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _isReadyToConsumeData = isReadyToConsumeData;
+    _serverIngestionOomProtectionManager = realtimeTableDataManager.getServerIngestionOomProtectionManager();
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getInstanceId();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_tableNameWithType);
@@ -1821,9 +1847,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
     _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
-    // Start new realtime segment
+    // Start new realtime segment. Use a mutable-only tier-overwritten index loading view when consuming tier overrides
+    // are configured; committed segments continue to use the base table config.
     String consumerDir = realtimeTableDataManager.getConsumerDir();
-    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder(indexLoadingConfig)
+    IndexLoadingConfig consumingIndexLoadingConfig =
+        TableConfigUtils.buildConsumingSegmentIndexLoadingConfig(_tableConfig, _schema, indexLoadingConfig);
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
+        new RealtimeSegmentConfig.Builder(consumingIndexLoadingConfig);
+    realtimeSegmentConfigBuilder
         .setTableNameWithType(_tableNameWithType)
         .setSegmentName(_segmentNameStr)
         .setStreamName(streamTopic)
@@ -1841,7 +1872,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
         .setConsumerDir(consumerDir)
-        .setTextIndexConfig(_tableConfig.getIndexingConfig().getMultiColumnTextIndexConfig())
+        .setTextIndexConfig(consumingIndexLoadingConfig.getMultiColTextIndexConfig())
         .setDropRecordOnPartitionMismatch(ingestionConfig != null
             && ingestionConfig.getStreamIngestionConfig() != null
             && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
@@ -2017,29 +2048,32 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         ColumnPartitionConfig columnPartitionConfig = entry.getValue();
         String partitionFunctionName = columnPartitionConfig.getFunctionName();
 
-        // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning and emit a
-        //       metric when they don't match, but use the one from the stream. The mismatch could happen when the
-        //       stream partitions are changed, but the table config has not been updated to reflect the change.
-        //       In such case, picking the number of partitions from the stream can keep the segment properly
-        //       partitioned as long as the partition function is not changed.
+        // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning when they
+        //       don't match, but use the one from the stream. The mismatch could happen when the stream partitions are
+        //       changed, but the table config has not been updated to reflect the change. In such case, picking the
+        //       number of partitions from the stream can keep the segment properly partitioned as long as the
+        //       partition function is not changed.
         int numPartitions = columnPartitionConfig.getNumPartitions();
         try {
-          // TODO: currentPartitionGroupConsumptionStatus should be fetched from idealState + segmentZkMetadata,
-          //  so that we get back accurate partitionGroups info
-          //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
-          //  a single partition
-          //  Fix this before opening support for partitioning in Kinesis
-          int numPartitionGroups = _partitionMetadataProvider.computePartitionGroupMetadata(_clientId, _streamConfig,
-              Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
+          // Use the total stream partition count as the partition function divisor. The upstream producer hashed each
+          // key over the full partition count, so the divisor must match that count for the per-segment partition
+          // metadata (and the partition pruning that relies on it) to be correct. fetchPartitionCount() returns that
+          // full count; computePartitionGroupMetadata().size() does not - when the table consumes only a subset of
+          // stream partitions it returns the subset size, which is wrong here.
+          // TODO: This is correct for Kafka, where partition ids are a stable contiguous range. It does not make
+          //   partitioning work for Kinesis, where shards split/merge and ids are not a contiguous 0..N range -
+          //   fetchPartitionCount() returns the total shard count there. Fix this before opening support for
+          //   partitioning in Kinesis.
+          int numStreamPartitions = _partitionMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/10_000);
 
-          if (numPartitionGroups != numPartitions) {
-            _segmentLogger.info(
+          if (numStreamPartitions != numPartitions) {
+            _segmentLogger.warn(
                 "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
-                    + "using number of stream " + "partitions", numPartitionGroups, numPartitions);
-            numPartitions = numPartitionGroups;
+                    + "using number of stream " + "partitions", numStreamPartitions, numPartitions);
+            numPartitions = numStreamPartitions;
           }
         } catch (Exception e) {
-          _segmentLogger.warn("Failed to get number of stream partitions in 5s, "
+          _segmentLogger.error("Failed to get number of stream partitions in 10s, "
               + "using number of partitions in the partition config: {}", numPartitions, e);
           createPartitionMetadataProvider("Timeout getting number of stream partitions");
         }

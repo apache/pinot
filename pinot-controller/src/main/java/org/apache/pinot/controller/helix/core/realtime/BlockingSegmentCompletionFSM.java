@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class implements the FSM on the controller side for each completing segment.
  *
- * An FSM is is created when we first hear about a segment (typically through the segmentConsumed message).
+ * An FSM is created when we first hear about a segment (typically through the segmentConsumed message).
  * When an FSM is created, it may have one of two start states (HOLDING, or COMMITTED), depending on the
  * constructor used.
  *

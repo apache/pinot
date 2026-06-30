@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
-import java.util.Collections;
+import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -239,7 +239,7 @@ public class DataLossRiskAssessorTest extends ControllerTest {
     tableConfig.setUpsertConfig(null);
     IngestionConfig ingestionConfig = new IngestionConfig();
     StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(
-        Collections.singletonList(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
+        List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
     streamIngestionConfig.setPauselessConsumptionEnabled(true);
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -376,7 +376,7 @@ public class DataLossRiskAssessorTest extends ControllerTest {
     tableConfig.setUpsertConfig(null);
     IngestionConfig ingestionConfig = new IngestionConfig();
     StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(
-        Collections.singletonList(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
+        List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
     streamIngestionConfig.setPauselessConsumptionEnabled(true);
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -415,7 +415,7 @@ public class DataLossRiskAssessorTest extends ControllerTest {
     // No need to test non-pauseless tables with COMMITTING state as this is only applicable to pauseless tables
     IngestionConfig ingestionConfig = new IngestionConfig();
     StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(
-        Collections.singletonList(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
+        List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
     streamIngestionConfig.setPauselessConsumptionEnabled(true);
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     tableConfig.setIngestionConfig(ingestionConfig);

@@ -33,7 +33,6 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -223,7 +222,7 @@ public class PinotSegmentRestletResource {
     return selectSegments(tableName, tableTypeStr, shouldExcludeReplacedSegments,
         startTimestampStr, endTimestampStr, excludeOverlapping)
         .stream()
-        .map(pair -> Collections.singletonMap(pair.getKey(), pair.getValue()))
+        .map(pair -> Map.of(pair.getKey(), pair.getValue()))
         .collect(Collectors.toList());
   }
 
@@ -569,7 +568,7 @@ public class PinotSegmentRestletResource {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     segmentName = URIUtils.decode(segmentName);
     String tableNameWithType = getExistingTable(tableName, segmentName);
-    deleteSegmentsInternal(tableNameWithType, Collections.singletonList(segmentName), retentionPeriod);
+    deleteSegmentsInternal(tableNameWithType, List.of(segmentName), retentionPeriod);
     return new SuccessResponse("Segment deleted");
   }
 
@@ -689,8 +688,8 @@ public class PinotSegmentRestletResource {
 
   private void deleteSegmentsInternal(String tableNameWithType, List<String> segments,
       @Nullable String retentionPeriod) {
-    PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments,
-        retentionPeriod);
+    PinotResourceManagerResponse response =
+        _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments, retentionPeriod);
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
           "Failed to delete segments from table: " + tableNameWithType + ", error message: " + response.getMessage(),
@@ -949,7 +948,7 @@ public class PinotSegmentRestletResource {
       List<String> segments =
           _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, true, startTimestamp, endTimestamp,
               excludeOverlapping);
-      resultList.add(Collections.singletonMap(tableType, segments));
+      resultList.add(Map.of(tableType, segments));
     }
     return resultList;
   }

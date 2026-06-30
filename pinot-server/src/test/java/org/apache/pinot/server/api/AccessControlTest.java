@@ -23,7 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
@@ -90,7 +90,7 @@ public class AccessControlTest {
         serverConf);
 
     int adminApiApplicationPort = getAvailablePort();
-    _adminApiApplication.start(Collections.singletonList(
+    _adminApiApplication.start(List.of(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", adminApiApplicationPort,
             CommonConstants.HTTP_PROTOCOL, new TlsConfig(), HttpServerThreadPoolConfig.defaultInstance())));
 

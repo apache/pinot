@@ -219,9 +219,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             accessControl);
     brokerResponse.setBrokerId(_brokerId);
     brokerResponse.setRequestId(Long.toString(requestId));
-    _brokerQueryEventListener.onQueryCompletion(requestContext);
+    onQueryCompletion(requestContext, brokerResponse);
 
     return brokerResponse;
+  }
+
+  /**
+   * Called after every successfully executed query with the fully-populated {@link RequestContext}
+   * and {@link BrokerResponse}. The default implementation fires the configured
+   * {@link org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener}. Subclasses may
+   * override to intercept the complete response (e.g. for async query-log pipelines) while still
+   * calling {@code super} to preserve the SPI listener behaviour.
+   */
+  protected void onQueryCompletion(RequestContext requestContext, BrokerResponse brokerResponse) {
+    _brokerQueryEventListener.onQueryCompletion(requestContext);
   }
 
   protected abstract BrokerResponse handleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
@@ -340,6 +351,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setNumExceptions(numExceptions);
     statistics.setGroupsTrimmed(response.isGroupsTrimmed());
     statistics.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    statistics.setMseLiteLeafStageLimitReached(response.isMseLiteLeafStageLimitReached());
     statistics.setProcessingTimeMillis(response.getTimeUsedMs());
     statistics.setNumDocsScanned(response.getNumDocsScanned());
     statistics.setTotalDocs(response.getTotalDocs());

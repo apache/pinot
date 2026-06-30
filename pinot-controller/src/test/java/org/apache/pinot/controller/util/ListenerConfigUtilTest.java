@@ -75,6 +75,43 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(9, listenerConfigs.get(0).getThreadPoolConfig().getMaxPoolSize());
   }
 
+  @Test
+  public void testMaxHttpHeaderConfig() {
+    // Test broker
+    PinotConfiguration brokerConf = new PinotConfiguration();
+    brokerConf.setProperty("pinot.broker.client.queryPort", "8099");
+
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    Assert.assertEquals(-1, listenerConfigs.get(0).getMaxHttpHeaderSize());
+    Assert.assertEquals(-1, listenerConfigs.get(0).getMaxRequestHeaders());
+
+    brokerConf.setProperty("pinot.broker.http.server.max.http.header.size", 16384);
+    brokerConf.setProperty("pinot.broker.http.server.max.request.headers", 200);
+
+    listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    Assert.assertEquals(16384, listenerConfigs.get(0).getMaxHttpHeaderSize());
+    Assert.assertEquals(200, listenerConfigs.get(0).getMaxRequestHeaders());
+
+    // Test controller
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setProperty("controller.port", "9000");
+
+    listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    Assert.assertEquals(-1, listenerConfigs.get(0).getMaxHttpHeaderSize());
+    Assert.assertEquals(-1, listenerConfigs.get(0).getMaxRequestHeaders());
+
+    controllerConf.setProperty("pinot.controller.http.server.max.http.header.size", 32768);
+    controllerConf.setProperty("pinot.controller.http.server.max.request.headers", 150);
+
+    listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    Assert.assertEquals(32768, listenerConfigs.get(0).getMaxHttpHeaderSize());
+    Assert.assertEquals(150, listenerConfigs.get(0).getMaxRequestHeaders());
+  }
+
   /**
    * Asserts that enabling https generates the existing legacy listener as well as the another one configured with
    * TLS settings.

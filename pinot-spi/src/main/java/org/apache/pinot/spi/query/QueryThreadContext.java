@@ -106,6 +106,35 @@ public class QueryThreadContext implements AutoCloseable {
     _accountant.sampleUsage();
   }
 
+  // Blocks the thread if the accountant has activated a pause, then re-checks termination before returning if the
+  // thread actually entered the slow path. The re-check catches the case where the watcher terminated this query
+  // while the thread was paused, allowing the thread to throw immediately instead of proceeding with more work. When
+  // the fast-path is taken (no pause was active), the re-check is skipped since termination was just checked by the
+  // caller.
+  private void waitIfPausedInternal(String scope) {
+    if (_accountant.waitIfPaused()) {
+      checkTerminationInternal(scope);
+    }
+  }
+
+  private void waitIfPausedInternal(Supplier<String> scopeSupplier) {
+    if (_accountant.waitIfPaused()) {
+      checkTerminationInternal(scopeSupplier);
+    }
+  }
+
+  private void waitIfPausedInternal(String scope, long deadlineMs) {
+    if (_accountant.waitIfPaused()) {
+      checkTerminationInternal(scope, deadlineMs);
+    }
+  }
+
+  private void waitIfPausedInternal(Supplier<String> scopeSupplier, long deadlineMs) {
+    if (_accountant.waitIfPaused()) {
+      checkTerminationInternal(scopeSupplier, deadlineMs);
+    }
+  }
+
   private void checkTerminationInternal(String scope) {
     checkTerminationInternal(scope, _executionContext.getActiveDeadlineMs());
   }
@@ -260,6 +289,7 @@ public class QueryThreadContext implements AutoCloseable {
     //       is not set up.
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scopeSupplier);
+      threadContext.waitIfPausedInternal(scopeSupplier);
     }
   }
 
@@ -273,6 +303,7 @@ public class QueryThreadContext implements AutoCloseable {
     //       is not set up.
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scopeSupplier, deadlineMs);
+      threadContext.waitIfPausedInternal(scopeSupplier, deadlineMs);
     }
   }
 
@@ -295,6 +326,7 @@ public class QueryThreadContext implements AutoCloseable {
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scope);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scope);
     }
   }
 
@@ -307,6 +339,7 @@ public class QueryThreadContext implements AutoCloseable {
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scopeSupplier);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scopeSupplier);
     }
   }
 
@@ -319,6 +352,7 @@ public class QueryThreadContext implements AutoCloseable {
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scope, deadlineMs);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scope, deadlineMs);
     }
   }
 
@@ -331,6 +365,7 @@ public class QueryThreadContext implements AutoCloseable {
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scopeSupplier, deadlineMs);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scopeSupplier, deadlineMs);
     }
   }
 

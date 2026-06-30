@@ -201,6 +201,23 @@ public class ControllerConfTest {
   }
 
   @Test
+  public void testConcurrentSchedulingEnabledDefault() {
+    ControllerConf conf = new ControllerConf();
+    Assert.assertFalse(conf.isPinotTaskManagerConcurrentSchedulingEnabled(),
+        "Concurrent task scheduling should default to false");
+  }
+
+  @Test
+  public void testConcurrentSchedulingEnabledOverride() {
+    ControllerConf conf = new ControllerConf();
+    conf.setProperty(CONCURRENT_SCHEDULING_ENABLED, true);
+    Assert.assertTrue(conf.isPinotTaskManagerConcurrentSchedulingEnabled());
+
+    conf.setProperty(CONCURRENT_SCHEDULING_ENABLED, false);
+    Assert.assertFalse(conf.isPinotTaskManagerConcurrentSchedulingEnabled());
+  }
+
+  @Test
   public void testTaskQueueBoundingConfigDefaults() {
     ControllerConf conf = new ControllerConf();
 

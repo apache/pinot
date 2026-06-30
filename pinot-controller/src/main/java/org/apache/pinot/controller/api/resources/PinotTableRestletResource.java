@@ -38,7 +38,6 @@ import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -252,7 +251,7 @@ public class PinotTableRestletResource {
       schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
 
-      TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
+      TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Map.of());
 
       TableConfigValidationUtils.validateTableConfig(
           tableConfig, schema, typesToSkip, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
@@ -445,7 +444,7 @@ public class PinotTableRestletResource {
     if (instanceAssignmentConfigMap == null) {
       return;
     }
-    java.util.Iterator<Map.Entry<String, JsonNode>> iterator = instanceAssignmentConfigMap.fields();
+    java.util.Iterator<Map.Entry<String, JsonNode>> iterator = instanceAssignmentConfigMap.properties().iterator();
     while (iterator.hasNext()) {
       Map.Entry<String, JsonNode> entry = iterator.next();
       JsonNode instanceAssignmentConfig = entry.getValue();

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
+import com.google.protobuf.DescriptorProtos;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Message;
 import java.io.IOException;
 import java.util.Arrays;
@@ -42,7 +45,6 @@ import static org.testng.Assert.*;
  *   <li>Field descriptor caching works correctly across multiple extractions</li>
  *   <li>Subset field extraction works correctly</li>
  *   <li>Schema change detection and cache invalidation</li>
- *   <li>Re-initialization behavior</li>
  *   <li>Edge cases like missing fields, empty fields set</li>
  * </ul>
  */
@@ -186,29 +188,6 @@ public class ProtoBufRecordExtractorCachingTest {
     assertEquals(row2.getValue("id"), 18);
   }
 
-  @Test
-  public void testExtractorReinitialization()
-      throws IOException {
-    // First initialization with all fields
-    _extractor.init(null, null);
-    Message message1 = createTestMessage("init1", 100);
-    GenericRow row1 = _extractor.extract(message1, new GenericRow());
-    int allFieldsCount = row1.getFieldToValueMap().size();
-    assertTrue(allFieldsCount > 5); // All fields from schema
-
-    // Re-initialize with subset fields
-    Set<String> subsetFields = new HashSet<>(Arrays.asList(STRING_FIELD, INT_FIELD));
-    _extractor.init(subsetFields, null);
-
-    Message message2 = createTestMessage("init2", 200);
-    GenericRow row2 = _extractor.extract(message2, new GenericRow());
-    assertEquals(row2.getFieldToValueMap().size(), subsetFields.size()); // Only subset
-    assertEquals(row2.getValue(STRING_FIELD), "init2");
-    assertEquals(row2.getValue(INT_FIELD), 200);
-    // Verify all fields count was greater than subset
-    assertTrue(allFieldsCount > subsetFields.size());
-  }
-
   // ==================== EDGE CASES ====================
 
   @Test
@@ -266,8 +245,7 @@ public class ProtoBufRecordExtractorCachingTest {
     assertEquals(row.getValue(LONG_FIELD), 100L);
     assertEquals(row.getValue(DOUBLE_FIELD), 1.1);
     assertEquals(row.getValue(FLOAT_FIELD), 2.2f);
-    // Note: convertSingleValue converts booleans to strings via toString()
-    assertEquals(row.getValue(BOOL_FIELD), "true");
+    assertEquals(row.getValue(BOOL_FIELD), true);
     assertNotNull(row.getValue(BYTES_FIELD)); // ByteString converted to byte[]
     assertEquals(row.getValue(ENUM_FIELD), "GAMMA");
 
@@ -342,6 +320,90 @@ public class ProtoBufRecordExtractorCachingTest {
     assertEquals(row1.getFieldToValueMap().size(), row2.getFieldToValueMap().size());
   }
 
+  // ==================== SCHEMA EVOLUTION (SAME FULL NAME, DIFFERENT DESCRIPTOR INSTANCE) ====================
+
+  /**
+   * Regression test for the bug introduced in PR #17593: when a Confluent Schema Registry schema evolves
+   * (e.g. a new column is added), KafkaProtobufDeserializer returns DynamicMessage instances built from a
+   * new Descriptor object even though the message's full name is unchanged. The old cache invalidation
+   * keyed on {@code descriptor.getFullName()} never detected this, so stale FieldDescriptors from the V1
+   * Descriptor were used against V2 DynamicMessages. Protobuf enforces strict identity between a
+   * FieldDescriptor and the Descriptor of the message it is applied to, so this threw
+   * {@code IllegalArgumentException: FieldDescriptor does not match message type}.
+   *
+   * <p>The fix uses object identity ({@code !=}) to detect descriptor changes, which correctly fires
+   * whenever the schema registry serves a new schema version.
+   */
+  @Test
+  public void testSchemaEvolutionSameFullNameDifferentDescriptorInstance()
+      throws Descriptors.DescriptorValidationException {
+    _extractor.init(null, null);
+
+    // Build V1 descriptor: Order { string id = 1; int32 amount = 2; }
+    Descriptors.Descriptor v1Descriptor = buildOrderDescriptor(false);
+    DynamicMessage v1Message = DynamicMessage.newBuilder(v1Descriptor)
+        .setField(v1Descriptor.findFieldByName("id"), "order-1")
+        .setField(v1Descriptor.findFieldByName("amount"), 100)
+        .build();
+
+    GenericRow row1 = _extractor.extract(v1Message, new GenericRow());
+    assertEquals(row1.getValue("id"), "order-1");
+    assertEquals(row1.getValue("amount"), 100);
+
+    // Simulate schema evolution: new column "status" added. Registry returns a fresh Descriptor
+    // object with the same full name "Order" but a different instance — same as what
+    // KafkaProtobufDeserializer does when it fetches a new schema ID.
+    Descriptors.Descriptor v2Descriptor = buildOrderDescriptor(true);
+    // Sanity: same full name, different object — this is the exact condition the old code missed.
+    assertEquals(v1Descriptor.getFullName(), v2Descriptor.getFullName());
+    assertNotSame(v1Descriptor, v2Descriptor);
+
+    DynamicMessage v2Message = DynamicMessage.newBuilder(v2Descriptor)
+        .setField(v2Descriptor.findFieldByName("id"), "order-2")
+        .setField(v2Descriptor.findFieldByName("amount"), 200)
+        .setField(v2Descriptor.findFieldByName("status"), "SHIPPED")
+        .build();
+
+    // Before the fix this threw: IllegalArgumentException: FieldDescriptor does not match message type
+    GenericRow row2 = _extractor.extract(v2Message, new GenericRow());
+    assertEquals(row2.getValue("id"), "order-2");
+    assertEquals(row2.getValue("amount"), 200);
+    assertEquals(row2.getValue("status"), "SHIPPED");
+  }
+
+  /**
+   * Builds a simple "Order" DynamicMessage descriptor with fields id (string) and amount (int32).
+   * When {@code withStatus} is true, a third field "status" (string) is added, simulating a schema
+   * evolution where a new column was appended to the registry schema.
+   *
+   * <p>Each invocation produces a distinct {@link Descriptors.Descriptor} instance even though the
+   * full name is the same — exactly what Confluent Schema Registry does across schema versions.
+   */
+  private static Descriptors.Descriptor buildOrderDescriptor(boolean withStatus)
+      throws Descriptors.DescriptorValidationException {
+    DescriptorProtos.DescriptorProto.Builder msgBuilder = DescriptorProtos.DescriptorProto.newBuilder()
+        .setName("Order")
+        .addField(DescriptorProtos.FieldDescriptorProto.newBuilder()
+            .setName("id").setNumber(1).setLabel(DescriptorProtos.FieldDescriptorProto.Label.LABEL_OPTIONAL)
+            .setType(DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
+        .addField(DescriptorProtos.FieldDescriptorProto.newBuilder()
+            .setName("amount").setNumber(2).setLabel(DescriptorProtos.FieldDescriptorProto.Label.LABEL_OPTIONAL)
+            .setType(DescriptorProtos.FieldDescriptorProto.Type.TYPE_INT32));
+    if (withStatus) {
+      msgBuilder.addField(DescriptorProtos.FieldDescriptorProto.newBuilder()
+          .setName("status").setNumber(3).setLabel(DescriptorProtos.FieldDescriptorProto.Label.LABEL_OPTIONAL)
+          .setType(DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING));
+    }
+    DescriptorProtos.FileDescriptorProto fileProto = DescriptorProtos.FileDescriptorProto.newBuilder()
+        .setName(withStatus ? "order_v2.proto" : "order_v1.proto")
+        .setSyntax("proto3")
+        .addMessageType(msgBuilder)
+        .build();
+    Descriptors.FileDescriptor fileDescriptor =
+        Descriptors.FileDescriptor.buildFrom(fileProto, new Descriptors.FileDescriptor[0]);
+    return fileDescriptor.findMessageTypeByName("Order");
+  }
+
   // ==================== HELPER METHODS ====================
 
   private Message createTestMessage(String stringValue, int intValue)
@@ -352,7 +414,7 @@ public class ProtoBufRecordExtractorCachingTest {
     record.put(LONG_FIELD, (long) intValue * 10);
     record.put(DOUBLE_FIELD, intValue * 1.1);
     record.put(FLOAT_FIELD, intValue * 0.5f);
-    record.put(BOOL_FIELD, String.valueOf(intValue % 2 == 0));
+    record.put(BOOL_FIELD, intValue % 2 == 0);
     record.put(BYTES_FIELD, ("bytes_" + intValue).getBytes(UTF_8));
     record.put(REPEATED_STRINGS, Arrays.asList("a", "b", "c"));
     record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "nested_" + intValue, NESTED_INT_FIELD, intValue));

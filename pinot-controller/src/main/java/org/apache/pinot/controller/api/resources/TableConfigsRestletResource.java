@@ -198,8 +198,7 @@ public class TableConfigsRestletResource {
   @ManualAuthorization // performed after parsing table configs
   public ConfigSuccessResponse addConfig(
       String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
-          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders httpHeaders, @Context Request request)
@@ -240,13 +239,13 @@ public class TableConfigsRestletResource {
       }
 
       if (offlineTableConfig != null) {
-        tuneConfig(offlineTableConfig, schema);
+        applyTuning(offlineTableConfig, schema);
         if (!ignoreActiveTasks) {
           PinotTableRestletResource.tableTasksValidation(offlineTableConfig, _pinotHelixTaskResourceManager);
         }
       }
       if (realtimeTableConfig != null) {
-        tuneConfig(realtimeTableConfig, schema);
+        applyTuning(realtimeTableConfig, schema);
         if (!ignoreActiveTasks) {
           PinotTableRestletResource.tableTasksValidation(realtimeTableConfig, _pinotHelixTaskResourceManager);
         }
@@ -366,8 +365,7 @@ public class TableConfigsRestletResource {
   public ConfigSuccessResponse updateConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
       String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
-          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload,
@@ -408,7 +406,7 @@ public class TableConfigsRestletResource {
       LOGGER.info("Updated schema: {}", tableName);
 
       if (offlineTableConfig != null) {
-        tuneConfig(offlineTableConfig, schema);
+        applyTuning(offlineTableConfig, schema);
         if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
           _pinotHelixResourceManager.updateTableConfig(offlineTableConfig, forceTableSchemaUpdate);
           LOGGER.info("Updated offline table config: {}", tableName);
@@ -418,7 +416,7 @@ public class TableConfigsRestletResource {
         }
       }
       if (realtimeTableConfig != null) {
-        tuneConfig(realtimeTableConfig, schema);
+        applyTuning(realtimeTableConfig, schema);
         if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
           _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig, forceTableSchemaUpdate);
           LOGGER.info("Updated realtime table config: {}", tableName);
@@ -460,6 +458,47 @@ public class TableConfigsRestletResource {
           + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
+    Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
+        parseAndValidateTableConfigs(tableConfigsStr, typesToSkip, httpHeaders, request);
+    TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+    ObjectNode response = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
+    response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));
+    return response.toString();
+  }
+
+  /**
+   * Validates and tunes the {@link TableConfigs} as provided in the tableConfigsStr json, by applying tuner configs,
+   * ensuring min replicas and storage quota constraints, and returns the tuned TableConfigs.
+   */
+  @POST
+  @Path("/tableConfigs/tune")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Tune the TableConfigs",
+      notes = "Validates and applies tuning (tuner configs, min replicas, storage quota) to the TableConfigs, "
+          + "returning the result that would be stored on create/update")
+  @ManualAuthorization // performed after parsing TableConfigs
+  public String tuneConfig(String tableConfigsStr,
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
+          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
+      @Context Request request) {
+    Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
+        parseAndValidateTableConfigs(tableConfigsStr, typesToSkip, httpHeaders, request);
+    TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+    Schema schema = tableConfigs.getSchema();
+    if (tableConfigs.getOffline() != null) {
+      applyTuning(tableConfigs.getOffline(), schema);
+    }
+    if (tableConfigs.getRealtime() != null) {
+      applyTuning(tableConfigs.getRealtime(), schema);
+    }
+    ObjectNode response = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
+    response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));
+    return response.toString();
+  }
+
+  private Pair<TableConfigs, Map<String, Object>> parseAndValidateTableConfigs(String tableConfigsStr,
+      @Nullable String typesToSkip, HttpHeaders httpHeaders, Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     try {
       tableConfigsAndUnrecognizedProps =
@@ -475,6 +514,25 @@ public class TableConfigsRestletResource {
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
     tableConfigs.setTableName(rawTableName);
 
+    // Cluster-aware validations are exclusive to the validate/tune pre-flight endpoints so that users get fail-fast
+    // feedback on tenant/minion/active-task issues without re-running them in the create/update paths (which already
+    // perform the equivalent checks inline or via PinotHelixResourceManager).
+    Set<TableConfigUtils.ValidationType> skipTypes = TableConfigUtils.parseTypesToSkipString(typesToSkip);
+    try {
+      if (tableConfigs.getOffline() != null) {
+        validateClusterAwareConfig(tableConfigs.getOffline(), skipTypes);
+      }
+      if (tableConfigs.getRealtime() != null) {
+        validateClusterAwareConfig(tableConfigs.getRealtime(), skipTypes);
+      }
+    } catch (ControllerApplicationException e) {
+      // Already logged by the inner constructor; let it propagate as-is.
+      throw e;
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
+    }
+
     // validate permission
     String endpointUrl = request.getRequestURL().toString();
     AccessControl accessControl = _accessControlFactory.create();
@@ -482,14 +540,26 @@ public class TableConfigsRestletResource {
     if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
-
-    ObjectNode response = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
-    response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));
-    return response.toString();
+    return tableConfigsAndUnrecognizedProps;
   }
 
-  private void tuneConfig(TableConfig tableConfig, Schema schema) {
-    TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
+  private void validateClusterAwareConfig(TableConfig tableConfig, Set<TableConfigUtils.ValidationType> skipTypes) {
+    if (skipTypes.contains(TableConfigUtils.ValidationType.ALL)) {
+      return;
+    }
+    if (!skipTypes.contains(TableConfigUtils.ValidationType.TENANT)) {
+      _pinotHelixResourceManager.validateTableTenantConfig(tableConfig);
+    }
+    if (!skipTypes.contains(TableConfigUtils.ValidationType.MINION_INSTANCES)) {
+      _pinotHelixResourceManager.validateTableTaskMinionInstanceTagConfig(tableConfig);
+    }
+    if (!skipTypes.contains(TableConfigUtils.ValidationType.ACTIVE_TASKS)) {
+      PinotTableRestletResource.tableTasksValidation(tableConfig, _pinotHelixTaskResourceManager);
+    }
+  }
+
+  private void applyTuning(TableConfig tableConfig, Schema schema) {
+    TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Map.of());
     TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
@@ -515,8 +585,6 @@ public class TableConfigsRestletResource {
       Preconditions.checkState(rawTableName.equals(schemaName),
           "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
       SchemaUtils.validate(schema);
-      // Parse validation types to skip using TableConfigUtils method
-      Set<TableConfigUtils.ValidationType> skipTypes = TableConfigUtils.parseTypesToSkipString(typesToSkip);
       if (offlineTableConfig != null) {
         String offlineRawTableName = DatabaseUtils.translateTableName(
             TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName()), database);
@@ -524,17 +592,6 @@ public class TableConfigsRestletResource {
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
         TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip);
-        if (!skipTypes.contains(TableConfigUtils.ValidationType.ALL)) {
-          if (!skipTypes.contains(TableConfigUtils.ValidationType.TENANT)) {
-            _pinotHelixResourceManager.validateTableTenantConfig(offlineTableConfig);
-          }
-          if (!skipTypes.contains(TableConfigUtils.ValidationType.MINION_INSTANCES)) {
-            _pinotHelixResourceManager.validateTableTaskMinionInstanceTagConfig(offlineTableConfig);
-          }
-          if (!skipTypes.contains(TableConfigUtils.ValidationType.ACTIVE_TASKS)) {
-            PinotTableRestletResource.tableTasksValidation(offlineTableConfig, _pinotHelixTaskResourceManager);
-          }
-        }
         TaskConfigUtils.validateTaskConfigs(tableConfigs.getOffline(), schema, _pinotTaskManager, typesToSkip);
         TableConfigValidatorRegistry.validate(offlineTableConfig, schema);
       }
@@ -545,17 +602,6 @@ public class TableConfigsRestletResource {
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
         TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip);
-        if (!skipTypes.contains(TableConfigUtils.ValidationType.ALL)) {
-          if (!skipTypes.contains(TableConfigUtils.ValidationType.TENANT)) {
-            _pinotHelixResourceManager.validateTableTenantConfig(realtimeTableConfig);
-          }
-          if (!skipTypes.contains(TableConfigUtils.ValidationType.MINION_INSTANCES)) {
-            _pinotHelixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
-          }
-          if (!skipTypes.contains(TableConfigUtils.ValidationType.ACTIVE_TASKS)) {
-            PinotTableRestletResource.tableTasksValidation(realtimeTableConfig, _pinotHelixTaskResourceManager);
-          }
-        }
         TaskConfigUtils.validateTaskConfigs(tableConfigs.getRealtime(), schema, _pinotTaskManager, typesToSkip);
         TableConfigValidatorRegistry.validate(realtimeTableConfig, schema);
       }

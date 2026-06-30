@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.segment.index.bloom;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -28,7 +27,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloo
 import org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
@@ -53,7 +51,7 @@ import org.apache.pinot.spi.data.Schema;
 public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator> {
   public static final String INDEX_DISPLAY_NAME = "bloom";
   private static final List<String> EXTENSIONS =
-      Collections.singletonList(V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
   protected BloomIndexType() {
     super(StandardIndexes.BLOOM_FILTER_ID);
@@ -99,7 +97,7 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
   @Override
   public BloomFilterCreator createIndexCreator(IndexCreationContext context, BloomFilterConfig indexConfig) {
     int cardinality = context.getCardinality();
-    if (cardinality == Constants.UNKNOWN_CARDINALITY) {
+    if (cardinality < 0) {
       // This is when we're creating bloom filters for non dictionary encoded cols where exact cardinality is not
       // known beforehand.
       // Since this field is only used for the estimate cardinality, using total # of entries instead
@@ -119,6 +117,19 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       Schema schema, TableConfig tableConfig) {
     return new BloomFilterHandler(segmentDirectory, configsByCol, tableConfig, schema);
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, BloomFilterConfig indexConfig) {
+    // Bloom filters are computed by hashing column values directly, so the index does not need a dictionary.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, BloomFilterConfig indexConfig) {
+    // The on-disk bloom filter content is independent of dictionary presence (values are hashed, not dict IDs),
+    // so enabling/disabling the dictionary does not require rebuilding it.
+    return false;
   }
 
   @Override

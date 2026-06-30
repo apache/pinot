@@ -21,10 +21,10 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
@@ -193,7 +193,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
   protected TableTaskConfig getPurgeTaskConfig() {
     Map<String, String> tableTaskConfigs = new HashMap<>();
     tableTaskConfigs.put(MinionConstants.PurgeTask.LAST_PURGE_TIME_THREESOLD_PERIOD, "1d");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
   }
 
   /**
@@ -203,7 +203,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
   public void testFirstRunPurge()
       throws Exception {
     // Expected purge task generation :
-    // 1. No previous purge run so all segment should be processed and purge metadata sould be added to the segments
+    // 1. No previous purge run so all segment should be processed and purge metadata should be added to the segments
     // 2. Check that we cannot run on same time two purge generation ensuring running segment will be skipped
     // 3. Check segment ZK metadata to ensure purge time is updated into the metadata
     // 4. Check after the first run of the purge if we rerun a purge task generation no task should be scheduled
@@ -211,14 +211,14 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_FIRST_RUN_TABLE);
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName)))
+            .setTablesToSchedule(Set.of(offlineTableName)))
         .get(MinionConstants.PurgeTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
     // Will not schedule task if there's incomplete task
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.PurgeTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
         _taskManager);
     waitForTaskToComplete();
 
@@ -230,8 +230,8 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     }
     // Should not generate new purge task as the last time purge is not greater than last + 1day (default purge delay)
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.PurgeTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
         _taskManager);
 
     // 52 rows with ArrTime = 1
@@ -264,14 +264,14 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_DELTA_PASSED_TABLE);
     assertNotNull(
         _taskManager.scheduleTasks(new TaskSchedulingContext()
-                .setTablesToSchedule(Collections.singleton(offlineTableName)))
+                .setTablesToSchedule(Set.of(offlineTableName)))
             .get(MinionConstants.PurgeTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
     // Will not schedule task if there's incomplete task
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.PurgeTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
         _taskManager);
     waitForTaskToComplete();
 
@@ -285,8 +285,8 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     }
     // Should not generate new purge task as the last time purge is not greater than last + 1day (default purge delay)
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.PurgeTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
         _taskManager);
 
     // 52 rows with ArrTime = 1
@@ -320,8 +320,8 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     // No task should be schedule as the delay is not passed
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.PurgeTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
         _taskManager);
     for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
       // Check purge time
@@ -374,13 +374,13 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // schedule purge tasks
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName)))
+            .setTablesToSchedule(Set.of(offlineTableName)))
         .get(MinionConstants.PurgeTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.PurgeTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
         _taskManager);
     waitForTaskToComplete();
 
@@ -426,7 +426,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     // First run: Schedule purge task to create empty segments
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName)))
+            .setTablesToSchedule(Set.of(offlineTableName)))
         .get(MinionConstants.PurgeTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
@@ -448,7 +448,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     // Second run: Schedule purge task again - this should delete the empty segments during task generation
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName)))
+            .setTablesToSchedule(Set.of(offlineTableName)))
         .get(MinionConstants.PurgeTask.TASK_TYPE));
 
     // Wait for second task to complete (if any tasks were generated)
@@ -493,7 +493,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     // First run: Schedule purge task to create empty segments
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(realtimeTableName)))
+            .setTablesToSchedule(Set.of(realtimeTableName)))
         .get(MinionConstants.PurgeTask.TASK_TYPE));
 
     // Wait for first task to complete
@@ -518,7 +518,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     // Second run: Schedule purge task again - this should delete empty non-last segments but preserve last segments
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(realtimeTableName)))
+            .setTablesToSchedule(Set.of(realtimeTableName)))
         .get(MinionConstants.PurgeTask.TASK_TYPE));
 
     // Wait for second task to complete

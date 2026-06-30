@@ -20,96 +20,23 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.EmptyColumnShape;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// Column statistics for an empty column (zero rows).
-@SuppressWarnings("rawtypes")
-public class EmptyColumnStatistics implements ColumnStatistics {
-  private final FieldSpec _fieldSpec;
-  private final PartitionFunction _partitionFunction;
-  private final Set<Integer> _partitions;
+public class EmptyColumnStatistics extends EmptyColumnShape implements ColumnStatistics {
 
-  // TODO: Revisit if we need to maintain partition info for empty columns
   public EmptyColumnStatistics(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
       @Nullable Set<Integer> partitions) {
-    _fieldSpec = fieldSpec;
-    _partitionFunction = partitionFunction;
-    _partitions = partitions;
-  }
-
-  @Override
-  public FieldSpec getFieldSpec() {
-    return _fieldSpec;
-  }
-
-  @Nullable
-  @Override
-  public Comparable getMinValue() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public Comparable getMaxValue() {
-    return null;
+    super(fieldSpec, partitionFunction, partitions);
   }
 
   @Nullable
   @Override
   public Object getUniqueValuesSet() {
     return null;
-  }
-
-  @Override
-  public int getCardinality() {
-    return 0;
-  }
-
-  @Override
-  public int getLengthOfShortestElement() {
-    DataType valueType = getValueType();
-    return valueType.isFixedWidth() ? valueType.size() : 0;
-  }
-
-  @Override
-  public int getLengthOfLongestElement() {
-    DataType valueType = getValueType();
-    return valueType.isFixedWidth() ? valueType.size() : 0;
-  }
-
-  @Override
-  public boolean isSorted() {
-    return isSingleValue();
-  }
-
-  @Override
-  public int getTotalNumberOfEntries() {
-    return 0;
-  }
-
-  @Override
-  public int getMaxNumberOfMultiValues() {
-    return 0;
-  }
-
-  @Override
-  public int getMaxRowLengthInBytes() {
-    return 0;
-  }
-
-  @Nullable
-  @Override
-  public PartitionFunction getPartitionFunction() {
-    return _partitionFunction;
-  }
-
-  @Nullable
-  @Override
-  public Set<Integer> getPartitions() {
-    return _partitions;
   }
 }

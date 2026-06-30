@@ -20,7 +20,6 @@ package org.apache.pinot.connector.flink.sink;
 
 import com.google.common.collect.Lists;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,7 +79,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     batchConfigs.put(BatchConfigProperties.PUSH_CONTROLLER_URI, getControllerBaseApiUrl());
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(
-        new BatchIngestionConfig(Collections.singletonList(batchConfigs), "APPEND", "HOURLY"));
+        new BatchIngestionConfig(List.of(batchConfigs), "APPEND", "HOURLY"));
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setIngestionConfig(ingestionConfig)
             .build();
@@ -114,8 +113,8 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     // Single-thread write
     StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
     execEnv.setParallelism(1);
-    DataStream<Row> srcDs = execEnv.fromCollection(_data).returns(_typeInfo);
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
+    DataStream<Row> srcDs = execEnv.fromData(_data, _typeInfo);
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
     execEnv.execute();
     verifySegments(1, 6);
 
@@ -124,8 +123,8 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     // Parallel write
     execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
     execEnv.setParallelism(2);
-    srcDs = execEnv.fromCollection(_data).returns(_typeInfo).keyBy(r -> r.getField(0));
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
+    srcDs = execEnv.fromData(_data, _typeInfo).keyBy(r -> r.getField(0));
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
     execEnv.execute();
     verifySegments(2, 6);
   }

@@ -35,6 +35,7 @@ import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -63,7 +64,6 @@ public enum AggregationFunctionType {
   SUMINT("sumInt", ReturnTypes.AGG_SUM, OperandTypes.INTEGER),
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
-  // TODO: Support MV types after next release (see https://github.com/apache/pinot/pull/17109)
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
@@ -168,8 +168,9 @@ public enum AggregationFunctionType {
   STUNION("STUnion", ReturnTypes.VARBINARY, OperandTypes.BINARY, SqlTypeName.OTHER),
 
   // boolean aggregate functions
-  BOOLAND("boolAnd", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.INTEGER),
-  BOOLOR("boolOr", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.INTEGER),
+  // Intermediate result type is BOOLEAN, serialized through its stored type (INT).
+  BOOLAND("boolAnd", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.BOOLEAN),
+  BOOLOR("boolOr", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.BOOLEAN),
 
   // ExprMin and ExprMax
   // TODO: revisit support for ExprMin/Max count in V2, particularly plug query rewriter in the right place
@@ -355,7 +356,7 @@ public enum AggregationFunctionType {
   }
 
   public static String getNormalizedAggregationFunctionName(String functionName) {
-    return StringUtils.remove(StringUtils.remove(functionName, '_').toUpperCase(), "$");
+    return Strings.CS.remove(StringUtils.remove(functionName, '_').toUpperCase(), "$");
   }
 
   /**

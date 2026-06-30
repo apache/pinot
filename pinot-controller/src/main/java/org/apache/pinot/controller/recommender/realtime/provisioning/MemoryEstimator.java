@@ -456,7 +456,7 @@ public class MemoryEstimator {
   }
 
   /**
-   * This class is used in Memory Estimator to generate segment based on the the given characteristics of data
+   * This class is used in Memory Estimator to generate segment based on the given characteristics of data
    */
   public static class SegmentGenerator {
     private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerator.class);

@@ -33,6 +33,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.realtime.ServerIngestionOomProtectionManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -82,7 +83,9 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
       ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      BooleanSupplier isServerReadyToConsumeData,
       BooleanSupplier isServerReadyToServeQueries,
+      ServerIngestionOomProtectionManager.ServerThrottleState serverIngestionOomProtectionThrottleState,
       boolean enableAsyncSegmentRefresh,
       ServerReloadJobStatusCache reloadJobStatusCache) {
     TableDataManager tableDataManager;
@@ -115,8 +118,8 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
           }
         }
         tableDataManager =
-            new FailureInjectingRealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToServeQueries,
-                failureInjectingTableConfig);
+            new FailureInjectingRealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToConsumeData,
+                isServerReadyToServeQueries, serverIngestionOomProtectionThrottleState, failureInjectingTableConfig);
         break;
       default:
         throw new IllegalStateException();

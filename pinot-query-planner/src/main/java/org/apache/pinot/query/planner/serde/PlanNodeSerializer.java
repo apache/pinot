@@ -287,7 +287,9 @@ public class PlanNodeSerializer {
           .addAllArrayExprs(convertExpressions(node.getArrayExprs()))
           .setWithOrdinality(context.isWithOrdinality())
           .addAllElementIndexes(context.getElementIndexes())
-          .setOrdinalityIndex(context.getOrdinalityIndex());
+          .setOrdinalityIndex(context.getOrdinalityIndex())
+          .addAllPassthroughInputIndexes(context.getPassthroughInputIndexes())
+          .setPrunedPassthrough(context.isPrunedPassthrough());
       builder.setUnnestNode(unnestNodeBuilder.build());
       return null;
     }

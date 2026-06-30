@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -60,7 +60,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
     assertEquals(instanceConfig.getPort(), "1234");
-    assertEquals(instanceConfig.getTags(), Collections.singleton(CONTROLLER_INSTANCE));
+    assertEquals(instanceConfig.getTags(), Set.of(CONTROLLER_INSTANCE));
 
     stopController();
     stopZk();
@@ -101,7 +101,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
     assertEquals(instanceConfig.getPort(), "1234");
-    assertEquals(instanceConfig.getTags(), Collections.singleton(CONTROLLER_INSTANCE));
+    assertEquals(instanceConfig.getTags(), Set.of(CONTROLLER_INSTANCE));
 
     stopController();
     stopZk();

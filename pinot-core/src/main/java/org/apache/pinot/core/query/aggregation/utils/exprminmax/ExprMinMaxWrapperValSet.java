@@ -18,89 +18,102 @@
  */
 package org.apache.pinot.core.query.aggregation.utils.exprminmax;
 
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
  * Wrapper class for the value sets of the column to do exprmin/max on.
  * This class is used for type-generic implementation of exprmin/max.
  */
+@SuppressWarnings("rawtypes")
 public class ExprMinMaxWrapperValSet {
-  protected final DataSchema.ColumnDataType _dataType;
-  boolean _isSingleValue;
+  final ColumnDataType _storedType;
   int[] _intValues;
   long[] _longValues;
   float[] _floatValues;
   double[] _doublesValues;
-  Object[] _objectsValues;
+  Comparable[] _objectsValues;
   int[][] _intValuesMV;
   long[][] _longValuesMV;
   float[][] _floatValuesMV;
   double[][] _doublesValuesMV;
-  Object[][] _objectsValuesMV;
+  Comparable[][] _objectsValuesMV;
 
-  public ExprMinMaxWrapperValSet(
-      DataSchema.ColumnDataType dataType, boolean isSingleValue) {
-    _dataType = dataType;
-    _isSingleValue = isSingleValue;
+  public ExprMinMaxWrapperValSet(ColumnDataType storedType) {
+    _storedType = storedType;
+  }
+
+  public ColumnDataType getStoredType() {
+    return _storedType;
   }
 
   public void setNewBlock(BlockValSet blockValSet) {
-    if (_isSingleValue) {
-      switch (_dataType) {
-        case INT:
-        case BOOLEAN:
-          _intValues = blockValSet.getIntValuesSV();
-          break;
-        case LONG:
-        case TIMESTAMP:
-          _longValues = blockValSet.getLongValuesSV();
-          break;
-        case FLOAT:
-          _floatValues = blockValSet.getFloatValuesSV();
-          break;
-        case DOUBLE:
-          _doublesValues = blockValSet.getDoubleValuesSV();
-          break;
-        case STRING:
-        case JSON:
-          _objectsValues = blockValSet.getStringValuesSV();
-          break;
-        case BIG_DECIMAL:
-          _objectsValues = blockValSet.getBigDecimalValuesSV();
-          break;
-        case BYTES:
-          _objectsValues = blockValSet.getBytesValuesSV();
-          break;
-        default:
-          throw new IllegalStateException("Unsupported data type: " + _dataType);
+    switch (_storedType) {
+      case INT:
+        _intValues = blockValSet.getIntValuesSV();
+        break;
+      case LONG:
+        _longValues = blockValSet.getLongValuesSV();
+        break;
+      case FLOAT:
+        _floatValues = blockValSet.getFloatValuesSV();
+        break;
+      case DOUBLE:
+        _doublesValues = blockValSet.getDoubleValuesSV();
+        break;
+      case BIG_DECIMAL:
+        _objectsValues = blockValSet.getBigDecimalValuesSV();
+        break;
+      case STRING:
+        _objectsValues = blockValSet.getStringValuesSV();
+        break;
+      case BYTES: {
+        // Wrap to ByteArray so values stay Comparable and match the DataTable BYTES serialization convention.
+        byte[][] bytesSV = blockValSet.getBytesValuesSV();
+        ByteArray[] byteArrays = new ByteArray[bytesSV.length];
+        for (int i = 0; i < bytesSV.length; i++) {
+          byteArrays[i] = new ByteArray(bytesSV[i]);
+        }
+        _objectsValues = byteArrays;
+        break;
       }
-    } else {
-      switch (_dataType) {
-        case INT_ARRAY:
-        case BOOLEAN_ARRAY:
-          _intValuesMV = blockValSet.getIntValuesMV();
-          break;
-        case LONG_ARRAY:
-        case TIMESTAMP_ARRAY:
-          _longValuesMV = blockValSet.getLongValuesMV();
-          break;
-        case FLOAT_ARRAY:
-          _floatValuesMV = blockValSet.getFloatValuesMV();
-          break;
-        case DOUBLE_ARRAY:
-          _doublesValuesMV = blockValSet.getDoubleValuesMV();
-          break;
-        case STRING_ARRAY:
-          _objectsValuesMV = blockValSet.getStringValuesMV();
-          break;
-        case BYTES_ARRAY:
-          _objectsValuesMV = blockValSet.getBytesValuesMV();
-          break;
-        default:
-          throw new IllegalStateException("Unsupported data type: " + _dataType);
+      case INT_ARRAY:
+        _intValuesMV = blockValSet.getIntValuesMV();
+        break;
+      case LONG_ARRAY:
+        _longValuesMV = blockValSet.getLongValuesMV();
+        break;
+      case FLOAT_ARRAY:
+        _floatValuesMV = blockValSet.getFloatValuesMV();
+        break;
+      case DOUBLE_ARRAY:
+        _doublesValuesMV = blockValSet.getDoubleValuesMV();
+        break;
+      case BIG_DECIMAL_ARRAY:
+        _objectsValuesMV = blockValSet.getBigDecimalValuesMV();
+        break;
+      case STRING_ARRAY:
+        _objectsValuesMV = blockValSet.getStringValuesMV();
+        break;
+      case BYTES_ARRAY: {
+        // Wrap to ByteArray[] so values match the DataTable BYTES_ARRAY serialization convention.
+        byte[][][] bytesMV = blockValSet.getBytesValuesMV();
+        ByteArray[][] byteArraysMV = new ByteArray[bytesMV.length][];
+        for (int i = 0; i < bytesMV.length; i++) {
+          byte[][] value = bytesMV[i];
+          ByteArray[] byteArrays = new ByteArray[value.length];
+          for (int j = 0; j < value.length; j++) {
+            byteArrays[j] = new ByteArray(value[j]);
+          }
+          byteArraysMV[i] = byteArrays;
+        }
+        _objectsValuesMV = byteArraysMV;
+        break;
       }
+      default:
+        throw new IllegalStateException("Unsupported stored type: " + _storedType);
     }
   }
 }

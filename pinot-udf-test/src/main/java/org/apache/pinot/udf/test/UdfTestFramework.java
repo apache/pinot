@@ -215,7 +215,7 @@ public class UdfTestFramework {
       switch (this) {
         case EQUAL:
           if (expected instanceof Double && actual instanceof Double
-            && !doubleEquals((Double) expected, (Double) actual)) {
+              && !doubleEquals((Double) expected, (Double) actual)) {
             throw new AssertionError(describeDiscrepancy(expected, actual));
           }
           if (!Objects.equals(expected, actual)) {

@@ -117,7 +117,7 @@ public class RemoteClusterBrokerRoutingManager extends BaseBrokerRoutingManager 
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while dropping routing for table: {} in cluster: {}", table, _remoteClusterName,
-        e);
+          e);
     }
   }
 

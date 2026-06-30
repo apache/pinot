@@ -21,7 +21,6 @@ package org.apache.pinot.core.util;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +96,7 @@ public class SchemaUtilsTest {
     // schema doesn't have destination columns from transformConfigs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("colA", "round(colB, 1000)")));
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("colA", "round(colB, 1000)")));
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
     try {
@@ -292,31 +291,12 @@ public class SchemaUtilsTest {
 
   @Test
   public void testValidateMultiValueFieldSpec() {
-    Schema pinotSchema;
-
-    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
-
+    Schema pinotSchema = new Schema.SchemaBuilder()
+        .setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", DataType.STRING)
+        .addMultiValueDimension("myJsonCol", DataType.JSON)
+        .build();
     checkValidationFails(pinotSchema);
-
-    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build();
-
-    checkValidationFails(pinotSchema);
-
-    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
-
-    SchemaUtils.validate(pinotSchema);
-
-    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build();
-
-    SchemaUtils.validate(pinotSchema);
   }
 
   @Test

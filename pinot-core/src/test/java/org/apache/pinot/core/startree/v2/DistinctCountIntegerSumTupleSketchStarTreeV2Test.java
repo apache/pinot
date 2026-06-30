@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.Union;
@@ -36,7 +36,7 @@ public class DistinctCountIntegerSumTupleSketchStarTreeV2Test extends BaseStarTr
 
   @Override
   ValueAggregator<byte[], Object> getValueAggregator() {
-    return new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+    return new IntegerTupleSketchValueAggregator(List.of(), IntegerSummary.Mode.Sum);
   }
 
   @Override

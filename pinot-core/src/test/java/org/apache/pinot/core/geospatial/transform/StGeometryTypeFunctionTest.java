@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.geospatial.transform;
 
-import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
@@ -41,16 +41,16 @@ public class StGeometryTypeFunctionTest extends GeoFunctionTest {
       throws Exception {
     // assert geometry
     assertStringFunction(String.format("ST_GeometryType(ST_GeomFromText(%s))", STRING_SV_COLUMN), new String[]{type},
-        Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{wkt})));
+        List.of(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{wkt})));
 
     // assert geography
     assertStringFunction(String.format("ST_GeometryType(ST_GeogFromText(%s))", STRING_SV_COLUMN), new String[]{type},
-        Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{wkt})));
+        List.of(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{wkt})));
   }
 
   @Test
   public void testGeoJsonConversion()
-  throws Exception {
+      throws Exception {
     assertGeoType("{\n \"type\": \"Point\",\n \"coordinates\": [100.0, 0.0]\n }", "Point");
 
     assertGeoType("{\n"
@@ -141,13 +141,13 @@ public class StGeometryTypeFunctionTest extends GeoFunctionTest {
   }
 
   private void assertGeoType(String geoJson, String type)
-  throws Exception {
+      throws Exception {
     // assert geometry
     assertStringFunction(String.format("ST_GeometryType(ST_GeomFromGeoJSON(%s))", STRING_SV_COLUMN), new String[]{type},
-        Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{geoJson})));
+        List.of(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{geoJson})));
 
     // assert geography
     assertStringFunction(String.format("ST_GeometryType(ST_GeogFromGeoJSON(%s))", STRING_SV_COLUMN), new String[]{type},
-        Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{geoJson})));
+        List.of(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{geoJson})));
   }
 }

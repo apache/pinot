@@ -1,0 +1,1000 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.materializedview.scheduler;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
+import org.apache.helix.store.HelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.materializedview.analysis.MaterializedViewAnalyzer;
+import org.apache.pinot.materializedview.context.MaterializedViewTaskGeneratorContext;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata.MaterializedViewSplitSpec;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataUtils;
+import org.apache.pinot.materializedview.metadata.MaterializedViewPartitionManager;
+import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadata;
+import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
+import org.apache.pinot.materializedview.metadata.PartitionFingerprint;
+import org.apache.pinot.materializedview.metadata.PartitionInfo;
+import org.apache.pinot.materializedview.metadata.PartitionState;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
+import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+/// Task generator for [MaterializedViewTask].
+///
+/// Unlike segment-conversion tasks, this generator does not scan source segments. It only
+/// computes a time window and appends it to the user-defined SQL, producing a
+/// [PinotTaskConfig] for the executor.
+///
+/// Two-step decision logic (evaluated per table, per schedule cycle):
+///
+///   - **Overwrite STALE** – If any partition is marked [PartitionState#STALE]
+///       (by the event-driven `MaterializedViewConsistencyManager`), the generator
+///       performs a precise fingerprint verification. If the data truly changed, it generates
+///       an `OVERWRITE` task for the earliest stale partition. If the fingerprint
+///       matches (false positive), the partition is reverted to [PartitionState#VALID].
+///       This step has the highest priority to maintain consistency.
+///   - **Append** – If no STALE partitions exist and the watermark can advance (next
+///       window is outside the buffer period), generate a normal `APPEND` task.
+///
+///
+/// Dirty marking (STALE detection) is handled externally by
+/// `MaterializedViewConsistencyManager`, which reacts to base table segment changes
+/// (add, replace, delete) and proactively marks affected partitions in
+/// [MaterializedViewRuntimeMetadata].
+///
+/// <h3>Partition model (TIME-WINDOWED ONLY in PR 1)</h3>
+///
+/// All selection logic assumes time-windowed partitions of fixed width `bucketTimePeriod`:
+/// the watermark is `long ms`, APPEND windows are `[watermarkMs, watermarkMs+bucketMs)`, and
+/// the per-window source-time predicate is spliced into the SQL via text manipulation. A
+/// future fixed-partition MV will need a different selection strategy (FIFO over STALE
+/// partitions keyed by categorical id, no time arithmetic, no watermark advance) — see
+/// `pinot-materialized-view/DESIGN.md`. The minion executor itself is partition-shape
+/// neutral: it runs whichever SQL the scheduler emits.
+public class MaterializedViewTaskScheduler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MaterializedViewTaskScheduler.class);
+
+  /// Identifier pattern used to validate a column name before it is interpolated into the
+  /// time-range filter SQL fragment.  Compiled once to avoid recompiling on every call.
+  private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("[A-Za-z_][A-Za-z0-9_.]*");
+
+  /// Compile-time default for the APPEND batch-scheduling-loop iteration cap. Overridable
+  /// per cluster (no restart) via `MaterializedViewTask.CLUSTER_CONFIG_KEY_MAX_BATCH_LOOP_ITERATIONS`.
+  /// Sized to comfortably exceed any realistic `availableSlots + partitionInfos.size()`
+  /// for production MVs (a 10-year hourly MV has ~88k partitions, a 30-year daily MV ~11k);
+  /// pathological maps beyond that stop the loop early so the scheduler can recover on the
+  /// next cycle. Distinct from [MaterializedViewTask#MAX_TASKS_PER_BATCH_USER_CAP],
+  /// which is the user-facing upper bound on the `maxTasksPerBatch` table-config value.
+  static final int DEFAULT_MAX_BATCH_LOOP_ITERATIONS = 100_000;
+
+  private final MaterializedViewTaskGeneratorContext _context;
+
+  public MaterializedViewTaskScheduler(MaterializedViewTaskGeneratorContext context) {
+    _context = context;
+  }
+
+  public String getTaskType() {
+    return MaterializedViewTask.TASK_TYPE;
+  }
+
+  public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+    String taskType = MaterializedViewTask.TASK_TYPE;
+    List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+
+    for (TableConfig tableConfig : tableConfigs) {
+      String offlineTableName = tableConfig.getTableName();
+
+      if (!tableConfig.isMaterializedView()) {
+        LOGGER.warn("Skip generating task: {} for table: {} because isMaterializedView is not set",
+            taskType, offlineTableName);
+        continue;
+      }
+
+      if (tableConfig.getTableType() != TableType.OFFLINE) {
+        LOGGER.warn("Skip generating task: {} for non-OFFLINE table: {}", taskType, offlineTableName);
+        continue;
+      }
+      LOGGER.info("Start generating task configs for table: {} for task: {}", offlineTableName, taskType);
+
+      TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
+      Preconditions.checkState(tableTaskConfig != null);
+      Map<String, String> taskConfigs = tableTaskConfig.getConfigsForTaskType(taskType);
+      Preconditions.checkState(taskConfigs != null, "Task config shouldn't be null for table: %s", offlineTableName);
+
+      String definedSQL = taskConfigs.get(MaterializedViewTask.DEFINED_SQL_KEY);
+      Preconditions.checkState(definedSQL != null && !definedSQL.isEmpty(),
+          "definedSQL must be specified for table: %s", offlineTableName);
+
+      String sourceTableName = MaterializedViewAnalyzer.extractSourceTableName(definedSQL);
+      String sourceTableWithType = resolveSourceTableNameWithType(sourceTableName);
+
+      // Bucket and buffer.  bucketTimePeriod is required (validated by MaterializedViewAnalyzer
+      // at create time; re-checked here so a hand-edited table config does not silently fall
+      // back to an implicit default).
+      String bucketTimePeriod = taskConfigs.get(MaterializedViewTask.BUCKET_TIME_PERIOD_KEY);
+      Preconditions.checkState(bucketTimePeriod != null && !bucketTimePeriod.isEmpty(),
+          "MaterializedViewTask requires '%s' to be set on table: %s",
+          MaterializedViewTask.BUCKET_TIME_PERIOD_KEY, offlineTableName);
+      long bucketMs = TimeUtils.convertPeriodToMillis(bucketTimePeriod);
+      String bufferTimePeriod =
+          taskConfigs.getOrDefault(MaterializedViewTask.BUFFER_TIME_PERIOD_KEY, "0d");
+      long bufferMs = TimeUtils.convertPeriodToMillis(bufferTimePeriod);
+      Preconditions.checkState(bufferMs >= 0,
+          "bufferTimePeriod must be non-negative for table: %s, got: %s",
+          offlineTableName, bufferTimePeriod);
+
+      String maxTasksPerBatchStr = taskConfigs.getOrDefault(
+          MaterializedViewTask.MAX_TASKS_PER_BATCH_KEY,
+          String.valueOf(MaterializedViewTask.DEFAULT_MAX_TASKS_PER_BATCH));
+      int maxTasksPerBatch;
+      try {
+        maxTasksPerBatch = Integer.parseInt(maxTasksPerBatchStr);
+      } catch (NumberFormatException e) {
+        throw new IllegalStateException(
+            "Invalid maxTasksPerBatch '" + maxTasksPerBatchStr + "' for table: " + offlineTableName, e);
+      }
+      Preconditions.checkState(maxTasksPerBatch >= 1,
+          "maxTasksPerBatch must be >= 1 for table: %s, got: %s", offlineTableName, maxTasksPerBatch);
+
+      // Resolve the effective LIMIT once via the AST. The user-declared value is used when
+      // present; otherwise DEFAULT_MATERIALIZED_VIEW_QUERY_LIMIT (a bounded cap, not Integer.MAX_VALUE).
+      // Both values flow downstream: (a) appended to the broker SQL so the broker's silent
+      // default-LIMIT-of-10 cannot truncate, and (b) stored in EFFECTIVE_LIMIT_KEY so the
+      // executor's saturation gate fires if a window's result set saturates the cap.
+      Optional<Integer> declaredLimit = MaterializedViewAnalyzer.tryExtractDeclaredLimit(definedSQL);
+      boolean userDeclaredLimit = declaredLimit.isPresent();
+      // The analyzer's create-time validation guarantees any present LIMIT is positive
+      // (and at most MAX_MATERIALIZED_VIEW_QUERY_LIMIT, currently 100_000_000); the orElse default
+      // is also positive. effectiveLimit > 0 holds.
+      int defaultLimit = MaterializedViewTaskUtils.readPositiveIntClusterConfigOrDefault(
+          _context::getClusterConfig,
+          MaterializedViewTask.CLUSTER_CONFIG_KEY_DEFAULT_QUERY_LIMIT,
+          MaterializedViewTask.DEFAULT_MATERIALIZED_VIEW_QUERY_LIMIT);
+      int effectiveLimit = declaredLimit.orElse(defaultLimit);
+
+      // Load watermarkMs and partitionInfos from MaterializedViewRuntimeMetadata
+      String viewTableWithType = TableNameBuilder.OFFLINE.tableNameWithType(offlineTableName);
+      HelixPropertyStore<ZNRecord> propertyStore = _context.getPropertyStore();
+      long watermarkMs = getWatermarkMs(offlineTableName, sourceTableName, bucketMs, definedSQL, taskConfigs);
+
+      Stat rtStat = new Stat();
+      MaterializedViewRuntimeMetadata runtime = MaterializedViewRuntimeMetadataUtils.fetchWithVersion(
+          propertyStore, viewTableWithType, rtStat);
+      Map<Long, PartitionInfo> partitionInfos = new HashMap<>();
+      int runtimeVersion = -1;
+      if (runtime != null) {
+        partitionInfos = new HashMap<>(runtime.getPartitions());
+        runtimeVersion = rtStat.getVersion();
+      }
+
+      // Walk the in-flight task configs ONCE and bucket per-mode. APPEND tasks must not
+      // starve DELETE/OVERWRITE (and vice versa) — they have independent gates. We also
+      // track the highest in-flight APPEND windowEnd so we know where to start new ones.
+      InFlightTaskCounts counts = countInFlightTasks(offlineTableName, taskType, watermarkMs);
+
+      // ── Step 1: Handle STALE partitions ──
+      // Under Design C there is no separate EXPIRED state.  When the scheduler finds a STALE
+      // partition it re-computes the source fingerprint and dispatches one of:
+      //   - DELETE task: source data is gone (segmentCount == 0) — drop MV segments and rewrite
+      //     the entry to VALID-empty (the executor re-checks emptiness at commit and leaves the
+      //     entry STALE if the source was backfilled in the meantime)
+      //   - revert to VALID: fingerprint matches the stored value (false positive STALE marking)
+      //   - OVERWRITE task: source changed — re-materialize the partition
+      if (counts.exclusiveModeCount() > 0) {
+        LOGGER.debug("Found {} in-flight DELETE/{} OVERWRITE tasks for table: {}; skipping",
+            counts._inFlightDeleteCount.get(), counts._inFlightOverwriteCount.get(), offlineTableName);
+      } else {
+        PinotTaskConfig staleTask = tryHandleStalePartition(offlineTableName, sourceTableName,
+            sourceTableWithType, definedSQL, taskConfigs, partitionInfos, bucketMs,
+            effectiveLimit, userDeclaredLimit);
+        if (staleTask != null) {
+          pinotTaskConfigs.add(staleTask);
+          LOGGER.info("Generated {} task for table: {}",
+              staleTask.getConfigs().get(MaterializedViewTask.TASK_MODE_KEY), offlineTableName);
+          continue;
+        }
+      }
+
+      // ── Step 2: Append new data — schedule up to maxTasksPerBatch windows ──
+      int inFlightAppend = counts._inFlightAppendCount.get();
+      int availableSlots = maxTasksPerBatch - inFlightAppend;
+      if (availableSlots <= 0) {
+        LOGGER.debug("MV table {} already has {} in-flight APPEND tasks (max={}); skipping",
+            offlineTableName, inFlightAppend, maxTasksPerBatch);
+        continue;
+      }
+      // Start scheduling from the max of (a) highest in-flight APPEND windowEnd and
+      // (b) highest contiguous VALID upper from partitionInfos. (b) prevents replay of
+      // already-VALID windows when a previous batch had a mid-batch failure that left
+      // some windows VALID and others FAILED — the in-flight set is then empty but
+      // some windows past `watermarkMs` are already done.
+      long contiguousValidUpper = MaterializedViewTaskUtils.computeContiguousUpperMs(
+          watermarkMs, partitionInfos, bucketMs);
+      long maxInFlightAppendWindowEndMs =
+          Math.max(counts._maxInFlightAppendWindowEndMs.get(), contiguousValidUpper);
+
+      // Start scheduling from the end of the highest in-flight window to avoid duplicates.
+      // Floor-align to bucketMs in case an in-flight task was scheduled under a different
+      // bucketTimePeriod (operator changed config mid-flight); the partition map is keyed by
+      // aligned starts, so a misaligned nextWindowStartMs would miss VALID-skip lookups.
+      long nextWindowStartMs = Math.floorDiv(maxInFlightAppendWindowEndMs, bucketMs) * bucketMs;
+
+      // Resolve the APPEND cutoff in two stages so steady-state cycles do not pay a ZK list
+      // call. Stage 1: rough cutoff = `now - bufferMs`. If the next window already lies past
+      // it, no scheduling work is possible regardless of source state, so we fall through to
+      // the loop where the first iteration breaks immediately — and the source-segment
+      // fetch below is skipped. Stage 2: when stage 1 admits at least one candidate bucket,
+      // fetch source segments once and tighten the cutoff by the end of the source data
+      // (see resolveAppendCutoffMs). The tighter cap matters because without it the scheduler
+      // would walk past the actual data tail (each empty bucket completes with zero rows,
+      // executor persists a VALID-empty partition + advances watermark), so `watermarkMs`
+      // would drift toward `now - bufferMs` even when source ingestion has stalled —
+      // defeating the staleness-threshold contract the broker uses in
+      // `now - watermarkMs <= stalenessThresholdMs`. See
+      // `MaterializedViewQueryRewriteEngine#isEligible`.
+      long roughCutoffMs = System.currentTimeMillis() - bufferMs;
+      long cutoffMs;
+      if (nextWindowStartMs + bucketMs > roughCutoffMs) {
+        // No bucket can fit before the rough cutoff. Skip the ZK fetch — the loop below
+        // will break on its first iteration and the caught-up log will fire.
+        cutoffMs = roughCutoffMs;
+      } else {
+        long maxSourceEndMs =
+            computeMaxSourceEndTimeMs(_context.getSegmentsZKMetadata(sourceTableWithType));
+        cutoffMs = resolveAppendCutoffMs(roughCutoffMs, maxSourceEndMs);
+      }
+      int scheduled = 0;
+
+      // Hard cap on iterations to defend against pathological partition maps. The loop
+      // advances nextWindowStartMs by bucketMs each iteration, so a finite cutoff bounds it,
+      // but skipping VALID slots could still in principle iterate forever if the cutoff is
+      // far in the future. Cap at availableSlots + partitionInfos.size() — any more is a bug.
+      // Also clamp at DEFAULT_MAX_BATCH_LOOP_ITERATIONS (or its cluster-config override) so an MV
+      // table accumulating years of VALID partitions doesn't burn unbounded CPU per cycle.
+      int maxBatchLoopIterations = MaterializedViewTaskUtils.readPositiveIntClusterConfigOrDefault(
+          _context::getClusterConfig,
+          MaterializedViewTask.CLUSTER_CONFIG_KEY_MAX_BATCH_LOOP_ITERATIONS,
+          DEFAULT_MAX_BATCH_LOOP_ITERATIONS);
+      int maxIterations = Math.min(availableSlots + partitionInfos.size(), maxBatchLoopIterations);
+      int iterations = 0;
+      while (scheduled < availableSlots && iterations < maxIterations) {
+        iterations++;
+        long windowEndMs = nextWindowStartMs + bucketMs;
+        if (windowEndMs > cutoffMs) {
+          break;
+        }
+        // Skip any bucket that already has an entry — APPEND only fills ABSENT buckets.
+        // VALID slots come from a prior partial batch (mid-batch failure recovery);
+        // re-running APPEND for one would produce duplicate segments.  STALE slots can
+        // appear above the watermark too (the consistency manager marks out-of-order
+        // VALID buckets STALE wherever they sit); those are exclusively step 1's
+        // responsibility (OVERWRITE / DELETE) — dispatching an APPEND for one would race
+        // the in-flight or upcoming exclusive task on the same window, risking concurrent
+        // segment-replace on the same window and duplicated rows.
+        PartitionInfo existing = partitionInfos.get(nextWindowStartMs);
+        if (existing != null) {
+          nextWindowStartMs = windowEndMs;
+          continue;
+        }
+        PinotTaskConfig appendTask = buildTaskConfig(offlineTableName, sourceTableName,
+            sourceTableWithType, definedSQL, taskConfigs, nextWindowStartMs, windowEndMs,
+            MaterializedViewTask.TASK_MODE_APPEND, effectiveLimit, userDeclaredLimit);
+        pinotTaskConfigs.add(appendTask);
+        LOGGER.info("Generated APPEND task for table: {} window [{}, {})", offlineTableName,
+            nextWindowStartMs, windowEndMs);
+        nextWindowStartMs = windowEndMs;
+        scheduled++;
+      }
+      // Surface the cap-hit case (scheduler ran out of iterations before filling availableSlots)
+      // so a corrupt partition map doesn't silently masquerade as "caught up".
+      if (iterations >= maxIterations && scheduled < availableSlots) {
+        LOGGER.error("MV table {} APPEND scheduler hit maxIterations cap ({}); partition map "
+            + "may be corrupted (size={}, scheduled={}). Investigate stale VALID partitions.",
+            offlineTableName, maxIterations, partitionInfos.size(), scheduled);
+      }
+
+      if (scheduled == 0) {
+        LOGGER.debug("MV table {} is caught up (watermark={}), no dirty partitions.", offlineTableName, watermarkMs);
+      }
+    }
+    return pinotTaskConfigs;
+  }
+
+  /// Step 1: Finds the earliest STALE partition and dispatches the appropriate task.
+  ///
+  /// Re-computes the source fingerprint and picks one of:
+  ///   - DELETE task: source data is gone (segmentCount == 0) — task will drop MV segments and
+  ///     rewrite the entry to VALID-empty (or leave it STALE if a backfill is detected at commit)
+  ///   - revert to VALID in place: fingerprint matches stored value (false positive)
+  ///   - OVERWRITE task: fingerprint differs — re-materialize the partition
+  ///
+  /// @return a [PinotTaskConfig] for DELETE or OVERWRITE, or `null` if no actionable
+  ///         STALE partition exists (either none STALE, or the only STALE one was reverted
+  ///         to VALID in place).
+  private PinotTaskConfig tryHandleStalePartition(String viewTableName, String sourceTableName,
+      String sourceTableWithType, String definedSQL, Map<String, String> taskConfigs,
+      Map<Long, PartitionInfo> partitionInfos, long bucketMs,
+      int effectiveLimit, boolean userDeclaredLimit) {
+    long earliestStaleMs = Long.MAX_VALUE;
+    for (Map.Entry<Long, PartitionInfo> entry : partitionInfos.entrySet()) {
+      if (entry.getValue().getState() == PartitionState.STALE && entry.getKey() < earliestStaleMs) {
+        earliestStaleMs = entry.getKey();
+      }
+    }
+    if (earliestStaleMs == Long.MAX_VALUE) {
+      return null;
+    }
+
+    long windowStartMs = earliestStaleMs;
+    long windowEndMs = windowStartMs + bucketMs;
+    PartitionInfo staleInfo = partitionInfos.get(earliestStaleMs);
+
+    PartitionFingerprint currentFp = MaterializedViewTaskUtils.computeWindowFingerprint(
+        _context.getSegmentsZKMetadata(sourceTableWithType), windowStartMs, windowEndMs);
+
+    if (currentFp.getSegmentCount() == 0) {
+      LOGGER.info("STALE partition [{}, {}) base data deleted for table: {}. Generating DELETE task.",
+          windowStartMs, windowEndMs, viewTableName);
+      Map<String, String> configs = new HashMap<>();
+      configs.put(MinionConstants.TABLE_NAME_KEY, viewTableName);
+      configs.put(MaterializedViewTask.WINDOW_START_MS_KEY, String.valueOf(windowStartMs));
+      configs.put(MaterializedViewTask.WINDOW_END_MS_KEY, String.valueOf(windowEndMs));
+      configs.put(MaterializedViewTask.TASK_MODE_KEY, MaterializedViewTask.TASK_MODE_DELETE);
+      // Carry the source table so the executor can recompute the source fingerprint at commit
+      // time and re-confirm the window is still empty before writing VALID-empty.  Without this,
+      // a backfill landing between dispatch and commit would be silently dropped (see
+      // MaterializedViewTaskExecutor#executeDeleteTask and MaterializedViewPartitionManager#clearValid).
+      configs.put(MaterializedViewTask.SOURCE_TABLE_NAME_KEY, sourceTableName);
+      configs.put(MinionConstants.UPLOAD_URL_KEY, _context.getVipUrl() + "/segments");
+      return new PinotTaskConfig(MaterializedViewTask.TASK_TYPE, configs);
+    }
+
+    if (currentFp.equals(staleInfo.getFingerprint())) {
+      LOGGER.info("STALE partition [{}, {}) fingerprint matches for table: {}. "
+          + "Reverting to VALID (false positive).", windowStartMs, windowEndMs, viewTableName);
+      // Best-effort revert: if it fails (CAS budget exhausted, transient ZK error), the
+      // partition stays STALE and the next scheduling cycle either reverts again (if the
+      // fingerprint still matches) or generates an OVERWRITE task — either way the system
+      // self-heals.  Spending the executor's critical-write retry budget on this avoidable
+      // optimization would be wasteful, so the manager uses its smaller `revert` profile.
+      try {
+        new MaterializedViewPartitionManager(_context.getPropertyStore(),
+            _context::getClusterConfig).revertValid(viewTableName, earliestStaleMs);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to revert STALE partition {} to VALID for MV table: {}; will retry "
+            + "on the next scheduling cycle", earliestStaleMs, viewTableName, e);
+      }
+      return null;
+    }
+
+    LOGGER.info("Confirmed STALE partition at {} for table: {}. Generating OVERWRITE task for window [{}, {})",
+        windowStartMs, viewTableName, windowStartMs, windowEndMs);
+    return buildTaskConfig(viewTableName, sourceTableName, sourceTableWithType, definedSQL,
+        taskConfigs, windowStartMs, windowEndMs, MaterializedViewTask.TASK_MODE_OVERWRITE,
+        effectiveLimit, userDeclaredLimit);
+  }
+
+  /// Builds a complete [PinotTaskConfig] for either APPEND or OVERWRITE mode.
+  ///
+  /// @param effectiveLimit pre-resolved LIMIT (user-declared, or
+  ///     [MaterializedViewTask#DEFAULT_MATERIALIZED_VIEW_QUERY_LIMIT] when absent in `definedSQL`).
+  ///     Same value flows to the broker SQL and to `EFFECTIVE_LIMIT_KEY` for the gate.
+  /// @param userDeclaredLimit `true` if `definedSQL` already contains a LIMIT clause
+  ///     (AST-detected by caller). When `false`, `effectiveLimit` is appended to the
+  ///     broker SQL here.
+  private PinotTaskConfig buildTaskConfig(String viewTableName, String sourceTableName,
+      String sourceTableWithType, String definedSQL, Map<String, String> taskConfigs,
+      long windowStartMs, long windowEndMs, String taskMode, int effectiveLimit,
+      boolean userDeclaredLimit) {
+    String taskType = MaterializedViewTask.TASK_TYPE;
+
+    PartitionFingerprint windowFingerprint = MaterializedViewTaskUtils.computeWindowFingerprint(
+        _context.getSegmentsZKMetadata(sourceTableWithType), windowStartMs, windowEndMs);
+
+    // The source time column may use any DateTimeFieldSpec format (TIMESTAMP, INT-days, etc.).
+    // Convert the window boundaries to the source's native unit so the appended WHERE filter
+    // compares apples to apples.
+    DateTimeFieldSpec sourceTimeFieldSpec = resolveSourceTimeFieldSpec(sourceTableName);
+    String sourceTimeColumn = sourceTimeFieldSpec.getName();
+    DateTimeFormatSpec sourceTimeFormat = sourceTimeFieldSpec.getFormatSpec();
+    String windowStart = sourceTimeFormat.fromMillisToFormat(windowStartMs);
+    String windowEnd = sourceTimeFormat.fromMillisToFormat(windowEndMs);
+    String sqlWithTimeRange = appendTimeRange(definedSQL, sourceTimeColumn, windowStart, windowEnd);
+    // If the user did not declare LIMIT, append the bounded default so the broker doesn't
+    // apply its own (small) cluster default. AST-based detection by the caller is reliable —
+    // a text scan would mis-fire on string literals or comments containing "LIMIT".
+    if (!userDeclaredLimit) {
+      sqlWithTimeRange = sqlWithTimeRange.trim();
+      if (sqlWithTimeRange.endsWith(";")) {
+        sqlWithTimeRange = sqlWithTimeRange.substring(0, sqlWithTimeRange.length() - 1).trim();
+      }
+      sqlWithTimeRange = sqlWithTimeRange + " LIMIT " + effectiveLimit;
+    }
+    // Defense: re-parse the final broker-bound SQL and verify the LIMIT is syntactically
+    // active. Catches text-manipulation hazards in either branch — auto-injected LIMIT
+    // swallowed by a trailing comment, or appendTimeRange's clause-keyword scan corrupting
+    // SQL that contained those keywords inside string literals.
+    Optional<Integer> verifyLimit;
+    try {
+      verifyLimit = MaterializedViewAnalyzer.tryExtractDeclaredLimit(sqlWithTimeRange);
+    } catch (IllegalStateException e) {
+      // Calcite parse failure (validateSqlSyntax wraps SqlCompilationException as
+      // IllegalStateException) — surface with MV table context for operator triage.
+      throw new IllegalStateException("Broker-bound SQL is unparseable for MV table: "
+          + viewTableName + ". Check definedSQL for syntax issues (trailing comments, unbalanced "
+          + "quotes, etc). SQL: " + sqlWithTimeRange, e);
+    }
+    String observedLimit = verifyLimit.map(String::valueOf).orElse("<absent>");
+    Preconditions.checkState(
+        verifyLimit.isPresent() && verifyLimit.get().intValue() == effectiveLimit,
+        "LIMIT verification failed for MV table: %s. Re-parsed SQL has LIMIT=%s, expected %s. "
+            + "definedSQL likely contains text (comments, literals) that interfered with SQL "
+            + "manipulation. SQL: %s",
+        viewTableName, observedLimit, effectiveLimit, sqlWithTimeRange);
+
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.TABLE_NAME_KEY, viewTableName);
+    configs.put(MaterializedViewTask.DEFINED_SQL_KEY, sqlWithTimeRange);
+    configs.put(MaterializedViewTask.WINDOW_START_MS_KEY, String.valueOf(windowStartMs));
+    configs.put(MaterializedViewTask.WINDOW_END_MS_KEY, String.valueOf(windowEndMs));
+    configs.put(MaterializedViewTask.SOURCE_TABLE_NAME_KEY, sourceTableName);
+    configs.put(MaterializedViewTask.TASK_MODE_KEY, taskMode);
+    configs.put(MaterializedViewTask.EFFECTIVE_LIMIT_KEY, String.valueOf(effectiveLimit));
+    configs.put(MinionConstants.UPLOAD_URL_KEY, _context.getVipUrl() + "/segments");
+
+    String maxNumRecords = taskConfigs.get(MaterializedViewTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
+    if (maxNumRecords != null) {
+      configs.put(MaterializedViewTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, maxNumRecords);
+    }
+
+    Map<Long, PartitionFingerprint> fingerprintMap = new HashMap<>();
+    fingerprintMap.put(windowStartMs, windowFingerprint);
+    configs.put(MaterializedViewTask.PARTITION_FINGERPRINTS_KEY,
+        PartitionFingerprint.encodeMap(fingerprintMap));
+
+    return new PinotTaskConfig(taskType, configs);
+  }
+
+  public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
+    MaterializedViewAnalyzer.analyze(
+        taskConfigs.get(MaterializedViewTask.DEFINED_SQL_KEY), tableConfig, schema, taskConfigs, _context);
+  }
+
+  /// Resolves the [DateTimeFieldSpec] for the source table's time column. The returned
+  /// spec provides both the column name and its format for converting ms watermarks to the
+  /// column's native format (e.g. days since epoch for `1:DAYS:EPOCH`).
+  private DateTimeFieldSpec resolveSourceTimeFieldSpec(String rawSourceTableName) {
+    String sourceTableWithType = resolveSourceTableNameWithType(rawSourceTableName);
+    TableConfig sourceTableConfig = _context.getTableConfig(sourceTableWithType);
+    Preconditions.checkState(sourceTableConfig != null,
+        "Source table config not found for: %s", rawSourceTableName);
+
+    String timeColumn = sourceTableConfig.getValidationConfig().getTimeColumnName();
+    Preconditions.checkState(timeColumn != null && !timeColumn.isEmpty(),
+        "Time column not configured for source table: %s", rawSourceTableName);
+
+    Schema sourceSchema = _context.getTableSchema(sourceTableWithType);
+    Preconditions.checkState(sourceSchema != null,
+        "Schema not found for source table: %s", rawSourceTableName);
+
+    DateTimeFieldSpec fieldSpec = sourceSchema.getSpecForTimeColumn(timeColumn);
+    Preconditions.checkState(fieldSpec != null,
+        "No DateTimeFieldSpec found for time column '%s' in source table: %s", timeColumn, rawSourceTableName);
+    return fieldSpec;
+  }
+
+  /// Resolves the MV table's designated time column from its [TableConfig]. The MV
+  /// side of a split query filters on this column (e.g. `materializedViewTime < watermarkMs`),
+  /// which may differ from the source time column when the defined SQL renames or buckets
+  /// the time via a `dateTimeConvert`/`DATETRUNC` expression.
+  private String resolveMaterializedViewTimeColumn(String viewTableWithType) {
+    TableConfig viewTableConfig = _context.getTableConfig(viewTableWithType);
+    Preconditions.checkState(viewTableConfig != null,
+        "MV table config not found for: %s", viewTableWithType);
+
+    String timeColumn = viewTableConfig.getValidationConfig().getTimeColumnName();
+    Preconditions.checkState(timeColumn != null && !timeColumn.isEmpty(),
+        "Time column not configured for MV table: %s (required for split queries)", viewTableWithType);
+    return timeColumn;
+  }
+
+  /// Resolves the raw format string for the MV table's time column, for persisting in
+  /// [MaterializedViewSplitSpec].  The broker uses this format to convert `watermarkMs` into
+  /// the MV column's native representation before attaching the `materializedViewTime < boundary`
+  /// filter on the MV branch of a split query.
+  private String resolveMaterializedViewTimeFormat(String viewTableWithType, String viewTimeColumn) {
+    Schema viewSchema = _context.getTableSchema(viewTableWithType);
+    Preconditions.checkState(viewSchema != null,
+        "Schema not found for MV table: %s", viewTableWithType);
+    DateTimeFieldSpec fieldSpec = viewSchema.getSpecForTimeColumn(viewTimeColumn);
+    Preconditions.checkState(fieldSpec != null,
+        "No DateTimeFieldSpec found for MV time column '%s' in table: %s",
+        viewTimeColumn, viewTableWithType);
+    return fieldSpec.getFormat();
+  }
+
+  /// Appends a time-range WHERE clause to the SQL.  Window values are raw epoch millis since
+  /// both base and MV time columns are TIMESTAMP (enforced by [MaterializedViewAnalyzer]).
+  /// If a WHERE clause already exists, appends with AND; otherwise inserts before GROUP BY /
+  /// ORDER BY / the trailing semicolon.
+  ///
+  /// Keyword scans (`WHERE`, `FROM`, `GROUP BY`, ...) skip text inside single-quoted
+  /// string literals so a column value like `'WHERE me'` cannot fool the splitter
+  /// into corrupting the SQL. Identifiers and column names are required to be simple
+  /// (validated by the analyzer); double-quoted identifiers are treated like string
+  /// literals (skipped).
+  static String appendTimeRange(String sql, String timeColumn, String windowStart, String windowEnd) {
+    Preconditions.checkArgument(sql != null, "SQL must not be null");
+    // Validate column name to prevent SQL injection (column names must be simple identifiers).
+    Preconditions.checkArgument(IDENTIFIER_PATTERN.matcher(timeColumn).matches(),
+        "Time column name contains invalid characters: %s", timeColumn);
+    // Reject SQL containing nested SELECTs / subqueries: the keyword splitter below finds the
+    // FIRST `WHERE` and inserts the time predicate after it, which would attach the predicate to
+    // the inner subquery's WHERE rather than the outer query's — producing a semantically-wrong
+    // task SQL. MV definitions are intentionally restricted to flat queries; reject up front
+    // rather than silently corrupt. Counts standalone SELECT tokens outside string literals
+    // and comments via the same mask used downstream.
+    Preconditions.checkArgument(countStandaloneSelectKeywords(sql) <= 1,
+        "MV definedSQL must not contain a nested SELECT / subquery; got: %s", sql);
+
+    // windowStart/windowEnd come from DateTimeFormatSpec.fromMillisToFormat — numeric for EPOCH
+    // formats (TIMESTAMP, epoch-days, etc.), or quoted strings for SIMPLE_DATE_FORMAT.  Quote
+    // non-numeric values so the SQL parser treats them as string literals.
+    String quotedStart = isNumeric(windowStart) ? windowStart : "'" + windowStart + "'";
+    String quotedEnd = isNumeric(windowEnd) ? windowEnd : "'" + windowEnd + "'";
+    String timeFilter = timeColumn + " >= " + quotedStart + " AND " + timeColumn + " < " + quotedEnd;
+
+    // Remove trailing semicolon for easier manipulation
+    String trimmed = sql.trim();
+    if (trimmed.endsWith(";")) {
+      trimmed = trimmed.substring(0, trimmed.length() - 1).trim();
+    }
+
+    // Use Locale.ROOT — the default locale can change a string's length on
+    // toUpperCase (e.g. de_DE turns 'ß' into "SS", growing length by one), which
+    // would misalign the quoteMask and let user-supplied keywords inside string
+    // literals fool the splitter.
+    String upperSql = trimmed.toUpperCase(Locale.ROOT);
+    // Build a parallel mask that marks positions inside single-quoted string literals or
+    // double-quoted identifiers, so keyword scans skip over user-controlled text.
+    boolean[] quoteMask = buildQuoteMask(trimmed);
+    // indexOfKeywordWithBoundary returns the start index of the keyword.
+    int whereIdx = indexOfKeywordWithBoundary(upperSql, quoteMask, "WHERE", 0);
+    if (whereIdx >= 0) {
+      int afterWhere = whereIdx + "WHERE".length();
+      int insertPos = findClauseEnd(upperSql, quoteMask, afterWhere);
+      return trimmed.substring(0, insertPos) + " AND " + timeFilter + trimmed.substring(insertPos);
+    }
+
+    // No WHERE — insert before GROUP BY / ORDER BY / LIMIT / HAVING / end
+    int fromIdx = indexOfKeywordWithBoundary(upperSql, quoteMask, "FROM", 0);
+    Preconditions.checkState(fromIdx >= 0, "definedSQL is missing a FROM clause: %s", sql);
+    int afterFrom = fromIdx + "FROM".length();
+    int insertPos = findClauseEnd(upperSql, quoteMask, afterFrom);
+    return trimmed.substring(0, insertPos) + " WHERE " + timeFilter + trimmed.substring(insertPos);
+  }
+
+  private static boolean isNumeric(String value) {
+    if (value == null || value.isEmpty()) {
+      return false;
+    }
+    for (int i = 0; i < value.length(); i++) {
+      char c = value.charAt(i);
+      if (!Character.isDigit(c) && c != '-' && c != '.') {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Counts standalone occurrences of the `SELECT` keyword in `sql` outside string literals,
+  /// double-quoted identifiers, and SQL comments.  A flat MV `definedSQL` has exactly one;
+  /// a value of two or more indicates a nested SELECT / subquery, which is unsupported because
+  /// the text-based [#appendTimeRange] inserts its time predicate after the FIRST `WHERE` and
+  /// would attach to the inner query's WHERE rather than the outer query.
+  static int countStandaloneSelectKeywords(String sql) {
+    String upper = sql.toUpperCase(Locale.ROOT);
+    boolean[] mask = buildQuoteMask(sql);
+    int count = 0;
+    int from = 0;
+    while (true) {
+      int idx = indexOfKeywordWithBoundary(upper, mask, "SELECT", from);
+      if (idx < 0) {
+        break;
+      }
+      count++;
+      from = idx + "SELECT".length();
+    }
+    return count;
+  }
+
+  private static long parseLong(String value, long defaultValue) {
+    if (value == null || value.isEmpty()) {
+      return defaultValue;
+    }
+    try {
+      return Long.parseLong(value);
+    } catch (NumberFormatException e) {
+      return defaultValue;
+    }
+  }
+
+  /// Builds a parallel mask of the SQL where `mask[i] == true` means position `i`
+  /// is inside text the keyword scanner must skip:
+  ///
+  ///   - single-quoted string literals (with ANSI doubled-quote escape `''`)
+  ///   - double-quoted identifiers (with ANSI doubled-quote escape `""`)
+  ///   - `--` line comments through end-of-line
+  ///   - `/* ... *``/` block comments
+  ///
+  /// Without comment masking a `definedSQL` fragment such as `-- WHERE x` would
+  /// fool the splitter into treating the comment text as a real WHERE clause.
+  private static boolean[] buildQuoteMask(String sql) {
+    boolean[] mask = new boolean[sql.length()];
+    char active = 0; // 0 means outside any quoted region; otherwise the quote char.
+    int i = 0;
+    int len = sql.length();
+    while (i < len) {
+      char c = sql.charAt(i);
+      if (active == 0) {
+        if (c == '-' && i + 1 < len && sql.charAt(i + 1) == '-') {
+          // -- line comment: mask through end-of-line (or end-of-string).
+          int eol = sql.indexOf('\n', i + 2);
+          int end = eol < 0 ? len : eol;
+          for (int j = i; j < end; j++) {
+            mask[j] = true;
+          }
+          i = end;
+        } else if (c == '/' && i + 1 < len && sql.charAt(i + 1) == '*') {
+          // /* ... */ block comment: mask through closing */ (or end-of-string).
+          int close = sql.indexOf("*/", i + 2);
+          int end = close < 0 ? len : close + 2;
+          for (int j = i; j < end; j++) {
+            mask[j] = true;
+          }
+          i = end;
+        } else if (c == '\'' || c == '"') {
+          active = c;
+          mask[i] = true;
+          i++;
+        } else {
+          i++;
+        }
+      } else {
+        mask[i] = true;
+        if (c == active) {
+          // ANSI doubled-quote escape: '' or "" stays inside the literal.
+          if (i + 1 < len && sql.charAt(i + 1) == active) {
+            mask[i + 1] = true;
+            i += 2;
+          } else {
+            active = 0;
+            i++;
+          }
+        } else {
+          i++;
+        }
+      }
+    }
+    return mask;
+  }
+
+  /// Finds the next standalone occurrence of `keyword` in `upperSql` starting
+  /// at `fromIdx`, requiring whitespace boundaries on both sides (or string edge) so
+  /// a column or alias containing the keyword as a substring cannot match. Skips any
+  /// positions covered by `quoteMask`. Returns the start index of the keyword
+  /// itself, or -1 if not found. Callers that want to insert *before* the keyword (and
+  /// preserve the leading whitespace) should use the returned index minus 1 — except
+  /// when the keyword is at index 0, in which case there is no preceding boundary char.
+  private static int indexOfKeywordWithBoundary(String upperSql, boolean[] quoteMask, String keyword,
+      int fromIdx) {
+    int idx = fromIdx;
+    int len = upperSql.length();
+    while (idx <= len - keyword.length()) {
+      int found = upperSql.indexOf(keyword, idx);
+      if (found < 0) {
+        return -1;
+      }
+      int end = found + keyword.length();
+      boolean leftBoundary = found == 0 || isSqlBoundary(upperSql.charAt(found - 1));
+      boolean rightBoundary = end == len || isSqlBoundary(upperSql.charAt(end));
+      if (leftBoundary && rightBoundary) {
+        // Reject if any character of the keyword overlaps a quoted/comment region.
+        boolean inMasked = false;
+        for (int j = 0; j < keyword.length(); j++) {
+          if (quoteMask[found + j]) {
+            inMasked = true;
+            break;
+          }
+        }
+        if (!inMasked) {
+          return found;
+        }
+      }
+      idx = found + 1;
+    }
+    return -1;
+  }
+
+  private static boolean isSqlBoundary(char c) {
+    return Character.isWhitespace(c) || c == '(' || c == ')' || c == ',' || c == ';';
+  }
+
+  /// Finds the position immediately before the next major SQL clause keyword (GROUP, ORDER,
+  /// HAVING, LIMIT) starting from `fromIdx`, skipping over quoted regions and
+  /// comments. Returns the index of the boundary char preceding the keyword (so a
+  /// substring-split at this position preserves the whitespace), or the end of the string
+  /// if no keyword is found. Match is by whitespace boundary on both sides so a keyword
+  /// preceded by a newline (e.g. after a line comment) is still detected.
+  private static int findClauseEnd(String upperSql, boolean[] quoteMask, int fromIdx) {
+    String[] keywords = {"GROUP", "ORDER", "HAVING", "LIMIT"};
+    int minIdx = upperSql.length();
+    for (String keyword : keywords) {
+      int kw = indexOfKeywordWithBoundary(upperSql, quoteMask, keyword, fromIdx);
+      // Adjust to the boundary char preceding the keyword. The keyword cannot legitimately
+      // appear at index 0 of a trimmed SQL (which starts with SELECT), so kw == 0 is
+      // unreachable here; defend against it just in case.
+      int idx = (kw < 0) ? -1 : (kw == 0 ? 0 : kw - 1);
+      if (idx >= 0 && idx < minIdx) {
+        minIdx = idx;
+      }
+    }
+    return minIdx;
+  }
+
+  /// Per-mode in-flight task counts for one MV table, derived from the live task configs.
+  /// APPEND uses the count to enforce `maxTasksPerBatch`. DELETE and OVERWRITE each
+  /// gate themselves at "single concurrent task" — and they are also mutually exclusive with
+  /// each other (both touch existing MV segments via segment-replace), so each step checks
+  /// both counts.
+  ///
+  /// Atomic fields are used defensively: context implementations usually iterate synchronously,
+  /// but a future change to async iteration would otherwise silently miscount and let
+  /// DELETE/OVERWRITE schedule simultaneously, double-replacing segments.
+  private static final class InFlightTaskCounts {
+    final AtomicInteger _inFlightAppendCount = new AtomicInteger();
+    final AtomicInteger _inFlightDeleteCount = new AtomicInteger();
+    final AtomicInteger _inFlightOverwriteCount = new AtomicInteger();
+    final AtomicLong _maxInFlightAppendWindowEndMs;
+
+    InFlightTaskCounts(long initialMaxAppendWindowEndMs) {
+      _maxInFlightAppendWindowEndMs = new AtomicLong(initialMaxAppendWindowEndMs);
+    }
+
+    int exclusiveModeCount() {
+      return _inFlightDeleteCount.get() + _inFlightOverwriteCount.get();
+    }
+  }
+
+  /// Walks the live task configs for `offlineTableName` once and buckets per-mode.
+  /// Required because OVERWRITE/DELETE and APPEND must have independent gates — sharing
+  /// a single "incompleteTasks" check made an in-flight APPEND silently block any DELETE
+  /// of a stale partition.
+  private InFlightTaskCounts countInFlightTasks(String offlineTableName, String taskType,
+      long watermarkMs) {
+    InFlightTaskCounts counts = new InFlightTaskCounts(watermarkMs);
+    _context.forRunningTasks(offlineTableName, taskType, cfg -> {
+      String mode = cfg.get(MaterializedViewTask.TASK_MODE_KEY);
+      Preconditions.checkState(mode != null && !mode.isEmpty(),
+          "In-flight task missing %s for table: %s — buildTaskConfig must always set the mode",
+          MaterializedViewTask.TASK_MODE_KEY, offlineTableName);
+      if (MaterializedViewTask.TASK_MODE_APPEND.equals(mode)) {
+        String windowEndStr = cfg.get(MaterializedViewTask.WINDOW_END_MS_KEY);
+        Preconditions.checkState(windowEndStr != null,
+            "In-flight APPEND task missing %s for table: %s — buildTaskConfig must always set it",
+            MaterializedViewTask.WINDOW_END_MS_KEY, offlineTableName);
+        long end = Long.parseLong(windowEndStr);
+        counts._maxInFlightAppendWindowEndMs.accumulateAndGet(end, Math::max);
+        counts._inFlightAppendCount.incrementAndGet();
+      } else if (MaterializedViewTask.TASK_MODE_DELETE.equals(mode)) {
+        counts._inFlightDeleteCount.incrementAndGet();
+      } else if (MaterializedViewTask.TASK_MODE_OVERWRITE.equals(mode)) {
+        counts._inFlightOverwriteCount.incrementAndGet();
+      } else {
+        // Forward-compat: unknown mode (e.g. a future REBUILD/BACKFILL added by a newer
+        // controller). Don't classify it as APPEND — that would silently miscount. Warn so
+        // operators see the version mismatch.
+        LOGGER.warn("Unknown task mode '{}' for in-flight task in table: {}; ignoring for "
+            + "scheduling decisions", mode, offlineTableName);
+      }
+    });
+    return counts;
+  }
+
+  /// Reads the scheduling watermark from MaterializedViewRuntimeMetadata or initialises it
+  /// on cold-start by finding the minimum segment start time from the source table
+  /// and aligning it to the bucket boundary.
+  ///
+  /// On cold-start, `watermarkMs` is 0 and the partitions map is empty, so the broker
+  /// will not attempt split queries against the empty MV table. The first successful APPEND
+  /// (via the executor) will advance `watermarkMs` and add the partition entry.
+  @VisibleForTesting
+  long getWatermarkMs(String viewTableName, String sourceTableName, long bucketMs, String definedSQL,
+      Map<String, String> taskConfigs) {
+    String viewTableWithType = TableNameBuilder.OFFLINE.tableNameWithType(viewTableName);
+    HelixPropertyStore<ZNRecord> propertyStore = _context.getPropertyStore();
+    MaterializedViewRuntimeMetadata runtime =
+        MaterializedViewRuntimeMetadataUtils.fetch(propertyStore, viewTableWithType);
+
+    if (runtime != null) {
+      return runtime.getWatermarkMs();
+    }
+
+    // Cold-start: find the earliest segment start time from the source table
+    String sourceTableWithType = resolveSourceTableNameWithType(sourceTableName);
+    List<SegmentZKMetadata> segmentsZKMetadata = _context.getSegmentsZKMetadata(sourceTableWithType);
+
+    long minStartTimeMs = Long.MAX_VALUE;
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      long startTimeMs = segmentZKMetadata.getStartTimeMs();
+      if (startTimeMs >= 0) {
+        minStartTimeMs = Math.min(minStartTimeMs, startTimeMs);
+      }
+    }
+    Preconditions.checkState(minStartTimeMs != Long.MAX_VALUE,
+        "No valid segments found in source table: %s for cold-start watermark", sourceTableName);
+
+    long watermarkMs = Math.floorDiv(minStartTimeMs, bucketMs) * bucketMs;
+
+    // Empty partitions map on cold-start: the broker treats every bucket as "not covered"
+    // until the first APPEND populates the map.  Freshness is now derived on read from
+    // (now - watermarkMs) against the per-table staleness SLO.
+    MaterializedViewRuntimeMetadata newRuntime = new MaterializedViewRuntimeMetadata(
+        viewTableWithType, watermarkMs, new HashMap<>());
+    // Create-if-absent: two scheduler runs racing on cold-start would otherwise blind-clobber
+    // each other.  If a concurrent writer already created the znode, fall back to fetching
+    // their value rather than overwriting — their persisted state may already include
+    // updates from the consistency manager / executor.
+    if (MaterializedViewRuntimeMetadataUtils.createIfAbsent(propertyStore, newRuntime)) {
+      LOGGER.info("Cold-start: initialized MaterializedViewRuntimeMetadata with watermark {} for MV table: {}",
+          watermarkMs, viewTableWithType);
+    } else {
+      MaterializedViewRuntimeMetadata existing =
+          MaterializedViewRuntimeMetadataUtils.fetch(propertyStore, viewTableWithType);
+      if (existing != null) {
+        LOGGER.info("Cold-start: another writer already initialized MV runtime metadata for {} "
+            + "(watermark={}); using existing values.", viewTableWithType, existing.getWatermarkMs());
+        watermarkMs = existing.getWatermarkMs();
+      }
+    }
+
+    // Initialize MaterializedViewDefinitionMetadata with base table info and partition expression maps
+    Schema viewSchema = _context.getTableSchema(viewTableWithType);
+    Map<String, String> partitionExprMaps = (viewSchema != null)
+        ? MaterializedViewAnalyzer.extractPartitionExprMaps(definedSQL, viewSchema)
+        : new HashMap<>();
+
+    /// Resolve split spec from both the source and MV tables' time columns.  Both base and MV
+    /// time columns may use any `DateTimeFieldSpec` format; persist each column's `getFormat()`
+    /// so the broker's base-side and MV-side boundary literals are each converted to the right
+    /// native unit at query time.
+    DateTimeFieldSpec sourceTimeFieldSpec = resolveSourceTimeFieldSpec(sourceTableName);
+    String sourceTimeColumn = sourceTimeFieldSpec.getName();
+    String sourceTimeFormat = sourceTimeFieldSpec.getFormat();
+    String viewTimeColumn = resolveMaterializedViewTimeColumn(viewTableWithType);
+    String viewTimeFormat = resolveMaterializedViewTimeFormat(viewTableWithType, viewTimeColumn);
+    MaterializedViewSplitSpec splitSpec = new MaterializedViewSplitSpec(sourceTimeColumn,
+        sourceTimeFormat, viewTimeColumn, viewTimeFormat, bucketMs);
+
+    long stalenessThresholdMs = parseLong(
+        taskConfigs.get(MaterializedViewTask.STALENESS_THRESHOLD_MS_KEY),
+        MaterializedViewTask.DEFAULT_STALENESS_THRESHOLD_MS);
+    MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
+        viewTableWithType,
+        List.of(sourceTableName),
+        definedSQL,
+        partitionExprMaps,
+        splitSpec,
+        stalenessThresholdMs,
+        /*rewriteEnabled=*/ true);
+    // Create-if-absent so a racing scheduler run cannot clobber definition metadata that may
+    // have diverged due to a concurrent schema update (different `partitionExprMaps` / split
+    // spec).  If the znode already exists, the controller-side definition writer (or another
+    // scheduler) already wrote it; we leave that authoritative copy in place.
+    if (MaterializedViewDefinitionMetadataUtils.createIfAbsent(propertyStore, definition)) {
+      LOGGER.info("Cold-start: initialized MaterializedViewDefinitionMetadata for MV table: {} with source table: {}",
+          viewTableWithType, sourceTableName);
+    } else {
+      LOGGER.info("Cold-start: MaterializedViewDefinitionMetadata for MV table: {} already exists; "
+          + "leaving authoritative copy in place.", viewTableWithType);
+    }
+
+    return watermarkMs;
+  }
+
+  /// Resolves the source table name with type suffix via the shared OFFLINE-first probe in
+  /// [MaterializedViewTaskUtils#resolveTableNameWithType]; fails loud when neither table
+  /// config exists (the scheduler cannot generate tasks against a missing source).
+  private String resolveSourceTableNameWithType(String rawSourceTableName) {
+    String sourceTableWithType = MaterializedViewTaskUtils.resolveTableNameWithType(
+        _context::getTableConfig, rawSourceTableName);
+    Preconditions.checkState(sourceTableWithType != null,
+        "Source table config not found for: %s", rawSourceTableName);
+    return sourceTableWithType;
+  }
+
+  /// Returns the maximum valid `endTimeMs` across all source segments, or [Long#MIN_VALUE]
+  /// when none of the segments carry a usable end time (empty list, or every segment has a
+  /// negative end time — the legacy "unset" marker `SegmentZKMetadata` returns for old
+  /// znodes without `TIME_UNIT`). Used by [#generateTasks] to cap the APPEND cutoff at the
+  /// latest known source data: without this cap, the scheduler would walk past the actual
+  /// data tail one bucket at a time (each empty bucket completes with zero rows, the
+  /// executor persists a VALID-empty partition + advances watermark), so `watermarkMs`
+  /// would drift toward `now - bufferMs` even when source ingestion has stalled — defeating
+  /// the staleness-threshold contract in the rewrite engine, where
+  /// `now - watermarkMs <= stalenessThresholdMs` is meant to reflect real data freshness.
+  ///
+  /// The `endMs >= 0` filter mirrors the cold-start scan in [#getWatermarkMs], which
+  /// already excludes negative `startTimeMs` for the same reason.
+  @VisibleForTesting
+  static long computeMaxSourceEndTimeMs(List<SegmentZKMetadata> segments) {
+    long maxEndMs = Long.MIN_VALUE;
+    for (SegmentZKMetadata seg : segments) {
+      long endMs = seg.getEndTimeMs();
+      if (endMs >= 0 && endMs > maxEndMs) {
+        maxEndMs = endMs;
+      }
+    }
+    return maxEndMs;
+  }
+
+  /// Tightens the wall-clock APPEND cutoff (`now - bufferMs`) by the end of the source data,
+  /// so the scheduler never materializes buckets past the data tail (see the stage-2 comment
+  /// in [#generateTasks]).
+  ///
+  /// `maxSourceEndMs` is the **inclusive** maximum `endTimeMs` across source segments (the
+  /// same convention `computeWindowFingerprint`'s overlap filter relies on), while the loop
+  /// gate compares against the bucket's **exclusive** `windowEndMs`.  The `+ 1` converts
+  /// between the two: a segment ending at `windowEndMs - 1` fully covers the bucket and must
+  /// admit it — without the adjustment, a complete day-aligned batch segment would never
+  /// admit its own final bucket, and a static historical dataset would never materialize its
+  /// last window.  `Long.MIN_VALUE` (no usable end time) falls back to the rough cutoff, and
+  /// a corrupt `Long.MAX_VALUE` end time is clamped rather than overflowed.
+  @VisibleForTesting
+  static long resolveAppendCutoffMs(long roughCutoffMs, long maxSourceEndMs) {
+    if (maxSourceEndMs == Long.MIN_VALUE || maxSourceEndMs == Long.MAX_VALUE) {
+      return roughCutoffMs;
+    }
+    return Math.min(roughCutoffMs, maxSourceEndMs + 1);
+  }
+}

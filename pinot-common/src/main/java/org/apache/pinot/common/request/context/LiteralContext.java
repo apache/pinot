@@ -26,11 +26,11 @@ import java.util.Arrays;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /**
@@ -71,7 +71,7 @@ public class LiteralContext {
       case INT_VALUE:
         _type = DataType.INT;
         _value = literal.getIntValue();
-        _pinotDataType = PinotDataType.INTEGER;
+        _pinotDataType = PinotDataType.INT;
         break;
       case LONG_VALUE:
         _type = DataType.LONG;
@@ -159,7 +159,7 @@ public class LiteralContext {
         Preconditions.checkState(singleValue, "Boolean array is not supported");
         return PinotDataType.BOOLEAN;
       case INT:
-        return singleValue ? PinotDataType.INTEGER : PinotDataType.PRIMITIVE_INT_ARRAY;
+        return singleValue ? PinotDataType.INT : PinotDataType.PRIMITIVE_INT_ARRAY;
       case LONG:
         return singleValue ? PinotDataType.LONG : PinotDataType.PRIMITIVE_LONG_ARRAY;
       case FLOAT:

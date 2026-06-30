@@ -20,7 +20,6 @@ package org.apache.pinot.common.metrics;
 
 import com.google.common.base.Preconditions;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -69,7 +68,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   private final Set<String> _allowedTables;
 
   public AbstractMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry, Class clazz) {
-    this(metricPrefix, metricsRegistry, clazz, true, Collections.emptySet());
+    this(metricPrefix, metricsRegistry, clazz, true, Set.of());
   }
 
   public AbstractMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry, Class clazz,
@@ -92,6 +91,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   public PinotMetricsRegistry getMetricsRegistry() {
     return _metricsRegistry;
+  }
+
+  public String getMetricPrefix() {
+    return _metricPrefix;
   }
 
   public interface QueryPhase {

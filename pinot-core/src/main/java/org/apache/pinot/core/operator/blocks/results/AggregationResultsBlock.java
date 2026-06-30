@@ -25,7 +25,6 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
@@ -97,7 +96,20 @@ public class AggregationResultsBlock extends BaseResultsBlock {
 
   @Override
   public List<Object[]> getRows() {
-    return Collections.singletonList(_results.toArray());
+    if (!_queryContext.isServerReturnFinalResult()) {
+      return List.<Object[]>of(_results.toArray());
+    }
+    // When the server is requested to return the final result (e.g. a single-server colocated DIRECT aggregate in the
+    // multi-stage engine), getDataSchema() reports the final column types. Finalize the intermediate results here so
+    // that the rows are consistent with the schema; otherwise an intermediate object (e.g. a HyperLogLogPlus) would be
+    // left in a column typed as its final type (e.g. LONG) and fail when the block is serialized. This mirrors the
+    // finalization done in getDataTable() and in GroupByCombineOperator for the group-by case.
+    int numColumns = _results.size();
+    Object[] row = new Object[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      row[i] = _aggregationFunctions[i].extractFinalResult(_results.get(i));
+    }
+    return List.<Object[]>of(row);
   }
 
   @Override
@@ -146,7 +158,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
               nullBitmaps[i].add(0);
             }
             assert result != null;
-            setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
+            AggregationFunctionUtils.setIntermediateResult(dataTableBuilder, columnDataTypes[i], i, result);
           }
         }
       }
@@ -174,7 +186,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
             if (columnDataTypes[i] == ColumnDataType.OBJECT) {
               dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
             } else {
-              setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
+              AggregationFunctionUtils.setIntermediateResult(dataTableBuilder, columnDataTypes[i], i, result);
             }
           }
         }
@@ -182,36 +194,6 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       dataTableBuilder.finishRow();
     }
     return dataTableBuilder.build();
-  }
-
-  private void setIntermediateResult(DataTableBuilder dataTableBuilder, ColumnDataType[] columnDataTypes, int index,
-      Object result) throws IOException {
-    ColumnDataType columnDataType = columnDataTypes[index];
-    switch (columnDataType) {
-      case INT:
-        dataTableBuilder.setColumn(index, (int) result);
-        break;
-      case LONG:
-        dataTableBuilder.setColumn(index, (long) result);
-        break;
-      case DOUBLE:
-        dataTableBuilder.setColumn(index, (double) result);
-        break;
-      case STRING:
-        dataTableBuilder.setColumn(index, result.toString());
-        break;
-      case FLOAT:
-        dataTableBuilder.setColumn(index, (float) result);
-        break;
-      case BIG_DECIMAL:
-        dataTableBuilder.setColumn(index, (BigDecimal) result);
-        break;
-      case BYTES:
-        dataTableBuilder.setColumn(index, (ByteArray) result);
-        break;
-      default:
-        throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);
-    }
   }
 
   private void setFinalResult(DataTableBuilder dataTableBuilder, ColumnDataType[] columnDataTypes, int index,
@@ -252,8 +234,14 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       case DOUBLE_ARRAY:
         dataTableBuilder.setColumn(index, ArrayListUtils.toDoubleArray((DoubleArrayList) result));
         break;
+      case BIG_DECIMAL_ARRAY:
+        dataTableBuilder.setColumn(index, ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) result));
+        break;
       case STRING_ARRAY:
         dataTableBuilder.setColumn(index, ArrayListUtils.toStringArray((ObjectArrayList<String>) result));
+        break;
+      case BYTES_ARRAY:
+        dataTableBuilder.setColumn(index, ArrayListUtils.toBytesArray((ObjectArrayList<ByteArray>) result));
         break;
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);

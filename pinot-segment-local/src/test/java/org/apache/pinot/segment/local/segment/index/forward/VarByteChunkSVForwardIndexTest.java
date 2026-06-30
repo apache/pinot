@@ -105,7 +105,7 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
 
     int maxStringLengthInBytes = 0;
     for (int i = 0; i < NUM_ENTRIES; i++) {
-      String value = RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH));
+      String value = RandomStringUtils.secure().next(random.nextInt(MAX_STRING_LENGTH));
       expected[i] = value;
       maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
     }
@@ -235,7 +235,7 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
 
     int maxStringLengthInBytes = 0;
     for (int i = 0; i < numDocs; i++) {
-      String value = RandomStringUtils.random(random.nextInt(numChars));
+      String value = RandomStringUtils.secure().next(random.nextInt(numChars));
       expected[i] = value;
       maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
     }

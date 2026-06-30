@@ -29,7 +29,9 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -42,10 +44,10 @@ public class QueryOptionsUtilsTest {
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
           GROUP_TRIM_THRESHOLD);
   private static final List<String> INT_KEYS = new ArrayList<>() {{
-    addAll(POSITIVE_INT_KEYS);
-    addAll(NON_NEGATIVE_INT_KEYS);
-    addAll(UNBOUNDED_INT_KEYS);
-  }};
+      addAll(POSITIVE_INT_KEYS);
+      addAll(NON_NEGATIVE_INT_KEYS);
+      addAll(UNBOUNDED_INT_KEYS);
+    }};
   private static final List<String> POSITIVE_LONG_KEYS =
       List.of(TIMEOUT_MS, MAX_SERVER_RESPONSE_SIZE_BYTES, MAX_QUERY_RESPONSE_SIZE_BYTES);
 
@@ -67,6 +69,24 @@ public class QueryOptionsUtilsTest {
     Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("SAMPLER", "firstOnly"));
 
     assertEquals(resolved.get(TABLE_SAMPLER), "firstOnly");
+  }
+
+  @Test
+  public void materializedViewRewriteDefaultsToEnabled() {
+    // Absent option and null map both default to enabled (back-compat with pre-option behavior).
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(null));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(new HashMap<>()));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "true")));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "TRUE")));
+    // Anything that is not "true" disables (explicit false, case variants, and any non-true value).
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "false")));
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "FALSE")));
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "1")));
   }
 
   @Test
@@ -262,6 +282,8 @@ public class QueryOptionsUtilsTest {
   @Test
   public void testInvertedIndexDistinctCostRatioValid() {
     assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "0")), Double.valueOf(0));
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
         Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "2.5")), Double.valueOf(2.5));
     assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
         Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, " 3.5 ")), Double.valueOf(3.5));
@@ -270,13 +292,13 @@ public class QueryOptionsUtilsTest {
 
   @Test
   public void testInvertedIndexDistinctCostRatioRejectsNonFiniteValues() {
-    for (String value : new String[]{"NaN", "Infinity", "-Infinity", "0", "-1"}) {
+    for (String value : new String[]{"NaN", "Infinity", "-Infinity", "-1", "invalid"}) {
       try {
         QueryOptionsUtils.getInvertedIndexDistinctCostRatio(Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, value));
         fail();
       } catch (IllegalArgumentException e) {
         assertEquals(e.getMessage(),
-            INVERTED_INDEX_DISTINCT_COST_RATIO + " must be a positive number, got: " + value);
+            INVERTED_INDEX_DISTINCT_COST_RATIO + " must be a non-negative number, got: " + value);
       }
     }
   }
@@ -320,5 +342,21 @@ public class QueryOptionsUtilsTest {
       default:
         throw new IllegalArgumentException("Unexpected key!");
     }
+  }
+
+  @Test
+  public void testGetLiteModeImplicitLeafStageLimit() {
+    Map<String, String> queryOptions = new HashMap<>();
+
+    // Absent → null
+    assertNull(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions));
+
+    // Present → parsed value
+    queryOptions.put(LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT, "42");
+    assertEquals(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions), Integer.valueOf(42));
+
+    // Zero
+    queryOptions.put(LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT, "0");
+    assertEquals(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions), Integer.valueOf(0));
   }
 }

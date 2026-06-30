@@ -21,10 +21,10 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ExecutionStats;
 import org.apache.pinot.client.ResultSet;
@@ -64,7 +64,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   public static final String UPSERT_SCHEMA_FILE_NAME = "upsert_table_test.schema";
   private static final List<String> COLUMNS_TO_COMPARE =
       List.of("name", "game", "score", "timestampInEpoch", "deleted");
-  private String _kafkaTopicName;
 
   @BeforeClass
   public void setUp()
@@ -186,7 +185,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     TableConfig tableConfigWithCompaction =
         createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicName, getNumKafkaPartitions(),
             csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
-    tableConfigWithCompaction.getIndexingConfig().setSortedColumn(Collections.singletonList("score"));
+    tableConfigWithCompaction.getIndexingConfig().setSortedColumn(List.of("score"));
     tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfigWithCompaction);
 
@@ -198,7 +197,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     TableConfig tableConfigWithoutCompaction =
         createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicName, getNumKafkaPartitions(),
             csvDecoderProperties, upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
-    tableConfigWithoutCompaction.getIndexingConfig().setSortedColumn(Collections.singletonList("score"));
+    tableConfigWithoutCompaction.getIndexingConfig().setSortedColumn(List.of("score"));
     tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfigWithoutCompaction);
 
@@ -208,7 +207,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     TableConfig tableConfigWithCompactionAndColumnMajor =
         createCSVUpsertTableConfig(tableNameWithCompactionAndColumnMajor, kafkaTopicName, getNumKafkaPartitions(),
             csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
-    tableConfigWithCompactionAndColumnMajor.getIndexingConfig().setSortedColumn(Collections.singletonList("score"));
+    tableConfigWithCompactionAndColumnMajor.getIndexingConfig().setSortedColumn(List.of("score"));
     tableConfigWithCompactionAndColumnMajor.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(true);
     addTableConfig(tableConfigWithCompactionAndColumnMajor);
 
@@ -451,7 +450,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         .addMultiValueDimension("game", FieldSpec.DataType.STRING)  // Multi-value for UNION strategy
         .addSingleValueDimension("deleted", FieldSpec.DataType.BOOLEAN).addMetric("score", FieldSpec.DataType.FLOAT)
         .addDateTime("timestampInEpoch", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .setPrimaryKeyColumns(Collections.singletonList("playerId"));
+        .setPrimaryKeyColumns(List.of("playerId"));
 
     // Create schema for partial upsert - make game multi-value to support UNION strategy
     String tableNameWithoutCompaction = "gameScoresPartialCompactionDisabled";
@@ -957,6 +956,13 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   private TableConfig createUpsertTable(String tableName, String kafkaTopicName, UpsertConfig.Mode upsertMode,
       boolean enableCommitTimeCompaction, boolean enableColumnMajorSegmentBuilder)
       throws Exception {
+    return createUpsertTable(tableName, kafkaTopicName, upsertMode, enableCommitTimeCompaction,
+        enableColumnMajorSegmentBuilder, null);
+  }
+
+  private TableConfig createUpsertTable(String tableName, String kafkaTopicName, UpsertConfig.Mode upsertMode,
+      boolean enableCommitTimeCompaction, boolean enableColumnMajorSegmentBuilder, @Nullable String deleteRecordColumn)
+      throws Exception {
     // Create schema
     Schema schema = createSchema();
     schema.setSchemaName(tableName);
@@ -965,6 +971,9 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Create upsert config
     UpsertConfig upsertConfig = new UpsertConfig(upsertMode);
     upsertConfig.setEnableCommitTimeCompaction(enableCommitTimeCompaction);
+    if (deleteRecordColumn != null) {
+      upsertConfig.setDeleteRecordColumn(deleteRecordColumn);
+    }
 
     // Create table config
     Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
@@ -1264,27 +1273,16 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
 
     // TABLE 1: With commit-time compaction DISABLED (baseline) and delete record column configured
     String tableNameWithoutCompaction = "gameScoresDeletedRecordsCompactionDisabled";
-    TableConfig tableConfigWithoutCompaction = createUpsertTable(tableNameWithoutCompaction, kafkaTopicName,
-        UpsertConfig.Mode.FULL, false, false);
-    // Configure delete record column for soft deletes
-    tableConfigWithoutCompaction.getUpsertConfig().setDeleteRecordColumn("deleted");
-    updateTableConfig(tableConfigWithoutCompaction);
+    createUpsertTable(tableNameWithoutCompaction, kafkaTopicName, UpsertConfig.Mode.FULL, false, false, "deleted");
 
     // TABLE 2: With commit-time compaction ENABLED + row-major build and delete record column configured
     String tableNameWithCompaction = "gameScoresDeletedRecordsCompactionEnabled";
-    TableConfig tableConfigWithCompaction = createUpsertTable(tableNameWithCompaction, kafkaTopicName,
-        UpsertConfig.Mode.FULL, true, false);
-    // Configure delete record column for soft deletes
-    tableConfigWithCompaction.getUpsertConfig().setDeleteRecordColumn("deleted");
-    updateTableConfig(tableConfigWithCompaction);
+    createUpsertTable(tableNameWithCompaction, kafkaTopicName, UpsertConfig.Mode.FULL, true, false, "deleted");
 
     // TABLE 3: With commit-time compaction ENABLED + column-major build and delete record column configured
     String tableNameWithCompactionColumnMajor = "gameScoresDeletedRecordsCompactionColumnMajor";
-    TableConfig tableConfigWithCompactionColumnMajor = createUpsertTable(tableNameWithCompactionColumnMajor,
-        kafkaTopicName, UpsertConfig.Mode.FULL, true, true);
-    // Configure delete record column for soft deletes
-    tableConfigWithCompactionColumnMajor.getUpsertConfig().setDeleteRecordColumn("deleted");
-    updateTableConfig(tableConfigWithCompactionColumnMajor);
+    createUpsertTable(tableNameWithCompactionColumnMajor, kafkaTopicName, UpsertConfig.Mode.FULL, true, true,
+        "deleted");
 
     // Wait for all three tables to load the same initial data (3 unique records after upserts)
     waitForAllDocsLoaded(tableNameWithoutCompaction, tableNameWithCompaction,

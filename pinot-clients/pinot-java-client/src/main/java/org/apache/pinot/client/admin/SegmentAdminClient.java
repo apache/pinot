@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -154,12 +153,12 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
       crcNode = response;
     }
     if (crcNode == null || crcNode.isNull()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, String> crcMap =
         PinotAdminTransport.getObjectMapper().convertValue(crcNode, new TypeReference<Map<String, String>>() {
         });
-    return crcMap != null ? crcMap : Collections.emptyMap();
+    return crcMap != null ? crcMap : Map.of();
   }
 
   /**
@@ -180,16 +179,16 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
         queryParams.isEmpty() ? null : queryParams, _headers);
 
     if (response == null || !response.isArray() || response.isEmpty()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     JsonNode serversMapNode = response.get(0).get("serverToSegmentsMap");
     if (serversMapNode == null || !serversMapNode.isObject()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     Map<String, List<String>> result = new HashMap<>();
-    serversMapNode.fields().forEachRemaining(entry -> {
+    serversMapNode.properties().forEach(entry -> {
       List<String> segments = new ArrayList<>();
       JsonNode value = entry.getValue();
       if (value != null && value.isArray()) {
@@ -479,8 +478,9 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
       long endTimestampMs, boolean excludeReplacedSegments)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
-    queryParams.put("startTimestampMs", String.valueOf(startTimestampMs));
-    queryParams.put("endTimestampMs", String.valueOf(endTimestampMs));
+    /// Controller reads startTimestamp/endTimestamp (ms); see PinotSegmentRestletResource#getSelectedSegments.
+    queryParams.put("startTimestamp", String.valueOf(startTimestampMs));
+    queryParams.put("endTimestamp", String.valueOf(endTimestampMs));
     queryParams.put("excludeReplacedSegments", String.valueOf(excludeReplacedSegments));
     if (tableType != null) {
       queryParams.put("type", tableType);
@@ -628,7 +628,8 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/zkmetadata",
         null, _headers);
-    return PinotAdminTransport.getObjectMapper().convertValue(response.get("zkMetadata"),
+    /// GET /segments/{tableName}/zkmetadata returns a bare map of segment name -> metadata, not a wrapper object.
+    return PinotAdminTransport.getObjectMapper().convertValue(response,
         new TypeReference<Map<String, Map<String, String>>>() {
         });
   }
@@ -717,7 +718,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
    */
   private List<String> parseSegmentList(JsonNode response) {
     if (response == null || response.isNull()) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     if (response.has("segments")) {
@@ -738,7 +739,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
       return segments;
     }
 
-    return Collections.emptyList();
+    return List.of();
   }
 
   private static String encodePath(String value) {

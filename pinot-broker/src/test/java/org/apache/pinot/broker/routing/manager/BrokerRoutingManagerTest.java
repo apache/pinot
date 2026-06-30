@@ -61,6 +61,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -141,7 +142,7 @@ public class BrokerRoutingManagerTest {
     // Don't set callback
 
     // Enable server
-    List<ZNRecord> instanceConfigs = Collections.singletonList(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
             anyInt(), anyInt())).thenReturn(instanceConfigs);
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
@@ -151,7 +152,7 @@ public class BrokerRoutingManagerTest {
 
     // Disable then re-enable
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
-            anyInt(), anyInt())).thenReturn(Collections.emptyList());
+            anyInt(), anyInt())).thenReturn(List.of());
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
 
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
@@ -170,7 +171,7 @@ public class BrokerRoutingManagerTest {
     _routingManager.setServerReenableCallback(_serverReenableCallback);
 
     // First, enable the server by processing instance config change
-    List<ZNRecord> instanceConfigs = Collections.singletonList(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
         anyInt(), anyInt())).thenReturn(instanceConfigs);
 
@@ -185,7 +186,7 @@ public class BrokerRoutingManagerTest {
     // Now simulate server being disabled then re-enabled (e.g., restart)
     // First, disable
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
-        anyInt(), anyInt())).thenReturn(Collections.emptyList());
+        anyInt(), anyInt())).thenReturn(List.of());
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
 
     // Then re-enable
@@ -208,7 +209,7 @@ public class BrokerRoutingManagerTest {
     _routingManager.setServerReenableCallback(_serverReenableCallback);
 
     // Enable a new server (never excluded)
-    List<ZNRecord> instanceConfigs = Collections.singletonList(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
         anyInt(), anyInt())).thenReturn(instanceConfigs);
 
@@ -226,7 +227,7 @@ public class BrokerRoutingManagerTest {
     TimeBoundaryInfo expectedTimeBoundaryInfo = new TimeBoundaryInfo("DaysSinceEpoch", "20000");
     TablePartitionInfo expectedPartitionInfo =
         new TablePartitionInfo(TEST_TABLE, "partitionCol", "Modulo", 2,
-            List.of(Collections.emptyList(), Collections.emptyList()), Collections.emptyList());
+            List.of(List.of(), List.of()), List.of());
     TablePartitionReplicatedServersInfo expectedReplicatedServersInfo = mock(TablePartitionReplicatedServersInfo.class);
     when(timeBoundaryManager.getTimeBoundaryInfo()).thenReturn(expectedTimeBoundaryInfo);
     when(partitionMetadataManager.getTablePartitionInfo()).thenReturn(expectedPartitionInfo);
@@ -260,6 +261,34 @@ public class BrokerRoutingManagerTest {
   private void putRoutingEntry(String tableNameWithType, Object routingEntry) {
     Map routingEntries = _routingManager._routingEntryMap;
     routingEntries.put(tableNameWithType, routingEntry);
+  }
+
+  @Test
+  public void testRoutableServerInstanceMapReflectsExclusion() {
+    // Enable server
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    // Server is present in both the enabled and routable maps initially.
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+
+    // Exclude the server (simulating FailureDetector marking it unhealthy).
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+
+    // Routable map no longer contains the server, but enabled map still does.
+    // This is the contract MSE WorkerManager relies on for intermediate-stage worker selection.
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertFalse(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+
+    // Re-include the server.
+    _routingManager.includeServerToRouting(SERVER_INSTANCE_ID);
+
+    // Routable map contains the server again.
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
   }
 
   /**

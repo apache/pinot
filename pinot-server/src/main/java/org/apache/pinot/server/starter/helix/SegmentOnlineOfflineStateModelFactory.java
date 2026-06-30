@@ -40,16 +40,16 @@ import org.slf4j.LoggerFactory;
  */
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
 
-  private final String _instanceId;
-  private final InstanceDataManager _instanceDataManager;
+  protected final String _instanceId;
+  protected final InstanceDataManager _instanceDataManager;
   /** Provides custom thread pools for executing Helix state transition messages. If this is null, all state
    * transition message will be executed using the default shared thread pool by Helix */
   @Nullable
-  private final StateTransitionThreadPoolManager _stateTransitionThreadPoolManager;
+  protected final StateTransitionThreadPoolManager _stateTransitionThreadPoolManager;
 
-  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager,
+  public SegmentOnlineOfflineStateModelFactory(InstanceDataManager instanceDataManager,
       @Nullable StateTransitionThreadPoolManager stateTransitionThreadPoolManager) {
-    _instanceId = instanceId;
+    _instanceId = instanceDataManager.getInstanceId();
     _instanceDataManager = instanceDataManager;
     _stateTransitionThreadPoolManager = stateTransitionThreadPoolManager;
   }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
@@ -26,12 +25,14 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class InMemorySendingMailbox implements SendingMailbox {
   private static final Logger LOGGER = LoggerFactory.getLogger(InMemorySendingMailbox.class);
+  private static final String SEND_SCOPE = "InMemorySendingMailbox";
 
   private final String _id;
   private final MailboxService _mailboxService;
@@ -63,7 +64,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
 
   @Override
   public void send(MseBlock.Data data) {
-    sendPrivate(data, Collections.emptyList());
+    QueryThreadContext.checkTerminationAndSampleUsage(SEND_SCOPE);
+    sendPrivate(data, List.of());
   }
 
   @Override
@@ -113,7 +115,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
     }
     _receivingMailbox.setErrorBlock(
         ErrorMseBlock.fromException(new QueryCancelledException(
-            "Cancelled by sender with exception: " + t.getMessage())), Collections.emptyList());
+            "Cancelled by sender with exception: " + t.getMessage())), List.of());
   }
 
   @Override
@@ -142,7 +144,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
       if (_receivingMailbox == null) {
         _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
       }
-      _receivingMailbox.setErrorBlock(ErrorMseBlock.fromException(exception), Collections.emptyList());
+      _receivingMailbox.setErrorBlock(ErrorMseBlock.fromException(exception), List.of());
     }
   }
 }

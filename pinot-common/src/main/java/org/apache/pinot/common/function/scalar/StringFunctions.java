@@ -20,16 +20,20 @@ package org.apache.pinot.common.function.scalar;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.UnsupportedEncodingException;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.commons.codec.language.Soundex;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -43,6 +47,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class StringFunctions {
   private StringFunctions() {
   }
+
+  private static final Soundex SOUNDEX = new Soundex();
 
   /**
    * @see StringUtils#reverse(String)
@@ -251,7 +257,7 @@ public class StringFunctions {
 
   /**
    * @see StringUtils#ordinalIndexOf(CharSequence, CharSequence, int)
-   * Return the Nth occurence of a substring within the String
+   * Return the Nth occurrence of a substring within the String
    * @param input
    * @param find substring to find
    * @param instance Integer denoting the instance no.
@@ -264,7 +270,7 @@ public class StringFunctions {
 
   /**
    * @see StringUtils#indexOf(CharSequence, CharSequence)
-   * Return the 1st occurence of a substring within the String
+   * Return the 1st occurrence of a substring within the String
    * @param input
    * @param find substring to find
    * @return start index of the 1st instance of substring in main string
@@ -276,7 +282,7 @@ public class StringFunctions {
 
   /**
    * @see StringUtils#lastIndexOf(CharSequence, CharSequence)
-   * Return the last occurence of a substring within the String
+   * Return the last occurrence of a substring within the String
    * @param input
    * @param find substring to find
    * @return start index of the last instance of substring in main string
@@ -288,7 +294,7 @@ public class StringFunctions {
 
   /**
    * @see StringUtils#lastIndexOf(CharSequence, CharSequence, int)
-   * Return the Nth occurence of a substring in string starting from the end of the string.
+   * Return the Nth occurrence of a substring in string starting from the end of the string.
    * @param input
    * @param find substring to find
    * @param instance Integer denoting the instance no.
@@ -442,11 +448,7 @@ public class StringFunctions {
   @ScalarFunction
   public static byte[] toUUIDBytes(String input) {
     try {
-      UUID uuid = UUID.fromString(input);
-      ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
-      bb.putLong(uuid.getMostSignificantBits());
-      bb.putLong(uuid.getLeastSignificantBits());
-      return bb.array();
+      return UuidUtils.toBytes(UUID.fromString(input));
     } catch (IllegalArgumentException e) {
       return null;
     }
@@ -459,10 +461,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String fromUUIDBytes(byte[] input) {
-    ByteBuffer bb = ByteBuffer.wrap(input);
-    long firstLong = bb.getLong();
-    long secondLong = bb.getLong();
-    return new UUID(firstLong, secondLong).toString();
+    return UuidUtils.fromBytes(input).toString();
   }
 
   /**
@@ -759,7 +758,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String remove(String input, String search) {
-    return StringUtils.remove(input, search);
+    return Strings.CS.remove(input, search);
   }
 
   /**
@@ -907,5 +906,301 @@ public class StringFunctions {
     } catch (Exception e) {
       return false;
     }
+  }
+
+  /**
+   * Returns the Soundex code for a string. Empty string returns "0000" (SQL standard behaviour).
+   */
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static String soundex(@Nullable String input) {
+    if (input == null) {
+      return null;
+    }
+    if (input.isEmpty()) {
+      return "0000";
+    }
+    return SOUNDEX.soundex(input);
+  }
+
+  /**
+   * Returns an integer 0-4 indicating how similar two strings sound based on their Soundex codes.
+   * 4 means the codes are identical; 0 means they share no common code characters.
+   * The framework null-propagates when either argument is null.
+   */
+  @ScalarFunction
+  public static int difference(String input1, String input2) {
+    String code1 = soundex(input1);
+    String code2 = soundex(input2);
+    int matches = 0;
+    for (int i = 0; i < 4; i++) {
+      if (code1.charAt(i) == code2.charAt(i)) {
+        matches++;
+      }
+    }
+    return matches;
+  }
+
+  /**
+   * Returns the ASCII code of the first character, or 0 for an empty string.
+   * Matches SQL standard behavior (MySQL, PostgreSQL, Trino).
+   *
+   * @param input the input string
+   * @return ASCII value of the first character, or 0 if the string is empty
+   */
+  @ScalarFunction
+  public static int ascii(String input) {
+    return input.isEmpty() ? 0 : (int) input.charAt(0);
+  }
+
+  /**
+   * Returns a string consisting of {@code n} space characters.
+   *
+   * @param n the number of spaces
+   * @return a string of n spaces, or empty string if n is non-positive
+   */
+  @ScalarFunction
+  public static String space(int n) {
+    if (n <= 0) {
+      return "";
+    }
+    return StringUtils.repeat(' ', n);
+  }
+
+  /**
+   * Returns the substring before (positive count) or after (negative count) the Nth delimiter occurrence.
+   *
+   * <p>MySQL-compatible semantics: {@code substringIndex("a.b.c.d", ".", 2)} returns {@code "a.b"}.
+   * Negative count counts from the right: {@code substringIndex("a.b.c.d", ".", -2)} returns {@code "c.d"}.
+   *
+   * @param input the input string
+   * @param delimiter the delimiter to search for
+   * @param count occurrence count (positive = from left, negative = from right)
+   * @return the substring, or the entire input if the delimiter does not occur enough times
+   */
+  @ScalarFunction(names = {"substringIndex", "substring_index"})
+  public static String substringIndex(String input, String delimiter, int count) {
+    if (count == 0 || delimiter.isEmpty()) {
+      return "";
+    }
+    if (count > 0) {
+      int idx = StringUtils.ordinalIndexOf(input, delimiter, count);
+      return idx == -1 ? input : input.substring(0, idx);
+    } else {
+      int idx = StringUtils.lastOrdinalIndexOf(input, delimiter, -count);
+      return idx == -1 ? input : input.substring(idx + delimiter.length());
+    }
+  }
+
+  /**
+   * Returns the first line of the input string (up to the first line terminator).
+   * Handles Unix ({@code \n}), Windows ({@code \r\n}), and old Mac ({@code \r}) line endings.
+   *
+   * @param input the input string
+   * @return the first line, without the line terminator
+   */
+  @ScalarFunction
+  public static String firstLine(String input) {
+    int idxN = input.indexOf('\n');
+    int idxR = input.indexOf('\r');
+    if (idxN == -1 && idxR == -1) {
+      return input;
+    }
+    int idx = (idxN == -1) ? idxR : (idxR == -1) ? idxN : Math.min(idxN, idxR);
+    return input.substring(0, idx);
+  }
+
+  /**
+   * Returns true if the string starts with the given prefix, ignoring case differences.
+   *
+   * @param input the input string
+   * @param prefix the prefix to check
+   * @return true if the input starts with the prefix (case-insensitive)
+   */
+  @ScalarFunction
+  public static boolean startsWithCaseInsensitive(String input, String prefix) {
+    return Strings.CI.startsWith(input, prefix);
+  }
+
+  /**
+   * Returns true if the string ends with the given suffix, ignoring case differences.
+   *
+   * @param input the input string
+   * @param suffix the suffix to check
+   * @return true if the input ends with the suffix (case-insensitive)
+   */
+  @ScalarFunction
+  public static boolean endsWithCaseInsensitive(String input, String suffix) {
+    return Strings.CI.endsWith(input, suffix);
+  }
+
+  /**
+   * Returns true if all characters in the string are valid ASCII (values 0–127).
+   *
+   * @param input the input string
+   * @return true if every character is in the ASCII range
+   */
+  @ScalarFunction
+  public static boolean isValidASCII(String input) {
+    for (int i = 0; i < input.length(); i++) {
+      if (input.charAt(i) > 127) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Returns the number of bytes in the UTF-8 representation of the string.
+   *
+   * @param input the input string
+   * @return byte length of the UTF-8 encoded string
+   */
+  @ScalarFunction(names = {"octetLength", "octet_length"})
+  public static int octetLength(String input) {
+    return input.getBytes(StandardCharsets.UTF_8).length;
+  }
+
+  /**
+   * Returns the number of bits in the UTF-8 representation of the string.
+   *
+   * @param input the input string
+   * @return bit length of the UTF-8 encoded string
+   */
+  @ScalarFunction(names = {"bitLength", "bit_length"})
+  public static int bitLength(String input) {
+    return octetLength(input) * 8;
+  }
+
+  /**
+   * Returns the number of Unicode codepoints in the string.
+   * Unlike {@link #length(String)}, this correctly counts supplementary characters (e.g., emoji) as one.
+   *
+   * @param input the input string
+   * @return number of Unicode codepoints
+   */
+  @ScalarFunction(names = {"charLength", "char_length", "characterLength", "character_length"})
+  public static int charLength(String input) {
+    return input.codePointCount(0, input.length());
+  }
+
+  /**
+   * Returns the number of non-overlapping matches of a regular expression pattern in the string.
+   *
+   * <p>Note: the pattern is compiled on every invocation. For constant-pattern queries, consider
+   * adding a {@code RegexpCountConstFunctions} variant in the {@code regexp/} package.
+   *
+   * @param input the input string
+   * @param regexp the regular expression pattern
+   * @return count of non-overlapping matches
+   */
+  @ScalarFunction(names = {"regexpCount", "regexp_count"})
+  public static int regexpCount(String input, String regexp) {
+    Matcher matcher = Pattern.compile(regexp).matcher(input);
+    int count = 0;
+    while (matcher.find()) {
+      count++;
+    }
+    return count;
+  }
+
+  /**
+   * Returns the first substring that matches the regular expression, or null if no match is found.
+   *
+   * <p>Note: the pattern is compiled on every invocation. For constant-pattern queries, consider
+   * adding a {@code RegexpSubstrConstFunctions} variant in the {@code regexp/} package.
+   *
+   * @param input the input string
+   * @param regexp the regular expression pattern
+   * @return the first matching substring, or null if no match
+   */
+  @Nullable
+  @ScalarFunction(names = {"regexpSubstr", "regexp_substr"})
+  public static String regexpSubstr(String input, String regexp) {
+    Matcher matcher = Pattern.compile(regexp).matcher(input);
+    return matcher.find() ? matcher.group() : null;
+  }
+
+  /**
+   * Returns a string with every occurrence of a character in {@code from} replaced by the corresponding character in
+   * {@code to}. Characters in {@code input} that do not appear in {@code from} are left unchanged. If {@code from} is
+   * longer than {@code to}, characters beyond the length of {@code to} are deleted from the result. Equivalent to the
+   * SQL standard {@code TRANSLATE(string, from, to)} function supported by PostgreSQL, Oracle, and Trino.
+   *
+   * <p>Examples:
+   * <pre>
+   *   translate("hello", "aeiou", "AEIOU") → "hEllO"
+   *   translate("abc", "abc", "xy")        → "xy"   (c has no target → deleted)
+   *   translate("abcdef", "ace", "XY")     → "XbYdf" (e has no target → deleted)
+   * </pre>
+   *
+   * @param input the source string
+   * @param from  characters to search for (must not be null)
+   * @param to    replacement characters (must not be null; may be shorter than {@code from})
+   * @return the translated string
+   */
+  @ScalarFunction
+  public static String translate(String input, String from, String to) {
+    if (input.isEmpty() || from.isEmpty()) {
+      return input;
+    }
+    StringBuilder sb = new StringBuilder(input.length());
+    for (int i = 0; i < input.length(); i++) {
+      char c = input.charAt(i);
+      int idx = from.indexOf(c);
+      if (idx < 0) {
+        sb.append(c);
+      } else if (idx < to.length()) {
+        sb.append(to.charAt(idx));
+      }
+      // idx >= to.length(): character is deleted (not appended)
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Replaces a substring of {@code input} with {@code replacement}, starting at the 1-based position {@code start}
+   * and replacing {@code length} characters. Equivalent to the SQL standard
+   * {@code OVERLAY(string PLACING replacement FROM start FOR length)} function supported by PostgreSQL and Trino.
+   *
+   * <p>When {@code length} is omitted (i.e. {@code OVERLAY(string PLACING new_str FROM start)}), it defaults to the
+   * length of {@code replacement}, so the replaced and inserted substrings are the same width.
+   *
+   * <p>Examples:
+   * <pre>
+   *   overlay("hello world", "there", 7)     → "hello there"   (length defaults to len("there") = 5)
+   *   overlay("hello world", "there", 7, 5)  → "hello there"
+   *   overlay("abcdef", "XY", 3, 0)          → "abXYcdef"      (insertion without deletion)
+   *   overlay("abcdef", "XY", 3, 4)          → "abXY"          (delete 4 chars cdef, insert 2)
+   * </pre>
+   *
+   * @param input       the source string
+   * @param replacement the string to insert
+   * @param start       1-based position in {@code input} at which replacement begins (clamped to [1, len+1])
+   * @return the result string
+   */
+  @ScalarFunction
+  public static String overlay(String input, String replacement, int start) {
+    return overlay(input, replacement, start, replacement.length());
+  }
+
+  /**
+   * Replaces {@code length} characters of {@code input} with {@code replacement}, starting at the 1-based position
+   * {@code start}. Equivalent to the SQL standard
+   * {@code OVERLAY(string PLACING replacement FROM start FOR length)} function.
+   *
+   * @param input       the source string
+   * @param replacement the string to insert
+   * @param start       1-based start position (clamped to [1, len+1])
+   * @param length      number of characters to delete from {@code input} (clamped to [0, remaining])
+   * @return the result string
+   */
+  @ScalarFunction
+  public static String overlay(String input, String replacement, int start, int length) {
+    int len = input.length();
+    // Convert to 0-based, clamping to valid range
+    int s = Math.max(0, Math.min(start - 1, len));
+    int e = Math.min(s + Math.max(0, length), len);
+    return input.substring(0, s) + replacement + input.substring(e);
   }
 }

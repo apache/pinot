@@ -23,7 +23,6 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -51,7 +50,7 @@ import org.apache.pinot.spi.data.Schema;
 public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
   public static final String INDEX_DISPLAY_NAME = "null";
   private static final List<String> EXTENSIONS =
-      Collections.singletonList(V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
 
   protected NullValueIndexType() {
     super(StandardIndexes.NULL_VALUE_VECTOR_ID);
@@ -115,6 +114,18 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       Schema schema, TableConfig tableConfig) {
     return IndexHandler.NoOp.INSTANCE;
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
+    // The null value vector is a bitmap of doc IDs whose value is null; no dictionary involvement.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, IndexConfig indexConfig) {
+    // The null value vector is keyed by doc ID and independent of the column's value representation.
+    return false;
   }
 
   @Override

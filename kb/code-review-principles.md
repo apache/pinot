@@ -921,35 +921,56 @@ Investigate CI failures in newly added tests before approval.
 Don't blindly update expected values without understanding root cause.
 - Trigger: Any PR modifying test expected values
 
+**C6.10 — Reject unnecessary standalone integration-test clusters**
+New Pinot integration tests should not spin up a fresh controller / broker / server / ZK cluster unless the test needs
+special setup. Ordinary query/data behavior tests should reuse an existing `CustomDataQueryClusterIntegrationTest`
+subclass or add a focused subclass under
+`pinot-integration-tests/src/test/java/org/apache/pinot/integration/tests/custom/`, with
+`@Test(suiteName = "CustomClusterIntegrationTest")`, so it is picked up by
+`pinot-integration-tests/src/test/resources/custom-cluster-integration-test-suite.xml`. This keeps CI from paying
+another cluster startup cost for tests that only need custom schema, data, and SQL assertions.
+- Trigger: Any PR adding a new Pinot integration test class that uses `BaseClusterIntegrationTest`, starts Pinot
+  components directly, or creates a dedicated cluster without a distinct topology/component setup requirement
+
+```java
+// BAD: New class pays a fresh cluster startup just to test schema/data/query behavior
+public class JsonFunctionIntegrationTest extends BaseClusterIntegrationTest { ... }
+```
+```java
+// GOOD: Reuse the shared custom-data cluster suite
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class JsonFunctionTest extends CustomDataQueryClusterIntegrationTest { ... }
+```
+
 ### MINOR
 
-**C6.10 — Core concurrent data structures require dedicated concurrent tests**
+**C6.11 — Core concurrent data structures require dedicated concurrent tests**
 - Trigger: Any PR adding or modifying concurrent data structures
 
-**C6.11 — Preserve test randomization**
+**C6.12 — Preserve test randomization**
 Don't fix random seeds without justification.
 - Trigger: Any PR fixing random seeds in tests
 
-**C6.12 — Tests should mimic real-world data states**
+**C6.13 — Tests should mimic real-world data states**
 Don't assume clean initial conditions.
 - Trigger: Any PR with test setup that assumes pristine state
 
-**C6.13 — Remove tests for invalid/unsupported request patterns**
+**C6.14 — Remove tests for invalid/unsupported request patterns**
 - Trigger: Any PR maintaining tests for deprecated functionality
 
-**C6.14 — Avoid expensive test setup changes**
+**C6.15 — Avoid expensive test setup changes**
 Don't change @BeforeClass to @BeforeMethod without justification.
 - Trigger: Any PR changing test lifecycle annotations
 
-**C6.15 — Binary compatibility baselines should use PR base commit**
+**C6.16 — Binary compatibility baselines should use PR base commit**
 Not latest master, to avoid false positives.
 - Trigger: Any PR modifying backward compatibility test configuration
 
-**C6.16 — Place tests in the correct test file**
+**C6.17 — Place tests in the correct test file**
 Tests for ClassB don't belong in ClassA's test file.
 - Trigger: Any PR adding tests to an unrelated test class
 
-**C6.17 — Maintain test scale unless explicitly justified**
+**C6.18 — Maintain test scale unless explicitly justified**
 Smaller tests may miss issues. Use assertions, not logging.
 - Trigger: Any PR reducing test data size or adding logging to tests
 
@@ -1026,7 +1047,23 @@ Getters use `isXXXEnabled()` not `isEnableXXX()`. Use `==` for enum comparisons.
 - Trigger: Any PR adding boolean getters or enum comparisons
 
 **C7.12 — Modern Java idioms**
-`List.of()` over `Collections.emptyList()`. Java std lib over Guava. `computeIfAbsent()` over manual check-and-put.
+Use Java immutable collection factories for non-null literals. Checkstyle blocks
+`Collections.emptyList()`, `Collections.emptySet()`, and
+`Collections.emptyMap()`, including method references such as
+`Collections::emptyList`, `Collections::emptySet`, and `Collections::emptyMap`;
+use `List.of()`, `Set.of()`, and `Map.of()` instead. Prefer `Set.of(x)` over
+`Collections.singleton(x)`, and prefer `List.of(x)` and `Map.of(k, v)` over
+`Collections.singletonList(x)` and
+`Collections.singletonMap(k, v)` for non-null singleton literals. Do not add
+blanket bans for `Collections.singleton*`, but use those factories only when an
+element/key/value argument is intentionally null because `List.of(null)`,
+`Set.of(null)`, and `Map.of(...)` with null keys or values throw
+`NullPointerException`. Keep such null-preserving cases explicit and local.
+Before replacing empty collection factories, check whether the returned value
+flows to mutating callers; `List.of().remove(x)` throws even when `x` is absent,
+while `Collections.emptyList().remove(x)` did not. Copy at the mutating call site
+when needed. Java std lib over Guava.
+`computeIfAbsent()` over manual check-and-put.
 - Trigger: Any PR using older Java patterns
 
 **C7.13 — No final on local variables**
@@ -1184,7 +1221,7 @@ Approve the immediate fix while deferring broader design to separate threads.
 | 3. Code Architecture & Module Design | 5 | 11 | 8 | 24 |
 | 4. Performance & Efficiency | 2 | 16 | 4 | 22 |
 | 5. Correctness & Safety | 9 | 16 | 3 | 28 |
-| 6. Testing Strategies | 2 | 7 | 8 | 17 |
+| 6. Testing Strategies | 2 | 8 | 8 | 18 |
 | 7. Naming & API Design | 1 | 9 | 10 | 20 |
 | 8. Process & Scope | 2 | 10 | 8 | 20 |
-| **Total** | **32** | **83** | **48** | **163** |
+| **Total** | **32** | **84** | **48** | **164** |

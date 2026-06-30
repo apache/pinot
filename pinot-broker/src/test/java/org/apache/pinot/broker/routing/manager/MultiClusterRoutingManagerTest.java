@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.manager;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -264,6 +263,28 @@ public class MultiClusterRoutingManagerTest {
     assertTrue(result.containsKey("server2"));
   }
 
+  @Test
+  public void testGetRoutableServerInstanceMapCombinesAll() {
+    ServerInstance server1 = createMockServerInstance("server1");
+    ServerInstance server2 = createMockServerInstance("server2");
+
+    Map<String, ServerInstance> localRoutable = new HashMap<>();
+    localRoutable.put("server1", server1);
+
+    Map<String, ServerInstance> remoteRoutable = new HashMap<>();
+    remoteRoutable.put("server2", server2);
+
+    when(_localClusterRoutingManager.getRoutableServerInstanceMap()).thenReturn(localRoutable);
+    when(_remoteClusterRoutingManager1.getRoutableServerInstanceMap()).thenReturn(remoteRoutable);
+    when(_remoteClusterRoutingManager2.getRoutableServerInstanceMap()).thenReturn(new HashMap<>());
+
+    Map<String, ServerInstance> result = _multiClusterRoutingManager.getRoutableServerInstanceMap();
+
+    assertEquals(result.size(), 2);
+    assertTrue(result.containsKey("server1"));
+    assertTrue(result.containsKey("server2"));
+  }
+
   // Helper methods
 
   private BrokerRequest createMockBrokerRequest(String tableName) {
@@ -277,9 +298,9 @@ public class MultiClusterRoutingManagerTest {
   private RoutingTable createRoutingTable(String serverName, List<String> segments) {
     Map<ServerInstance, SegmentsToQuery> serverMap = new HashMap<>();
     ServerInstance server = createMockServerInstance(serverName);
-    SegmentsToQuery segmentsToQuery = new SegmentsToQuery(segments, Collections.emptyList());
+    SegmentsToQuery segmentsToQuery = new SegmentsToQuery(segments, List.of());
     serverMap.put(server, segmentsToQuery);
-    return new RoutingTable(serverMap, Collections.emptyList(), 0);
+    return new RoutingTable(serverMap, List.of(), 0);
   }
 
   private ServerInstance createMockServerInstance(String instanceName) {

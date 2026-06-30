@@ -23,7 +23,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -31,18 +31,24 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public interface JsonIndexReader extends IndexReader {
 
-  MutableRoaringBitmap getMatchingDocIds(String filterString);
+  /// Returns the matching document ids for the given filter string.
+  ///
+  /// The returned bitmap MUST be treated as read-only. It may be a borrowed view backed by the index's underlying
+  /// (possibly memory-mapped) storage, so it is valid only while the segment/index is held open and must not be
+  /// mutated. Callers that need to mutate the result should first copy it via
+  /// [ImmutableRoaringBitmap#toMutableRoaringBitmap()]. Stock readers still return a freshly-allocated bitmap; an
+  /// mmap-backed reader may return the posting list directly to avoid a per-call copy.
+  ImmutableRoaringBitmap getMatchingDocIds(String filterString);
 
-  /**
-   * Returns the matching document ids for the given filter Context.
-   */
-  MutableRoaringBitmap getMatchingDocIds(Object filterCtx);
+  /// Returns the matching document ids for the given filter context. See [#getMatchingDocIds(String)] for the
+  /// read-only borrowed-bitmap contract.
+  ImmutableRoaringBitmap getMatchingDocIds(Object filterCtx);
 
-  /**
-   * Returns the matching document ids for the given filter.
-   * @param flatDocCountFilter predicate used to filter results based on number of matched flattened document
-   */
-  default MutableRoaringBitmap getMatchingDocIds(String documentFilter, String flatDocCountFilter) {
+  /// Returns the matching document ids for the given filter. See [#getMatchingDocIds(String)] for the read-only
+  /// borrowed-bitmap contract.
+  ///
+  /// @param flatDocCountFilter predicate used to filter results based on number of matched flattened document
+  default ImmutableRoaringBitmap getMatchingDocIds(String documentFilter, String flatDocCountFilter) {
     return getMatchingDocIds(documentFilter);
   }
 

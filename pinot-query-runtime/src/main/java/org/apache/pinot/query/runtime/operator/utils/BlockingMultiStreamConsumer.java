@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator.utils;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -394,7 +393,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       if (terminateException != null) {
         return onException(terminateException.getErrorCode(), terminateException.getMessage());
       }
-      // TODO: Add the sender stage id to the error message
       String errMsg = "Timed out on stage " + _stageId + " waiting for data from child stage " + _senderStageId;
       // We log this case as debug because:
       // - The opchain will already log a stackless message once the opchain fail
@@ -412,8 +410,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       if (terminateException != null) {
         return onException(terminateException.getErrorCode(), terminateException.getMessage());
       }
-      // TODO: Add the sender stage id to the error message
-      String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage";
+      String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage " + _senderStageId;
       // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
       // with an exception and the stack trace may be useful to find the root cause.
       LOGGER.warn(errMsg, e);
@@ -426,11 +423,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
         if (_stats != null) {
           serializedStats = _stats.serialize();
         } else {
-          serializedStats = Collections.emptyList();
+          serializedStats = List.of();
         }
       } catch (IOException ioEx) {
         LOGGER.warn("Could not serialize stats", ioEx);
-        serializedStats = Collections.emptyList();
+        serializedStats = List.of();
       }
       ErrorMseBlock errorBlock = ErrorMseBlock.fromException(code.asException(errMsg));
       return new ReceivingMailbox.MseBlockWithStats(errorBlock, serializedStats);
@@ -438,7 +435,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected ReceivingMailbox.MseBlockWithStats onSuccess() {
-      return new ReceivingMailbox.MseBlockWithStats(SuccessMseBlock.INSTANCE, Collections.emptyList());
+      return new ReceivingMailbox.MseBlockWithStats(SuccessMseBlock.INSTANCE, List.of());
     }
 
     public MultiStageQueryStats calculateStats() {

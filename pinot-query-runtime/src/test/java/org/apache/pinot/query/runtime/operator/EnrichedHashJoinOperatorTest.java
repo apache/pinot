@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
@@ -439,7 +438,7 @@ public class EnrichedHashJoinOperatorTest {
 
     HashJoinOperator operator =
         getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1),
-            Collections.emptyList(),
+            List.of(),
             PlanNode.NodeHint.EMPTY, null, null, null, fetch, offset);
 
     List<Object[]> resultRows = new ArrayList<>();
@@ -480,7 +479,7 @@ public class EnrichedHashJoinOperatorTest {
 
     HashJoinOperator operator =
         getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1),
-            Collections.emptyList(),
+            List.of(),
             PlanNode.NodeHint.EMPTY, null, null, null, fetch, offset);
 
     List<Object[]> resultRows = new ArrayList<>();
@@ -523,7 +522,7 @@ public class EnrichedHashJoinOperatorTest {
 
     HashJoinOperator operator =
         getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1),
-            Collections.emptyList(),
+            List.of(),
             PlanNode.NodeHint.EMPTY, null, null, null, fetch, offset);
 
     List<Object[]> resultRows = new ArrayList<>();
@@ -566,7 +565,7 @@ public class EnrichedHashJoinOperatorTest {
 
     HashJoinOperator operator =
         getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1),
-            Collections.emptyList(),
+            List.of(),
             PlanNode.NodeHint.EMPTY, null, null, null, fetch, offset);
 
     List<Object[]> resultRows = new ArrayList<>();

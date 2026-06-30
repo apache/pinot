@@ -23,7 +23,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Map;
-import org.apache.pinot.common.utils.PinotDataType;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
@@ -35,6 +35,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,11 +89,12 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public void collect(Object entry) {
     assert !_sealed;
+    _totalDocs++;
 
     if (entry instanceof Map) {
       //noinspection unchecked
       Map<String, Object> mapValue = (Map<String, Object>) entry;
-      int length = MapUtils.serializeMap(mapValue).length;
+      int length = MapUtils.serializedSize(mapValue);
       _minLength = Math.min(_minLength, length);
       _maxLength = Math.max(_maxLength, length);
 
@@ -206,26 +208,29 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     }
   }
 
+  @Nullable
   @Override
   public String getMinValue() {
     if (_sealed) {
-      return _sortedKeys[0];
+      return _sortedKeys.length > 0 ? _sortedKeys[0] : null;
     }
     throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
+  @Nullable
   @Override
   public String getMaxValue() {
     if (_sealed) {
-      return _sortedKeys[_sortedKeys.length - 1];
+      return _sortedKeys.length > 0 ? _sortedKeys[_sortedKeys.length - 1] : null;
     }
     throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
 
+  @Nullable
   @Override
   public String[] getUniqueValuesSet() {
     if (_sealed) {
-      return _sortedKeys;
+      return _sortedKeys.length > 0 ? _sortedKeys : null;
     }
     throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
@@ -279,7 +284,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
    */
   private AbstractColumnStatisticsCollector createKeyStatsCollector(String key, Object value) {
     // Get the type of the value
-    PinotDataType type = PinotDataType.getSingleValueType(value.getClass());
+    PinotDataType type = PinotDataType.getSingleValueType(value);
     return createKeyStatsCollector(key, convertToDataType(type));
   }
 
@@ -311,7 +316,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       default:
         LOGGER.warn("Unknown data type {} for key {}", dataType, key);
         return new StringColumnPreIndexStatsCollector(key, config);
-      }
+    }
   }
 
   private AbstractColumnStatisticsCollector promoteNumericKeyStatsToStringCollector(String key,
@@ -358,7 +363,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       case BYTE:
       case CHARACTER:
       case SHORT:
-      case INTEGER:
+      case INT:
         return FieldSpec.DataType.INT;
       case LONG:
         return FieldSpec.DataType.LONG;

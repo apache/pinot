@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.io.IOUtils;
@@ -54,10 +53,14 @@ public class UrlAuthProvider implements AuthProvider {
   }
 
   public UrlAuthProvider(AuthConfig authConfig) {
+    _header = AuthProviderUtils.getOrDefault(authConfig, HEADER, HttpHeaders.AUTHORIZATION);
+    _prefix = AuthProviderUtils.getOrDefault(authConfig, PREFIX, "Bearer");
+    Object urlValue = authConfig.getProperties().get(URL);
+    if (urlValue == null) {
+      throw new IllegalArgumentException("Missing required auth config property: " + URL);
+    }
     try {
-      _header = AuthProviderUtils.getOrDefault(authConfig, HEADER, HttpHeaders.AUTHORIZATION);
-      _prefix = AuthProviderUtils.getOrDefault(authConfig, PREFIX, "Bearer");
-      _url = new URL(authConfig.getProperties().get(URL).toString());
+      _url = new URL(urlValue.toString());
     } catch (MalformedURLException e) {
       throw new IllegalArgumentException(e);
     }
@@ -65,7 +68,7 @@ public class UrlAuthProvider implements AuthProvider {
 
   @Override
   public Map<String, Object> getRequestHeaders() {
-    return Collections.singletonMap(_header, makeToken());
+    return Map.of(_header, makeToken());
   }
 
   @Override

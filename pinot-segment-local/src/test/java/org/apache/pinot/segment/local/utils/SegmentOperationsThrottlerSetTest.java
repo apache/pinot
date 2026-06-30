@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.utils;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -195,15 +197,61 @@ public class SegmentOperationsThrottlerSetTest {
 
   @Test
   public void testThrowExceptionOnSettingInvalidConfigValues() {
-    // All invalid constructor args should throw IllegalArgumentException regardless of isServingQueries
+    // Negative constructor args should throw IllegalArgumentException regardless of isServingQueries.
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(-1, 4, true));
-    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(0, 4, true));
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(1, -4, true));
-    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(1, 0, true));
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(-1, 4, false));
-    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(0, 4, false));
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(1, -4, false));
-    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(1, 0, false));
+  }
+
+  @Test
+  public void testZeroPermitsKillSwitch()
+      throws Exception {
+    SegmentOperationsThrottler t = new SegmentOperationsThrottler(0, 0, true);
+    Assert.assertEquals(t.totalPermits(), 0);
+    Assert.assertEquals(t.availablePermits(), 0);
+
+    // Updating to a positive value lifts the kill switch.
+    t.updatePermits(2, 2);
+    Assert.assertEquals(t.totalPermits(), 2);
+    Assert.assertEquals(t.availablePermits(), 2);
+
+    // Setting back to 0 restores the kill switch without throwing.
+    t.updatePermits(0, 0);
+    Assert.assertEquals(t.totalPermits(), 0);
+    Assert.assertEquals(t.availablePermits(), 0);
+  }
+
+  @Test(timeOut = 10_000)
+  public void testZeroPermitsUnblocksWhenPermitsRestored()
+      throws Exception {
+    SegmentOperationsThrottler t = new SegmentOperationsThrottler(0, 0, true);
+    Assert.assertEquals(t.totalPermits(), 0);
+    Assert.assertEquals(t.availablePermits(), 0);
+
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    Thread acquirer = new Thread(() -> {
+      try {
+        t.acquire();
+      } catch (Throwable th) {
+        failure.set(th);
+      }
+    }, "kill-switch-acquirer");
+    acquirer.setDaemon(true);
+    acquirer.start();
+
+    // Restore permits — the parked acquirer should be released.
+    t.updatePermits(1, 1);
+    acquirer.join(TimeUnit.SECONDS.toMillis(5));
+    Assert.assertFalse(acquirer.isAlive(), "acquire() should complete once permits are restored");
+    Assert.assertNull(failure.get(), "acquirer thread should not throw");
+
+    // The released acquirer holds the one permit, so available is now 0 with total 1.
+    Assert.assertEquals(t.totalPermits(), 1);
+    Assert.assertEquals(t.availablePermits(), 0);
+
+    t.release();
+    Assert.assertEquals(t.availablePermits(), 1);
   }
 
   @Test
@@ -259,7 +307,7 @@ public class SegmentOperationsThrottlerSetTest {
       Assert.assertEquals(countGaugeValue, 0);
 
       // Change the value of cluster config for max segment operation parallelism to be a negative value.
-      // If config is <= 0, this is an invalid configuration change. The throttler should not be updated.
+      // Negative values are invalid and the throttler should not be updated. (0 is valid as a kill switch.)
       Map<String, String> updatedClusterConfigs = new HashMap<>();
       updatedClusterConfigs.put(PARALLELISM_KEYS[i], "-1");
       sot.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
@@ -336,6 +384,107 @@ public class SegmentOperationsThrottlerSetTest {
       }
       Assert.assertEquals(t.totalPermits(), initialPermits * 2);
       Assert.assertEquals(t.availablePermits(), initialPermits * 2);
+    }
+  }
+
+  @Test
+  public void testChangeOnlyMaxConcurrencyPreservesBeforeServingQueries() {
+    // Regression: changing only maxConcurrency must not reset maxConcurrencyBeforeServingQueries (which defaults to
+    // Integer.MAX_VALUE and would have been clobbered before the fix).
+    int initialMaxConcurrency = 4;
+    int initialBeforeServing = 8;
+    SegmentOperationsThrottler[] throttlers = createThrottlers(initialMaxConcurrency, initialBeforeServing, false);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
+    for (int i = 0; i < NUM_THROTTLERS; i++) {
+      SegmentOperationsThrottler t = throttlers[i];
+      // Not serving queries yet, so permits reflect the before-serving value.
+      Assert.assertEquals(t.totalPermits(), initialBeforeServing);
+
+      // Change only maxConcurrency.
+      Map<String, String> updatedClusterConfigs = new HashMap<>();
+      updatedClusterConfigs.put(PARALLELISM_KEYS[i], String.valueOf(initialMaxConcurrency * 2));
+      sot.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
+
+      // Before-serving value must be preserved (permits unchanged while not serving).
+      Assert.assertEquals(t.totalPermits(), initialBeforeServing);
+
+      // After serving begins, permits reflect the newly-applied maxConcurrency.
+      t.startServingQueries();
+      Assert.assertEquals(t.totalPermits(), initialMaxConcurrency * 2);
+    }
+  }
+
+  @Test
+  public void testChangeOnlyBeforeServingQueriesPreservesMaxConcurrency() {
+    // Regression: changing only maxConcurrencyBeforeServingQueries must not reset maxConcurrency (which defaults to
+    // Integer.MAX_VALUE and would have been clobbered before the fix).
+    int initialMaxConcurrency = 4;
+    int initialBeforeServing = 8;
+    SegmentOperationsThrottler[] throttlers = createThrottlers(initialMaxConcurrency, initialBeforeServing, false);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
+    for (int i = 0; i < NUM_THROTTLERS; i++) {
+      SegmentOperationsThrottler t = throttlers[i];
+      Assert.assertEquals(t.totalPermits(), initialBeforeServing);
+
+      // Change only maxConcurrencyBeforeServingQueries.
+      Map<String, String> updatedClusterConfigs = new HashMap<>();
+      updatedClusterConfigs.put(PARALLELISM_BEFORE_SERVING_KEYS[i], String.valueOf(initialBeforeServing * 2));
+      sot.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
+
+      // Before-serving value updated.
+      Assert.assertEquals(t.totalPermits(), initialBeforeServing * 2);
+
+      // After serving begins, the preserved maxConcurrency is applied.
+      t.startServingQueries();
+      Assert.assertEquals(t.totalPermits(), initialMaxConcurrency);
+    }
+  }
+
+  @Test
+  public void testInvalidChangedConfigLeavesBothValuesUntouched() {
+    // An unparseable changed config triggers the early return before updatePermits; neither the changed nor the
+    // unchanged value should be modified.
+    int initialMaxConcurrency = 4;
+    int initialBeforeServing = 8;
+    SegmentOperationsThrottler[] throttlers = createThrottlers(initialMaxConcurrency, initialBeforeServing, false);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
+    for (int i = 0; i < NUM_THROTTLERS; i++) {
+      SegmentOperationsThrottler t = throttlers[i];
+      Assert.assertEquals(t.totalPermits(), initialBeforeServing);
+
+      // Change only maxConcurrency to a non-numeric value.
+      Map<String, String> updatedClusterConfigs = new HashMap<>();
+      updatedClusterConfigs.put(PARALLELISM_KEYS[i], "not-a-number");
+      sot.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
+
+      // Before-serving value untouched (still not serving).
+      Assert.assertEquals(t.totalPermits(), initialBeforeServing);
+      // maxConcurrency untouched: after serving begins, the original value applies.
+      t.startServingQueries();
+      Assert.assertEquals(t.totalPermits(), initialMaxConcurrency);
+    }
+  }
+
+  @Test
+  public void testChangeOnlyMaxConcurrencyToZeroAppliesKillSwitchAndPreservesBeforeServing() {
+    // 0 is a valid kill-switch for maxConcurrency; changing only it must not disturb the before-serving value.
+    int initialMaxConcurrency = 4;
+    int initialBeforeServing = 8;
+    SegmentOperationsThrottler[] throttlers = createThrottlers(initialMaxConcurrency, initialBeforeServing, false);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
+    for (int i = 0; i < NUM_THROTTLERS; i++) {
+      SegmentOperationsThrottler t = throttlers[i];
+      Assert.assertEquals(t.totalPermits(), initialBeforeServing);
+
+      Map<String, String> updatedClusterConfigs = new HashMap<>();
+      updatedClusterConfigs.put(PARALLELISM_KEYS[i], "0");
+      sot.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
+
+      // Before-serving value preserved while not serving.
+      Assert.assertEquals(t.totalPermits(), initialBeforeServing);
+      // Kill switch takes effect once serving begins.
+      t.startServingQueries();
+      Assert.assertEquals(t.totalPermits(), 0);
     }
   }
 

@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.upsert;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -83,8 +82,8 @@ import static org.testng.Assert.*;
 public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
-  private static final List<String> PRIMARY_KEY_COLUMNS = Collections.singletonList("pk");
-  private static final List<String> COMPARISON_COLUMNS = Collections.singletonList("timeCol");
+  private static final List<String> PRIMARY_KEY_COLUMNS = List.of("pk");
+  private static final List<String> COMPARISON_COLUMNS = List.of("timeCol");
   private static final String DELETE_RECORD_COLUMN = "deleteCol";
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), "ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest");
@@ -481,7 +480,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, 1, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
 
     // Stop the metadata manager
     upsertMetadataManager.stop();
@@ -492,7 +491,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     assertEquals(recordLocationMap.size(), 1);
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, 1, hashFunction);
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
 
     // Close the metadata manager
     upsertMetadataManager.close();
@@ -791,7 +790,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, 1, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
     assertEquals(queryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 3});
     assertTrue(newQueryableDocIds1.getMutableRoaringBitmap().isEmpty());
 
@@ -804,7 +803,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     assertEquals(recordLocationMap.size(), 1);
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, 1, hashFunction);
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
     assertTrue(newQueryableDocIds1.getMutableRoaringBitmap().isEmpty());
 
     // Close the metadata manager
@@ -1237,8 +1236,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
       ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
       when(segmentMetadata.getTotalDocs()).thenReturn(deleteFlags.length);
       when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
-        this.put(COMPARISON_COLUMNS.get(0), columnMetadata);
-      }});
+          this.put(COMPARISON_COLUMNS.get(0), columnMetadata);
+        }});
 
       ImmutableSegmentImpl segment =
           mockImmutableSegmentWithSegmentMetadata(1, new ThreadSafeMutableRoaringBitmap(), null, null, segmentMetadata,

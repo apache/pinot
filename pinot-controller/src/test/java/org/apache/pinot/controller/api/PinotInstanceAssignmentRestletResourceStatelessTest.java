@@ -20,8 +20,8 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -123,7 +123,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
         new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME), false, 0, null), null,
         new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
     offlineTableConfig.setInstanceAssignmentConfigMap(
-        Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(), offlineInstanceAssignmentConfig));
+        Map.of(InstancePartitionsType.OFFLINE.toString(), offlineInstanceAssignmentConfig));
     _helixResourceManager.setExistingTableConfig(offlineTableConfig);
 
     // OFFLINE instance partitions should be generated
@@ -141,7 +141,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
         new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME), false, 0, null), null,
         new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
     realtimeTableConfig.setInstanceAssignmentConfigMap(
-        Collections.singletonMap(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig));
+        Map.of(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig));
     _helixResourceManager.setExistingTableConfig(realtimeTableConfig);
 
     // CONSUMING instance partitions should be generated
@@ -151,7 +151,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     assertNotNull(offlineInstancePartitions);
     assertEquals(offlineInstancePartitions.getNumReplicaGroups(), 1);
     assertEquals(offlineInstancePartitions.getNumPartitions(), 1);
-    assertEquals(offlineInstancePartitions.getInstances(0, 0), Collections.singletonList(offlineInstanceId));
+    assertEquals(offlineInstancePartitions.getInstances(0, 0), List.of(offlineInstanceId));
     InstancePartitions consumingInstancePartitions =
         instancePartitionsMap.get(InstancePartitionsType.CONSUMING.toString());
     assertNotNull(consumingInstancePartitions);
@@ -161,7 +161,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     String consumingInstanceId = consumingInstancePartitions.getInstances(0, 0).get(0);
 
     // Add tier config and tier instance assignment config to the offline table config
-    offlineTableConfig.setTierConfigsList(Collections.singletonList(
+    offlineTableConfig.setTierConfigsList(List.of(
         new TierConfig(TIER_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME), null,
             null)));
@@ -185,9 +185,9 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
 
     // Use OFFLINE instance assignment config as the COMPLETED instance assignment config
     realtimeTableConfig.setInstanceAssignmentConfigMap(new TreeMap<String, InstanceAssignmentConfig>() {{
-      put(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig);
-      put(InstancePartitionsType.COMPLETED.toString(), offlineInstanceAssignmentConfig);
-    }});
+        put(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig);
+        put(InstancePartitionsType.COMPLETED.toString(), offlineInstanceAssignmentConfig);
+      }});
     _helixResourceManager.setExistingTableConfig(realtimeTableConfig);
 
     // COMPLETED instance partitions should be generated
@@ -197,21 +197,21 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     assertNotNull(offlineInstancePartitions);
     assertEquals(offlineInstancePartitions.getNumReplicaGroups(), 1);
     assertEquals(offlineInstancePartitions.getNumPartitions(), 1);
-    assertEquals(offlineInstancePartitions.getInstances(0, 0), Collections.singletonList(offlineInstanceId));
+    assertEquals(offlineInstancePartitions.getInstances(0, 0), List.of(offlineInstanceId));
     consumingInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.CONSUMING.toString());
     assertNotNull(consumingInstancePartitions);
     assertEquals(consumingInstancePartitions.getNumReplicaGroups(), 1);
     assertEquals(consumingInstancePartitions.getNumPartitions(), 1);
-    assertEquals(consumingInstancePartitions.getInstances(0, 0), Collections.singletonList(consumingInstanceId));
+    assertEquals(consumingInstancePartitions.getInstances(0, 0), List.of(consumingInstanceId));
     InstancePartitions completedInstancePartitions =
         instancePartitionsMap.get(InstancePartitionsType.COMPLETED.toString());
     assertEquals(completedInstancePartitions.getNumReplicaGroups(), 1);
     assertEquals(completedInstancePartitions.getNumPartitions(), 1);
-    assertEquals(completedInstancePartitions.getInstances(0, 0), Collections.singletonList(offlineInstanceId));
+    assertEquals(completedInstancePartitions.getInstances(0, 0), List.of(offlineInstanceId));
     InstancePartitions tInstancePartitions = instancePartitionsMap.get(TIER_NAME);
     assertEquals(tInstancePartitions.getNumReplicaGroups(), 1);
     assertEquals(tInstancePartitions.getNumPartitions(), 1);
-    assertEquals(tInstancePartitions.getInstances(0, 0), Collections.singletonList(offlineInstanceId));
+    assertEquals(tInstancePartitions.getInstances(0, 0), List.of(offlineInstanceId));
 
     // Test fetching instance partitions by table name with type suffix
     instancePartitionsMap = deserializeInstancePartitionsMap(
@@ -257,20 +257,20 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     assertNotNull(offlineInstancePartitions);
     assertEquals(offlineInstancePartitions.getNumReplicaGroups(), 1);
     assertEquals(offlineInstancePartitions.getNumPartitions(), 1);
-    assertEquals(offlineInstancePartitions.getInstances(0, 0), Collections.singletonList(offlineInstanceId));
+    assertEquals(offlineInstancePartitions.getInstances(0, 0), List.of(offlineInstanceId));
     consumingInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.CONSUMING.toString());
     assertNotNull(consumingInstancePartitions);
     assertEquals(consumingInstancePartitions.getNumReplicaGroups(), 1);
     assertEquals(consumingInstancePartitions.getNumPartitions(), 1);
-    assertEquals(consumingInstancePartitions.getInstances(0, 0), Collections.singletonList(consumingInstanceId));
+    assertEquals(consumingInstancePartitions.getInstances(0, 0), List.of(consumingInstanceId));
     completedInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.COMPLETED.toString());
     assertEquals(completedInstancePartitions.getNumReplicaGroups(), 1);
     assertEquals(completedInstancePartitions.getNumPartitions(), 1);
-    assertEquals(completedInstancePartitions.getInstances(0, 0), Collections.singletonList(offlineInstanceId));
+    assertEquals(completedInstancePartitions.getInstances(0, 0), List.of(offlineInstanceId));
     tInstancePartitions = instancePartitionsMap.get(TIER_NAME);
     assertEquals(tInstancePartitions.getNumReplicaGroups(), 1);
     assertEquals(tInstancePartitions.getNumPartitions(), 1);
-    assertEquals(tInstancePartitions.getInstances(0, 0), Collections.singletonList(offlineInstanceId));
+    assertEquals(tInstancePartitions.getInstances(0, 0), List.of(offlineInstanceId));
 
     // Instance partitions should not be persisted
     try {
@@ -313,7 +313,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
             consumingInstanceId));
     assertEquals(instancePartitionsMap.size(), 1);
     assertEquals(instancePartitionsMap.get(InstancePartitionsType.COMPLETED.toString()).getInstances(0, 0),
-        Collections.singletonList(consumingInstanceId));
+        List.of(consumingInstanceId));
 
     // Replace the instance again using real-time table name (old instance does not exist)
     try {
@@ -330,19 +330,19 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
             consumingInstancePartitions.toJsonString()));
     assertEquals(instancePartitionsMap.size(), 1);
     assertEquals(instancePartitionsMap.get(InstancePartitionsType.CONSUMING.toString()).getInstances(0, 0),
-        Collections.singletonList(consumingInstanceId));
+        List.of(consumingInstanceId));
 
     // OFFLINE instance partitions should have OFFLINE instance, CONSUMING and COMPLETED instance partitions should have
     // CONSUMING instance
     instancePartitionsMap = getInstancePartitionsMap();
     assertEquals(instancePartitionsMap.size(), 4);
     assertEquals(instancePartitionsMap.get(InstancePartitionsType.OFFLINE.toString()).getInstances(0, 0),
-        Collections.singletonList(offlineInstanceId));
-    assertEquals(instancePartitionsMap.get(TIER_NAME).getInstances(0, 0), Collections.singletonList(offlineInstanceId));
+        List.of(offlineInstanceId));
+    assertEquals(instancePartitionsMap.get(TIER_NAME).getInstances(0, 0), List.of(offlineInstanceId));
     assertEquals(instancePartitionsMap.get(InstancePartitionsType.CONSUMING.toString()).getInstances(0, 0),
-        Collections.singletonList(consumingInstanceId));
+        List.of(consumingInstanceId));
     assertEquals(instancePartitionsMap.get(InstancePartitionsType.COMPLETED.toString()).getInstances(0, 0),
-        Collections.singletonList(consumingInstanceId));
+        List.of(consumingInstanceId));
 
     // Delete the offline table
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);

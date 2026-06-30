@@ -24,7 +24,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
@@ -39,7 +38,7 @@ import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
@@ -114,7 +113,7 @@ public class DimensionTableDataManagerTest {
     SegmentGeneratorConfig segmentGeneratorConfig =
         SegmentTestUtils.getSegmentGeneratorConfig(csvFile, FileFormat.CSV, tableDataDir, RAW_TABLE_NAME, tableConfig,
             schema);
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig);
     driver.build();
 
@@ -143,7 +142,7 @@ public class DimensionTableDataManagerTest {
         .setSchemaName("dimBaseballTeams")
         .addSingleValueDimension("teamID", DataType.STRING)
         .addSingleValueDimension("teamName", DataType.STRING)
-        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .setPrimaryKeyColumns(List.of("teamID"))
         .build();
   }
 
@@ -152,7 +151,7 @@ public class DimensionTableDataManagerTest {
         .addSingleValueDimension("teamID", DataType.STRING)
         .addSingleValueDimension("teamName", DataType.STRING)
         .addSingleValueDimension("teamCity", DataType.STRING)
-        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .setPrimaryKeyColumns(List.of("teamID"))
         .build();
   }
 
@@ -250,7 +249,7 @@ public class DimensionTableDataManagerTest {
 
     // Confirm we can read primary column list
     List<String> pkColumns = tableDataManager.getPrimaryKeyColumns();
-    assertEquals(pkColumns, Collections.singletonList("teamID"), "Should return PK column list");
+    assertEquals(pkColumns, List.of("teamID"), "Should return PK column list");
 
     // Remove the segment
     List<SegmentDataManager> segmentManagers = tableDataManager.acquireAllSegments();
@@ -347,7 +346,7 @@ public class DimensionTableDataManagerTest {
 
     // Confirm we can read primary column list
     List<String> pkColumns = tableDataManager.getPrimaryKeyColumns();
-    assertEquals(pkColumns, Collections.singletonList("teamID"), "Should return PK column list");
+    assertEquals(pkColumns, List.of("teamID"), "Should return PK column list");
 
     // Remove the segment
     List<SegmentDataManager> segmentManagers = tableDataManager.acquireAllSegments();

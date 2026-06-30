@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,10 +94,10 @@ public class QuickstartRunner {
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
-    int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides, AuthProvider authProvider)
-    throws Exception {
+      int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides, AuthProvider authProvider)
+      throws Exception {
     this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, authProvider,
-      configOverrides, null, true, Map.of());
+        configOverrides, null, true, Map.of());
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
@@ -300,7 +299,7 @@ public class QuickstartRunner {
 
   public JsonNode runQuery(String query)
       throws Exception {
-    return runQuery(query, Collections.emptyMap());
+    return runQuery(query, Map.of());
   }
 
   public JsonNode runQuery(String query, Map<String, String> additionalOptions)

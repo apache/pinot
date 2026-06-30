@@ -26,7 +26,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,6 +47,7 @@ import org.apache.pinot.common.config.provider.LogicalTableMetadataCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.LogicalTableContext;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
@@ -56,6 +56,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
+import org.apache.pinot.core.data.manager.realtime.ServerIngestionOomProtectionManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
@@ -64,9 +65,6 @@ import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -105,7 +103,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
+  private BooleanSupplier _isServerReadyToConsumeData = () -> false;
   private BooleanSupplier _isServerReadyToServeQueries = () -> false;
+  private ServerIngestionOomProtectionManager.ServerThrottleState _serverIngestionOomProtectionThrottleState;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -121,6 +121,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Nullable
   private ExecutorService _segmentPreloadExecutor;
+
+  @Override
+  public void setSupplierOfIsServerReadyToConsumeData(BooleanSupplier isServerReadyToConsumeData) {
+    _isServerReadyToConsumeData = isServerReadyToConsumeData;
+  }
 
   @Override
   public void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServingQueries) {
@@ -139,6 +144,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
     _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
+    _serverIngestionOomProtectionThrottleState =
+        ServerIngestionOomProtectionManager.createServerThrottleState(config, serverMetrics);
     String tableDataManagerProviderClass = _instanceDataManagerConfig.getTableDataManagerProviderClass();
     LOGGER.info("Initializing table data manager provider of class: {}", tableDataManagerProviderClass);
     _tableDataManagerProvider = PluginManager.get().createInstance(tableDataManagerProviderClass);
@@ -182,6 +189,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         .expireAfterWrite(_instanceDataManagerConfig.getDeletedTablesCacheTtlMinutes(), TimeUnit.MINUTES).build();
   }
 
+  ServerIngestionOomProtectionManager.ServerThrottleState getServerIngestionOomProtectionThrottleState() {
+    return _serverIngestionOomProtectionThrottleState;
+  }
+
   @VisibleForTesting
   void initInstanceDataDir(File instanceDataDir) {
     if (!instanceDataDir.exists()) {
@@ -207,8 +218,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
-    // Ensure we can write to the instance data dir
-    Preconditions.checkState(instanceDataDir.canWrite(), "Cannot write to the instance data dir: %s", instanceDataDir);
+    ensureDirectoryWritable(instanceDataDir, "instance data dir");
   }
 
   @VisibleForTesting
@@ -217,9 +227,24 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance segment tar dir: %s",
           instanceSegmentTarDir);
     }
-    // Ensure we can write to the instance segment tar dir
-    Preconditions.checkState(instanceSegmentTarDir.canWrite(), "Cannot write to the instance segment tar dir: %s",
-        instanceSegmentTarDir);
+    ensureDirectoryWritable(instanceSegmentTarDir, "instance segment tar dir");
+  }
+
+  @VisibleForTesting
+  static void ensureDirectoryWritable(File directory, String directoryDescription) {
+    Preconditions.checkState(directory.isDirectory(), "Expected %s to be a directory: %s", directoryDescription,
+        directory);
+
+    File probeFile = null;
+    try {
+      probeFile = File.createTempFile(".pinot-writability-check-", ".tmp", directory);
+    } catch (IOException e) {
+      throw new IllegalStateException("Cannot write to the " + directoryDescription + ": " + directory, e);
+    } finally {
+      if (probeFile != null) {
+        Preconditions.checkState(probeFile.delete(), "Failed to delete writability check file: %s", probeFile);
+      }
+    }
   }
 
   @Override
@@ -342,8 +367,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,
-            _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries,
-            _enableAsyncSegmentRefresh, _reloadJobStatusCache);
+            _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToConsumeData,
+            _isServerReadyToServeQueries, _serverIngestionOomProtectionThrottleState, _enableAsyncSegmentRefresh,
+            _reloadJobStatusCache);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
@@ -383,38 +409,23 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void deleteSegment(String tableNameWithType, String segmentName)
       throws Exception {
     LOGGER.info("Deleting segment: {} from table: {}", segmentName, tableNameWithType);
-    // Segment deletion is handled at instance level because table data manager might not exist. Acquire the lock here.
+    // Hold the per-segment lock around the TDM lookup so the lookup + delete is atomic vs. removeTableDataManager
+    // shutting the TDM down concurrently. The TDM's own deleteSegment re-acquires the same lock (ReentrantLock).
     Lock segmentLock = _segmentLocks.getLock(tableNameWithType, segmentName);
     segmentLock.lock();
     try {
-      // Check if the segment is still loaded, if so, offload it first.
-      // This might happen when the server disconnected from ZK and reconnected, and the segment is still loaded.
-      // TODO: Consider using table data manager to delete the segment. This will allow the table data manager to clean
-      //       up the segment data on all tiers. Note that table data manager might have not been created, and table
-      //       config might have been deleted at this point.
       TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-      if (tableDataManager != null && tableDataManager.hasSegment(segmentName)) {
-        LOGGER.warn("Segment: {} from table: {} is still loaded, offloading it first", segmentName, tableNameWithType);
-        tableDataManager.offloadSegment(segmentName);
+      if (tableDataManager != null) {
+        // The TDM owns the offload-if-loaded prelude, the on-disk dir delete, and the tier-aware
+        // segment-directory-loader cleanup.
+        tableDataManager.deleteSegment(segmentName);
+      } else {
+        // Fallback: TDM can be null if it was never instantiated, or has already been removed via deleteTable.
+        // In that case, do a path-only cleanup keyed by segment name.
+        String tableDataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType;
+        BaseTableDataManager.deleteSegmentFilesFromDisk(tableDataDir, segmentName, _instanceDataManagerConfig);
+        LOGGER.info("Deleted segment: {} from table: {}", segmentName, tableNameWithType);
       }
-      // Clean up the segment data on default tier unconditionally.
-      File segmentDir = getSegmentDataDirectory(tableNameWithType, segmentName);
-      if (segmentDir.exists()) {
-        FileUtils.deleteQuietly(segmentDir);
-        LOGGER.info("Deleted segment directory {} on default tier", segmentDir);
-      }
-      // We might clean up further more with the specific segment loader. But note that table data manager might have
-      // not been created, and table config might have been deleted at this point.
-      SegmentDirectoryLoader segmentLoader = SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(
-          _instanceDataManagerConfig.getSegmentDirectoryLoader());
-      if (segmentLoader != null) {
-        LOGGER.info("Deleting segment: {} further with segment loader: {}", segmentName,
-            _instanceDataManagerConfig.getSegmentDirectoryLoader());
-        SegmentDirectoryLoaderContext ctx = new SegmentDirectoryLoaderContext.Builder().setSegmentName(segmentName)
-            .setTableDataDir(_instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType).build();
-        segmentLoader.delete(ctx);
-      }
-      LOGGER.info("Deleted segment: {} from table: {}", segmentName, tableNameWithType);
     } finally {
       segmentLock.unlock();
     }
@@ -492,7 +503,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public List<SegmentMetadata> getAllSegmentsMetadata(String tableNameWithType) {
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager == null) {
-      return Collections.emptyList();
+      return List.of();
     } else {
       List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
       try {

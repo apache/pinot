@@ -20,8 +20,8 @@ package org.apache.pinot.plugin.stream.kafka40.utils;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
@@ -97,7 +97,7 @@ public final class MiniKafkaCluster implements StreamDataServerStartable, Closea
       int retries = 5;
       while (retries > 0) {
         try {
-          adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
+          adminClient.createTopics(List.of(newTopic)).all().get();
           return;
         } catch (ExecutionException e) {
           if (e.getCause() instanceof org.apache.kafka.common.errors.TimeoutException) {
@@ -123,7 +123,7 @@ public final class MiniKafkaCluster implements StreamDataServerStartable, Closea
   @Override
   public void deleteTopic(String topicName) {
     try (AdminClient adminClient = getOrCreateAdminClient()) {
-      adminClient.deleteTopics(Collections.singletonList(topicName)).all().get();
+      adminClient.deleteTopics(List.of(topicName)).all().get();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException("Interrupted while deleting topic: " + topicName, e);
@@ -152,7 +152,7 @@ public final class MiniKafkaCluster implements StreamDataServerStartable, Closea
   @Override
   public void createPartitions(String topicName, int numPartitions) {
     try (AdminClient adminClient = getOrCreateAdminClient()) {
-      adminClient.createPartitions(Collections.singletonMap(topicName, NewPartitions.increaseTo(numPartitions))).all()
+      adminClient.createPartitions(Map.of(topicName, NewPartitions.increaseTo(numPartitions))).all()
           .get();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

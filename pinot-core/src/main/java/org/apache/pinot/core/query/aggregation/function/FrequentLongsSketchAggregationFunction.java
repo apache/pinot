@@ -174,18 +174,18 @@ public class FrequentLongsSketchAggregationFunction
           }
         }
         break;
-    case INT:
-    case LONG:
-      long[] values = valueSet.getLongValuesSV();
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          LongsSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
-          sketch.update(values[i]);
+      case INT:
+      case LONG:
+        long[] values = valueSet.getLongValuesSV();
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            LongsSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
+            sketch.update(values[i]);
+          }
         }
-      }
-      break;
-    default:
-      throw new UnsupportedOperationException("Cannot aggregate on non int/long types");
+        break;
+      default:
+        throw new UnsupportedOperationException("Cannot aggregate on non int/long types");
     }
   }
 

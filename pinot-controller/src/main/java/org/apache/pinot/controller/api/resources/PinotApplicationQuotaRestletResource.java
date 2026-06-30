@@ -24,7 +24,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -84,7 +84,7 @@ public class PinotApplicationQuotaRestletResource {
     if (quotas != null) {
       return quotas;
     } else {
-      return Collections.emptyMap();
+      return Map.of();
     }
   }
 
@@ -109,7 +109,7 @@ public class PinotApplicationQuotaRestletResource {
 
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     String defaultQuota =
-        helixAdmin.getConfig(scope, Collections.singletonList(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
+        helixAdmin.getConfig(scope, List.of(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
             .get(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND);
     return defaultQuota != null ? Double.parseDouble(defaultQuota) : null;
   }

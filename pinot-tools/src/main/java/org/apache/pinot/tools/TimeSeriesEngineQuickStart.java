@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +58,7 @@ public class TimeSeriesEngineQuickStart extends Quickstart {
 
   @Override
   public List<String> types() {
-    return Collections.singletonList("TIME_SERIES");
+    return List.of("TIME_SERIES");
   }
 
   @Override

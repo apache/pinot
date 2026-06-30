@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -299,7 +298,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     int numExceptions = 0;
     long totalBrokerTime = 0L;
     long totalClientTime = 0L;
-    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    List<Statistics> statisticsList = List.of(new Statistics(CLIENT_TIME_STATISTICS));
     @Nullable
     Map<String, QueryStat> queryStatMap;
     if (enablePerQueryStats) {
@@ -416,7 +415,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicInteger numExceptions = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
-    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    List<Statistics> statisticsList = List.of(new Statistics(CLIENT_TIME_STATISTICS));
     @Nullable
     Map<String, QueryStat> queryStatMap;
     if (enablePerQueryStats) {
@@ -537,7 +536,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicInteger numExceptions = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
-    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    List<Statistics> statisticsList = List.of(new Statistics(CLIENT_TIME_STATISTICS));
     @Nullable
     Map<String, QueryStat> queryStatMap;
     if (enablePerQueryStats) {
@@ -672,7 +671,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicInteger numExceptions = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
-    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    List<Statistics> statisticsList = List.of(new Statistics(CLIENT_TIME_STATISTICS));
     @Nullable
     Map<String, QueryStat> queryStatMap;
     if (enablePerQueryStats) {

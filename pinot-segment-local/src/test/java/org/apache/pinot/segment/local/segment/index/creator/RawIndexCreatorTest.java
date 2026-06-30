@@ -335,10 +335,10 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
       case DOUBLE:
         return random.nextDouble();
       case STRING:
-        return StringUtil.sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
+        return StringUtil.sanitizeStringValue(RandomStringUtils.secure().next(random.nextInt(MAX_STRING_LENGTH)),
             Integer.MAX_VALUE);
       case BYTES:
-        return StringUtil.sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
+        return StringUtil.sanitizeStringValue(RandomStringUtils.secure().next(random.nextInt(MAX_STRING_LENGTH)),
             Integer.MAX_VALUE).getBytes();
       default:
         throw new UnsupportedOperationException("Unsupported data type for random value generator: " + dataType);

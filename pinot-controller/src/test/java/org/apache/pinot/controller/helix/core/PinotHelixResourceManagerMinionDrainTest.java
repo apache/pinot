@@ -19,15 +19,16 @@
 package org.apache.pinot.controller.helix.core;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -70,7 +71,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     String minionHost = "minion-test-1.example.com";
     int minionPort = 9514;
     Instance minionInstance =
-        new Instance(minionHost, minionPort, InstanceType.MINION, Collections.singletonList(
+        new Instance(minionHost, minionPort, InstanceType.MINION, List.of(
             Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
@@ -223,7 +224,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     int grpcPort = 8090;
     int adminPort = 8091;
     Instance minionInstance =
-        new Instance(minionHost, minionPort, InstanceType.MINION, Collections.singletonList(
+        new Instance(minionHost, minionPort, InstanceType.MINION, List.of(
             Helix.UNTAGGED_MINION_INSTANCE), null, grpcPort, adminPort, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
@@ -264,7 +265,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     String minionHost = "minion-test-7.example.com";
     int minionPort = 9520;
     Instance minionInstance =
-        new Instance(minionHost, minionPort, InstanceType.MINION, Collections.singletonList(
+        new Instance(minionHost, minionPort, InstanceType.MINION, List.of(
             Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
@@ -285,8 +286,8 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
 
     // Subsequent drain attempts should throw UnsupportedOperationException (already drained)
     for (int i = 1; i < 3; i++) {
-        PinotResourceManagerResponse drainResponse = _helixResourceManager.drainMinionInstance(minionInstanceId);
-        assertFalse(drainResponse.isSuccessful(), "Subsequent drain operation " + (i + 1) + " should have failed");
+      PinotResourceManagerResponse drainResponse = _helixResourceManager.drainMinionInstance(minionInstanceId);
+      assertFalse(drainResponse.isSuccessful(), "Subsequent drain operation " + (i + 1) + " should have failed");
     }
 
     // Verify final state remains unchanged
@@ -305,7 +306,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     // Create a minion with only standard tag
     String minionHost = "minion-test-8.example.com";
     int minionPort = 9521;
-    List<String> tags = Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE);
+    List<String> tags = List.of(Helix.UNTAGGED_MINION_INSTANCE);
     Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
@@ -362,7 +363,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     // Create a minion with minion_untagged tag
     String minionHost = "minion-test-9.example.com";
     int minionPort = 9522;
-    List<String> originalTags = Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE);
+    List<String> originalTags = List.of(Helix.UNTAGGED_MINION_INSTANCE);
     Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
         originalTags, null, 0, 0, 0, 0, false);
 
@@ -454,7 +455,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     // Create a normal minion
     String minionHost = "minion-test-11.example.com";
     int minionPort = 9524;
-    List<String> originalTags = Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE);
+    List<String> originalTags = List.of(Helix.UNTAGGED_MINION_INSTANCE);
     Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
         originalTags, null, 0, 0, 0, 0, false);
 
@@ -478,6 +479,69 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
 
     // Cleanup
     _helixResourceManager.dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testInstanceDropSafetyCheckSkipsResourceScanForMinion() {
+    // A minion never hosts any resource, so the drop safety check must skip the expensive cluster-wide
+    // IdealState scan entirely (getAllResources is never invoked) while still reporting it as safe.
+    String minionHost = "minion-test-safety.example.com";
+    int minionPort = 9530;
+    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+    assertTrue(_helixResourceManager.addInstance(minionInstance, false).isSuccessful());
+    String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
+
+    PinotHelixResourceManager spy = Mockito.spy(_helixResourceManager);
+    OperationValidationResponse response = spy.instanceDropSafetyCheck(minionInstanceId);
+
+    assertTrue(response.isSafe(), "Minion should be safe to drop: " + response.getIssues());
+    // The resource scan must be skipped for minions - this is the behavior under test.
+    Mockito.verify(spy, Mockito.never()).getAllResources();
+
+    // Cleanup
+    _helixResourceManager.dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testInstanceDropSafetyCheckRunsResourceScanForNonMinion() {
+    // Non-minion instances can host resources, so the scan must still run. This locks the !isMinion
+    // guard: inverting it would skip the scan here and fail this verification.
+    String brokerHost = "broker-test-safety.example.com";
+    int brokerPort = 9531;
+    Instance brokerInstance = new Instance(brokerHost, brokerPort, InstanceType.BROKER,
+        List.of(Helix.UNTAGGED_BROKER_INSTANCE), null, 0, 0, 0, 0, false);
+    assertTrue(_helixResourceManager.addInstance(brokerInstance, false).isSuccessful());
+    String brokerInstanceId = "Broker_" + brokerHost + "_" + brokerPort;
+
+    PinotHelixResourceManager spy = Mockito.spy(_helixResourceManager);
+    spy.instanceDropSafetyCheck(brokerInstanceId);
+
+    // The resource scan must run for non-minion instances.
+    Mockito.verify(spy, Mockito.atLeastOnce()).getAllResources();
+
+    // Cleanup
+    _helixResourceManager.dropInstance(brokerInstanceId);
+  }
+
+  @Test
+  public void testInstanceDropSafetyCheckFlagsLiveMinion()
+      throws Exception {
+    // The cheap liveness check must still apply to minions even though the resource scan is skipped:
+    // a live minion is reported as unsafe with an IS_ALIVE issue.
+    String minionHost = "minion-test-live.example.com";
+    int minionPort = 9532;
+    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+    assertTrue(_helixResourceManager.addInstance(minionInstance, false).isSuccessful());
+    String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
+    createFakeMinionLiveInstance(minionInstanceId);
+
+    OperationValidationResponse response = _helixResourceManager.instanceDropSafetyCheck(minionInstanceId);
+    assertFalse(response.isSafe(), "Live minion should not be safe to drop");
+    assertTrue(response.getIssues().stream()
+            .anyMatch(issue -> issue.getCode() == OperationValidationResponse.ErrorCode.IS_ALIVE),
+        "Live minion drop safety check should produce an IS_ALIVE issue");
   }
 
   @AfterClass

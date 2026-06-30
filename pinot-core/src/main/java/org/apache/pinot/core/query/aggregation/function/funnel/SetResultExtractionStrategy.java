@@ -33,7 +33,10 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * Aggregation strategy leveraging set algebra (unions/intersections).
+ * Extracts intermediate set results for cross-segment merging.
+ *
+ * <p>For single-key, converts dictionary IDs to typed value sets. For multi-key, converts composite IDs
+ * to length-prefix-encoded composite strings, producing a {@code Set<String>} per step.
  */
 class SetResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWrapper, List<Set>> {
   protected final int _numSteps;
@@ -51,12 +54,31 @@ class SetResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWra
       }
       return result;
     }
-    Dictionary dictionary = dictIdsWrapper._dictionary;
     List<Set> result = new ArrayList<>(_numSteps);
-    for (RoaringBitmap dictIdBitmap : dictIdsWrapper._stepsBitmaps) {
-      result.add(convertToValueSet(dictionary, dictIdBitmap));
+    if (dictIdsWrapper.isMultiKey()) {
+      for (RoaringBitmap compositeIdBitmap : dictIdsWrapper._stepsBitmaps) {
+        result.add(convertCompositeToValueSet(dictIdsWrapper, compositeIdBitmap));
+      }
+    } else {
+      Dictionary dictionary = dictIdsWrapper._dictionaries[0];
+      for (RoaringBitmap dictIdBitmap : dictIdsWrapper._stepsBitmaps) {
+        result.add(convertToValueSet(dictionary, dictIdBitmap));
+      }
     }
     return result;
+  }
+
+  private Set<String> convertCompositeToValueSet(DictIdsWrapper wrapper, RoaringBitmap compositeIdBitmap) {
+    int numValues = compositeIdBitmap.getCardinality();
+    int numKeys = wrapper._dictionaries.length;
+    int[] dictIds = new int[numKeys];
+    ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(numValues);
+    PeekableIntIterator iterator = compositeIdBitmap.getIntIterator();
+    while (iterator.hasNext()) {
+      wrapper.reverseCompositeId(iterator.next(), dictIds);
+      stringSet.add(DictIdsWrapper.toCompositeString(wrapper._dictionaries, dictIds));
+    }
+    return stringSet;
   }
 
   private Set convertToValueSet(Dictionary dictionary, RoaringBitmap dictIdBitmap) {

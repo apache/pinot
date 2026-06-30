@@ -21,8 +21,8 @@ package org.apache.pinot.spi.utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.tuple.Pair;
@@ -103,13 +103,13 @@ public class ObfuscatorTest {
 
   @Test
   public void testNoop() {
-    Object output = new Obfuscator("nope", Collections.emptyList()).toJson(_map);
+    Object output = new Obfuscator("nope", List.of()).toJson(_map);
     Assert.assertEquals(output, JsonUtils.objectToJsonNode(_map));
   }
 
   @Test
   public void testCustomPattern() {
-    Obfuscator obfuscator = new Obfuscator("verycustomized", Collections.singletonList(Pattern.compile("^value$")));
+    Obfuscator obfuscator = new Obfuscator("verycustomized", List.of(Pattern.compile("^value$")));
     String output = obfuscator.toJsonString(_nestedMap);
     Assert.assertFalse(output.contains(VALUE));
     Assert.assertTrue(output.contains("verycustomized"));
@@ -158,11 +158,11 @@ public class ObfuscatorTest {
     innerItem.put("host", "localhost");
 
     Map<String, Object> outerItem = new HashMap<>();
-    outerItem.put("connections", Collections.singletonList(innerItem));
+    outerItem.put("connections", List.of(innerItem));
     outerItem.put("label", "cluster-1");
 
     Map<String, Object> root = new HashMap<>();
-    root.put("clusters", Collections.singletonList(outerItem));
+    root.put("clusters", List.of(outerItem));
 
     String output = _obfuscator.toJsonString(root);
     Assert.assertTrue(output.contains("localhost"));

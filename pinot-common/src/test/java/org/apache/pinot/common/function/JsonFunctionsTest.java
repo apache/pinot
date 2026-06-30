@@ -34,6 +34,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -154,6 +155,92 @@ public class JsonFunctionsTest {
       throws JsonProcessingException {
     assertEquals(JsonFunctions.jsonPathString("{\"foo\": \"null\"}", "$.foo"), "null");
     assertEquals(JsonFunctions.jsonPathString("{\"foo\": \"null\"}", "$.foo", "default"), "null");
+  }
+
+  /**
+   * The default-value {@code jsonPath*} overloads return the caller's default for input that cannot begin a JSON
+   * value (plain text, null, empty) without invoking the parser - this avoids the {@code fillInStackTrace()} cost
+   * of a thrown-and-caught {@link InvalidJsonException} on the ingestion hot path. Behavior is unchanged for valid
+   * JSON and for any input that could begin a JSON value (which is still handed to the parser).
+   */
+  @Test
+  public void testJsonPathDefaultVariantsSkipNonJson() {
+    // Plain-text input (e.g. a raw log line) -> default, no exception thrown.
+    assertEquals(JsonFunctions.jsonPathString("INFO 2026-06-08 request done", "$.level", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString("INFO 2026-06-08 request done", "$", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathLong("ERROR boom code", "$.code", -1L), -1L);
+    assertEquals(JsonFunctions.jsonPathDouble("WARN slow request", "$.latency", -1.0), -1.0, 0.0);
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty("plain text line", "$.items").length, 0);
+
+    // null input -> default.
+    assertEquals(JsonFunctions.jsonPathString(null, "$.level", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathLong(null, "$.code", -1L), -1L);
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(null, "$.items").length, 0);
+
+    // Empty / whitespace-only input -> default.
+    assertEquals(JsonFunctions.jsonPathString("", "$.x", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString("   ", "$.x", "def"), "def");
+
+    // Valid JSON object/array is still extracted, including with leading whitespace.
+    assertEquals(JsonFunctions.jsonPathString("{\"level\":\"info\"}", "$.level", "def"), "info");
+    assertEquals(JsonFunctions.jsonPathString("  \n {\"level\":\"info\"}", "$.level", "def"), "info");
+    assertEquals(JsonFunctions.jsonPathString("[{\"k\":\"v\"}]", "$[0].k", "def"), "v");
+
+    // Inputs that could begin a JSON value are still handed to the parser, so behavior is unchanged:
+    // "not json" begins with 'n' (the `null` literal) -> parsed, fails, default returned.
+    assertEquals(JsonFunctions.jsonPathString("not json", "$.x", "def"), "def");
+    // Bare JSON scalars are parsed and returned for the whole-document path (preserved behavior).
+    assertEquals(JsonFunctions.jsonPathString("12345", "$", "def"), "12345");
+    assertEquals(JsonFunctions.jsonPathString("\"hello\"", "$", "def"), "hello");
+
+    // Inputs the fast-path skips that the parser also rejected before -> default (equivalence preserved at the
+    // exact char boundary: these do not begin with {, [, ", -, a digit, or a true/false/null literal).
+    assertEquals(JsonFunctions.jsonPathString("+5", "$", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString(".5", "$", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString("NaN", "$", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString("Infinity", "$", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString("'single quoted'", "$.x", "def"), "def");
+  }
+
+  /**
+   * {@code jsonExtractObject} parses a JSON document once into a reusable Map/List (or passes through an
+   * already-parsed container), returns null without throwing for null/scalar/non-JSON input, and the returned object
+   * is navigable by {@code jsonPath*} with results identical to parsing the raw string - enabling parse-once
+   * transform configs.
+   */
+  @Test
+  public void testJsonExtractObject()
+      throws Exception {
+    // JSON object -> reusable Map, navigable by jsonPath without re-parsing.
+    Object obj = JsonFunctions.jsonExtractObject("{\"level\":\"info\",\"log\":{\"msg\":\"hi\"}}");
+    assertTrue(obj instanceof Map);
+    assertEquals(JsonFunctions.jsonPathString(obj, "$.log.msg", "def"), "hi");
+    assertEquals(JsonFunctions.jsonPathString(obj, "$.level", "def"), "info");
+
+    // JSON array -> reusable List.
+    Object arr = JsonFunctions.jsonExtractObject("[{\"k\":\"v\"}]");
+    assertTrue(arr instanceof List);
+    assertEquals(JsonFunctions.jsonPathString(arr, "$[0].k", "def"), "v");
+
+    // null / scalar / plain-text / empty -> null, no exception.
+    assertNull(JsonFunctions.jsonExtractObject(null));
+    assertNull(JsonFunctions.jsonExtractObject("INFO 2026-06-08 plain text log line"));
+    assertNull(JsonFunctions.jsonExtractObject("12345"));
+    assertNull(JsonFunctions.jsonExtractObject(""));
+
+    // Already-parsed container -> passed through unchanged (Map and Object[]), still navigable by jsonPath.
+    Map<String, Object> map = Map.of("a", "b");
+    assertEquals(JsonFunctions.jsonExtractObject(map), map);
+    Object[] preParsed = new Object[]{Map.of("k", "v")};
+    assertSame(JsonFunctions.jsonExtractObject(preParsed), preParsed);
+    assertEquals(JsonFunctions.jsonPathString(preParsed, "$[0].k", "def"), "v");
+
+    // Parse-once equivalence: extracting through the parsed object matches extracting from the raw string.
+    String json = "{\"labels\":{\"service_name\":\"svc-1\",\"environment\":\"prod\"},\"id\":\"abc\"}";
+    Object parsed = JsonFunctions.jsonExtractObject(json);
+    assertEquals(JsonFunctions.jsonPathString(parsed, "$.labels.service_name", "def"),
+        JsonFunctions.jsonPathString(json, "$.labels.service_name", "def"));
+    assertEquals(JsonFunctions.jsonPathString(parsed, "$.id", "def"), "abc");
   }
 
   @Test
@@ -376,7 +463,7 @@ public class JsonFunctionsTest {
         {
             Map.of("foo", "x", "bar", Map.of("foo", "y")), "$.bar", new Object[]{
             Map.of("foo", "y")
-        }
+            }
         },
     };
   }

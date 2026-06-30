@@ -94,6 +94,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT("upsertQueryableDocIdsInSnapshot", false),
   REALTIME_INGESTION_OFFSET_LAG("offsetLag", false,
       "The difference between latest message offset and the last consumed message offset."),
+  REALTIME_INGESTION_OOM_PROTECTION_ACTIVE("boolean", true,
+      "Binary indicator (1 or 0) for whether the server-wide realtime ingestion OOM throttle is active."),
   REALTIME_INGESTION_UPSTREAM_OFFSET("upstreamOffset", false, "The offset of the latest message in the upstream."),
   REALTIME_INGESTION_CONSUMING_OFFSET("consumingOffset", false, "The offset of the last consumed message."),
   REALTIME_INGESTION_DELAY_MS("milliseconds", false,
@@ -126,6 +128,10 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   MAILBOX_SERVER_THREADLOCALCACHE("bytes", true),
   MAILBOX_SERVER_CHUNK_SIZE("bytes", true),
 
+  // MailboxService gRPC client (outbound to peer mailboxes) memory metrics
+  MAILBOX_CLIENT_USED_DIRECT_MEMORY("bytes", true),
+  MAILBOX_CLIENT_USED_HEAP_MEMORY("bytes", true),
+
   /// Exports the max amount of direct memory that can be allocated by Netty
   /// It is basically an adaptor for io.netty.util.internal.PlatformDependent.maxDirectMemory()
   ///
@@ -147,6 +153,12 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   HELIX_MESSAGES_COUNT("count", true),
   STARTUP_STATUS_CHECK_IN_PROGRESS("state", true,
       "Indicates whether the server startup status check is currently in progress"),
+  STARTUP_CURRENT_STATE_MATCH_TIME_MS("milliseconds", true,
+      "Time in ms from status checker registration until ideal-state/current-state match first reports GOOD"),
+  STARTUP_EXTERNAL_VIEW_MATCH_TIME_MS("milliseconds", true,
+      "Time in ms from status checker registration until ideal-state/external-view match first reports GOOD"),
+  STARTUP_REALTIME_CONSUMPTION_CATCHUP_TIME_MS("milliseconds", true,
+      "Time in ms from status checker registration until realtime consumption catchup first reports GOOD"),
   CONSUMER_LOCK_WAIT_TIME_MS("milliseconds", false,
       "Indicates the time consumer spends while waiting on the consumer lock."),
 
@@ -155,7 +167,9 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
 
   // ThrottleOnCriticalHeapUsageExecutor metrics
   THROTTLE_EXECUTOR_QUEUE_SIZE("count", true,
-      "Current number of tasks in the throttle executor queue");
+      "Current number of tasks in the throttle executor queue"),
+  // Workload config fetch status: 1 = success, 0 = failure
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true);
 
   private final String _gaugeName;
   private final String _unit;

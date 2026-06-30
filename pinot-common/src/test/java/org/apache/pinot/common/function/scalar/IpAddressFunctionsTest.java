@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import inet.ipaddr.IPAddressString;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -283,5 +284,346 @@ public class IpAddressFunctionsTest {
     // Documentation prefix
     String docPrefix = IpAddressFunctions.ipPrefix("2001:db8::1", 32);
     assertEquals(docPrefix, "2001:db8::/32");
+  }
+
+  // ==================== Tests for isIPv4String ====================
+
+  @Test
+  public void testIsIPv4String() {
+    assertTrue(IpAddressFunctions.isIPv4String("192.168.1.1"));
+    assertTrue(IpAddressFunctions.isIPv4String("0.0.0.0"));
+    assertTrue(IpAddressFunctions.isIPv4String("255.255.255.255"));
+    assertTrue(IpAddressFunctions.isIPv4String("10.0.0.1"));
+
+    assertFalse(IpAddressFunctions.isIPv4String("2001:db8::1"));
+    assertFalse(IpAddressFunctions.isIPv4String("::1"));
+    assertFalse(IpAddressFunctions.isIPv4String("not-an-ip"));
+    assertFalse(IpAddressFunctions.isIPv4String(""));
+    assertFalse(IpAddressFunctions.isIPv4String("999.999.999.999"));
+    assertFalse(IpAddressFunctions.isIPv4String("192.168.1.1/24"));
+  }
+
+  // ==================== Tests for isIPv6String ====================
+
+  @Test
+  public void testIsIPv6String() {
+    assertTrue(IpAddressFunctions.isIPv6String("2001:db8::1"));
+    assertTrue(IpAddressFunctions.isIPv6String("::1"));
+    assertTrue(IpAddressFunctions.isIPv6String("fe80::1"));
+    assertTrue(IpAddressFunctions.isIPv6String("::"));
+
+    assertFalse(IpAddressFunctions.isIPv6String("192.168.1.1"));
+    assertFalse(IpAddressFunctions.isIPv6String("not-an-ip"));
+    assertFalse(IpAddressFunctions.isIPv6String(""));
+    assertFalse(IpAddressFunctions.isIPv6String("2001:db8::1/64"));
+  }
+
+  // ==================== Tests for ipv4ToLong ====================
+
+  @Test
+  public void testIpv4ToLong() {
+    assertEquals(IpAddressFunctions.ipv4ToLong("0.0.0.0"), 0L);
+    assertEquals(IpAddressFunctions.ipv4ToLong("0.0.0.1"), 1L);
+    assertEquals(IpAddressFunctions.ipv4ToLong("0.0.1.0"), 256L);
+    assertEquals(IpAddressFunctions.ipv4ToLong("192.168.1.1"), 3232235777L);
+    assertEquals(IpAddressFunctions.ipv4ToLong("255.255.255.255"), 4294967295L);
+    assertEquals(IpAddressFunctions.ipv4ToLong("10.0.0.1"), 167772161L);
+  }
+
+  @Test
+  public void testIpv4ToLongInvalid() {
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipv4ToLong("2001:db8::1"));
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipv4ToLong("not-an-ip"));
+  }
+
+  // ==================== Tests for longToIpv4 ====================
+
+  @Test
+  public void testLongToIpv4() {
+    assertEquals(IpAddressFunctions.longToIpv4(0L), "0.0.0.0");
+    assertEquals(IpAddressFunctions.longToIpv4(1L), "0.0.0.1");
+    assertEquals(IpAddressFunctions.longToIpv4(256L), "0.0.1.0");
+    assertEquals(IpAddressFunctions.longToIpv4(3232235777L), "192.168.1.1");
+    assertEquals(IpAddressFunctions.longToIpv4(4294967295L), "255.255.255.255");
+  }
+
+  @Test
+  public void testLongToIpv4Invalid() {
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.longToIpv4(-1L));
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.longToIpv4(4294967296L));
+  }
+
+  @Test
+  public void testIpv4RoundTrip() {
+    String[] addresses = {"0.0.0.0", "192.168.1.1", "10.20.30.40", "255.255.255.255", "127.0.0.1"};
+    for (String addr : addresses) {
+      assertEquals(IpAddressFunctions.longToIpv4(IpAddressFunctions.ipv4ToLong(addr)), addr);
+    }
+  }
+
+  // ==================== Tests for ipv6ToBytes / bytesToIpv6 ====================
+
+  @Test
+  public void testIpv6ToBytes() {
+    byte[] bytes = IpAddressFunctions.ipv6ToBytes("::1");
+    assertEquals(bytes.length, 16);
+    assertEquals(bytes[15], 1);
+    for (int i = 0; i < 15; i++) {
+      assertEquals(bytes[i], 0);
+    }
+  }
+
+  @Test
+  public void testIpv6ToBytesInvalid() {
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipv6ToBytes("192.168.1.1"));
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipv6ToBytes("not-an-ip"));
+  }
+
+  @Test
+  public void testBytesToIpv6() {
+    byte[] loopback = new byte[16];
+    loopback[15] = 1;
+    assertEquals(IpAddressFunctions.bytesToIpv6(loopback), "::1");
+  }
+
+  @Test
+  public void testBytesToIpv6Invalid() {
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.bytesToIpv6(new byte[4]));
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.bytesToIpv6(new byte[15]));
+  }
+
+  @Test
+  public void testIpv6RoundTrip() {
+    String[] addresses = {"::1", "2001:db8::1", "fe80::1", "::"};
+    for (String addr : addresses) {
+      assertEquals(IpAddressFunctions.bytesToIpv6(IpAddressFunctions.ipv6ToBytes(addr)), addr);
+    }
+  }
+
+  // ==================== Tests for ipv4ToIpv6 ====================
+
+  @Test
+  public void testIpv4ToIpv6() {
+    assertEquals(IpAddressFunctions.ipv4ToIpv6("192.168.1.1"), "::ffff:c0a8:101");
+  }
+
+  @Test
+  public void testIpv4ToIpv6Invalid() {
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipv4ToIpv6("2001:db8::1"));
+  }
+
+  // ==================== Tests for ipv4CIDRToRange ====================
+
+  @Test
+  public void testIpv4CIDRToRange() {
+    String[] range = IpAddressFunctions.ipv4CIDRToRange("192.168.1.0/24");
+    assertEquals(range[0], "192.168.1.0");
+    assertEquals(range[1], "192.168.1.255");
+
+    range = IpAddressFunctions.ipv4CIDRToRange("10.0.0.0/8");
+    assertEquals(range[0], "10.0.0.0");
+    assertEquals(range[1], "10.255.255.255");
+
+    range = IpAddressFunctions.ipv4CIDRToRange("192.168.1.1/32");
+    assertEquals(range[0], "192.168.1.1");
+    assertEquals(range[1], "192.168.1.1");
+  }
+
+  @Test
+  public void testIpv4CIDRToRangeInvalid() {
+    // Not a prefix
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipv4CIDRToRange("192.168.1.0"));
+    // IPv6 CIDR rejected
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipv4CIDRToRange("2001:db8::/32"));
+  }
+
+  // ==================== Tests for ipFamily ====================
+
+  @Test
+  public void testIpFamily() {
+    assertEquals(IpAddressFunctions.ipFamily("192.168.1.1"), 4);
+    assertEquals(IpAddressFunctions.ipFamily("10.0.0.1"), 4);
+    assertEquals(IpAddressFunctions.ipFamily("0.0.0.0"), 4);
+    assertEquals(IpAddressFunctions.ipFamily("2001:db8::1"), 6);
+    assertEquals(IpAddressFunctions.ipFamily("::1"), 6);
+    assertEquals(IpAddressFunctions.ipFamily("fe80::1"), 6);
+  }
+
+  @Test
+  public void testIpFamilyInvalid() {
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipFamily("not-an-ip"));
+  }
+
+  // ==================== Tests for ipMaskLen ====================
+
+  @Test
+  public void testIpMaskLen() {
+    assertEquals(IpAddressFunctions.ipMaskLen("192.168.1.0/24"), 24);
+    assertEquals(IpAddressFunctions.ipMaskLen("10.0.0.0/8"), 8);
+    assertEquals(IpAddressFunctions.ipMaskLen("192.168.1.1/32"), 32);
+    assertEquals(IpAddressFunctions.ipMaskLen("0.0.0.0/0"), 0);
+    assertEquals(IpAddressFunctions.ipMaskLen("2001:db8::/32"), 32);
+    assertEquals(IpAddressFunctions.ipMaskLen("2001:db8::/64"), 64);
+    assertEquals(IpAddressFunctions.ipMaskLen("::1/128"), 128);
+  }
+
+  @Test
+  public void testIpMaskLenInvalid() {
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipMaskLen("192.168.1.0"));
+  }
+
+  // ==================== Tests for ipNetmask ====================
+
+  @Test
+  public void testIpNetmask() {
+    assertEquals(IpAddressFunctions.ipNetmask("192.168.1.0/24"), "255.255.255.0");
+    assertEquals(IpAddressFunctions.ipNetmask("10.0.0.0/8"), "255.0.0.0");
+    assertEquals(IpAddressFunctions.ipNetmask("192.168.1.0/16"), "255.255.0.0");
+    assertEquals(IpAddressFunctions.ipNetmask("192.168.1.1/32"), "255.255.255.255");
+    assertEquals(IpAddressFunctions.ipNetmask("0.0.0.0/0"), "0.0.0.0");
+    assertEquals(IpAddressFunctions.ipNetmask("192.168.1.0/25"), "255.255.255.128");
+  }
+
+  @Test
+  public void testIpNetmaskIpv6() {
+    // /64 → first 8 bytes all 0xFF, rest 0
+    assertEquals(IpAddressFunctions.ipNetmask("2001:db8::/64"), "ffff:ffff:ffff:ffff::");
+    // /128 → all 0xFF
+    assertEquals(IpAddressFunctions.ipNetmask("::1/128"), "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff");
+    // /0 → all 0
+    assertEquals(IpAddressFunctions.ipNetmask("::/0"), "::");
+  }
+
+  @Test
+  public void testIpNetmaskInvalid() {
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipNetmask("192.168.1.0"));
+  }
+
+  // ==================== Tests for ipHostmask ====================
+
+  @Test
+  public void testIpHostmask() {
+    assertEquals(IpAddressFunctions.ipHostmask("192.168.1.0/24"), "0.0.0.255");
+    assertEquals(IpAddressFunctions.ipHostmask("10.0.0.0/8"), "0.255.255.255");
+    assertEquals(IpAddressFunctions.ipHostmask("192.168.1.0/16"), "0.0.255.255");
+    assertEquals(IpAddressFunctions.ipHostmask("192.168.1.1/32"), "0.0.0.0");
+    assertEquals(IpAddressFunctions.ipHostmask("0.0.0.0/0"), "255.255.255.255");
+    assertEquals(IpAddressFunctions.ipHostmask("192.168.1.0/25"), "0.0.0.127");
+  }
+
+  @Test
+  public void testIpHostmaskIpv6() {
+    // /64 → first 8 bytes all 0, rest 0xFF
+    assertEquals(IpAddressFunctions.ipHostmask("2001:db8::/64"), "::ffff:ffff:ffff:ffff");
+    // /128 → all 0
+    assertEquals(IpAddressFunctions.ipHostmask("::1/128"), "::");
+    // /0 → all 0xFF
+    assertEquals(IpAddressFunctions.ipHostmask("::/0"), "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff");
+  }
+
+  @Test
+  public void testIpHostmaskInvalid() {
+    assertThrows(IllegalArgumentException.class, () -> IpAddressFunctions.ipHostmask("192.168.1.0"));
+  }
+
+  // ==================== Netmask/Hostmask consistency ====================
+
+  @Test
+  public void testNetmaskHostmaskConsistency() {
+    // For any CIDR, netmask and hostmask must be bitwise complements:
+    // (netmask | hostmask) == all 0xFF, (netmask & hostmask) == all 0x00
+    String[] cidrs = {"192.168.1.0/24", "10.0.0.0/8", "172.16.0.0/12", "192.168.1.0/25", "0.0.0.0/0",
+        "192.168.1.1/32"};
+    for (String cidr : cidrs) {
+      String netmask = IpAddressFunctions.ipNetmask(cidr);
+      String hostmask = IpAddressFunctions.ipHostmask(cidr);
+      byte[] netBytes = new IPAddressString(netmask).getAddress().getBytes();
+      byte[] hostBytes = new IPAddressString(hostmask).getAddress().getBytes();
+      assertEquals(netBytes.length, hostBytes.length);
+      for (int i = 0; i < netBytes.length; i++) {
+        assertEquals((byte) (netBytes[i] | hostBytes[i]), (byte) 0xFF,
+            "netmask | hostmask must be all 1s at byte " + i + " for " + cidr);
+        assertEquals((byte) (netBytes[i] & hostBytes[i]), (byte) 0x00,
+            "netmask & hostmask must be all 0s at byte " + i + " for " + cidr);
+      }
+    }
+  }
+
+  // ==================== Tests for isPrivateIp ====================
+
+  @Test
+  public void testIsPrivateIpRfc1918() {
+    // 10.0.0.0/8
+    assertTrue(IpAddressFunctions.isPrivateIp("10.0.0.1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("10.255.255.255"));
+    assertTrue(IpAddressFunctions.isPrivateIp("10.128.0.1"));
+
+    // 172.16.0.0/12
+    assertTrue(IpAddressFunctions.isPrivateIp("172.16.0.1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("172.31.255.255"));
+    assertTrue(IpAddressFunctions.isPrivateIp("172.20.10.5"));
+    assertFalse(IpAddressFunctions.isPrivateIp("172.32.0.1")); // just outside /12
+
+    // 192.168.0.0/16
+    assertTrue(IpAddressFunctions.isPrivateIp("192.168.0.1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("192.168.255.255"));
+    assertTrue(IpAddressFunctions.isPrivateIp("192.168.100.200"));
+  }
+
+  @Test
+  public void testIsPrivateIpLoopback() {
+    // IPv4 loopback 127.0.0.0/8
+    assertTrue(IpAddressFunctions.isPrivateIp("127.0.0.1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("127.255.255.255"));
+
+    // IPv6 loopback
+    assertTrue(IpAddressFunctions.isPrivateIp("::1"));
+  }
+
+  @Test
+  public void testIsPrivateIpLinkLocal() {
+    // IPv4 link-local 169.254.0.0/16
+    assertTrue(IpAddressFunctions.isPrivateIp("169.254.0.1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("169.254.255.255"));
+
+    // IPv6 link-local fe80::/10
+    assertTrue(IpAddressFunctions.isPrivateIp("fe80::1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("fe80::abcd:1234"));
+  }
+
+  @Test
+  public void testIsPrivateIpIPv6Ula() {
+    // fc00::/7 covers fc::/8 and fd::/8
+    assertTrue(IpAddressFunctions.isPrivateIp("fd00::1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("fc00::1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("fdab:cdef:1234::1"));
+  }
+
+  @Test
+  public void testIsPrivateIpPublicAddresses() {
+    // Public IPv4 — must NOT be private
+    assertFalse(IpAddressFunctions.isPrivateIp("8.8.8.8"));
+    assertFalse(IpAddressFunctions.isPrivateIp("1.1.1.1"));
+    assertFalse(IpAddressFunctions.isPrivateIp("203.0.113.1"));
+    assertFalse(IpAddressFunctions.isPrivateIp("198.18.0.1"));  // TEST-NET-3 is public
+
+    // Public IPv6 — must NOT be private
+    assertFalse(IpAddressFunctions.isPrivateIp("2001:db8::1")); // documentation prefix
+    assertFalse(IpAddressFunctions.isPrivateIp("2606:4700::1")); // Cloudflare
+  }
+
+  @Test
+  public void testIsPrivateIpInvalidInputs() {
+    // CIDR notation not accepted
+    assertThrows(IllegalArgumentException.class,
+        () -> IpAddressFunctions.isPrivateIp("10.0.0.0/8"));
+    assertThrows(IllegalArgumentException.class,
+        () -> IpAddressFunctions.isPrivateIp("fc00::/7"));
+
+    // Invalid formats
+    assertThrows(IllegalArgumentException.class,
+        () -> IpAddressFunctions.isPrivateIp("not-an-ip"));
+    assertThrows(IllegalArgumentException.class,
+        () -> IpAddressFunctions.isPrivateIp("999.999.999.999"));
   }
 }

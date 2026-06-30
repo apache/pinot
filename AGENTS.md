@@ -92,8 +92,8 @@ repo. It is intentionally short and focused on day-to-day work.
 - assembly-descriptor: Maven assembly descriptor for plugin packaging.
 
 ## Build and test
-- Build JDK: Use JDK 11+ (CI runs 11/17/21); code targets Java 11.
-- Runtime JRE: Broker/server/controller/minion run on Java 11+.
+- Build JDK: Use JDK 21+ for Pinot services and the default build; client and SPI artifacts still target Java 11 bytecode.
+- Runtime JRE: Broker/server/controller/minion run on Java 21+.
 - Default build: `./mvnw clean install`
 - Faster dev build: `./mvnw verify -Ppinot-fastdev`
 - Full binary/shaded build:
@@ -107,12 +107,24 @@ repo. It is intentionally short and focused on day-to-day work.
 
 ## Coding conventions and hygiene
 - Add class-level Javadoc for new classes; describe behavior and thread-safety.
-- Use Javadoc comments with either `/** ... */` or `///` syntax (per JEP-467); code targets Java 11.
+- Use Javadoc comments with either `/** ... */` or `///` syntax (per JEP-467); service code targets Java 21 by default.
 - Keep license headers on all new source files.
 - Use `./mvnw license:format` to add headers to new files.
 - Preserve backward compatibility across mixed-version broker/server/controller.
 - Prefer imports over fully qualified class names (e.g., use `import com.foo.Bar` and refer to `Bar`, not `com.foo.Bar` inline).
+- Prefer `List.of()`, `Set.of()`, and `Map.of()` for non-null immutable collection literals. Checkstyle blocks
+  `Collections.emptyList()`, `Collections.emptySet()`, and `Collections.emptyMap()`; use `List.of()`, `Set.of()`, and
+  `Map.of()` instead. Do not add blanket bans for `Collections.singleton*`; use them only when an element/key/value
+  argument is intentionally null because `List.of(null)`, `Set.of(null)`, and `Map.of(...)` with null keys or values
+  throw `NullPointerException`. Before replacing empty collection factories, check whether the value flows to
+  mutating callers. See
+  `kb/code-review-principles.md` C7.12.
 - Prefer targeted unit tests; use integration tests when behavior crosses roles.
+
+## Commit messages
+- Do not include `Co-authored-by` trailers that reference AI tools (e.g., Claude, Copilot).
+  - **Why**: These trailers propagate into squash-merge commits on GitHub, making the project history appear AI-authored rather than human-authored.
+  - **Fix**: Omit the `Co-authored-by` line entirely when committing.
 
 ## Checkstyle config
 - Checkstyle rules and related config files live under `config/`.
@@ -137,3 +149,32 @@ Do not push until all four checks pass cleanly.
 ## Reference docs
 - `README.md` for build and quickstart details.
 - `CONTRIBUTING.md` for style, licensing, and contribution guidance.
+
+## Knowledge base (tool-neutral)
+The `kb/` directory holds AI-optimized procedures and reference material that any
+coding agent (Claude Code, Copilot, Cursor, GPT, Qwen, Gemini, etc.) can read.
+Claude Code's `.claude/skills/<name>/SKILL.md` and `.claude/agents/<name>.md`
+files are thin pointers that delegate to the kb/ procedures — non-Claude agents
+should read kb/ directly.
+
+- `kb/skills/` — operational procedures and review checklists. See
+  [`kb/skills/README.md`](kb/skills/README.md) for the index. Each file is
+  self-contained; read it and follow it when your task matches the skill name.
+  - Operations: `precommit`, `run-test`, `quickstart`, `bench-compare`,
+    `flaky-analyze`.
+  - Review (eight domains, one per file): `review-config-backcompat`,
+    `review-concurrency-state`, `review-architecture`, `review-performance`,
+    `review-correctness-nulls`, `review-testing`, `review-naming-api`,
+    `review-process-scope`.
+- `kb/agents/code-reviewer.md` — orchestrator that dispatches the eight review
+  skills in parallel, aggregates findings, and emits a consolidated severity-
+  ranked report.
+- `kb/code-review-principles.md` — Pinot-specific review principles cited by id
+  (e.g. `C2.4`, `C6.1`) from the review skills.
+- `kb/CLAUDE.md` — kb/ authoring rules (one source of truth, terse, AI-optimized).
+
+**For non-Claude agents:** when a task matches a skill name (e.g. user asks for
+a pre-commit check, a benchmark comparison, a flaky-test investigation, or a
+code review), read the corresponding `kb/skills/<name>.md` and follow its
+procedure. For a full code review, read `kb/agents/code-reviewer.md` and run the
+eight review skills as it describes.

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.columntransformer;
 
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
 import org.apache.pinot.spi.columntransformer.ColumnTransformer;
@@ -26,6 +25,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +56,7 @@ public class DataTypeColumnTransformer implements ColumnTransformer {
     // If source and destination data types are primitive types and the same, no transformation is needed.
     if (_columnReader.isSingleValue()) {
       if (_columnReader.isInt()) {
-        return _destDataType == PinotDataType.INTEGER;
+        return _destDataType == PinotDataType.INT;
       } else if (_columnReader.isLong()) {
         return _destDataType == PinotDataType.LONG;
       } else if (_columnReader.isFloat()) {
@@ -72,7 +72,7 @@ public class DataTypeColumnTransformer implements ColumnTransformer {
       }
     } else {
       if (_columnReader.isInt()) {
-        return _destDataType == PinotDataType.INTEGER_ARRAY;
+        return _destDataType == PinotDataType.INT_ARRAY;
       } else if (_columnReader.isLong()) {
         return _destDataType == PinotDataType.LONG_ARRAY;
       } else if (_columnReader.isFloat()) {

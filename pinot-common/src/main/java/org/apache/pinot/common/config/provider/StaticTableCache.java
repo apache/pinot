@@ -155,7 +155,7 @@ public class StaticTableCache implements TableCache {
   @Override
   public Map<String, String> getColumnNameMap(String rawTableName) {
     SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
-    return schemaInfo != null ? schemaInfo._columnNameMap : Collections.emptyMap();
+    return schemaInfo != null ? schemaInfo._columnNameMap : Map.of();
   }
 
   @Nullable

@@ -24,8 +24,12 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -33,6 +37,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -47,6 +52,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.InstanceCost;
+import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -68,6 +74,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotQueryWorkloadRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryWorkloadRestletResource.class);
+  public static final String WORKLOAD = "workload";
+  public static final String TABLE = "table";
+  public static final String TENANT = "tenant";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -226,6 +235,7 @@ public class PinotQueryWorkloadRestletResource {
   public String getQueryWorkloadConfigForInstance(@PathParam("instanceName") String instanceName,
                                                   @Context HttpHeaders httpHeaders) {
     try {
+      LOGGER.info("Received request to get workload configs for instance: {}", instanceName);
       Map<String, InstanceCost> workloadToInstanceCostMap = _pinotHelixResourceManager.getQueryWorkloadManager()
           .getWorkloadToInstanceCostFor(instanceName);
       if (workloadToInstanceCostMap == null || workloadToInstanceCostMap.isEmpty()) {
@@ -361,6 +371,7 @@ public class PinotQueryWorkloadRestletResource {
   public Response deleteQueryWorkloadConfig(@PathParam("queryWorkloadName") String queryWorkloadName,
       @Context HttpHeaders httpHeaders) {
     try {
+      LOGGER.info("Received request to delete workload config for workload: {}", queryWorkloadName);
       _pinotHelixResourceManager.deleteQueryWorkloadConfig(queryWorkloadName);
       String successMessage = String.format("Query Workload config deleted successfully for workload: %s",
           queryWorkloadName);
@@ -374,49 +385,189 @@ public class PinotQueryWorkloadRestletResource {
   }
 
   /**
-   * Refreshes the propagation of a query workload configuration without updating it.
-   * <p>
-   * This API re-triggers propagation for an existing `QueryWorkloadConfig`. It does not
-   * modify the configuration itself but ensures that the workload settings are pushed
-   * to all relevant nodes.
-   * </p>
+   * API to refresh workload propagation for workloads, tables, or tenants.
+   * <ul>
+   *   <li><strong>Workload refresh</strong>: If {@code resourceType=workload}, refreshes the workload config(s)</li>
+   *   <li><strong>Table refresh</strong>: If {@code resourceType=table}, refreshes workloads associated with
+   *                                       table(s)</li>
+   *   <li><strong>Tenant refresh</strong>: If {@code resourceType=tenant}, refreshes workloads associated
+   *                                        with tenant(s)</li>
+   * </ul>
    * <p><strong>Example:</strong></p>
    * <pre>{@code
-   * POST /queryWorkloadConfigs/workload-foo1/refresh
+   * POST /queryWorkloadConfigs/refresh?resourceType=workload&resourceNames=workload-foo1
+   * POST /queryWorkloadConfigs/refresh?resourceType=workload&resourceNames=workload-foo1,workload-foo2
+   * POST /queryWorkloadConfigs/refresh?resourceType=table&resourceNames=myTable_OFFLINE
+   * POST /queryWorkloadConfigs/refresh?resourceType=table&resourceNames=myTable_OFFLINE,
+   *       myTable_REALTIME&nodeType=SERVER_NODE
+   * POST /queryWorkloadConfigs/refresh?resourceType=table&resourceNames=myTable_OFFLINE&nodeType=BROKER_NODE
+   * POST /queryWorkloadConfigs/refresh?resourceType=tenant&resourceNames=DefaultTenant
+   * POST /queryWorkloadConfigs/refresh?resourceType=tenant&resourceNames=DefaultTenant,AnotherTenant
    * }</pre>
    *
-   * @param queryWorkloadName Name of the query workload to refresh
+   * @param resourceType The type of entity to refresh ("workload", "table", or "tenant")
+   * @param resourceNames Comma-separated list of entity names to refresh
+   * @param nodeTypeStr Optional node type ("BROKER_NODE" or "SERVER_NODE"). If not provided, propagates to both.
    */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/queryWorkloadConfigs/{queryWorkloadName}/refresh")
+  @Path("/queryWorkloadConfigs/refresh")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_QUERY_WORKLOAD_CONFIG)
   @Authenticate(AccessType.UPDATE)
-  @ApiOperation(value = "Refresh query workload config propagation", notes = "Force propagation of an existing config")
-  public Response refreshQueryWorkloadConfig(@PathParam("queryWorkloadName") String queryWorkloadName,
-                                             @Context HttpHeaders httpHeaders) {
+  @ApiOperation(value = "Refresh API for workload propagation",
+      notes = "Refresh workload propagation for workloads, tables, or tenants based on the resourceType parameter")
+  public Response refreshWorkload(@QueryParam("resourceType") String resourceType,
+                                  @QueryParam("resourceNames") String resourceNames,
+                                  @QueryParam("nodeType") String nodeTypeStr,
+                                  @Context HttpHeaders httpHeaders) {
     try {
-      LOGGER.info("Received request to refresh workload config propagation for workload: {}", queryWorkloadName);
-      // Fetch existing config
-      QueryWorkloadConfig existingConfig = _pinotHelixResourceManager.getQueryWorkloadConfig(queryWorkloadName);
-      if (existingConfig == null) {
-        throw new ControllerApplicationException(LOGGER, "Workload config not found for workload: " + queryWorkloadName,
-            Response.Status.NOT_FOUND, null);
+      LOGGER.info("Received refresh request - resourceType: {}, names: {}, nodeType: {}", resourceType, resourceNames,
+          nodeTypeStr);
+      Set<String> nameList = validateAndParseRefreshRequest(resourceType, resourceNames);
+      // Parse nodeType if provided
+      NodeConfig.Type nodeType = null;
+      if (nodeTypeStr != null && !nodeTypeStr.trim().isEmpty()) {
+        try {
+          nodeType = NodeConfig.Type.forValue(nodeTypeStr.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+          throw new ControllerApplicationException(LOGGER,
+              String.format("Invalid nodeType: '%s'. Must be 'BROKER_NODE' or 'SERVER_NODE'", nodeTypeStr),
+              Response.Status.BAD_REQUEST, null);
+        }
       }
-      _pinotHelixResourceManager.getQueryWorkloadManager().propagateWorkloadUpdateMessage(existingConfig);
-      String successMessage = String.format("Query workload config propagation triggered for workload: %s",
-          queryWorkloadName);
-      LOGGER.info(successMessage);
-      return Response.ok().entity(successMessage).build();
+      switch (resourceType) {
+        case WORKLOAD:
+          return refreshWorkloadsByNames(nameList);
+        case TABLE:
+          return refreshWorkloadsByTables(nameList, nodeType);
+        case TENANT:
+          return refreshWorkloadsByTenants(nameList);
+        default:
+          throw new ControllerApplicationException(LOGGER,
+              String.format("Invalid resourceType: '%s'. Must be 'workload', 'table', or 'tenant'", resourceType),
+              Response.Status.BAD_REQUEST, null);
+      }
     } catch (Exception e) {
       if (e instanceof ControllerApplicationException) {
         throw (ControllerApplicationException) e;
-      } else {
-        String errorMessage = String.format("Error when refreshing query workload config for workload: %s, error: %s",
-            queryWorkloadName, e);
-        throw new ControllerApplicationException(LOGGER, errorMessage,
-            Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
+      String errorMessage = String.format("Error when refreshing workload - resourceType: %s, names: %s, error: %s",
+          resourceType, resourceNames, e);
+      throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  /**
+   * Validates and parses the refresh request parameters.
+   */
+  private Set<String> validateAndParseRefreshRequest(String resourceType, String resourceNames) {
+    // Validate resourceType parameter
+    if (resourceType == null || resourceType.trim().isEmpty() || !(resourceType.equals(WORKLOAD)
+        || resourceType.equals(TABLE) || resourceType.equals(TENANT))) {
+      throw new ControllerApplicationException(LOGGER,
+          "Query parameter 'resourceType' is required. Must be 'workload', 'table', or 'tenant'",
+          Response.Status.BAD_REQUEST, null);
+    }
+
+    // Validate resourceNames parameter
+    if (resourceNames == null || resourceNames.trim().isEmpty()) {
+      throw new ControllerApplicationException(LOGGER, "Query parameter 'resourceNames' is required",
+          Response.Status.BAD_REQUEST, null);
+    }
+
+    // Split comma-separated names and trim whitespace
+    String[] names = resourceNames.split(",");
+    Set<String> nameList = new HashSet<>();
+    for (String name : names) {
+      String trimmed = name.trim();
+      if (!trimmed.isEmpty()) {
+        nameList.add(trimmed);
       }
     }
+    // Ensure at least one valid name exists
+    if (nameList.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER, "At least one resource name is required",
+          Response.Status.BAD_REQUEST, null);
+    }
+    return nameList;
+  }
+
+  /**
+   * Helper method to refresh multiple workloads by name.
+   */
+  private Response refreshWorkloadsByNames(Set<String> workloadNames) {
+    LOGGER.info("Refreshing workload config propagation for workloads: {}", workloadNames);
+    List<String> successfulWorkloads = new ArrayList<>();
+    List<String> failedWorkloads = new ArrayList<>();
+
+    for (String workloadName : workloadNames) {
+      try {
+        QueryWorkloadConfig existingConfig = _pinotHelixResourceManager.getQueryWorkloadConfig(workloadName);
+        if (existingConfig == null) {
+          LOGGER.warn("Workload config not found for workload: {}", workloadName);
+          failedWorkloads.add(workloadName + " (not found)");
+          continue;
+        }
+        _pinotHelixResourceManager.getQueryWorkloadManager().propagateWorkloadUpdateMessage(existingConfig);
+        successfulWorkloads.add(workloadName);
+      } catch (Exception e) {
+        LOGGER.error("Failed to refresh workload: {}", workloadName, e);
+        failedWorkloads.add(workloadName + " (" + e.getMessage() + ")");
+      }
+    }
+
+    String successMessage = String.format("Workload propagation completed. Successful: %s, Failed: %s",
+        successfulWorkloads, failedWorkloads);
+    LOGGER.info(successMessage);
+    return Response.ok().entity(successMessage).build();
+  }
+
+  /**
+   * Helper method to refresh workloads for multiple tables.
+   * Optimized to deduplicate common workloads across tables.
+   *
+   * @param tableNames List of table names
+   * @param nodeType Node type (BROKER_NODE, SERVER_NODE, or null for both)
+   */
+  private Response refreshWorkloadsByTables(Set<String> tableNames, @Nullable NodeConfig.Type nodeType) {
+    String nodeTypeDesc = nodeType == null ? "both broker and server nodes" : nodeType.toString();
+    LOGGER.info("Refreshing workload propagation for tables: {} on {}", tableNames, nodeTypeDesc);
+    try {
+      // Use the optimized batch method that deduplicates workloads
+      _pinotHelixResourceManager.getQueryWorkloadManager().propagateWorkloadForTables(tableNames, nodeType);
+      String successMessage = String.format(
+          "Workload propagation completed successfully for %d tables on %s: %s",
+          tableNames.size(), nodeTypeDesc, tableNames);
+      LOGGER.info(successMessage);
+      return Response.ok().entity(successMessage).build();
+    } catch (Exception e) {
+      String errorMessage = String.format("Failed to refresh workloads for tables: %s on %s",
+          tableNames, nodeTypeDesc);
+      LOGGER.error(errorMessage, e);
+      return Response.serverError().entity(errorMessage + " - " + e.getMessage()).build();
+    }
+  }
+
+  /**
+   * Helper method to refresh workloads for multiple tenants.
+   */
+  private Response refreshWorkloadsByTenants(Set<String> tenantNames) {
+    LOGGER.info("Refreshing workload propagation for tenants: {}", tenantNames);
+    List<String> successfulTenants = new ArrayList<>();
+    List<String> failedTenants = new ArrayList<>();
+    for (String tenantName : tenantNames) {
+      try {
+        _pinotHelixResourceManager.getQueryWorkloadManager().propagateWorkloadForTenant(tenantName);
+        successfulTenants.add(tenantName);
+      } catch (Exception e) {
+        LOGGER.error("Failed to refresh workload for tenant: {}", tenantName, e);
+        failedTenants.add(tenantName + " (" + e.getMessage() + ")");
+      }
+    }
+
+    String successMessage = String.format("Workload propagation completed. Successful: %s, Failed: %s",
+        successfulTenants, failedTenants);
+    LOGGER.info(successMessage);
+    return Response.ok().entity(successMessage).build();
   }
 }

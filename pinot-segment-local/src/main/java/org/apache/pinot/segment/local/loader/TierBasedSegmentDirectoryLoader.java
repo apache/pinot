@@ -28,14 +28,12 @@ import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentLoader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,8 +101,7 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
     if (!destDir.exists()) {
       segmentDirectory = new SegmentLocalFSDirectory(destDir);
     } else {
-      segmentDirectory = new SegmentLocalFSDirectory(destDir, ReadMode.valueOf(
-          segmentLoaderContext.getSegmentDirectoryConfigs().getProperty(IndexLoadingConfig.READ_MODE_KEY)));
+      segmentDirectory = new SegmentLocalFSDirectory(destDir, segmentLoaderContext.getReadMode());
     }
     LOGGER.info("Created segmentDirectory object for segment: {} with dataDir: {} on targetTier: {}", segmentName,
         destDir, targetTierName);

@@ -28,6 +28,7 @@ import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
+import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamMessageMetadata;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -46,7 +47,32 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
-  private long _lastFetchedOffset = -1;
+  // Offset the consumer is positioned to read NEXT. -1 means the consumer has not been
+  // positioned for any caller-requested startOffset yet (we have not issued a seek).
+  // After a successful fetch, this is lastRecord.offset + 1. After an empty fetch under
+  // read_committed (where the batch may have been filtered as aborted), this is the
+  // consumer's actual KafkaConsumer.position(), which may have advanced past the caller's
+  // startOffset even though zero records were returned.
+  private long _nextReadOffset = -1;
+  // The caller's startOffset on the previous fetchMessages() call. Used to distinguish
+  // "caller is passing the same startOffset back because RealtimeSegmentDataManager's
+  // _currentOffset didn't advance on our last empty batch" (should NOT re-seek and undo
+  // _nextReadOffset's progress) from "caller is requesting a new startOffset" (should
+  // re-seek). The latter does not occur in production -- RealtimeSegmentDataManager
+  // consumes monotonically forward -- but the public PartitionGroupConsumer contract
+  // (and KafkaPartitionLevelConsumerTest.testConsumer) does exercise arbitrary
+  // re-seeks, so we preserve that behaviour.
+  private long _lastFetchStartOffset = Long.MIN_VALUE;
+  // Whether the previous successful poll returned any records from Kafka. When the caller
+  // repeats the same startOffset after a non-empty fetch, the records may have been fetched
+  // but not processed by RealtimeSegmentDataManager because an end criterion fired before
+  // index 0. In that case we must re-seek and replay the batch instead of continuing from
+  // _nextReadOffset.
+  private boolean _lastFetchReturnedRecords;
+  // Cached true iff stream.kafka.isolation.level == read_committed. Computed once at
+  // construction (the value is final per consumer) and reused on every fetch instead of
+  // re-resolving the StreamConfig each time.
+  private final boolean _isReadCommitted = isReadCommitted(_config);
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -63,24 +89,41 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Polling partition: {}, startOffset: {}, timeout: {}ms", _topicPartition, startOffset, timeoutMs);
     }
-    if (_lastFetchedOffset < 0 || _lastFetchedOffset != startOffset - 1) {
+    // Seek when:
+    //   (a) we have not yet positioned the consumer (initial state), OR
+    //   (b) the caller-requested startOffset differs from _nextReadOffset, except for
+    //       the repeated-startOffset-after-empty-fetch case described below.
+    //
+    // We only suppress a re-seek when the caller passed the same startOffset after the
+    // previous successful fetch returned zero records. That is the read_committed
+    // empty-poll case: RealtimeSegmentDataManager._currentOffset did not advance, but
+    // KafkaConsumer.position() may have advanced through aborted records. Seeking back to
+    // startOffset would undo that progress and wedge consumption forever.
+    //
+    // If the previous poll returned records, a repeated startOffset means the caller did
+    // not process them (for example, the segment time limit fired before index 0). We must
+    // seek back and replay those records; otherwise CATCH_UP can skip an already-fetched
+    // batch and falsely report data loss.
+    boolean repeatedStartOffsetAfterEmptyFetch = startOffset == _lastFetchStartOffset && !_lastFetchReturnedRecords;
+    if (_nextReadOffset < 0 || (startOffset != _nextReadOffset && !repeatedStartOffsetAfterEmptyFetch)) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Seeking to offset: {}", startOffset);
       }
       _consumer.seek(_topicPartition, startOffset);
+      _nextReadOffset = startOffset;
     }
 
     ConsumerRecords<Bytes, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
     List<ConsumerRecord<Bytes, Bytes>> records = consumerRecords.records(_topicPartition);
+    _lastFetchStartOffset = startOffset;
+    _lastFetchReturnedRecords = !records.isEmpty();
     List<BytesStreamMessage> filteredRecords = new ArrayList<>(records.size());
     long firstOffset = -1;
-    long offsetOfNextBatch = startOffset;
     StreamMessageMetadata lastMessageMetadata = null;
     long batchSizeInBytes = 0;
     if (!records.isEmpty()) {
       firstOffset = records.get(0).offset();
-      _lastFetchedOffset = records.get(records.size() - 1).offset();
-      offsetOfNextBatch = _lastFetchedOffset + 1;
+      _nextReadOffset = records.get(records.size() - 1).offset() + 1;
       for (ConsumerRecord<Bytes, Bytes> record : records) {
         StreamMessageMetadata messageMetadata = extractMessageMetadata(record);
         Bytes message = record.value();
@@ -96,18 +139,46 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         }
         lastMessageMetadata = messageMetadata;
       }
+    } else if (_isReadCommitted) {
+      // No records returned. With read_committed isolation, the underlying KafkaConsumer's
+      // internal position may still have advanced past offsets filtered out as aborted
+      // transactional records, so snap _nextReadOffset to the consumer's actual position.
+      // RealtimeSegmentDataManager doesn't advance _currentOffset on empty batches and will
+      // call us again with the same startOffset; without this update the seek-check would
+      // re-seek to startOffset and undo the consumer's progress through the aborted region.
+      //
+      // For read_uncommitted (the default), empty polls can never advance the internal
+      // position past records that didn't exist, so we skip the position() call in the
+      // hot path. The call is bounded by the same timeout as poll() so a sick broker
+      // can't stall this loop unbounded.
+      long currentPosition;
+      try {
+        currentPosition = _consumer.position(_topicPartition, Duration.ofMillis(timeoutMs));
+      } catch (Exception e) {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Failed to read consumer position after empty poll on {}", _topicPartition, e);
+        }
+        currentPosition = _nextReadOffset;
+      }
+      if (currentPosition > _nextReadOffset) {
+        _nextReadOffset = currentPosition;
+      }
     }
+    long offsetOfNextBatch = _nextReadOffset;
 
-    // In case read_committed is enabled, the messages consumed are not guaranteed to have consecutive offsets.
-    // TODO: A better solution would be to fetch earliest offset from topic and see if it is greater than startOffset.
-    // However, this would require and additional call to Kafka which we want to avoid.
-    boolean hasDataLoss = false;
-    if (_config.getKafkaIsolationLevel() == null || _config.getKafkaIsolationLevel()
-        .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED)) {
-      hasDataLoss = firstOffset > startOffset;
-    }
+    // For read_uncommitted (the default), a non-contiguous returned batch implies data
+    // loss (records dropped before being read). For read_committed the offset gap is
+    // expected because the broker filters aborted transactional records, so we don't flag
+    // it as data loss.
+    boolean hasDataLoss = !_isReadCommitted && firstOffset > startOffset;
     return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata,
         hasDataLoss, batchSizeInBytes);
+  }
+
+  private static boolean isReadCommitted(KafkaPartitionLevelStreamConfig config) {
+    String level = config.getKafkaIsolationLevel();
+    return level != null
+        && !level.equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED);
   }
 
   private StreamMessageMetadata extractMessageMetadata(ConsumerRecord<Bytes, Bytes> record) {

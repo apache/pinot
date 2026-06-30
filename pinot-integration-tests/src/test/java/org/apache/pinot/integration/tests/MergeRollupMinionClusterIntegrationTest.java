@@ -21,10 +21,10 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -34,6 +34,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
@@ -205,7 +206,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("100days.maxNumRecordsPerTask", "15000");
     tableTaskConfigs.put("ActualElapsedTime.aggregationType", "min");
     tableTaskConfigs.put("WeatherDelay.aggregationType", "sum");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private TableConfig createOfflineTableConfig(String tableName, TableTaskConfig taskConfig) {
@@ -250,7 +251,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         .setBloomFilterColumns(getBloomFilterColumns()).setFieldConfigList(getFieldConfigs())
         .setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode())
         .setTaskConfig(
-            new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs)))
+            new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs)))
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
         .setQueryConfig(getQueryConfig()).setStreamConfigs(streamConfigs)
         .setNullHandlingEnabled(getNullHandlingEnabled()).build();
@@ -266,7 +267,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("ActualElapsedTime.aggregationType", "min");
     tableTaskConfigs.put("WeatherDelay.aggregationType", "sum");
     tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private TableTaskConfig getSingleLevelConcatMetadataTaskConfig() {
@@ -280,7 +281,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("WeatherDelay.aggregationType", "sum");
     tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
     tableTaskConfigs.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.toString());
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private TableTaskConfig getSingleLevelRollupTaskConfig() {
@@ -290,7 +291,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("150days.bucketTimePeriod", "150d");
     tableTaskConfigs.put("150days.roundBucketTimePeriod", "7d");
     tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private TableTaskConfig getMultiLevelConcatTaskConfig() {
@@ -307,7 +308,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("90days.maxNumRecordsPerSegment", "100000");
     tableTaskConfigs.put("90days.maxNumRecordsPerTask", "100000");
     tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private SegmentPartitionConfig getMultiColumnsSegmentPartitionConfig() {
@@ -408,7 +409,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_CONCAT_TEST_TABLE);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(offlineTableName));
+        .setTablesToSchedule(Set.of(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -463,8 +464,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Check total tasks
     assertEquals(numTasks, 5);
 
-    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
-        "mergeRollupTaskDelayInNumBuckets.myTable1_OFFLINE.100days"));
+    waitForGaugesToExist("mergeRollupTaskDelayInNumBuckets.myTable1_OFFLINE.100days");
     // Drop the table
     dropOfflineTable(SINGLE_LEVEL_CONCAT_TEST_TABLE);
 
@@ -526,7 +526,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_CONCAT_METADATA_TEST_TABLE);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(offlineTableName));
+        .setTablesToSchedule(Set.of(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -581,8 +581,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Check total tasks
     assertEquals(numTasks, 5);
 
-    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
-        "mergeRollupTaskDelayInNumBuckets.myTable4_OFFLINE.100days"));
+    waitForGaugesToExist("mergeRollupTaskDelayInNumBuckets.myTable4_OFFLINE.100days");
 
     // Drop the table
     dropOfflineTable(SINGLE_LEVEL_CONCAT_METADATA_TEST_TABLE);
@@ -637,7 +636,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_ROLLUP_TEST_TABLE);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(offlineTableName));
+        .setTablesToSchedule(Set.of(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -705,8 +704,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Check total tasks
     assertEquals(numTasks, 3);
 
-    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
-        "mergeRollupTaskDelayInNumBuckets.myTable2_OFFLINE.150days"));
+    waitForGaugesToExist("mergeRollupTaskDelayInNumBuckets.myTable2_OFFLINE.150days");
   }
 
   /**
@@ -791,7 +789,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(MULTI_LEVEL_CONCAT_TEST_TABLE);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(offlineTableName));
+        .setTablesToSchedule(Set.of(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -852,10 +850,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Check total tasks
     assertEquals(numTasks, 8);
 
-    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
-        "mergeRollupTaskDelayInNumBuckets.myTable3_OFFLINE.45days"));
-    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
-        "mergeRollupTaskDelayInNumBuckets.myTable3_OFFLINE.90days"));
+    waitForGaugesToExist("mergeRollupTaskDelayInNumBuckets.myTable3_OFFLINE.45days",
+        "mergeRollupTaskDelayInNumBuckets.myTable3_OFFLINE.90days");
   }
 
   protected void verifyTableDelete(String tableNameWithType) {
@@ -884,6 +880,55 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       }
       return true;
     }, 600_000L, "Failed to complete task");
+  }
+
+  /**
+   * Poll the {@code mergeRollupTaskNumBucketsToProcess} gauges until they exist and match the expected values.
+   *
+   * <p>The gauges are (re)registered and updated only when {@link PinotTaskManager#scheduleTasks} runs for a merge
+   * level that has no in-flight task. In {@link #testRealtimeTableProcessAllModeMultiLevelConcat}, the scheduling
+   * call that refreshes the gauge for a given iteration can race with either (a) the in-flight task's completion
+   * in Helix or (b) the segment-lineage commit that follows task completion. Polling here absorbs that short race
+   * window instead of asserting once and flaking.
+   */
+  private void waitForExpectedNumBucketsToProcess(String tableNameWithType, long expected100Days,
+      long expected200Days) {
+    String metric100Days = "mergeRollupTaskNumBucketsToProcess." + tableNameWithType + ".100days";
+    String metric200Days = "mergeRollupTaskNumBucketsToProcess." + tableNameWithType + ".200days";
+    TestUtils.waitForCondition(aVoid -> {
+      ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
+      if (!MetricValueUtils.gaugeExists(controllerMetrics, metric100Days)
+          || !MetricValueUtils.gaugeExists(controllerMetrics, metric200Days)) {
+        return false;
+      }
+      return MetricValueUtils.getGaugeValue(controllerMetrics, metric100Days) == expected100Days
+          && MetricValueUtils.getGaugeValue(controllerMetrics, metric200Days) == expected200Days;
+    }, TIMEOUT_IN_MS, "Timeout while waiting for expected num buckets to process metrics on " + tableNameWithType);
+  }
+
+  /**
+   * Poll until all of the named gauges exist on the controller. Used here for
+   * {@code mergeRollupTaskDelayInNumBuckets.*} after each test's scheduling loop completes.
+   *
+   * <p>Those gauges are (re)registered by {@link PinotTaskManager#scheduleTasks} via
+   * {@code MergeRollupTaskGenerator.createOrUpdateDelayMetrics}. They are removed by
+   * {@code resetDelayMetrics} when a {@code scheduleTasks} call observes no eligible segments for the
+   * table — which can happen transiently if a {@code scheduleTasks} call (e.g. the per-iteration
+   * {@code RealtimeToOfflineSegmentsTask} probe inside the for-loop body) lands while the previous
+   * merge task's segment-lineage commit is still in flight. Polling here mirrors
+   * {@link #waitForExpectedNumBucketsToProcess} so the post-loop assertion does not flake on the same
+   * race window.
+   */
+  private void waitForGaugesToExist(String... metricNames) {
+    TestUtils.waitForCondition(aVoid -> {
+      ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
+      for (String metricName : metricNames) {
+        if (!MetricValueUtils.gaugeExists(controllerMetrics, metricName)) {
+          return false;
+        }
+      }
+      return true;
+    }, TIMEOUT_IN_MS, "Timeout while waiting for gauges to exist: " + String.join(", ", metricNames));
   }
 
   // The use case is similar as the one defined in offline table
@@ -926,7 +971,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(realtimeTableName));
+        .setTablesToSchedule(Set.of(realtimeTableName));
     List<String> taskList;
     for (String tasks = taskManager.scheduleTasks(context)
             .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -985,8 +1030,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Check total tasks
     assertEquals(numTasks, 5);
 
-    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
-        "mergeRollupTaskDelayInNumBuckets.myTable5_REALTIME.100days"));
+    waitForGaugesToExist("mergeRollupTaskDelayInNumBuckets.myTable5_REALTIME.100days");
 
     // Drop the table
     dropRealtimeTable(tableName);
@@ -1034,7 +1078,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(realtimeTableName));
+        .setTablesToSchedule(Set.of(realtimeTableName));
     List<String> taskList;
     for (String tasks = taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0); tasks != null;
@@ -1055,16 +1099,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       assertNull(minionTaskMetadataZNRecord);
 
       // Check metrics
-      assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.100days"));
-      assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.200days"));
-      long numBucketsToProcess = MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.100days");
-      assertEquals(numBucketsToProcess, expectedNumBucketsToProcess100Days[numTasks]);
-      numBucketsToProcess = MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.200days");
-      assertEquals(numBucketsToProcess, expectedNumBucketsToProcess200Days[numTasks]);
+      waitForExpectedNumBucketsToProcess(realtimeTableName, expectedNumBucketsToProcess100Days[numTasks],
+          expectedNumBucketsToProcess200Days[numTasks]);
     }
     // Check total tasks
     assertEquals(numTasks, 4);
@@ -1085,12 +1121,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
             tasks = taskList != null && !taskList.isEmpty() ? taskList.get(0) : null, numTasks++) {
       waitForTaskToComplete();
       // Check metrics
-      long numBucketsToProcess = MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.100days");
-      assertEquals(numBucketsToProcess, expectedNumBucketsToProcess100Days[numTasks]);
-      numBucketsToProcess = MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.200days");
-      assertEquals(numBucketsToProcess, expectedNumBucketsToProcess200Days[numTasks]);
+      waitForExpectedNumBucketsToProcess(realtimeTableName, expectedNumBucketsToProcess100Days[numTasks],
+          expectedNumBucketsToProcess200Days[numTasks]);
     }
 
     // Check total tasks

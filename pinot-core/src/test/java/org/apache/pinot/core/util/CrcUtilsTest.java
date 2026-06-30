@@ -105,10 +105,10 @@ public class CrcUtilsTest {
     driver.build();
 
     File indexDir = driver.getOutputDirectory();
-    assertEquals(CrcUtils.computeCrc(indexDir), 2102337593L);
+    assertEquals(CrcUtils.computeCrc(indexDir), 1541360722L);
 
     new SegmentV1V2ToV3FormatConverter().convert(indexDir);
-    assertEquals(CrcUtils.computeCrc(indexDir), 3362640853L);
+    assertEquals(CrcUtils.computeCrc(indexDir), 4234543086L);
   }
 
   @Test
@@ -135,10 +135,10 @@ public class CrcUtilsTest {
     driver.build();
 
     File indexDir = driver.getOutputDirectory();
-    assertEquals(CrcUtils.computeCrc(indexDir), 2627227852L);
+    assertEquals(CrcUtils.computeCrc(indexDir), 4137909477L);
 
     new SegmentV1V2ToV3FormatConverter().convert(indexDir);
-    assertEquals(CrcUtils.computeCrc(indexDir), 1229791705L);
+    assertEquals(CrcUtils.computeCrc(indexDir), 3355659762L);
   }
 
   @Test

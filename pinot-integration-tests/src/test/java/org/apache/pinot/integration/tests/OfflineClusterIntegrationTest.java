@@ -871,7 +871,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "hsomething, something, something and wise");
 
-    // Test occurence
+    // Test occurrence
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
@@ -989,7 +989,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "hsomething, something, something and wise");
 
-    // Test occurence
+    // Test occurrence
     sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
@@ -1440,9 +1440,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode results = resultTable.get("rows").get(0);
     assertEquals(results.get(0).asInt(), 1);
     long nowResult = results.get(1).asLong();
-    // Timestamp granularity is seconds
-    assertTrue(nowResult >= ((queryStartTimeMs / 1000) * 1000));
-    assertTrue(nowResult <= ((queryEndTimeMs / 1000) * 1000));
+    // now() returns millisecond-precision epoch millis, consistent with the single-stage engine (issue #18881)
+    assertTrue(nowResult >= queryStartTimeMs);
+    assertTrue(nowResult <= queryEndTimeMs);
     long oneHourAgoResult = results.get(2).asLong();
     assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
     assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
@@ -1531,7 +1531,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Convert 'DestCityName' to v6 raw index (delta-encoded chunk header)
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigs);
-    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(6).build();
+    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withRawIndexWriterVersion(6)
+        .build();
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     FieldConfig fieldConfig =
@@ -1552,7 +1554,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Convert 'DestCityName' to v2 raw index by modifying existing FieldConfig
     fieldConfigs = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigs);
-    forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(2).build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withRawIndexWriterVersion(2)
+        .build();
     indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
@@ -1567,7 +1571,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(v2RawIndexSize > v4rawIndexSize);
 
     // Convert 'DestCityName' to SNAPPY compression
-    forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.SNAPPY).build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(CompressionCodec.SNAPPY)
+        .build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
         new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
@@ -1590,7 +1596,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v4SnappyRawIndexSize);
 
     // Adding 'LZ4' compression explicitly should trigger the conversion
-    forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.LZ4).build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(CompressionCodec.LZ4)
+        .build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
         new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
@@ -2288,7 +2296,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Add expression override
     TableConfig tableConfig = createOfflineTableConfig();
     tableConfig.setQueryConfig(
-        new QueryConfig(null, null, null, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), null, null));
+        new QueryConfig(null, null, null, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), null,
+            null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -3019,8 +3028,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(query);
   }
 
-  // these tests actually checks a calcite limitation.
-  // Once it is fixed in calcite, we should merge this tests with testQueryRepetedColumnsV1
+  // The repeated-column ORDER BY case below still hits a Calcite limitation in the multi-stage engine: the ORDER BY
+  // reference to a column that appears twice in the SELECT list is rejected as ambiguous, so it is asserted
+  // separately from the single-stage variant (V1). As of Calcite 1.42 the repeated GROUP BY case is now accepted
+  // (the planner de-duplicates the repeated grouping key), matching V1.
   @Test
   public void testQueryWithRepeatedColumnsV2()
       throws Exception {
@@ -3029,7 +3040,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testQuery(query);
 
-    //test repeated columns in selection query with order by
+    //test repeated columns in selection query with order by (ambiguous reference, rejected by the MSE validator)
     query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' order by ArrTime";
     testQueryError(query, QueryErrorCode.QUERY_VALIDATION);
 
@@ -3037,10 +3048,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     query = "SELECT COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testQuery(query);
 
-    //test repeated columns in agg group by query
+    //test repeated columns in agg group by query (Calcite 1.42 de-duplicates the repeated grouping key)
     query = "SELECT ArrTime, ArrTime, COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
         + "GROUP BY ArrTime, ArrTime";
-    testQueryError(query, QueryErrorCode.QUERY_VALIDATION);
+    testQuery(query);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -3560,7 +3571,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // needed because both OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest run this test
     // case with different number of documents in the segment.
     response1 = response1.replaceAll("docs:[0-9]+", "docs:*")
-        .replaceAll("Time: \\d+\\.\\d+", "Time:*");
+        .replaceAll("Time: \\d+\\.\\d+(?:[eE][-+]?\\d+)?", "Time:*");
 
     JsonNode response1Json = JsonUtils.stringToJsonNode(response1);
     assertEquals(response1Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");
@@ -3585,6 +3596,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: SortRemove -> Time:*\n"
         + "Rule: AggregateProjectMerge -> Time:*\n"
+        + "Rule: AggregateProjectPullUpConstants -> Time:*\n"
+        + "Rule: ProjectAggregateMerge -> Time:*\n"
+        + "Rule: SortRemoveConstantKeys -> Time:*\n"
         + "Rule: EvaluateProjectLiteral -> Time:*\n"
         + "Rule: AggregateRemove -> Time:*\n");
 
@@ -3593,7 +3607,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // language=sql
     String query2 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM mytable WHERE FlightNum < 0";
     String response2 = postQuery(query2).get("resultTable").toString()
-        .replaceAll("Time: \\d+\\.\\d+", "Time: *");
+        .replaceAll("Time: \\d+\\.\\d+(?:[eE][-+]?\\d+)?", "Time: *");
 
     JsonNode response2Json = JsonUtils.stringToJsonNode(response2);
     assertEquals(response2Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");

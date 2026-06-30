@@ -32,7 +32,6 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -391,8 +390,9 @@ public class PinotTenantRestletResource {
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
     try {
       LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+      // WorkloadChangeListener is not needed for tenant instance partitions update
       InstancePartitionsUtils.persistInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
-          instancePartitions);
+          instancePartitions, null);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions. "
           + "Reason: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -471,12 +471,12 @@ public class PinotTenantRestletResource {
 
     if (StateType.DISABLE.name().equalsIgnoreCase(stateStr)) {
       for (String instance : allInstances) {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
+        instanceResult.set(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
       }
     }
     if (StateType.ENABLE.name().equalsIgnoreCase(stateStr)) {
       for (String instance : allInstances) {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
+        instanceResult.set(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
       }
     }
     return new SuccessResponse("Changed state of tenant " + tenantName + " to " + stateStr + " successfully.");
@@ -858,7 +858,7 @@ public class PinotTenantRestletResource {
       notes = "Get list of rebalance jobs for this tenant")
   public Map<String, Map<String, String>> getControllerJobs(
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName) {
-    return _pinotHelixResourceManager.getAllJobs(Collections.singleton(ControllerJobTypes.TENANT_REBALANCE),
+    return _pinotHelixResourceManager.getAllJobs(Set.of(ControllerJobTypes.TENANT_REBALANCE),
         jobMetadata -> jobMetadata.get(CommonConstants.ControllerJob.TENANT_NAME)
             .equals(tenantName));
   }
