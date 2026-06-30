@@ -206,6 +206,12 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
     checkResult("SELECT intColumn FROM testTable WHERE " + id + " = intColumn", new Object[][]{});
     checkResult("SELECT intColumn FROM testTable WHERE " + id + " > intColumn LIMIT 3",
         new Object[][]{{1}, {2}, {3}});
+
+    // Mixed numeric/string comparison: an INT column against a non-numeric STRING column. The old minus()-based
+    // rewrite coerced both operands to DOUBLE and threw NumberFormatException on the non-numeric string, failing the
+    // whole query. The type-safe rewrite evaluates per-row, treating an unparseable comparison as no-match, so the
+    // query runs and simply returns no rows instead of erroring.
+    checkResult("SELECT intColumn FROM testTable WHERE intColumn = stringColumn", new Object[][]{});
   }
 
   @Test
