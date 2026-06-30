@@ -28,6 +28,8 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -39,6 +41,8 @@ public class IdentifierTransformFunction implements TransformFunction {
   private final String _columnName;
   private final Dictionary _dictionary;
   private final TransformResultMetadata _resultMetadata;
+  private String[] _uuidStringValuesSV;
+  private String[][] _uuidStringValuesMV;
 
   public IdentifierTransformFunction(String columnName, ColumnContext columnContext) {
     _columnName = columnName;
@@ -115,6 +119,19 @@ public class IdentifierTransformFunction implements TransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType() == DataType.UUID) {
+      int numDocs = valueBlock.getNumDocs();
+      String[] uuidStringValuesSV = _uuidStringValuesSV;
+      if (uuidStringValuesSV == null || uuidStringValuesSV.length < numDocs) {
+        uuidStringValuesSV = new String[numDocs];
+        _uuidStringValuesSV = uuidStringValuesSV;
+      }
+      byte[][] bytesValues = valueBlock.getBlockValueSet(_columnName).getBytesValuesSV();
+      for (int i = 0; i < numDocs; i++) {
+        uuidStringValuesSV[i] = UuidUtils.toString(bytesValues[i]);
+      }
+      return uuidStringValuesSV;
+    }
     return valueBlock.getBlockValueSet(_columnName).getStringValuesSV();
   }
 
@@ -150,6 +167,25 @@ public class IdentifierTransformFunction implements TransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType() == DataType.UUID) {
+      int numDocs = valueBlock.getNumDocs();
+      String[][] uuidStringValuesMV = _uuidStringValuesMV;
+      if (uuidStringValuesMV == null || uuidStringValuesMV.length < numDocs) {
+        uuidStringValuesMV = new String[numDocs][];
+        _uuidStringValuesMV = uuidStringValuesMV;
+      }
+      byte[][][] bytesValuesMV = valueBlock.getBlockValueSet(_columnName).getBytesValuesMV();
+      for (int i = 0; i < numDocs; i++) {
+        byte[][] bytesValues = bytesValuesMV[i];
+        int numValues = bytesValues.length;
+        String[] uuidValues = new String[numValues];
+        for (int j = 0; j < numValues; j++) {
+          uuidValues[j] = UuidUtils.toString(bytesValues[j]);
+        }
+        uuidStringValuesMV[i] = uuidValues;
+      }
+      return uuidStringValuesMV;
+    }
     return valueBlock.getBlockValueSet(_columnName).getStringValuesMV();
   }
 
