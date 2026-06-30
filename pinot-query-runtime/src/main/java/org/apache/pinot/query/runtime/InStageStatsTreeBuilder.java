@@ -304,10 +304,16 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
 
   @Override
   public ObjectNode visitMailboxSend(MailboxSendNode node, Context context) {
-    @SuppressWarnings("unchecked")
-    StatMap<MailboxSendOperator.StatKey> operatorStats =
-        (StatMap<MailboxSendOperator.StatKey>) _stageStats.getOperatorStats(_index);
-    long parallelism = operatorStats.getLong(MailboxSendOperator.StatKey.PARALLELISM);
+    long parallelism = 1;
+    // Plugin-defined send operators (id >= 256) carry a different StatMap key class; reading the built-in
+    // PARALLELISM key from them returns 0, which would make every division by parallelism below throw. Only read
+    // it when the stats really are the built-in MAILBOX_SEND ones.
+    if (_stageStats.getOperatorType(_index) == MultiStageOperator.Type.MAILBOX_SEND) {
+      @SuppressWarnings("unchecked")
+      StatMap<MailboxSendOperator.StatKey> operatorStats =
+          (StatMap<MailboxSendOperator.StatKey>) _stageStats.getOperatorStats(_index);
+      parallelism = Math.max(1, operatorStats.getLong(MailboxSendOperator.StatKey.PARALLELISM));
+    }
     Context myContext = new Context((int) parallelism);
     return recursiveCase(node, MultiStageOperator.Type.MAILBOX_SEND, myContext);
   }

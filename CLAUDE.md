@@ -110,6 +110,13 @@ Apache Pinot is a real-time distributed OLAP datastore for low-latency analytics
 - Keep Apache 2.0 license headers on all new source files.
 - Preserve backward compatibility across mixed-version broker/server/controller.
 - Prefer imports over fully qualified class names (e.g., use `import com.foo.Bar` and refer to `Bar`, not `com.foo.Bar` inline).
+- Prefer `List.of()`, `Set.of()`, and `Map.of()` for non-null immutable collection literals. Checkstyle blocks
+  `Collections.emptyList()`, `Collections.emptySet()`, and `Collections.emptyMap()`; use `List.of()`, `Set.of()`, and
+  `Map.of()` instead. Do not add blanket bans for `Collections.singleton*`; use them only when an element/key/value
+  argument is intentionally null because `List.of(null)`, `Set.of(null)`, and `Map.of(...)` with null keys or values
+  throw `NullPointerException`. Before replacing empty collection factories, check whether the value flows to
+  mutating callers. See
+  `kb/code-review-principles.md` C7.12.
 - Prefer targeted unit tests; use integration tests when behavior crosses roles.
 - Avoid deprecated APIs in new code. If you must reference one (e.g., for backward-compat serialization or to test the deprecated path), justify it with a comment.
 

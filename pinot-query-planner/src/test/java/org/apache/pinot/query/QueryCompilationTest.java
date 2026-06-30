@@ -38,8 +38,10 @@ import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Ignore;
@@ -951,6 +953,103 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "LEFT side of RIGHT non-equi join should be BROADCAST");
     assertEquals(rightInput.getDistributionType(), RelDistribution.Type.RANDOM_DISTRIBUTED,
         "RIGHT side of RIGHT non-equi join should be RANDOM");
+  }
+
+  /**
+   * The {@code windowOptions(is_partitioned_by_window_keys='true')} hint forces a pre-partitioned (direct) exchange
+   * below the window, avoiding a data shuffle. Here the window partitions by {@code col1}, which is NOT table a's
+   * partition column ({@code col2}), so without the hint the planner would shuffle. This exercises the
+   * {@link org.apache.pinot.calcite.rel.logical.PinotLogicalExchange} path (PARTITION BY only).
+   */
+  @Test
+  public void testWindowPartitionByKeysHintForcesPrePartitionedExchange() {
+    String query = "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ "
+        + "col1, SUM(col3) OVER (PARTITION BY col1) FROM a";
+    MailboxSendNode sendNode = findWindowInputSendNode(_queryEnvironment.planQuery(query));
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    assertTrue(sendNode.isPrePartitioned(),
+        "windowOptions(is_partitioned_by_window_keys='true') should force a pre-partitioned exchange");
+  }
+
+  /**
+   * Without the hint and with a window partition key that does not match the table's partitioning, the exchange below
+   * the window must be a regular (shuffled) exchange.
+   */
+  @Test
+  public void testWindowWithoutHintIsNotPrePartitioned() {
+    String query = "SELECT col1, SUM(col3) OVER (PARTITION BY col1) FROM a";
+    MailboxSendNode sendNode = findWindowInputSendNode(_queryEnvironment.planQuery(query));
+    assertFalse(sendNode.isPrePartitioned(),
+        "Without the hint and matching partitioning, the window exchange should be a full shuffle");
+  }
+
+  /**
+   * The hint must also flow through the {@link org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange} path,
+   * used when PARTITION BY and ORDER BY are on different keys. This is the path the PR fixes: previously
+   * {@code RelToPlanNodeConverter} hardcoded {@code prePartitioned = null} for sort exchanges, dropping the hint.
+   */
+  @Test
+  public void testWindowPartitionByKeysHintForcesPrePartitionedSortExchange() {
+    String query = "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ "
+        + "col1, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3) FROM a";
+    MailboxSendNode sendNode = findWindowInputSendNode(_queryEnvironment.planQuery(query));
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    assertTrue(sendNode.isPrePartitioned(),
+        "windowOptions hint should force a pre-partitioned sort exchange (PARTITION BY + ORDER BY on different keys)");
+  }
+
+  /**
+   * Setting the hint to {@code 'false'} overrides the planner's automatic detection of pre-partitioning. Here table a
+   * is declared partitioned by {@code col2} (via tableOptions) and the window also partitions by {@code col2}, so the
+   * planner would otherwise auto-detect a pre-partitioned exchange; the hint disables it.
+   */
+  @Test
+  public void testWindowPartitionByKeysHintFalseDisablesAutoDetectedPrePartitioning() {
+    String query = "SELECT /*+ windowOptions(is_partitioned_by_window_keys='false') */ "
+        + "col1, SUM(col3) OVER (PARTITION BY col2) "
+        + "FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */";
+    MailboxSendNode sendNode = findWindowInputSendNode(_queryEnvironment.planQuery(query));
+    assertFalse(sendNode.isPrePartitioned(),
+        "windowOptions(is_partitioned_by_window_keys='false') should disable auto-detected pre-partitioning");
+  }
+
+  /**
+   * With matching tableOptions partitioning and no window hint, the planner auto-detects pre-partitioning. This must
+   * hold for both window exchange paths: PinotLogicalExchange (PARTITION BY only) and PinotLogicalSortExchange
+   * (PARTITION BY + ORDER BY). The latter verifies the PR preserves the {@code null -> auto-detect} behavior.
+   */
+  @Test
+  public void testWindowAutoDetectsPrePartitioningWithoutHint() {
+    String partitionOnly = "SELECT col1, SUM(col3) OVER (PARTITION BY col2) "
+        + "FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */";
+    assertTrue(findWindowInputSendNode(_queryEnvironment.planQuery(partitionOnly)).isPrePartitioned(),
+        "PARTITION BY on the table's partition column should auto-detect a pre-partitioned exchange");
+
+    String partitionAndOrder = "SELECT col1, SUM(col3) OVER (PARTITION BY col2 ORDER BY col3) "
+        + "FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */";
+    assertTrue(findWindowInputSendNode(_queryEnvironment.planQuery(partitionAndOrder)).isPrePartitioned(),
+        "Sort exchange should also auto-detect pre-partitioning when the table is partitioned by the window key");
+  }
+
+  /**
+   * Finds the {@link MailboxSendNode} that feeds the (single) WINDOW stage's input exchange, i.e. the sender side of
+   * the exchange inserted directly below the window. The {@code prePartitioned} flag lives on this send node.
+   */
+  private MailboxSendNode findWindowInputSendNode(DispatchableSubPlan dispatchableSubPlan) {
+    WindowNode window = null;
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      window = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(), WindowNode.class);
+      if (window != null) {
+        break;
+      }
+    }
+    assertNotNull(window, "Expected a WINDOW node in the plan");
+    MailboxReceiveNode receiveNode = findNodeOfType(window, MailboxReceiveNode.class);
+    assertNotNull(receiveNode, "Expected the WINDOW input to be a mailbox exchange");
+    PlanNode senderRoot =
+        dispatchableSubPlan.getQueryStageMap().get(receiveNode.getSenderStageId()).getPlanFragment().getFragmentRoot();
+    assertTrue(senderRoot instanceof MailboxSendNode, "Sender fragment root should be a MailboxSendNode");
+    return (MailboxSendNode) senderRoot;
   }
 
   /**

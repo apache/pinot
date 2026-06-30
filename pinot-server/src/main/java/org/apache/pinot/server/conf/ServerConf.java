@@ -19,7 +19,6 @@
 package org.apache.pinot.server.conf;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -131,7 +130,7 @@ public class ServerConf {
    * @return List of transform functions
    */
   public List<String> getTransformFunctions() {
-    return _serverConf.getProperty(CONFIG_OF_TRANSFORM_FUNCTIONS, Collections.emptyList());
+    return _serverConf.getProperty(CONFIG_OF_TRANSFORM_FUNCTIONS, List.of());
   }
 
   public boolean emitTableLevelMetrics() {
@@ -139,7 +138,7 @@ public class ServerConf {
   }
 
   public Collection<String> getAllowedTablesForEmittingMetrics() {
-    return _serverConf.getProperty(CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList());
+    return _serverConf.getProperty(CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, List.of());
   }
 
   public String getMetricsPrefix() {

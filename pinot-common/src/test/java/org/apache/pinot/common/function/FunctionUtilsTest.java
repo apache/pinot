@@ -38,7 +38,7 @@ public class FunctionUtilsTest {
   @Test
   public void testGetArgumentType() {
     // Single values delegated to PinotDataType.getSingleValueType
-    assertEquals(FunctionUtils.getArgumentType(1), PinotDataType.INTEGER);
+    assertEquals(FunctionUtils.getArgumentType(1), PinotDataType.INT);
     assertEquals(FunctionUtils.getArgumentType(1L), PinotDataType.LONG);
     assertEquals(FunctionUtils.getArgumentType(1.0f), PinotDataType.FLOAT);
     assertEquals(FunctionUtils.getArgumentType(1.0d), PinotDataType.DOUBLE);
@@ -80,7 +80,7 @@ public class FunctionUtilsTest {
   @Test
   public void testGetArgumentTypeForReferenceArrays() {
     // Reference arrays sample first non-null element via PinotDataType.getMultiValueType
-    assertEquals(FunctionUtils.getArgumentType(new Integer[]{1}), PinotDataType.INTEGER_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new Integer[]{1}), PinotDataType.INT_ARRAY);
     assertEquals(FunctionUtils.getArgumentType(new Long[]{1L}), PinotDataType.LONG_ARRAY);
     assertEquals(FunctionUtils.getArgumentType(new Float[]{1.0f}), PinotDataType.FLOAT_ARRAY);
     assertEquals(FunctionUtils.getArgumentType(new Double[]{1.0d}), PinotDataType.DOUBLE_ARRAY);
@@ -117,8 +117,8 @@ public class FunctionUtilsTest {
   @Test
   public void testGetParameterType() {
     // Scalars
-    assertEquals(FunctionUtils.getParameterType(int.class), PinotDataType.INTEGER);
-    assertEquals(FunctionUtils.getParameterType(Integer.class), PinotDataType.INTEGER);
+    assertEquals(FunctionUtils.getParameterType(int.class), PinotDataType.INT);
+    assertEquals(FunctionUtils.getParameterType(Integer.class), PinotDataType.INT);
     assertEquals(FunctionUtils.getParameterType(boolean.class), PinotDataType.BOOLEAN);
     assertEquals(FunctionUtils.getParameterType(Boolean.class), PinotDataType.BOOLEAN);
     assertEquals(FunctionUtils.getParameterType(Timestamp.class), PinotDataType.TIMESTAMP);

@@ -89,6 +89,7 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.StageStatsTreeNode;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
@@ -557,6 +558,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sortExchangeCopyThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD);
+    boolean defaultUnnestColumnPruning = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_UNNEST_COLUMN_PRUNING,
+        CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
     WorkerManager workerManager = QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
         ? _multiClusterWorkerManager : _workerManager;
     return QueryEnvironment.configBuilder()
@@ -568,6 +572,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .isNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(queryOptions))
         .defaultInferPartitionHint(inferPartitionHint)
         .defaultUseSpools(defaultUseSpool)
+        .defaultUnnestColumnPruning(defaultUnnestColumnPruning)
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
@@ -605,6 +610,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
    */
   protected void prepareCompiledQueryForPlanning(QueryEnvironment.CompiledQuery compiledQuery, long requestId,
       RequestContext requestContext, HttpHeaders httpHeaders) {
+  }
+
+  /**
+   * Estimates the total number of server query threads the given plan will consume; used to acquire permits from the
+   * multi-stage query throttler before dispatch. Subclasses can override to accurately
+   * estimate the real per-server work.
+   */
+  protected int getEstimatedNumQueryThreads(DispatchableSubPlan dispatchableSubPlan) {
+    return dispatchableSubPlan.getEstimatedNumQueryThreads();
   }
 
   private long getTimeoutMs(Map<String, String> queryOptions) {
@@ -650,6 +664,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
 
+    // Inject the implicit leaf-stage limit as a query option so servers can detect truncation
+    if (queryPlanResult.isLiteModeImplicitSortApplied()) {
+      query.getOptions().put(CommonConstants.Broker.Request.QueryOptionKey.LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT,
+          String.valueOf(queryPlanResult.getLiteModeEffectiveSortLimit()));
+    }
+
     // Optionally set ignoreMissingSegments query option based on broker config if not already set.
     if (_config.getProperty(CommonConstants.Broker.CONFIG_OF_IGNORE_MISSING_SEGMENTS,
         CommonConstants.Broker.DEFAULT_IGNORE_MISSING_SEGMENTS)) {
@@ -689,7 +709,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     // Short-circuit: if all leaf stages are empty (all segments pruned or table has no data),
     // run only the broker reduce stage locally. No server dispatch is attempted.
     boolean allLeafStagesEmpty = dispatchableSubPlan.isAllLeafStagesEmpty();
-    int estimatedNumQueryThreads = dispatchableSubPlan.getEstimatedNumQueryThreads();
+    int estimatedNumQueryThreads = getEstimatedNumQueryThreads(dispatchableSubPlan);
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
       // these requests.
@@ -815,7 +835,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
 
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan,
-          queryResults.getStageCoverage());
+          queryResults.getStageCoverage(), queryResults.getStageStatsTrees());
 
       if (QueryOptionsUtils.isStreamStats(query.getOptions(), _streamStatsDefault)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_STREAM_STATS_QUERIES, 1);
@@ -829,6 +849,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         }
       }
 
+      // Set MSE Lite planning-time warning fields
+      if (queryPlanResult.isLiteModeImplicitSortApplied()) {
+        int effectiveLimit = queryPlanResult.getLiteModeEffectiveSortLimit();
+        brokerResponse.setMseLiteLeafStageEffectiveLimit(effectiveLimit);
+        brokerResponse.setMseLiteFanOutAdjustedLimitApplied(
+            effectiveLimit != QueryOptionsUtils.getLiteModeLeafStageLimit(query.getOptions(),
+                CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT));
+      }
+
       long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
       _brokerMetrics.addTimedValue(BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
 
@@ -840,6 +869,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         }
         if (brokerResponse.isGroupsTrimmed()) {
           _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
+        }
+        if (brokerResponse.isMseLiteLeafStageLimitReached()) {
+          _brokerMetrics.addMeteredTableValue(table,
+              BrokerMeter.BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED, 1);
         }
       }
 
@@ -919,11 +952,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
       List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan,
-      @Nullable List<QueryDispatcher.QueryResult.StageCoverage> stageCoverage) {
+      @Nullable List<QueryDispatcher.QueryResult.StageCoverage> stageCoverage,
+      @Nullable Map<Integer, StageStatsTreeNode> stageStatsTrees) {
     try {
       Map<Integer, DispatchablePlanFragment> queryStageMap = dispatchableSubPlan.getQueryStageMap();
 
-      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(queryStageMap, queryStats);
+      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(queryStageMap, queryStats,
+          stageStatsTrees);
       brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
       for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
         if (stageStats != null) { // for example pipeline breaker may not have stats

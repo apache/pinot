@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,7 +83,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
     // Create broker and server instances with tags and pools
     Instance brokerInstance2 =
-        new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null, 0, 0, 0, 0,
+        new Instance("2.3.4.5", 1234, InstanceType.BROKER, List.of("tag_BROKER"), null, 0, 0, 0, 0,
             false);
     adminClient.getInstanceClient().createInstance(brokerInstance2.toJsonString());
     Map<String, Integer> serverPools = new TreeMap<>();
@@ -124,13 +123,13 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     // Test PUT instance API
     String newBrokerTag = "new-broker-tag";
     Instance newBrokerInstance =
-        new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null, 0, 0, 0, 0,
+        new Instance("1.2.3.4", 1234, InstanceType.BROKER, List.of(newBrokerTag), null, 0, 0, 0, 0,
             false);
     String brokerInstanceId = "Broker_1.2.3.4_1234";
     adminClient.getInstanceClient().updateInstance(brokerInstanceId, newBrokerInstance.toJsonString());
     String newServerTag = "new-server-tag";
     Instance newServerInstance =
-        new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null, 28090, 28091,
+        new Instance("1.2.3.4", 2345, InstanceType.SERVER, List.of(newServerTag), null, 28090, 28091,
             28092, 28093, true);
     String serverInstanceId = "Server_1.2.3.4_2345";
     adminClient.getInstanceClient().updateInstance(serverInstanceId, newServerInstance.toJsonString());
@@ -295,7 +294,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     // Create a minion instance with minion_untagged tag
     Instance minionInstance =
         new Instance("minion1.test.com", 9514, InstanceType.MINION,
-            Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE),
+            List.of(Helix.UNTAGGED_MINION_INSTANCE),
             null, 0, 0, 0, 0, false);
     adminClient.getInstanceClient().createInstance(minionInstance.toJsonString());
     String minionInstanceId = "Minion_minion1.test.com_9514";
@@ -392,7 +391,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     // Try to drain a broker instance (should fail)
     String brokerInstanceId = "Broker_localhost_1234";
     Instance brokerInstance =
-        new Instance("localhost", 1234, InstanceType.BROKER, Collections.singletonList("broker_tag"), null, 0, 0, 0, 0,
+        new Instance("localhost", 1234, InstanceType.BROKER, List.of("broker_tag"), null, 0, 0, 0, 0,
             false);
     adminClient.getInstanceClient().createInstance(brokerInstance.toJsonString());
 

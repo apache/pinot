@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -64,6 +65,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -1243,6 +1245,158 @@ public abstract class BaseSegmentProcessorFrameworkTest {
 
     FileUtils.cleanDirectory(workingDir);
     FileUtils.cleanDirectory(inputDir);
+  }
+
+  @Test
+  public void testRollupWithFirstLastAggregation()
+      throws Exception {
+    File workingDir = new File(TEMP_DIR, "first_last_aggregation_output");
+    FileUtils.forceMkdir(workingDir);
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("mySchema")
+        .addSingleValueDimension("campaign", DataType.STRING, "").addMetric("firstClicks", DataType.LONG)
+        .addMetric("lastClicks", DataType.LONG)
+        .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
+
+    long day1 = 1597708800000L;
+    long day2 = day1 + 86400000;
+    // (campaign, clicks, time): rows are intentionally out of time order to verify that the first/last values are
+    // picked based on the original time instead of the input order
+    List<Object[]> rawRows =
+        Arrays.asList(new Object[]{"abc", 10L, day1 + 2000}, new Object[]{"abc", 20L, day1 + 1000},
+            new Object[]{"abc", 30L, day1 + 3000}, new Object[]{"xyz", 5L, day1 + 500},
+            new Object[]{"abc", 100L, day2 + 10}, new Object[]{"abc", 50L, day2 + 5});
+    List<GenericRow> inputRows = new ArrayList<>();
+    for (Object[] rawRow : rawRows) {
+      GenericRow row = new GenericRow();
+      row.putValue("campaign", rawRow[0]);
+      row.putValue("firstClicks", rawRow[1]);
+      row.putValue("lastClicks", rawRow[1]);
+      row.putValue("time", rawRow[2]);
+      inputRows.add(row);
+    }
+
+    File inputDir = new File(TEMP_DIR, "first_last_aggregation_input");
+    FileUtils.forceMkdir(inputDir);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setOutDir(inputDir.getPath());
+    segmentGeneratorConfig.setSequenceId(0);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(inputRows));
+    driver.build();
+
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
+    aggregationTypes.put("firstClicks", AggregationFunctionType.FIRSTWITHTIME);
+    aggregationTypes.put("lastClicks", AggregationFunctionType.LASTWITHTIME);
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setTimeHandlerConfig(new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setRoundBucketMs(86400000)
+            .setPartitionBucketMs(86400000).build()).setMergeType(MergeType.ROLLUP)
+        .setAggregationTypes(aggregationTypes).build();
+
+    List<File> outputSegments = processSegments(List.of(driver.getOutputDirectory()), config, workingDir);
+    assertEquals(outputSegments.size(), 2);
+    outputSegments.sort(null);
+
+    // Day 1 segment: [abc: first=20 (earliest time), last=30 (latest time)], [xyz: 5]
+    ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    assertEquals(segmentMetadata.getTotalDocs(), 2);
+    // The hidden original time column should not be part of the output segment
+    assertFalse(segmentMetadata.getAllColumns().contains(TimeHandler.ORIGINAL_TIME_MS_COLUMN));
+    try (PinotSegmentColumnReader campaignReader = new PinotSegmentColumnReader(segment, "campaign");
+        PinotSegmentColumnReader firstClicksReader = new PinotSegmentColumnReader(segment, "firstClicks");
+        PinotSegmentColumnReader lastClicksReader = new PinotSegmentColumnReader(segment, "lastClicks")) {
+      assertEquals(campaignReader.getValue(0), "abc");
+      assertEquals(firstClicksReader.getValue(0), 20L);
+      assertEquals(lastClicksReader.getValue(0), 30L);
+      assertEquals(campaignReader.getValue(1), "xyz");
+      assertEquals(firstClicksReader.getValue(1), 5L);
+      assertEquals(lastClicksReader.getValue(1), 5L);
+    }
+    segment.destroy();
+
+    // Day 2 segment: [abc: first=50, last=100]
+    segment = ImmutableSegmentLoader.load(outputSegments.get(1), ReadMode.mmap);
+    assertEquals(segment.getSegmentMetadata().getTotalDocs(), 1);
+    try (PinotSegmentColumnReader firstClicksReader = new PinotSegmentColumnReader(segment, "firstClicks");
+        PinotSegmentColumnReader lastClicksReader = new PinotSegmentColumnReader(segment, "lastClicks")) {
+      assertEquals(firstClicksReader.getValue(0), 50L);
+      assertEquals(lastClicksReader.getValue(0), 100L);
+    }
+    segment.destroy();
+
+    FileUtils.cleanDirectory(workingDir);
+    FileUtils.deleteQuietly(inputDir);
+  }
+
+  @Test
+  public void testRollupWithFirstLastAggregationNonMillisTimeFormat()
+      throws Exception {
+    File workingDir = new File(TEMP_DIR, "first_last_aggregation_seconds_output");
+    FileUtils.forceMkdir(workingDir);
+
+    // Time column in SECONDS epoch format to verify that the original time ordering works across the time format
+    // conversion (the hidden column always stores millis)
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("mySchema")
+        .addSingleValueDimension("campaign", DataType.STRING, "").addMetric("firstGauge", DataType.LONG)
+        .addMetric("lastGauge", DataType.LONG)
+        .addDateTime("time", DataType.LONG, "1:SECONDS:EPOCH", "1:SECONDS").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
+
+    long day1Seconds = 1597708800L;
+    // (campaign, gauge, time in seconds): rows are intentionally out of time order within the same day bucket
+    List<Object[]> rawRows =
+        Arrays.asList(new Object[]{"abc", 10L, day1Seconds + 200}, new Object[]{"abc", 20L, day1Seconds + 100},
+            new Object[]{"abc", 30L, day1Seconds + 300});
+    List<GenericRow> inputRows = new ArrayList<>();
+    for (Object[] rawRow : rawRows) {
+      GenericRow row = new GenericRow();
+      row.putValue("campaign", rawRow[0]);
+      row.putValue("firstGauge", rawRow[1]);
+      row.putValue("lastGauge", rawRow[1]);
+      row.putValue("time", rawRow[2]);
+      inputRows.add(row);
+    }
+
+    File inputDir = new File(TEMP_DIR, "first_last_aggregation_seconds_input");
+    FileUtils.forceMkdir(inputDir);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setOutDir(inputDir.getPath());
+    segmentGeneratorConfig.setSequenceId(0);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(inputRows));
+    driver.build();
+
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
+    aggregationTypes.put("firstGauge", AggregationFunctionType.FIRSTWITHTIME);
+    aggregationTypes.put("lastGauge", AggregationFunctionType.LASTWITHTIME);
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setTimeHandlerConfig(new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setRoundBucketMs(86400000)
+            .setPartitionBucketMs(86400000).build()).setMergeType(MergeType.ROLLUP)
+        .setAggregationTypes(aggregationTypes).build();
+
+    List<File> outputSegments = processSegments(List.of(driver.getOutputDirectory()), config, workingDir);
+    assertEquals(outputSegments.size(), 1);
+
+    // [abc: first=20 (earliest time), last=30 (latest time)], time rounded to the day in SECONDS format
+    ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    assertEquals(segmentMetadata.getTotalDocs(), 1);
+    assertFalse(segmentMetadata.getAllColumns().contains(TimeHandler.ORIGINAL_TIME_MS_COLUMN));
+    try (PinotSegmentColumnReader firstGaugeReader = new PinotSegmentColumnReader(segment, "firstGauge");
+        PinotSegmentColumnReader lastGaugeReader = new PinotSegmentColumnReader(segment, "lastGauge");
+        PinotSegmentColumnReader timeReader = new PinotSegmentColumnReader(segment, "time")) {
+      assertEquals(firstGaugeReader.getValue(0), 20L);
+      assertEquals(lastGaugeReader.getValue(0), 30L);
+      assertEquals(timeReader.getValue(0), day1Seconds);
+    }
+    segment.destroy();
+
+    FileUtils.cleanDirectory(workingDir);
+    FileUtils.deleteQuietly(inputDir);
   }
 
   @AfterClass

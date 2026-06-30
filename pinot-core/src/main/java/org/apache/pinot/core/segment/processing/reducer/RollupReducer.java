@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.processing.reducer;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -38,9 +37,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * RollupReducer aggregates the metric values for GenericRows with the same dimension + time values.
- */
+/// RollupReducer aggregates the metric values for GenericRows with the same dimension + time values.
+///
+/// When order sensitive aggregations (FIRSTWITHTIME/LASTWITHTIME) are configured, rows within a rollup group are
+/// sorted by the hidden original time column appended by the mapper. Rows with identical original time values are
+/// ordered arbitrarily (the sort is not stable), so first/last picks among exact ties non-deterministically,
+/// including across task retries.
 public class RollupReducer implements Reducer {
   private static final Logger LOGGER = LoggerFactory.getLogger(RollupReducer.class);
   private static final AggregationFunctionType DEFAULT_AGGREGATOR_TYPE = AggregationFunctionType.SUM;
@@ -91,12 +93,31 @@ public class RollupReducer implements Reducer {
 
     List<FieldSpec> fieldSpecs = _fileManager.getFieldSpecs();
     boolean includeNullFields = _fileManager.isIncludeNullFields();
+    // When order sensitive aggregations (FIRSTWITHTIME/LASTWITHTIME) are configured, the mapper appends a hidden
+    // column carrying the original (pre-rounding) time value as the last sort field, so that rows within the same
+    // rollup group are sorted by the original time. The hidden column is not part of the group key, and is stripped
+    // from the rollup output. The flag is carried explicitly by the file manager (set by the mapper that added the
+    // field) instead of being inferred from the column name, so that a schema column which happens to share the name
+    // can never be mistaken for the hidden field.
+    boolean hasOriginalTimeField = _fileManager.hasOriginalTimeField();
+    int numGroupFields = hasOriginalTimeField ? numSortFields - 1 : numSortFields;
+    List<FieldSpec> outputFieldSpecs = fieldSpecs;
+    if (hasOriginalTimeField) {
+      outputFieldSpecs = new ArrayList<>(fieldSpecs);
+      outputFieldSpecs.remove(numSortFields - 1);
+    }
     List<AggregatorContext> aggregatorContextList = new ArrayList<>();
-    for (FieldSpec fieldSpec : fieldSpecs) {
+    for (FieldSpec fieldSpec : outputFieldSpecs) {
       if (fieldSpec.getFieldType() == FieldType.METRIC) {
-        aggregatorContextList.add(new AggregatorContext(fieldSpec,
-            _aggregationTypes.getOrDefault(fieldSpec.getName(), DEFAULT_AGGREGATOR_TYPE),
-            _aggregationFunctionParameters.getOrDefault(fieldSpec.getName(), Collections.emptyMap())));
+        AggregationFunctionType aggregationType =
+            _aggregationTypes.getOrDefault(fieldSpec.getName(), DEFAULT_AGGREGATOR_TYPE);
+        if (ValueAggregatorFactory.requiresTimeOrdering(aggregationType) && !hasOriginalTimeField) {
+          throw new IllegalStateException(String.format(
+              "Aggregation type: %s on column: %s requires a time column with EPOCH time handling",
+              aggregationType, fieldSpec.getName()));
+        }
+        aggregatorContextList.add(new AggregatorContext(fieldSpec, aggregationType,
+            _aggregationFunctionParameters.getOrDefault(fieldSpec.getName(), Map.of())));
       }
     }
 
@@ -104,7 +125,7 @@ public class RollupReducer implements Reducer {
     FileUtils.forceMkdir(partitionOutputDir);
     LOGGER.info("Start creating rollup file under dir: {}", partitionOutputDir);
     long rollupFileCreationStartTimeMs = System.currentTimeMillis();
-    _rollupFileManager = new GenericRowFileManager(partitionOutputDir, fieldSpecs, includeNullFields, 0);
+    _rollupFileManager = new GenericRowFileManager(partitionOutputDir, outputFieldSpecs, includeNullFields, 0);
     GenericRowFileWriter rollupFileWriter = _rollupFileManager.getFileWriter();
     GenericRow previousRow = new GenericRow();
     recordReader.read(0, previousRow);
@@ -114,7 +135,7 @@ public class RollupReducer implements Reducer {
       for (int i = 1; i < numRows; i++) {
         buffer.clear();
         recordReader.read(i, buffer);
-        if (recordReader.compare(previousRowId, i) == 0) {
+        if (recordReader.compare(previousRowId, i, numGroupFields) == 0) {
           aggregateWithNullFields(previousRow, buffer, aggregatorContextList);
         } else {
           rollupFileWriter.write(previousRow);
@@ -128,7 +149,7 @@ public class RollupReducer implements Reducer {
       for (int i = 1; i < numRows; i++) {
         buffer.clear();
         recordReader.read(i, buffer);
-        if (recordReader.compare(previousRowId, i) == 0) {
+        if (recordReader.compare(previousRowId, i, numGroupFields) == 0) {
           aggregateWithoutNullFields(previousRow, buffer, aggregatorContextList);
         } else {
           rollupFileWriter.write(previousRow);

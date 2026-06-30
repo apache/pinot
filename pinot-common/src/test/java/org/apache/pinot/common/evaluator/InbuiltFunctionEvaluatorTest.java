@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.evaluator;
 
-import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.PinotDataType;
@@ -116,7 +116,7 @@ public class InbuiltFunctionEvaluatorTest {
   public void testColumnExpression() {
     String expression = "testColumn";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
+    assertEquals(evaluator.getArguments(), List.of("testColumn"));
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
       String value = "testValue" + i;
@@ -140,7 +140,7 @@ public class InbuiltFunctionEvaluatorTest {
   public void testScalarWrapperWithReservedKeywordExpression() {
     String expression = "dateTrunc('MONTH', \"date\")";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(evaluator.getArguments(), Collections.singletonList("date"));
+    assertEquals(evaluator.getArguments(), List.of("date"));
     GenericRow row = new GenericRow();
     for (int i = 1; i < 9; i++) {
       DateTime dt = new DateTime(String.format("2020-0%d-15T12:00:00", i));
@@ -160,7 +160,7 @@ public class InbuiltFunctionEvaluatorTest {
     row.putValue("testColumn", "testValue0");
     InbuiltFunctionEvaluator evaluator;
     evaluator = new InbuiltFunctionEvaluator(expr);
-    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
+    assertEquals(evaluator.getArguments(), List.of("testColumn"));
     assertEquals(evaluator.evaluate(row), "testValue0");
     evaluator = new InbuiltFunctionEvaluator(exprWithGroup);
     assertEquals(evaluator.evaluate(row), "0");
@@ -172,7 +172,7 @@ public class InbuiltFunctionEvaluatorTest {
   public void testFunctionWithColumn() {
     String expression = "reverse(testColumn)";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
+    assertEquals(evaluator.getArguments(), List.of("testColumn"));
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
       String value = "testValue" + i;
@@ -194,7 +194,7 @@ public class InbuiltFunctionEvaluatorTest {
   public void testNestedFunction() {
     String expression = "reverse(reverse(testColumn))";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
+    assertEquals(evaluator.getArguments(), List.of("testColumn"));
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
       String value = "testValue" + i;

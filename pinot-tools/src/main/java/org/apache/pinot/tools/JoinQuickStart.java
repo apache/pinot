@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
@@ -30,7 +29,7 @@ public class JoinQuickStart extends Quickstart {
 
   @Override
   public List<String> types() {
-    return Collections.singletonList("JOIN");
+    return List.of("JOIN");
   }
 
   @Override

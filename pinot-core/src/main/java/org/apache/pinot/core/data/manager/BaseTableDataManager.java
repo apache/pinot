@@ -83,6 +83,7 @@ import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -94,6 +95,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
@@ -106,6 +108,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -445,6 +448,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void updateCachedTableConfigAndSchema(TableConfig tableConfig, Schema schema) {
     _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
+  }
+
+  @Override
+  public void onTableConfigOrSchemaRefresh() {
+    // A genuine config/schema change: refresh the cached table config and schema from ZK. The returned index loading
+    // config is not needed here; the side effect of updating the cache is the contract of this callback.
+    fetchIndexLoadingConfig();
   }
 
   @Override
@@ -908,7 +918,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (isUpsertEnabled()) {
       return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
     }
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   protected void handleUpsert(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
@@ -1114,12 +1124,39 @@ public abstract class BaseTableDataManager implements TableDataManager {
       - Copy the backup directory back to the original index directory.
       - Continue loading the segment from the index directory.
       */
-      boolean shouldDownload =
-          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata)
+      boolean crcMatch = hasSameCRC(zkMetadata, localMetadata);
+      boolean shouldDownload = forceDownload
+          || (isSegmentStatusCompleted(zkMetadata) && !crcMatch
               && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
+      // For an upsert table with metadata TTL and snapshots enabled, a reload must not blindly re-scan the segment and
+      // re-add every primary key, as that would resurrect keys already expired (metadataTTL) or deleted
+      // (deletedKeysTTL). Instead we rebuild the upsert metadata from the persisted validDocIds snapshot (valid docs
+      // only). The snapshot is docId-position based, so it only maps to the segment being loaded when the content (CRC)
+      // is unchanged. A CRC mismatch with shouldDownload means a different (downloaded) copy will be loaded, so
+      // reusing the local snapshot could silently rebuild upsert state against the wrong docIds: fail closed in that
+      // case. When CRC checking is disabled (instance.check.crc.on.segment.load=false) a CRC-mismatched normal reload
+      // keeps the local segment (shouldDownload is false), so the local snapshot still maps and the reload proceeds.
+      UpsertContext upsertContext = isUpsertEnabled() ? _tableUpsertMetadataManager.getContext() : null;
+      boolean restoreValidDocIdsSnapshot = upsertContext != null && upsertContext.isSnapshotEnabled()
+          && (upsertContext.getMetadataTTL() > 0 || upsertContext.getDeletedKeysTTL() > 0);
+      if (restoreValidDocIdsSnapshot && !crcMatch && shouldDownload) {
+        throw new IllegalStateException(String.format(
+            "Failing reload for segment: %s of upsert table with metadata TTL: %s because the segment CRC has "
+                + "changed from: %s to: %s and the docId-based validDocIds snapshot cannot be guaranteed to map to "
+                + "the reloaded segment. Reload once the local copy matches the deep-store segment, or recreate the "
+                + "snapshot from the new segment.", segmentName, _tableNameWithType, localMetadata.getCrc(),
+            zkMetadata.getCrc()));
+      }
       if (shouldDownload) {
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
+        // The validDocIds snapshot is a server-local file absent from the deep-store copy. createBackup moved it into
+        // the backup dir; capture that path so it can be copied into the freshly downloaded segment dir below (the
+        // non-download copyTo path already restores it via copyDirectory).
+        File backupValidDocIdsSnapshotFile = restoreValidDocIdsSnapshot ? new File(
+            SegmentDirectoryPaths.findSegmentDirectory(new File(indexDir.getParentFile(),
+                indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX)),
+            V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) : null;
         if (forceDownload) {
           _logger.info("Force downloading segment: {}", segmentName);
         } else {
@@ -1127,6 +1164,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
               localMetadata.getCrc(), zkMetadata.getCrc());
         }
         indexDir = downloadSegment(zkMetadata);
+        if (backupValidDocIdsSnapshotFile != null && backupValidDocIdsSnapshotFile.exists()) {
+          FileUtils.copyFile(backupValidDocIdsSnapshotFile, new File(
+              SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+        }
       } else {
         _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
             TierConfigUtils.normalizeTierName(segmentTier));
@@ -1924,19 +1965,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
-    Map<String, String> segmentCustomConfigs = zkMetadata != null ? zkMetadata.getCustomMap() : new HashMap<>();
-    SegmentDirectoryLoaderContext loaderContext =
-        new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
-            .setSchema(indexLoadingConfig.getSchema())
-            .setInstanceId(indexLoadingConfig.getInstanceId())
-            .setTableDataDir(indexLoadingConfig.getTableDataDir())
-            .setSegmentName(segmentName)
-            .setSegmentCrc(segmentCrc)
-            .setSegmentTier(indexLoadingConfig.getSegmentTier())
-            .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
-            .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs())
-            .setSegmentCustomConfigs(segmentCustomConfigs)
-            .build();
+    SegmentDirectoryLoaderContext loaderContext = new SegmentDirectoryLoaderContext.Builder()
+        .setReadMode(indexLoadingConfig.getReadMode())
+        .setTableConfig(indexLoadingConfig.getTableConfig())
+        .setSchema(indexLoadingConfig.getSchema())
+        .setInstanceId(indexLoadingConfig.getInstanceId())
+        .setTableDataDir(indexLoadingConfig.getTableDataDir())
+        .setSegmentName(segmentName)
+        .setSegmentCrc(segmentCrc)
+        .setSegmentTier(indexLoadingConfig.getSegmentTier())
+        .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
+        .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
+        .build();
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     File indexDir =

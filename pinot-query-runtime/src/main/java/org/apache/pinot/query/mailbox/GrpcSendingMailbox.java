@@ -28,7 +28,6 @@ import io.grpc.stub.MetadataUtils;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +68,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
   private static final String SEND_SCOPE = "GrpcSendingMailbox";
 
-  private static final List<ByteString> EMPTY_BYTEBUFFER_LIST = Collections.emptyList();
+  private static final List<ByteString> EMPTY_BYTEBUFFER_LIST = List.of();
   private final String _id;
   private final ChannelManager _channelManager;
   private final String _hostname;

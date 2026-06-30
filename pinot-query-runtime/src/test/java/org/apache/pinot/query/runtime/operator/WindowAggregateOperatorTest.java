@@ -238,7 +238,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of("Aa", List.<Object[]>of(new Object[]{1, "Aa", 1.0}), "BB",
-        List.of(new Object[]{2, "BB", 5.0}, new Object[]{3, "BB", 5.0})));
+        List.<Object[]>of(new Object[]{2, "BB", 5.0}, new Object[]{3, "BB", 5.0})));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
@@ -309,12 +309,12 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     verifyResultRows(resultRows, keys,
-        Map.of(1, List.of(new Object[]{1, "foo", 1L, 1L}, new Object[]{1, "foo", 1L, 1L}, new Object[]{
+        Map.of(1, List.<Object[]>of(new Object[]{1, "foo", 1L, 1L}, new Object[]{1, "foo", 1L, 1L}, new Object[]{
           1, "numb", 3L, 2L
-            }), 2, List.of(new Object[]{2, "bar", 1L, 1L}, new Object[]{2, "foo", 2L, 2L}, new Object[]{
+            }), 2, List.<Object[]>of(new Object[]{2, "bar", 1L, 1L}, new Object[]{2, "foo", 2L, 2L}, new Object[]{
                 2, "foo", 2L, 2L
             }, new Object[]{2, "the", 4L, 3L}), 3,
-            List.of(new Object[]{3, "and", 1L, 1L}, new Object[]{3, "true", 2L, 2L})));
+            List.<Object[]>of(new Object[]{3, "and", 1L, 1L}, new Object[]{3, "true", 2L, 2L})));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
@@ -349,8 +349,9 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of(1, List.<Object[]>of(new Object[]{1, "foo", 1L}), 2,
-        List.of(new Object[]{2, "bar", 1L}, new Object[]{2, "foo", 2L}, new Object[]{2, "foo", 3L},
-            new Object[]{2, "the", 4L}), 3, List.of(new Object[]{3, "and", 1L}, new Object[]{3, "true", 2L})));
+        List.<Object[]>of(new Object[]{2, "bar", 1L}, new Object[]{2, "foo", 2L}, new Object[]{2, "foo", 3L},
+            new Object[]{2, "the", 4L}), 3,
+        List.<Object[]>of(new Object[]{3, "and", 1L}, new Object[]{3, "true", 2L})));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
@@ -384,8 +385,8 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of(1, List.<Object[]>of(new Object[]{1, "foo", 1.0}), 2,
-        List.of(new Object[]{2, "bar", 2.0}, new Object[]{2, "foo", 6.0}, new Object[]{2, "foo", 6.0}), 3,
-        List.of(new Object[]{3, "and", 3.0}, new Object[]{3, "true", 6.0})));
+        List.<Object[]>of(new Object[]{2, "bar", 2.0}, new Object[]{2, "foo", 6.0}, new Object[]{2, "foo", 6.0}), 3,
+        List.<Object[]>of(new Object[]{3, "and", 3.0}, new Object[]{3, "true", 6.0})));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
@@ -444,7 +445,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of("bar", List.<Object[]>of(new Object[]{2, "bar", 2.0}), "foo",
-        List.of(new Object[]{2, "foo", 5.0}, new Object[]{3, "foo", 5.0})));
+        List.<Object[]>of(new Object[]{2, "foo", 5.0}, new Object[]{3, "foo", 5.0})));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 

@@ -62,10 +62,10 @@ public class DataTypeConversionFunctions {
       case "DECIMAL":
         targetDataType = BIG_DECIMAL;
         break;
-      case "INT":
+      case "INTEGER":
       case "UTINYINT":
       case "USMALLINT":
-        targetDataType = INTEGER;
+        targetDataType = INT;
         break;
       case "VARBINARY":
         targetDataType = BYTES;
@@ -81,9 +81,9 @@ public class DataTypeConversionFunctions {
         }
         break;
     }
-    if (sourceType == STRING && (targetDataType == INTEGER || targetDataType == LONG)) {
+    if (sourceType == STRING && (targetDataType == INT || targetDataType == LONG)) {
       String stringValue = value.toString().trim();
-      if (targetDataType == INTEGER) {
+      if (targetDataType == INT) {
         try {
           return Integer.parseInt(stringValue);
         } catch (NumberFormatException e) {

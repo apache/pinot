@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.timeseries;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,7 +87,7 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
 
   public TimeSeriesExchangeReceiveOperator(BlockingQueue<Object> receiver, long deadlineMs, int numServersQueried,
       @Nullable AggInfo aggInfo, TimeSeriesBuilderFactory seriesBuilderFactory) {
-    super(Collections.emptyList());
+    super(List.of());
     Preconditions.checkArgument(numServersQueried > 0, "No servers to query in receive operator");
     _receiver = receiver;
     _deadlineMs = deadlineMs;

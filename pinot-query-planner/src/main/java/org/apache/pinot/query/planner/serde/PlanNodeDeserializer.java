@@ -240,8 +240,16 @@ public class PlanNodeDeserializer {
     int ordIdx = protoUnnestNode.hasOrdinalityIndex() ? protoUnnestNode.getOrdinalityIndex()
         : UnnestNode.UNSPECIFIED_INDEX;
 
+    // Passthrough pruning metadata. Absent on plans produced by older brokers, in which case prunedPassthrough is
+    // false and the operator copies the whole input row (legacy behavior).
+    List<Integer> passthroughInputIndexes = new ArrayList<>();
+    for (int idx : protoUnnestNode.getPassthroughInputIndexesList()) {
+      passthroughInputIndexes.add(idx);
+    }
+
     UnnestNode.TableFunctionContext context =
-        new UnnestNode.TableFunctionContext(protoUnnestNode.getWithOrdinality(), elementIndexes, ordIdx);
+        new UnnestNode.TableFunctionContext(protoUnnestNode.getWithOrdinality(), elementIndexes, ordIdx,
+            passthroughInputIndexes, protoUnnestNode.getPrunedPassthrough());
 
     return new UnnestNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), arrayExprs, context);

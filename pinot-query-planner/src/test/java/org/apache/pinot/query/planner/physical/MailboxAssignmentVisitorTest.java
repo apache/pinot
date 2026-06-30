@@ -21,12 +21,22 @@ package org.apache.pinot.query.planner.physical;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
+import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -67,6 +77,93 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
 
     DispatchableSubPlan subPlan = _queryEnvironment.planQuery(query);
     verifyAllMailboxInfosSorted(subPlan, query);
+  }
+
+  private static final int SENDER_STAGE = 1;
+  private static final int RECEIVER_STAGE = 0;
+
+  /// A SINGLETON local exchange where sender worker `i` and receiver worker `i` land on different servers (as can
+  /// happen for a colocated semi-join during a rolling restart) must not fail: it falls back to a cross-server send
+  /// for the diverged worker while keeping the co-located worker local.
+  @Test
+  public void testSingletonFallsBackToCrossServerWhenWorkersDiverge() {
+    // Worker 0 co-located on A; worker 1 diverged (sender on B, receiver on C).
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A"), 1, server("B")));
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("C")));
+    process(singletonSendNode(List.of()), sender, receiver);
+
+    Map<Integer, Map<Integer, MailboxInfos>> senderMailboxes = sender.getWorkerIdToMailboxesMap();
+    Map<Integer, Map<Integer, MailboxInfos>> receiverMailboxes = receiver.getWorkerIdToMailboxesMap();
+
+    // Worker 0 is co-located: a single shared local mailbox on host_A on both sides.
+    assertTrue(senderMailboxes.get(0).get(RECEIVER_STAGE) instanceof SharedMailboxInfos);
+    assertEquals(singleMailbox(senderMailboxes, 0, RECEIVER_STAGE).getHostname(), "host_A");
+    assertEquals(singleMailbox(receiverMailboxes, 0, SENDER_STAGE).getHostname(), "host_A");
+
+    // Worker 1 diverged: cross-server send, not a shared mailbox. The sender sends to the receiver's server (C) and
+    // the receiver reads from the sender's server (B).
+    assertFalse(senderMailboxes.get(1).get(RECEIVER_STAGE) instanceof SharedMailboxInfos);
+    assertEquals(singleMailbox(senderMailboxes, 1, RECEIVER_STAGE).getHostname(), "host_C");
+    assertEquals(singleMailbox(receiverMailboxes, 1, SENDER_STAGE).getHostname(), "host_B");
+  }
+
+  /// An unequal-but-non-multiple worker count (2 senders, 3 receivers) must be rejected rather than rounding the
+  /// parallelism down to 1 and silently dropping the extra receiver.
+  @Test(expectedExceptions = IllegalStateException.class,
+      expectedExceptionsMessageRegExp = ".*multiple of number of senders.*")
+  public void testSingletonRejectsNonMultipleReceiverCount() {
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A"), 1, server("B")));
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B"), 2, server("C")));
+    process(singletonSendNode(List.of(0)), sender, receiver);
+  }
+
+  /// A SINGLETON local exchange with parallelism (more receivers than senders) does not assert co-location either: it
+  /// rewrites the distribution to HASH and fans each sender worker out to its receiver workers, even cross-server.
+  @Test
+  public void testSingletonWithParallelismAllowsCrossServer() {
+    // 1 sender on A, 2 receivers on B (parallelism 2), so the fan-out is cross-server.
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A")));
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("B"), 1, server("B")));
+    MailboxSendNode sendNode = singletonSendNode(List.of(0));
+    process(sendNode, sender, receiver);
+
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    MailboxInfo senderToReceiver = singleMailbox(sender.getWorkerIdToMailboxesMap(), 0, RECEIVER_STAGE);
+    assertEquals(senderToReceiver.getHostname(), "host_B");
+    assertEquals(senderToReceiver.getWorkerIds(), List.of(0, 1));
+    assertEquals(singleMailbox(receiver.getWorkerIdToMailboxesMap(), 0, SENDER_STAGE).getHostname(), "host_A");
+    assertEquals(singleMailbox(receiver.getWorkerIdToMailboxesMap(), 1, SENDER_STAGE).getHostname(), "host_A");
+  }
+
+  private static QueryServerInstance server(String id) {
+    return new QueryServerInstance(id, "host_" + id, 1, 1);
+  }
+
+  private static DispatchablePlanMetadata metadata(Map<Integer, QueryServerInstance> workerIdToServerInstanceMap) {
+    DispatchablePlanMetadata metadata = new DispatchablePlanMetadata();
+    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
+    return metadata;
+  }
+
+  private static MailboxSendNode singletonSendNode(List<Integer> keys) {
+    DataSchema dataSchema = new DataSchema(new String[]{"col"}, new ColumnDataType[]{ColumnDataType.INT});
+    return new MailboxSendNode(SENDER_STAGE, dataSchema, List.of(), RECEIVER_STAGE,
+        PinotRelExchangeType.PIPELINE_BREAKER, RelDistribution.Type.SINGLETON, keys, false, null, false, "absHashCode");
+  }
+
+  private static void process(MailboxSendNode sendNode, DispatchablePlanMetadata sender,
+      DispatchablePlanMetadata receiver) {
+    DispatchablePlanContext context = Mockito.mock(DispatchablePlanContext.class);
+    Mockito.when(context.getDispatchablePlanMetadataMap())
+        .thenReturn(Map.of(SENDER_STAGE, sender, RECEIVER_STAGE, receiver));
+    MailboxAssignmentVisitor.INSTANCE.process(sendNode, context);
+  }
+
+  private static MailboxInfo singleMailbox(Map<Integer, Map<Integer, MailboxInfos>> mailboxesMap, int workerId,
+      int stageId) {
+    List<MailboxInfo> mailboxInfos = mailboxesMap.get(workerId).get(stageId).getMailboxInfos();
+    assertEquals(mailboxInfos.size(), 1);
+    return mailboxInfos.get(0);
   }
 
   private void verifyAllMailboxInfosSorted(DispatchableSubPlan subPlan, String query) {

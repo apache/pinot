@@ -21,10 +21,10 @@ package org.apache.pinot.integration.tests;
 import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
@@ -273,7 +273,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
 
     // TEST 2: Revive a previously deleted primary key
     // Revive pk - 100 by adding a record with a newer timestamp
-    List<String> revivedRecord = Collections.singletonList("100,Zook-New,,0.0,1684707335000,false");
+    List<String> revivedRecord = List.of("100,Zook-New,,0.0,1684707335000,false");
     pushCsvIntoKafka(revivedRecord, kafkaTopicName, 0);
     // Wait for the new record (13 with skipUpsert=true) to be indexed
     waitForAllDocsLoaded(tableName, 600_000L, 13);
@@ -435,7 +435,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
 
     // TEST 2: Revive a previously deleted primary key
     // Revive pk - 100 by adding a record with a newer timestamp
-    List<String> revivedRecord = Collections.singletonList("100,Zook,,0.0,1684707335000,false");
+    List<String> revivedRecord = List.of("100,Zook,,0.0,1684707335000,false");
     pushCsvIntoKafka(revivedRecord, kafkaTopicName, 0);
     // Wait for the new record (13 with skipUpsert=true) to be indexed
     waitForAllDocsLoaded(tableName, 600_000L, 13);
@@ -537,7 +537,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 5, 2);
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(realtimeTableName)))
+            .setTablesToSchedule(Set.of(realtimeTableName)))
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     // 2 segments should be compacted (351 rows -> 1 row; 500 rows -> 2 rows), 1 segment (149 rows) should be deleted
@@ -571,7 +571,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     // NOTE: When in-memory valid doc ids are used, no need to pause/resume consumption to trigger the snapshot.
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(realtimeTableName)))
+            .setTablesToSchedule(Set.of(realtimeTableName)))
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     // 1 segment should be compacted (500 rows -> 2 rows)
@@ -615,7 +615,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
 
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(realtimeTableName)))
+            .setTablesToSchedule(Set.of(realtimeTableName)))
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     // 1 segment should be compacted (351 rows -> 1 rows), 2 segments (500 rows, 151 rows) should be deleted
@@ -655,6 +655,6 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "0d");
     tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT, "1");
     return new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.UpsertCompactionTask.TASK_TYPE, tableTaskConfigs));
+        Map.of(MinionConstants.UpsertCompactionTask.TASK_TYPE, tableTaskConfigs));
   }
 }

@@ -47,6 +47,13 @@ public class SegmentGenerationJobUtils implements Serializable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationJobUtils.class);
 
+  // Key used to pass the serialized SegmentGenerationJobSpec through a distributed job framework
+  public static final String SEGMENT_GENERATION_JOB_SPEC = "segmentGenerationJobSpec";
+
+  // Field names in the executionFrameworkSpec/extraConfigs section shared across ingestion frameworks
+  public static final String DEPENDENCY_JAR_DIR = "dependencyJarDir";
+  public static final String STAGING_DIR = "stagingDir";
+
   /**
    * Always use local directory sequence id unless explicitly config: "use.global.directory.sequence.id".
    *

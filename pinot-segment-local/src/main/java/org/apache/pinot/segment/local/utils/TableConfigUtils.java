@@ -89,11 +89,13 @@ import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
+import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
@@ -485,11 +487,12 @@ public final class TableConfigUtils {
         IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
         Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
             "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
-        List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
+        StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
+        List<Map<String, String>> streamConfigMaps = streamIngestionConfig.getStreamConfigMaps();
         Preconditions.checkState(!streamConfigMaps.isEmpty(), "Must have at least 1 stream in REALTIME table");
         // TODO: for multiple stream configs, validate them
 
-        boolean isPauselessEnabled = ingestionConfig.getStreamIngestionConfig().isPauselessConsumptionEnabled();
+        boolean isPauselessEnabled = streamIngestionConfig.isPauselessConsumptionEnabled();
         if (isPauselessEnabled) {
           int replication = tableConfig.getReplication();
           // We are checking for this only when replication is greater than 1 because in test environments
@@ -644,6 +647,23 @@ public final class TableConfigUtils {
           Preconditions.checkState(dictConfig != null && dictConfig.isDisabled(),
               "Aggregated column: %s must be a no-dictionary column", column);
         });
+      }
+
+      // Source field configs
+      List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
+      if (sourceFieldConfigs != null) {
+        // A source field can be configured once per phase (pre- and post-complex-type), but not twice within the same
+        // phase, because that would yield two DataTypeTransformers targeting it in the same phase, which is ambiguous.
+        Set<String> preComplexTypeFieldNames = new HashSet<>();
+        Set<String> postComplexTypeFieldNames = new HashSet<>();
+        for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
+          String name = sourceFieldConfig.getName();
+          boolean preComplexTypeTransform = sourceFieldConfig.isPreComplexTypeTransform();
+          Set<String> fieldNames = preComplexTypeTransform ? preComplexTypeFieldNames : postComplexTypeFieldNames;
+          Preconditions.checkState(fieldNames.add(name),
+              "Duplicate SourceFieldConfig found for source field: %s (preComplexTypeTransform: %s)", name,
+              preComplexTypeTransform);
+        }
       }
 
       // Enrichment configs
@@ -1644,6 +1664,23 @@ public final class TableConfigUtils {
     }
 
     validateMultiColumnTextIndex(indexingConfig.getMultiColumnTextIndexConfig());
+
+    // OPEN_STRUCT materialized child columns use a reserved separator '$' in their name. When any
+    // schema field is OPEN_STRUCT, reject ALL columns (including OPEN_STRUCT parents themselves)
+    // whose names contain '$'. This prevents naming collisions: a parent named 'a$b' would produce
+    // children 'a$b$key', which parseParentColumn() would misparse as parent 'a' and key 'b$key'.
+    // This validation runs here (with full schema access) rather than per-field because each
+    // OpenStructIndexType.validate() call only sees one field at a time.
+    boolean anyOpenStruct = schema.getAllFieldSpecs().stream()
+        .anyMatch(fs -> fs.getDataType() == DataType.OPEN_STRUCT);
+    if (anyOpenStruct) {
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        Preconditions.checkState(
+            !OpenStructNaming.isMaterializedOpenStructColumn(fieldSpec.getName()),
+            "Schema column '%s' contains reserved OPEN_STRUCT separator '%s'",
+            fieldSpec.getName(), OpenStructNaming.SEPARATOR);
+      }
+    }
 
     // Star-tree index config is not managed by FieldIndexConfigs, and we need to validate it separately.
     List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();

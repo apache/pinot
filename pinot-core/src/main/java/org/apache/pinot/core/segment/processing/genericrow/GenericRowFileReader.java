@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -77,9 +78,19 @@ public class GenericRowFileReader implements Closeable {
    * Compares the rows at the given row ids. Only compare the values for the sort fields.
    */
   public int compare(int rowId1, int rowId2) {
+    return compare(rowId1, rowId2, _numSortFields);
+  }
+
+  /// Compares the rows at the given row ids. Only compare the values for the first `numFieldsToCompare` fields,
+  /// which must not exceed the number of sort fields (fields beyond the sort fields are not stored in comparable
+  /// order).
+  public int compare(int rowId1, int rowId2, int numFieldsToCompare) {
+    Preconditions.checkArgument(numFieldsToCompare <= _numSortFields,
+        "Number of fields to compare: %s must not exceed the number of sort fields: %s", numFieldsToCompare,
+        _numSortFields);
     long offset1 = _offsetBuffer.getLong((long) rowId1 << 3); // rowId1 * Long.BYTES
     long offset2 = _offsetBuffer.getLong((long) rowId2 << 3); // rowId2 * Long.BYTES
-    return _deserializer.compare(offset1, offset2, _numSortFields);
+    return _deserializer.compare(offset1, offset2, numFieldsToCompare);
   }
 
   /**

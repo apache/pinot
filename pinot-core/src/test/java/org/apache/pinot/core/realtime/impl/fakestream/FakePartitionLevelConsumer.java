@@ -22,7 +22,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -97,7 +96,7 @@ public class FakePartitionLevelConsumer implements PartitionGroupConsumer {
   public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
     int startOffsetInt = (int) ((LongMsgOffset) startOffset).getOffset();
     if (startOffsetInt >= _messageOffsets.size()) {
-      return new FakeStreamMessageBatch(Collections.emptyList(), Collections.emptyList(), startOffsetInt);
+      return new FakeStreamMessageBatch(List.of(), List.of(), startOffsetInt);
     }
     int endOffsetInt = Math.min(startOffsetInt + _defaultBatchSize, _messageOffsets.size());
     return new FakeStreamMessageBatch(_messageBytes.subList(startOffsetInt, endOffsetInt),

@@ -26,7 +26,6 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -1995,7 +1994,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
   private void testInterSegmentAggregationQueryHelper(String query, long expectedCount) {
     DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG});
-    List<Object[]> expectedRows = Collections.singletonList(new Object[]{expectedCount});
+    List<Object[]> expectedRows = List.<Object[]>of(new Object[]{expectedCount});
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
         new ResultTable(expectedDataSchema, expectedRows));
   }

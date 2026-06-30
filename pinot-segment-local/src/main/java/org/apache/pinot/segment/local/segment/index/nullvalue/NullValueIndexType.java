@@ -23,7 +23,6 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -51,7 +50,7 @@ import org.apache.pinot.spi.data.Schema;
 public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
   public static final String INDEX_DISPLAY_NAME = "null";
   private static final List<String> EXTENSIONS =
-      Collections.singletonList(V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
 
   protected NullValueIndexType() {
     super(StandardIndexes.NULL_VALUE_VECTOR_ID);

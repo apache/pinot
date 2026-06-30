@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.streaming;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Plan;
@@ -36,6 +35,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -122,6 +122,12 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
       }
     }
     _numDocsScanned += numDocs;
+    QueryScanCostContext scanCost = getScanCostContext();
+    if (scanCost != null) {
+      scanCost.addDocsScanned(numDocs);
+      scanCost.addEntriesScannedPostFilter(
+          (long) numDocs * _projectOperator.getNumColumnsProjected());
+    }
     return new SelectionResultsBlock(_dataSchema, rows, _queryContext);
   }
 
@@ -151,7 +157,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
 
   @Override
   public List<BaseProjectOperator<?>> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   @Override

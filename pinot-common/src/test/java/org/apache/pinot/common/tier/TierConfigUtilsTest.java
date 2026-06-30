@@ -19,9 +19,9 @@
 package org.apache.pinot.common.tier;
 
 import com.google.common.collect.Lists;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
@@ -47,7 +47,7 @@ public class TierConfigUtilsTest {
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Collections.emptyList())
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(List.of())
             .build();
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
@@ -74,7 +74,7 @@ public class TierConfigUtilsTest {
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(Collections.emptyList())
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(List.of())
             .build();
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
@@ -222,7 +222,7 @@ public class TierConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
         .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null,
-            Collections.singletonMap("dataDir", "/foo/bar")))).build();
+            Map.of("dataDir", "/foo/bar")))).build();
     dataDir = TierConfigUtils.getDataDirForTier(tableConfig, "myTier", instanceTierConfigs);
     Assert.assertEquals(dataDir, "/foo/bar");
   }

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.sql.ddl.compile;
 
-import java.util.Collections;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableType;
 
@@ -31,7 +31,7 @@ public final class CompiledDropTable extends CompiledDdl {
 
   public CompiledDropTable(@Nullable String databaseName, String rawTableName,
       @Nullable TableType tableType, boolean ifExists) {
-    super(DdlOperation.DROP_TABLE, databaseName, Collections.emptyList());
+    super(DdlOperation.DROP_TABLE, databaseName, List.of());
     _rawTableName = rawTableName;
     _tableType = tableType;
     _ifExists = ifExists;

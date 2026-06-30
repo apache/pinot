@@ -26,7 +26,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -472,7 +471,7 @@ public class PinotAdminTransport implements AutoCloseable {
       /// so the result matches the JSON-array path.
       String text = arrayNode.asText().trim();
       if (text.isEmpty()) {
-        return Collections.emptyList();
+        return List.of();
       }
       List<String> result = new ArrayList<>();
       for (String token : text.split(",")) {
@@ -499,7 +498,7 @@ public class PinotAdminTransport implements AutoCloseable {
       return parseStringArray(response, fieldName);
     } catch (PinotAdminException e) {
       LOGGER.warn("Failed to parse string array for field '{}': {}", fieldName, e.getMessage());
-      return Collections.emptyList();
+      return List.of();
     }
   }
 

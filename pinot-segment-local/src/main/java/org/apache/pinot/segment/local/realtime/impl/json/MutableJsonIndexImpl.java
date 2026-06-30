@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -134,16 +135,26 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         // Put both key and key-value into the posting list. Key is useful for checking if a key exists in the json.
         String key = entry.getKey();
         _postingListMap.computeIfAbsent(key, k -> {
-          _bytesSize += Utf8.encodedLength(key);
+          _bytesSize += estimateLength(key);
           return new RoaringBitmap();
         }).add(_nextFlattenedDocId);
         String keyValue = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + entry.getValue();
         _postingListMap.computeIfAbsent(keyValue, k -> {
-          _bytesSize += Utf8.encodedLength(keyValue);
+          _bytesSize += estimateLength(keyValue);
           return new RoaringBitmap();
         }).add(_nextFlattenedDocId);
       }
       _nextFlattenedDocId++;
+    }
+  }
+
+  private static int estimateLength(String value) {
+    // Utf8.encodedLength counts bytes without allocating but throws on malformed strings (e.g. unpaired surrogates).
+    // _bytesSize is only a heuristic, so fall back to getBytes (which never throws) instead of failing.
+    try {
+      return Utf8.encodedLength(value);
+    } catch (IllegalArgumentException e) {
+      return value.getBytes(StandardCharsets.UTF_8).length;
     }
   }
 

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.datablock;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -38,7 +37,7 @@ public class MetadataBlock extends BaseDataBlock {
   private final String _serverId;
 
   private MetadataBlock() {
-    this(Collections.emptyList());
+    this(List.of());
   }
 
   public static MetadataBlock newEos() {
@@ -75,7 +74,7 @@ public class MetadataBlock extends BaseDataBlock {
 
   private MetadataBlock(int stageId, int workerId, @Nullable String serverId) {
     super(0, null, new String[0], new byte[0], new byte[0]);
-    _statsByStage = Collections.emptyList();
+    _statsByStage = List.of();
     _stageId = stageId;
     _workerId = workerId;
     _serverId = serverId;

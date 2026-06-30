@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.segment.index.bloom;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -52,7 +51,7 @@ import org.apache.pinot.spi.data.Schema;
 public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator> {
   public static final String INDEX_DISPLAY_NAME = "bloom";
   private static final List<String> EXTENSIONS =
-      Collections.singletonList(V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
   protected BloomIndexType() {
     super(StandardIndexes.BLOOM_FILTER_ID);

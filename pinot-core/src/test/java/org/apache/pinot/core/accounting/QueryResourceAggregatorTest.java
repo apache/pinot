@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.accounting;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -80,7 +80,7 @@ public class QueryResourceAggregatorTest {
 
     assertFalse(aggregator.isPauseActive(), "Pause should not be active initially");
 
-    aggregator.preAggregate(Collections.emptyList());
+    aggregator.preAggregate(List.of());
     assertEquals(aggregator.getTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.HeapMemoryCritical,
         "Triggering level should be HeapMemoryCritical");
     assertEquals(aggregator.getPreviousTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.Normal,
@@ -105,7 +105,7 @@ public class QueryResourceAggregatorTest {
       throws Exception {
     QueryResourceAggregator aggregator = createAggregator(5000);
 
-    aggregator.preAggregate(Collections.emptyList());
+    aggregator.preAggregate(List.of());
     aggregator.postAggregate();
     assertTrue(aggregator.isPauseActive(), "Pause should be active");
 
@@ -134,7 +134,7 @@ public class QueryResourceAggregatorTest {
   public void testNoPauseWhenDisabled() {
     QueryResourceAggregator aggregator = createAggregator(-1);
 
-    aggregator.preAggregate(Collections.emptyList());
+    aggregator.preAggregate(List.of());
     aggregator.postAggregate();
 
     assertFalse(aggregator.isPauseActive(), "Pause should not be active when feature is disabled");
@@ -145,7 +145,7 @@ public class QueryResourceAggregatorTest {
     QueryResourceAggregator aggregator = createAggregator(200);
 
     // First cycle: transitions Normal -> Critical, activates pause
-    aggregator.preAggregate(Collections.emptyList());
+    aggregator.preAggregate(List.of());
     aggregator.postAggregate();
     assertTrue(aggregator.isPauseActive(), "Pause should be active after first cycle");
 
@@ -153,7 +153,7 @@ public class QueryResourceAggregatorTest {
     aggregator.clearPause();
 
     // Second cycle: stays at Critical -> Critical, should NOT re-pause
-    aggregator.preAggregate(Collections.emptyList());
+    aggregator.preAggregate(List.of());
     aggregator.postAggregate();
 
     assertFalse(aggregator.isPauseActive(), "Should not re-pause when already at critical level");
@@ -165,7 +165,7 @@ public class QueryResourceAggregatorTest {
 
     assertFalse(aggregator.isPauseActive(), "Pause should not be active initially");
 
-    aggregator.preAggregate(Collections.emptyList());
+    aggregator.preAggregate(List.of());
     assertEquals(aggregator.getTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.HeapMemoryPanic,
         "Triggering level should be HeapMemoryPanic");
     assertEquals(aggregator.getPreviousTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.Normal,
@@ -191,7 +191,7 @@ public class QueryResourceAggregatorTest {
     QueryResourceAggregator aggregator =
         new QueryResourceAggregator("test-instance", InstanceType.SERVER, false, true, configRef);
 
-    aggregator.preAggregate(Collections.emptyList());
+    aggregator.preAggregate(List.of());
 
     assertFalse(aggregator.isPauseActive(),
         "Pause should not be active at panic level when pause-on-panic is disabled");
@@ -202,14 +202,14 @@ public class QueryResourceAggregatorTest {
     QueryResourceAggregator aggregator = createAggregator(5000, true);
 
     // First cycle: Normal → Panic, activates pause
-    aggregator.preAggregate(Collections.emptyList());
+    aggregator.preAggregate(List.of());
     assertTrue(aggregator.isPauseActive(), "Pause should be active from first panic transition");
 
     // Simulate the watcher clearing the pause after timeout
     aggregator.clearPause();
 
     // Second cycle: Panic → Panic, should NOT re-pause
-    aggregator.preAggregate(Collections.emptyList());
+    aggregator.preAggregate(List.of());
     assertEquals(aggregator.getPreviousTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.HeapMemoryPanic);
     assertFalse(aggregator.isPauseActive(), "Should not re-pause on Panic→Panic transition");
   }

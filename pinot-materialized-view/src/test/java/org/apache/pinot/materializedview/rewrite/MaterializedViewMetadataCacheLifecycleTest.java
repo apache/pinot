@@ -19,7 +19,6 @@
 package org.apache.pinot.materializedview.rewrite;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -178,7 +177,7 @@ public class MaterializedViewMetadataCacheLifecycleTest {
   private static MaterializedViewDefinitionMetadata buildDefinition() {
     /// baseTables stores the RAW base-table name (the controller-side convention; see
     /// MaterializedViewClusterIntegrationTest, which constructs definitions with
-    /// Collections.singletonList(SOURCE_TABLE_NAME)).
+    /// List.of(SOURCE_TABLE_NAME)).
     Set<String> baseTables = new HashSet<>();
     baseTables.add("orders");
     return new MaterializedViewDefinitionMetadata(
@@ -190,7 +189,7 @@ public class MaterializedViewMetadataCacheLifecycleTest {
   }
 
   private static MaterializedViewRuntimeMetadata buildRuntime() {
-    return new MaterializedViewRuntimeMetadata(MV_OFFLINE, 1_700_000_000_000L, Collections.emptyMap());
+    return new MaterializedViewRuntimeMetadata(MV_OFFLINE, 1_700_000_000_000L, Map.of());
   }
 
   /// Pins the close-on-startup-leak fix: if a watcher is subscribed in
@@ -208,7 +207,7 @@ public class MaterializedViewMetadataCacheLifecycleTest {
     String ghostDefPath = DEF_PARENT + "/" + ghostView;
     String ghostRuntimePath = RUNTIME_PARENT + "/" + ghostView;
     when(propertyStore.getChildNames(eq(DEF_PARENT), anyInt()))
-        .thenReturn(new ArrayList<>(Collections.singletonList(ghostView)));
+        .thenReturn(new ArrayList<>(List.of(ghostView)));
     when(propertyStore.getChildNames(eq(RUNTIME_PARENT), anyInt())).thenReturn(new ArrayList<>());
     when(propertyStore.exists(anyString(), anyInt())).thenAnswer(invocation -> store.containsKey(
         (String) invocation.getArgument(0)));

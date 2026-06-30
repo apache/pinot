@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -35,6 +34,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
 /**
@@ -72,6 +72,12 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(valueBlock.getNumDocs());
+        scanCost.addEntriesScannedPostFilter(
+            (long) valueBlock.getNumDocs() * _projectOperator.getNumColumnsProjected());
+      }
       aggregationExecutor.aggregate(valueBlock);
     }
 
@@ -81,7 +87,7 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
 
   @Override
   public List<BaseProjectOperator<?>> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   @Override

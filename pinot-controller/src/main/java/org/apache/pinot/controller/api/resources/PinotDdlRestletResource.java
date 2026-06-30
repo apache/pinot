@@ -30,7 +30,6 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -386,7 +385,7 @@ public class PinotDdlRestletResource {
     // table config (e.g. fill in defaulted index configs) and the validators must run against
     // the post-tuner shape, otherwise a tuner-introduced setting bypasses validation.
     TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, create.getTableConfig(),
-        schemaForValidation, Collections.emptyMap());
+        schemaForValidation, Map.of());
     // Refresh the response's tableConfig snapshot now that tuners have run; otherwise the
     // response advertises a pre-tuner config while ZK persists the post-tuner shape (and dry-run
     // would mis-predict what a real CREATE would write).
@@ -755,7 +754,7 @@ public class PinotDdlRestletResource {
     // POST /tables. The MV TableConfig already carries the MaterializedViewTask wiring set up
     // by the compiler; tuners only fill in defaulted index/segment configs.
     TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, create.getTableConfig(),
-        schemaForValidation, Collections.emptyMap());
+        schemaForValidation, Map.of());
     response.setTableConfig(toJson(create.getTableConfig()));
 
     // validateTableConfig fans out to TaskConfigUtils.validateTaskConfigs which triggers
@@ -1087,7 +1086,7 @@ public class PinotDdlRestletResource {
     if (!exists) {
       if (drop.isIfExists()) {
         return response
-            .setDeletedTables(Collections.emptyList())
+            .setDeletedTables(List.of())
             .setMessage("No matching materialized view to drop; IF EXISTS satisfied.");
       }
       throw new ControllerApplicationException(LOGGER,
@@ -1118,7 +1117,7 @@ public class PinotDdlRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
-    List<String> targets = Collections.singletonList(tableNameWithType);
+    List<String> targets = List.of(tableNameWithType);
 
     // Reuse the same logical-table and active-task safeguards as executeDrop. An MV is realized
     // as an OFFLINE table, so it is reachable from a logical-table union and may be a target of
@@ -1147,7 +1146,7 @@ public class PinotDdlRestletResource {
         tasksCleaned = false;
       }
       LOGGER.warn("DROP MATERIALIZED VIEW on {} failed: {}", tableNameWithType, e.getMessage());
-      throw dropFailed(tableNameWithType, Collections.emptyList(), tasksCleaned,
+      throw dropFailed(tableNameWithType, List.of(), tasksCleaned,
           e.getResponse().getStatus(), e);
     } catch (IllegalStateException e) {
       // Thrown by deleteTable when a dependent MV blocks the delete (matches the legacy
@@ -1157,7 +1156,7 @@ public class PinotDdlRestletResource {
         tasksCleaned = false;
       }
       LOGGER.warn("DROP MATERIALIZED VIEW on {} blocked: {}", tableNameWithType, e.getMessage());
-      throw dropFailed(tableNameWithType, Collections.emptyList(), tasksCleaned,
+      throw dropFailed(tableNameWithType, List.of(), tasksCleaned,
           Response.Status.CONFLICT.getStatusCode(), e);
     } catch (Exception e) {
       if (restorer != null && restorer.restore()) {
@@ -1165,7 +1164,7 @@ public class PinotDdlRestletResource {
       }
       LOGGER.warn("DROP MATERIALIZED VIEW on {} failed unexpectedly: {}",
           tableNameWithType, e.toString());
-      throw dropFailed(tableNameWithType, Collections.emptyList(), tasksCleaned,
+      throw dropFailed(tableNameWithType, List.of(), tasksCleaned,
           Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), e);
     }
 

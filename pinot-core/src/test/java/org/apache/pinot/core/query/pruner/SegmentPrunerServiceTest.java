@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.pruner;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -89,7 +88,7 @@ public class SegmentPrunerServiceTest {
 
     List<IndexSegment> actual = service.prune(indexes, queryContext, stats);
 
-    Assert.assertEquals(actual, Collections.emptyList());
+    Assert.assertEquals(actual, List.of());
     Assert.assertEquals(stats.getInvalidSegments(), 0);
   }
 
@@ -104,7 +103,7 @@ public class SegmentPrunerServiceTest {
 
     List<IndexSegment> actual = service.prune(segments, queryContext, new SegmentPrunerStatistics());
 
-    Assert.assertEquals(actual, Collections.emptyList());
+    Assert.assertEquals(actual, List.of());
   }
 
   @Test
@@ -167,7 +166,7 @@ public class SegmentPrunerServiceTest {
 
     List<IndexSegment> actual = service.prune(segments, queryContext, new SegmentPrunerStatistics());
 
-    Assert.assertEquals(actual, Collections.emptyList());
+    Assert.assertEquals(actual, List.of());
   }
 
   @Test

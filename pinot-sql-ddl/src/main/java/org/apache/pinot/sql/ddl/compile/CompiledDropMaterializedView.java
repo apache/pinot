@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.sql.ddl.compile;
 
-import java.util.Collections;
+import java.util.List;
 import javax.annotation.Nullable;
 
 
@@ -43,7 +43,7 @@ public final class CompiledDropMaterializedView extends CompiledDdl {
 
   public CompiledDropMaterializedView(@Nullable String databaseName, String rawTableName,
       boolean ifExists) {
-    super(DdlOperation.DROP_MATERIALIZED_VIEW, databaseName, Collections.emptyList());
+    super(DdlOperation.DROP_MATERIALIZED_VIEW, databaseName, List.of());
     _rawTableName = rawTableName;
     _ifExists = ifExists;
   }

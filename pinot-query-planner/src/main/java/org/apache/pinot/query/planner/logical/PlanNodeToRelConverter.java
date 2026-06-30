@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,7 +120,7 @@ public final class PlanNodeToRelConverter {
         _builder.aggregate(groupKey, aggCalls);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert aggregate node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownAggregate", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownAggregate", Map.of(),
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
 
@@ -137,7 +136,7 @@ public final class PlanNodeToRelConverter {
         _builder.filter(rexNode);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert filter node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownFilter", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownFilter", Map.of(),
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
 
@@ -169,7 +168,7 @@ public final class PlanNodeToRelConverter {
         }
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert join node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownJoin", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownJoin", Map.of(),
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
 
@@ -194,7 +193,7 @@ public final class PlanNodeToRelConverter {
         }
 
         if (node.getJoinType() == JoinRelType.ASOF || node.getJoinType() == JoinRelType.LEFT_ASOF) {
-          _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "EnrichedASOFJoin", Collections.emptyMap(),
+          _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "EnrichedASOFJoin", Map.of(),
               node.getDataSchema(), readAlreadyPushedChildren(node)));
         } else {
           Map<String, Plan.ExplainNode.AttributeValue> attributes = new HashMap<>();
@@ -203,7 +202,7 @@ public final class PlanNodeToRelConverter {
         }
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert join node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownJoin", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownJoin", Map.of(),
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
 
@@ -286,7 +285,7 @@ public final class PlanNodeToRelConverter {
         _builder.project(projects);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert project node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownProject", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownProject", Map.of(),
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
       return null;
@@ -305,7 +304,7 @@ public final class PlanNodeToRelConverter {
         _builder.push(logicalSort);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert sort node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownSort", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownSort", Map.of(),
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
       return null;
@@ -319,7 +318,7 @@ public final class PlanNodeToRelConverter {
         _builder.scan(DatabaseUtils.splitTableName(node.getTableName()));
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert table scan node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownTableScan", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownTableScan", Map.of(),
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
       return null;
@@ -343,7 +342,7 @@ public final class PlanNodeToRelConverter {
         _builder.values(values, relDataType);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert value node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownValue", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownValue", Map.of(),
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
       return null;
@@ -385,11 +384,11 @@ public final class PlanNodeToRelConverter {
         RelDataType rowType = node.getDataSchema().toRelDataType(_builder.getTypeFactory());
 
         LogicalWindow window = LogicalWindow.create(RelTraitSet.createEmpty(), input, constants, rowType,
-            Collections.singletonList(group));
+            List.of(group));
         _builder.push(window);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert window node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownWindow", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownWindow", Map.of(),
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
       return null;
@@ -431,7 +430,7 @@ public final class PlanNodeToRelConverter {
         _builder.push(setOp);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert set op node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownSetOp", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownSetOp", Map.of(),
             node.getDataSchema(), inputs));
       }
       return null;
@@ -449,7 +448,7 @@ public final class PlanNodeToRelConverter {
         _builder.push(explainedNode);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert explained node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownExplained", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownExplained", Map.of(),
             node.getDataSchema(), inputs));
       }
       return null;
@@ -476,11 +475,11 @@ public final class PlanNodeToRelConverter {
 
         // Use Uncollect to model UNNEST with optional ordinality.
         Uncollect uncollect =
-            Uncollect.create(project.getTraitSet(), project, node.isWithOrdinality(), Collections.emptyList());
+            Uncollect.create(project.getTraitSet(), project, node.isWithOrdinality(), List.of());
         _builder.push(uncollect);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert unnest node: {}", node, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownUnnest", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownUnnest", Map.of(),
             node.getDataSchema(), inputs));
       }
       return null;
@@ -526,7 +525,7 @@ public final class PlanNodeToRelConverter {
         _builder.exchange(distribution);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert exchange node: {}", exchangeNode, e);
-        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownExchange", Collections.emptyMap(),
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownExchange", Map.of(),
             exchangeNode.getDataSchema(), readAlreadyPushedChildren(exchangeNode)));
       }
 

@@ -19,7 +19,7 @@
 package org.apache.pinot.query.planner.explain;
 
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
@@ -48,11 +48,11 @@ public class ExplainNodeSimplifierTest {
   private static final String COMBINE_TITLE = "LeafStageCombineOperator";
 
   private static ExplainedNode leaf(String title) {
-    return new ExplainedNode(0, SCHEMA, null, Collections.emptyList(), title, Map.of());
+    return new ExplainedNode(0, SCHEMA, null, List.of(), title, Map.of());
   }
 
   private static ExplainedNode leaf(String title, Map<String, Plan.ExplainNode.AttributeValue> attributes) {
-    return new ExplainedNode(0, SCHEMA, null, Collections.emptyList(), title, attributes);
+    return new ExplainedNode(0, SCHEMA, null, List.of(), title, attributes);
   }
 
   private static ExplainedNode combine(PlanNode... children) {
@@ -61,7 +61,7 @@ public class ExplainNodeSimplifierTest {
 
   /// Wraps a child the way {@code AcquireReleaseColumnsSegmentOperator} does when prefetch is enabled.
   private static ExplainedNode acquireRelease(PlanNode child) {
-    return new ExplainedNode(0, SCHEMA, null, Collections.singletonList(child), "AcquireReleaseColumnsSegment",
+    return new ExplainedNode(0, SCHEMA, null, List.of(child), "AcquireReleaseColumnsSegment",
         Map.of());
   }
 
@@ -257,7 +257,7 @@ public class ExplainNodeSimplifierTest {
   @Test
   public void nestedCombineUnderNonCombineIsSimplified() {
     ExplainedNode nested = new ExplainedNode(0, SCHEMA, null,
-        Collections.singletonList(combine(leaf("Scan"), leaf("Scan"))), "InstanceResponse", Map.of());
+        List.of(combine(leaf("Scan"), leaf("Scan"))), "InstanceResponse", Map.of());
     PlanNode simplified = ExplainNodeSimplifier.simplifyNode(nested);
 
     assertNotSame(simplified, nested);

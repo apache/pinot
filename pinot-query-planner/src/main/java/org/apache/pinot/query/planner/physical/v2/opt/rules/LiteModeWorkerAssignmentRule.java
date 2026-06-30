@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.physical.v2.opt.rules;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelTraitSet;
@@ -105,7 +104,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
       pdd = new PinotDataDistribution(
           RelDistribution.Type.SINGLETON, liteModeWorkers, liteModeWorkers.hashCode(), null, null);
     }
-    return new PhysicalExchange(nodeId(), leafStageRoot, pdd, Collections.emptyList(),
+    return new PhysicalExchange(nodeId(), leafStageRoot, pdd, List.of(),
         ExchangeStrategy.SINGLETON_EXCHANGE, collation, PinotExecStrategyTrait.getDefaultExecStrategy(),
         _context.getDefaultHashFunction());
   }

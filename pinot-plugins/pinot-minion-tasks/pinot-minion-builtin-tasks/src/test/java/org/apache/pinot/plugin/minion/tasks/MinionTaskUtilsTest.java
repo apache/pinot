@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,7 +126,7 @@ public class MinionTaskUtilsTest {
   public void testExtractMinionAllowDownloadFromServer() {
     Map<String, String> configs = new HashMap<>();
     TableTaskConfig tableTaskConfig = new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+        Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
 
@@ -137,7 +136,7 @@ public class MinionTaskUtilsTest {
 
     // Test when the configuration is set to true
     configs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "true");
-    tableTaskConfig = new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+    tableTaskConfig = new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
     assertTrue(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
@@ -145,7 +144,7 @@ public class MinionTaskUtilsTest {
 
     // Test when the configuration is set to false
     configs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "false");
-    tableTaskConfig = new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+    tableTaskConfig = new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
     assertFalse(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
@@ -163,11 +162,12 @@ public class MinionTaskUtilsTest {
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
     assertEquals(result1, ValidDocIdsType.SNAPSHOT);
 
-    // Test 2: Default when delete is enabled
+    // Test 2: Default stays SNAPSHOT even when delete is enabled. Delete records are retained until they expire via
+    // deletedKeysTTL rather than being dropped eagerly.
     upsertConfig.setDeleteRecordColumn("deleted");
     ValidDocIdsType result2 =
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
-    assertEquals(result2, ValidDocIdsType.SNAPSHOT_WITH_DELETE);
+    assertEquals(result2, ValidDocIdsType.SNAPSHOT);
   }
 
   @Test
@@ -211,23 +211,24 @@ public class MinionTaskUtilsTest {
   }
 
   @Test
-  public void testGetValidDocIdsTypeBackwardCompatibilityAndOverride() {
-    // Test backward compatibility behavior when delete is enabled
+  public void testGetValidDocIdsTypeNotOverriddenForDeleteTable() {
+    // A user-specified validDocIdsType is always honored on a delete-enabled table; it is never silently overridden
+    // to SNAPSHOT_WITH_DELETE.
     UpsertConfig upsertConfig = new UpsertConfig();
     upsertConfig.setDeleteRecordColumn("deleted");
     Map<String, String> taskConfigs = new HashMap<>();
 
-    // Test 1: SNAPSHOT gets overridden to SNAPSHOT_WITH_DELETE
+    // Test 1: SNAPSHOT is honored (not overridden to SNAPSHOT_WITH_DELETE)
     taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "SNAPSHOT");
     ValidDocIdsType result1 =
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
-    assertEquals(result1, ValidDocIdsType.SNAPSHOT_WITH_DELETE);
+    assertEquals(result1, ValidDocIdsType.SNAPSHOT);
 
-    // Test 2: IN_MEMORY gets overridden to SNAPSHOT_WITH_DELETE
+    // Test 2: IN_MEMORY is honored (not overridden)
     taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "IN_MEMORY");
     ValidDocIdsType result2 =
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
-    assertEquals(result2, ValidDocIdsType.SNAPSHOT_WITH_DELETE);
+    assertEquals(result2, ValidDocIdsType.IN_MEMORY);
 
     // Test 3: SNAPSHOT_WITH_DELETE stays the same
     taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "SNAPSHOT_WITH_DELETE");
@@ -235,17 +236,17 @@ public class MinionTaskUtilsTest {
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
     assertEquals(result3, ValidDocIdsType.SNAPSHOT_WITH_DELETE);
 
-    // Test 4: IN_MEMORY_WITH_DELETE stays the same (not overridden)
+    // Test 4: IN_MEMORY_WITH_DELETE stays the same
     taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "IN_MEMORY_WITH_DELETE");
     ValidDocIdsType result4 =
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
     assertEquals(result4, ValidDocIdsType.IN_MEMORY_WITH_DELETE);
 
-    // Test 5: Case insensitive override behavior
-    taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "in_memory_with_delete");
+    // Test 5: Case-insensitive parsing, still honored without override
+    taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "snapshot");
     ValidDocIdsType result5 =
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
-    assertEquals(result5, ValidDocIdsType.IN_MEMORY_WITH_DELETE);
+    assertEquals(result5, ValidDocIdsType.SNAPSHOT);
   }
 
   @Test

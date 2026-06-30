@@ -20,7 +20,6 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -45,7 +44,7 @@ public class EndReplaceSegmentsRequest {
   @JsonCreator
   public EndReplaceSegmentsRequest(@JsonProperty("segmentsTo") @Nullable List<String> segmentsTo,
       @JsonProperty("customMap") @Nullable Map<String, String> customMap) {
-    _segmentsTo = (segmentsTo == null) ? Collections.emptyList() : segmentsTo;
+    _segmentsTo = (segmentsTo == null) ? List.of() : segmentsTo;
     _customMap = customMap;
   }
 

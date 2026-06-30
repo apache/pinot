@@ -160,6 +160,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   @Nullable
   protected List<String> _tags;
 
+  @JsonProperty("fieldId")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  protected Integer _fieldId;
+
+  @JsonProperty("aliases")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  protected List<String> _aliases;
+
   protected String _name;
   protected DataType _dataType;
   protected boolean _singleValueField = true;
@@ -238,6 +248,24 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   public void setTags(@Nullable List<String> tags) {
     _tags = tags;
+  }
+
+  @Nullable
+  public Integer getFieldId() {
+    return _fieldId;
+  }
+
+  public void setFieldId(@Nullable Integer fieldId) {
+    _fieldId = fieldId;
+  }
+
+  @Nullable
+  public List<String> getAliases() {
+    return _aliases;
+  }
+
+  public void setAliases(@Nullable List<String> aliases) {
+    _aliases = aliases == null || aliases.isEmpty() ? null : aliases;
   }
 
   public DataType getDataType() {
@@ -585,7 +613,25 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       }
       jsonObject.set("tags", tagsArray);
     }
+    appendFieldIdAndAliases(jsonObject);
     return jsonObject;
+  }
+
+  /// Appends `fieldId` and `aliases` (when set) to the given JSON object.
+  ///
+  /// Subclasses that build JSON without calling [FieldSpec#toJsonObject()], such as [TimeFieldSpec], use this helper
+  /// to preserve these fields during schema round-trip serialization.
+  protected void appendFieldIdAndAliases(ObjectNode jsonObject) {
+    if (_fieldId != null) {
+      jsonObject.put("fieldId", _fieldId);
+    }
+    if (_aliases != null && !_aliases.isEmpty()) {
+      ArrayNode aliasesArray = JsonUtils.newArrayNode();
+      for (String alias : _aliases) {
+        aliasesArray.add(alias);
+      }
+      jsonObject.set("aliases", aliasesArray);
+    }
   }
 
   protected void appendDefaultNullValue(ObjectNode jsonNode) {
@@ -658,14 +704,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && Objects.equals(_transformFunction, that._transformFunction)
         && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider)
         && Objects.equals(_description, that._description)
-        && Objects.equals(_tags, that._tags);
+        && Objects.equals(_tags, that._tags)
+        && Objects.equals(_fieldId, that._fieldId)
+        && Objects.equals(_aliases, that._aliases);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
         _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider,
-        _description, _tags);
+        _description, _tags, _fieldId, _aliases);
   }
 
   /**

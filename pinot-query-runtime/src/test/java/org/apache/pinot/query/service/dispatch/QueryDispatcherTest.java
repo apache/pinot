@@ -21,7 +21,6 @@ package org.apache.pinot.query.service.dispatch;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -275,7 +274,7 @@ public class QueryDispatcherTest extends QueryTestSet {
         CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX,
         metricsRegistry,
         CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS,
-        Collections.emptyList());
+        List.of());
     brokerMetrics.initializeGlobalMeters();
     BrokerMetrics.register(brokerMetrics);
 

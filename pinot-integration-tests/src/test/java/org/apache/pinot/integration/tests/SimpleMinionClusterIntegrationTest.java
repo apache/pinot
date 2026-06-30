@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -96,7 +95,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     addDummySchema(TABLE_NAME_1);
     addDummySchema(TABLE_NAME_2);
     addDummySchema(TABLE_NAME_3);
-    TableTaskConfig taskConfig = new TableTaskConfig(Collections.singletonMap(TASK_TYPE, Collections.emptyMap()));
+    TableTaskConfig taskConfig = new TableTaskConfig(Map.of(TASK_TYPE, Map.of()));
     addTableConfig(
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_1).setTaskConfig(taskConfig).build());
     addTableConfig(

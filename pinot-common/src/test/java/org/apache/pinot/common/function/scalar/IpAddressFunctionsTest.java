@@ -548,4 +548,82 @@ public class IpAddressFunctionsTest {
       }
     }
   }
+
+  // ==================== Tests for isPrivateIp ====================
+
+  @Test
+  public void testIsPrivateIpRfc1918() {
+    // 10.0.0.0/8
+    assertTrue(IpAddressFunctions.isPrivateIp("10.0.0.1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("10.255.255.255"));
+    assertTrue(IpAddressFunctions.isPrivateIp("10.128.0.1"));
+
+    // 172.16.0.0/12
+    assertTrue(IpAddressFunctions.isPrivateIp("172.16.0.1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("172.31.255.255"));
+    assertTrue(IpAddressFunctions.isPrivateIp("172.20.10.5"));
+    assertFalse(IpAddressFunctions.isPrivateIp("172.32.0.1")); // just outside /12
+
+    // 192.168.0.0/16
+    assertTrue(IpAddressFunctions.isPrivateIp("192.168.0.1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("192.168.255.255"));
+    assertTrue(IpAddressFunctions.isPrivateIp("192.168.100.200"));
+  }
+
+  @Test
+  public void testIsPrivateIpLoopback() {
+    // IPv4 loopback 127.0.0.0/8
+    assertTrue(IpAddressFunctions.isPrivateIp("127.0.0.1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("127.255.255.255"));
+
+    // IPv6 loopback
+    assertTrue(IpAddressFunctions.isPrivateIp("::1"));
+  }
+
+  @Test
+  public void testIsPrivateIpLinkLocal() {
+    // IPv4 link-local 169.254.0.0/16
+    assertTrue(IpAddressFunctions.isPrivateIp("169.254.0.1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("169.254.255.255"));
+
+    // IPv6 link-local fe80::/10
+    assertTrue(IpAddressFunctions.isPrivateIp("fe80::1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("fe80::abcd:1234"));
+  }
+
+  @Test
+  public void testIsPrivateIpIPv6Ula() {
+    // fc00::/7 covers fc::/8 and fd::/8
+    assertTrue(IpAddressFunctions.isPrivateIp("fd00::1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("fc00::1"));
+    assertTrue(IpAddressFunctions.isPrivateIp("fdab:cdef:1234::1"));
+  }
+
+  @Test
+  public void testIsPrivateIpPublicAddresses() {
+    // Public IPv4 — must NOT be private
+    assertFalse(IpAddressFunctions.isPrivateIp("8.8.8.8"));
+    assertFalse(IpAddressFunctions.isPrivateIp("1.1.1.1"));
+    assertFalse(IpAddressFunctions.isPrivateIp("203.0.113.1"));
+    assertFalse(IpAddressFunctions.isPrivateIp("198.18.0.1"));  // TEST-NET-3 is public
+
+    // Public IPv6 — must NOT be private
+    assertFalse(IpAddressFunctions.isPrivateIp("2001:db8::1")); // documentation prefix
+    assertFalse(IpAddressFunctions.isPrivateIp("2606:4700::1")); // Cloudflare
+  }
+
+  @Test
+  public void testIsPrivateIpInvalidInputs() {
+    // CIDR notation not accepted
+    assertThrows(IllegalArgumentException.class,
+        () -> IpAddressFunctions.isPrivateIp("10.0.0.0/8"));
+    assertThrows(IllegalArgumentException.class,
+        () -> IpAddressFunctions.isPrivateIp("fc00::/7"));
+
+    // Invalid formats
+    assertThrows(IllegalArgumentException.class,
+        () -> IpAddressFunctions.isPrivateIp("not-an-ip"));
+    assertThrows(IllegalArgumentException.class,
+        () -> IpAddressFunctions.isPrivateIp("999.999.999.999"));
+  }
 }

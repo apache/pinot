@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests.custom;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -74,11 +73,11 @@ public class AggregateMetricsTest extends CustomDataQueryClusterIntegrationTest 
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     TableConfig tableConfig = super.createRealtimeTableConfig(sampleAvroFile);
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    indexingConfig.setSortedColumn(Collections.singletonList("Carrier"));
-    indexingConfig.setInvertedIndexColumns(Collections.singletonList("Origin"));
+    indexingConfig.setSortedColumn(List.of("Carrier"));
+    indexingConfig.setInvertedIndexColumns(List.of("Origin"));
     indexingConfig.setNoDictionaryColumns(Arrays.asList("AirTime", "ArrDelay"));
-    indexingConfig.setRangeIndexColumns(Collections.singletonList("DaysSinceEpoch"));
-    indexingConfig.setBloomFilterColumns(Collections.singletonList("Origin"));
+    indexingConfig.setRangeIndexColumns(List.of("DaysSinceEpoch"));
+    indexingConfig.setBloomFilterColumns(List.of("Origin"));
     indexingConfig.setAggregateMetrics(true);
     return tableConfig;
   }

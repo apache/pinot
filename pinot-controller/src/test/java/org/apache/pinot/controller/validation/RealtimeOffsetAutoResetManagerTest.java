@@ -20,7 +20,6 @@ package org.apache.pinot.controller.validation;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -261,7 +260,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     streamConfigMap.put("stream.kafka.consumer.type", "simple");
     streamConfigMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
     streamConfigMap.put("stream.kafka.decoder.class.name", "testDecoder");
-    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigMap));
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigMap));
     streamIngestionConfig.setRealtimeOffsetAutoResetHandlerClass(null);
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -278,7 +277,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     streamConfigMap.put("stream.kafka.consumer.type", "simple");
     streamConfigMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
     streamConfigMap.put("stream.kafka.decoder.class.name", "testDecoder");
-    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigMap));
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigMap));
     streamIngestionConfig.setRealtimeOffsetAutoResetHandlerClass("InvalidClass");
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -297,7 +296,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     streamConfigMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
     streamConfigMap.put("stream.kafka.decoder.class.name", "testDecoder");
 
-    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigMap));
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigMap));
     streamIngestionConfig.setRealtimeOffsetAutoResetHandlerClass(TEST_HANDLER_CLASS_NAME);
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -330,7 +329,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     streamConfigMap.put("stream.kafka.consumer.type", "simple");
     streamConfigMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
     streamConfigMap.put("stream.kafka.decoder.class.name", "testDecoder");
-    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigMap));
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigMap));
     streamIngestionConfig.setRealtimeOffsetAutoResetHandlerClass(LEGACY_HANDLER_CLASS_NAME);
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -371,7 +370,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     @Override
     public Collection<String> cleanupCompletedBackfillJobs(String tableNameWithType, Collection<String> topicNames) {
       // Test implementation - return empty collection
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override
@@ -412,7 +411,7 @@ public class RealtimeOffsetAutoResetManagerTest {
 
     @Override
     public Collection<String> cleanupCompletedBackfillJobs(String tableNameWithType, Collection<String> topicNames) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override

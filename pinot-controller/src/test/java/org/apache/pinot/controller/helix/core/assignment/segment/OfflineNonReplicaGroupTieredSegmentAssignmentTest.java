@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.collect.Lists;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -139,7 +138,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     // }
     InstancePartitions instancePartitionsOffline = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
     instancePartitionsOffline.setInstances(0, 0, INSTANCES);
-    _instancePartitionsMap = Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitionsOffline);
+    _instancePartitionsMap = Map.of(InstancePartitionsType.OFFLINE, instancePartitionsOffline);
     InstancePartitions instancePartitionsTierA = new InstancePartitions(TIER_A_INSTANCE_PARTITIONS_NAME);
     instancePartitionsTierA.setInstances(0, 0, INSTANCES_TIER_A);
     InstancePartitions instancePartitionsTierB = new InstancePartitions(TIER_B_INSTANCE_PARTITIONS_NAME);
