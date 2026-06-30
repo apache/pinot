@@ -41,6 +41,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
 
 
 /**
@@ -149,6 +150,14 @@ public class InPredicateEvaluatorFactory {
           matchingValues.add(value);
         }
         return new BytesRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
+      }
+      case UUID: {
+        ByteArray[] uuidValues = inPredicate.getUuidValues();
+        Set<UuidKey> matchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(uuidValues.length));
+        for (ByteArray value : uuidValues) {
+          matchingValues.add(UuidKey.fromByteArray(value));
+        }
+        return new UuidRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
@@ -488,6 +497,39 @@ public class InPredicateEvaluatorFactory {
     @Override
     public <R> R accept(Visitor<R> visitor) {
       return visitor.visitBytes(_matchingValues);
+    }
+  }
+
+  private static final class UuidRawValueBasedInPredicateEvaluator extends InRawPredicateEvaluator {
+    final Set<UuidKey> _matchingValues;
+
+    UuidRawValueBasedInPredicateEvaluator(InPredicate inPredicate, Set<UuidKey> matchingValues) {
+      super(inPredicate);
+      _matchingValues = matchingValues;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return _matchingValues.size();
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.UUID;
+    }
+
+    @Override
+    public boolean applySV(byte[] value) {
+      return _matchingValues.contains(UuidKey.fromBytes(value));
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      Set<ByteArray> matchingByteArrays = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(_matchingValues.size()));
+      for (UuidKey matchingValue : _matchingValues) {
+        matchingByteArrays.add(matchingValue.toByteArray());
+      }
+      return visitor.visitBytes(matchingByteArrays);
     }
   }
 }

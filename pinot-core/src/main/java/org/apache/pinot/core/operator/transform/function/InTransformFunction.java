@@ -36,6 +36,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -118,11 +119,19 @@ public class InTransformFunction extends BaseTransformFunction {
           _valueSet = stringValues;
           break;
         case BYTES:
-          ObjectOpenHashSet<ByteArray> bytesValues = new ObjectOpenHashSet<>(numValues);
-          for (String stringValue : stringValues) {
-            bytesValues.add(BytesUtils.toByteArray(stringValue));
+          if (_mainFunction.getResultMetadata().getDataType() == DataType.UUID) {
+            ObjectOpenHashSet<UuidKey> uuidValues = new ObjectOpenHashSet<>(numValues);
+            for (String stringValue : stringValues) {
+              uuidValues.add(UuidKey.fromObject(stringValue));
+            }
+            _valueSet = uuidValues;
+          } else {
+            ObjectOpenHashSet<ByteArray> bytesValues = new ObjectOpenHashSet<>(numValues);
+            for (String stringValue : stringValues) {
+              bytesValues.add(BytesUtils.toByteArray(stringValue));
+            }
+            _valueSet = bytesValues;
           }
-          _valueSet = bytesValues;
           break;
         case UNKNOWN:
           _valueSet = new ObjectOpenHashSet<>();
@@ -203,11 +212,20 @@ public class InTransformFunction extends BaseTransformFunction {
             }
             break;
           case BYTES:
-            ObjectOpenHashSet<ByteArray> inBytesValues = (ObjectOpenHashSet<ByteArray>) _valueSet;
             byte[][] bytesValues = _mainFunction.transformToBytesValuesSV(valueBlock);
-            for (int i = 0; i < length; i++) {
-              if (inBytesValues.contains(new ByteArray(bytesValues[i]))) {
-                _intValuesSV[i] = 1;
+            if (_mainFunction.getResultMetadata().getDataType() == DataType.UUID) {
+              ObjectOpenHashSet<UuidKey> inUuidValues = (ObjectOpenHashSet<UuidKey>) _valueSet;
+              for (int i = 0; i < length; i++) {
+                if (inUuidValues.contains(UuidKey.fromBytes(bytesValues[i]))) {
+                  _intValuesSV[i] = 1;
+                }
+              }
+            } else {
+              ObjectOpenHashSet<ByteArray> inBytesValues = (ObjectOpenHashSet<ByteArray>) _valueSet;
+              for (int i = 0; i < length; i++) {
+                if (inBytesValues.contains(new ByteArray(bytesValues[i]))) {
+                  _intValuesSV[i] = 1;
+                }
               }
             }
             break;
