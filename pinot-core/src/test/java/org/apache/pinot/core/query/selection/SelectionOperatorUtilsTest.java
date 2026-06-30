@@ -18,17 +18,23 @@
  */
 package org.apache.pinot.core.query.selection;
 
+import java.util.Collections;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
 public class SelectionOperatorUtilsTest {
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
 
   @Test
   public void testGetResultTableColumnIndices() {
@@ -206,5 +212,22 @@ public class SelectionOperatorUtilsTest {
         new DataSchema(new String[]{"plus(col1,'1')", "plus(col2,'2')", "plus(col1,'1')"}, new ColumnDataType[]{
             ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING
         }));
+  }
+
+  @Test
+  public void testRenderResultTableWithoutOrderingFormatsUUIDAndBytes() {
+    byte[] bytesValue = new byte[]{0x01, 0x23, 0x45};
+    DataSchema dataSchema = new DataSchema(new String[]{"uuidCol", "bytesCol"},
+        new ColumnDataType[]{ColumnDataType.UUID, ColumnDataType.BYTES});
+
+    ResultTable resultTable = SelectionOperatorUtils.renderResultTableWithoutOrdering(
+        Collections.singletonList(
+            new Object[]{new ByteArray(UuidUtils.toBytes(UUID_VALUE)), new ByteArray(bytesValue)}),
+        dataSchema,
+        new int[]{0, 1});
+
+    Object[] row = resultTable.getRows().get(0);
+    assertEquals(row[0], UUID_VALUE);
+    assertEquals(row[1], BytesUtils.toHexString(bytesValue));
   }
 }
