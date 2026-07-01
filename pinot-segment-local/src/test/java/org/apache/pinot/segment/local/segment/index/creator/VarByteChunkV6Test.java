@@ -101,4 +101,52 @@ public class VarByteChunkV6Test extends VarByteChunkV5Test {
     FileUtils.deleteQuietly(v4FwdIndexFile);
     FileUtils.deleteQuietly(v6FwdIndexFile);
   }
+
+  /// A positive `targetDocsPerChunk` must cap each chunk at that many documents even when the byte
+  /// buffer is far from full, and values must still round-trip. The default (`-1`) keeps the original
+  /// byte-driven behavior, which is exercised by all the inherited read/write tests.
+  @Test
+  public void testTargetDocsPerChunkCapsChunk()
+      throws IOException {
+    int numDocs = 1000;
+    // 1000 is not a multiple of 30, so the last chunk holds a remainder (10 docs).
+    int docsPerChunk = 30;
+    // Large byte budget so flushing is driven purely by the docs-per-chunk cap, not the buffer size.
+    int chunkSize = 1 << 20;
+    File file = new File(FileUtils.getTempDirectory(), "v6test_docs_cap");
+    FileUtils.deleteQuietly(file);
+
+    String[] values = new String[numDocs];
+    try (VarByteChunkForwardIndexWriterV6 writer =
+        new VarByteChunkForwardIndexWriterV6(file, ChunkCompressionType.ZSTANDARD, chunkSize, docsPerChunk)) {
+      for (int i = 0; i < numDocs; i++) {
+        values[i] = "value_" + i;
+        writer.putString(values[i]);
+      }
+    }
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file)) {
+      // Chunk metadata starts at byte 16; each 8-byte entry begins with the chunk's first docId (stored
+      // little-endian, MSB reserved for the huge-chunk flag). The region ends at the offset stored at byte 12.
+      int numChunks = (buffer.getInt(12) - 16) / 8;
+      Assert.assertEquals(numChunks, (numDocs + docsPerChunk - 1) / docsPerChunk, "Unexpected chunk count");
+      // Each chunk must start exactly docsPerChunk docs after the previous one, so every chunk holds
+      // docsPerChunk docs and the last holds the remainder.
+      for (int chunk = 0; chunk < numChunks; chunk++) {
+        int firstDocId = Integer.reverseBytes(buffer.getInt(16 + chunk * 8)) & 0x7FFFFFFF;
+        Assert.assertEquals(firstDocId, chunk * docsPerChunk, "Unexpected start docId for chunk " + chunk);
+      }
+    }
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        VarByteChunkForwardIndexReaderV6 reader =
+            new VarByteChunkForwardIndexReaderV6(buffer, FieldSpec.DataType.STRING, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      for (int i = 0; i < numDocs; i++) {
+        Assert.assertEquals(reader.getString(i, context), values[i]);
+      }
+    }
+
+    FileUtils.deleteQuietly(file);
+  }
 }
