@@ -41,6 +41,8 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -53,6 +55,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -147,6 +150,54 @@ public class OpChainSchedulerServiceTest {
     }
 
     assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
+  }
+
+  @Test
+  public void shouldTrackProgressForActiveRequest()
+      throws InterruptedException {
+    CountDownLatch operatorAClosed = new CountDownLatch(1);
+    CountDownLatch operatorBStarted = new CountDownLatch(1);
+    CountDownLatch operatorBCanFinish = new CountDownLatch(1);
+    CountDownLatch operatorBClosed = new CountDownLatch(1);
+    MultiStageOperator operatorB = Mockito.mock(MultiStageOperator.class);
+    Mockito.when(operatorB.copyStatMaps()).thenAnswer(inv -> new StatMap<>(MailboxSendOperator.StatKey.class));
+
+    Mockito.when(_operatorA.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+    Mockito.doAnswer(inv -> {
+      operatorAClosed.countDown();
+      return null;
+    }).when(_operatorA).close();
+
+    Mockito.when(operatorB.nextBlock()).thenAnswer(inv -> {
+      operatorBStarted.countDown();
+      assertTrue(operatorBCanFinish.await(10, TimeUnit.SECONDS), "expected operatorB to be released");
+      return SuccessMseBlock.INSTANCE;
+    });
+    Mockito.doAnswer(inv -> {
+      operatorBClosed.countDown();
+      return null;
+    }).when(operatorB).close();
+
+    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
+      executionContext.addTotalWorkUnits(2);
+      schedulerService.register(getChain(_operatorA, 0));
+      schedulerService.register(getChain(operatorB, 1));
+    }
+
+    assertTrue(operatorAClosed.await(10, TimeUnit.SECONDS), "expected operatorA to finish");
+    assertTrue(operatorBStarted.await(10, TimeUnit.SECONDS), "expected operatorB to start");
+    QueryProgressStats progressStats = schedulerService.getQueryProgressStats(123L);
+    assertEquals(progressStats.getProcessedWorkUnits(), 1);
+    assertEquals(progressStats.getTotalWorkUnits(), 2);
+    assertEquals(progressStats.getProgressPercent(), 50.0);
+    assertTrue(schedulerService.hasRunningExecutionContext(123L));
+
+    operatorBCanFinish.countDown();
+    assertTrue(operatorBClosed.await(10, TimeUnit.SECONDS), "expected operatorB to finish");
+    assertNull(schedulerService.getQueryProgressStats(123L));
+    assertEquals(schedulerService.activeRequestCount(), 0);
   }
 
   @Test

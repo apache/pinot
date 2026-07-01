@@ -54,6 +54,7 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.slf4j.Logger;
@@ -220,6 +221,7 @@ public class OpChainSchedulerService {
     Futures.addCallback(listenableFutureTask, new FutureCallback<>() {
       @Override
       public void onSuccess(Void result) {
+        executionContext.incrementProcessedWorkUnits();
         _metrics.onOpChainFinished(rootOperator);
         decrementActiveOpChains(requestId);
         notifyCompletionListener(opChainId, operatorChain, statsRef.get(), null);
@@ -229,6 +231,7 @@ public class OpChainSchedulerService {
       @Override
       public void onFailure(Throwable t) {
         String logMsg = "Failed to execute operator chain: " + t.getMessage();
+        executionContext.incrementProcessedWorkUnits();
         _metrics.onOpChainFinished(rootOperator);
         if (t instanceof QueryException) {
           switch (((QueryException) t).getErrorCode()) {
@@ -263,8 +266,14 @@ public class OpChainSchedulerService {
     }
   }
 
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long requestId) {
+    QueryExecutionContext executionContext = _executionContextByRequest.get(requestId);
+    return executionContext != null ? executionContext.getProgressStats() : null;
+  }
+
   private void decrementActiveOpChains(long requestId) {
-    // Use compute() so the "decrement-to-zero → remove" step is atomic with a concurrent registerInternal()
+    // Use compute() so the "decrement-to-zero -> remove" step is atomic with a concurrent registerInternal()
     // that would otherwise interleave a putIfAbsent + increment between our remove() calls.
     _activeOpChainsByRequest.compute(requestId, (k, counter) -> {
       if (counter == null) {
@@ -390,6 +399,11 @@ public class OpChainSchedulerService {
 
   private ReadWriteLock getQueryLock(long requestId) {
     return _queryLocks[(int) (requestId & QUERY_LOCK_MASK)];
+  }
+
+  @VisibleForTesting
+  boolean hasRunningExecutionContext(long requestId) {
+    return _executionContextByRequest.containsKey(requestId);
   }
 
   private static class Metrics {

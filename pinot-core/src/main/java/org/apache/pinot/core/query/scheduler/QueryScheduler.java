@@ -134,7 +134,7 @@ public abstract class QueryScheduler {
    */
   @Nullable
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
-    QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceId);
+    QueryExecutionContext executionContext = queryRequest.getOrCreateExecutionContext(_instanceId);
     _latestQueryTime.accumulate(executionContext.getStartTimeMs());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       InstanceResponseBlock instanceResponse;

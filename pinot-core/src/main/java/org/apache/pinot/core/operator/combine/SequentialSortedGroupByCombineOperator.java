@@ -113,6 +113,7 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
+      markSegmentProcessed();
       _blockingQueue.offer(resultsBlock);
     }
   }

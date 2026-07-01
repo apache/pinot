@@ -194,6 +194,14 @@ class DispatchClient {
     _dispatchStub.withDeadline(deadline).cancel(cancelRequest, observer);
   }
 
+  public void progress(long requestId, QueryServerInstance virtualServer, Deadline deadline,
+      Consumer<AsyncResponse<Worker.QueryProgressResponse>> callback) {
+    Worker.QueryProgressRequest queryProgressRequest =
+        Worker.QueryProgressRequest.newBuilder().setRequestId(requestId).build();
+    StreamObserver<Worker.QueryProgressResponse> observer = new LastValueDispatchObserver<>(virtualServer, callback);
+    _dispatchStub.withDeadline(deadline).progress(queryProgressRequest, observer);
+  }
+
   public void explain(Worker.QueryRequest request, QueryServerInstance virtualServer, Deadline deadline,
       Consumer<AsyncResponse<List<Worker.ExplainResponse>>> callback) {
     _dispatchStub.withDeadline(deadline).explain(request, new AllValuesDispatchObserver<>(virtualServer, callback));

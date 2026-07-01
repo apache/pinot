@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -58,6 +59,7 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.net.URIBuilder;
 import org.apache.hc.core5.util.Timeout;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.http.MultiHttpRequest;
@@ -69,6 +71,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -304,6 +307,40 @@ public class PinotRunningQueryResource {
   }
 
   @GET
+  @Path("clientQuery/{clientQueryId}/progress")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get progress for a query as identified by the clientQueryId",
+      notes = "Polls all live brokers and returns the first matching running query progress. No progress is returned "
+          + "if no broker is currently tracking the given clientQueryId. Multi-stage responses may include labeled "
+          + "details for component-level progress.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Query not found on any broker")
+  })
+  public QueryProgressStats getClientQueryProgress(
+      @ApiParam(value = "ClientQueryId provided by the client", required = true)
+      @PathParam("clientQueryId") String clientQueryId,
+      @ApiParam(value = "Timeout for brokers and servers to respond the progress request") @QueryParam("timeoutMs")
+      @DefaultValue("1000") int timeoutMs, @Context HttpHeaders httpHeaders) {
+    try {
+      Map<String, InstanceInfo> brokers = getBrokers(httpHeaders.getHeaderString(DATABASE));
+      QueryProgressStats progressStats =
+          getClientQueryProgress(brokers, clientQueryId, timeoutMs, createRequestHeaders(httpHeaders));
+      if (progressStats != null) {
+        return progressStats;
+      }
+      throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+          .entity(String.format("Client query: %s not found on any broker", clientQueryId)).build());
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Failed to get query progress due to error: " + e.getMessage()).build());
+    }
+  }
+
+  @GET
   @Path("/queries")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)
   @Produces(MediaType.APPLICATION_JSON)
@@ -369,6 +406,55 @@ public class PinotRunningQueryResource {
       throw new Exception("Unexpected responses from brokers: " + StringUtils.join(errMsgs, ","));
     }
     return queriesByBroker;
+  }
+
+  @Nullable
+  private QueryProgressStats getClientQueryProgress(Map<String, InstanceInfo> brokers, String clientQueryId,
+      int timeoutMs, Map<String, String> requestHeaders)
+      throws Exception {
+    String protocol = _controllerConf.getControllerBrokerProtocol();
+    int portOverride = _controllerConf.getControllerBrokerPortOverride();
+    List<String> brokerUrls = new ArrayList<>();
+    for (InstanceInfo broker : brokers.values()) {
+      int port = portOverride > 0 ? portOverride : broker.getPort();
+      brokerUrls.add(new URIBuilder().setScheme(protocol).setHost(broker.getHost()).setPort(port)
+          .setPathSegments("query", clientQueryId, "progress").addParameter("client", "true")
+          .addParameter("timeoutMs", Integer.toString(timeoutMs)).build().toString());
+    }
+    if (brokerUrls.isEmpty()) {
+      return null;
+    }
+    LOGGER.debug("Getting query progress via broker urls: {}", brokerUrls);
+    CompletionService<MultiHttpRequestResponse> completionService =
+        new MultiHttpRequest(_executor, _httpConnMgr).executeGet(brokerUrls, requestHeaders, timeoutMs);
+    List<String> errMsgs = new ArrayList<>(brokerUrls.size());
+    for (int i = 0; i < brokerUrls.size(); i++) {
+      MultiHttpRequestResponse httpRequestResponse = null;
+      URI uri = null;
+      try {
+        httpRequestResponse = completionService.take().get();
+        uri = httpRequestResponse.getURI();
+        int status = httpRequestResponse.getResponse().getCode();
+        String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
+        if (status == 200) {
+          return JsonUtils.stringToObject(responseString, QueryProgressStats.class);
+        } else if (status != 404) {
+          throw new Exception(
+              String.format("Unexpected status=%d and response='%s' from uri='%s'", status, responseString, uri));
+        }
+      } catch (Exception e) {
+        LOGGER.debug("Failed to get progress for client query id: {} from uri: {}", clientQueryId, uri, e);
+        errMsgs.add(e.getMessage());
+      } finally {
+        if (httpRequestResponse != null) {
+          httpRequestResponse.close();
+        }
+      }
+    }
+    if (errMsgs.size() == brokerUrls.size()) {
+      throw new Exception("Unexpected responses from brokers: " + StringUtils.join(errMsgs, ","));
+    }
+    return null;
   }
 
   private static String getInstanceKey(InstanceInfo info) {
