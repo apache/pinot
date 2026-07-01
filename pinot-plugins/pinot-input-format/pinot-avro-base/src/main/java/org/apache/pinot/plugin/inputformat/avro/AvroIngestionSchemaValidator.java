@@ -139,7 +139,7 @@ public class AvroIngestionSchemaValidator implements IngestionSchemaValidator {
         if (fieldSpec.getDataType() != dataTypeForSVColumn) {
           _dataTypeMismatch.addMismatchReason(String
               .format("The Pinot column: (%s: %s) doesn't match with the column (%s: %s) in input %s schema.",
-                  columnName, fieldSpec.getDataType().name(), avroColumnName, avroColumnType.name(),
+                  columnName, fieldSpec.getDataType().name(), avroColumnName, dataTypeForSVColumn.name(),
                   getInputSchemaType()));
         }
       } else {

@@ -2823,6 +2823,23 @@ public class CalciteSqlCompilerTest {
     expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertFalse(expression.getLiteral().getBoolValue());
+
+    // UUID_V4() / UUID_V7() are non-deterministic; the broker MUST NOT fold them into a single literal that
+    // every row would then reuse. Annotated as @ScalarFunction(isDeterministic = false), so the expression
+    // must remain a function call after going through the compile-time invoker.
+    expression = compileToExpression("uuidV4()");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getFunctionCall(),
+        "UUID_V4() must remain a function call after compile-time evaluation, not be folded to a literal");
+    Assert.assertEquals(expression.getFunctionCall().getOperator(), "uuidv4");
+
+    expression = compileToExpression("uuidV7()");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getFunctionCall(),
+        "UUID_V7() must remain a function call after compile-time evaluation, not be folded to a literal");
+    Assert.assertEquals(expression.getFunctionCall().getOperator(), "uuidv7");
   }
 
   @Test

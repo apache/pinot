@@ -102,6 +102,8 @@ public class TypeFactory extends JavaTypeFactoryImpl {
       case STRING:
       case JSON:
         return SqlTypeName.VARCHAR;
+      case UUID:
+        return SqlTypeName.UUID;
       case BYTES:
         return SqlTypeName.VARBINARY;
       case BIG_DECIMAL:

@@ -194,6 +194,7 @@ public class JsonResponseEncoder implements ResponseEncoder {
       case TIMESTAMP_ARRAY:
       case STRING_ARRAY:
       case BYTES_ARRAY:
+      case UUID_ARRAY:
         String[] stringArray = new String[jsonValue.size()];
         for (int k = 0; k < jsonValue.size(); k++) {
           stringArray[k] = jsonValue.get(k).textValue();
@@ -219,6 +220,7 @@ public class JsonResponseEncoder implements ResponseEncoder {
         return Double.valueOf(jsonValue.asDouble()).floatValue();
       case DOUBLE:
         return jsonValue.asDouble();
+      case UUID:
       case BIG_DECIMAL:
       case TIMESTAMP:
       case STRING:
