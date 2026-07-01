@@ -106,7 +106,7 @@ export default function SchemaComponent({
     dateTimeFieldSpecs: []
   };
   const defaultDataTypeOptions = {
-    dimension: ["INT", "LONG", "STRING", "FLOAT", "DOUBLE", "BYTES", "BOOLEAN", "JSON"],
+    dimension: ["INT", "LONG", "STRING", "FLOAT", "DOUBLE", "BYTES", "BOOLEAN", "JSON", "UUID"],
     metric: ["INT", "LONG", "DOUBLE", "FLOAT", "BYTES"],
     datetime: ["STRING", "INT", "LONG", "TIMESTAMP"]
   };

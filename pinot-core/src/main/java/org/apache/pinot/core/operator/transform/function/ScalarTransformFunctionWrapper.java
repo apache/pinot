@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionUtils;
@@ -35,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.PinotDataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -374,6 +376,36 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     return _stringValuesMV;
   }
 
+  @Override
+  public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
+      return super.transformToBytesValuesMV(valueBlock);
+    }
+    int length = valueBlock.getNumDocs();
+    initBytesValuesMV(length);
+    getNonLiteralValues(valueBlock);
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      if (value == null) {
+        _bytesValuesMV[i] = NullValuePlaceHolder.BYTES_ARRAY;
+        continue;
+      }
+      // BYTES_ARRAY scalars return ByteArray[] via toInternal (default returns value as-is and the convention
+      // is ByteArray[]); UUID_ARRAY scalars return byte[][] directly (PinotDataType.UUID_ARRAY#toInternal
+      // overrides to byte[][]). Handle both shapes so callers do not ClassCast.
+      Object internal = _resultType.toInternal(value);
+      if (internal instanceof byte[][]) {
+        _bytesValuesMV[i] = (byte[][]) internal;
+      } else {
+        _bytesValuesMV[i] = toBytesArray((ByteArray[]) internal);
+      }
+    }
+    return _bytesValuesMV;
+  }
+
   /**
    * Helper method to fetch values for the non-literal transform functions based on the parameter types.
    */
@@ -424,6 +456,16 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BYTES:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesSV(valueBlock);
           break;
+        case UUID: {
+          byte[][] bytesValues = transformFunction.transformToBytesValuesSV(valueBlock);
+          int numValues = bytesValues.length;
+          UUID[] uuidValues = new UUID[numValues];
+          for (int j = 0; j < numValues; j++) {
+            uuidValues[j] = UuidUtils.toUUID(bytesValues[j]);
+          }
+          _nonLiteralValues[i] = uuidValues;
+          break;
+        }
         case PRIMITIVE_INT_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToIntValuesMV(valueBlock);
           break;
@@ -477,9 +519,36 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BYTES_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesMV(valueBlock);
           break;
+        case UUID_ARRAY:
+          _nonLiteralValues[i] = toUuidValuesMV(transformFunction.transformToBytesValuesMV(valueBlock));
+          break;
         default:
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);
       }
     }
+  }
+
+  private static UUID[][] toUuidValuesMV(byte[][][] bytesValuesMV) {
+    int numDocs = bytesValuesMV.length;
+    UUID[][] uuidValuesMV = new UUID[numDocs][];
+    for (int i = 0; i < numDocs; i++) {
+      byte[][] bytesValues = bytesValuesMV[i];
+      int numValues = bytesValues.length;
+      UUID[] uuidValues = new UUID[numValues];
+      for (int j = 0; j < numValues; j++) {
+        uuidValues[j] = UuidUtils.toUUID(bytesValues[j]);
+      }
+      uuidValuesMV[i] = uuidValues;
+    }
+    return uuidValuesMV;
+  }
+
+  private static byte[][] toBytesArray(ByteArray[] byteArray) {
+    int numValues = byteArray.length;
+    byte[][] bytesArray = new byte[numValues][];
+    for (int i = 0; i < numValues; i++) {
+      bytesArray[i] = byteArray[i].getBytes();
+    }
+    return bytesArray;
   }
 }
