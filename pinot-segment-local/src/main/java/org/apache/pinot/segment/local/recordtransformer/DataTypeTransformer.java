@@ -18,17 +18,26 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,20 +59,31 @@ public class DataTypeTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTypeTransformer.class);
 
   private final Map<String, PinotDataType> _dataTypes;
+  /// JSON-typed columns that have a JSON index. For these the parsed value is cached on the row (before it is
+  /// serialized to a string for the forward index) so the JSON index can flatten it directly instead of re-parsing.
+  /// Computed once here so we only pay for the cache when a JSON index will actually consume the parsed value. Empty
+  /// for the source-field usage, which runs before indexing.
+  private final Set<String> _jsonCacheColumns;
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
 
   /// Creates a [DataTypeTransformer] that converts the (non-virtual) schema columns to the data types defined in the
   /// [Schema].
   public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
-    this(tableConfig, extractSchemaDataTypes(schema));
+    this(tableConfig, extractSchemaDataTypes(schema), computeJsonCacheColumns(tableConfig, schema));
   }
 
   /// Creates a [DataTypeTransformer] that converts the given columns to the provided [PinotDataType]s. This is useful
   /// for fixing the data types of source fields before other transformers (such as [ExpressionTransformer]) consume
   /// them.
   public DataTypeTransformer(TableConfig tableConfig, Map<String, PinotDataType> dataTypes) {
+    this(tableConfig, dataTypes, Set.of());
+  }
+
+  private DataTypeTransformer(TableConfig tableConfig, Map<String, PinotDataType> dataTypes,
+      Set<String> jsonCacheColumns) {
     _dataTypes = dataTypes;
+    _jsonCacheColumns = jsonCacheColumns;
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
     _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
@@ -84,6 +104,34 @@ public class DataTypeTransformer implements RecordTransformer {
     return _dataTypes.isEmpty();
   }
 
+  /// Returns the JSON-typed columns that have an (enabled) JSON index, i.e. the columns worth caching the parsed value
+  /// for. If the index configs cannot be resolved, returns an empty set and the optimization is disabled (the JSON
+  /// index simply re-parses the serialized string, as before).
+  private static Set<String> computeJsonCacheColumns(TableConfig tableConfig, Schema schema) {
+    Set<String> columns = new HashSet<>();
+    try {
+      Map<String, FieldIndexConfigs> indexConfigsByColumn =
+          FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        if (!fieldSpec.isVirtualColumn() && fieldSpec.getDataType() == FieldSpec.DataType.JSON) {
+          FieldIndexConfigs configs = indexConfigsByColumn.get(fieldSpec.getName());
+          if (configs != null && hasJsonIndex(configs)) {
+            columns.add(fieldSpec.getName());
+          }
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Failed to compute JSON parse-once cache columns; disabling the optimization", e);
+      return Set.of();
+    }
+    return columns;
+  }
+
+  /// Returns true if the column has the built-in `json` index enabled.
+  private static boolean hasJsonIndex(FieldIndexConfigs configs) {
+    return configs.getConfig(StandardIndexes.json()).isEnabled();
+  }
+
   @Override
   public Set<String> getInputColumns() {
     return _dataTypes.keySet();
@@ -95,8 +143,39 @@ public class DataTypeTransformer implements RecordTransformer {
       String column = entry.getKey();
       try {
         Object value = record.getValue(column);
-        value = DataTypeTransformerUtils.transformValue(column, value, entry.getValue());
+        // For a JSON column with a JSON index, cache the parsed value so the index flattens it directly instead of
+        // re-parsing the string the value is serialized into for the forward index. The parsed value is cached AFTER
+        // the forward value is written (below), because putValue invalidates the parsed-JSON cache: a later transformer
+        // that rewrites the value (e.g. sanitization trimming an over-length JSON string) must not leave a stale node.
+        Object parsedToCache = null;
+        if (value != null && !_jsonCacheColumns.isEmpty() && _jsonCacheColumns.contains(column)) {
+          if (value instanceof Map || value instanceof List || value instanceof JsonNode) {
+            // Already-parsed JSON: serialize it for the forward index (below) and cache the parsed value for the index.
+            parsedToCache = value;
+            value = DataTypeTransformerUtils.transformValue(column, value, entry.getValue());
+          } else if (value instanceof String) {
+            // The column value is JSON text. The JSON conversion parses it (preserving BigDecimal) and re-serializes it
+            // to the canonical string for the forward index; the JSON index then re-parses that string. Parse it once
+            // here instead: reuse the node's canonical string for the forward index and cache the node for the index.
+            JsonNode parsed = tryParseJson((String) value);
+            if (parsed != null) {
+              parsedToCache = parsed;
+              // parsed.toString() equals PinotDataType.JSON.convert(value) for well-formed JSON (byte-identical).
+              value = parsed.toString();
+            } else {
+              // Not well-formed JSON: the normal conversion wraps it as a JSON string.
+              value = DataTypeTransformerUtils.transformValue(column, value, entry.getValue());
+            }
+          } else {
+            value = DataTypeTransformerUtils.transformValue(column, value, entry.getValue());
+          }
+        } else {
+          value = DataTypeTransformerUtils.transformValue(column, value, entry.getValue());
+        }
         record.putValue(column, value);
+        if (parsedToCache != null) {
+          record.putParsedJsonValue(column, parsedToCache);
+        }
       } catch (Exception e) {
         if (!_continueOnError) {
           throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
@@ -105,6 +184,19 @@ public class DataTypeTransformer implements RecordTransformer {
         record.putValue(column, null);
         record.markIncomplete();
       }
+    }
+  }
+
+  /// Parses JSON text the way [PinotDataType]'s JSON conversion does (preserving `BigDecimal` floats so the
+  /// canonical string is byte-identical), or returns `null` if the text is not well-formed JSON so the caller
+  /// falls back to the normal conversion (which wraps a non-JSON string as a JSON string).
+  @Nullable
+  private static JsonNode tryParseJson(String jsonText) {
+    try {
+      return JsonUtils.stringToJsonNodeWithBigDecimal(jsonText);
+    } catch (IOException e) {
+      // Not well-formed JSON; let the caller fall back to the normal conversion (which wraps it as a JSON string).
+      return null;
     }
   }
 }

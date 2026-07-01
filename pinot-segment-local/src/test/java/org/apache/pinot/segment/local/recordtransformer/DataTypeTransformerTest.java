@@ -18,21 +18,121 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertEqualsNoOrder;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
 public class DataTypeTransformerTest {
   private static final String COLUMN = "testColumn";
+
+  /// The JSON parse-once cache: for a JSON column with a JSON index, the DataTypeTransformer caches the parsed Map on
+  /// the row (so the index can flatten it directly) and still serializes the column value to a string. For a JSON
+  /// column without a JSON index, nothing is cached.
+  @Test
+  public void testJsonParseOnceCache() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("jsonCol", FieldSpec.DataType.JSON).build();
+    Map<String, Object> doc = new HashMap<>();
+    doc.put("a", 1);
+    doc.put("b", "x");
+
+    TableConfig withIndex = new TableConfigBuilder(TableType.OFFLINE).setTableName("t")
+        .setJsonIndexColumns(List.of("jsonCol")).build();
+    GenericRow indexed = new GenericRow();
+    indexed.putValue("jsonCol", doc);
+    new DataTypeTransformer(withIndex, schema).transform(indexed);
+    // The column value is serialized for the forward index...
+    assertTrue(indexed.getValue("jsonCol") instanceof String);
+    // ...and the parsed Map is cached for the JSON index to flatten directly.
+    assertEquals(indexed.getParsedJsonValue("jsonCol"), doc);
+
+    // No JSON index on the column -> no caching (the index, if any, would re-parse as before).
+    TableConfig noIndex = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
+    GenericRow unindexed = new GenericRow();
+    unindexed.putValue("jsonCol", doc);
+    new DataTypeTransformer(noIndex, schema).transform(unindexed);
+    assertTrue(unindexed.getValue("jsonCol") instanceof String);
+    assertNull(unindexed.getParsedJsonValue("jsonCol"));
+  }
+
+  /// The common case: a JSON column is fed as JSON text (e.g. a stringified log payload). With a JSON index, the
+  /// transformer parses it once, caches the JsonNode for the index, and the forward-index string is byte-identical to
+  /// the normal conversion. A non-JSON string falls through to the normal conversion with nothing cached.
+  @Test
+  public void testJsonParseOnceCacheFromString() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("jsonCol", FieldSpec.DataType.JSON).build();
+    TableConfig withIndex = new TableConfigBuilder(TableType.OFFLINE).setTableName("t")
+        .setJsonIndexColumns(List.of("jsonCol")).build();
+    TableConfig noIndex = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
+
+    // Includes a fractional number (BigDecimal canonicalization) and an integer to cover both flatten paths.
+    for (String json : new String[]{"{\"b\":\"x\",\"a\":1}", "{\"bd\":1234567890.5,\"n\":42}"}) {
+      // Reference: the same column without a JSON index serializes via the normal PinotDataType conversion.
+      GenericRow reference = new GenericRow();
+      reference.putValue("jsonCol", json);
+      new DataTypeTransformer(noIndex, schema).transform(reference);
+      assertNull(reference.getParsedJsonValue("jsonCol"));
+
+      GenericRow row = new GenericRow();
+      row.putValue("jsonCol", json);
+      new DataTypeTransformer(withIndex, schema).transform(row);
+      // Forward-index value is byte-identical to the normal conversion...
+      assertEquals(row.getValue("jsonCol"), reference.getValue("jsonCol"));
+      // ...and the parsed node is cached for the JSON index to flatten directly.
+      assertTrue(row.getParsedJsonValue("jsonCol") instanceof JsonNode);
+    }
+
+    // A non-JSON string is not cached and is serialized exactly as the normal conversion would.
+    GenericRow nonJsonReference = new GenericRow();
+    nonJsonReference.putValue("jsonCol", "not json");
+    new DataTypeTransformer(noIndex, schema).transform(nonJsonReference);
+    GenericRow nonJson = new GenericRow();
+    nonJson.putValue("jsonCol", "not json");
+    new DataTypeTransformer(withIndex, schema).transform(nonJson);
+    assertEquals(nonJson.getValue("jsonCol"), nonJsonReference.getValue("jsonCol"));
+    assertNull(nonJson.getParsedJsonValue("jsonCol"));
+  }
+
+  /// A transformer that runs after DataTypeTransformer and rewrites a JSON column's value must not leave a stale parsed
+  /// node cached: SanitizationTransformer trims an over-length JSON string, which has to invalidate the cache so the
+  /// JSON index re-parses the trimmed forward value instead of flattening the original (full) document.
+  @Test
+  public void testParsedJsonCacheInvalidatedBySanitization() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("jsonCol", FieldSpec.DataType.JSON).build();
+    FieldSpec jsonSpec = schema.getFieldSpecFor("jsonCol");
+    jsonSpec.setMaxLength(8);
+    jsonSpec.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
+    TableConfig withIndex = new TableConfigBuilder(TableType.OFFLINE).setTableName("t")
+        .setJsonIndexColumns(List.of("jsonCol")).build();
+
+    GenericRow row = new GenericRow();
+    row.putValue("jsonCol", "{\"a\":\"averylongvalue\",\"b\":2}");
+    new DataTypeTransformer(withIndex, schema).transform(row);
+    // After type transformation the full parsed node is cached for the JSON index.
+    assertTrue(row.getParsedJsonValue("jsonCol") instanceof JsonNode);
+
+    // Sanitization trims the forward-index string; the stale node must be dropped so the index re-parses the trimmed
+    // value (which the forward index now holds) rather than flattening the full document.
+    new SanitizationTransformer(schema).transform(row);
+    assertTrue(((String) row.getValue("jsonCol")).length() <= 8);
+    assertNull(row.getParsedJsonValue("jsonCol"));
+  }
 
   @Test
   public void testStandardize() {
