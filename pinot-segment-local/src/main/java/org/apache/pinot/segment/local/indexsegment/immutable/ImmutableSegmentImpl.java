@@ -24,6 +24,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +36,7 @@ import org.apache.pinot.segment.local.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.map.ImmutableMapDataSource;
+import org.apache.pinot.segment.local.segment.index.openstruct.ImmutableOpenStructDataSource;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -49,6 +52,7 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -58,7 +62,9 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -98,13 +104,48 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _dataSources =
         new Object2ObjectOpenHashMap<>(segmentMetadata.getColumnMetadataMap().size());
 
+    Map<String, Map<String, DataSource>> openStructDenseChildren = new HashMap<>();
+    Map<String, DataSource> openStructSparseChildren = new HashMap<>();
+    Set<String> openStructParents = new HashSet<>();
+
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
       String colName = entry.getKey();
       ColumnMetadata columnMetadata = entry.getValue();
+
+      if (columnMetadata instanceof ColumnMetadataImpl && ((ColumnMetadataImpl) columnMetadata).isMaterializedChild()) {
+        String parent = ((ColumnMetadataImpl) columnMetadata).getParentColumn();
+        openStructParents.add(parent);
+        DataSource childDs = new ImmutableDataSource(columnMetadata, _indexContainerMap.get(colName));
+        if (OpenStructNaming.isSparseColumn(colName)) {
+          openStructSparseChildren.put(parent, childDs);
+        } else {
+          openStructDenseChildren.computeIfAbsent(parent, k -> new HashMap<>())
+              .put(OpenStructNaming.parseKey(colName), childDs);
+        }
+        continue;
+      }
+
       if (columnMetadata.getFieldSpec().getDataType() == FieldSpec.DataType.MAP) {
-        _dataSources.put(colName, new ImmutableMapDataSource(entry.getValue(), _indexContainerMap.get(colName)));
+        _dataSources.put(colName, new ImmutableMapDataSource(columnMetadata, _indexContainerMap.get(colName)));
       } else {
-        _dataSources.put(colName, new ImmutableDataSource(entry.getValue(), _indexContainerMap.get(colName)));
+        _dataSources.put(colName, new ImmutableDataSource(columnMetadata, _indexContainerMap.get(colName)));
+      }
+    }
+
+    if (!openStructParents.isEmpty()) {
+      Schema schema = segmentMetadata.getSchema();
+      for (String parent : openStructParents) {
+        FieldSpec fieldSpec = schema != null ? schema.getFieldSpecFor(parent) : null;
+        if (!(fieldSpec instanceof ComplexFieldSpec)) {
+          LOGGER.warn("Skipping OPEN_STRUCT parent column '{}': schema is {} or fieldSpec is {} "
+                  + "(expected ComplexFieldSpec). Dense/sparse child data on disk will not be queryable.",
+              parent, schema != null ? "present" : "null",
+              fieldSpec != null ? fieldSpec.getClass().getSimpleName() : "null");
+          continue;
+        }
+        _dataSources.put(parent, new ImmutableOpenStructDataSource((ComplexFieldSpec) fieldSpec,
+            openStructDenseChildren.getOrDefault(parent, Map.of()),
+            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs()));
       }
     }
 
