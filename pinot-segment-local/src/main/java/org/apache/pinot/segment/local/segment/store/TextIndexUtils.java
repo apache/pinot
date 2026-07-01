@@ -398,6 +398,9 @@ public class TextIndexUtils {
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES, escapedLuceneAnalyzerClassArgTypes);
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS, config.getLuceneQueryParserClass());
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE, config.getDocIdTranslatorMode());
+    // Persist the build mode so the reader self-describes (a table may hold a mix of dictionary-based and per-row
+    // text segments; reads must not depend on the live table config).
+    properties.setProperty(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, config.isBuildOnDictionary());
 
     File propertiesFile = new File(indexDir, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
     CommonsConfigurationUtils.saveToFile(properties, propertiesFile);
@@ -436,6 +439,10 @@ public class TextIndexUtils {
         .withLuceneAnalyzerClassArgTypes(recoveredLuceneAnalyzerClassArgTypes)
         .withLuceneQueryParserClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS))
         .withDocIdTranslatorMode(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE))
+        // The build mode is intrinsic to the segment: default to false when the property is absent (segments written
+        // before this feature are always per-row). Must NOT fall back to the live table config, otherwise a per-row
+        // segment could be misread as dictionary-based after the flag is flipped on.
+        .withBuildOnDictionary(properties.getBoolean(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, false))
         .build();
   }
 }
