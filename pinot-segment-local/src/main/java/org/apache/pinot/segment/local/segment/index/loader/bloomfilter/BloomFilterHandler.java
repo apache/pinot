@@ -27,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
+import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -54,6 +55,10 @@ import org.slf4j.LoggerFactory;
 public class BloomFilterHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
+  // Offsets within the bloom filter file:
+  // [0..3] TYPE_VALUE (int), [4..7] VERSION (int), [8] strategy ordinal, [9] numHashFunctions
+  private static final int NUM_HASH_FUNCTIONS_OFFSET = 9;
+
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
   public BloomFilterHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
@@ -72,6 +77,11 @@ public class BloomFilterHandler extends BaseIndexHandler {
       if (!columnsToAddBF.remove(column)) {
         LOGGER.info("Need to remove existing bloom filter from segment: {}, column: {}", segmentName, column);
         return true;
+      } else {
+        // Bloom filter exists for this column; check if fpp config changed by comparing numHashFunctions
+        if (isFppChanged(segmentReader, segmentName, column)) {
+          return true;
+        }
       }
     }
     // Check if any new bloomfilter need to be added.
@@ -83,6 +93,54 @@ public class BloomFilterHandler extends BaseIndexHandler {
       }
     }
     return false;
+  }
+
+  /**
+   * Checks whether the fpp (false positive probability) config has changed by comparing the number of hash functions
+   * in the existing bloom filter with what the new config would produce.
+   */
+  private boolean isFppChanged(SegmentDirectory.Reader segmentReader, String segmentName, String column) {
+    ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+    if (columnMetadata == null) {
+      return false;
+    }
+    int existingNumHashFunctions;
+    try {
+      PinotDataBuffer dataBuffer = segmentReader.getIndexFor(column, StandardIndexes.bloomFilter());
+      existingNumHashFunctions = dataBuffer.getByte(NUM_HASH_FUNCTIONS_OFFSET) & 0xFF;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read existing bloom filter for segment: {}, column: {}", segmentName, column, e);
+      return false;
+    }
+    int expectedNumHashFunctions = computeExpectedNumHashFunctions(columnMetadata, _bloomFilterConfigs.get(column));
+    if (expectedNumHashFunctions != existingNumHashFunctions) {
+      LOGGER.info("Bloom filter fpp config changed for segment: {}, column: {}, existing numHashFunctions: {}, "
+              + "expected numHashFunctions: {}. Index needs to be rebuilt.",
+          segmentName, column, existingNumHashFunctions, expectedNumHashFunctions);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Computes the expected number of hash functions that would be used for a bloom filter created with the given
+   * column metadata and bloom filter config. This mirrors the logic in Guava's BloomFilter.create().
+   */
+  private int computeExpectedNumHashFunctions(ColumnMetadata columnMetadata, BloomFilterConfig bloomFilterConfig) {
+    int cardinality = columnMetadata.getCardinality();
+    if (cardinality <= 0) {
+      cardinality = columnMetadata.getTotalNumberOfEntries();
+    }
+    double fpp = bloomFilterConfig.getFpp();
+    int maxSizeInBytes = bloomFilterConfig.getMaxSizeInBytes();
+    if (maxSizeInBytes > 0) {
+      double minFpp = GuavaBloomFilterReaderUtils.computeFPP(maxSizeInBytes, cardinality);
+      fpp = Math.max(fpp, minFpp);
+    }
+    // Formula from Guava BloomFilter: optimalNumOfBits = (long) (-n * ln(p) / (ln2)^2)
+    long optimalNumOfBits = (long) (-cardinality * Math.log(fpp) / (Math.log(2) * Math.log(2)));
+    // Formula from Guava BloomFilter: optimalNumOfHashFunctions = max(1, round(m/n * ln2))
+    return Math.max(1, (int) Math.round((double) optimalNumOfBits / cardinality * Math.log(2)));
   }
 
   @Override
@@ -97,6 +155,32 @@ public class BloomFilterHandler extends BaseIndexHandler {
         LOGGER.info("Removing existing bloom filter from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.bloomFilter());
         LOGGER.info("Removed existing bloom filter from segment: {}, column: {}", segmentName, column);
+      } else {
+        // Bloom filter exists for this column; check if fpp config changed
+        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        if (columnMetadata == null) {
+          continue;
+        }
+        int existingNumHashFunctions;
+        try {
+          PinotDataBuffer dataBuffer = segmentWriter.getIndexFor(column, StandardIndexes.bloomFilter());
+          existingNumHashFunctions = dataBuffer.getByte(NUM_HASH_FUNCTIONS_OFFSET) & 0xFF;
+        } catch (Exception e) {
+          LOGGER.warn("Failed to read existing bloom filter for segment: {}, column: {}", segmentName, column, e);
+          segmentWriter.removeIndex(column, StandardIndexes.bloomFilter());
+          columnsToAddBF.add(column);
+          continue;
+        }
+        int expectedNumHashFunctions =
+            computeExpectedNumHashFunctions(columnMetadata, _bloomFilterConfigs.get(column));
+        if (expectedNumHashFunctions != existingNumHashFunctions) {
+          LOGGER.info("Bloom filter fpp config changed for segment: {}, column: {}, existing numHashFunctions: {}, "
+                  + "expected numHashFunctions: {}. Deleting existing bloom filter before rebuilding a new one.",
+              segmentName, column, existingNumHashFunctions, expectedNumHashFunctions);
+          segmentWriter.removeIndex(column, StandardIndexes.bloomFilter());
+          LOGGER.info("Removed existing bloom filter from segment: {}, column: {}", segmentName, column);
+          columnsToAddBF.add(column);
+        }
       }
     }
     for (String column : columnsToAddBF) {
