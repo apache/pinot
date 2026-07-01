@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -736,45 +737,41 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT(Integer.BYTES, true, true),
-    LONG(Long.BYTES, true, true),
-    FLOAT(Float.BYTES, true, true),
-    DOUBLE(Double.BYTES, true, true),
-    BIG_DECIMAL(true, true),
-    BOOLEAN(INT, false, true),
-    TIMESTAMP(LONG, false, true),
-    STRING(false, true),
-    JSON(STRING, false, false),
-    BYTES(false, false),
-    STRUCT(false, false),
-    MAP(false, false),
-    OPEN_STRUCT(false, false),
-    LIST(false, false),
-    UNKNOWN(false, true);
+    INT(Integer.BYTES, true),
+    LONG(Long.BYTES, true),
+    FLOAT(Float.BYTES, true),
+    DOUBLE(Double.BYTES, true),
+    BIG_DECIMAL(true),
+    BOOLEAN(INT, false),
+    TIMESTAMP(LONG, false),
+    STRING(false),
+    JSON(STRING, false),
+    BYTES(false),
+    STRUCT(false),
+    MAP(false),
+    OPEN_STRUCT(false),
+    LIST(false),
+    UNKNOWN(false);
 
     private final DataType _storedType;
     private final int _size;
-    private final boolean _sortable;
     private final boolean _numeric;
 
-    DataType(boolean numeric, boolean sortable) {
+    DataType(boolean numeric) {
       _storedType = this;
       _size = -1;
-      _sortable = sortable;
       _numeric = numeric;
     }
 
-    DataType(DataType storedType, boolean numeric, boolean sortable) {
-      _storedType = storedType;
-      _size = storedType._size;
-      _sortable = sortable;
-      _numeric = numeric;
-    }
-
-    DataType(int size, boolean numeric, boolean sortable) {
+    DataType(int size, boolean numeric) {
       _storedType = this;
       _size = size;
-      _sortable = sortable;
+      _numeric = numeric;
+    }
+
+    DataType(DataType storedType, boolean numeric) {
+      _storedType = storedType;
+      _size = storedType._size;
       _numeric = numeric;
     }
 
@@ -960,13 +957,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         throw new IllegalArgumentException("Cannot convert value: '" + value + "' to type: " + this);
       }
     }
-
-    /**
-     * Checks whether the data type can be a sorted column.
-     */
-    public boolean canBeASortedColumn() {
-      return _sortable;
-    }
   }
 
   @Override
@@ -1022,19 +1012,17 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class DataTypeProperties {
     @JsonProperty("storedType")
     public final DataType _storedType;
     @JsonProperty("size")
     public final int _size;
-    @JsonProperty("sortable")
-    public final boolean _sortable;
     @JsonProperty("numeric")
     public final boolean _numeric;
 
     public DataTypeProperties(DataType dataType) {
       _storedType = dataType._storedType;
-      _sortable = dataType._sortable;
       _numeric = dataType._numeric;
       _size = dataType._size;
     }
