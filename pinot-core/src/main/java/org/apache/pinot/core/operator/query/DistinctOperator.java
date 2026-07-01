@@ -58,6 +58,7 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   protected DistinctResultsBlock getNextBlock() {
     DistinctExecutor executor = DistinctExecutorFactory.getDistinctExecutor(_projectOperator, _queryContext);
     ValueBlock valueBlock;
+    boolean brokeEarly = false;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
       QueryScanCostContext scanCost = getScanCostContext();
@@ -67,12 +68,14 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
             (long) valueBlock.getNumDocs() * _projectOperator.getNumColumnsProjected());
       }
       if (executor.process(valueBlock)) {
+        // executor signaled it has enough rows to satisfy the limit; treat as early if more blocks may remain
+        brokeEarly = true;
         break;
       }
     }
-    DistinctResultsBlock resultsBlock = new DistinctResultsBlock(executor.getResult(), _queryContext);
-    resultsBlock.setNumDocsScanned(_numDocsScanned);
-    return resultsBlock;
+    DistinctResultsBlock results = new DistinctResultsBlock(executor.getResult(), _queryContext);
+    results.setNumDocsScanned(_numDocsScanned);
+    return results;
   }
 
   @Override
