@@ -34,6 +34,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -173,6 +174,38 @@ public class PinotSchemaRestletResourceTest {
     // Update non-existing schema
     expectNotFoundException(
         () -> adminClient.getSchemaClient().updateSchema(newSchemaName, schema.toSingleLineJsonString()));
+  }
+
+  @Test
+  public void testSchemaUpdateWithColumnDeletion()
+      throws Exception {
+    PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
+    String schemaName = "columnDeletionSchema";
+    Schema schema = TEST_INSTANCE.createDummySchema(schemaName);
+
+    // Add a deletable column and create the schema.
+    DimensionFieldSpec deletableColumn = new DimensionFieldSpec("deletableColumn", DataType.STRING, true);
+    schema.addField(deletableColumn);
+    adminClient.getSchemaClient().createSchema(schema.toSingleLineJsonString());
+
+    // Remove the column from the new schema.
+    schema.removeField("deletableColumn");
+
+    // Updating without allowColumnDeletion is rejected as backward-incompatible.
+    expectValidationException(
+        () -> adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString()));
+
+    // Updating with allowColumnDeletion=true is accepted, and the column is dropped.
+    adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString(), false, false, true);
+    Schema remoteSchema = adminClient.getSchemaClient().getSchemaObject(schemaName);
+    assertFalse(remoteSchema.hasColumn("deletableColumn"));
+
+    // allowColumnDeletion must NOT relax an incompatible type change on a retained column. dimB has a numeric default
+    // value (0), so converting it to INT is a valid schema but a backward-incompatible type change.
+    schema.getFieldSpecFor("dimB").setDataType(DataType.INT);
+    expectValidationException(
+        () -> adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString(), false, false,
+            true));
   }
 
   @Test

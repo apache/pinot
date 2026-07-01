@@ -654,6 +654,38 @@ public class SchemaTest {
   }
 
   @Test
+  public void testSchemaBackwardCompatibilityWithColumnDeletion() {
+    Schema oldSchema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svDimensionToDrop", FieldSpec.DataType.INT, 10)
+        .addMetric("metric", FieldSpec.DataType.INT)
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+
+    // Dropping a column is incompatible by default, but compatible when allowColumnDeletion is set.
+    Schema droppedColumn = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addMetric("metric", FieldSpec.DataType.INT)
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+    Assert.assertFalse(droppedColumn.isBackwardCompatibleWith(oldSchema));
+    Assert.assertFalse(droppedColumn.isBackwardCompatibleWith(oldSchema, false));
+    Assert.assertTrue(droppedColumn.isBackwardCompatibleWith(oldSchema, true));
+
+    // allowColumnDeletion must NOT relax data type changes on retained columns.
+    Schema droppedAndRetyped =
+        new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.LONG)
+            .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+    Assert.assertFalse(droppedAndRetyped.isBackwardCompatibleWith(oldSchema, true));
+
+    // allowColumnDeletion must NOT relax primary key changes.
+    Schema oldWithPk = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svDimensionToDrop", FieldSpec.DataType.INT, 10)
+        .addMetric("metric", FieldSpec.DataType.INT)
+        .setPrimaryKeyColumns(List.of("svDimension")).build();
+    Schema droppedPkColumn = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addMetric("metric", FieldSpec.DataType.INT)
+        .setPrimaryKeyColumns(List.of("metric")).build();
+    Assert.assertFalse(droppedPkColumn.isBackwardCompatibleWith(oldWithPk, true));
+  }
+
+  @Test
   public void testWithoutVirtualColumns() {
     DimensionFieldSpec virtualField = new DimensionFieldSpec(
         CommonConstants.Segment.BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true, Integer.class);

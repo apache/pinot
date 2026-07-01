@@ -64,6 +64,9 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
   private boolean _skipSegmentPreprocess;
+  // When enabled, columns physically present in a segment but absent from the table schema
+  // are physically removed during reload to reclaim disk.
+  private boolean _reclaimDeletedColumnsOnReload;
   // If set to true, uses NoDictColumnStatisticsCollector for stats collection for no-dictionary columns.
   // Once we are confident about the stability of NoDictColumnStatisticsCollector,
   // we can enable it by default and deprecate this config
@@ -352,6 +355,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setSkipSegmentPreprocess(boolean skipSegmentPreprocess) {
     _skipSegmentPreprocess = skipSegmentPreprocess;
+  }
+
+  public boolean isReclaimDeletedColumnsOnReload() {
+    return _reclaimDeletedColumnsOnReload;
+  }
+
+  public void setReclaimDeletedColumnsOnReload(boolean reclaimDeletedColumnsOnReload) {
+    _reclaimDeletedColumnsOnReload = reclaimDeletedColumnsOnReload;
   }
 
   public boolean isOptimizeNoDictStatsCollection() {
