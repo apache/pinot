@@ -23,7 +23,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -45,17 +44,20 @@ import static org.testng.Assert.assertEquals;
 public class RealtimeConsumptionRateManagerTest {
   private static final int NUM_PARTITIONS_TOPIC_A = 10;
   private static final int NUM_PARTITIONS_TOPIC_B = 20;
-  private static final Double RATE_LIMIT_FOR_ENTIRE_TOPIC = 50.0;
+  private static final double RATE_LIMIT_FOR_PARTITION = 4.0;
+  private static final double RATE_LIMIT_FOR_ENTIRE_TOPIC = 50.0;
   private static final String TABLE_NAME = "table-XYZ";
   private static final double DELTA = 0.0001;
   private static final StreamConfig STREAM_CONFIG_A = mock(StreamConfig.class);
   private static final StreamConfig STREAM_CONFIG_B = mock(StreamConfig.class);
   private static final StreamConfig STREAM_CONFIG_C = mock(StreamConfig.class);
+  private static final StreamConfig STREAM_CONFIG_D = mock(StreamConfig.class);
+  private static final StreamConfig STREAM_CONFIG_E = mock(StreamConfig.class);
   private static final PinotConfiguration SERVER_CONFIG_1 = mock(PinotConfiguration.class);
   private static final PinotConfiguration SERVER_CONFIG_2 = mock(PinotConfiguration.class);
   private static final PinotConfiguration SERVER_CONFIG_3 = mock(PinotConfiguration.class);
   private static final PinotConfiguration SERVER_CONFIG_4 = mock(PinotConfiguration.class);
-  private static RealtimeConsumptionRateManager _consumptionRateManager;
+  private static final RealtimeConsumptionRateManager CONSUMPTION_RATE_MANAGER;
 
   static {
     LoadingCache<StreamConfig, Integer> cache = mock(LoadingCache.class);
@@ -63,12 +65,15 @@ public class RealtimeConsumptionRateManagerTest {
       when(cache.get(STREAM_CONFIG_A)).thenReturn(NUM_PARTITIONS_TOPIC_A);
       when(cache.get(STREAM_CONFIG_B)).thenReturn(NUM_PARTITIONS_TOPIC_B);
     } catch (ExecutionException e) {
-      e.printStackTrace();
+      throw new RuntimeException(e);
     }
-    when(STREAM_CONFIG_A.getTopicConsumptionRateLimit()).thenReturn(Optional.of(RATE_LIMIT_FOR_ENTIRE_TOPIC));
-    when(STREAM_CONFIG_B.getTopicConsumptionRateLimit()).thenReturn(Optional.of(RATE_LIMIT_FOR_ENTIRE_TOPIC));
-    when(STREAM_CONFIG_C.getTopicConsumptionRateLimit()).thenReturn(Optional.empty());
-    _consumptionRateManager = new RealtimeConsumptionRateManager(cache);
+    when(STREAM_CONFIG_A.getTopicConsumptionRateLimit()).thenReturn(RATE_LIMIT_FOR_ENTIRE_TOPIC);
+    when(STREAM_CONFIG_B.getTopicConsumptionRateLimit()).thenReturn(RATE_LIMIT_FOR_ENTIRE_TOPIC);
+    when(STREAM_CONFIG_C.getTopicConsumptionRateLimit()).thenReturn(StreamConfig.CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED);
+    when(STREAM_CONFIG_D.getPartitionConsumptionRateLimit()).thenReturn(RATE_LIMIT_FOR_PARTITION);
+    when(STREAM_CONFIG_E.getPartitionConsumptionRateLimit()).thenReturn(RATE_LIMIT_FOR_PARTITION);
+    when(STREAM_CONFIG_E.getTopicConsumptionRateLimit()).thenReturn(RATE_LIMIT_FOR_ENTIRE_TOPIC);
+    CONSUMPTION_RATE_MANAGER = new RealtimeConsumptionRateManager(cache);
 
     when(SERVER_CONFIG_1.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
@@ -91,22 +96,30 @@ public class RealtimeConsumptionRateManagerTest {
   @Test
   public void testCreateRateLimiter() {
     // topic A
-    ConsumptionRateLimiter rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_A, TABLE_NAME);
-    assertEquals(5.0, ((PartitionRateLimiter) rateLimiter).getRate(), DELTA);
+    ConsumptionRateLimiter rateLimiter = CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_A, TABLE_NAME);
+    assertEquals(((PartitionRateLimiter) rateLimiter).getRate(), 5.0, DELTA);
 
     // topic B
-    rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_B, TABLE_NAME);
-    assertEquals(2.5, ((PartitionRateLimiter) rateLimiter).getRate(), DELTA);
+    rateLimiter = CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_B, TABLE_NAME);
+    assertEquals(((PartitionRateLimiter) rateLimiter).getRate(), 2.5, DELTA);
 
     // topic C
-    rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME);
+    rateLimiter = CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
+
+    // topic D: partition level rate limit is used directly, without fetching the partition count
+    rateLimiter = CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_D, TABLE_NAME);
+    assertEquals(((PartitionRateLimiter) rateLimiter).getRate(), 4.0, DELTA);
+
+    // topic E: partition level rate limit takes precedence over topic level rate limit
+    rateLimiter = CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_E, TABLE_NAME);
+    assertEquals(((PartitionRateLimiter) rateLimiter).getRate(), 4.0, DELTA);
   }
 
   @Test
   public void testCreateServerRateLimiter() {
     // Server config 1
-    ConsumptionRateLimiter rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_1, null);
+    ConsumptionRateLimiter rateLimiter = CONSUMPTION_RATE_MANAGER.createServerRateLimiter(SERVER_CONFIG_1, null);
     ServerRateLimiter serverRateLimiter = (ServerRateLimiter) rateLimiter;
     try {
       assertEquals(serverRateLimiter.getRate(), 5.0, DELTA);
@@ -116,7 +129,7 @@ public class RealtimeConsumptionRateManagerTest {
     }
 
     // Server config 2
-    serverRateLimiter = (ServerRateLimiter) _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_2, null);
+    serverRateLimiter = (ServerRateLimiter) CONSUMPTION_RATE_MANAGER.createServerRateLimiter(SERVER_CONFIG_2, null);
     try {
       assertEquals(((ServerRateLimiter) rateLimiter).getRate(), 2.5, DELTA);
       assertEquals(serverRateLimiter.getRate(), 2.5, DELTA);
@@ -125,16 +138,16 @@ public class RealtimeConsumptionRateManagerTest {
     }
 
     // Server config 3
-    rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_3, null);
+    rateLimiter = CONSUMPTION_RATE_MANAGER.createServerRateLimiter(SERVER_CONFIG_3, null);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
 
     // Server config 4
-    rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_4, null);
+    rateLimiter = CONSUMPTION_RATE_MANAGER.createServerRateLimiter(SERVER_CONFIG_4, null);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
 
     ServerRateLimitConfig serverRateLimitConfig = new ServerRateLimitConfig(1, MessageCountThrottlingStrategy.INSTANCE);
-    _consumptionRateManager.updateServerRateLimiter(serverRateLimitConfig, null);
-    serverRateLimiter = (ServerRateLimiter) _consumptionRateManager.getServerRateLimiter();
+    CONSUMPTION_RATE_MANAGER.updateServerRateLimiter(serverRateLimitConfig, null);
+    serverRateLimiter = (ServerRateLimiter) CONSUMPTION_RATE_MANAGER.getServerRateLimiter();
     try {
       assertEquals(serverRateLimiter.getRate(), 1);
       assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 1);
