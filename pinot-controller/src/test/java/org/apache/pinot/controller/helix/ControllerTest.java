@@ -1608,9 +1608,9 @@ public class ControllerTest {
   public void setupSharedStateAndValidate()
       throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
-      // this is expected to happen only when running a single test case outside testNG group, i.e. when test
-      // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
-      // group, state will have already been setup by @BeforeGroups method in ControllerTestSetup.
+      // First stateful test class in the forked JVM starts the shared cluster; later classes reuse it (the
+      // surefire "default-test" execution runs the stateful set with reuseForks=true, so they share a JVM).
+      // This branch also covers running a single class in isolation (e.g. from an IDE or a -Dtest run).
       startSharedTestSetup();
     } else {
       // Ensure the shared cluster starts clean between test classes.

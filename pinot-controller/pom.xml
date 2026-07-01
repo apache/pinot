@@ -103,6 +103,18 @@
       <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- JUnit Platform engine that runs these TestNG tests, plus the launcher
+         (must be a test-classpath dependency to stay version-aligned with the engines). -->
+    <dependency>
+      <groupId>org.junit.support</groupId>
+      <artifactId>testng-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
@@ -171,12 +183,41 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <suiteXmlFiles>
-            <suiteXmlFile>testng-statefull.xml</suiteXmlFile>
-            <suiteXmlFile>testng-stateless.xml</suiteXmlFile>
-          </suiteXmlFiles>
-        </configuration>
+        <!--
+          The two former TestNG suites (testng-statefull.xml / testng-stateless.xml) split
+          controller tests by the "stateless" TestNG group. The TestNG engine maps TestNG
+          groups to JUnit Platform tags, so the split is now two Surefire executions
+          filtering on the "stateless" tag.
+
+          Each execution sets reuseForks=true so all of its classes run in a single forked
+          JVM, matching how the old suiteXmlFiles ran an entire suite in one JVM. This is
+          what preserves the stateful optimization: the first stateful class lazily starts
+          the shared cluster (ControllerTest.setupSharedStateAndValidate) and subsequent
+          classes reuse it, instead of each class paying a full cluster startup. (The root
+          default of reuseForks=false would fork a JVM per class once the suite XML is gone.)
+        -->
+        <executions>
+          <!-- Override the inherited default-test execution to run only the stateful set. -->
+          <execution>
+            <id>default-test</id>
+            <configuration>
+              <excludedGroups>stateless</excludedGroups>
+              <reuseForks>true</reuseForks>
+            </configuration>
+          </execution>
+          <!-- Second pass: the stateless set, in its own JVM. -->
+          <execution>
+            <id>stateless</id>
+            <phase>test</phase>
+            <goals>
+              <goal>test</goal>
+            </goals>
+            <configuration>
+              <groups>stateless</groups>
+              <reuseForks>true</reuseForks>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
