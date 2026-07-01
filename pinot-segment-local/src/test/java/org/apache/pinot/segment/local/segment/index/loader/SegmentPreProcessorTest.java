@@ -1747,6 +1747,45 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     runPreProcessor(_newColumnsSchemaWithH3Json);
   }
 
+  @Test(dataProvider = "bothV1AndV3")
+  public void testBloomFilterFppUpdate(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    // Create bloom filter with fpp 0.1
+    _bloomFilterConfigs = Map.of("column3", new BloomFilterConfig(0.1, 0, false));
+    runPreProcessor();
+
+    // Verify no processing needed with same config
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            createIndexLoadingConfig(_schema))) {
+      assertFalse(processor.needProcess());
+    }
+
+    // Update bloom filter fpp to 0.01
+    _bloomFilterConfigs = Map.of("column3", new BloomFilterConfig(0.01, 0, false));
+
+    // Verify that preprocessing is needed due to fpp change
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            createIndexLoadingConfig(_schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify no more processing is needed after rebuild
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            createIndexLoadingConfig(_schema))) {
+      assertFalse(processor.needProcess());
+    }
+
+    // Remove bloom filter config
+    resetIndexConfigs();
+    runPreProcessor();
+  }
+
   private void verifyProcessNeeded()
       throws Exception {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
