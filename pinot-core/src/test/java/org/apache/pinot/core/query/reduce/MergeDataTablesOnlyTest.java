@@ -118,6 +118,50 @@ public class MergeDataTablesOnlyTest {
     assertRoundTrip(query, serverTables);
   }
 
+  /**
+   * Regression for the merge-only-reducer GROUP BY + DISTINCTCOUNT defect: prior to the fix,
+   * {@code mergeDataTablesOnly} called {@code getIndexedTable} which unconditionally finished the
+   * IndexedTable with {@code storeFinalResult=true} — finalizing each row's aggregate (Set → Integer).
+   * The subsequent {@code buildIntermediateDataTable} then read {@code _storedColumnDataTypes} (still
+   * OBJECT), took the OBJECT branch, and handed the now-Integer value into
+   * {@code BaseDistinctAggregateAggregationFunction.serializeIntermediateResult(Set)} →
+   * {@link ClassCastException}. This test fails without the fix and passes with it.
+   *
+   * <p>Builds fresh per-server DataTables for the {@code reduce(...)} baseline and the
+   * {@code merge(...)} call separately. The regular reduce path mutates the input DataTable's
+   * schema's column-data-types array in place via {@code IndexedTable.finish(_, true)} — that's
+   * pre-existing OSS behavior and is fine in production where no caller re-reads the input after
+   * a reduce. Reusing the same DataTable list across both calls would falsely surface that
+   * mutation as an apparent merge-only bug.
+   */
+  @Test
+  public void testGroupByDistinctCountObjectRoundTrip()
+      throws IOException {
+    String query = "SELECT col1, DISTINCTCOUNT(col2) FROM testTable GROUP BY col1";
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    BrokerResponseNative baseline = reduce(brokerRequest, toMap(buildDistinctCountServerTables(query)));
+    DataTable merged = merge(brokerRequest, toMap(buildDistinctCountServerTables(query)));
+    assertNotNull(merged, "merge produced null");
+    BrokerResponseNative viaMerge = reduce(brokerRequest, singletonMap(merged));
+    assertResultTablesEquivalent(baseline.getResultTable(), viaMerge.getResultTable());
+  }
+
+  /** Two per-server intermediate DataTables for {@code GROUP BY col1, DISTINCTCOUNT(col2)} with one
+   * overlapping group across servers so the OBJECT-path per-group Set merge actually runs. */
+  private static List<DataTable> buildDistinctCountServerTables(String query)
+      throws IOException {
+    AggregationFunction aggFunction = aggFunctions(query)[0];
+    DataSchema schema = new DataSchema(new String[]{"col1", "distinctcount(col2)"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.OBJECT});
+    return List.of(
+        buildGroupByWithObject(schema, aggFunction,
+            new Object[]{1, new IntOpenHashSet(new int[]{1, 2, 3})},
+            new Object[]{2, new IntOpenHashSet(new int[]{4, 5})}),
+        buildGroupByWithObject(schema, aggFunction,
+            new Object[]{1, new IntOpenHashSet(new int[]{3, 4, 5})},
+            new Object[]{3, new IntOpenHashSet(new int[]{6, 7})}));
+  }
+
   @Test
   public void testDistinctRoundTrip() {
     String query = "SELECT DISTINCT col1 FROM testTable";
@@ -487,6 +531,27 @@ public class MergeDataTablesOnlyTest {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Builds a GROUP BY DataTable with one INT key column followed by one OBJECT aggregate column whose
+   * value is the intermediate {@code Set} (or other aggregate state) the server would have emitted.
+   * Mirrors what {@code GroupByResultsBlock.getDataTable()} produces on the server side for the
+   * non-null-handling path: scalar key written directly, OBJECT column written via
+   * {@code serializeIntermediateResult}.
+   */
+  private static DataTable buildGroupByWithObject(DataSchema schema, AggregationFunction aggFunction,
+      Object[]... rows)
+      throws IOException {
+    DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(schema);
+    for (Object[] row : rows) {
+      builder.startRow();
+      // Single INT key column at index 0; OBJECT aggregate intermediate at index 1.
+      builder.setColumn(0, (int) row[0]);
+      builder.setColumn(1, aggFunction.serializeIntermediateResult(row[1]));
+      builder.finishRow();
+    }
+    return builder.build();
   }
 
   private static DataTable buildObjectRow(DataSchema schema, AggregationFunction aggFunction, Object intermediate)
