@@ -286,6 +286,32 @@ public interface PinotFS extends Closeable, Serializable {
       throws IOException;
 
   /**
+   * Opens a byte range {@code [offset, offset + length)} of a file and returns an InputStream over just that range,
+   * without reading (or downloading) the whole file. This is intended for filesystems backed by remote object stores
+   * that support range requests (e.g. S3/GCS), enabling targeted reads of file regions (such as Parquet footers and
+   * column chunks) instead of fetching entire objects.
+   * <p>The default implementation throws {@link UnsupportedOperationException}; implementations that support ranged
+   * reads must override both this method and {@link #supportsRangedRead()}. Callers should gate usage on
+   * {@link #supportsRangedRead()} rather than catching the exception.
+   * @param uri location of the file to open
+   * @param offset starting byte offset (inclusive, {@code >= 0})
+   * @param length number of bytes to read ({@code >= 0}); reads are truncated at end-of-file
+   * @return a new InputStream over the requested byte range; the caller is responsible for closing it
+   * @throws IOException on any IO error - missing file, not a file etc
+   */
+  default InputStream openForRead(URI uri, long offset, long length)
+      throws IOException {
+    throw new UnsupportedOperationException(getClass().getSimpleName() + " does not support ranged reads");
+  }
+
+  /**
+   * @return true if this filesystem supports {@link #openForRead(URI, long, long)}. Default is false.
+   */
+  default boolean supportsRangedRead() {
+    return false;
+  }
+
+  /**
    * For certain filesystems, we may need to close the filesystem and do relevant operations to prevent leaks.
    * By default, this method does nothing.
    * @throws IOException on IO failure
