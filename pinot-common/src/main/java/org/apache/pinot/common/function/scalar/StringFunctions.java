@@ -461,7 +461,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String fromUUIDBytes(byte[] input) {
-    return UuidUtils.fromBytes(input).toString();
+    return UuidUtils.toString(input);
   }
 
   /**
