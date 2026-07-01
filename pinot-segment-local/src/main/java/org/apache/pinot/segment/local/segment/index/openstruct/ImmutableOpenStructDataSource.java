@@ -102,6 +102,9 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     return _sparseDataSource == null;
   }
 
+  /// Returns only the materialized (dense) key DataSources. Sparse keys are not included because
+  /// they share a single JSON column and have no individual DataSource. Use {@link #getMapValue}
+  /// to read the full key set (dense + sparse) for a given document.
   @Override
   public Map<String, DataSource> getDataSources() {
     return _perKeyDataSources;

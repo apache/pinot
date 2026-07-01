@@ -92,6 +92,10 @@ public class IndexLoadingConfig {
 
   private boolean _dirty = true;
 
+  // Stored so that refreshIndexConfigs() can re-derive OPEN_STRUCT child configs after a dirty rebuild
+  @Nullable
+  private volatile SegmentMetadataImpl _openStructSegmentMetadata;
+
   private MultiColumnTextIndexConfig _multiColTextIndexConfig;
 
   /**
@@ -223,6 +227,11 @@ public class IndexLoadingConfig {
     _enableDefaultStarTree = indexingConfig.isEnableDefaultStarTree();
     _multiColTextIndexConfig = indexingConfig.getMultiColumnTextIndexConfig();
     _dirty = false;
+
+    SegmentMetadataImpl osMetadata = _openStructSegmentMetadata;
+    if (osMetadata != null) {
+      addOpenStructChildConfigs(osMetadata);
+    }
   }
 
   private TableConfig getTableConfigWithTierOverwrites() {
@@ -414,11 +423,8 @@ public class IndexLoadingConfig {
     return map == null ? null : Collections.unmodifiableMap(map);
   }
 
-  // NOTE: entries added here are written directly into _indexConfigsByColName. Any later call that
-  // sets _dirty = true (e.g. setSegmentTier, addKnownColumns) will trigger refreshIndexConfigs()
-  // and rebuild the map from scratch, wiping these entries. Callers must ensure no dirty-flag
-  // mutations happen between this call and the point where the configs are consumed.
   public void addOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
+    _openStructSegmentMetadata = segmentMetadata;
     if (_indexConfigsByColName == null || _dirty) {
       refreshIndexConfigs();
     }

@@ -1334,19 +1334,6 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /**
-   * Returns the per-column mutable OPEN_STRUCT index, or {@code null} if the column is not OPEN_STRUCT
-   * or the index has not been initialized.
-   */
-  @Nullable
-  public MutableOpenStructIndex getOpenStructIndex(String column) {
-    IndexContainer container = _indexContainerMap.get(column);
-    if (container == null) {
-      return null;
-    }
-    MutableIndex index = container._mutableIndexes.get(StandardIndexes.openStruct());
-    return index instanceof MutableOpenStructIndex ? (MutableOpenStructIndex) index : null;
-  }
 
   @Override
   public void offload() {
@@ -1751,6 +1738,8 @@ public class MutableSegmentImpl implements MutableSegment {
     DataSource toDataSource() {
       if (_fieldSpec.getDataType() == DataType.OPEN_STRUCT) {
         MutableIndex idx = _mutableIndexes.get(StandardIndexes.openStruct());
+        Preconditions.checkState(idx instanceof MutableOpenStructIndex,
+            "OPEN_STRUCT column '%s' requires the open_struct_index to be enabled", _fieldSpec.getName());
         return new MutableOpenStructDataSource((ComplexFieldSpec) _fieldSpec, (MutableOpenStructIndex) idx,
             _numDocsIndexed);
       }
