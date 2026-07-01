@@ -94,12 +94,15 @@ public class PlanNodeDeserializer {
 
   private static AggregateNode deserializeAggregateNode(Plan.PlanNode protoNode) {
     Plan.AggregateNode protoAggregateNode = protoNode.getAggregateNode();
+    List<List<Integer>> groupingSets = new ArrayList<>(protoAggregateNode.getGroupingSetsCount());
+    for (Plan.GroupingSet protoGroupingSet : protoAggregateNode.getGroupingSetsList()) {
+      groupingSets.add(protoGroupingSet.getGroupKeyIndexesList());
+    }
     return new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), convertFunctionCalls(protoAggregateNode.getAggCallsList()),
         protoAggregateNode.getFilterArgsList(), protoAggregateNode.getGroupKeysList(),
         convertAggType(protoAggregateNode.getAggType()), protoAggregateNode.getLeafReturnFinalResult(),
-        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit(),
-        protoAggregateNode.getGroupingSetsList());
+        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit(), groupingSets);
   }
 
   private static FilterNode deserializeFilterNode(Plan.PlanNode protoNode) {

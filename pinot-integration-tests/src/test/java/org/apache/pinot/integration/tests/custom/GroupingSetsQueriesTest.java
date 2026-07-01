@@ -156,7 +156,8 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
     /// With usePhysicalOptimizer the multi-stage v2 physical planner splits the grouping-set aggregate itself; verify
     /// it returns the same rows, including the genuine (a, NULL) detail vs the rolled-up (a, NULL) subtotal kept
     /// distinct via $groupingId. The single-stage engine ignores usePhysicalOptimizer and runs the same ROLLUP, so
-    /// this also cross-checks both engines agree. (GROUPING() / GROUPING_ID() are not yet supported on the v2 planner.)
+    /// this also cross-checks both engines agree. (GROUPING() / GROUPING_ID() on the v2 planner are covered by
+    /// testV2PhysicalPlannerGrouping.)
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SET usePhysicalOptimizer=true; SET enableNullHandling=true; SELECT " + D1 + ", " + D2
         + ", COUNT(*) FROM " + getTableName() + " GROUP BY ROLLUP(" + D1 + ", " + D2 + ")";
@@ -266,6 +267,113 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
     expected.put("b|0", 16L);
     expected.put("NULL|1", 32L);
     assertEquals(actual, expected);
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testMultiStageAggregationOfGroupingColumnOverJoin(boolean useMultiStageQueryEngine)
+      throws Exception {
+    /// Regression: an aggregation argument may BE a grouping column. Under ROLLUP(d1, met) the (d1) subtotals
+    /// and the grand total roll up met, but SUM(met) must still aggregate the real met values — the runtime
+    /// per-set expansion must not NULL the aggregation input in place (it groups by separate key copies).
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT t1." + D1 + ", t1." + MET + ", SUM(t1." + MET + ") FROM " + getTableName() + " t1 JOIN "
+        + getTableName() + " t2 ON t1." + D1 + " = t2." + D1 + " GROUP BY ROLLUP(t1." + D1 + ", t1." + MET + ")";
+    JsonNode response = postQuery("SET enableNullHandling=true; " + query);
+    JsonNode exceptions = response.get("exceptions");
+    assertTrue(exceptions == null || exceptions.isEmpty(), "query failed: " + response.toPrettyString());
+    Map<String, Long> actual = new HashMap<>();
+    for (JsonNode row : response.get("resultTable").get("rows")) {
+      actual.put(cell(row, 0) + "|" + cell(row, 1), row.get(2).asLong());
+    }
+    /// The self-join on d1 multiplies each d1 group 4x4=16; met = 1 on every row.
+    Map<String, Long> expected = new HashMap<>();
+    expected.put("a|1", 16L);
+    expected.put("b|1", 16L);
+    /// The (d1) subtotals: met rolled up to NULL in the key, but SUM(met) still 16 — NOT null/0.
+    expected.put("a|NULL", 16L);
+    expected.put("b|NULL", 16L);
+    expected.put("NULL|NULL", 32L);
+    assertEquals(actual, expected, response.toPrettyString());
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testV2PhysicalPlannerRejectsGroupingSetsOverJoin(boolean useMultiStageQueryEngine)
+      throws Exception {
+    /// The v2 physical planner only splits a grouping-set aggregate when its input is a repartitioning exchange;
+    /// over a JOIN there is none, so it rejects explicitly (a clean plan-time error) rather than producing a broken
+    /// plan. The default planner handles the same query (see testMultiStageRollupOverJoin).
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT t1." + D1 + ", COUNT(*) FROM " + getTableName() + " t1 JOIN " + getTableName() + " t2 ON t1."
+        + D1 + " = t2." + D1 + " GROUP BY ROLLUP(t1." + D1 + ")";
+    JsonNode response = postQuery("SET usePhysicalOptimizer=true; SET enableNullHandling=true; " + query);
+    JsonNode exceptions = response.get("exceptions");
+    assertTrue(exceptions != null && !exceptions.isEmpty(), "expected a rejection: " + response.toPrettyString());
+    assertTrue(exceptions.toString().contains("GROUP BY GROUPING SETS"),
+        "expected a grouping-sets rejection: " + response.toPrettyString());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testManyGroupingColumnsEndToEnd(boolean useMultiStageQueryEngine)
+      throws Exception {
+    /// The 31-column limit is gone end-to-end: ROLLUP over 33 grouping expressions (d1, d2 and 31 met-derived
+    /// expressions) executes on both engines without hitting a column-count cap. Assert only what is robust
+    /// regardless of how the engine folds the constant expressions: it does not error, and the grand-total set ()
+    /// produces the max-count row (all 8 docs). ORDER BY count DESC pins that row first (it is the unique maximum),
+    /// so the default result limit cannot truncate it away.
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    StringBuilder rollup = new StringBuilder(D1 + ", " + D2);
+    for (int i = 0; i < 31; i++) {
+      rollup.append(", ").append(MET).append(" + ").append(i);
+    }
+    String query =
+        "SELECT COUNT(*) AS c FROM " + getTableName() + " GROUP BY ROLLUP(" + rollup + ") ORDER BY c DESC";
+    JsonNode response = postQuery("SET enableNullHandling=true; " + query);
+    JsonNode exceptions = response.get("exceptions");
+    assertTrue(exceptions == null || exceptions.isEmpty(), "query failed: " + response.toPrettyString());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, response.toPrettyString());
+    assertEquals(rows.get(0).get(0).asLong(), 8L,
+        "grand-total row counting all 8 docs must sort first: " + response.toPrettyString());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDuplicateGroupingSetsValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    /// Explicit duplicate grouping sets do not corrupt the aggregation values: {d1} yields a=4/b=4 and () yields
+    /// NULL=8 on both engines. NOTE: whether the duplicate (d1) set is de-duplicated (affecting the row COUNT) is
+    /// not pinned here — the single-stage parser collapses duplicates while the multi-stage path may keep them
+    /// (standard SQL keeps them); reconciling that is tracked separately. Asserting the value map (keyed by d1)
+    /// is robust to either choice.
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT " + D1 + ", COUNT(*) FROM " + getTableName() + " GROUP BY GROUPING SETS ((" + D1 + "), ("
+        + D1 + "), ())";
+    JsonNode response = postQuery("SET enableNullHandling=true; " + query);
+    JsonNode exceptions = response.get("exceptions");
+    assertTrue(exceptions == null || exceptions.isEmpty(), "query failed: " + response.toPrettyString());
+    Map<String, Long> actual = new HashMap<>();
+    for (JsonNode row : response.get("resultTable").get("rows")) {
+      actual.put(cell(row, 0), row.get(1).asLong());
+    }
+    Map<String, Long> expected = new HashMap<>();
+    expected.put("a", 4L);
+    expected.put("b", 4L);
+    expected.put("NULL", 8L);
+    assertEquals(actual, expected, response.toPrettyString());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGrandTotalOnlyGroupingSet(boolean useMultiStageQueryEngine)
+      throws Exception {
+    /// GROUP BY GROUPING SETS (()) — the grand total as the only set, with an empty grouping-column union — is
+    /// a QueryContext shape no other query produces (grouping sets present, no group-by expressions).
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " GROUP BY GROUPING SETS (())";
+    JsonNode response = postQuery("SET enableNullHandling=true; " + query);
+    JsonNode exceptions = response.get("exceptions");
+    assertTrue(exceptions == null || exceptions.isEmpty(), "query failed: " + response.toPrettyString());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1, response.toPrettyString());
+    assertEquals(rows.get(0).get(0).asLong(), 8L);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

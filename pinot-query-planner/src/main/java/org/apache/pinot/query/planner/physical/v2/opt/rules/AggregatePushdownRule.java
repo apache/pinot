@@ -36,7 +36,6 @@ import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
@@ -47,15 +46,13 @@ import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
-import org.apache.pinot.calcite.rel.rules.GroupingSetsRexUtils;
+import org.apache.pinot.calcite.rel.rules.GroupingSetsPlanUtils;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
-import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
@@ -104,17 +101,10 @@ public class AggregatePushdownRule extends PRelOptRule {
       /// GROUP BY GROUPING SETS / ROLLUP / CUBE: split with the synthetic $groupingId discriminator carried through the
       /// exchange (the runtime RepeatOperator does the per-set row expansion). Requires an input exchange to
       /// repartition by union keys + $groupingId.
-      /// $groupingId is a 32-bit bitmask over the union columns, so cap the distinct grouping columns (same guard as
-      /// the single-stage rule PinotAggregateExchangeNodeInsertRule).
-      if (aggRel.getGroupCount() > GroupingSets.MAX_GROUPING_SET_COLUMNS) {
-        throw new UnsupportedOperationException(
-            "GROUP BY GROUPING SETS / ROLLUP / CUBE supports at most " + GroupingSets.MAX_GROUPING_SET_COLUMNS
-                + " distinct grouping columns in the multi-stage query engine, got " + aggRel.getGroupCount());
-      }
       /// A WITHIN GROUP ordered aggregate (e.g. LISTAGG ... WITHIN GROUP) under a grouping set cannot be leaf/final
       /// split without losing the ORDER BY, and the DIRECT fallback does not preserve the ordering across the per-set
-      /// expansion either. Reject explicitly (run on the default planner / single-stage) rather than silently
-      /// returning a wrong result. The default planner checks WITHIN GROUP before any split for the same reason.
+      /// expansion either. Reject explicitly (run on the single-stage engine) rather than silently returning a wrong
+      /// result; the default planner rejects the same combination.
       if (withinGroupCollation != null) {
         throw new UnsupportedOperationException(
             "WITHIN GROUP ordered aggregates with GROUP BY GROUPING SETS / ROLLUP / CUBE are not supported in the "
@@ -125,14 +115,30 @@ public class AggregatePushdownRule extends PRelOptRule {
             "GROUP BY GROUPING SETS / ROLLUP / CUBE without a repartitioning exchange is not yet supported in the "
                 + "multi-stage v2 physical planner. Run the query on the single-stage query engine instead.");
       }
-      return addPartialAggregateForGroupingSets((PhysicalAggregate) call._currentNode, hintOptions,
-          _context.getNodeIdGenerator());
+      /// Aggregate hints (e.g. is_leaf_return_final_result) are not applied to grouping-set splits.
+      return addPartialAggregateForGroupingSets((PhysicalAggregate) call._currentNode, _context.getNodeIdGenerator());
     }
+    /// GROUPING() / GROUPING_ID() with a plain GROUP BY is constant 0 per the SQL standard; it is not wired into
+    /// the multi-stage runtime (it is not a real aggregation function), so reject it explicitly rather than failing
+    /// with an obscure error at execution. TODO: fold it to the literal 0 for single-stage parity.
+    rejectGroupingFunctionWithPlainGroupBy(aggRel);
     if (!isInputExchange || withinGroupCollation != null || (hasGroupBy && Boolean.parseBoolean(
         hintOptions.get(PinotHintOptions.AggregateOptions.IS_SKIP_LEAF_STAGE_GROUP_BY)))) {
       return skipPartialAggregate(call._currentNode);
     }
     return addPartialAggregate((PhysicalAggregate) call._currentNode, hintOptions, _context.getNodeIdGenerator());
+  }
+
+  /// Rejects GROUPING() / GROUPING_ID() calls on a plain (single-grouping-set) aggregate.
+  private static void rejectGroupingFunctionWithPlainGroupBy(Aggregate aggRel) {
+    for (AggregateCall aggCall : aggRel.getAggCallList()) {
+      SqlKind kind = aggCall.getAggregation().getKind();
+      if (kind == SqlKind.GROUPING || kind == SqlKind.GROUPING_ID) {
+        throw new UnsupportedOperationException(
+            "GROUPING() / GROUPING_ID() requires GROUP BY GROUPING SETS / ROLLUP / CUBE in the multi-stage query "
+                + "engine. Run the query on the single-stage query engine instead.");
+      }
+    }
   }
 
   private static PRelNode skipPartialAggregate(PRelNode aggPRelNode) {
@@ -156,31 +162,31 @@ public class AggregatePushdownRule extends PRelOptRule {
   ///     the real aggregate result or, for GROUPING() / GROUPING_ID(), the value computed from {@code $groupingId};
   ///     {@code $groupingId} itself is dropped.
   private static PRelNode addPartialAggregateForGroupingSets(PhysicalAggregate aggPRelNode,
-      Map<String, String> hintOptions, Supplier<Integer> idGenerator) {
+      Supplier<Integer> idGenerator) {
     PhysicalAggregate o0 = aggPRelNode;
     PhysicalExchange o1 = (PhysicalExchange) o0.getPRelInput(0);
     PRelNode o2 = o1.getPRelInput(0);
     int groupCount = o0.getGroupCount();
-    /// GROUPING() / GROUPING_ID() are not real aggregations: they are functions of which grouping set a row belongs to,
-    /// computed from $groupingId in the projection. Split them out of the LEAF/FINAL aggregate calls. realAggIndex[i]
-    /// is the position of original aggregate call i among the real aggregates, or -1 if it is a GROUPING / GROUPING_ID.
+    /// GROUPING() / GROUPING_ID() are not real aggregations: they are computed from $groupingId in the final
+    /// projection, so they are split out of the LEAF/FINAL aggregate calls here (shared with the default planner).
     List<AggregateCall> orgAggCalls = o0.getAggCallList();
     List<AggregateCall> realAggCalls = new ArrayList<>(orgAggCalls.size());
-    int[] realAggIndex = new int[orgAggCalls.size()];
-    for (int i = 0; i < orgAggCalls.size(); i++) {
-      SqlKind kind = orgAggCalls.get(i).getAggregation().getKind();
-      if (kind == SqlKind.GROUPING || kind == SqlKind.GROUPING_ID) {
-        realAggIndex[i] = -1;
-      } else {
-        realAggIndex[i] = realAggCalls.size();
-        realAggCalls.add(orgAggCalls.get(i));
-      }
+    int[] realAggIndex = GroupingSetsPlanUtils.splitOutGroupingCalls(orgAggCalls, realAggCalls);
+    /// Without a real aggregation the LEAF would push an aggregation-free query down to the single-stage engine,
+    /// which would execute it as a plain selection and ignore the grouping sets. Mirrors the single-stage parser
+    /// rejection (GROUPING()/GROUPING_ID() are not aggregations).
+    if (realAggCalls.isEmpty()) {
+      throw new UnsupportedOperationException(
+          "GROUP BY GROUPING SETS / ROLLUP / CUBE requires at least one aggregation function in the query");
     }
     /// LEAF: carries the grouping sets and only the real aggregations; deriveRowType() appends $groupingId at position
     /// groupCount, so the leaf output is [union keys..., $groupingId, real aggregates...].
+    /// Group trim (collations/limit) is not applied to the grouping-set LEAF: the collation indexes were
+    /// extracted against the original [union keys..., aggs...] layout and would be off by one past the inserted
+    /// $groupingId column (the default planner disables trim for grouping sets for the same reason).
     PhysicalAggregate n2 = new PhysicalAggregate(o0.getCluster(), RelTraitSet.createEmpty(), List.of() /* hints */,
         o0.getGroupSet(), o0.groupSets, buildAggCalls(o0, realAggCalls, AggType.LEAF, false), idGenerator.get(), o2,
-        null /* data dist */, o2.isLeafStage(), AggType.LEAF, false, o0.getCollations(), o0.getLimit());
+        null /* data dist */, o2.isLeafStage(), AggType.LEAF, false, List.of() /* collations */, 0 /* limit */);
     PinotDistMapping mapFromInputToPartialAgg = DistMappingGenerator.compute(o2.unwrap(), n2, null);
     PinotDataDistribution leafAggDataDistribution =
         o2.getPinotDataDistributionOrThrow().apply(mapFromInputToPartialAgg);
@@ -196,33 +202,10 @@ public class AggregatePushdownRule extends PRelOptRule {
     /// groupCount + 1 in the exchange (intermediate) output.
     int finalGroupCount = groupCount + 1;
     PhysicalAggregate n0 = convertAggForGroupingSets(o0, n1, realAggCalls, finalGroupCount, idGenerator);
-    /// PROJECT: restore the original aggregate row type. For each original aggregate call, reference the real result or
-    /// compute the GROUPING() / GROUPING_ID() value from $groupingId (at position groupCount in the final output).
-    RexBuilder rexBuilder = o0.getCluster().getRexBuilder();
-    RelDataType intType = o0.getCluster().getTypeFactory().createSqlType(SqlTypeName.INTEGER);
-    RexNode groupingIdRef = rexBuilder.makeInputRef(n0, groupCount);
-    List<Integer> union = o0.getGroupSet().asList();
-    List<RexNode> projects = new ArrayList<>(groupCount + orgAggCalls.size());
-    for (int i = 0; i < groupCount; i++) {
-      projects.add(rexBuilder.makeInputRef(n0, i));
-    }
-    for (int i = 0; i < orgAggCalls.size(); i++) {
-      if (realAggIndex[i] >= 0) {
-        projects.add(rexBuilder.makeInputRef(n0, finalGroupCount + realAggIndex[i]));
-      } else {
-        AggregateCall groupingCall = orgAggCalls.get(i);
-        /// Map each GROUPING argument (an input column index) to its bit position in $groupingId (its position in the
-        /// union group key list).
-        List<Integer> unionIndexes = new ArrayList<>(groupingCall.getArgList().size());
-        for (int arg : groupingCall.getArgList()) {
-          int unionIndex = union.indexOf(arg);
-          Preconditions.checkState(unionIndex >= 0, "GROUPING argument must be a grouping column");
-          unionIndexes.add(unionIndex);
-        }
-        RexNode value = GroupingSetsRexUtils.buildGroupingValue(rexBuilder, intType, groupingIdRef, unionIndexes);
-        projects.add(rexBuilder.makeCast(groupingCall.getType(), value));
-      }
-    }
+    /// PROJECT: restore the original aggregate row type via the shared projection builder (also used by the
+    /// default planner), dropping $groupingId.
+    List<RexNode> projects =
+        GroupingSetsPlanUtils.buildGroupingSetsProjects(o0.getCluster().getRexBuilder(), n0, o0, realAggIndex);
     return new PhysicalProject(o0.getCluster(), o0.getTraitSet(), List.of() /* hints */, projects, o0.getRowType(),
         Set.of(), idGenerator.get(), n0, n0.getPinotDataDistributionOrThrow(), false);
   }

@@ -33,11 +33,13 @@ public class AggregateNode extends BasePlanNode {
   private final AggType _aggType;
   private final boolean _leafReturnFinalResult;
 
-  /// GROUP BY GROUPING SETS / ROLLUP / CUBE: one membership bitmask per grouping set, over _groupKeys (the union of
-  /// all grouping columns). Bit i is set iff _groupKeys[i] participates in (is grouped by) that set; a mask of 0 is
-  /// the grand-total set (). Empty for a plain GROUP BY. Mirrors the single-stage engine's PinotQuery.groupingSetMasks
-  /// so the per-set row expansion can be pushed down to the single-stage (leaf) engine.
-  private final List<Integer> _groupingSets;
+  /// GROUP BY GROUPING SETS / ROLLUP / CUBE: one entry per grouping set, each the list of indexes into _groupKeys
+  /// (the union of all grouping columns) participating in (grouped by) that set; an empty inner list is the
+  /// grand-total set (). A set's position in this list is its ordinal, carried as the synthetic $groupingId
+  /// discriminator, so the number of grouping columns is unlimited. Empty for a plain GROUP BY. Mirrors the
+  /// single-stage engine's PinotQuery.groupingSets so the per-set row expansion can be pushed down to the
+  /// single-stage (leaf) engine.
+  private final List<List<Integer>> _groupingSets;
 
   // The following fields are set when group trim is enabled, and are extracted from the Sort on top of this Aggregate.
   // The group trim behavior at leaf stage is shared with single-stage engine.
@@ -54,7 +56,7 @@ public class AggregateNode extends BasePlanNode {
   public AggregateNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
       List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, List<Integer> groupKeys, AggType aggType,
       boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations, int limit,
-      List<Integer> groupingSets) {
+      List<List<Integer>> groupingSets) {
     super(stageId, dataSchema, nodeHint, inputs);
     _aggCalls = aggCalls;
     _filterArgs = filterArgs;
@@ -86,8 +88,9 @@ public class AggregateNode extends BasePlanNode {
     return _leafReturnFinalResult;
   }
 
-  /// One membership bitmask per grouping set over {@link #getGroupKeys()}, or empty for a plain GROUP BY.
-  public List<Integer> getGroupingSets() {
+  /// Per grouping set (in ordinal order), the indexes into {@link #getGroupKeys()} participating in it, or
+  /// empty for a plain GROUP BY.
+  public List<List<Integer>> getGroupingSets() {
     return _groupingSets;
   }
 

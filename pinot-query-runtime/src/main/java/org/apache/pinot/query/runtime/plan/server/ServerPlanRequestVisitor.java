@@ -79,11 +79,11 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         pinotQuery.setGroupByList(groupByList);
       }
       /// GROUP BY GROUPING SETS / ROLLUP / CUBE: push the per-set row expansion down to the single-stage engine. The
-      /// masks are over groupByList (== node.getGroupKeys()), so they transfer directly. The single-stage leaf expands
-      /// each row across the sets and appends the synthetic $groupingId discriminator column; the multi-stage final
-      /// stage then groups on it (it is one of the group keys), keeping the grouping sets distinct.
+      /// per-set column-index lists are over groupByList (== node.getGroupKeys()), so they transfer directly. The
+      /// single-stage leaf expands each row across the sets and appends the synthetic $groupingId ordinal column; the
+      /// multi-stage final stage then groups on it (it is one of the group keys), keeping the grouping sets distinct.
       if (node.isGroupingSets()) {
-        pinotQuery.setGroupingSetMasks(node.getGroupingSets());
+        pinotQuery.setGroupingSets(node.getGroupingSets());
       }
       List<Expression> selectList = CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(),
           node.getFilterArgs(), pinotQuery.getSelectList());

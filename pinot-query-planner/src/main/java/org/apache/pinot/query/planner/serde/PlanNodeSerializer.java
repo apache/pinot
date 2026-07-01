@@ -94,17 +94,18 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitAggregate(AggregateNode node, Plan.PlanNode.Builder builder) {
-      Plan.AggregateNode aggregateNode = Plan.AggregateNode.newBuilder()
+      Plan.AggregateNode.Builder aggregateNodeBuilder = Plan.AggregateNode.newBuilder()
           .addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
           .addAllFilterArgs(node.getFilterArgs())
           .addAllGroupKeys(node.getGroupKeys())
           .setAggType(convertAggType(node.getAggType()))
           .setLeafReturnFinalResult(node.isLeafReturnFinalResult())
           .addAllCollations(convertCollations(node.getCollations()))
-          .setLimit(node.getLimit())
-          .addAllGroupingSets(node.getGroupingSets())
-          .build();
-      builder.setAggregateNode(aggregateNode);
+          .setLimit(node.getLimit());
+      for (List<Integer> groupingSet : node.getGroupingSets()) {
+        aggregateNodeBuilder.addGroupingSets(Plan.GroupingSet.newBuilder().addAllGroupKeyIndexes(groupingSet).build());
+      }
+      builder.setAggregateNode(aggregateNodeBuilder.build());
       return null;
     }
 
