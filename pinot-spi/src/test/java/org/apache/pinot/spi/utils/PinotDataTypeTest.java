@@ -35,11 +35,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.utils.PinotDataType.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
 public class PinotDataTypeTest {
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
   private static final PinotDataType[] SOURCE_TYPES = {
       BYTE, CHARACTER, SHORT, INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, STRING, JSON,
       BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
@@ -157,9 +159,15 @@ public class PinotDataTypeTest {
         new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
         {BYTES_ARRAY, BYTES_ARRAY, new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) },
             new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) }},
+        {STRING_ARRAY, UUID_ARRAY, new String[] {UUID_VALUE},
+            new byte[][] {UuidUtils.toBytes(UUID_VALUE)}},
+        {UUID_ARRAY, UUID_ARRAY, new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)},
+            new byte[][] {UuidUtils.toBytes(UUID_VALUE)}},
         {COLLECTION, STRING_ARRAY, Arrays.asList("test1", "test2"), new String[] {"test1", "test2"}},
+        {COLLECTION, UUID_ARRAY, Arrays.asList(UUID_VALUE), new byte[][] {UuidUtils.toBytes(UUID_VALUE)}},
         {COLLECTION, FLOAT_ARRAY, Arrays.asList(1.0f, 2.0f), new Float[] {1.0f, 2.0f}},
         {OBJECT_ARRAY, STRING_ARRAY, new Object[] {"test1", "test2"}, new String[] {"test1", "test2"}},
+        {OBJECT_ARRAY, UUID_ARRAY, new Object[] {UUID_VALUE}, new byte[][] {UuidUtils.toBytes(UUID_VALUE)}},
         {OBJECT_ARRAY, FLOAT_ARRAY, new Object[] {1.0f, 2.0f}, new Float[] {1.0f, 2.0f}},
     };
   }
@@ -209,6 +217,28 @@ public class PinotDataTypeTest {
     assertEquals(BYTES.convert("AAE=", JSON), new byte[]{0, 1});
     assertEquals(BYTES.convert(new Byte[]{0, 1}, BYTE_ARRAY), new byte[]{0, 1});
     assertEquals(BYTES.convert(new String[]{"0001"}, STRING_ARRAY), new byte[]{0, 1});
+  }
+
+  @Test
+  public void testUUID() {
+    java.util.UUID uuid = java.util.UUID.fromString(UUID_VALUE);
+    byte[] uuidBytes = UuidUtils.toBytes(UUID_VALUE);
+    String mixedCaseUuid = UUID_VALUE.toUpperCase();
+
+    assertEquals(UUID.convert(UUID_VALUE, STRING), uuid);
+    assertEquals(UUID.convert(mixedCaseUuid, STRING), uuid);
+    assertEquals(UUID.convert(uuid, UUID), uuid);
+    assertEquals(UUID.convert(uuidBytes, BYTES), uuid);
+    assertEquals(STRING.convert(uuid, UUID), UUID_VALUE);
+    assertEquals(BYTES.convert(uuid, UUID), uuidBytes);
+    // Single-element collection/object/array sources carry a UUID (FunctionInvoker argument resolution and MV
+    // sources feeding SV UUID columns)
+    assertEquals(UUID.convert(Arrays.asList(UUID_VALUE), COLLECTION), uuid);
+    assertEquals(UUID.convert(UUID_VALUE, OBJECT), uuid);
+    assertEquals(UUID.convert(new Object[]{UUID_VALUE}, OBJECT_ARRAY), uuid);
+    // Sources with no UUID interpretation fail with an explicit message
+    assertThrows(UnsupportedOperationException.class, () -> UUID.convert(1, INT));
+    assertThrows(UnsupportedOperationException.class, () -> UUID.convert(1.0, DOUBLE));
   }
 
   @Test
@@ -296,9 +326,9 @@ public class PinotDataTypeTest {
     byte[] bytes = UUID.toBytes(uuid);
     assertEquals(bytes.length, 16);
     assertEquals(UUID.convert(bytes, BYTES), uuid);
-    // toString / toInternal both return the canonical form (no FQN needed in canonical 8-4-4-4-12 layout).
+    // toString returns the canonical form, while toInternal returns the fixed-width byte form.
     assertEquals(UUID.toString(uuid), canonical);
-    assertEquals(UUID.toInternal(uuid), canonical);
+    assertEquals((byte[]) UUID.toInternal(uuid), bytes);
   }
 
   @Test
@@ -306,11 +336,14 @@ public class PinotDataTypeTest {
     UUID u1 = java.util.UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
     UUID u2 = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
     UUID[] uuids = {u1, u2};
-    assertEquals(UUID_ARRAY.convert(uuids, UUID_ARRAY), uuids);
+    byte[][] convertedBytes = (byte[][]) UUID_ARRAY.convert(uuids, UUID_ARRAY);
+    assertEquals(UUID.convert(convertedBytes[0], BYTES), u1);
+    assertEquals(UUID.convert(convertedBytes[1], BYTES), u2);
     // STRING_ARRAY → UUID_ARRAY: per-element parse.
-    assertEquals(UUID_ARRAY.convert(
-        new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"}, STRING_ARRAY),
-        uuids);
+    byte[][] convertedStringBytes = (byte[][]) UUID_ARRAY.convert(
+        new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"}, STRING_ARRAY);
+    assertEquals(UUID.convert(convertedStringBytes[0], BYTES), u1);
+    assertEquals(UUID.convert(convertedStringBytes[1], BYTES), u2);
     // STRING_ARRAY destination: canonical strings.
     assertEquals(STRING_ARRAY.convert(uuids, UUID_ARRAY),
         new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"});
@@ -323,9 +356,10 @@ public class PinotDataTypeTest {
     assertEquals(UUID.convert(bytesArray[1], BYTES), u2);
     // Lookup: Object[] of UUID routes to UUID_ARRAY.
     assertEquals(getMultiValueType(u1), UUID_ARRAY);
-    // toInternal: String[] of canonical form.
-    assertEquals(UUID_ARRAY.toInternal(uuids),
-        new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"});
+    // toInternal: byte[][] of 16-byte big-endian forms.
+    byte[][] internalBytes = (byte[][]) UUID_ARRAY.toInternal(uuids);
+    assertEquals(UUID.convert(internalBytes[0], BYTES), u1);
+    assertEquals(UUID.convert(internalBytes[1], BYTES), u2);
   }
 
   @Test
