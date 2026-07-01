@@ -133,6 +133,7 @@ public final class Schema implements Serializable {
           case TIMESTAMP:
           case STRING:
           case JSON:
+          case UUID:
           case BYTES:
             break;
           default:
@@ -617,10 +618,14 @@ public final class Schema implements Serializable {
    * Validates a pinot schema.
    * <p>The following validations are performed:
    * <ul>
-   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BOOLEAN,
-   *   TIMESTAMP, STRING, BYTES</li>
-   *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BYTES</li>
+   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL,
+   *   BOOLEAN, TIMESTAMP, STRING, JSON, UUID, BYTES</li>
+   *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, BYTES</li>
    * </ul>
+   * <p>Note: multi-value compatibility checks (e.g. rejecting MV JSON columns) live in
+   * {@code SchemaUtils.validateMultiValueCompatibility} so that schema construction via
+   * {@link SchemaBuilder#build()} stays a pure DTO operation; controller-side ingest validation continues
+   * to call {@code SchemaUtils.validate(Schema)} which enforces those constraints.
    */
   public void validate() {
     for (FieldSpec fieldSpec : _fieldSpecMap.values()) {
