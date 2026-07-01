@@ -129,6 +129,13 @@ public class CommonConstants {
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
     public static final int DEFAULT_HYPERLOGLOG_PLUS_P = 14;
+
+    // Arrow allocator configuration
+    public static final String CONFIG_OF_ARROW_ALLOCATOR_MAX_SIZE = "pinot.arrow.allocator.max.size";
+    public static final String CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_INITIAL_RESERVATION =
+        "pinot.arrow.allocator.default.initial.reservation";
+    public static final String CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_CHILD_LIMIT =
+        "pinot.arrow.allocator.default.child.limit";
     public static final int DEFAULT_HYPERLOGLOG_PLUS_SP = 0;
 
     // 2 to the power of 14, for tradeoffs see datasketches library documentation:
@@ -265,6 +272,14 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED = "pinot.multistage.engine.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = true;
+
+    /**
+     * When true, the Multi-Stage Query Engine uses Apache Arrow as the in-memory block format and Arrow Flight
+     * for inter-node data transfer instead of the default row-oriented Object[][] / gRPC path.
+     * Disabled by default; enable to opt into the Arrow execution path.
+     */
+    public static final String CONFIG_OF_MULTI_STAGE_ENGINE_USE_ARROW = "pinot.multistage.engine.use.arrow";
+    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_USE_ARROW = false;
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED = "pinot.multistage.engine.tls.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED = false;

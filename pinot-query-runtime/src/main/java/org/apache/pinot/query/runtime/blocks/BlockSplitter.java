@@ -93,5 +93,15 @@ public interface BlockSplitter {
       }
       return Iterators.singletonIterator(block);
     }
+
+    @Override
+    public Iterator<MseBlock.Data> visit(ArrowBlock block, Integer maxBlockSize) {
+      // No operator currently produces ArrowBlocks, so the splitter is never invoked with one.
+      // Phase 3 (wire protocol): IPC-serialize the ArrowBlock and let the existing byte-level chunking
+      // split the serialized payload, preserving the mailbox chunk-size guarantees. (A later optimization
+      // can split at Arrow row-batch boundaries.)
+      throw new UnsupportedOperationException(
+          "BlockSplitter does not yet support ArrowBlocks; Arrow chunking lands in the wire phase");
+    }
   }
 }
