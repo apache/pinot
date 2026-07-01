@@ -19,8 +19,10 @@
 package org.apache.pinot.core.transport;
 
 import com.sun.net.httpserver.HttpServer;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelOption;
 import io.netty.util.concurrent.GenericFutureListener;
 import java.net.InetSocketAddress;
 import org.apache.pinot.common.config.NettyConfig;
@@ -42,6 +44,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
 
 
 public class ServerChannelsTest {
@@ -89,6 +93,33 @@ public class ServerChannelsTest {
     } finally {
       dummyServer.stop(0);
     }
+  }
+
+  @Test
+  public void testChannelsShareBufferAllocator() {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    ServerChannels otherServerChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try {
+      ByteBufAllocator allocator = getBootstrapAllocator(
+          serverChannels.getOrCreateServerChannel(new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE)));
+      assertNotNull(allocator);
+      assertSame(allocator, PooledByteBufAllocatorWithLimits.getSharedBufferAllocatorWithLimits());
+      // All channels created by a ServerChannels use the same allocator
+      assertSame(getBootstrapAllocator(serverChannels.getOrCreateServerChannel(
+          new ServerRoutingInstance("localhost", 12346, TableType.REALTIME))), allocator);
+      // Channels created by another ServerChannels instance (e.g. the TLS one) share it as well
+      assertSame(getBootstrapAllocator(otherServerChannels.getOrCreateServerChannel(
+          new ServerRoutingInstance("localhost", 12347, TableType.OFFLINE))), allocator);
+    } finally {
+      serverChannels.shutDown();
+      otherServerChannels.shutDown();
+    }
+  }
+
+  private static ByteBufAllocator getBootstrapAllocator(ServerChannels.ServerChannel serverChannel) {
+    return (ByteBufAllocator) serverChannel._bootstrap.config().options().get(ChannelOption.ALLOCATOR);
   }
 
   @SuppressWarnings("unchecked")
