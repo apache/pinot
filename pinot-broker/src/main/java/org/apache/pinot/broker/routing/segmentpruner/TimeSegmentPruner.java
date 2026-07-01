@@ -107,12 +107,16 @@ public class TimeSegmentPruner implements SegmentPruner {
   @Override
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
-    // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
-    //       ones. The refreshed segment ZK metadata change won't be picked up.
     for (int idx = 0; idx < pulledSegments.size(); idx++) {
       String segment = pulledSegments.get(idx);
       ZNRecord zNrecord = znRecords.get(idx);
-      _intervalMap.computeIfAbsent(segment, k -> extractIntervalFromSegmentZKMetaZNRecord(k, zNrecord));
+      // Always update segments that have DEFAULT_INTERVAL, which covers two cases:
+      // 1. New segments not yet in the map
+      // 2. Segments that transitioned from CONSUMING (DEFAULT_INTERVAL) to COMMITTED (valid time range)
+      Interval existing = _intervalMap.get(segment);
+      if (existing == null || existing == DEFAULT_INTERVAL) {
+        _intervalMap.put(segment, extractIntervalFromSegmentZKMetaZNRecord(segment, zNrecord));
+      }
     }
     _intervalMap.keySet().retainAll(onlineSegments);
     _intervalTree = new IntervalTree<>(_intervalMap);
