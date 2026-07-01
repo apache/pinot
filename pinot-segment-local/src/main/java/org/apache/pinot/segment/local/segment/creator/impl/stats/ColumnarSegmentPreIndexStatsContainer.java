@@ -132,6 +132,18 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
     PinotDataType destDataType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
     try {
       columnReader.rewind();
+      // Typed fast path: when the reader can serve a single-value column as a primitive directly
+      // (ColumnReader.isInt()/isLong()/...), read it with the type-specific accessor and feed the
+      // matching AbstractColumnStatisticsCollector.collect(primitive) overload. This avoids the
+      // Integer/Long/Float/Double box that next() -> collect(Object) incurs on every value, plus the
+      // per-value normalize() allocation. Anything the reader cannot type directly — multi-value,
+      // BIG_DECIMAL/STRING/BYTES, or a column needing coercion (BOOLEAN/TIMESTAMP) — falls through to
+      // the shared, normalize()-based Object path below, which stays the single source of truth for
+      // null and type handling.
+      if (fieldSpec.isSingleValueField()
+          && collectSingleValuePrimitive(columnName, fieldSpec, destDataType, columnReader, statsCollector)) {
+        return;
+      }
       while (columnReader.hasNext()) {
         statsCollector.collect(
             ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, columnReader.next()));
@@ -139,6 +151,94 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
     } catch (IOException e) {
       throw new RuntimeException("Caught exception collecting stats for column: " + columnName, e);
     }
+  }
+
+  /**
+   * Typed, allocation-free stats collection for a single-value primitive column. Returns {@code true}
+   * if it consumed the column (the reader served it as INT / LONG / FLOAT / DOUBLE directly), or
+   * {@code false} — without advancing the reader — if the caller should fall back to the Object path.
+   *
+   * <p>A {@code null} value is collected as the column's default, pre-normalized once via {@link
+   * ColumnarValueNormalizer} so it matches the value the Object path would collect (segment metadata
+   * stays identical between the two paths). The reader's {@code isInt()} / {@code isLong()} / ...
+   * capability check guards each typed accessor, so a column the reader cannot type natively (e.g.
+   * BOOLEAN or TIMESTAMP read from a non-native vector) returns {@code false} here rather than risking
+   * a wrong typed read.
+   */
+  private static boolean collectSingleValuePrimitive(String columnName, FieldSpec fieldSpec,
+      PinotDataType destDataType, ColumnReader columnReader, AbstractColumnStatisticsCollector statsCollector)
+      throws IOException {
+    switch (fieldSpec.getDataType()) {
+      case INT: {
+        if (!columnReader.isInt()) {
+          return false;
+        }
+        while (columnReader.hasNext()) {
+          if (columnReader.isNextNull()) {
+            collectNull(columnName, fieldSpec, destDataType, columnReader, statsCollector);
+          } else {
+            statsCollector.collect(columnReader.nextInt());
+          }
+        }
+        return true;
+      }
+      case LONG: {
+        if (!columnReader.isLong()) {
+          return false;
+        }
+        while (columnReader.hasNext()) {
+          if (columnReader.isNextNull()) {
+            collectNull(columnName, fieldSpec, destDataType, columnReader, statsCollector);
+          } else {
+            statsCollector.collect(columnReader.nextLong());
+          }
+        }
+        return true;
+      }
+      case FLOAT: {
+        if (!columnReader.isFloat()) {
+          return false;
+        }
+        while (columnReader.hasNext()) {
+          if (columnReader.isNextNull()) {
+            collectNull(columnName, fieldSpec, destDataType, columnReader, statsCollector);
+          } else {
+            statsCollector.collect(columnReader.nextFloat());
+          }
+        }
+        return true;
+      }
+      case DOUBLE: {
+        if (!columnReader.isDouble()) {
+          return false;
+        }
+        while (columnReader.hasNext()) {
+          if (columnReader.isNextNull()) {
+            collectNull(columnName, fieldSpec, destDataType, columnReader, statsCollector);
+          } else {
+            statsCollector.collect(columnReader.nextDouble());
+          }
+        }
+        return true;
+      }
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Collect a null doc on the typed fast path by routing it through the same {@link
+   * ColumnarValueNormalizer#normalize} call {@code collectColumn} uses, so this path records exactly
+   * what the Object path would: a source that returns {@code null} at a null doc (e.g. Arrow) yields
+   * the column default, and one that surfaces a stored sentinel (e.g. a Pinot-segment reader) yields
+   * that sentinel — both identical to the Object path. Null docs are rare, so the box this incurs is
+   * immaterial; the non-null hot path stays primitive.
+   */
+  private static void collectNull(String columnName, FieldSpec fieldSpec, PinotDataType destDataType,
+      ColumnReader columnReader, AbstractColumnStatisticsCollector statsCollector)
+      throws IOException {
+    statsCollector.collect(
+        ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, columnReader.next()));
   }
 
   @Override
