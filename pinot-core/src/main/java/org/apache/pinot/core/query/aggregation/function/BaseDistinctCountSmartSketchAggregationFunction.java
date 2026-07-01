@@ -508,16 +508,16 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
   }
 
   @Override
-  public final Set extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public final Object extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Object result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
       return EMPTY_PLACEHOLDER;
     }
 
-    if (result instanceof DictIdsWrapper) {
-      return convertToValueSet((DictIdsWrapper) result);
+    if (result instanceof DictIdsWrapper dictIdsWrapper) {
+      return convertToValueSet(dictIdsWrapper);
     } else {
-      return (Set) result;
+      return result;
     }
   }
 
