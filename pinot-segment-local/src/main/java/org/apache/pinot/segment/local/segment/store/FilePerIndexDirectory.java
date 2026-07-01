@@ -144,9 +144,11 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
     File file = getFileFor(key._name, key._type);
     if (!file.exists()) {
+      // Same "absent index" signal as SingleFileIndexDirectory; share its prefix so the
+      // VectorIndexUtils#getConsolidatedVectorEntry match stays valid for V1/V2-backed readers too.
       throw new RuntimeException(
-          "Could not find index for column: " + key._name + ", type: " + key._type + ", segment: " + _segmentDirectory
-              .toString());
+          SingleFileIndexDirectory.INDEX_NOT_FOUND_MESSAGE_PREFIX + ": " + key._name + ", type: " + key._type
+              + ", segment: " + _segmentDirectory.toString());
     }
     PinotDataBuffer buffer = mapForReads(file, key._type.getId() + ".reader");
     _indexBuffers.put(key, buffer);

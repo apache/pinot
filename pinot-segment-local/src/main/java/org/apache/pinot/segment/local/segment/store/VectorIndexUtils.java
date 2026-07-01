@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.codecs.lucene912.Lucene912Codec;
@@ -28,8 +29,11 @@ import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswCodec;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 
 
@@ -56,16 +60,31 @@ public class VectorIndexUtils {
     File nativeV912IndexFile = new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(nativeV912IndexFile);
 
-    // Remove the IVF_FLAT index file
+    // Remove the IVF_FLAT index file (legacy and combined-form transient siblings)
     File ivfFlatIndexFile = new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(ivfFlatIndexFile);
+    File ivfFlatCombinedFile = new File(segDir, column + Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(ivfFlatCombinedFile);
 
-    // Remove the IVF_PQ index file
+    // Remove the IVF_PQ index file (legacy and combined-form transient siblings)
     File ivfPqIndexFile = new File(segDir, column + Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(ivfPqIndexFile);
+    File ivfPqCombinedFile = new File(segDir, column + Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(ivfPqCombinedFile);
+
+    // Remove the HNSW combined-form transient sibling (the Lucene HNSW directories themselves are
+    // handled above via the per-version VECTOR_HNSW_INDEX_FILE_EXTENSION entries).
+    File hnswCombinedFile = new File(segDir, column + Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(hnswCombinedFile);
   }
 
-  static boolean hasVectorIndex(File segDir, String column) {
+  /// Returns {@code true} when the V1/V2 segment directory holds a vector index file that should
+  /// be preserved as a sibling during V2→V3 conversion (the converter's "skip standard copy" gate).
+  /// Deliberately excludes the IVF {@code *.combined.index} extensions — those are the transient
+  /// consolidated form that the converter is supposed to pack into {@code columns.psf} via the
+  /// standard copy path, not sibling-copy. Callers that need to know about the combined form too
+  /// should use {@link #hasCombinedFormVectorIndex} alongside this.
+  public static boolean hasVectorIndex(File segDir, String column) {
     return new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).exists()
@@ -74,6 +93,52 @@ public class VectorIndexUtils {
         || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION).exists();
+  }
+
+  /// Returns {@code true} when the V1/V2 segment directory holds an IVF vector index in the
+  /// combined-form extension ({@code .vector.ivfflat.combined.index} or
+  /// {@code .vector.ivfpq.combined.index}). The combined form is written by an IVF creator run
+  /// with {@code storeInSegmentFile=true} and is meant to be packed into {@code columns.psf} by
+  /// the V2→V3 converter, not preserved as a sibling.
+  public static boolean hasCombinedFormVectorIndex(File segDir, String column) {
+    return new File(segDir, column + Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION).exists();
+  }
+
+  /// Returns the {@code columns.psf} typed-entry buffer holding the column's consolidated vector
+  /// index, or {@code null} when no such entry has been packed into {@code columns.psf} yet.
+  ///
+  /// Unlike {@link SegmentDirectory.Reader#hasIndexFor}, this does NOT report a legacy on-disk
+  /// sidecar (an IVF flat file or an HNSW Lucene directory) as a match — only a real packed
+  /// `_columnEntries` slot counts. The store implementations that back {@code getIndexFor}
+  /// ({@link SingleFileIndexDirectory} for V3 and {@link FilePerIndexDirectory} for V1/V2) both
+  /// signal an absent slot by throwing an unchecked exception whose message starts with
+  /// {@link SingleFileIndexDirectory#INDEX_NOT_FOUND_MESSAGE_PREFIX} (the shared constant both
+  /// classes build their message from); that is mapped to {@code null} here. Any other
+  /// {@code RuntimeException} (e.g. a corruption marker) is rethrown rather than masked as "absent",
+  /// so the migration / crash-recovery paths do not proceed on a broken segment. Genuine
+  /// {@link IOException}s also propagate.
+  ///
+  /// Callers use this to tell "a prior absorb already committed bytes" (crash recovery) apart from
+  /// "first absorb of an existing sidecar", and to select the {@code columns.psf} read path only
+  /// when the consolidated entry truly exists.
+  ///
+  /// The returned buffer is owned by the segment directory and must NOT be closed by the caller.
+  @Nullable
+  public static PinotDataBuffer getConsolidatedVectorEntry(SegmentDirectory.Reader reader, String column)
+      throws IOException {
+    try {
+      return reader.getIndexFor(column, StandardIndexes.vector());
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null && message.startsWith(SingleFileIndexDirectory.INDEX_NOT_FOUND_MESSAGE_PREFIX)) {
+        // No typed entry in columns.psf yet — the expected "not consolidated" case.
+        return null;
+      }
+      // Anything else (corruption, unexpected state) must not be silently treated as "absent".
+      throw e;
+    }
   }
 
   @Nullable
@@ -91,16 +156,38 @@ public class VectorIndexUtils {
   }
 
   public static String getIndexFileExtension(VectorBackendType backendType) {
+    return getIndexFileExtension(backendType, /* combined */ false);
+  }
+
+  /// Returns the on-disk file extension for an IVF/HNSW vector index file.
+  ///
+  /// @param combined when {@code true}, returns the combined-form extension used when
+  ///                 {@code storeInSegmentFile=true} (consumed by the V2→V3 converter, then
+  ///                 removed). When {@code false}, returns the legacy file extension that
+  ///                 remains alongside {@code columns.psf}.
+  ///                 For HNSW the combined form is a single packed file that bundles the
+  ///                 Lucene HNSW directory's contents (and the optional docId mapping file) using
+  ///                 the same {@code LUCENE_V2} layout the text index uses; the legacy form is
+  ///                 the Lucene directory itself.
+  public static String getIndexFileExtension(VectorBackendType backendType, boolean combined) {
     switch (backendType) {
       case HNSW:
-        return Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
+        return combined
+            ? Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION
+            : Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
       case IVF_FLAT:
-        return Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
+        return combined
+            ? Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION
+            : Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
       case IVF_PQ:
-        return Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION;
+        return combined
+            ? Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION
+            : Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION;
       case IVF_ON_DISK:
-        // IVF_ON_DISK reuses the IVF_FLAT file format with FileChannel random-access reads
-        return Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
+        // IVF_ON_DISK reuses the IVF_FLAT file format with positional buffer reads.
+        return combined
+            ? Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION
+            : Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
       default:
         throw new IllegalStateException("Unsupported vector backend type: " + backendType);
     }
