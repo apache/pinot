@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator.window;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -63,6 +64,7 @@ public abstract class WindowFunction extends AggregationUtils.Accumulator {
    */
   public abstract List<Object> processRows(List<Object[]> rows);
 
+  @Nullable
   protected Object extractValueFromRow(Object[] row) {
     return _inputRef == -1 ? _literal : (row == null ? null : row[_inputRef]);
   }
