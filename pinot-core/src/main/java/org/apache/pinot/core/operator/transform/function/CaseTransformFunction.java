@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -213,6 +214,13 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           BytesUtils.toBytes(literal);
         } catch (Exception e) {
           throw new IllegalArgumentException("Invalid literal: " + literal + " for BYTES");
+        }
+        break;
+      case UUID:
+        try {
+          UuidUtils.toBytes(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for UUID");
         }
         break;
       default:
@@ -802,7 +810,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     Map<Integer, byte[][]> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToBytesValuesSV(valueBlock));
+        thenStatementsIndexToValues.put(i, getBytesValues(_thenStatements.get(i), valueBlock));
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
@@ -817,7 +825,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           _bytesValuesSV[docId] = NullValuePlaceHolder.BYTES;
         }
       } else {
-        byte[][] bytesValues = _elseStatement.transformToBytesValuesSV(valueBlock);
+        byte[][] bytesValues = getBytesValues(_elseStatement, valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
           _bytesValuesSV[docId] = bytesValues[docId];
         }
@@ -831,14 +839,14 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
-    initStringValuesSV(numDocs);
+    initBytesValuesSV(numDocs);
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     Map<Integer, Pair<byte[][], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToBytesValuesSV(valueBlock),
+        thenStatementsIndexToValues.put(i, ImmutablePair.of(getBytesValues(_thenStatements.get(i), valueBlock),
             _thenStatements.get(i).getNullBitmap(valueBlock)));
       }
     }
@@ -863,7 +871,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           bitmap.add(docId);
         }
       } else {
-        byte[][] bytesValues = _elseStatement.transformToBytesValuesSV(valueBlock);
+        byte[][] bytesValues = getBytesValues(_elseStatement, valueBlock);
         RoaringBitmap nullBitmap = _elseStatement.getNullBitmap(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
           _bytesValuesSV[docId] = bytesValues[docId];
@@ -874,6 +882,22 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
       }
     }
     return _bytesValuesSV;
+  }
+
+  private byte[][] getBytesValues(TransformFunction transformFunction, ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType() != DataType.UUID || !(transformFunction instanceof LiteralTransformFunction)) {
+      return transformFunction.transformToBytesValuesSV(valueBlock);
+    }
+    LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) transformFunction;
+    if (literalTransformFunction.isNull()
+        || literalTransformFunction.getResultMetadata().getDataType() != DataType.STRING) {
+      return transformFunction.transformToBytesValuesSV(valueBlock);
+    }
+    int numDocs = valueBlock.getNumDocs();
+    byte[][] bytesValues = new byte[numDocs][];
+    byte[] uuidBytes = UuidUtils.toBytes(literalTransformFunction.getStringLiteral());
+    Arrays.fill(bytesValues, uuidBytes);
+    return bytesValues;
   }
 
   @Override
