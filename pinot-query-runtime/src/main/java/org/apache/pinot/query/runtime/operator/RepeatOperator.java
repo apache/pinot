@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
@@ -33,9 +34,10 @@ import org.slf4j.LoggerFactory;
 /// multi-stage equivalent of the single-stage per-set row expansion. For every input row and every grouping set it
 /// emits one output row in which the columns NOT grouped by that set (the
 /// "rolled up" columns) are set to NULL, and appends the synthetic INT discriminator column
-/// {@link org.apache.pinot.common.request.context.GroupingSets#GROUPING_ID_COLUMN} whose bit i is set iff union
-/// group-by column i is rolled up in that set (matching the single-stage convention so GROUPING() / GROUPING_ID()
-/// agree across engines).
+/// {@link org.apache.pinot.common.request.context.GroupingSets#GROUPING_ID_COLUMN} carrying the grouping set's
+/// ordinal (its index in the plan's grouping-set list, matching the single-stage convention so GROUPING() /
+/// GROUPING_ID() agree across engines). Because the ordinal is not a per-column bitmask, the number of grouping
+/// columns is unlimited.
 ///
 /// With the rows expanded and tagged, the downstream aggregate is an ordinary GROUP BY over the union group-by
 /// columns plus {@code $groupingId} — no grouping-set-specific aggregation logic is needed. This lets grouping sets
@@ -46,31 +48,45 @@ public class RepeatOperator extends MultiStageOperator {
 
   private final MultiStageOperator _input;
   private final DataSchema _resultSchema;
-  /// Input column index of each union group-by column, in union order; bit i of a grouping-set mask refers to
-  /// _unionGroupKeyIds[i].
-  private final int[] _unionGroupKeyIds;
-  /// Per grouping set: the rolled-up bitmask over the union columns (bit i set iff column i is NOT in the set), in the
-  /// order the output rows are emitted. Precomputed from the participation masks.
-  private final int[] _groupingIds;
+  /// Per grouping set (in ordinal order): the input column ids to NULL out (the union columns NOT participating
+  /// in the set). Output rows of set s carry the ordinal s in the discriminator column.
+  private final int[][] _nulledColumnIds;
+  private final int _numSets;
   private final int _inputColumnCount;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   /// @param unionGroupKeyIds input column index of each union group-by column (in union order)
-  /// @param groupingSetMasks one participation bitmask per grouping set over the union columns (bit i set iff
-  ///                         {@code unionGroupKeyIds[i]} is grouped by that set)
+  /// @param groupingSets per grouping set (in ordinal order), the union-column indexes participating in
+  ///                     (grouped by) that set — {@code unionGroupKeyIds[i]} for member index i
   /// @param resultSchema the input schema with the {@code $groupingId} INT column appended
   public RepeatOperator(OpChainExecutionContext context, MultiStageOperator input, int[] unionGroupKeyIds,
-      List<Integer> groupingSetMasks, DataSchema resultSchema) {
+      List<List<Integer>> groupingSets, DataSchema resultSchema) {
     super(context);
     _input = input;
     _resultSchema = resultSchema;
-    _unionGroupKeyIds = unionGroupKeyIds;
     _inputColumnCount = resultSchema.size() - 1;
-    int fullMask = (1 << unionGroupKeyIds.length) - 1;
-    _groupingIds = new int[groupingSetMasks.size()];
-    for (int s = 0; s < groupingSetMasks.size(); s++) {
-      /// Rolled-up bits are the complement of the participation mask over the union columns.
-      _groupingIds[s] = ~groupingSetMasks.get(s) & fullMask;
+    _numSets = groupingSets.size();
+    _nulledColumnIds = new int[_numSets][];
+    boolean[] contains = new boolean[unionGroupKeyIds.length];
+    for (int s = 0; s < _numSets; s++) {
+      Arrays.fill(contains, false);
+      for (int memberIndex : groupingSets.get(s)) {
+        contains[memberIndex] = true;
+      }
+      int numNulled = 0;
+      for (int i = 0; i < unionGroupKeyIds.length; i++) {
+        if (!contains[i]) {
+          numNulled++;
+        }
+      }
+      int[] nulledColumnIds = new int[numNulled];
+      int idx = 0;
+      for (int i = 0; i < unionGroupKeyIds.length; i++) {
+        if (!contains[i]) {
+          nulledColumnIds[idx++] = unionGroupKeyIds[i];
+        }
+      }
+      _nulledColumnIds[s] = nulledColumnIds;
     }
   }
 
@@ -110,18 +126,16 @@ public class RepeatOperator extends MultiStageOperator {
     }
     List<Object[]> inputRows = ((MseBlock.Data) block).asRowHeap().getRows();
     int groupingIdIndex = _inputColumnCount;
-    List<Object[]> expanded = new ArrayList<>(inputRows.size() * _groupingIds.length);
+    List<Object[]> expanded = new ArrayList<>(inputRows.size() * _numSets);
     for (Object[] inputRow : inputRows) {
-      for (int groupingId : _groupingIds) {
+      for (int s = 0; s < _numSets; s++) {
         Object[] row = new Object[_inputColumnCount + 1];
         System.arraycopy(inputRow, 0, row, 0, _inputColumnCount);
-        /// NULL out the union columns that are rolled up in this set (their bit is set in groupingId).
-        for (int i = 0; i < _unionGroupKeyIds.length; i++) {
-          if ((groupingId & (1 << i)) != 0) {
-            row[_unionGroupKeyIds[i]] = null;
-          }
+        /// NULL out the union columns that are rolled up in (not part of) this set.
+        for (int nulledColumnId : _nulledColumnIds[s]) {
+          row[nulledColumnId] = null;
         }
-        row[groupingIdIndex] = groupingId;
+        row[groupingIdIndex] = s;
         expanded.add(row);
       }
     }

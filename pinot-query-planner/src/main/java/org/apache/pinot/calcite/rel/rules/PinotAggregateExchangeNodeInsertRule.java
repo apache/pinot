@@ -68,8 +68,8 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
-import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -323,12 +323,6 @@ public class PinotAggregateExchangeNodeInsertRule {
   /// combine/reduce trim for them anyway; add it when leaf per-set trim is wired through.
   private static RelNode createGroupingSetsPlanWithLeafExchangeFinalAggregate(Aggregate aggRel) {
     int groupCount = aggRel.getGroupCount();
-    /// The single-stage leaf encodes the grouping set as a 32-bit $groupingId bitmask over the union columns.
-    if (groupCount > GroupingSets.MAX_GROUPING_SET_COLUMNS) {
-      throw new UnsupportedOperationException(
-          "GROUP BY GROUPING SETS / ROLLUP / CUBE supports at most " + GroupingSets.MAX_GROUPING_SET_COLUMNS
-              + " distinct grouping columns in the multi-stage query engine, got " + groupCount);
-    }
     /// GROUPING() / GROUPING_ID() are not real aggregations: they are functions of which grouping set a row belongs
     /// to. Like the single-stage post-aggregation handler, they are computed from $groupingId in the final projection,
     /// so they are split out of the LEAF/FINAL aggregate calls here.
@@ -384,20 +378,24 @@ public class PinotAggregateExchangeNodeInsertRule {
     for (int i = 0; i < groupCount; i++) {
       projects.add(rexBuilder.makeInputRef(finalAggRel, i));
     }
+    /// The ordinal order of the sets — must be the same list the runtime receives on the wire, so both come
+    /// from the single conversion point RelToPlanNodeConverter.computeGroupingSets.
+    List<List<Integer>> groupingSets = RelToPlanNodeConverter.computeGroupingSets(aggRel);
     for (int i = 0; i < orgAggCalls.size(); i++) {
       if (realAggIndex[i] >= 0) {
         projects.add(rexBuilder.makeInputRef(finalAggRel, finalGroupCount + realAggIndex[i]));
       } else {
         AggregateCall groupingCall = orgAggCalls.get(i);
-        /// Map each GROUPING argument (an input column index) to its position in the union group key list, which is
-        /// the bit position in $groupingId (bit set iff the column is rolled up in the row's grouping set).
+        /// Map each GROUPING argument (an input column index) to its position in the union group key list (the
+        /// index space the grouping sets are expressed in).
         List<Integer> unionIndexes = new ArrayList<>(groupingCall.getArgList().size());
         for (int arg : groupingCall.getArgList()) {
           int unionIndex = union.indexOf(arg);
           Preconditions.checkState(unionIndex >= 0, "GROUPING argument must be a grouping column");
           unionIndexes.add(unionIndex);
         }
-        RexNode value = GroupingSetsRexUtils.buildGroupingValue(rexBuilder, intType, groupingIdRef, unionIndexes);
+        RexNode value =
+            GroupingSetsRexUtils.buildGroupingValue(rexBuilder, intType, groupingIdRef, groupingSets, unionIndexes);
         projects.add(rexBuilder.makeCast(groupingCall.getType(), value));
       }
     }

@@ -160,6 +160,20 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testGroupingSetsUnlimitedColumnsInMultiStage() {
+    /// The number of distinct grouping columns is unlimited (each grouping set is carried as a member-index
+    /// list and the discriminator is the set ordinal, mirroring Calcite's per-set column bitset). 40 distinct
+    /// grouping expressions — past the retired 31-column bitmask cap — must plan successfully, including with a
+    /// GROUPING() call.
+    StringBuilder columns = new StringBuilder("col1, col2");
+    for (int i = 0; i < 38; i++) {
+      columns.append(", col3 + ").append(i);
+    }
+    String sql = "SELECT col1, GROUPING(col1), SUM(col3) FROM a GROUP BY ROLLUP(" + columns + ")";
+    assertNotNull(_queryEnvironment.planQuery(sql), "expected a multi-stage plan for a 40-column ROLLUP");
+  }
+
+  @Test
   public void testUnsignedLiteralCastIsFolded() {
     // Companion to testUnsignedTypeCastIsAccepted using literal (constant-foldable) casts, so the unsigned
     // literal-folding branch in PinotEvaluateLiteralRule#convertRexCall (which normalizes an unsigned cast to its

@@ -213,7 +213,7 @@ public class PRelToPlanNodeConverter {
     return new AggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         new ArrayList<>(), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
         node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(),
-        RelToPlanNodeConverter.computeGroupingSetMasks(node));
+        RelToPlanNodeConverter.computeGroupingSets(node));
   }
 
   public static ProjectNode convertProject(Project node) {

@@ -55,8 +55,8 @@ import org.apache.pinot.calcite.rel.rules.GroupingSetsRexUtils;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
-import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
 import org.apache.pinot.query.planner.physical.v2.mapping.DistMappingGenerator;
@@ -104,13 +104,6 @@ public class AggregatePushdownRule extends PRelOptRule {
       /// GROUP BY GROUPING SETS / ROLLUP / CUBE: split with the synthetic $groupingId discriminator carried through the
       /// exchange (the runtime RepeatOperator does the per-set row expansion). Requires an input exchange to
       /// repartition by union keys + $groupingId.
-      /// $groupingId is a 32-bit bitmask over the union columns, so cap the distinct grouping columns (same guard as
-      /// the single-stage rule PinotAggregateExchangeNodeInsertRule).
-      if (aggRel.getGroupCount() > GroupingSets.MAX_GROUPING_SET_COLUMNS) {
-        throw new UnsupportedOperationException(
-            "GROUP BY GROUPING SETS / ROLLUP / CUBE supports at most " + GroupingSets.MAX_GROUPING_SET_COLUMNS
-                + " distinct grouping columns in the multi-stage query engine, got " + aggRel.getGroupCount());
-      }
       /// A WITHIN GROUP ordered aggregate (e.g. LISTAGG ... WITHIN GROUP) under a grouping set cannot be leaf/final
       /// split without losing the ORDER BY, and the DIRECT fallback does not preserve the ordering across the per-set
       /// expansion either. Reject explicitly (run on the default planner / single-stage) rather than silently
@@ -206,20 +199,24 @@ public class AggregatePushdownRule extends PRelOptRule {
     for (int i = 0; i < groupCount; i++) {
       projects.add(rexBuilder.makeInputRef(n0, i));
     }
+    /// The ordinal order of the sets — must be the same list the runtime receives on the wire, so both come
+    /// from the single conversion point RelToPlanNodeConverter.computeGroupingSets.
+    List<List<Integer>> groupingSets = RelToPlanNodeConverter.computeGroupingSets(o0);
     for (int i = 0; i < orgAggCalls.size(); i++) {
       if (realAggIndex[i] >= 0) {
         projects.add(rexBuilder.makeInputRef(n0, finalGroupCount + realAggIndex[i]));
       } else {
         AggregateCall groupingCall = orgAggCalls.get(i);
-        /// Map each GROUPING argument (an input column index) to its bit position in $groupingId (its position in the
-        /// union group key list).
+        /// Map each GROUPING argument (an input column index) to its position in the union group key list (the
+        /// index space the grouping sets are expressed in).
         List<Integer> unionIndexes = new ArrayList<>(groupingCall.getArgList().size());
         for (int arg : groupingCall.getArgList()) {
           int unionIndex = union.indexOf(arg);
           Preconditions.checkState(unionIndex >= 0, "GROUPING argument must be a grouping column");
           unionIndexes.add(unionIndex);
         }
-        RexNode value = GroupingSetsRexUtils.buildGroupingValue(rexBuilder, intType, groupingIdRef, unionIndexes);
+        RexNode value =
+            GroupingSetsRexUtils.buildGroupingValue(rexBuilder, intType, groupingIdRef, groupingSets, unionIndexes);
         projects.add(rexBuilder.makeCast(groupingCall.getType(), value));
       }
     }

@@ -116,7 +116,7 @@ public class AggregateOperator extends MultiStageOperator {
     /// an ordinary GROUP BY over the union columns plus $groupingId. This handles grouping sets over any input (e.g.
     /// above a JOIN); when the aggregate sits directly on a table scan it is instead pushed down to the single-stage
     /// leaf and this operator is not used.
-    List<Integer> groupingSets = node.getGroupingSets();
+    List<List<Integer>> groupingSets = node.getGroupingSets();
     if (!groupingSets.isEmpty()) {
       int groupingIdColumnIndex = node.getInputs().get(0).getDataSchema().size();
       input = new RepeatOperator(context, input, getGroupKeyIds(groupKeys), groupingSets, repeatResultSchema(node));

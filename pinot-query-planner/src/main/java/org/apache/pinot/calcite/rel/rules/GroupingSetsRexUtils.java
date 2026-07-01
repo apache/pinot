@@ -18,67 +18,52 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlFunctionCategory;
-import org.apache.calcite.sql.SqlIdentifier;
-import org.apache.calcite.sql.SqlOperator;
-import org.apache.calcite.sql.SqlSyntax;
-import org.apache.calcite.sql.parser.SqlParserPos;
-import org.apache.calcite.sql.validate.SqlNameMatchers;
-import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.pinot.common.request.context.GroupingSets;
 
 
-/// Builds the {@code GROUPING(args...)} / {@code GROUPING_ID(args...)} value as a bit expression over the synthetic
-/// {@code $groupingId} discriminator column. Shared by the default planner
+/// Builds the {@code GROUPING(args...)} / {@code GROUPING_ID(args...)} value over the synthetic
+/// {@code $groupingId} discriminator column (the grouping-set ordinal). Shared by the default planner
 /// ({@link PinotAggregateExchangeNodeInsertRule}) and the v2 physical planner ({@code AggregatePushdownRule}) so both
-/// compute the value identically, mirroring {@link org.apache.pinot.common.request.context.GroupingSets#groupingValue}.
+/// compute the value identically, mirroring {@link GroupingSets#groupingValue}.
 public class GroupingSetsRexUtils {
   private GroupingSetsRexUtils() {
   }
 
-  /// Builds the GROUPING / GROUPING_ID value: for each argument (identified by its union-column index) extract its bit
-  /// from {@code groupingIdRef}, and pack the bits with the first argument as the most significant bit. Uses Pinot's
-  /// bit scalar functions, evaluated in the projection operator.
+  /// Builds the GROUPING / GROUPING_ID value expression. The value is fully determined by the grouping set a
+  /// row belongs to, so it is a plan-time constant per grouping-set ordinal: the expression is
+  /// {@code CASE WHEN $groupingId = 0 THEN v_0 WHEN $groupingId = 1 THEN v_1 ... ELSE null END}, with each
+  /// {@code v_k} packed from the argument columns' rolled-up bits in set {@code k} (first argument = most
+  /// significant bit, PostgreSQL semantics, see {@link GroupingSets#groupingValuesByOrdinal}).
   ///
-  /// @param groupingIdRef reference to the {@code $groupingId} INT column (bit i set iff union column i is rolled up)
-  /// @param unionIndexes the union-column index of each GROUPING argument, in argument order
+  /// The projection evaluates the CASE per output group row, so the per-row cost is O(number of grouping
+  /// sets), bounded by {@link GroupingSets#MAX_GROUPING_SETS} (enforced where the sets are computed).
+  /// TODO: replace the CASE with an O(1) per-ordinal lookup (an INT-array literal indexed by $groupingId,
+  ///   mirroring the single-stage reduce-side precompute) once array literals are supported in the plan
+  ///   expression conversion.
+  ///
+  /// @param groupingIdRef reference to the {@code $groupingId} INT column (the grouping-set ordinal)
+  /// @param groupingSets per grouping set (in ordinal order), the participating union-column indexes (the
+  ///                     list produced by {@code RelToPlanNodeConverter.computeGroupingSets}, so the ordinals
+  ///                     here match the ones the runtime emits)
+  /// @param argUnionIndexes the union-column index of each GROUPING argument, in argument order
   public static RexNode buildGroupingValue(RexBuilder rexBuilder, RelDataType intType, RexNode groupingIdRef,
-      List<Integer> unionIndexes) {
-    SqlOperator bitAnd = pinotScalarOperator("bitAnd");
-    SqlOperator bitShiftRightUnsigned = pinotScalarOperator("bitShiftRightUnsigned");
-    SqlOperator bitShiftLeft = pinotScalarOperator("bitShiftLeft");
-    SqlOperator bitOr = pinotScalarOperator("bitOr");
-    int numArgs = unionIndexes.size();
-    RexNode result = null;
-    for (int j = 0; j < numArgs; j++) {
-      RexNode k = rexBuilder.makeExactLiteral(BigDecimal.valueOf(unionIndexes.get(j)), intType);
-      /// bit = (groupingId >>> k) & 1
-      RexNode shifted = rexBuilder.makeCall(intType, bitShiftRightUnsigned, List.of(groupingIdRef, k));
-      RexNode bit = rexBuilder.makeCall(intType, bitAnd,
-          List.of(shifted, rexBuilder.makeExactLiteral(BigDecimal.ONE, intType)));
-      /// Pack with the first argument as the MSB: shift left by (numArgs - 1 - j).
-      int shiftLeftBy = numArgs - 1 - j;
-      RexNode placed = shiftLeftBy == 0 ? bit : rexBuilder.makeCall(intType, bitShiftLeft,
-          List.of(bit, rexBuilder.makeExactLiteral(BigDecimal.valueOf(shiftLeftBy), intType)));
-      result = result == null ? placed : rexBuilder.makeCall(intType, bitOr, List.of(result, placed));
+      List<List<Integer>> groupingSets, List<Integer> argUnionIndexes) {
+    int[] valuesByOrdinal = GroupingSets.groupingValuesByOrdinal(groupingSets, argUnionIndexes);
+    int numSets = valuesByOrdinal.length;
+    List<RexNode> caseOperands = new ArrayList<>(2 * numSets + 1);
+    for (int ordinal = 0; ordinal < numSets; ordinal++) {
+      caseOperands.add(rexBuilder.makeCall(SqlStdOperatorTable.EQUALS, groupingIdRef,
+          rexBuilder.makeExactLiteral(BigDecimal.valueOf(ordinal), intType)));
+      caseOperands.add(rexBuilder.makeExactLiteral(BigDecimal.valueOf(valuesByOrdinal[ordinal]), intType));
     }
-    return result;
-  }
-
-  /// Looks up a Pinot scalar function as a Calcite {@link SqlOperator} by name, for building bit expressions in the
-  /// grouping-set final projection.
-  private static SqlOperator pinotScalarOperator(String name) {
-    List<SqlOperator> operators = new ArrayList<>(1);
-    PinotOperatorTable.instance(false).lookupOperatorOverloads(new SqlIdentifier(name, SqlParserPos.ZERO),
-        SqlFunctionCategory.USER_DEFINED_FUNCTION, SqlSyntax.FUNCTION, operators,
-        SqlNameMatchers.withCaseSensitive(false));
-    Preconditions.checkState(!operators.isEmpty(), "Pinot scalar function not found: %s", name);
-    return operators.get(0);
+    caseOperands.add(rexBuilder.makeNullLiteral(intType));
+    return rexBuilder.makeCall(intType, SqlStdOperatorTable.CASE, caseOperands);
   }
 }

@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -57,6 +58,10 @@ public class TableResizer {
   /// Number of key columns preceding the aggregation columns in a record: the group-by (union) columns plus
   /// the synthetic $groupingId column for grouping-set queries. Equals _numGroupByExpressions otherwise.
   private final int _numKeyColumns;
+  /// Per grouping set (in ordinal order), the participating union-column indexes; null when the query has no
+  /// grouping sets. Read by the GROUPING()/GROUPING_ID() ORDER BY extractor.
+  @Nullable
+  private final List<int[]> _groupingSets;
   private final Map<ExpressionContext, Integer> _groupByExpressionIndexMap;
   private final AggregationFunction[] _aggregationFunctions;
   private final Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationIndexMap;
@@ -79,6 +84,7 @@ public class TableResizer {
     assert groupByExpressions != null;
     _numGroupByExpressions = groupByExpressions.size();
     _numKeyColumns = queryContext.getNumGroupByKeyColumns();
+    _groupingSets = queryContext.getGroupingSets();
     _groupByExpressionIndexMap = new HashMap<>();
     for (int i = 0; i < _numGroupByExpressions; i++) {
       _groupByExpressionIndexMap.put(groupByExpressions.get(i), i);
@@ -537,26 +543,30 @@ public class TableResizer {
   }
 
   /// Extractor for {@code GROUPING(col, ...)} / {@code GROUPING_ID(col, ...)} in ORDER BY. Mirrors
-  /// {@code PostAggregationHandler.GroupingValueExtractor}: reads the synthetic {@code $groupingId}
-  /// discriminator column (immediately after the union group-by columns) and computes the bitmask over the
-  /// argument columns, with the first argument as the most significant bit (PostgreSQL semantics). Returns 0
-  /// when the query has no grouping sets (no column is rolled up).
+  /// {@code PostAggregationHandler.GroupingValueExtractor}: the value is fully determined by the grouping set
+  /// a row belongs to, so it is precomputed per grouping-set ordinal at construction (first argument = most
+  /// significant bit, PostgreSQL semantics) and extraction is a single lookup on the synthetic
+  /// {@code $groupingId} ordinal column (immediately after the union group-by columns). Returns 0 when the
+  /// query has no grouping sets (no column is rolled up).
   private class GroupingExtractor implements OrderByValueExtractor {
-    final int[] _unionColumnIndexes;
+    @Nullable
+    final int[] _valuesByOrdinal;
     final int _discriminatorIndex;
 
     GroupingExtractor(FunctionContext function) {
       List<ExpressionContext> arguments = function.getArguments();
       Preconditions.checkState(!arguments.isEmpty(), "GROUPING requires at least one argument");
-      _unionColumnIndexes = new int[arguments.size()];
+      int[] argUnionIndexes = new int[arguments.size()];
       for (int i = 0; i < arguments.size(); i++) {
         Integer index = _groupByExpressionIndexMap.get(arguments.get(i));
         Preconditions.checkState(index != null, "GROUPING argument must be a grouping column, got: %s",
             arguments.get(i));
-        _unionColumnIndexes[i] = index;
+        argUnionIndexes[i] = index;
       }
       /// The $groupingId column sits right after the union columns; it is absent for non-grouping-set queries.
       _discriminatorIndex = _numKeyColumns > _numGroupByExpressions ? _numGroupByExpressions : -1;
+      _valuesByOrdinal =
+          _groupingSets != null ? GroupingSets.groupingValuesByOrdinal(_groupingSets, argUnionIndexes) : null;
     }
 
     @Override
@@ -566,11 +576,11 @@ public class TableResizer {
 
     @Override
     public Comparable extract(Record record) {
-      if (_discriminatorIndex < 0) {
+      if (_discriminatorIndex < 0 || _valuesByOrdinal == null) {
         return 0;
       }
-      int groupingId = ((Number) record.getValues()[_discriminatorIndex]).intValue();
-      return GroupingSets.groupingValue(groupingId, _unionColumnIndexes);
+      int ordinal = ((Number) record.getValues()[_discriminatorIndex]).intValue();
+      return _valuesByOrdinal[ordinal];
     }
   }
 
