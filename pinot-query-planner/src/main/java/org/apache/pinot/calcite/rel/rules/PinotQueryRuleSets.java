@@ -284,6 +284,11 @@ public class PinotQueryRuleSets {
       // apply dynamic broadcast rule after exchange is inserted
       PinotJoinToDynamicBroadcastRule.INSTANCE,
 
+      // additive probe-side runtime filter for inner joins, after exchange insertion. This placeholder
+      // instance is swapped for a per-query-configured one in QueryEnvironment#getTraitProgram (it needs
+      // the resolved enable flag); see PinotJoinToInnerRuntimeFilterRule#INSTANCE.
+      PinotJoinToInnerRuntimeFilterRule.INSTANCE,
+
       // remove exchanges when there's duplicates
       PinotExchangeEliminationRule.INSTANCE,
 

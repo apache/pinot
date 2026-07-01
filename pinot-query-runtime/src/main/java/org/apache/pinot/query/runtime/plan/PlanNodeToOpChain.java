@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -382,6 +383,18 @@ public class PlanNodeToOpChain {
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
+    }
+
+    @Override
+    public MultiStageOperator visitRuntimeFilter(RuntimeFilterNode node,
+        OpChainExecutionContext context) {
+      // RuntimeFilterNode is normally collapsed into the LeafOperator (it sits at the leaf-stage
+      // boundary, intercepted in visit() above). It is only dispatched here when the leaf-stage boundary
+      // landed strictly inside the probe subtree (e.g. a Filter->Project->Filter->TableScan probe). In
+      // that case the node is a pure pass-through for the probe rows (input[1] is the build-key pipeline
+      // breaker, consumed separately at leaf compile), so build the op-chain from input[0] only. The
+      // runtime filter is a droppable optimization, so an otherwise-valid query must still succeed.
+      return visit(node.getInputs().get(0), context);
     }
   }
 }

@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -222,6 +223,29 @@ class PlanNodeMerger {
         return null;
       }
       if (!node.getNonEquiConditions().equals(otherNode.getNonEquiConditions())) {
+        return null;
+      }
+      List<PlanNode> children = mergeChildren(node, context);
+      if (children == null) {
+        return null;
+      }
+      return node.withInputs(children);
+    }
+
+    @Nullable
+    @Override
+    public PlanNode visitRuntimeFilter(RuntimeFilterNode node, PlanNode context) {
+      if (context.getClass() != RuntimeFilterNode.class) {
+        return null;
+      }
+      RuntimeFilterNode otherNode = (RuntimeFilterNode) context;
+      if (!node.getProbeKeys().equals(otherNode.getProbeKeys())) {
+        return null;
+      }
+      if (!node.getBuildKeys().equals(otherNode.getBuildKeys())) {
+        return null;
+      }
+      if (node.getType() != otherNode.getType()) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);

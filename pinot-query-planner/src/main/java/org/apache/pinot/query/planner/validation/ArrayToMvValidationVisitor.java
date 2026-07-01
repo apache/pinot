@@ -31,6 +31,7 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -71,6 +72,12 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitEnrichedJoin(EnrichedJoinNode node, Boolean isIntermediateStage) {
     visitJoin(node, isIntermediateStage);
+    return null;
+  }
+
+  @Override
+  public Void visitRuntimeFilter(RuntimeFilterNode node, Boolean isIntermediateStage) {
+    node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
   }
 

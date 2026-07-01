@@ -39,6 +39,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -131,6 +132,11 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   @Override
   public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
     return visitJoin(node, context);
+  }
+
+  @Override
+  public PlanNode visitRuntimeFilter(RuntimeFilterNode node, Context context) {
+    return process(node, context);
   }
 
   @Override
