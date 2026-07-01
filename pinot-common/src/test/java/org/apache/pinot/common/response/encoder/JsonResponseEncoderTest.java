@@ -26,9 +26,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -111,13 +113,33 @@ public class JsonResponseEncoderTest {
   }
 
   @Test
+  public void testEncodeDecodeUuidColumn() throws IOException {
+    DataSchema schema = new DataSchema(
+        new String[] {"uuidCol"},
+        new ColumnDataType[] {ColumnDataType.UUID});
+    String uuidValue = "550e8400-e29b-41d4-a716-446655440000";
+
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[] {ColumnDataType.UUID.format(UUID.fromString(uuidValue))});
+
+    ResultTable resultTable = new ResultTable(schema, rows);
+    JsonResponseEncoder encoder = new JsonResponseEncoder();
+
+    byte[] encodedBytes = encoder.encodeResultTable(resultTable, 0, rows.size());
+    ResultTable decodedTable = encoder.decodeResultTable(encodedBytes, rows.size(), schema);
+
+    assertEquals(decodedTable.getRows().size(), 1, "Row count should be 1");
+    assertEquals(decodedTable.getRows().get(0)[0], uuidValue, "UUID value should round-trip as canonical string");
+  }
+
+  @Test
   public void testEncodeDecodeAllDataTypes() throws IOException {
     // Define the column names and corresponding data types.
     String[] columnNames = {
         "intCol", "longCol", "floatCol", "doubleCol", "bigDecimalCol", "booleanCol", "timestampCol",
         "stringCol", "jsonCol", "mapCol", "bytesCol", "objectCol", "intArrayCol", "longArrayCol",
         "floatArrayCol", "doubleArrayCol", "booleanArrayCol", "timestampArrayCol", "stringArrayCol",
-        "bytesArrayCol", "unknownCol"
+        "bytesArrayCol", "uuidArrayCol", "unknownCol"
     };
 
     DataSchema.ColumnDataType[] columnTypes = {
@@ -141,6 +163,7 @@ public class JsonResponseEncoderTest {
         ColumnDataType.TIMESTAMP_ARRAY,
         ColumnDataType.STRING_ARRAY,
         ColumnDataType.BYTES_ARRAY,
+        ColumnDataType.UUID_ARRAY,
         ColumnDataType.UNKNOWN
     };
 
@@ -173,6 +196,10 @@ public class JsonResponseEncoderTest {
     byte[][] bytesArrayVal = new byte[][] {
         new byte[] {1, 2}, new byte[] {3, 4}
     };
+    byte[][] uuidArrayVal = new byte[][] {
+        UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000"),
+        UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440001")
+    };
     Object unknownVal = null;  // UNKNOWN is represented as null in this example.
 
     // Build a single row that contains all the above values.
@@ -180,7 +207,7 @@ public class JsonResponseEncoderTest {
     Object[] row = new Object[] {
         intVal, longVal, floatVal, doubleVal, bigDecimalVal, booleanVal, timestampVal, stringVal,
         jsonVal, mapVal, bytesVal, objectVal, intArrayVal, longArrayVal, floatArrayVal, doubleArrayVal,
-        booleanArrayVal, timestampArrayVal, stringArrayVal, bytesArrayVal, unknownVal
+        booleanArrayVal, timestampArrayVal, stringArrayVal, bytesArrayVal, uuidArrayVal, unknownVal
     };
 
     // Convert each value using the schema's formatting (if needed).
