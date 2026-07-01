@@ -527,6 +527,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       case STRING:
       case JSON:
         return dataTable.getString(rowId, colId);
+      case UUID:
       case BYTES:
         return dataTable.getBytes(rowId, colId).getBytes();
       default:

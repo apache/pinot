@@ -39,6 +39,7 @@ import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -364,5 +365,41 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
     Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
     Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+  }
+
+  @Test
+  public void testUuidPredicateEvaluators() {
+    List<String> uuidStrings = new ArrayList<>(NUM_PREDICATE_VALUES);
+    Set<String> uuidStringSet = new HashSet<>();
+
+    for (int i = 0; i < NUM_PREDICATE_VALUES; i++) {
+      String uuidString = java.util.UUID.randomUUID().toString();
+      uuidStrings.add(uuidString);
+      uuidStringSet.add(uuidString);
+    }
+
+    InPredicate inPredicate = new InPredicate(COLUMN_EXPRESSION, uuidStrings);
+    PredicateEvaluator inPredicateEvaluator =
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.UUID);
+
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_EXPRESSION, uuidStrings);
+    PredicateEvaluator notInPredicateEvaluator =
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.UUID);
+
+    Assert.assertEquals(inPredicateEvaluator.getDataType(), FieldSpec.DataType.UUID);
+    Assert.assertEquals(notInPredicateEvaluator.getDataType(), FieldSpec.DataType.UUID);
+
+    for (String uuidString : uuidStringSet) {
+      byte[] uuidBytes = UuidUtils.toBytes(uuidString);
+      Assert.assertTrue(inPredicateEvaluator.applySV(uuidBytes));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(uuidBytes));
+    }
+
+    for (int i = 0; i < NUM_PREDICATE_VALUES; i++) {
+      byte[] value = UuidUtils.toBytes(java.util.UUID.randomUUID());
+      boolean expected = uuidStringSet.contains(UuidUtils.toString(value));
+      Assert.assertEquals(inPredicateEvaluator.applySV(value), expected);
+      Assert.assertEquals(notInPredicateEvaluator.applySV(value), !expected);
+    }
   }
 }
