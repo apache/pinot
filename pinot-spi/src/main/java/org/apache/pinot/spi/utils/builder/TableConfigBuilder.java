@@ -49,6 +49,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
@@ -78,8 +79,8 @@ public class TableConfigBuilder {
   private String _lineageEntryCleanupRetentionPeriod;
   @Deprecated
   private String _segmentPushFrequency;
-
-  // TODO: Remove 'DEFAULT_SEGMENT_PUSH_TYPE' in the future major release.
+  // Written to validationConfig for backward compat: IngestionConfigUtils still falls back to this field.
+  // Remove once the IngestionConfigUtils fallback is removed.
   @Deprecated
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
   private String _peerSegmentDownloadScheme;
@@ -225,6 +226,7 @@ public class TableConfigBuilder {
   /**
    * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
+  @Deprecated
   public TableConfigBuilder setSegmentPushType(String segmentPushType) {
     if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
       _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
@@ -237,6 +239,7 @@ public class TableConfigBuilder {
   /**
    * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
+  @Deprecated
   public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
     _segmentPushFrequency = segmentPushFrequency;
     return this;
@@ -512,6 +515,8 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @SuppressWarnings("deprecation") // intentionally calls deprecated setters on SegmentsValidationAndRetentionConfig
+  // and IndexingConfig; those calls are required to keep the IngestionConfigUtils legacy fallback working.
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -567,6 +572,30 @@ public class TableConfigBuilder {
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);
+    }
+
+    // Propagate deprecated push-type/frequency into BatchIngestionConfig (the correct storage location)
+    // so consumers reading BatchIngestionConfig see the same values as those set via the deprecated setters.
+    // Only propagate when a non-default value was explicitly set to avoid adding a spurious
+    // BatchIngestionConfig to REALTIME tables that never called the deprecated setters.
+    if (REFRESH_SEGMENT_PUSH_TYPE.equals(_segmentPushType) || _segmentPushFrequency != null) {
+      if (_ingestionConfig == null) {
+        _ingestionConfig = new IngestionConfig();
+      }
+      BatchIngestionConfig batchIngestionConfig = _ingestionConfig.getBatchIngestionConfig();
+      if (batchIngestionConfig == null) {
+        _ingestionConfig.setBatchIngestionConfig(
+            new BatchIngestionConfig(null, _segmentPushType, _segmentPushFrequency));
+      } else {
+        // BatchIngestionConfig already exists — fill in only the fields that are not yet set,
+        // so that an explicit withIngestionConfig() call takes precedence over the deprecated setters.
+        if (batchIngestionConfig.getSegmentIngestionType() == null && _segmentPushType != null) {
+          batchIngestionConfig.setSegmentIngestionType(_segmentPushType);
+        }
+        if (batchIngestionConfig.getSegmentIngestionFrequency() == null && _segmentPushFrequency != null) {
+          batchIngestionConfig.setSegmentIngestionFrequency(_segmentPushFrequency);
+        }
+      }
     }
 
     TableConfig tableConfig =
