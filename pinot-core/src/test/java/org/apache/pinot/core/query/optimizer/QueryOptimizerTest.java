@@ -251,6 +251,10 @@ public class QueryOptimizerTest {
 
     testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\"", "SELECT * FROM testTable WHERE true");
     testQuery("SELECT * FROM testTable WHERE \"a\"!=\"a\"", "SELECT * FROM testTable WHERE false");
+    testQuery("SELECT * FROM testTable WHERE \"a\">=\"a\"", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE \"a\"<=\"a\"", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE \"a\">\"a\"", "SELECT * FROM testTable WHERE false");
+    testQuery("SELECT * FROM testTable WHERE \"a\"<\"a\"", "SELECT * FROM testTable WHERE false");
     testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\" AND \"a\"!=\"a\"", "SELECT * FROM testTable WHERE false");
     testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\" OR \"a\"!=\"a\"", "SELECT * FROM testTable WHERE true");
 
@@ -267,6 +271,9 @@ public class QueryOptimizerTest {
 
     testQuery("SELECT * FROM testTable WHERE 1=1 AND true", "SELECT * FROM testTable WHERE true");
     testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\" AND true", "SELECT * FROM testTable WHERE true");
+
+    // Non-comparison boolean functions with identical column arguments must not be folded
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE startsWith(string, string)");
 
     // TextMatchFilterOptimizer
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
