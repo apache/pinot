@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.text.SimpleDateFormat;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
@@ -38,6 +40,7 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RetentionUtils;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
@@ -72,12 +75,30 @@ import org.slf4j.LoggerFactory;
 public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
-  /** Package-private for testing: parses validDocIdsComparisonMode config string. */
-  static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsConsensusMode(String value) {
-    if (value == null || value.isBlank()) {
+  /// Parses the validDocIdsConsensusMode config string. Blank/null defaults to `EQUAL`.
+  public static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsConsensusMode(String value) {
+    if (StringUtils.isBlank(value)) {
       return MinionConstants.ValidDocIdsConsensusMode.EQUAL;
     }
     return MinionConstants.ValidDocIdsConsensusMode.valueOf(value.toUpperCase().trim());
+  }
+
+  /// Parses the validDocIdsValidationMode config string. Blank/null defaults to `STRICT`.
+  public static MinionConstants.ValidDocIdsValidationMode parseValidDocIdsValidationMode(String value) {
+    if (StringUtils.isBlank(value)) {
+      return MinionConstants.ValidDocIdsValidationMode.STRICT;
+    }
+    return MinionConstants.ValidDocIdsValidationMode.valueOf(value.toUpperCase().trim());
+  }
+
+  /// Resolves the consensus mode the generator should apply, given the configured consensus mode and validation
+  /// mode. EXECUTOR_ONLY downgrades the generator to UNSAFE (lenient pick, no bitmaps, no cross-replica enforcement)
+  /// so the executor stays the sole gate; STRICT keeps the configured mode.
+  public static MinionConstants.ValidDocIdsConsensusMode resolveGeneratorConsensusMode(
+      MinionConstants.ValidDocIdsConsensusMode consensusMode,
+      MinionConstants.ValidDocIdsValidationMode validationMode) {
+    return validationMode == MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY
+        ? MinionConstants.ValidDocIdsConsensusMode.UNSAFE : consensusMode;
   }
 
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
@@ -324,6 +345,14 @@ public class MinionTaskUtils {
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, String comparisonModeStr) {
+    return getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsType, minionContext,
+        expectedCrc, null, comparisonModeStr);
+  }
+
+  /// Variant that also matches on the expected data CRC; see [#crcMatches].
+  public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
+      String validDocIdsType, MinionContext minionContext, String expectedCrc, @Nullable String expectedDataCrc,
+      String comparisonModeStr) {
     MinionConstants.ValidDocIdsConsensusMode consensusMode = parseValidDocIdsConsensusMode(comparisonModeStr);
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
@@ -352,13 +381,15 @@ public class MinionTaskUtils {
       }
 
       String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
+      long serverDataCrc = parseCrc(validDocIdsBitmapResponse.getSegmentDataCrc());
       // Check crc from the downloaded segment against the crc returned from the server along with the valid doc id
       // bitmap. If this doesn't match, this means that we are hitting the race condition where the segment has been
       // uploaded successfully while the server is still reloading the segment. Reloading can take a while when the
       // offheap upsert is used because we will need to delete & add all primary keys.
       // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
       // against the crc from the current segment zk metadata, so we don't need to check that here.
-      if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
+      if (!crcMatches(parseCrc(expectedCrc), parseCrc(expectedDataCrc), parseCrc(crcFromValidDocIdsBitmap),
+          serverDataCrc)) {
         if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
           LOGGER.warn("CRC mismatch for segment: {} from endpoint {}, skipping", segmentName, endpoint);
           continue;
@@ -426,6 +457,122 @@ public class MinionTaskUtils {
           maxCard, segmentName, servers.size());
     }
     return maxCardinalityMap;
+  }
+
+  /// Picks the replica whose validDocIds the generator should use, or null to skip the segment, applying the same
+  /// checks the executor would so bad segments aren't scheduled: the replica must match CRC (via [#crcMatches]) and
+  /// be on a healthy server. UNSAFE uses the first such replica, EQUAL requires all to report the same valid doc
+  /// count, and MOST_VALID_DOCS picks the highest.
+  @Nullable
+  public static ValidDocIdsMetadataInfo selectValidDocIdsMetadataForConsensus(String taskType,
+      SegmentZKMetadata segmentZKMetadata, @Nullable List<ValidDocIdsMetadataInfo> replicas, int expectedReplicaCount,
+      MinionConstants.ValidDocIdsConsensusMode consensusMode) {
+    String segmentName = segmentZKMetadata.getSegmentName();
+    if (CollectionUtils.isEmpty(replicas)) {
+      return null;
+    }
+    boolean unsafe = consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE;
+    List<ValidDocIdsMetadataInfo> usableReplicas = new ArrayList<>();
+    for (ValidDocIdsMetadataInfo replica : replicas) {
+      // A CRC mismatch usually means the server is still reloading the segment, so its valid doc set can't be
+      // trusted. UNSAFE skips just this replica; stricter modes skip the whole segment.
+      long replicaCrc = parseCrc(replica.getSegmentCrc());
+      if (replicaCrc < 0) {
+        LOGGER.warn("Unparseable CRC '{}' for segment: {} from server: {}, skipping {} (mode={}) for {}",
+            replica.getSegmentCrc(), segmentName, replica.getInstanceId(), unsafe ? "replica" : "segment",
+            consensusMode, taskType);
+        if (unsafe) {
+          continue;
+        }
+        return null;
+      }
+      // -1 when this table doesn't use data CRC, so crcMatches falls back to the segment CRC.
+      long zkDataCrc = segmentZKMetadata.isUseDataCrc() ? segmentZKMetadata.getDataCrc() : -1;
+      if (!crcMatches(segmentZKMetadata.getCrc(), zkDataCrc, replicaCrc, parseCrc(replica.getSegmentDataCrc()))) {
+        LOGGER.warn("CRC mismatch for segment: {} (zkCrc={}, zkDataCrc={}, server={} reported crc={} dataCrc={}), "
+                + "skipping {} (mode={}) for {}", segmentName, segmentZKMetadata.getCrc(),
+            segmentZKMetadata.getDataCrc(), replica.getInstanceId(), replicaCrc, replica.getSegmentDataCrc(),
+            unsafe ? "replica" : "segment", consensusMode, taskType);
+        if (unsafe) {
+          continue;
+        }
+        return null;
+      }
+      // A non-GOOD server may still be mutating the segment, so its valid doc set is unreliable.
+      if (replica.getServerStatus() != null && replica.getServerStatus() != ServiceStatus.Status.GOOD) {
+        LOGGER.warn("Server {} is in {} state for segment: {}, skipping {} (mode={}) for {}", replica.getInstanceId(),
+            replica.getServerStatus(), segmentName, unsafe ? "replica" : "segment", consensusMode, taskType);
+        if (unsafe) {
+          continue;
+        }
+        return null;
+      }
+      if (unsafe) {
+        return replica;
+      }
+      usableReplicas.add(replica);
+    }
+
+    if (usableReplicas.isEmpty()) {
+      return null;
+    }
+
+    // Strict modes need every assigned replica to have responded; a short responder list means a server dropped out
+    // (network error, parse failure, or it no longer has the segment), so we can't confirm consensus across the full
+    // replica set and skip the segment.
+    if (usableReplicas.size() < expectedReplicaCount) {
+      LOGGER.warn("Only {} of {} replicas responded for segment: {}, cannot confirm consensus, skipping for {}",
+          usableReplicas.size(), expectedReplicaCount, segmentName, taskType);
+      return null;
+    }
+
+    if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL) {
+      // Require every replica to report the same valid doc count. Comparing counts (rather than the full bitmaps)
+      // keeps the generator cheap - it avoids serializing a bitmap per replica back to the controller.
+      ValidDocIdsMetadataInfo first = usableReplicas.get(0);
+      for (int i = 1; i < usableReplicas.size(); i++) {
+        if (usableReplicas.get(i).getTotalValidDocs() != first.getTotalValidDocs()) {
+          LOGGER.warn("Replicas disagree on valid doc count for segment: {}, skipping segment for {}", segmentName,
+              taskType);
+          return null;
+        }
+      }
+      return first;
+    }
+
+    // MOST_VALID_DOCS: pick the replica reporting the most valid docs.
+    ValidDocIdsMetadataInfo chosen = usableReplicas.get(0);
+    for (ValidDocIdsMetadataInfo replica : usableReplicas) {
+      if (replica.getTotalValidDocs() > chosen.getTotalValidDocs()) {
+        chosen = replica;
+      }
+    }
+    return chosen;
+  }
+
+  /// Whether two segment copies hold the same data. Matches on the full segment CRC, or - when those differ - on the
+  /// data CRC (a checksum over only the forward index and dictionary, so index/metadata-only changes don't affect
+  /// it) when both copies report one (`>= 0`). A negative data CRC means "not reported". Mirrors the logic of
+  /// `BaseTableDataManager.hasSameCRC` and is used by both the generator's pre-scheduling check and the executor's
+  /// per-server check.
+  @VisibleForTesting
+  static boolean crcMatches(long segmentCrc, long dataCrc, long otherSegmentCrc, long otherDataCrc) {
+    if (segmentCrc == otherSegmentCrc) {
+      return true;
+    }
+    return dataCrc >= 0 && otherDataCrc >= 0 && dataCrc == otherDataCrc;
+  }
+
+  /// Parses a CRC string, returning `-1` ("unavailable") when it is null or unparseable.
+  private static long parseCrc(@Nullable String crc) {
+    if (crc == null) {
+      return -1;
+    }
+    try {
+      return Long.parseLong(crc);
+    } catch (NumberFormatException e) {
+      return -1;
+    }
   }
 
   public static String toUTCString(long epochMillis) {

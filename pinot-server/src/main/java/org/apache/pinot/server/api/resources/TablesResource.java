@@ -573,8 +573,8 @@ public class TablesResource {
       }
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
-          finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(),
-          status);
+          toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc()), finalValidDocIdsType, validDocIdsBytes,
+          _serverInstance.getInstanceDataManager().getInstanceId(), status);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
@@ -747,6 +747,10 @@ public class TablesResource {
         validDocIdsMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
+        String reportableDataCrc = toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc());
+        if (reportableDataCrc != null) {
+          validDocIdsMetadata.put("segmentDataCrc", reportableDataCrc);
+        }
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
         validDocIdsMetadata.put("serverStatus", status);
         validDocIdsMetadata.put("instanceId", _serverInstance.getInstanceDataManager().getInstanceId());
@@ -772,6 +776,12 @@ public class TablesResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+  }
+
+  /// The segment's data CRC to report, or null when unavailable (negative).
+  @Nullable
+  private static String toReportableDataCrc(String dataCrc) {
+    return dataCrc != null && Long.parseLong(dataCrc) >= 0 ? dataCrc : null;
   }
 
   private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
