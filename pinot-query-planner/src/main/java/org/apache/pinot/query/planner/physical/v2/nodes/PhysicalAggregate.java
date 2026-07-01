@@ -30,7 +30,7 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.apache.pinot.common.request.context.GroupingSets;
+import org.apache.pinot.calcite.rel.rules.GroupingSetsPlanUtils;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -88,7 +88,7 @@ public class PhysicalAggregate extends Aggregate implements PRelNode {
     if (!emitsGroupingId()) {
       return rowType;
     }
-    return GroupingSets.appendGroupingIdColumn(getCluster().getTypeFactory(), rowType, getGroupCount());
+    return GroupingSetsPlanUtils.appendGroupingIdColumn(getCluster().getTypeFactory(), rowType, getGroupCount());
   }
 
   @Override

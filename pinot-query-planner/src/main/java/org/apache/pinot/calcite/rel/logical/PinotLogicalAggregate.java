@@ -30,7 +30,7 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.apache.pinot.common.request.context.GroupingSets;
+import org.apache.pinot.calcite.rel.rules.GroupingSetsPlanUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 
 
@@ -107,7 +107,7 @@ public class PinotLogicalAggregate extends Aggregate {
     if (!emitsGroupingId()) {
       return rowType;
     }
-    return GroupingSets.appendGroupingIdColumn(getCluster().getTypeFactory(), rowType, getGroupCount());
+    return GroupingSetsPlanUtils.appendGroupingIdColumn(getCluster().getTypeFactory(), rowType, getGroupCount());
   }
 
   @Override

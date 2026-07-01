@@ -119,14 +119,16 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
 
   @Test
   public void testAggregateGroupingSetsSerDe() {
-    /// The grouping-set masks (over the union group keys) must survive serialization to the worker. ROLLUP(g0, g1)
-    /// over the union {g0, g1} expands to masks {0b11, 0b01, 0b00}.
+    /// The grouping sets (member indexes over the union group keys, in ordinal order) must survive serialization
+    /// to the worker. ROLLUP(g0, g1) over the union {g0, g1} expands to the sets (g0, g1), (g0), (). The empty
+    /// grand-total set in particular must round-trip as an entry (not vanish as a proto default).
     DataSchema schema = new DataSchema(new String[]{"g0", "g1", "sum"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<List<Integer>> groupingSets = List.of(List.of(0, 1), List.of(0), List.of());
     AggregateNode node = new AggregateNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(), List.of(), List.of(),
-        List.of(0, 1), AggType.DIRECT, false, List.of(), 0, List.of(0b11, 0b01, 0b00));
+        List.of(0, 1), AggType.DIRECT, false, List.of(), 0, groupingSets);
     AggregateNode deserialized = (AggregateNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
-    assertEquals(deserialized.getGroupingSets(), List.of(0b11, 0b01, 0b00));
+    assertEquals(deserialized.getGroupingSets(), groupingSets);
     assertEquals(deserialized, node);
   }
 }

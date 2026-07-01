@@ -22,6 +22,7 @@ import com.google.common.base.Throwables;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -158,6 +159,61 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     for (String sql : queries) {
       assertNotNull(_queryEnvironment.planQuery(sql), "expected a multi-stage plan for: " + sql);
     }
+  }
+
+  @Test
+  public void testGroupingSetsRejectionsInMultiStage() {
+    /// Combinations the multi-stage planners reject explicitly (instead of producing broken plans or silently
+    /// wrong results): too many expanded sets (CUBE blow-up past the 4096 cap), WITHIN GROUP ordered aggregates
+    /// under a grouping set, aggregate hints with grouping sets, aggregation-free grouping sets (GROUPING() is
+    /// not an aggregation), and GROUPING() with a plain GROUP BY.
+    StringBuilder cubeColumns = new StringBuilder("col1, col2");
+    for (int i = 0; i < 11; i++) {
+      cubeColumns.append(", col3 + ").append(i);
+    }
+    /// Each query must be rejected for its OWN reason, so assert on the error message (not just that some
+    /// RuntimeException is thrown) — otherwise an unrelated failure would pass vacuously.
+    Map<String, String> queryToExpectedMessage = new LinkedHashMap<>();
+    /// CUBE over 13 grouping expressions expands to 2^13 = 8192 grouping sets, exceeding the 4096 cap.
+    queryToExpectedMessage.put("SELECT COUNT(*) FROM a GROUP BY CUBE(" + cubeColumns + ")", "4096");
+    queryToExpectedMessage.put(
+        "SELECT col1, LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col2) FROM a GROUP BY ROLLUP(col1)", "WITHIN GROUP");
+    queryToExpectedMessage.put(
+        "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col1, COUNT(*) FROM a GROUP BY ROLLUP(col1)",
+        "Aggregate hints are not supported");
+    queryToExpectedMessage.put("SELECT col1 FROM a GROUP BY ROLLUP(col1)", "at least one aggregation function");
+    queryToExpectedMessage.put(
+        "SELECT col1, GROUPING(col1) FROM a GROUP BY ROLLUP(col1)", "at least one aggregation function");
+    queryToExpectedMessage.put(
+        "SELECT col1, GROUPING(col1), COUNT(*) FROM a GROUP BY col1", "GROUPING() / GROUPING_ID() requires");
+    for (Map.Entry<String, String> entry : queryToExpectedMessage.entrySet()) {
+      String sql = entry.getKey();
+      try {
+        _queryEnvironment.planQuery(sql);
+        fail("expected rejection for: " + sql);
+      } catch (RuntimeException e) {
+        StringBuilder messages = new StringBuilder();
+        for (Throwable t = e; t != null; t = t.getCause()) {
+          messages.append(t.getMessage()).append('\n');
+        }
+        assertTrue(messages.toString().contains(entry.getValue()),
+            "expected rejection of [" + sql + "] to mention \"" + entry.getValue() + "\" but got: " + messages);
+      }
+    }
+  }
+
+  @Test
+  public void testGroupingSetsUnlimitedColumnsInMultiStage() {
+    /// The number of distinct grouping columns is unlimited (each grouping set is carried as a member-index
+    /// list and the discriminator is the set ordinal, mirroring Calcite's per-set column bitset). 40 distinct
+    /// grouping expressions — past the retired 31-column bitmask cap — must plan successfully, including with a
+    /// GROUPING() call.
+    StringBuilder columns = new StringBuilder("col1, col2");
+    for (int i = 0; i < 38; i++) {
+      columns.append(", col3 + ").append(i);
+    }
+    String sql = "SELECT col1, GROUPING(col1), SUM(col3) FROM a GROUP BY ROLLUP(" + columns + ")";
+    assertNotNull(_queryEnvironment.planQuery(sql), "expected a multi-stage plan for a 40-column ROLLUP");
   }
 
   @Test
