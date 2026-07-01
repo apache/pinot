@@ -1638,26 +1638,50 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public boolean needReloadSegments()
       throws Exception {
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    // Snapshot the current segment names, then release the references right away. The per-segment reload
+    // lock acquired below is not taken while holding segment references (avoiding lock/refcount ordering
+    // surprises), and each segment is re-acquired fresh under its lock anyway.
+    List<String> segmentNames = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    boolean needReload = false;
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        IndexSegment segment = segmentDataManager.getSegment();
-        if (segment instanceof ImmutableSegmentImpl) {
-          ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-          indexLoadingConfig.setSegmentTier(immutableSegment.getTier());
-          if (immutableSegment.isReloadNeeded(indexLoadingConfig)) {
-            needReload = true;
-            break;
-          }
-        }
+        segmentNames.add(segmentDataManager.getSegmentName());
       }
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         releaseSegment(segmentDataManager);
       }
     }
-    return needReload;
+    for (String segmentName : segmentNames) {
+      // Hold the per-segment reload lock while inspecting the segment. isReloadNeeded() reads the segment
+      // directory (via SegmentPreProcessor), which a concurrent reload/replace/offload of the same segment
+      // can mutate or release under this same lock. Inspecting without the lock can therefore race with a
+      // reload freeing the segment's backing resources. Re-acquiring the segment fresh under the lock also
+      // avoids inspecting a segment that a reload has already replaced.
+      Lock segmentLock = getSegmentLock(segmentName);
+      segmentLock.lock();
+      try {
+        SegmentDataManager segmentDataManager = acquireSegment(segmentName);
+        if (segmentDataManager == null) {
+          continue;
+        }
+        try {
+          IndexSegment segment = segmentDataManager.getSegment();
+          if (segment instanceof ImmutableSegmentImpl) {
+            ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+            indexLoadingConfig.setSegmentTier(immutableSegment.getTier());
+            if (immutableSegment.isReloadNeeded(indexLoadingConfig)) {
+              return true;
+            }
+          }
+        } finally {
+          releaseSegment(segmentDataManager);
+        }
+      } finally {
+        segmentLock.unlock();
+      }
+    }
+    return false;
   }
 
   @Override
