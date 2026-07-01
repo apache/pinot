@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.BadRequestException;
@@ -63,6 +64,7 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -127,6 +129,9 @@ public class PinotClientRequest {
 
   @Inject
   private BrokerMetrics _brokerMetrics;
+
+  @Inject
+  private BrokerDrainManager _brokerDrainManager;
 
   @Inject
   private Executor _executor;
@@ -698,6 +703,7 @@ public class PinotClientRequest {
           throw e;
         }
       case DML:
+        BrokerDrainManager.QueryPermit queryPermit = acquireQueryPermitOrThrow();
         try {
           Map<String, String> headers = new HashMap<>();
           httpRequesterIdentity.getHttpHeaders().entries()
@@ -706,6 +712,8 @@ public class PinotClientRequest {
         } catch (Exception e) {
           LOGGER.error("Error handling DML request:\n{}", sqlRequestJson, e);
           throw e;
+        } finally {
+          closeQueryPermit(queryPermit);
         }
       default:
         return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
@@ -754,6 +762,25 @@ public class PinotClientRequest {
 
   private static boolean isExplainMode(JsonNode requestJson) {
     return requestJson.has("mode") && "explain".equalsIgnoreCase(requestJson.get("mode").asText());
+  }
+
+  @Nullable
+  private BrokerDrainManager.QueryPermit acquireQueryPermitOrThrow() {
+    if (_brokerDrainManager == null) {
+      return null;
+    }
+    BrokerDrainManager.QueryPermit queryPermit = _brokerDrainManager.tryAcquireQuery();
+    if (queryPermit == null) {
+      throw new WebApplicationException(Response.status(QueryErrorCode.BROKER_SHUTTING_DOWN.getHttpResponseStatus())
+          .entity(_brokerDrainManager.getRejectMessage()).build());
+    }
+    return queryPermit;
+  }
+
+  private static void closeQueryPermit(@Nullable BrokerDrainManager.QueryPermit queryPermit) {
+    if (queryPermit != null) {
+      queryPermit.close();
+    }
   }
 
   public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
