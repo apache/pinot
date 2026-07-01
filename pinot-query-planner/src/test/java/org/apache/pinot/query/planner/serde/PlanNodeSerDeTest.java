@@ -26,6 +26,8 @@ import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
@@ -77,5 +79,20 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     assertEquals(deserialized, node);
     assertEquals(deserialized.isPrunedPassthrough(), false);
     assertEquals(deserialized.getPassthroughInputIndexes(), List.of());
+  }
+
+  @Test
+  public void testAggregateGroupingSetsSerDe() {
+    /// The grouping sets (member indexes over the union group keys, in ordinal order) must survive serialization
+    /// to the worker. ROLLUP(g0, g1) over the union {g0, g1} expands to the sets (g0, g1), (g0), (). The empty
+    /// grand-total set in particular must round-trip as an entry (not vanish as a proto default).
+    DataSchema schema = new DataSchema(new String[]{"g0", "g1", "sum"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<List<Integer>> groupingSets = List.of(List.of(0, 1), List.of(0), List.of());
+    AggregateNode node = new AggregateNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(), List.of(), List.of(),
+        List.of(0, 1), AggType.DIRECT, false, List.of(), 0, groupingSets);
+    AggregateNode deserialized = (AggregateNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertEquals(deserialized.getGroupingSets(), groupingSets);
+    assertEquals(deserialized, node);
   }
 }

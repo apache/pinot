@@ -22,7 +22,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptTable;
@@ -30,6 +33,7 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.JoinInfo;
@@ -58,6 +62,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
@@ -68,6 +73,7 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -706,6 +712,42 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), node.getCollation().getFieldCollations(), fetch, offset);
   }
 
+  /// Encodes each grouping set as the list of its participating union group-by column indexes (positions in
+  /// {@code groupSet.asList()}), in {@code getGroupSets()} order — a set's position in the returned list is
+  /// its ordinal, the value carried as the synthetic $groupingId discriminator. Mirrors the single-stage
+  /// engine's {@code PinotQuery.groupingSets} so the per-set expansion can be pushed down to the single-stage
+  /// (leaf) engine, and mirrors Calcite's per-set column bitset so the number of grouping columns is
+  /// unlimited. Returns an empty list for a plain GROUP BY (SIMPLE). This is the single conversion point for
+  /// both planners: every consumer of the ordinal (planner GROUPING projections, RepeatOperator, leaf
+  /// pushdown) derives the set order from the list produced here.
+  public static List<List<Integer>> computeGroupingSets(Aggregate node) {
+    if (node.getGroupType() == Aggregate.Group.SIMPLE) {
+      return List.of();
+    }
+    /// Same cap as the single-stage parser: every set is materialized in the plan, expanded per input row at
+    /// runtime, and enumerated by the GROUPING()/GROUPING_ID() projection.
+    if (node.getGroupSets().size() > GroupingSets.MAX_GROUPING_SETS) {
+      throw new UnsupportedOperationException(
+          "GROUPING SETS / ROLLUP / CUBE expands to more than " + GroupingSets.MAX_GROUPING_SETS
+              + " grouping sets");
+    }
+    List<Integer> union = node.getGroupSet().asList();
+    Map<Integer, Integer> unionIndex = new HashMap<>();
+    for (int i = 0; i < union.size(); i++) {
+      unionIndex.put(union.get(i), i);
+    }
+    List<List<Integer>> groupingSets = new ArrayList<>(node.getGroupSets().size());
+    for (ImmutableBitSet set : node.getGroupSets()) {
+      List<Integer> columnIndexes = new ArrayList<>(set.cardinality());
+      for (int bit : set) {
+        columnIndexes.add(unionIndex.get(bit));
+      }
+      Collections.sort(columnIndexes);
+      groupingSets.add(columnIndexes);
+    }
+    return groupingSets;
+  }
+
   private AggregateNode convertLogicalAggregate(PinotLogicalAggregate node) {
     List<AggregateCall> aggregateCalls = node.getAggCallList();
     int numAggregates = aggregateCalls.size();
@@ -717,7 +759,7 @@ public final class RelToPlanNodeConverter {
     }
     return new AggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
-        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit());
+        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(), computeGroupingSets(node));
   }
 
   private ProjectNode convertLogicalProject(LogicalProject node) {

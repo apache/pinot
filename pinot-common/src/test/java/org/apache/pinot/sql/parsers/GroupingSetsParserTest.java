@@ -32,20 +32,18 @@ import static org.testng.Assert.expectThrows;
 
 
 /// Tests that GROUP BY GROUPING SETS / ROLLUP / CUBE are expanded by {@link CalciteSqlParser} into the union
-/// of grouping columns ({@link PinotQuery#getGroupByList()}) plus a per-set membership bitmask
-/// ({@link PinotQuery#getGroupingSetMasks()}).
+/// of grouping columns ({@link PinotQuery#getGroupByList()}) plus, per grouping set, the list of participating
+/// union-column indexes ({@link PinotQuery#getGroupingSets()}).
 public class GroupingSetsParserTest {
 
   /// Returns the grouping sets as a set of column-name sets, decoupled from union/set ordering.
   private static Set<Set<String>> groupingSetsByName(PinotQuery query) {
     List<Expression> union = query.getGroupByList();
     Set<Set<String>> result = new HashSet<>();
-    for (int mask : query.getGroupingSetMasks()) {
+    for (List<Integer> set : query.getGroupingSets()) {
       Set<String> names = new HashSet<>();
-      for (int bit = 0; bit < Integer.SIZE; bit++) {
-        if ((mask & (1 << bit)) != 0) {
-          names.add(union.get(bit).getIdentifier().getName());
-        }
+      for (int columnIndex : set) {
+        names.add(union.get(columnIndex).getIdentifier().getName());
       }
       result.add(names);
     }
@@ -60,8 +58,8 @@ public class GroupingSetsParserTest {
   public void testPlainGroupByLeavesGroupingSetsUnset() {
     PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT a, SUM(c) FROM t GROUP BY a, b");
     assertEquals(query.getGroupByList().size(), 2);
-    /// Plain GROUP BY must be byte-for-byte unchanged: no grouping-set masks emitted.
-    assertNull(query.getGroupingSetMasks());
+    /// Plain GROUP BY must be byte-for-byte unchanged: no grouping sets emitted.
+    assertNull(query.getGroupingSets());
     assertTrue(query.getGroupByListSize() == 2);
   }
 
@@ -117,7 +115,7 @@ public class GroupingSetsParserTest {
         "SELECT a, SUM(c) FROM t GROUP BY GROUPING SETS ((a), (a), ())");
     assertEquals(groupingSetsByName(query), Set.of(names("a"), names()));
     /// {a} and {} only -> 2 distinct grouping sets.
-    assertEquals(query.getGroupingSetMasks().size(), 2);
+    assertEquals(query.getGroupingSets().size(), 2);
   }
 
   @Test
@@ -155,15 +153,27 @@ public class GroupingSetsParserTest {
     }
   }
 
-  @Test(expectedExceptions = SqlCompilationException.class)
-  public void testTooManyGroupingColumnsRejected() {
-    /// 32 distinct grouping columns exceed the 31-column limit imposed by the INT grouping-id bitmask.
+  @Test
+  public void testManyGroupingColumnsSupported() {
+    /// The number of grouping columns is unlimited (each set is a column-index list and the discriminator is
+    /// the set ordinal, mirroring Calcite's per-set column bitset): 40 distinct grouping columns parse fine,
+    /// where the retired 32-bit bitmask encoding capped the union at 31.
     StringBuilder sets = new StringBuilder();
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 40; i++) {
       sets.append(i == 0 ? "(c" : ", (c").append(i).append(')');
     }
-    CalciteSqlParser.compileToPinotQuery(
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery(
         "SELECT SUM(m) FROM t GROUP BY GROUPING SETS (" + sets + ")");
+    assertEquals(query.getGroupByList().size(), 40);
+    assertEquals(query.getGroupingSets().size(), 40);
+    /// Each set holds exactly one distinct column index within range.
+    Set<Integer> seenColumns = new HashSet<>();
+    for (List<Integer> set : query.getGroupingSets()) {
+      assertEquals(set.size(), 1);
+      int columnIndex = set.get(0);
+      assertTrue(columnIndex >= 0 && columnIndex < 40, "column index out of range: " + columnIndex);
+      assertTrue(seenColumns.add(columnIndex), "duplicate column index: " + columnIndex);
+    }
   }
 
   @Test(expectedExceptions = SqlCompilationException.class)

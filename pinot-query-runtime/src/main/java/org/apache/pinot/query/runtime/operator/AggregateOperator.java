@@ -32,6 +32,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
@@ -95,7 +96,6 @@ public class AggregateOperator extends MultiStageOperator {
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node) {
     super(context);
-    _input = input;
     _resultSchema = node.getDataSchema();
     _aggFunctions = getAggFunctions(node.getAggCalls());
     int numFunctions = _aggFunctions.length;
@@ -110,6 +110,21 @@ public class AggregateOperator extends MultiStageOperator {
     }
 
     List<Integer> groupKeys = node.getGroupKeys();
+
+    /// GROUP BY GROUPING SETS / ROLLUP / CUBE in the multi-stage runtime: expand each input row across the grouping
+    /// sets (NULLing the rolled-up columns and appending the $groupingId discriminator) via a RepeatOperator, then run
+    /// an ordinary GROUP BY over the union columns plus $groupingId. This handles grouping sets over any input (e.g.
+    /// above a JOIN); when the aggregate sits directly on a table scan it is instead pushed down to the single-stage
+    /// leaf and this operator is not used.
+    List<List<Integer>> groupingSets = node.getGroupingSets();
+    if (!groupingSets.isEmpty()) {
+      int groupingIdColumnIndex = node.getInputs().get(0).getDataSchema().size();
+      input = new RepeatOperator(context, input, getGroupKeyIds(groupKeys), groupingSets, repeatResultSchema(node));
+      /// The group keys are the union columns (unchanged input positions) plus $groupingId, appended by the Repeat.
+      groupKeys = new ArrayList<>(groupKeys);
+      groupKeys.add(groupingIdColumnIndex);
+    }
+    _input = input;
 
     int groupTrimSize = Integer.MAX_VALUE;
     Comparator<Object[]> comparator = null;
@@ -344,6 +359,22 @@ public class AggregateOperator extends MultiStageOperator {
       groupKeyIds[i] = groupKeys.get(i);
     }
     return groupKeyIds;
+  }
+
+  /// Output schema of the {@link RepeatOperator} that feeds a grouping-set aggregate: the aggregate input schema with
+  /// the synthetic {@code $groupingId} INT discriminator column appended.
+  private static DataSchema repeatResultSchema(AggregateNode node) {
+    DataSchema inputSchema = node.getInputs().get(0).getDataSchema();
+    int numInputColumns = inputSchema.size();
+    String[] columnNames = new String[numInputColumns + 1];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numInputColumns + 1];
+    for (int i = 0; i < numInputColumns; i++) {
+      columnNames[i] = inputSchema.getColumnName(i);
+      columnDataTypes[i] = inputSchema.getColumnDataType(i);
+    }
+    columnNames[numInputColumns] = GroupingSets.GROUPING_ID_COLUMN;
+    columnDataTypes[numInputColumns] = DataSchema.ColumnDataType.INT;
+    return new DataSchema(columnNames, columnDataTypes);
   }
 
   static RoaringBitmap getMatchedBitmap(MseBlock.Data block, int filterArgId) {

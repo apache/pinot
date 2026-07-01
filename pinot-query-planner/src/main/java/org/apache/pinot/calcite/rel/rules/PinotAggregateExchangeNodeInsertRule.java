@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +38,11 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.rules.AggregateExtractProjectRule;
 import org.apache.calcite.rel.rules.AggregateReduceFunctionsRule;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
@@ -50,6 +53,7 @@ import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -65,6 +69,7 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -160,7 +165,7 @@ public class PinotAggregateExchangeNodeInsertRule {
         return;
       }
 
-      PinotLogicalAggregate newAggRel = createPlan(call, aggRel, true, hintOptions, newCollations, limit);
+      RelNode newAggRel = createPlan(call, aggRel, true, hintOptions, newCollations, limit);
       RelNode newProjectRel = projectRel.copy(projectRel.getTraitSet(), List.of(newAggRel));
       call.transformTo(sortRel.copy(sortRel.getTraitSet(), List.of(newProjectRel)));
     }
@@ -202,7 +207,7 @@ public class PinotAggregateExchangeNodeInsertRule {
         return;
       }
 
-      PinotLogicalAggregate newAggRel = createPlan(call, aggRel, true, hintOptions, collations, limit);
+      RelNode newAggRel = createPlan(call, aggRel, true, hintOptions, collations, limit);
       call.transformTo(sortRel.copy(sortRel.getTraitSet(), List.of(newAggRel)));
     }
   }
@@ -227,7 +232,7 @@ public class PinotAggregateExchangeNodeInsertRule {
     }
   }
 
-  private static PinotLogicalAggregate createPlan(RelOptRuleCall call, Aggregate aggRel, boolean hasGroupBy,
+  private static RelNode createPlan(RelOptRuleCall call, Aggregate aggRel, boolean hasGroupBy,
       Map<String, String> hintOptions, @Nullable List<RelFieldCollation> collations, int limit) {
     // WITHIN GROUP collation is not supported in leaf stage aggregation.
     RelCollation withinGroupCollation = extractWithinGroupCollation(aggRel);
@@ -288,8 +293,11 @@ public class PinotAggregateExchangeNodeInsertRule {
    * Aggregate node will be split into LEAF + EXCHANGE + FINAL.
    * TODO: Add optional INTERMEDIATE stage to reduce hotspot.
    */
-  private static PinotLogicalAggregate createPlanWithLeafExchangeFinalAggregate(Aggregate aggRel,
-      boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations, int limit) {
+  private static RelNode createPlanWithLeafExchangeFinalAggregate(Aggregate aggRel, boolean leafReturnFinalResult,
+      @Nullable List<RelFieldCollation> collations, int limit) {
+    if (aggRel.getGroupType() != Aggregate.Group.SIMPLE) {
+      return createGroupingSetsPlanWithLeafExchangeFinalAggregate(aggRel);
+    }
     // Create a LEAF aggregate.
     PinotLogicalAggregate leafAggRel =
         new PinotLogicalAggregate(aggRel, aggRel.getInput(), buildAggCalls(aggRel, AggType.LEAF, leafReturnFinalResult),
@@ -299,6 +307,99 @@ public class PinotAggregateExchangeNodeInsertRule {
         RelDistributions.hash(ImmutableIntList.range(0, aggRel.getGroupCount())));
     // Create a FINAL aggregate over the EXCHANGE.
     return convertAggFromIntermediateInput(aggRel, exchange, AggType.FINAL, leafReturnFinalResult, collations, limit);
+  }
+
+  /// Splits a GROUP BY GROUPING SETS / ROLLUP / CUBE aggregate into LEAF + EXCHANGE + FINAL, pushing the per-set
+  /// row expansion down to the single-stage (leaf) engine, which expands each row across the sets at the backend so
+  /// the rest of the plan is an ordinary aggregate. Layout:
+  ///   - LEAF (carries the grouping sets): the single-stage engine expands each row across the sets and appends the
+  ///     synthetic {@code $groupingId} discriminator, so the leaf output is {@code [union keys..., $groupingId,
+  ///     leaf aggregates...]} (see {@link PinotLogicalAggregate#deriveRowType}).
+  ///   - EXCHANGE: hash-partition by the union keys AND {@code $groupingId} so all rows of a (set, key) co-locate.
+  ///   - FINAL: a plain (SIMPLE) aggregate grouping by {@code [union keys..., $groupingId]}, so rows from different
+  ///     grouping sets stay distinct with no grouping-set-specific merge logic.
+  ///   - PROJECT: drop {@code $groupingId} so the output row type matches the original aggregate.
+  /// TODO: group trim (collations/limit) is not pushed for grouping sets yet — the single-stage engine disables
+  /// combine/reduce trim for them anyway; add it when leaf per-set trim is wired through.
+  private static RelNode createGroupingSetsPlanWithLeafExchangeFinalAggregate(Aggregate aggRel) {
+    int groupCount = aggRel.getGroupCount();
+    /// GROUPING() / GROUPING_ID() are not real aggregations: they are functions of which grouping set a row belongs
+    /// to. Like the single-stage post-aggregation handler, they are computed from $groupingId in the final projection,
+    /// so they are split out of the LEAF/FINAL aggregate calls here.
+    List<AggregateCall> orgAggCalls = aggRel.getAggCallList();
+    List<AggregateCall> realAggCalls = new ArrayList<>(orgAggCalls.size());
+    /// For each original aggregate call: its index among the real (non-GROUPING) aggregates, or -1 if it is a
+    /// GROUPING / GROUPING_ID call (computed in the projection instead).
+    int[] realAggIndex = new int[orgAggCalls.size()];
+    for (int i = 0; i < orgAggCalls.size(); i++) {
+      SqlKind kind = orgAggCalls.get(i).getAggregation().getKind();
+      if (kind == SqlKind.GROUPING || kind == SqlKind.GROUPING_ID) {
+        realAggIndex[i] = -1;
+      } else {
+        realAggIndex[i] = realAggCalls.size();
+        realAggCalls.add(orgAggCalls.get(i));
+      }
+    }
+    /// LEAF: carries the original groupSets; deriveRowType() appends $groupingId after the union group keys. Only the
+    /// real aggregations are pushed down, so the leaf output is [union keys..., $groupingId, real aggregates...].
+    PinotLogicalAggregate leafAggRel = new PinotLogicalAggregate(aggRel, aggRel.getInput(),
+        buildAggCalls(aggRel, realAggCalls, AggType.LEAF, false), AggType.LEAF, false, null, 0);
+    /// The leaf output adds $groupingId after the union keys, so the final group key count is groupCount + 1.
+    int finalGroupCount = groupCount + 1;
+    /// EXCHANGE: hash by union keys + $groupingId.
+    PinotLogicalExchange exchange =
+        PinotLogicalExchange.create(leafAggRel, RelDistributions.hash(ImmutableIntList.range(0, finalGroupCount)));
+    /// FINAL: SIMPLE aggregate over [union keys..., $groupingId]; the real aggregate input refs are shifted by
+    /// finalGroupCount and typed against the exchange (intermediate) row type, which carries the extra $groupingId.
+    PinotLogicalAggregate finalAggRel =
+        convertAggFromIntermediateInput(aggRel, exchange, realAggCalls, ImmutableBitSet.range(finalGroupCount),
+            finalGroupCount, exchange.getRowType(), AggType.FINAL, false, null, 0);
+    /// PROJECT: emit the original row type — group keys, then per original aggregate call either a real aggregate
+    /// result reference or a GROUPING/GROUPING_ID value computed from $groupingId — dropping $groupingId itself.
+    return buildGroupingSetsProject(aggRel, finalAggRel, groupCount, realAggIndex);
+  }
+
+  /// Builds the Project on top of the FINAL grouping-set aggregate. The FINAL output is
+  /// {@code [union keys..., $groupingId, real aggregate results...]}; the project restores the original aggregate row
+  /// type by emitting, in order: the group keys, then for each original aggregate call either the real aggregate
+  /// result (referenced from the FINAL) or, for GROUPING() / GROUPING_ID(), the value computed from the {@code
+  /// $groupingId} discriminator column (mirroring the single-stage post-aggregation handler). {@code $groupingId}
+  /// itself is dropped.
+  private static RelNode buildGroupingSetsProject(Aggregate aggRel, PinotLogicalAggregate finalAggRel, int groupCount,
+      int[] realAggIndex) {
+    RexBuilder rexBuilder = finalAggRel.getCluster().getRexBuilder();
+    RelDataType intType = finalAggRel.getCluster().getTypeFactory().createSqlType(SqlTypeName.INTEGER);
+    int finalGroupCount = groupCount + 1;
+    /// $groupingId is the INT discriminator column immediately after the union group keys.
+    RexNode groupingIdRef = rexBuilder.makeInputRef(finalAggRel, groupCount);
+    List<Integer> union = aggRel.getGroupSet().asList();
+    List<AggregateCall> orgAggCalls = aggRel.getAggCallList();
+    List<RexNode> projects = new ArrayList<>(groupCount + orgAggCalls.size());
+    for (int i = 0; i < groupCount; i++) {
+      projects.add(rexBuilder.makeInputRef(finalAggRel, i));
+    }
+    /// The ordinal order of the sets — must be the same list the runtime receives on the wire, so both come
+    /// from the single conversion point RelToPlanNodeConverter.computeGroupingSets.
+    List<List<Integer>> groupingSets = RelToPlanNodeConverter.computeGroupingSets(aggRel);
+    for (int i = 0; i < orgAggCalls.size(); i++) {
+      if (realAggIndex[i] >= 0) {
+        projects.add(rexBuilder.makeInputRef(finalAggRel, finalGroupCount + realAggIndex[i]));
+      } else {
+        AggregateCall groupingCall = orgAggCalls.get(i);
+        /// Map each GROUPING argument (an input column index) to its position in the union group key list (the
+        /// index space the grouping sets are expressed in).
+        List<Integer> unionIndexes = new ArrayList<>(groupingCall.getArgList().size());
+        for (int arg : groupingCall.getArgList()) {
+          int unionIndex = union.indexOf(arg);
+          Preconditions.checkState(unionIndex >= 0, "GROUPING argument must be a grouping column");
+          unionIndexes.add(unionIndex);
+        }
+        RexNode value =
+            GroupingSetsRexUtils.buildGroupingValue(rexBuilder, intType, groupingIdRef, groupingSets, unionIndexes);
+        projects.add(rexBuilder.makeCast(groupingCall.getType(), value));
+      }
+    }
+    return LogicalProject.create(finalAggRel, List.of(), projects, aggRel.getRowType().getFieldNames());
   }
 
   /**
@@ -354,20 +455,42 @@ public class PinotAggregateExchangeNodeInsertRule {
 
   private static PinotLogicalAggregate convertAggFromIntermediateInput(Aggregate aggRel, PinotLogicalExchange exchange,
       AggType aggType, boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations, int limit) {
+    /// Plain GROUP BY: the FINAL groups by the union keys (range(groupCount)) and the intermediate aggregate columns
+    /// start at groupCount; the input ref types are taken from the original aggregate row type (same field count).
+    int groupCount = aggRel.getGroupCount();
+    return convertAggFromIntermediateInput(aggRel, exchange, ImmutableBitSet.range(groupCount), groupCount,
+        aggRel.getRowType(), aggType, leafReturnFinalResult, collations, limit);
+  }
+
+  /// As above, but with an explicit FINAL group set, the column offset where intermediate aggregate results begin,
+  /// and the row type to type the aggregate input refs against. The grouping-set split passes
+  /// {@code finalGroupSet = range(groupCount + 1)} and {@code aggColumnOffset = groupCount + 1} (the union keys plus
+  /// the synthetic {@code $groupingId}), and types the refs against the exchange (intermediate) row type.
+  private static PinotLogicalAggregate convertAggFromIntermediateInput(Aggregate aggRel, PinotLogicalExchange exchange,
+      ImmutableBitSet finalGroupSet, int aggColumnOffset, RelDataType refRowType, AggType aggType,
+      boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations, int limit) {
+    return convertAggFromIntermediateInput(aggRel, exchange, aggRel.getAggCallList(), finalGroupSet, aggColumnOffset,
+        refRowType, aggType, leafReturnFinalResult, collations, limit);
+  }
+
+  /// As above, but over an explicit list of aggregate calls (rather than {@code aggRel.getAggCallList()}). The
+  /// grouping-set split passes only the real (non-GROUPING) aggregates, which the leaf emits in this order starting
+  /// at {@code aggColumnOffset}.
+  private static PinotLogicalAggregate convertAggFromIntermediateInput(Aggregate aggRel, PinotLogicalExchange exchange,
+      List<AggregateCall> orgAggCalls, ImmutableBitSet finalGroupSet, int aggColumnOffset, RelDataType refRowType,
+      AggType aggType, boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations, int limit) {
     RelNode input = aggRel.getInput();
     List<RexNode> projects = findImmediateProjects(input);
 
     // Create new AggregateCalls from exchange input. Exchange produces results with group keys followed by intermediate
     // aggregate results.
-    int groupCount = aggRel.getGroupCount();
-    List<AggregateCall> orgAggCalls = aggRel.getAggCallList();
     int numAggCalls = orgAggCalls.size();
     List<AggregateCall> aggCalls = new ArrayList<>(numAggCalls);
     for (int i = 0; i < numAggCalls; i++) {
       AggregateCall orgAggCall = orgAggCalls.get(i);
       List<Integer> argList = orgAggCall.getArgList();
-      int index = groupCount + i;
-      RexInputRef inputRef = RexInputRef.of(index, aggRel.getRowType());
+      int index = aggColumnOffset + i;
+      RexInputRef inputRef = RexInputRef.of(index, refRowType);
       // Generate rexList from argList and replace literal reference with literal. Keep the first argument as is.
       int numArguments = argList.size();
       List<RexNode> rexList;
@@ -386,17 +509,23 @@ public class PinotAggregateExchangeNodeInsertRule {
           }
         }
       }
-      aggCalls.add(buildAggCall(exchange, orgAggCall, rexList, groupCount, aggType, leafReturnFinalResult));
+      aggCalls.add(buildAggCall(exchange, orgAggCall, rexList, aggColumnOffset, aggType, leafReturnFinalResult));
     }
 
-    return new PinotLogicalAggregate(aggRel, exchange, ImmutableBitSet.range(groupCount), aggCalls, aggType,
-        leafReturnFinalResult, collations, limit);
+    return new PinotLogicalAggregate(aggRel, exchange, finalGroupSet, aggCalls, aggType, leafReturnFinalResult,
+        collations, limit);
   }
 
   private static List<AggregateCall> buildAggCalls(Aggregate aggRel, AggType aggType, boolean leafReturnFinalResult) {
+    return buildAggCalls(aggRel, aggRel.getAggCallList(), aggType, leafReturnFinalResult);
+  }
+
+  /// As above, but over an explicit list of aggregate calls (rather than {@code aggRel.getAggCallList()}). The
+  /// grouping-set split passes only the real (non-GROUPING) aggregates to push down to the leaf.
+  private static List<AggregateCall> buildAggCalls(Aggregate aggRel, List<AggregateCall> orgAggCalls, AggType aggType,
+      boolean leafReturnFinalResult) {
     RelNode input = aggRel.getInput();
     List<RexNode> projects = findImmediateProjects(input);
-    List<AggregateCall> orgAggCalls = aggRel.getAggCallList();
     List<AggregateCall> aggCalls = new ArrayList<>(orgAggCalls.size());
     for (AggregateCall orgAggCall : orgAggCalls) {
       // Generate rexList from argList and replace literal reference with literal. Keep the first argument as is.
