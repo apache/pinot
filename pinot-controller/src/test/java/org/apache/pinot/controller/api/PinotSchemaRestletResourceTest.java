@@ -107,9 +107,10 @@ public class PinotSchemaRestletResourceTest {
     // Update the schema with addSchema api and override on
     expectValidationException(() -> adminClient.getSchemaClient().createSchema(schema.toSingleLineJsonString()));
 
-    // Update the schema with updateSchema api
-    expectValidationException(
-        () -> adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString()));
+    // Update the schema with updateSchema api - verify the error message includes the actual reason
+    expectValidationExceptionWithMessage(
+        () -> adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString()),
+        "Incompatible field specifications");
 
     // Change the column data type from STRING to BOOLEAN
     newColumnFieldSpec.setDataType(DataType.BOOLEAN);
@@ -274,6 +275,15 @@ public class PinotSchemaRestletResourceTest {
         expectThrows(RuntimeException.class, () -> runUnchecked(runnable));
     Throwable cause = unwrap(runtimeException);
     assertTrue(cause instanceof PinotAdminValidationException, "Unexpected exception: " + cause);
+  }
+
+  private void expectValidationExceptionWithMessage(ThrowingRunnable runnable, String expectedMessageSubstring) {
+    RuntimeException runtimeException =
+        expectThrows(RuntimeException.class, () -> runUnchecked(runnable));
+    Throwable cause = unwrap(runtimeException);
+    assertTrue(cause instanceof PinotAdminValidationException, "Unexpected exception: " + cause);
+    assertTrue(cause.getMessage().contains(expectedMessageSubstring),
+        "Expected message to contain '" + expectedMessageSubstring + "' but was: " + cause.getMessage());
   }
 
   private void expectNotFoundException(ThrowingRunnable runnable) {
