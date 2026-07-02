@@ -21,6 +21,7 @@ package org.apache.pinot.spi.stream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -38,7 +39,7 @@ public class PartitionGroupMetadataFetcherTest {
   public void testFetchSingleStreamSuccess()
       throws Exception {
     // Setup
-    StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", false);
+    StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", 0);
     List<StreamConfig> streamConfigs = Collections.singletonList(streamConfig);
 
     PartitionGroupConsumptionStatus status = mock(PartitionGroupConsumptionStatus.class);
@@ -79,7 +80,7 @@ public class PartitionGroupMetadataFetcherTest {
   public void testFetchSingleStreamTransientException()
       throws Exception {
     // Setup
-    StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", false);
+    StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", 0);
     List<StreamConfig> streamConfigs = Collections.singletonList(streamConfig);
 
     List<PartitionGroupConsumptionStatus> statusList = Collections.emptyList();
@@ -113,8 +114,8 @@ public class PartitionGroupMetadataFetcherTest {
   public void testFetchMultipleStreams()
       throws Exception {
     // Setup
-    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
-    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", 0);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", 1);
     List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
 
     PartitionGroupConsumptionStatus status1 = new PartitionGroupConsumptionStatus(0, 0, null, null, "IN_PROGRESS");
@@ -168,9 +169,9 @@ public class PartitionGroupMetadataFetcherTest {
   public void testFetchMultipleStreamsWithPause()
       throws Exception {
     // Setup
-    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
-    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
-    StreamConfig streamConfig3 = createMockStreamConfig("topic3", "test-table", false);
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", 0);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", 1);
+    StreamConfig streamConfig3 = createMockStreamConfig("topic3", "test-table", 2);
     List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2, streamConfig3);
 
     PartitionGroupConsumptionStatus status1 = new PartitionGroupConsumptionStatus(0, 0, null, null, "IN_PROGRESS");
@@ -219,8 +220,8 @@ public class PartitionGroupMetadataFetcherTest {
   @Test
   public void testDeprecatedGetPartitionGroupMetadataListFlatMaps()
       throws Exception {
-    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
-    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", 0);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", 1);
     List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
 
     PartitionGroupConsumptionStatus status1 = new PartitionGroupConsumptionStatus(0, 0, null, null, "IN_PROGRESS");
@@ -255,7 +256,7 @@ public class PartitionGroupMetadataFetcherTest {
   @Test
   public void testExceptionResetOnRetry()
       throws Exception {
-    StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", false);
+    StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", 0);
     List<StreamConfig> streamConfigs = Collections.singletonList(streamConfig);
 
     StreamPartitionMsgOffset offset = mock(StreamPartitionMsgOffset.class);
@@ -295,8 +296,8 @@ public class PartitionGroupMetadataFetcherTest {
   @Test
   public void testSequenceNumberPreservedInMultiStreamRemap()
       throws Exception {
-    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
-    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", 0);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", 1);
     List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
 
     List<PartitionGroupConsumptionStatus> statusList = Collections.emptyList();
@@ -336,7 +337,7 @@ public class PartitionGroupMetadataFetcherTest {
   @Test
   public void testGetStreamMetadataListReturnsUnmodifiable()
       throws Exception {
-    StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", false);
+    StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", 0);
     List<StreamConfig> streamConfigs = Collections.singletonList(streamConfig);
 
     PartitionGroupMetadata metadata = new PartitionGroupMetadata(0, mock(StreamPartitionMsgOffset.class));
@@ -374,8 +375,8 @@ public class PartitionGroupMetadataFetcherTest {
   @Test
   public void testFetchMultipleStreamsOneTopicPermanentFailure()
       throws Exception {
-    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table_REALTIME", false);
-    StreamConfig streamConfig2 = createMockStreamConfig("topic2-deleted", "test-table_REALTIME", false);
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table_REALTIME", 0);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2-deleted", "test-table_REALTIME", 1);
     List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
 
     StreamPartitionMsgOffset offset = mock(StreamPartitionMsgOffset.class);
@@ -416,8 +417,8 @@ public class PartitionGroupMetadataFetcherTest {
   @Test
   public void testFetchMultipleStreamsFailedTopicDoesNotBlockOthersOnRetry()
       throws Exception {
-    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table_REALTIME", false);
-    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table_REALTIME", false);
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table_REALTIME", 0);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table_REALTIME", 1);
     List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
 
     StreamPartitionMsgOffset offset = mock(StreamPartitionMsgOffset.class);
@@ -458,8 +459,8 @@ public class PartitionGroupMetadataFetcherTest {
   @Test
   public void testFetchMultipleStreamsNonPermanentExceptionStillPropagates()
       throws Exception {
-    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table_REALTIME", false);
-    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table_REALTIME", false);
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table_REALTIME", 0);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table_REALTIME", 1);
     List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
 
     StreamMetadataProvider goodProvider = mock(StreamMetadataProvider.class);
@@ -494,10 +495,12 @@ public class PartitionGroupMetadataFetcherTest {
     }
   }
 
-  private StreamConfig createMockStreamConfig(String topicName, String tableName, boolean isEphemeral) {
+  private StreamConfig createMockStreamConfig(String topicName, String tableName, int configId) {
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getTopicName()).thenReturn(topicName);
     when(streamConfig.getTableNameWithType()).thenReturn(tableName);
+    when(streamConfig.getStreamConfigsMap()).thenReturn(
+        Map.of(StreamConfigProperties.STREAM_CONFIG_ID, String.valueOf(configId)));
     return streamConfig;
   }
 }
