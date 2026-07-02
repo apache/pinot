@@ -106,6 +106,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   REALTIME_CONSUMER_DIR_USAGE("bytes", true),
   SEGMENT_DOWNLOAD_SPEED("bytes", true),
   PREDOWNLOAD_SPEED("bytes", true),
+  PEER_DOWNLOAD_SPEED("bytes", true),
   ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
 
   // gRPC Netty buffer metrics

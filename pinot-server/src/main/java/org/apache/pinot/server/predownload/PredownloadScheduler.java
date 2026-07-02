@@ -19,9 +19,12 @@
 package org.apache.pinot.server.predownload;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +75,8 @@ public class PredownloadScheduler {
   @VisibleForTesting
   Set<String> _failedSegments;
   private PredownloadMetrics _predownloadMetrics;
+  private boolean _peerDownloadEnabled;
+  private String _peerDownloadScheme;
   private int _numOfSkippedSegments;
   private int _numOfUnableToDownloadSegments;
   private int _numOfDownloadSegments;
@@ -107,6 +112,18 @@ public class PredownloadScheduler {
     _failedSegments = ConcurrentHashMap.newKeySet();
     _executor = Executors.newFixedThreadPool(predownloadParallelism);
     LOGGER.info("Created thread pool with num of threads: {}", predownloadParallelism);
+
+    _peerDownloadEnabled = properties.getBoolean("pinot.server.peer.download.enabled", false);
+    _peerDownloadScheme = _instanceDataManagerConfig.getSegmentPeerDownloadScheme();
+    if (_peerDownloadScheme != null) {
+      _peerDownloadScheme = _peerDownloadScheme.toLowerCase();
+      Preconditions.checkState(
+          CommonConstants.HTTP_PROTOCOL.equals(_peerDownloadScheme)
+              || CommonConstants.HTTPS_PROTOCOL.equals(_peerDownloadScheme),
+          "Unsupported peer download scheme: %s", _peerDownloadScheme);
+    }
+    LOGGER.info("Peer download enabled: {}, scheme: {}", _peerDownloadEnabled, _peerDownloadScheme);
+
     _numOfSkippedSegments = 0;
     _numOfDownloadSegments = 0;
   }
@@ -301,23 +318,25 @@ public class PredownloadScheduler {
       throws Exception {
     try {
       long startTime = System.currentTimeMillis();
-      File tempRootDir = getTmpSegmentDataDir(predownloadSegmentInfo);
-      if (_instanceDataManagerConfig.isStreamSegmentDownloadUntar()
-          && predownloadSegmentInfo.getCrypterName() == null) {
-        try {
-          // TODO: increase rate limit here
-          File untaredSegDir = downloadAndStreamUntarWithRateLimit(predownloadSegmentInfo, tempRootDir,
-              _instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit());
-          moveSegment(predownloadSegmentInfo, untaredSegDir);
-        } finally {
-          FileUtils.deleteQuietly(tempRootDir);
-        }
-      } else {
-        try {
-          File tarFile = downloadAndDecrypt(predownloadSegmentInfo, tempRootDir);
-          untarAndMoveSegment(predownloadSegmentInfo, tarFile, tempRootDir);
-        } finally {
-          FileUtils.deleteQuietly(tempRootDir);
+      try {
+        downloadFromDeepStore(predownloadSegmentInfo);
+        _predownloadMetrics.deepStoreSegmentDownloaded();
+      } catch (Exception e) {
+        if (_peerDownloadEnabled && _peerDownloadScheme != null) {
+          LOGGER.warn("Deep store download failed for segment: {} of table: {}, falling back to peer download",
+              predownloadSegmentInfo.getSegmentName(), predownloadSegmentInfo.getTableNameWithType(), e);
+          long peerStartTime = System.currentTimeMillis();
+          try {
+            downloadFromPeers(predownloadSegmentInfo);
+            _predownloadMetrics.peerSegmentDownloaded(true, predownloadSegmentInfo.getSegmentName(),
+                predownloadSegmentInfo.getLocalSizeBytes(),
+                System.currentTimeMillis() - peerStartTime);
+          } catch (Exception peerEx) {
+            _predownloadMetrics.peerSegmentDownloaded(false, predownloadSegmentInfo.getSegmentName(), 0, 0);
+            throw peerEx;
+          }
+        } else {
+          throw e;
         }
       }
       _failedSegments.remove(predownloadSegmentInfo.getSegmentName());
@@ -333,6 +352,52 @@ public class PredownloadScheduler {
       _failedSegments.add(predownloadSegmentInfo.getSegmentName());
       _predownloadMetrics.segmentDownloaded(false, predownloadSegmentInfo.getSegmentName(), 0, 0);
       throw e;
+    }
+  }
+
+  private void downloadFromDeepStore(PredownloadSegmentInfo predownloadSegmentInfo)
+      throws Exception {
+    File tempRootDir = getTmpSegmentDataDir(predownloadSegmentInfo);
+    if (_instanceDataManagerConfig.isStreamSegmentDownloadUntar()
+        && predownloadSegmentInfo.getCrypterName() == null) {
+      try {
+        File untaredSegDir = downloadAndStreamUntarWithRateLimit(predownloadSegmentInfo, tempRootDir,
+            _instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit());
+        moveSegment(predownloadSegmentInfo, untaredSegDir);
+      } finally {
+        FileUtils.deleteQuietly(tempRootDir);
+      }
+    } else {
+      try {
+        File tarFile = downloadAndDecrypt(predownloadSegmentInfo, tempRootDir);
+        untarAndMoveSegment(predownloadSegmentInfo, tarFile, tempRootDir);
+      } finally {
+        FileUtils.deleteQuietly(tempRootDir);
+      }
+    }
+  }
+
+  private void downloadFromPeers(PredownloadSegmentInfo predownloadSegmentInfo)
+      throws Exception {
+    String segmentName = predownloadSegmentInfo.getSegmentName();
+    String tableNameWithType = predownloadSegmentInfo.getTableNameWithType();
+    LOGGER.info("Downloading segment: {} of table: {} from peers using scheme: {}", segmentName, tableNameWithType,
+        _peerDownloadScheme);
+    File tempRootDir = getTmpSegmentDataDir(predownloadSegmentInfo);
+    try {
+      File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
+        List<URI> peerURIs =
+            _predownloadZkClient.getPeerServerURIs(_predownloadZkClient.getDataAccessor(), tableNameWithType,
+                segmentName, _peerDownloadScheme);
+        Collections.shuffle(peerURIs);
+        return peerURIs;
+      }, segmentTarFile, predownloadSegmentInfo.getCrypterName());
+      LOGGER.info("Downloaded segment: {} from peers to: {}, file length: {}", segmentName, segmentTarFile,
+          segmentTarFile.length());
+      untarAndMoveSegment(predownloadSegmentInfo, segmentTarFile, tempRootDir);
+    } finally {
+      FileUtils.deleteQuietly(tempRootDir);
     }
   }
 
@@ -395,7 +460,6 @@ public class PredownloadScheduler {
     } catch (AttemptsExceededException e) {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,
           tableNameWithType, uri, tarFile);
-      // TODO: add download from peer logic
       throw e;
     }
   }
