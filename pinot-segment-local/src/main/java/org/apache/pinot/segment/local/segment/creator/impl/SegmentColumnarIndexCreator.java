@@ -32,6 +32,8 @@ import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.roaringbitmap.RoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -39,7 +41,15 @@ import org.roaringbitmap.RoaringBitmap;
  */
 // TODO: check resource leaks
 public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
+
   private int _nextDocId;
+
+  // Column-major build-path accounting, populated only by indexColumn(String, ColumnReader) and summarized
+  // once via logColumnMajorBuildPathSummary(). A fresh creator is instantiated per segment build, so these
+  // reset naturally; the row-major path never touches them.
+  private int _columnMajorTypedFastPathColumns;
+  private int _columnMajorObjectPathColumns;
 
   @Override
   public void indexRow(GenericRow row)
@@ -167,8 +177,13 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     if (fieldSpec.isSingleValueField()
         && indexSingleValuePrimitive(columnName, fieldSpec, destDataType, columnReader, dictionaryCreator,
             creatorsByIndex, nullVec)) {
+      _columnMajorTypedFastPathColumns++;
       return;
     }
+    // Multi-value columns, non-primitive single-value types, and fast-path primitives whose reader serves a
+    // different physical type all fall through to the Object path below (the single source of truth for null
+    // and type handling).
+    _columnMajorObjectPathColumns++;
 
     Object reuseColumnValueToIndex;
     int docId = 0;
@@ -200,13 +215,14 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
   }
 
   /**
-   * Typed, allocation-free index write for a single-value primitive column. Returns {@code true} if it
-   * consumed the column (the reader served it as INT / LONG / FLOAT / DOUBLE directly), or {@code
-   * false} — without advancing the reader — if the caller should fall back to the Object path. Drives
-   * each value through {@code ColumnReader.nextInt()}/... -> {@code indexOfSV(primitive)} -> {@code
+   * Typed, allocation-free index write for a single-value primitive column. Returns {@code true} if it consumed
+   * the column (the reader served it as INT / LONG / FLOAT / DOUBLE directly). Otherwise it returns {@code false}
+   * — without advancing the reader — either because the column is not a fast-path primitive, or because it is
+   * one but the reader serves a different physical type, so the caller falls back to the Object path. Drives each
+   * value through {@code ColumnReader.nextInt()}/... -> {@code indexOfSV(primitive)} -> {@code
    * IndexCreator.addInt(primitive, dictId)}, avoiding the box that {@code next() -> indexOfSV(Object) ->
-   * add(Object, ...)} incurs. Null docs (rare) are routed through the shared Object handling for exact
-   * parity, including whole-value-null marking in the null-value vector.
+   * add(Object, ...)} incurs. Null docs (rare) are routed through the shared Object handling for exact parity,
+   * including whole-value-null marking in the null-value vector.
    */
   private boolean indexSingleValuePrimitive(String columnName, FieldSpec fieldSpec, PinotDataType destDataType,
       ColumnReader columnReader, SegmentDictionaryCreator dictionaryCreator, List<IndexCreator> creatorsByIndex,
@@ -309,6 +325,17 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
       nullVec.setNull(docId);
     }
     return ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, rawValue);
+  }
+
+  /**
+   * Emit a single INFO line, once per column-major build after all columns are indexed, reporting how many
+   * single-value primitive columns took the typed allocation-free fast path versus the Object path (multi-value,
+   * non-primitive single-value, or a fast-path primitive whose source type did not match the schema).
+   */
+  void logColumnMajorBuildPathSummary() {
+    LOGGER.info("Column-major build path for segment {}: {} column(s) via typed single-value primitive fast path, "
+            + "{} column(s) via Object path",
+        getSegmentName(), _columnMajorTypedFastPathColumns, _columnMajorObjectPathColumns);
   }
 
   private void indexColumnValue(PinotSegmentColumnReader colReader,

@@ -556,6 +556,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
       LOGGER.info("Finished indexing using columnar approach in IndexCreator!");
       handlePostCreation();
+
+      if (_indexCreator instanceof SegmentColumnarIndexCreator) {
+        // Logged after seal so the final segment name is available; only reads accumulated counters.
+        ((SegmentColumnarIndexCreator) _indexCreator).logColumnMajorBuildPathSummary();
+      }
     } catch (Exception e) {
       try {
         _indexCreator.close();
