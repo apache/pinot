@@ -230,8 +230,10 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     // The segment download URL is auth-protected (BasicAuth is enabled on the controller).
     // The controller will fetch from this URL using SegmentFetcherFactory, which must be
     // initialized with pinot.controller.segment.fetcher.auth.token to pass credentials.
+    // NOTE: the download endpoint stores and looks up segment files by rawTableName ("baseballStats"),
+    // not by tableNameWithType ("baseballStats_OFFLINE"), so we use rawTableName in the URL.
     String segmentDownloadUrl =
-        "http://localhost:" + getControllerPort() + "/segments/baseballStats_OFFLINE/" + segmentName;
+        "http://localhost:" + getControllerPort() + "/segments/baseballStats/" + segmentName;
 
     // Pass tableName as a URL query parameter directly in the URI.
     // ClassicRequestBuilder.addParameter() adds form data to the POST body, but the controller's
