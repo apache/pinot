@@ -750,6 +750,48 @@
           "\n                        └── [2]@localhost:1|[0] TABLE SCAN (a) null",
           "\n"
         ]
+      },
+      {
+        "description": "set op (UNION ALL) without the colocation hint shuffles (hash redistributes) its inputs to all set-op-stage workers",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT col3 FROM a UNION ALL SELECT col3 FROM a",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)",
+          "\n├── [1]@localhost:2|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)",
+          "\n└── [1]@localhost:1|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}",
+          "\n    └── [1]@localhost:1|[0] UNION_ALL",
+          "\n        └── [1]@localhost:1|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)",
+          "\n            ├── [2]@localhost:2|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[0],[1]@localhost:2|[1]} (Subtree Omitted)",
+          "\n            └── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[0],[1]@localhost:2|[1]}",
+          "\n                └── [2]@localhost:1|[0] PROJECT",
+          "\n                    └── [2]@localhost:1|[0] TABLE SCAN (a) null",
+          "\n        └── [1]@localhost:1|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)",
+          "\n            ├── [3]@localhost:2|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[0],[1]@localhost:2|[1]} (Subtree Omitted)",
+          "\n            └── [3]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[0],[1]@localhost:2|[1]}",
+          "\n                └── [3]@localhost:1|[0] PROJECT",
+          "\n                    └── [3]@localhost:1|[0] TABLE SCAN (a) null",
+          "\n"
+        ]
+      },
+      {
+        "description": "set op (UNION ALL) with the is_colocated_by_set_op_keys hint uses a pre-partitioned (direct, 1-to-1) exchange on every input to avoid the shuffle",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ col3 FROM a UNION ALL SELECT col3 FROM a",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)",
+          "\n├── [1]@localhost:2|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)",
+          "\n└── [1]@localhost:1|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}",
+          "\n    └── [1]@localhost:1|[0] UNION_ALL",
+          "\n        └── [1]@localhost:1|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)",
+          "\n            ├── [2]@localhost:2|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[1]} (Subtree Omitted)",
+          "\n            └── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[0]}",
+          "\n                └── [2]@localhost:1|[0] PROJECT",
+          "\n                    └── [2]@localhost:1|[0] TABLE SCAN (a) null",
+          "\n        └── [1]@localhost:1|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)",
+          "\n            ├── [3]@localhost:2|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[1]} (Subtree Omitted)",
+          "\n            └── [3]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[0]}",
+          "\n                └── [3]@localhost:1|[0] PROJECT",
+          "\n                    └── [3]@localhost:1|[0] TABLE SCAN (a) null",
+          "\n"
+        ]
       }
     ]
   }

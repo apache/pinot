@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.hint;
 
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
@@ -42,6 +43,7 @@ public class PinotHintOptions {
   public static final String JOIN_HINT_OPTIONS = "joinOptions";
   public static final String TABLE_HINT_OPTIONS = "tableOptions";
   public static final String WINDOW_HINT_OPTIONS = "windowOptions";
+  public static final String SET_OP_HINT_OPTIONS = "setOpOptions";
 
   public static class AggregateOptions {
     public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "is_partitioned_by_group_by_keys";
@@ -87,6 +89,36 @@ public class PinotHintOptions {
     public static Boolean isPartitionedByWindowKeys(Window window) {
       String hint =
           PinotHintStrategyTable.getHintOption(window.getHints(), WINDOW_HINT_OPTIONS, IS_PARTITIONED_BY_WINDOW_KEYS);
+      return hint != null ? Boolean.parseBoolean(hint) : null;
+    }
+  }
+
+  /**
+   * Hint options for set operations (UNION / UNION ALL / INTERSECT / EXCEPT).
+   */
+  public static class SetOpHintOptions {
+    /**
+     * Forces (or disables) a colocated, pre-partitioned exchange on every input of a set operation
+     * (UNION / UNION ALL / INTERSECT / EXCEPT), so the inputs are processed in place without a network shuffle.
+     *
+     * <p>This is opt-in and honored only by the default (V1) query planner; the V2 physical planner determines
+     * colocation on its own. Like the join hint {@link JoinHintOptions#IS_COLOCATED_BY_JOIN_KEYS}, it trusts the user:
+     * {@code 'true'} forces a pre-partitioned exchange and bypasses the planner's automatic detection, while
+     * {@code 'false'} forces a normal shuffle even when the planner would otherwise detect pre-partitioning. A set
+     * operation matches rows on the entire output row, so forcing {@code 'true'} is only correct when all inputs are
+     * partitioned the same way (same partition function and count) on one or more of the projected columns, so that
+     * rows which are equal across all projected columns are guaranteed to land on the same worker. Forcing it when that
+     * does not hold silently produces wrong results for INTERSECT, EXCEPT and distinct UNION; UNION ALL only
+     * concatenates and is unaffected.
+     */
+    public static final String IS_COLOCATED_BY_SET_OP_KEYS = "is_colocated_by_set_op_keys";
+
+    /// Reads the hint from a hint list. Unlike {@link JoinHintOptions#isColocatedByJoinKeys}, this takes the hint list
+    /// directly because the hint can attach either to the set operation itself or to one of its inputs (see
+    /// {@code PinotSetOpExchangeNodeInsertRule}), and the caller resolves which one applies.
+    @Nullable
+    public static Boolean isColocatedBySetOpKeys(List<RelHint> hints) {
+      String hint = PinotHintStrategyTable.getHintOption(hints, SET_OP_HINT_OPTIONS, IS_COLOCATED_BY_SET_OP_KEYS);
       return hint != null ? Boolean.parseBoolean(hint) : null;
     }
   }
