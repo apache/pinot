@@ -161,7 +161,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+      int partitionGroupId =
+          new LLCSegmentName(segmentZKMetadata.getSegmentName()).getTopicPartitionId().getPartitionId();
       assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
       numSegmentsForPartition[partitionGroupId]++;
     }
@@ -268,7 +269,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+      int partitionGroupId =
+          new LLCSegmentName(segmentZKMetadata.getSegmentName()).getTopicPartitionId().getPartitionId();
       numSegmentsForPartition[partitionGroupId]++;
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
@@ -345,7 +347,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+      int partitionGroupId =
+          new LLCSegmentName(segmentZKMetadata.getSegmentName()).getTopicPartitionId().getPartitionId();
       numSegmentsForPartition[partitionGroupId]++;
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {

@@ -244,7 +244,8 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     Map<String, SegmentZKMetadata> segmentZKMetadataMap = new HashMap<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
-      String segmentKey = llcSegmentName.getPartitionGroupId() + "_" + llcSegmentName.getSequenceNumber();
+      String segmentKey =
+          llcSegmentName.getTopicPartitionId().getPartitionId() + "_" + llcSegmentName.getSequenceNumber();
       segmentZKMetadataMap.put(segmentKey, segmentZKMetadata);
     }
     return segmentZKMetadataMap;

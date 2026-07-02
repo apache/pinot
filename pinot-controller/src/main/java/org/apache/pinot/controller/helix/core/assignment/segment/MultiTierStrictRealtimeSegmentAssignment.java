@@ -107,7 +107,7 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
       if (llcSegmentName == null) {
         continue;
       }
-      if (llcSegmentName.getPartitionGroupId() == partitionId && (latestLLCSegmentName == null
+      if (llcSegmentName.getTopicPartitionId().getPartitionId() == partitionId && (latestLLCSegmentName == null
           || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber())) {
         latestLLCSegmentName = llcSegmentName;
         latestAssignment = entry.getValue().keySet();

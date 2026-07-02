@@ -455,7 +455,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   static int inferPartitionId(String segmentName, int numPartitions) {
     if (LLCSegmentName.isLLCSegment(segmentName)) {
       LLCSegmentName llc = LLCSegmentName.of(segmentName);
-      return llc != null ? (llc.getPartitionGroupId() % numPartitions) : -1;
+      return llc != null ? (llc.getTopicPartitionId().getPartitionId() % numPartitions) : -1;
     } else if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName)) {
       UploadedRealtimeSegmentName uploaded = UploadedRealtimeSegmentName.of(segmentName);
       return uploaded != null ? (uploaded.getPartitionId() % numPartitions) : -1;

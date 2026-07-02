@@ -260,7 +260,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       // Skip UPLOADED segments that don't conform to the LLC segment name
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName());
       if (llcSegmentName != null) {
-        int partitionId = llcSegmentName.getPartitionGroupId();
+        int partitionId = llcSegmentName.getTopicPartitionId().getPartitionId();
         allPartitions.add(partitionId);
         latestLLCSegmentNameMap.compute(partitionId, (k, latestLLCSegmentName) -> {
           if (latestLLCSegmentName == null

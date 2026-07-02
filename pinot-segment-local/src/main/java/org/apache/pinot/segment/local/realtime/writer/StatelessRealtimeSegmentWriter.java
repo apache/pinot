@@ -125,7 +125,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
 
     _segmentName = segmentZKMetadata.getSegmentName();
-    _partitionGroupId = llcSegmentName.getPartitionGroupId();
+    _partitionGroupId = llcSegmentName.getTopicPartitionId().getPartitionId();
     _segBuildSemaphore = segBuildSemaphore;
     _tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(llcSegmentName.getTableName());
     _segmentZKMetadata = segmentZKMetadata;

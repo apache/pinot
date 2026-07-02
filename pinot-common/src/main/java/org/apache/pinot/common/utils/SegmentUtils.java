@@ -72,7 +72,7 @@ public class SegmentUtils {
   public static Integer getPartitionIdFromSegmentName(String segmentName) {
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     if (llcSegmentName != null) {
-      return llcSegmentName.getPartitionGroupId();
+      return llcSegmentName.getTopicPartitionId().getPartitionId();
     }
     UploadedRealtimeSegmentName uploadedRealtimeSegmentName = UploadedRealtimeSegmentName.of(segmentName);
     if (uploadedRealtimeSegmentName != null) {

@@ -102,11 +102,11 @@ public class ConsumerCoordinator {
         LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName,
             waitTimeMs);
         _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
-            llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, waitTimeMs);
+            llcSegmentName.getTopicPartitionId().getPartitionId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, waitTimeMs);
       }
     } finally {
       _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
-          llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, 0);
+          llcSegmentName.getTopicPartitionId().getPartitionId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, 0);
     }
   }
 
@@ -197,7 +197,7 @@ public class ConsumerCoordinator {
     // so that it can always pass the check.
     int maxSequenceNumberBelowCurrentSegment = -1;
     String instanceId = _realtimeTableDataManager.getServerInstance();
-    int partitionId = currentSegment.getPartitionGroupId();
+    int partitionId = currentSegment.getTopicPartitionId().getPartitionId();
     int currentSequenceNumber = currentSegment.getSequenceNumber();
 
     for (Map.Entry<String, Map<String, String>> entry : getSegmentAssignment().entrySet()) {
@@ -215,7 +215,7 @@ public class ConsumerCoordinator {
         continue;
       }
 
-      if (llcSegmentName.getPartitionGroupId() != partitionId) {
+      if (llcSegmentName.getTopicPartitionId().getPartitionId() != partitionId) {
         // ignore segments of different partitions.
         continue;
       }

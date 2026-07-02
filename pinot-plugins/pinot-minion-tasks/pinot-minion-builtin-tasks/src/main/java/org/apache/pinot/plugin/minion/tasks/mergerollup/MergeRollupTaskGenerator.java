@@ -603,14 +603,15 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       String segmentName = segmentZKMetadata.getSegmentName();
       if (LLCSegmentName.isLLCSegment(segmentName)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-        partitionIdToLatestCompletedSegment.compute(llcSegmentName.getPartitionGroupId(), (partId, latestSegment) -> {
-          if (latestSegment == null) {
-            return llcSegmentName;
-          } else {
-            return latestSegment.getSequenceNumber() > llcSegmentName.getSequenceNumber()
+        partitionIdToLatestCompletedSegment.compute(llcSegmentName.getTopicPartitionId().getPartitionId(),
+            (partId, latestSegment) -> {
+              if (latestSegment == null) {
+                return llcSegmentName;
+              } else {
+                return latestSegment.getSequenceNumber() > llcSegmentName.getSequenceNumber()
                     ? latestSegment : llcSegmentName;
-          }
-        });
+              }
+            });
       }
     }
     Set<String> filteredSegmentNames = new HashSet<>();

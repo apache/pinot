@@ -152,7 +152,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     for (String segmentNameStr : ev.getPartitionSet()) {
       if (LLCSegmentName.isLLCSegment(segmentNameStr)) {
         LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-        if (segmentName.getSequenceNumber() == seqNum && segmentName.getPartitionGroupId() == partition
+        if (segmentName.getSequenceNumber() == seqNum && segmentName.getTopicPartitionId().getPartitionId() == partition
             && ev.getStateMap(segmentNameStr).values().contains(
             CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE)) {
           isOffline = true;
@@ -563,7 +563,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
           if (is.getInstanceStateMap(segmentNameStr).values().contains(
               CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
             LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-            if (segmentName.getPartitionGroupId() == partition) {
+            if (segmentName.getTopicPartitionId().getPartitionId() == partition) {
               seqNum.set(segmentName.getSequenceNumber());
             }
           }

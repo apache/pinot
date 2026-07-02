@@ -39,7 +39,7 @@ public class LLCSegmentNameTest {
     assertEquals(segmentName, "myTable__0__1__20160609T2142Z");
     assertTrue(LLCSegmentName.isLLCSegment(segmentName));
     assertEquals(llcSegmentName.getTableName(), "myTable");
-    assertEquals(llcSegmentName.getPartitionGroupId(), 0);
+    assertEquals(llcSegmentName.getTopicPartitionId().getPartitionId(), 0);
     assertEquals(llcSegmentName.getSequenceNumber(), 1);
 
     // Invalid segment name
@@ -58,7 +58,7 @@ public class LLCSegmentNameTest {
 
     LLCSegmentName segName1 = new LLCSegmentName(tableName, partitionGroupId, sequenceNumber, msSinceEpoch);
     Assert.assertEquals(segName1.getSegmentName(), segmentName);
-    Assert.assertEquals(segName1.getPartitionGroupId(), partitionGroupId);
+    Assert.assertEquals(segName1.getTopicPartitionId().getPartitionId(), partitionGroupId);
     Assert.assertEquals(segName1.getCreationTime(), creationTime);
     Assert.assertEquals(segName1.getCreationTimeMs(), creationTimeInMs);
     Assert.assertEquals(segName1.getSequenceNumber(), sequenceNumber);
@@ -66,7 +66,7 @@ public class LLCSegmentNameTest {
 
     LLCSegmentName segName2 = new LLCSegmentName(segmentName);
     Assert.assertEquals(segName2.getSegmentName(), segmentName);
-    Assert.assertEquals(segName2.getPartitionGroupId(), partitionGroupId);
+    Assert.assertEquals(segName2.getTopicPartitionId().getPartitionId(), partitionGroupId);
     Assert.assertEquals(segName2.getCreationTime(), creationTime);
     Assert.assertEquals(segName2.getCreationTimeMs(), creationTimeInMs);
     Assert.assertEquals(segName2.getSequenceNumber(), sequenceNumber);

@@ -169,14 +169,15 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       // Skip UPLOADED segments that don't conform to the LLC segment name
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName());
       if (llcSegmentName != null) {
-        latestLLCSegmentNameMap.compute(llcSegmentName.getPartitionGroupId(), (k, latestLLCSegmentName) -> {
-          if (latestLLCSegmentName == null
-              || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
-            return llcSegmentName;
-          } else {
-            return latestLLCSegmentName;
-          }
-        });
+        latestLLCSegmentNameMap.compute(llcSegmentName.getTopicPartitionId().getPartitionId(),
+            (k, latestLLCSegmentName) -> {
+              if (latestLLCSegmentName == null
+                  || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
+                return llcSegmentName;
+              } else {
+                return latestLLCSegmentName;
+              }
+            });
       }
     }
     Set<String> lastLLCSegmentPerPartition = new HashSet<>();

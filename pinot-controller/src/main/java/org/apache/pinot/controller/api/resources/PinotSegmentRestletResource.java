@@ -1124,7 +1124,7 @@ public class PinotSegmentRestletResource {
         LOGGER.info("Skip segment: {} not in low-level consumer format", segmentName);
         continue;
       }
-      int partitionId = llcSegmentName.getPartitionGroupId();
+      int partitionId = llcSegmentName.getTopicPartitionId().getPartitionId();
 
       LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionId);
       if (oldestSegment == null) {
@@ -1163,7 +1163,7 @@ public class PinotSegmentRestletResource {
         LOGGER.warn("Segment: {} is not present in the ideal state", segment);
         continue;
       }
-      int partitionId = llcSegmentName.getPartitionGroupId();
+      int partitionId = llcSegmentName.getTopicPartitionId().getPartitionId();
 
       LLCSegmentName currentOldest = partitionToOldestSegment.get(partitionId);
       if (currentOldest == null || llcSegmentName.getSequenceNumber() < currentOldest.getSequenceNumber()) {
