@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -88,7 +87,7 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
 
   @Override
   public List<BaseProjectOperator<?>> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   @Override

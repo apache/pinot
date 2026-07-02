@@ -20,10 +20,10 @@ package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import com.google.common.collect.Lists;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
@@ -92,7 +92,7 @@ public class MergeRollupTaskGeneratorTest {
     assertTrue(MergeRollupTaskGenerator.validate(tableConfig, MinionConstants.MergeRollupTask.TASK_TYPE));
 
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(Collections.emptyList(), "REFRESH", "daily"));
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(List.of(), "REFRESH", "daily"));
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
             .setIngestionConfig(ingestionConfig).build();
@@ -182,7 +182,7 @@ public class MergeRollupTaskGeneratorTest {
         () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, taskConfig));
 
     // Parseable aggregation type without an available value aggregator should fail the validation
-    taskConfig.put("c.aggregationType", "avg");
+    taskConfig.put("c.aggregationType", "distinctCount");
     assertThrows(IllegalStateException.class,
         () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, taskConfig));
     taskConfig.put("c.aggregationType", "lastWithTime");
@@ -214,6 +214,44 @@ public class MergeRollupTaskGeneratorTest {
     missingColumnConfig.put("missingCol.aggregationType", "sum");
     assertThrows(IllegalStateException.class,
         () -> taskGenerator.validateTaskConfigs(tableConfigWithTimeColumn, schema, missingColumnConfig));
+  }
+
+  @Test
+  public void testBytesBackedAggregationColumnTypeValidation() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new MetricFieldSpec("bytesCol", FieldSpec.DataType.BYTES));
+    schema.addField(new MetricFieldSpec("longCol", FieldSpec.DataType.LONG));
+    schema.addField(new DimensionFieldSpec("d", FieldSpec.DataType.STRING, true));
+    schema.addField(new DateTimeFieldSpec(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME).build();
+
+    // Bytes-backed aggregations on a BYTES column are valid
+    for (String aggregationType : new String[]{"avg", "percentileTDigest", "distinctCountHLL"}) {
+      Map<String, String> validConfig = new HashMap<>();
+      validConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
+      validConfig.put("bytesCol.aggregationType", aggregationType);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, validConfig);
+    }
+
+    // The same bytes-backed aggregations on a non-BYTES (LONG) column must fail at config time
+    for (String aggregationType : new String[]{"avg", "percentileTDigest", "distinctCountHLL"}) {
+      Map<String, String> invalidConfig = new HashMap<>();
+      invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
+      invalidConfig.put("longCol.aggregationType", aggregationType);
+      assertThrows(IllegalStateException.class,
+          () -> taskGenerator.validateTaskConfigs(tableConfig, schema, invalidConfig));
+    }
+
+    // Non-bytes-backed aggregations on a numeric column remain valid
+    for (String aggregationType : new String[]{"sum", "max"}) {
+      Map<String, String> validConfig = new HashMap<>();
+      validConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
+      validConfig.put("longCol.aggregationType", aggregationType);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, validConfig);
+    }
   }
 
   @Test
@@ -484,7 +522,7 @@ public class MergeRollupTaskGeneratorTest {
     TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
-        Lists.newArrayList(Collections.emptyList()));
+        Lists.newArrayList(List.of()));
     when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(new IdealState(OFFLINE_TABLE_NAME));
     mockMergeRollupTaskMetadataGetterAndSetter(mockClusterInfoProvide);
 
@@ -748,7 +786,7 @@ public class MergeRollupTaskGeneratorTest {
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
             .setSegmentPartitionConfig(new SegmentPartitionConfig(
-                Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10))))
+                Map.of("memberId", new ColumnPartitionConfig("murmur", 10))))
             .setTaskConfig(new TableTaskConfig(taskConfigsMap)).build();
 
     String segmentName1 = "testTable__1";
@@ -757,20 +795,20 @@ public class MergeRollupTaskGeneratorTest {
     String segmentName4 = "testTable__4";
     SegmentZKMetadata metadata1 =
         getSegmentZKMetadata(segmentName1, 86_400_000L, 90_000_000L, TimeUnit.MILLISECONDS, null);
-    metadata1.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap("memberId",
-        new ColumnPartitionMetadata("murmur", 10, Collections.singleton(0), null))));
+    metadata1.setPartitionMetadata(new SegmentPartitionMetadata(Map.of("memberId",
+        new ColumnPartitionMetadata("murmur", 10, Set.of(0), null))));
     SegmentZKMetadata metadata2 =
         getSegmentZKMetadata(segmentName2, 86_400_000L, 100_000_000L, TimeUnit.MILLISECONDS, null);
-    metadata2.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap("memberId",
-        new ColumnPartitionMetadata("murmur", 10, Collections.singleton(0), null))));
+    metadata2.setPartitionMetadata(new SegmentPartitionMetadata(Map.of("memberId",
+        new ColumnPartitionMetadata("murmur", 10, Set.of(0), null))));
     SegmentZKMetadata metadata3 =
         getSegmentZKMetadata(segmentName3, 86_400_000L, 110_000_000L, TimeUnit.MILLISECONDS, null);
-    metadata3.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap("memberId",
-        new ColumnPartitionMetadata("murmur", 10, Collections.singleton(1), null))));
+    metadata3.setPartitionMetadata(new SegmentPartitionMetadata(Map.of("memberId",
+        new ColumnPartitionMetadata("murmur", 10, Set.of(1), null))));
     SegmentZKMetadata metadata4 =
         getSegmentZKMetadata(segmentName4, 90_000_000L, 110_000_000L, TimeUnit.MILLISECONDS, null);
-    metadata4.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap("memberId",
-        new ColumnPartitionMetadata("murmur", 10, Collections.singleton(1), null))));
+    metadata4.setPartitionMetadata(new SegmentPartitionMetadata(Map.of("memberId",
+        new ColumnPartitionMetadata("murmur", 10, Set.of(1), null))));
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
         Lists.newArrayList(metadata1, metadata2, metadata3, metadata4));
@@ -969,7 +1007,7 @@ public class MergeRollupTaskGeneratorTest {
         getIdealState(OFFLINE_TABLE_NAME, Lists.newArrayList(segmentName1, segmentName2, mergedSegmentName1)));
     SegmentLineage segmentLineage = new SegmentLineage(OFFLINE_TABLE_NAME);
     segmentLineage.addLineageEntry(SegmentLineageUtils.generateLineageEntryId(),
-        new LineageEntry(Collections.singletonList(segmentName1), Collections.singletonList(mergedSegmentName1),
+        new LineageEntry(List.of(segmentName1), List.of(mergedSegmentName1),
             LineageEntryState.COMPLETED, 11111L));
     when(mockClusterInfoProvide.getSegmentLineage(OFFLINE_TABLE_NAME)).thenReturn(segmentLineage);
     taskStatesMap.put(taskName, TaskState.COMPLETED);
@@ -1053,7 +1091,7 @@ public class MergeRollupTaskGeneratorTest {
     SegmentLineage segmentLineage = new SegmentLineage(OFFLINE_TABLE_NAME);
     segmentLineage.addLineageEntry(SegmentLineageUtils.generateLineageEntryId(),
         new LineageEntry(Arrays.asList(segmentName1, segmentName2, segmentName3),
-            Collections.singletonList(segmentNameMergedDaily1), LineageEntryState.COMPLETED, 11111L));
+            List.of(segmentNameMergedDaily1), LineageEntryState.COMPLETED, 11111L));
     when(mockClusterInfoProvide.getSegmentLineage(OFFLINE_TABLE_NAME)).thenReturn(segmentLineage);
     Map<String, TaskState> taskStatesMap = new HashMap<>();
     String taskName1 = "Task_MergeRollupTask_1";
@@ -1090,7 +1128,7 @@ public class MergeRollupTaskGeneratorTest {
             segmentNameMergedDaily1, segmentNameMergedDaily2, segmentNameMergedDaily3)));
 
     segmentLineage.addLineageEntry(SegmentLineageUtils.generateLineageEntryId(),
-        new LineageEntry(Collections.singletonList(segmentName4),
+        new LineageEntry(List.of(segmentName4),
             Arrays.asList(segmentNameMergedDaily1, segmentNameMergedDaily2), LineageEntryState.COMPLETED, 11111L));
 
     String taskName2 = "Task_MergeRollupTask_2";
@@ -1136,10 +1174,10 @@ public class MergeRollupTaskGeneratorTest {
 
     segmentLineage.addLineageEntry(SegmentLineageUtils.generateLineageEntryId(),
         new LineageEntry(Arrays.asList(segmentNameMergedDaily3, segmentName5),
-            Collections.singletonList(segmentNameMergedDaily4), LineageEntryState.COMPLETED, 11111L));
+            List.of(segmentNameMergedDaily4), LineageEntryState.COMPLETED, 11111L));
     segmentLineage.addLineageEntry(SegmentLineageUtils.generateLineageEntryId(),
         new LineageEntry(Arrays.asList(segmentNameMergedDaily1, segmentNameMergedDaily2),
-            Collections.singletonList(segmentNameMergedMonthly1), LineageEntryState.COMPLETED, 11111L));
+            List.of(segmentNameMergedMonthly1), LineageEntryState.COMPLETED, 11111L));
 
     String taskName3 = "Task_MergeRollupTask_3";
     taskStatesMap.put(taskName3, TaskState.COMPLETED);

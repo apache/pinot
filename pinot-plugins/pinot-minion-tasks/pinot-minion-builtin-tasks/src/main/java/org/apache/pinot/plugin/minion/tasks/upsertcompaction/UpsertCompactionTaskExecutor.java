@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -79,13 +78,13 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     // Executor-only: read comparison mode string from task config (no auth resolution or URL hits).
     Map<String, String> taskConfigs =
         tableConfig.getTaskConfig() != null ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
-    String consensusMode =
-        taskConfigs != null ? taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
-            UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
-            : UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
+    String consensusMode = taskConfigs != null
+        ? taskConfigs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+            MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
+        : MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
     RoaringBitmap validDocIds =
         MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
-            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator, consensusMode);
+            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator, segmentMetadata.getDataCrc(), consensusMode);
     if (validDocIds == null) {
       // no valid crc match found or no validDocIds obtained from all servers
       // error out the task instead of silently failing so that we can track it via task-error metrics
@@ -165,7 +164,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-        Collections.singletonMap(UpsertCompactionTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
+        Map.of(UpsertCompactionTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));
   }
 }

@@ -28,8 +28,8 @@ import io.confluent.kafka.schemaregistry.json.JsonSchemaProvider;
 import io.confluent.kafka.serializers.json.KafkaJsonSchemaDeserializer;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -119,7 +119,7 @@ public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMes
             props.getOrDefault(CACHED_SCHEMA_MAP_CAPACITY, DEFAULT_CACHED_SCHEMA_MAP_CAPACITY));
     SchemaRegistryClient schemaRegistryClient =
         new CachedSchemaRegistryClient(createRestService(schemaRegistryUrl, props), identityMapCapacity,
-                Collections.singletonList(jsonSchemaProvider), props, null);
+                List.of(jsonSchemaProvider), props, null);
 
     _deserializer = new KafkaJsonSchemaDeserializer(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");

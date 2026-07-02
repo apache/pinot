@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -218,7 +217,7 @@ public class StUnionQueriesTest extends BaseQueriesTest {
         ColumnDataType.BYTES,
         ColumnDataType.BYTES
     });
-    List<Object[]> expectedRows = Collections.singletonList(new Object[]{
+    List<Object[]> expectedRows = List.<Object[]>of(new Object[]{
         ScalarFunctions.stAsText(_expectedResults),
         BytesUtils.toHexString(ScalarFunctions.stAsBinary(_expectedResults)),
         BytesUtils.toHexString(ScalarFunctions.toGeometry(_expectedResults)),

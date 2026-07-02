@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockEquals;
@@ -128,12 +127,12 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     if (_isNull) {
       // serialize the null object with schemas
       header = ObjectNullState.NULL.getState();
-      _immutableMeasuringKeys = DataBlockBuilder.buildFromRows(Collections.emptyList(), _measuringSchema);
-      _immutableProjectionVals = DataBlockBuilder.buildFromRows(Collections.emptyList(), _projectionSchema);
+      _immutableMeasuringKeys = DataBlockBuilder.buildFromRows(List.of(), _measuringSchema);
+      _immutableProjectionVals = DataBlockBuilder.buildFromRows(List.of(), _projectionSchema);
     } else {
       header = ObjectNullState.NON_NULL.getState();
       _immutableMeasuringKeys =
-          DataBlockBuilder.buildFromRows(Collections.singletonList(_extremumMeasuringKeys), _measuringSchema);
+          DataBlockBuilder.buildFromRows(List.<Object[]>of(_extremumMeasuringKeys), _measuringSchema);
       _immutableProjectionVals = DataBlockBuilder.buildFromRows(_extremumProjectionValues, _projectionSchema);
     }
     List<ByteBuffer> measuringKeys = DataBlockUtils.serialize(_immutableMeasuringKeys);

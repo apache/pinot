@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.executor;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -141,7 +140,7 @@ public interface TableExecutionInfo {
     List<IndexSegment> selectedSegments;
     if ((queryContext.getFilter() != null && queryContext.getFilter().isConstantFalse()) || (
         queryContext.getHavingFilter() != null && queryContext.getHavingFilter().isConstantFalse())) {
-      selectedSegments = Collections.emptyList();
+      selectedSegments = List.of();
     } else {
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
       selectedSegments = segmentPrunerService.prune(indexSegments, queryContext, prunerStats, executorService);

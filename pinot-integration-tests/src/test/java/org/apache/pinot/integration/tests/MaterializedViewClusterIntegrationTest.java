@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -635,9 +634,9 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     /// 2014-era epoch, so any small positive threshold trips `(now - watermarkMs) > threshold`.
     MaterializedViewDefinitionMetadata staleDefinition = new MaterializedViewDefinitionMetadata(
         MATERIALIZED_VIEW_FULL_TABLE_OFFLINE,
-        Collections.singletonList(SOURCE_TABLE_NAME),
+        List.of(SOURCE_TABLE_NAME),
         definedSql,
-        Collections.emptyMap(),
+        Map.of(),
         null,
         1L,
         true);
@@ -672,9 +671,9 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     /// Step 4: Disable the SLO again by setting stalenessThresholdMs back to 0.
     MaterializedViewDefinitionMetadata freshDefinition = new MaterializedViewDefinitionMetadata(
         MATERIALIZED_VIEW_FULL_TABLE_OFFLINE,
-        Collections.singletonList(SOURCE_TABLE_NAME),
+        List.of(SOURCE_TABLE_NAME),
         definedSql,
-        Collections.emptyMap(),
+        Map.of(),
         null,
         0L,
         true);
@@ -877,9 +876,9 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
         + "FROM " + SOURCE_TABLE_NAME + " GROUP BY Carrier";
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         MATERIALIZED_VIEW_FULL_TABLE_OFFLINE,
-        Collections.singletonList(SOURCE_TABLE_NAME),
+        List.of(SOURCE_TABLE_NAME),
         definedSql,
-        Collections.emptyMap(),
+        Map.of(),
         null);
     MaterializedViewDefinitionMetadataUtils.persist(_propertyStore, definition, -1);
 
@@ -943,9 +942,9 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
         new MaterializedViewSplitSpec(TIME_COLUMN, "1:DAYS:EPOCH", TIME_COLUMN, "1:DAYS:EPOCH", 86_400_000L);
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         MATERIALIZED_VIEW_SPLIT_TABLE_OFFLINE,
-        Collections.singletonList(SOURCE_TABLE_NAME),
+        List.of(SOURCE_TABLE_NAME),
         definedSql,
-        Collections.emptyMap(),
+        Map.of(),
         splitSpec);
     MaterializedViewDefinitionMetadataUtils.persist(_propertyStore, definition, -1);
 
@@ -987,9 +986,9 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
         new MaterializedViewSplitSpec(TIME_COLUMN, "1:DAYS:EPOCH", TIME_COLUMN, "1:DAYS:EPOCH", 86_400_000L);
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         MATERIALIZED_VIEW_COLD_TABLE_OFFLINE,
-        Collections.singletonList(SOURCE_TABLE_NAME),
+        List.of(SOURCE_TABLE_NAME),
         definedSql,
-        Collections.emptyMap(),
+        Map.of(),
         splitSpec);
     MaterializedViewDefinitionMetadataUtils.persist(_propertyStore, definition, -1);
 
@@ -1044,9 +1043,9 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
         + "FROM " + SOURCE_TABLE_NAME;
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         MATERIALIZED_VIEW_SCAN_TABLE_OFFLINE,
-        Collections.singletonList(SOURCE_TABLE_NAME),
+        List.of(SOURCE_TABLE_NAME),
         definedSql,
-        Collections.emptyMap(),
+        Map.of(),
         null);
     MaterializedViewDefinitionMetadataUtils.persist(_propertyStore, definition, -1);
 
@@ -1098,9 +1097,9 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
         + "GROUP BY " + TIME_COLUMN + ", Carrier";
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         MATERIALIZED_VIEW_COST_TABLE_OFFLINE,
-        Collections.singletonList(SOURCE_TABLE_NAME),
+        List.of(SOURCE_TABLE_NAME),
         definedSql,
-        Collections.emptyMap(),
+        Map.of(),
         null);
     MaterializedViewDefinitionMetadataUtils.persist(_propertyStore, definition, -1);
 

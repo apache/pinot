@@ -45,8 +45,7 @@ public class StreamConfigProperties {
   public static final String STREAM_IDLE_TIMEOUT_MILLIS = "idle.timeout.millis";
   public static final String STREAM_DECODER_CLASS = "decoder.class.name";
   public static final String DECODER_PROPS_PREFIX = "decoder.prop";
-  public static final String GROUP_ID = "hlc.group.id";
-  public static final String PARTITION_MSG_OFFSET_FACTORY_CLASS = "partition.offset.factory.class.name";
+  public static final String PARTITION_CONSUMPTION_RATE_LIMIT = "partition.consumption.rate.limit";
   public static final String TOPIC_CONSUMPTION_RATE_LIMIT = "topic.consumption.rate.limit";
   public static final String METADATA_POPULATE = "metadata.populate";
 

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -95,7 +94,7 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     // For LIMIT 0 case, keep one segment to create the schema
     int limit = query.getLimit();
     if (limit == 0) {
-      return Collections.singletonList(segments.get(0));
+      return List.of(segments.get(0));
     }
 
     // Skip pruning segments for upsert table because valid doc index is equivalent to a filter

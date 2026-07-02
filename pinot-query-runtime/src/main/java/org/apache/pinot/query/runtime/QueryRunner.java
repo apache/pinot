@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -427,7 +426,7 @@ public class QueryRunner {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext(metadata.get(Request.MetadataKeys.TimeSeries.LANGUAGE),
               extractTimeBuckets(metadata), deadlineMs, metadata, extractPlanToSegmentMap(metadata),
-              Collections.emptyMap());
+              Map.of());
       final List<BaseTimeSeriesOperator> fragmentOpChains = fragmentRoots.stream().map(x -> {
         return _timeSeriesPhysicalPlanVisitor.compile(x, context);
       }).collect(Collectors.toList());

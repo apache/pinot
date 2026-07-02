@@ -26,7 +26,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +56,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
+import org.apache.pinot.core.data.manager.realtime.ServerIngestionOomProtectionManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
@@ -105,6 +105,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private SegmentUploader _segmentUploader;
   private BooleanSupplier _isServerReadyToConsumeData = () -> false;
   private BooleanSupplier _isServerReadyToServeQueries = () -> false;
+  private ServerIngestionOomProtectionManager.ServerThrottleState _serverIngestionOomProtectionThrottleState;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -143,6 +144,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
     _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
+    _serverIngestionOomProtectionThrottleState =
+        ServerIngestionOomProtectionManager.createServerThrottleState(config, serverMetrics);
     String tableDataManagerProviderClass = _instanceDataManagerConfig.getTableDataManagerProviderClass();
     LOGGER.info("Initializing table data manager provider of class: {}", tableDataManagerProviderClass);
     _tableDataManagerProvider = PluginManager.get().createInstance(tableDataManagerProviderClass);
@@ -184,6 +187,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _errorCache = CacheBuilder.newBuilder().maximumSize(_instanceDataManagerConfig.getErrorCacheSize()).build();
     _recentlyDeletedTables = CacheBuilder.newBuilder()
         .expireAfterWrite(_instanceDataManagerConfig.getDeletedTablesCacheTtlMinutes(), TimeUnit.MINUTES).build();
+  }
+
+  ServerIngestionOomProtectionManager.ServerThrottleState getServerIngestionOomProtectionThrottleState() {
+    return _serverIngestionOomProtectionThrottleState;
   }
 
   @VisibleForTesting
@@ -361,7 +368,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,
             _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToConsumeData,
-            _isServerReadyToServeQueries, _enableAsyncSegmentRefresh, _reloadJobStatusCache);
+            _isServerReadyToServeQueries, _serverIngestionOomProtectionThrottleState, _enableAsyncSegmentRefresh,
+            _reloadJobStatusCache);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
@@ -495,7 +503,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public List<SegmentMetadata> getAllSegmentsMetadata(String tableNameWithType) {
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager == null) {
-      return Collections.emptyList();
+      return List.of();
     } else {
       List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
       try {

@@ -214,6 +214,13 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable {
       // Copy the mutable index to the v1 index location
       File dest = getV1TextIndexFile(segmentIndexDir);
       File mutableDir = getMutableIndexDir(segmentIndexDir, consumerDir);
+      // Remove any stale Lucene files left over at the destination from a prior crashed or killed
+      // conversion attempt. Otherwise FileUtils.copyDirectory preserves dest-only files, and
+      // CREATE_OR_APPEND below folds those stale segments into the merged index, inflating
+      // Lucene numDocs past the segment's totalDocs and causing AIOOB in DocIdTranslator at query time.
+      if (dest.exists()) {
+        FileUtils.deleteDirectory(dest);
+      }
       FileUtils.copyDirectory(mutableDir, dest);
 
       // Remove the copied write.lock file

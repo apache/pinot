@@ -231,54 +231,54 @@ public class TablesResource {
     Map<String, Map<String, Double>> columnIndexSizesMap = new HashMap<>();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        if (segmentDataManager instanceof ImmutableSegmentDataManager) {
-          ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
-          long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
-          SegmentMetadataImpl segmentMetadata =
-              (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
+        for (IndexSegment indexSegment : segmentDataManager.getReportableSegments()) {
+          if (indexSegment instanceof ImmutableSegment immutableSegment) {
+            long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
+            SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) immutableSegment.getSegmentMetadata();
 
-          totalSegmentSizeBytes += segmentSizeBytes;
-          totalNumRows += segmentMetadata.getTotalDocs();
+            totalSegmentSizeBytes += segmentSizeBytes;
+            totalNumRows += segmentMetadata.getTotalDocs();
 
-          if (columnSet == null) {
-            columnSet = segmentMetadata.getAllColumns();
-          } else {
-            columnSet.retainAll(segmentMetadata.getAllColumns());
-          }
-          for (String column : columnSet) {
-            ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
-            int columnLength = columnMetadata.getLengthOfLongestElement();
-            if (columnLength < 0) {
-              // For raw STRING/BYTES/BIG_DECIMAL column, set the columnLength as the length of the max value.
-              Comparable<?> maxValue = columnMetadata.getMaxValue();
-              if (maxValue instanceof String) {
-                columnLength = Utf8.encodedLength((String) maxValue);
-              } else if (maxValue instanceof ByteArray) {
-                columnLength = ((ByteArray) maxValue).length();
-              } else if (maxValue instanceof BigDecimal) {
-                columnLength = BigDecimalUtils.byteSize((BigDecimal) maxValue);
-              } else {
-                // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
-                columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
+            if (columnSet == null) {
+              columnSet = segmentMetadata.getAllColumns();
+            } else {
+              columnSet.retainAll(segmentMetadata.getAllColumns());
+            }
+            for (String column : columnSet) {
+              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+              int columnLength = columnMetadata.getLengthOfLongestElement();
+              if (columnLength < 0) {
+                // For raw STRING/BYTES/BIG_DECIMAL column, set the columnLength as the length of the max value.
+                Comparable<?> maxValue = columnMetadata.getMaxValue();
+                if (maxValue instanceof String) {
+                  columnLength = Utf8.encodedLength((String) maxValue);
+                } else if (maxValue instanceof ByteArray) {
+                  columnLength = ((ByteArray) maxValue).length();
+                } else if (maxValue instanceof BigDecimal) {
+                  columnLength = BigDecimalUtils.byteSize((BigDecimal) maxValue);
+                } else {
+                  // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
+                  columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
+                }
               }
-            }
-            int columnCardinality = columnMetadata.getCardinality();
-            columnLengthMap.merge(column, (double) columnLength, Double::sum);
-            columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
-            if (!columnMetadata.isSingleValue()) {
-              int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
-              maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
-            }
+              int columnCardinality = columnMetadata.getCardinality();
+              columnLengthMap.merge(column, (double) columnLength, Double::sum);
+              columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
+              if (!columnMetadata.isSingleValue()) {
+                int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
+                maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
+              }
 
-            IndexService indexService = IndexService.getInstance();
-            for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
-              String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();
-              long value = columnMetadata.getIndexSize(i);
+              IndexService indexService = IndexService.getInstance();
+              for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
+                String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();
+                long value = columnMetadata.getIndexSize(i);
 
-              Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
-              Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + value;
-              columnIndexSizes.put(indexName, indexSize);
-              columnIndexSizesMap.put(column, columnIndexSizes);
+                Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
+                Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + value;
+                columnIndexSizes.put(indexName, indexSize);
+                columnIndexSizesMap.put(column, columnIndexSizes);
+              }
             }
           }
         }
@@ -332,16 +332,17 @@ public class TablesResource {
           // REALTIME segments may not have indexes since not all indexes have mutable implementations
           continue;
         }
-        totalSegmentCount++;
-        IndexSegment segment = segmentDataManager.getSegment();
-        segment.getColumnNames().forEach(col -> {
-          columnToIndexesCount.putIfAbsent(col, new HashMap<>());
-          DataSource colDataSource = segment.getDataSource(col);
-          IndexService.getInstance().getAllIndexes().forEach(idxType -> {
-            int count = colDataSource.getIndex(idxType) != null ? 1 : 0;
-            columnToIndexesCount.get(col).merge(idxType.getId(), count, Integer::sum);
+        for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+          totalSegmentCount++;
+          segment.getColumnNames().forEach(col -> {
+            columnToIndexesCount.putIfAbsent(col, new HashMap<>());
+            DataSource colDataSource = segment.getDataSource(col);
+            IndexService.getInstance().getAllIndexes().forEach(idxType -> {
+              int count = colDataSource.getIndex(idxType) != null ? 1 : 0;
+              columnToIndexesCount.get(col).merge(idxType.getId(), count, Integer::sum);
+            });
           });
-        });
+        }
       }
       TableIndexMetadataResponse tableIndexMetadataResponse =
           new TableIndexMetadataResponse(totalSegmentCount, columnToIndexesCount);
@@ -453,8 +454,7 @@ public class TablesResource {
     try {
       Map<String, String> segmentCrcForTable = new HashMap<>();
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        segmentCrcForTable.put(segmentDataManager.getSegmentName(),
-            segmentDataManager.getSegment().getSegmentMetadata().getCrc());
+        segmentCrcForTable.put(segmentDataManager.getSegmentName(), segmentDataManager.getCrc());
       }
       return ResourceUtils.convertToJsonString(segmentCrcForTable);
     } catch (Exception e) {
@@ -573,8 +573,8 @@ public class TablesResource {
       }
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
-          finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(),
-          status);
+          toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc()), finalValidDocIdsType, validDocIdsBytes,
+          _serverInstance.getInstanceDataManager().getInstanceId(), status);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
@@ -747,6 +747,10 @@ public class TablesResource {
         validDocIdsMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
+        String reportableDataCrc = toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc());
+        if (reportableDataCrc != null) {
+          validDocIdsMetadata.put("segmentDataCrc", reportableDataCrc);
+        }
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
         validDocIdsMetadata.put("serverStatus", status);
         validDocIdsMetadata.put("instanceId", _serverInstance.getInstanceDataManager().getInstanceId());
@@ -772,6 +776,12 @@ public class TablesResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+  }
+
+  /// The segment's data CRC to report, or null when unavailable (negative).
+  @Nullable
+  private static String toReportableDataCrc(String dataCrc) {
+    return dataCrc != null && Long.parseLong(dataCrc) >= 0 ? dataCrc : null;
   }
 
   private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
@@ -1181,12 +1191,11 @@ public class TablesResource {
                 String invalidReason = String.format(
                     "Segment %s is in ONLINE state, but segmentDataManager is null", segmentName);
                 return new TableSegmentValidationInfo(false, invalidReason, -1);
-              } else if (!segmentDataManager.getSegment().getSegmentMetadata().getCrc()
-                  .equals(String.valueOf(zkMetadata.getCrc()))) {
+              } else if (!segmentDataManager.getCrc().equals(String.valueOf(zkMetadata.getCrc()))) {
                 String invalidReason = String.format(
                     "Segment %s is in ONLINE state, but has CRC mismatch. "
                         + "zk_metadata_crc=%s, segment_data_manager_crc=%s",
-                    segmentName, zkMetadata.getCrc(), segmentDataManager.getSegment().getSegmentMetadata().getCrc());
+                    segmentName, zkMetadata.getCrc(), segmentDataManager.getCrc());
                 return new TableSegmentValidationInfo(false, invalidReason, -1);
               }
               maxEndTimeMs = Math.max(maxEndTimeMs, zkMetadata.getEndTimeMs());

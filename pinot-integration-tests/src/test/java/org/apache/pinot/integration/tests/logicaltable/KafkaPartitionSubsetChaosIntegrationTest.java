@@ -23,7 +23,6 @@ import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -343,7 +342,7 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
     }
 
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigMap)));
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap)));
 
     return new TableConfigBuilder(TableType.REALTIME)
         .setTableName(tableName)

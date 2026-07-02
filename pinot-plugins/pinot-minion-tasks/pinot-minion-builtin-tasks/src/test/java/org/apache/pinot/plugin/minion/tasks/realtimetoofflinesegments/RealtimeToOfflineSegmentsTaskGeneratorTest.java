@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import com.google.common.collect.Lists;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -451,7 +450,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         getSegmentZKMetadata("testTable__0__1__12345", Status.DONE, 1590220800000L, 1590307200000L,
             TimeUnit.MILLISECONDS, "download2"); // 05-23-2020T08:00:00 UTC to 05-24-2020T08:00:00 UTC
     when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
-        Collections.singletonList(segmentZKMetadata));
+        List.of(segmentZKMetadata));
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME)).thenReturn(getIdealState(REALTIME_TABLE_NAME,
         Lists.newArrayList(segmentZKMetadata.getSegmentName())));
 
@@ -524,6 +523,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
 
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addMetric("bytesCol", FieldSpec.DataType.BYTES)
         .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
 
@@ -626,16 +626,17 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
       Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
     }
 
-    // valid agg
+    // valid agg: distinctCountHLL is bytes-backed, so it requires a BYTES column
     HashMap<String, String> validAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
-    validAggConfig.put("myCol.aggregationType", "distinctCountHLL");
+    validAggConfig.put("bytesCol.aggregationType", "distinctCountHLL");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
         new TableTaskConfig(
             Map.of("RealtimeToOfflineSegmentsTask", validAggConfig, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
     taskGenerator.validateTaskConfigs(tableConfig, schema, validAggConfig);
 
-    // valid agg
+    // valid agg: distinctCountHLLPlus is allow-listed but has no merge value aggregator, so it is not bytes-backed
+    // and is not subject to the BYTES column requirement
     HashMap<String, String> validAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
     validAgg2Config.put("myCol.aggregationType", "distinctCountHLLPlus");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
@@ -691,6 +692,44 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("to be a DateTime column in schema"));
+    }
+  }
+
+  @Test
+  public void testBytesBackedAggregationColumnTypeValidation() {
+    RealtimeToOfflineSegmentsTaskGenerator taskGenerator = new RealtimeToOfflineSegmentsTaskGenerator();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("d", FieldSpec.DataType.STRING)
+        .addMetric("bytesCol", FieldSpec.DataType.BYTES)
+        .addMetric("longCol", FieldSpec.DataType.LONG)
+        .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+            .build();
+
+    // Bytes-backed aggregations on a BYTES column are valid
+    for (String aggregationType : new String[]{"avg", "percentileTDigest", "distinctCountHLL"}) {
+      Map<String, String> validConfig = new HashMap<>();
+      validConfig.put("mergeType", "rollup");
+      validConfig.put("bytesCol.aggregationType", aggregationType);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, validConfig);
+    }
+
+    // The same bytes-backed aggregations on a non-BYTES (LONG) column must fail at config time
+    for (String aggregationType : new String[]{"avg", "percentileTDigest", "distinctCountHLL"}) {
+      Map<String, String> invalidConfig = new HashMap<>();
+      invalidConfig.put("mergeType", "rollup");
+      invalidConfig.put("longCol.aggregationType", aggregationType);
+      Assert.assertThrows(IllegalStateException.class,
+          () -> taskGenerator.validateTaskConfigs(tableConfig, schema, invalidConfig));
+    }
+
+    // Non-bytes-backed aggregations on a numeric column remain valid
+    for (String aggregationType : new String[]{"sum", "max"}) {
+      Map<String, String> validConfig = new HashMap<>();
+      validConfig.put("mergeType", "rollup");
+      validConfig.put("longCol.aggregationType", aggregationType);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, validConfig);
     }
   }
 

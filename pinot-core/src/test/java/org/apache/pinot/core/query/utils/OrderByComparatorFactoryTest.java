@@ -20,7 +20,6 @@
 package org.apache.pinot.core.query.utils;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -54,7 +53,7 @@ public class OrderByComparatorFactoryTest {
   @Test
   public void testAscNullsLast() {
     List<OrderByExpressionContext> orderBys =
-        Collections.singletonList(new OrderByExpressionContext(COLUMN1, ASC, NULLS_LAST));
+        List.of(new OrderByExpressionContext(COLUMN1, ASC, NULLS_LAST));
     setUpSingleColumnRows();
 
     _rows.sort(OrderByComparatorFactory.getComparator(orderBys, ENABLE_NULL_HANDLING));
@@ -65,7 +64,7 @@ public class OrderByComparatorFactoryTest {
   @Test
   public void testAscNullsFirst() {
     List<OrderByExpressionContext> orderBys =
-        Collections.singletonList(new OrderByExpressionContext(COLUMN1, ASC, NULLS_FIRST));
+        List.of(new OrderByExpressionContext(COLUMN1, ASC, NULLS_FIRST));
     setUpSingleColumnRows();
 
     _rows.sort(OrderByComparatorFactory.getComparator(orderBys, ENABLE_NULL_HANDLING));
@@ -76,7 +75,7 @@ public class OrderByComparatorFactoryTest {
   @Test
   public void testDescNullsLast() {
     List<OrderByExpressionContext> orderBys =
-        Collections.singletonList(new OrderByExpressionContext(COLUMN1, DESC, NULLS_LAST));
+        List.of(new OrderByExpressionContext(COLUMN1, DESC, NULLS_LAST));
     setUpSingleColumnRows();
 
     _rows.sort(OrderByComparatorFactory.getComparator(orderBys, ENABLE_NULL_HANDLING));
@@ -87,7 +86,7 @@ public class OrderByComparatorFactoryTest {
   @Test
   public void testDescNullsFirst() {
     List<OrderByExpressionContext> orderBys =
-        Collections.singletonList(new OrderByExpressionContext(COLUMN1, DESC, NULLS_FIRST));
+        List.of(new OrderByExpressionContext(COLUMN1, DESC, NULLS_FIRST));
     setUpSingleColumnRows();
 
     _rows.sort(OrderByComparatorFactory.getComparator(orderBys, ENABLE_NULL_HANDLING));

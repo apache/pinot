@@ -23,6 +23,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
@@ -33,8 +35,12 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.SortedRecords;
 import org.apache.pinot.core.data.table.SortedRecordsMerger;
+import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -46,6 +52,40 @@ public final class GroupByUtils {
 
   public static final int DEFAULT_MIN_NUM_GROUPS = 5000;
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
+
+  /// Builds the segment-level {@link GroupByResultsBlock} for a GROUP BY GROUPING SETS / ROLLUP / CUBE query,
+  /// shared by {@code GroupByOperator} and {@code FilteredGroupByOperator}. When the group count exceeds the
+  /// per-set budget ({@code perSetTrimSize * numGroupingSets}), a per-set bucketed trim (keyed on the
+  /// {@code $groupingId} discriminator at {@code discriminatorColumnIndex}) keeps each grouping set's own top
+  /// candidates so a global top-K cannot starve low-magnitude sets such as the grand total; otherwise the full
+  /// segment result is returned. The broker still applies the final ORDER BY + LIMIT across all sets.
+  ///
+  /// @param discriminatorColumnIndex index of the synthetic $groupingId column, i.e. the number of union
+  ///                                 group-by columns
+  public static GroupByResultsBlock buildGroupingSetsResultsBlock(QueryContext queryContext, DataSchema dataSchema,
+      GroupKeyGenerator groupKeyGenerator, GroupByResultHolder[] groupByResultHolders, int numGroups,
+      int discriminatorColumnIndex, boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached) {
+    GroupByResultsBlock resultsBlock;
+    int perSetTrimSize = queryContext.getGroupingSetSegmentTrimSize();
+    int numGroupingSets = queryContext.getGroupingSets().size();
+    if (perSetTrimSize > 0 && numGroups > (long) perSetTrimSize * numGroupingSets) {
+      TableResizer tableResizer = new TableResizer(dataSchema, queryContext);
+      List<IntermediateRecord> intermediateRecords =
+          tableResizer.trimInSegmentResultsByGroupingSet(groupKeyGenerator, groupByResultHolders, perSetTrimSize,
+              discriminatorColumnIndex);
+      groupKeyGenerator.close();
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
+      resultsBlock = new GroupByResultsBlock(dataSchema, intermediateRecords, queryContext);
+      resultsBlock.setGroupsTrimmed(true);
+    } else {
+      AggregationGroupByResult aggregationGroupByResult =
+          new AggregationGroupByResult(groupKeyGenerator, queryContext.getAggregationFunctions(), groupByResultHolders);
+      resultsBlock = new GroupByResultsBlock(dataSchema, aggregationGroupByResult, queryContext);
+    }
+    resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
+    return resultsBlock;
+  }
 
   /**
    * Returns the capacity of the table required by the given query. NOTE: It returns {@code max(limit * 5, 5000)} to
@@ -112,6 +152,17 @@ public final class GroupByUtils {
         queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
     int minInitialIndexedTableCapacity = queryContext.getMinInitialIndexedTableCapacity();
 
+    /// Grouping-set queries must not trim per server: a global ORDER BY top-K here would drop a row that ranks
+    /// higher globally once partial aggregates are merged at the broker, and could starve entire grouping sets
+    /// (silently wrong results). Keep all groups (bounded by numGroupsLimit) and defer ORDER BY + LIMIT to the
+    /// broker. Per-set bucketed trim still happens at the segment level.
+    if (queryContext.isGroupingSets()) {
+      int resultSize = queryContext.getNumGroupsLimit();
+      int initialCapacity = getIndexedTableInitialCapacity(resultSize, numGroups, minInitialIndexedTableCapacity);
+      return getTrimDisabledIndexedTable(dataSchema, false, queryContext, resultSize, initialCapacity, numThreads,
+          executorService);
+    }
+
     // Disable trim when min trim size is non-positive
     int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
 
@@ -171,6 +222,16 @@ public final class GroupByUtils {
     // Keep more groups when there is HAVING clause
     // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
     int resultSize = hasHaving ? trimSize : limit;
+
+    /// Grouping-set queries must not incrementally trim while merging server responses (a row could be dropped
+    /// before all its partial aggregates are merged) nor apply a per-server top-K. Force the trim-disabled path
+    /// so all groups are merged first; finish() then keeps the correct global top-K (resultSize) and the broker
+    /// applies the final ORDER BY + LIMIT over the fully-merged table.
+    if (queryContext.isGroupingSets()) {
+      int initialCapacity = getIndexedTableInitialCapacity(resultSize, numGroups, minInitialIndexedTableCapacity);
+      return getTrimDisabledIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, initialCapacity,
+          numThreads, executorService);
+    }
 
     // When there is no ORDER BY, trim is not required because the indexed table stops accepting new groups once the
     // result size is reached

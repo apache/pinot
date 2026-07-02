@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.plugin.stream.kafka30.server;
 
-import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import kafka.testkit.KafkaClusterTestKit;
@@ -71,7 +72,7 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
           .setCombined(true)
           .setNumBrokerNodes(_brokerCount)
           .setNumControllerNodes(1)
-          .setPerServerProperties(Collections.emptyMap())
+          .setPerServerProperties(Map.of())
           .setBootstrapMetadataVersion(MetadataVersion.latestProduction())
           .build();
 
@@ -140,7 +141,7 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
     short replicationFactor = (short) Math.max(1, Math.min(_brokerCount, requestedReplicationFactor));
     try (AdminClient adminClient = createAdminClient()) {
       NewTopic newTopic = new NewTopic(topic, numPartitions, replicationFactor);
-      runAdminWithRetry(() -> adminClient.createTopics(Collections.singletonList(newTopic)).all().get(),
+      runAdminWithRetry(() -> adminClient.createTopics(List.of(newTopic)).all().get(),
           "create topic: " + topic);
     } catch (Exception e) {
       if (e instanceof ExecutionException
@@ -154,7 +155,7 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
   @Override
   public void deleteTopic(String topic) {
     try (AdminClient adminClient = createAdminClient()) {
-      runAdminWithRetry(() -> adminClient.deleteTopics(Collections.singletonList(topic)).all().get(),
+      runAdminWithRetry(() -> adminClient.deleteTopics(List.of(topic)).all().get(),
           "delete topic: " + topic);
     } catch (Exception e) {
       throw new RuntimeException("Failed to delete topic: " + topic, e);
@@ -165,7 +166,7 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
   public void createPartitions(String topic, int numPartitions) {
     try (AdminClient adminClient = createAdminClient()) {
       runAdminWithRetry(() -> {
-        adminClient.createPartitions(Collections.singletonMap(topic, NewPartitions.increaseTo(numPartitions)))
+        adminClient.createPartitions(Map.of(topic, NewPartitions.increaseTo(numPartitions)))
             .all().get();
         return null;
       }, "create partitions for topic: " + topic);
@@ -179,7 +180,7 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
     TopicPartition topicPartition = new TopicPartition(topic, partition);
     try (AdminClient adminClient = createAdminClient()) {
       runAdminWithRetry(() -> {
-        adminClient.deleteRecords(Collections.singletonMap(topicPartition, RecordsToDelete.beforeOffset(offset)))
+        adminClient.deleteRecords(Map.of(topicPartition, RecordsToDelete.beforeOffset(offset)))
             .all().get();
         return null;
       }, "delete records before offset for topic: " + topic + ", partition: " + partition);

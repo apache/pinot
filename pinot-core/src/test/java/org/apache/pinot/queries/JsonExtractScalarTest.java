@@ -191,6 +191,29 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
     );
   }
 
+  @Test(dataProvider = "allJsonColumns")
+  public void testColumnToColumnComparison(String column) {
+    // A JSON last name ("duck", "mouse", ...) is compared as a STRING against stringColumn ("daffy duck",
+    // "mickey mouse", ...). The two are never equal, so '=' matches no row and '!=' matches every row.
+    String lastName = "json_extract_scalar(" + column + ", '$.name.last', 'STRING', '')";
+    checkResult("SELECT intColumn FROM testTable WHERE " + lastName + " = stringColumn", new Object[][]{});
+    checkResult("SELECT intColumn FROM testTable WHERE " + lastName + " != stringColumn LIMIT 3",
+        new Object[][]{{1}, {2}, {3}});
+
+    // A JSON id (101, 111, 121, ... for the first rows) is compared numerically against intColumn (1, 2, 3, ...).
+    // The id is never equal to the row's intColumn, and for the leading rows it is the larger value.
+    String id = "json_extract_scalar(" + column + ", '$.id', 'INT', '0')";
+    checkResult("SELECT intColumn FROM testTable WHERE " + id + " = intColumn", new Object[][]{});
+    checkResult("SELECT intColumn FROM testTable WHERE " + id + " > intColumn LIMIT 3",
+        new Object[][]{{1}, {2}, {3}});
+
+    // Mixed numeric/string comparison: an INT column against a non-numeric STRING column. The old minus()-based
+    // rewrite coerced both operands to DOUBLE and threw NumberFormatException on the non-numeric string, failing the
+    // whole query. The type-safe rewrite evaluates per-row, treating an unparseable comparison as no-match, so the
+    // query runs and simply returns no rows instead of erroring.
+    checkResult("SELECT intColumn FROM testTable WHERE intColumn = stringColumn", new Object[][]{});
+  }
+
   @Test
   public void testNullAsDefaultValueWithNullHandlingEnabled() {
     checkResult(

@@ -295,7 +295,7 @@ public class MutableSegmentImpl implements MutableSegment {
     // and no metrics have dictionary. If not enabled, the map returned is null.
     _recordIdMap = enableMetricsAggregationIfPossible(config);
 
-    Map<String, Pair<String, ValueAggregator>> metricsAggregators = Collections.emptyMap();
+    Map<String, Pair<String, ValueAggregator>> metricsAggregators = Map.of();
     if (_recordIdMap != null) {
       metricsAggregators = getMetricsAggregators(config);
     }
@@ -503,7 +503,7 @@ public class MutableSegmentImpl implements MutableSegment {
     } else if (CollectionUtils.isNotEmpty(segmentConfig.getIngestionAggregationConfigs())) {
       return fromAggregationConfig(segmentConfig);
     } else {
-      return Collections.emptyMap();
+      return Map.of();
     }
   }
 
@@ -516,7 +516,7 @@ public class MutableSegmentImpl implements MutableSegment {
         Maps.newHashMapWithExpectedSize(metricNames.size());
     for (String metricName : metricNames) {
       columnNameToAggregator.put(metricName, Pair.of(metricName,
-          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.emptyList())));
+          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, List.of())));
     }
     return columnNameToAggregator;
   }
@@ -602,7 +602,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
     if (_partitionColumn != null) {
-      return new SegmentPartitionConfig(Collections.singletonMap(_partitionColumn,
+      return new SegmentPartitionConfig(Map.of(_partitionColumn,
           new ColumnPartitionConfig(_partitionFunction.getName(), _partitionFunction.getNumPartitions(),
               _partitionFunction.getFunctionConfig())));
     } else {

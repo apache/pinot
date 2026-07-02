@@ -21,7 +21,6 @@ package org.apache.pinot.core.plan.maker;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -222,7 +221,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
                 fetchContext));
       }
     } else {
-      fetchContexts = Collections.emptyList();
+      fetchContexts = List.of();
       for (SegmentContext segmentContext : segmentContexts) {
         planNodes.add(makeSegmentPlanNode(segmentContext, queryContext));
       }
@@ -382,7 +381,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
                 segmentContext, fetchContext));
       }
     } else {
-      fetchContexts = Collections.emptyList();
+      fetchContexts = List.of();
       for (SegmentContext segmentContext : segmentContexts) {
         planNodes.add(makeStreamingSegmentPlanNode(segmentContext, queryContext));
       }

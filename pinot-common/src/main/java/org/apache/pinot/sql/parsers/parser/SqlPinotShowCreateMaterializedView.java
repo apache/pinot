@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.sql.parsers.parser;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -62,7 +61,7 @@ public class SqlPinotShowCreateMaterializedView extends SqlCall {
 
   @Override
   public List<SqlNode> getOperandList() {
-    return Collections.singletonList(_name);
+    return List.of(_name);
   }
 
   @Override

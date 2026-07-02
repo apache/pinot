@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -35,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
@@ -421,12 +421,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     List<ServiceStatus.ServiceStatusCallback> serviceStatusCallbackListBuilder = new ArrayList<>();
-    serviceStatusCallbackListBuilder.add(
+    serviceStatusCallbackListBuilder.add(new TimeToHealthyTrackingCallback(
         new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId, resourcesToMonitor, minResourcePercentForStartup));
-    serviceStatusCallbackListBuilder.add(
+            _instanceId, resourcesToMonitor, minResourcePercentForStartup),
+        ServerGauge.STARTUP_CURRENT_STATE_MATCH_TIME_MS, _serverMetrics));
+    serviceStatusCallbackListBuilder.add(new TimeToHealthyTrackingCallback(
         new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId, resourcesToMonitor, minResourcePercentForStartup));
+            _instanceId, resourcesToMonitor, minResourcePercentForStartup),
+        ServerGauge.STARTUP_EXTERNAL_VIEW_MATCH_TIME_MS, _serverMetrics));
     boolean foundConsuming = !consumingSegments.isEmpty();
     if (checkRealtime && foundConsuming) {
       // We specifically put the freshness based checker first to ensure it's the only one setup if both checkers
@@ -443,9 +445,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
                 this::getConsumingSegments, realtimeMinFreshnessMs, idleTimeoutMs);
         Supplier<Integer> getNumConsumingSegmentsNotReachedMinFreshness =
             freshnessStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
-        serviceStatusCallbackListBuilder.add(
+        serviceStatusCallbackListBuilder.add(new TimeToHealthyTrackingCallback(
             new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
-                _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedMinFreshness));
+                _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedMinFreshness),
+            ServerGauge.STARTUP_REALTIME_CONSUMPTION_CATCHUP_TIME_MS, _serverMetrics));
       } else if (isOffsetBasedConsumptionStatusCheckerEnabled) {
         LOGGER.info("Setting up offset based status checker");
         OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
@@ -453,11 +456,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
                 this::getConsumingSegments);
         Supplier<Integer> getNumConsumingSegmentsNotReachedTheirLatestOffset =
             consumptionStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
-        serviceStatusCallbackListBuilder.add(
+        serviceStatusCallbackListBuilder.add(new TimeToHealthyTrackingCallback(
             new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
-                _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedTheirLatestOffset));
+                _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedTheirLatestOffset),
+            ServerGauge.STARTUP_REALTIME_CONSUMPTION_CATCHUP_TIME_MS, _serverMetrics));
       } else {
         LOGGER.info("Setting up static time based status checker");
+        // Not wrapped with a time-to-healthy gauge: this checker turns GOOD purely on wall-clock elapsed time, so the
+        // resulting metric would just echo realtimeConsumptionCatchupWaitMs and not reflect actual catchup latency.
         serviceStatusCallbackListBuilder.add(
             new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
                 _instanceId, realtimeConsumptionCatchupWaitMs, null));
@@ -496,7 +502,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
         return Arrays.asList(TagNameUtils.getOfflineTagForTenant(null), TagNameUtils.getRealtimeTagForTenant(null));
       } else {
-        return Collections.singletonList(Helix.UNTAGGED_SERVER_INSTANCE);
+        return List.of(Helix.UNTAGGED_SERVER_INSTANCE);
       }
     });
 
@@ -541,7 +547,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       // Retrieve failure domain information and add to the environment properties map
       String failureDomain = _pinotEnvironmentProvider.getFailureDomain();
       Map<String, String> environmentProperties =
-          Collections.singletonMap(CommonConstants.INSTANCE_FAILURE_DOMAIN, failureDomain);
+          Map.of(CommonConstants.INSTANCE_FAILURE_DOMAIN, failureDomain);
       if (!environmentProperties.equals(znRecord.getMapField(CommonConstants.ENVIRONMENT_IDENTIFIER))) {
         LOGGER.info("Updating instance: {} with environment properties: {}", _instanceId, environmentProperties);
         znRecord.setMapField(CommonConstants.ENVIRONMENT_IDENTIFIER, environmentProperties);
@@ -795,6 +801,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
         new ServerRateLimitConfigChangeListener(_serverMetrics);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
+    if (instanceDataManager instanceof HelixInstanceDataManager) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          ((HelixInstanceDataManager) instanceDataManager).getServerIngestionOomProtectionThrottleState());
+    }
 
     // Register query killing manager for dynamic config updates (threshold/mode changes via ZK)
     if (_queryKillingManager != null) {
@@ -926,7 +936,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // querying the server pre-maturely.
     _serverInstance.startQueryServer();
     _helixAdmin.setConfig(_instanceConfigScope,
-        Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
+        Map.of(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
     _isServerReadyToServeQueries = true;
     // Throttling for realtime consumption is disabled up to this point to allow maximum consumption during startup time
     RealtimeConsumptionRateManager.getInstance().enablePartitionRateLimiter();
@@ -1052,7 +1062,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
-        Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
+        Map.of(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
     if (_transitionThreadPoolManager != null) {
       _transitionThreadPoolManager.shutdown();
     }
@@ -1302,6 +1312,41 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected SegmentOnlineOfflineStateModelFactory createSegmentOnlineOfflineStateModelFactory(
       InstanceDataManager instanceDataManager, StateTransitionThreadPoolManager transitionThreadPoolManager) {
     return new SegmentOnlineOfflineStateModelFactory(instanceDataManager, transitionThreadPoolManager);
+  }
+
+  /**
+   * Wraps a {@link ServiceStatus.ServiceStatusCallback} and records the elapsed time (in ms since this wrapper was
+   * constructed) into the supplied gauge the first time the delegate reports {@link Status#GOOD}. Subsequent calls
+   * leave the gauge value frozen. {@code getServiceStatus} can be called concurrently by the startup poll loop and
+   * by HTTP threads (health/tables endpoints), so the record-once latch uses CAS for visibility.
+   */
+  private static final class TimeToHealthyTrackingCallback implements ServiceStatus.ServiceStatusCallback {
+    private final ServiceStatus.ServiceStatusCallback _delegate;
+    private final ServerGauge _gauge;
+    private final ServerMetrics _serverMetrics;
+    private final long _startNanos = System.nanoTime();
+    private final AtomicBoolean _recorded = new AtomicBoolean(false);
+
+    TimeToHealthyTrackingCallback(ServiceStatus.ServiceStatusCallback delegate, ServerGauge gauge,
+        ServerMetrics serverMetrics) {
+      _delegate = delegate;
+      _gauge = gauge;
+      _serverMetrics = serverMetrics;
+    }
+
+    @Override
+    public Status getServiceStatus() {
+      Status status = _delegate.getServiceStatus();
+      if (status == Status.GOOD && _recorded.compareAndSet(false, true)) {
+        _serverMetrics.setValueOfGlobalGauge(_gauge, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - _startNanos));
+      }
+      return status;
+    }
+
+    @Override
+    public String getStatusDescription() {
+      return _delegate.getStatusDescription();
+    }
   }
 
   private void refreshMessageCount() {

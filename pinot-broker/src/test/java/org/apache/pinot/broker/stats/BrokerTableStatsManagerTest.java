@@ -190,8 +190,7 @@ public class BrokerTableStatsManagerTest {
 
     // Now remove seg1 from the online set
     Set<String> updatedOnline = Set.of("seg2");
-    listener.onAssignmentChange(null, null, updatedOnline, Collections.emptyList(),
-        Collections.emptyList());
+    listener.onAssignmentChange(null, null, updatedOnline, List.of(), List.of());
 
     Map<String, Long> crcs2 = _store.getSegmentCrcs(TABLE);
     assertFalse(crcs2.containsKey("seg1"), "seg1 should be removed");

@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.utils.grpc;
 
-import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server;
@@ -29,7 +29,7 @@ public class ServerGrpcQueryClient extends BaseGrpcQueryClient<Server.ServerRequ
   private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
 
   public ServerGrpcQueryClient(String host, int port) {
-    this(host, port, new GrpcConfig(Collections.emptyMap()));
+    this(host, port, new GrpcConfig(Map.of()));
   }
 
   public ServerGrpcQueryClient(String host, int port, GrpcConfig config) {

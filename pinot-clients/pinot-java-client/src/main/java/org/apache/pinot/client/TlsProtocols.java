@@ -19,7 +19,6 @@
 package org.apache.pinot.client;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -36,7 +35,7 @@ public class TlsProtocols {
     if (_enabledProtocols != null) {
       return _enabledProtocols;
     }
-    return Collections.emptyList();
+    return List.of();
   }
 
   public static TlsProtocols defaultProtocols(boolean tlsV10Enabled) {

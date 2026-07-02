@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,10 +88,10 @@ public class MergeTaskUtilsTest {
   public void testGetPartitionerConfigs() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
         .setSegmentPartitionConfig(
-            new SegmentPartitionConfig(Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10))))
+            new SegmentPartitionConfig(Map.of("memberId", new ColumnPartitionConfig("murmur", 10))))
         .build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("memberId", DataType.LONG).build();
-    Map<String, String> taskConfig = Collections.emptyMap();
+    Map<String, String> taskConfig = Map.of();
 
     List<PartitionerConfig> partitionerConfigs = MergeTaskUtils.getPartitionerConfigs(tableConfig, schema, taskConfig);
     assertEquals(partitionerConfigs.size(), 1);
@@ -134,16 +133,16 @@ public class MergeTaskUtilsTest {
 
   @Test
   public void testGetMergeType() {
-    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "concat")),
+    assertEquals(MergeTaskUtils.getMergeType(Map.of(MergeTask.MERGE_TYPE_KEY, "concat")),
         MergeType.CONCAT);
-    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "Rollup")),
+    assertEquals(MergeTaskUtils.getMergeType(Map.of(MergeTask.MERGE_TYPE_KEY, "Rollup")),
         MergeType.ROLLUP);
-    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "DeDuP")),
+    assertEquals(MergeTaskUtils.getMergeType(Map.of(MergeTask.MERGE_TYPE_KEY, "DeDuP")),
         MergeType.DEDUP);
-    assertNull(MergeTaskUtils.getMergeType(Collections.emptyMap()));
+    assertNull(MergeTaskUtils.getMergeType(Map.of()));
 
     try {
-      MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "unsupported"));
+      MergeTaskUtils.getMergeType(Map.of(MergeTask.MERGE_TYPE_KEY, "unsupported"));
       fail();
     } catch (IllegalArgumentException e) {
       // Expected
@@ -236,7 +235,7 @@ public class MergeTaskUtilsTest {
     assertEquals(segmentConfig.getIntermediateFileSizeThreshold(), 1000000000L);
     assertEquals(segmentConfig.getMaxDiskUsagePercentage(), 80);
 
-    segmentConfig = MergeTaskUtils.getSegmentConfig(Collections.emptyMap());
+    segmentConfig = MergeTaskUtils.getSegmentConfig(Map.of());
     assertEquals(segmentConfig.getMaxNumRecordsPerSegment(), SegmentConfig.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT);
     assertNull(segmentConfig.getSegmentNamePrefix());
     assertNull(segmentConfig.getSegmentNamePostfix());
@@ -249,15 +248,15 @@ public class MergeTaskUtilsTest {
     assertNull(segmentZKMetadata.getCustomMap());
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
-    segmentZKMetadata.setCustomMap(Collections.emptyMap());
+    segmentZKMetadata.setCustomMap(Map.of());
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
     segmentZKMetadata.setCustomMap(
-        Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
+        Map.of(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
     segmentZKMetadata.setCustomMap(
-        Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
+        Map.of(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
     assertFalse(MergeTaskUtils.allowMerge(segmentZKMetadata));
   }
 }

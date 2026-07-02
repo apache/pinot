@@ -92,9 +92,16 @@ public class MinionConstants {
    */
   public static final String SEGMENT_DOWNLOAD_PARALLELISM = "segmentDownloadParallelism";
 
-  /** Valid doc ids consensus mode (executor-only). Kept internal; executors pass config string. */
+  /// Valid doc ids consensus mode enforced by both the task generators (pre-scheduling) and the executors.
   public enum ValidDocIdsConsensusMode {
     UNSAFE, EQUAL, MOST_VALID_DOCS
+  }
+
+  /// Where validDocIds consensus is enforced. STRICT (default) runs the checks in both the task generator
+  /// (pre-scheduling) and the executor; EXECUTOR_ONLY skips the generator-side checks and leaves the executor as the
+  /// sole gate.
+  public enum ValidDocIdsValidationMode {
+    STRICT, EXECUTOR_ONLY
   }
 
   // Purges rows inside segment that match chosen criteria
@@ -173,7 +180,7 @@ public class MinionConstants {
     /// with RealtimeToOfflineSegmentsTask, which performs the same rollup aggregation when configured with rollup
     /// merge type.
     public static final EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
-        EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
+        EnumSet.of(MIN, MAX, SUM, AVG, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
             DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
             SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS,
             DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
@@ -268,15 +275,16 @@ public class MinionConstants {
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
 
-    /**
-     * Valid doc ids consensus mode used by the executor only (generator unchanged). Values: UNSAFE, EQUAL,
-     * MOST_VALID_DOCS. UNSAFE = use first server with matching CRC and READY; EQUAL = require all replicas
-     * to have the same valid doc set (default); MOST_VALID_DOCS = use replica with most valid docs.
-     */
+    /// Valid doc ids consensus mode used by both the task generators (pre-scheduling) and the executors. UNSAFE =
+    /// first server with matching CRC and GOOD status; EQUAL (default) = all replicas must agree; MOST_VALID_DOCS =
+    /// the replica with the most valid docs. Shared by UpsertCompactionTask and UpsertCompactMergeTask.
     public static final String VALID_DOC_IDS_CONSENSUS_MODE_KEY = "validDocIdsConsensusMode";
-
-    /** Default: equal valid doc set consensus across replicas. */
     public static final String DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE = "EQUAL";
+
+    /// Whether the consensus checks also run in the generator. STRICT (default) = generator + executor;
+    /// EXECUTOR_ONLY = executor only. Shared by UpsertCompactionTask and UpsertCompactMergeTask.
+    public static final String VALID_DOC_IDS_VALIDATION_MODE_KEY = "validDocIdsValidationMode";
+    public static final String DEFAULT_VALID_DOC_IDS_VALIDATION_MODE = "STRICT";
   }
 
   public static class UpsertCompactMergeTask {

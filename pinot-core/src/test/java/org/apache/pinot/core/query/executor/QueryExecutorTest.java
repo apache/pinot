@@ -23,10 +23,10 @@ import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -228,8 +228,8 @@ public class QueryExecutorTest {
   public void testTimeSeriesSumQuery() {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofHours(2), 2);
     QueryContext queryContext =
-        getQueryContextForTimeSeries("orderAmount", timeBuckets, 0L, new AggInfo("SUM", false, Collections.emptyMap()),
-            Collections.emptyList());
+        getQueryContextForTimeSeries("orderAmount", timeBuckets, 0L, new AggInfo("SUM", false, Map.of()),
+            List.of());
     ServerQueryRequest queryRequest =
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
     InstanceResponseBlock instanceResponse = execute(queryRequest);
@@ -245,7 +245,7 @@ public class QueryExecutorTest {
   public void testTimeSeriesMaxQuery() {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
     QueryContext queryContext = getQueryContextForTimeSeries("orderItemCount", timeBuckets, 0L,
-        new AggInfo("MAX", false, Collections.emptyMap()), List.of("cityName"));
+        new AggInfo("MAX", false, Map.of()), List.of("cityName"));
     ServerQueryRequest queryRequest =
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
     InstanceResponseBlock instanceResponse = execute(queryRequest);
@@ -275,7 +275,7 @@ public class QueryExecutorTest {
   public void testTimeSeriesMinQuery() {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
     QueryContext queryContext = getQueryContextForTimeSeries("orderItemCount", timeBuckets, 0L,
-        new AggInfo("MIN", false, Collections.emptyMap()), List.of("cityName"));
+        new AggInfo("MIN", false, Map.of()), List.of("cityName"));
     ServerQueryRequest queryRequest =
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
     InstanceResponseBlock instanceResponse = execute(queryRequest);
@@ -328,7 +328,7 @@ public class QueryExecutorTest {
             TimeUnit.SECONDS, offsetSeconds, timeBuckets, aggInfo);
     QueryContext.Builder builder = new QueryContext.Builder();
     builder.setTableName(OFFLINE_TABLE_NAME);
-    builder.setAliasList(Collections.emptyList());
+    builder.setAliasList(List.of());
     builder.setSelectExpressions(List.of(aggregateExpr));
     // We pass in null to group-by exp to get AggregationResultsBlock in response to test both group-by and agg paths.
     builder.setGroupByExpressions(groupByExpList.isEmpty() ? null : groupByExpList);

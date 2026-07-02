@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.segmentpartition;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -128,7 +127,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private static List<String> getOnlineServers(ExternalView externalView, String segment) {
     Map<String, String> instanceStateMap = externalView.getStateMap(segment);
     if (instanceStateMap == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     List<String> onlineServers = new ArrayList<>(instanceStateMap.size());
     for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
@@ -179,7 +178,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       // NOTE: This should not happen, but we still handle it gracefully by adding an invalid SegmentInfo
       LOGGER.error("Failed to find segment info for segment: {} in table: {} while handling segment refresh", segment,
           _tableNameWithType);
-      segmentInfo = new SegmentInfo(partitionId, pushTimeMs, Collections.emptyList());
+      segmentInfo = new SegmentInfo(partitionId, pushTimeMs, List.of());
       _segmentInfoMap.put(segment, segmentInfo);
     } else {
       segmentInfo._partitionId = partitionId;

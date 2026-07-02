@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -859,7 +858,7 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
       _taskGenerationCount++;
       Map<String, String> configs = new HashMap<>();
       configs.put("tableName", tableConfig.getTableName());
-      return Collections.singletonList(new PinotTaskConfig(_taskType, configs));
+      return List.of(new PinotTaskConfig(_taskType, configs));
     }
 
     @Override

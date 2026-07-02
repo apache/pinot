@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.sql.parsers.parser;
 
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlCall;
@@ -59,7 +58,7 @@ public class SqlPinotShowTables extends SqlCall {
 
   @Override
   public List<SqlNode> getOperandList() {
-    return _database == null ? Collections.emptyList() : Collections.singletonList(_database);
+    return _database == null ? List.of() : List.of(_database);
   }
 
   @Override

@@ -19,9 +19,9 @@
 package org.apache.pinot.controller.helix.core;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
@@ -55,7 +55,7 @@ public class SegmentResetTest {
     public IdealState getTableIdealState(String tableNameWithType) {
       IdealState idealState = Mockito.mock(IdealState.class);
       when(idealState.getInstanceSet(_segmentName)).thenReturn(new HashSet<>(Arrays.asList(_instance1, _instance2)));
-      when(idealState.getPartitionSet()).thenReturn(new HashSet<>(Collections.singletonList(_segmentName)));
+      when(idealState.getPartitionSet()).thenReturn(new HashSet<>(List.of(_segmentName)));
       return idealState;
     }
 

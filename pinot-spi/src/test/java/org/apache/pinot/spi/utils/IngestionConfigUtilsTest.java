@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.utils;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -56,9 +55,9 @@ public class IngestionConfigUtilsTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTimeColumnName("timeColumn").build();
 
     // get from ingestion config (when not present in indexing config)
-    Map<String, String> streamConfigMap = Collections.singletonMap("streamType", "kafka");
+    Map<String, String> streamConfigMap = Map.of("streamType", "kafka");
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigMap)));
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap)));
     tableConfig.setIngestionConfig(ingestionConfig);
     Map<String, String> actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
     Assert.assertEquals(actualStreamConfigsMap.size(), 1);
@@ -172,14 +171,14 @@ public class IngestionConfigUtilsTest {
     Assert.assertFalse(IngestionConfigUtils.hasMultipleStreams(realtimeTable));
 
     // REALTIME, single stream
-    Map<String, String> streamConfigMap1 = Collections.singletonMap("streamType", "kafka");
+    Map<String, String> streamConfigMap1 = Map.of("streamType", "kafka");
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigMap1)));
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap1)));
     realtimeTable.setIngestionConfig(ingestionConfig);
     Assert.assertFalse(IngestionConfigUtils.hasMultipleStreams(realtimeTable));
 
     // REALTIME, two streams
-    Map<String, String> streamConfigMap2 = Collections.singletonMap("streamType", "kinesis");
+    Map<String, String> streamConfigMap2 = Map.of("streamType", "kinesis");
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap1, streamConfigMap2)));
     Assert.assertTrue(IngestionConfigUtils.hasMultipleStreams(realtimeTable));
   }
@@ -191,16 +190,16 @@ public class IngestionConfigUtilsTest {
     Assert.assertEquals(IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(offlineTable, 42), 42);
 
     // REALTIME, single stream — must return partitionId unchanged
-    Map<String, String> streamConfigMap = Collections.singletonMap("streamType", "kafka");
+    Map<String, String> streamConfigMap = Map.of("streamType", "kafka");
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigMap)));
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap)));
     TableConfig realtimeTable =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTimeColumnName("timeColumn").build();
     realtimeTable.setIngestionConfig(ingestionConfig);
     Assert.assertEquals(IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(realtimeTable, 42), 42);
 
     // REALTIME, multi-stream — encoded partition id 10003 (stream 1, partition 3) must decode to 3
-    Map<String, String> streamConfigMap2 = Collections.singletonMap("streamType", "kinesis");
+    Map<String, String> streamConfigMap2 = Map.of("streamType", "kinesis");
     ingestionConfig.setStreamIngestionConfig(
         new StreamIngestionConfig(List.of(streamConfigMap, streamConfigMap2)));
     int pinotPartitionId = IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(3, 1);

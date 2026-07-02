@@ -20,7 +20,6 @@ package org.apache.pinot.broker.routing.segmentpruner;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -146,7 +145,7 @@ public class TimeSegmentPruner implements SegmentPruner {
     }
     if (intervals.isEmpty()) {
       // Invalid query time interval
-      return Collections.emptySet();
+      return Set.of();
     }
 
     Set<String> selectedSegments = new HashSet<>();
@@ -182,7 +181,7 @@ public class TimeSegmentPruner implements SegmentPruner {
           List<Interval> childIntervals = getFilterTimeIntervals(child);
           if (childIntervals != null) {
             if (childIntervals.isEmpty()) {
-              return Collections.emptyList();
+              return List.of();
             }
             andIntervals.add(childIntervals);
           }

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.segment.processing.framework;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -246,16 +245,16 @@ public class SegmentProcessorConfig {
         _timeHandlerConfig = new TimeHandlerConfig.Builder(TimeHandler.Type.NO_OP).build();
       }
       if (_partitionerConfigs == null) {
-        _partitionerConfigs = Collections.emptyList();
+        _partitionerConfigs = List.of();
       }
       if (_mergeType == null) {
         _mergeType = DEFAULT_MERGE_TYPE;
       }
       if (_aggregationTypes == null) {
-        _aggregationTypes = Collections.emptyMap();
+        _aggregationTypes = Map.of();
       }
       if (_aggregationFunctionParameters == null) {
-        _aggregationFunctionParameters = Collections.emptyMap();
+        _aggregationFunctionParameters = Map.of();
       }
       if (_segmentConfig == null) {
         _segmentConfig = new SegmentConfig.Builder().build();

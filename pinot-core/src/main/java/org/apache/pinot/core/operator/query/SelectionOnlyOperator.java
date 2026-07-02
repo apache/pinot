@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -159,7 +158,7 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   @Override

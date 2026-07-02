@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -160,6 +161,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   @Nullable
   protected List<String> _tags;
 
+  @JsonProperty("fieldId")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  protected Integer _fieldId;
+
+  @JsonProperty("aliases")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  protected List<String> _aliases;
+
   protected String _name;
   protected DataType _dataType;
   protected boolean _singleValueField = true;
@@ -238,6 +249,24 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   public void setTags(@Nullable List<String> tags) {
     _tags = tags;
+  }
+
+  @Nullable
+  public Integer getFieldId() {
+    return _fieldId;
+  }
+
+  public void setFieldId(@Nullable Integer fieldId) {
+    _fieldId = fieldId;
+  }
+
+  @Nullable
+  public List<String> getAliases() {
+    return _aliases;
+  }
+
+  public void setAliases(@Nullable List<String> aliases) {
+    _aliases = aliases == null || aliases.isEmpty() ? null : aliases;
   }
 
   public DataType getDataType() {
@@ -585,7 +614,25 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       }
       jsonObject.set("tags", tagsArray);
     }
+    appendFieldIdAndAliases(jsonObject);
     return jsonObject;
+  }
+
+  /// Appends `fieldId` and `aliases` (when set) to the given JSON object.
+  ///
+  /// Subclasses that build JSON without calling [FieldSpec#toJsonObject()], such as [TimeFieldSpec], use this helper
+  /// to preserve these fields during schema round-trip serialization.
+  protected void appendFieldIdAndAliases(ObjectNode jsonObject) {
+    if (_fieldId != null) {
+      jsonObject.put("fieldId", _fieldId);
+    }
+    if (_aliases != null && !_aliases.isEmpty()) {
+      ArrayNode aliasesArray = JsonUtils.newArrayNode();
+      for (String alias : _aliases) {
+        aliasesArray.add(alias);
+      }
+      jsonObject.set("aliases", aliasesArray);
+    }
   }
 
   protected void appendDefaultNullValue(ObjectNode jsonNode) {
@@ -658,14 +705,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && Objects.equals(_transformFunction, that._transformFunction)
         && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider)
         && Objects.equals(_description, that._description)
-        && Objects.equals(_tags, that._tags);
+        && Objects.equals(_tags, that._tags)
+        && Objects.equals(_fieldId, that._fieldId)
+        && Objects.equals(_aliases, that._aliases);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
         _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider,
-        _description, _tags);
+        _description, _tags, _fieldId, _aliases);
   }
 
   /**
@@ -688,45 +737,41 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT(Integer.BYTES, true, true),
-    LONG(Long.BYTES, true, true),
-    FLOAT(Float.BYTES, true, true),
-    DOUBLE(Double.BYTES, true, true),
-    BIG_DECIMAL(true, true),
-    BOOLEAN(INT, false, true),
-    TIMESTAMP(LONG, false, true),
-    STRING(false, true),
-    JSON(STRING, false, false),
-    BYTES(false, false),
-    STRUCT(false, false),
-    MAP(false, false),
-    OPEN_STRUCT(false, false),
-    LIST(false, false),
-    UNKNOWN(false, true);
+    INT(Integer.BYTES, true),
+    LONG(Long.BYTES, true),
+    FLOAT(Float.BYTES, true),
+    DOUBLE(Double.BYTES, true),
+    BIG_DECIMAL(true),
+    BOOLEAN(INT, false),
+    TIMESTAMP(LONG, false),
+    STRING(false),
+    JSON(STRING, false),
+    BYTES(false),
+    STRUCT(false),
+    MAP(false),
+    OPEN_STRUCT(false),
+    LIST(false),
+    UNKNOWN(false);
 
     private final DataType _storedType;
     private final int _size;
-    private final boolean _sortable;
     private final boolean _numeric;
 
-    DataType(boolean numeric, boolean sortable) {
+    DataType(boolean numeric) {
       _storedType = this;
       _size = -1;
-      _sortable = sortable;
       _numeric = numeric;
     }
 
-    DataType(DataType storedType, boolean numeric, boolean sortable) {
-      _storedType = storedType;
-      _size = storedType._size;
-      _sortable = sortable;
-      _numeric = numeric;
-    }
-
-    DataType(int size, boolean numeric, boolean sortable) {
+    DataType(int size, boolean numeric) {
       _storedType = this;
       _size = size;
-      _sortable = sortable;
+      _numeric = numeric;
+    }
+
+    DataType(DataType storedType, boolean numeric) {
+      _storedType = storedType;
+      _size = storedType._size;
       _numeric = numeric;
     }
 
@@ -912,13 +957,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         throw new IllegalArgumentException("Cannot convert value: '" + value + "' to type: " + this);
       }
     }
-
-    /**
-     * Checks whether the data type can be a sorted column.
-     */
-    public boolean canBeASortedColumn() {
-      return _sortable;
-    }
   }
 
   @Override
@@ -974,19 +1012,17 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class DataTypeProperties {
     @JsonProperty("storedType")
     public final DataType _storedType;
     @JsonProperty("size")
     public final int _size;
-    @JsonProperty("sortable")
-    public final boolean _sortable;
     @JsonProperty("numeric")
     public final boolean _numeric;
 
     public DataTypeProperties(DataType dataType) {
       _storedType = dataType._storedType;
-      _sortable = dataType._sortable;
       _numeric = dataType._numeric;
       _size = dataType._size;
     }

@@ -20,7 +20,6 @@ package org.apache.pinot.controller.recommender.rules.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
 
@@ -53,7 +52,7 @@ public class FixedLenBitset {
 
   public List<Integer> getOffsets() {
     if (isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
     List<Integer> ret = new ArrayList<>();
     for (int i = 0; i < _size; i++) {

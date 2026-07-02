@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.recommender.rules.utils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -57,7 +56,7 @@ public class QueryInvertedSortedIndexRecommender {
   private static final int NESTED_TOP_LEVEL = 0;
   private static final int NESTED_SECOND_LEVEL = 1;
   public static final List<List<PredicateParseResult>> EMPTY_PARSE_RESULT =
-      Collections.singletonList(Collections.singletonList(PredicateParseResult.emptyPredicateParseResult()));
+      List.of(List.of(PredicateParseResult.emptyPredicateParseResult()));
 
   private InputManager _inputManager;
   private boolean _useOverwrittenIndices;
@@ -111,10 +110,10 @@ public class QueryInvertedSortedIndexRecommender {
           childResults.stream().collect(Collectors.groupingBy(PredicateParseResult::getIteratorEvalPriority));
       List<PredicateParseResult> ret =
           groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.INDEXED, new ArrayList<>());
-      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.SCAN, Collections.emptyList()));
-      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.AND, Collections.emptyList()));
-      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.OR, Collections.emptyList()));
-      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.EXPRESSION, Collections.emptyList()));
+      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.SCAN, List.of()));
+      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.AND, List.of()));
+      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.OR, List.of()));
+      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.EXPRESSION, List.of()));
       return ret;
     } else {
       // Else the evaluation priority is simply AND, OR, SCAN, EXPRESSION
@@ -283,7 +282,7 @@ public class QueryInvertedSortedIndexRecommender {
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.AND)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.NESTED).setnESI(totalNESI)
           .setPercentSelected(percentSelected).setnESIWithIdx(totalNESI).setQueryWeight(queryWeight).build());
-      return Collections.singletonList(ret);
+      return List.of(ret);
     } else if (type == FilterContext.Type.OR) {
       // case: OR connected top level predicates, recursively run parseTopLevel on each on its children and
       // simply return all the results. Each result will contribute to the global recommendation equally
@@ -318,7 +317,7 @@ public class QueryInvertedSortedIndexRecommender {
             .setnESIWithIdx(predicateParseResult._nESI).setQueryWeight(queryWeight).build());
         ret.add(predicateParseResult.multiplyWeight(queryWeight));
         LOGGER.debug("parseTopLevel: LEAF: Child results: {}", ret);
-        return Collections.singletonList(ret);
+        return List.of(ret);
       }
     }
   }
@@ -397,7 +396,7 @@ public class QueryInvertedSortedIndexRecommender {
       // Recommend one predicate having min percent docs selected to apply indices on,
       // from the scanning based predicates
       Optional<PredicateParseResult> newCandidateOptional =
-          groupedPredicates.getOrDefault(RecommendationPriorityEnum.CANDIDATE_SCAN, Collections.emptyList()).stream()
+          groupedPredicates.getOrDefault(RecommendationPriorityEnum.CANDIDATE_SCAN, List.of()).stream()
               .filter(
                   PredicateParseResult::hasCandidateDim) // The predicate should be index applicable to be recommended
               .min(Comparator.comparing(PredicateParseResult::getPercentSelected));
@@ -405,7 +404,7 @@ public class QueryInvertedSortedIndexRecommender {
       double bitmapPercentSelected = PERCENT_SELECT_ALL;
       double bitmapNESIWithIdx = NESI_ZERO;
       for (PredicateParseResult predicateParseResult : groupedPredicates
-          .getOrDefault(RecommendationPriorityEnum.BITMAP, Collections.emptyList())) {
+          .getOrDefault(RecommendationPriorityEnum.BITMAP, List.of())) {
         bitmapPercentSelected *= predicateParseResult.getPercentSelected();
         bitmapNESIWithIdx += predicateParseResult.getnESIWithIdx();
         candidateDims.union(predicateParseResult.getCandidateDims());
@@ -433,7 +432,7 @@ public class QueryInvertedSortedIndexRecommender {
       nESIWithIdx += bitmapNESIWithIdx;
 
       for (PredicateParseResult predicateParseResult : groupedPredicates
-          .getOrDefault(RecommendationPriorityEnum.CANDIDATE_SCAN, Collections.emptyList())) {
+          .getOrDefault(RecommendationPriorityEnum.CANDIDATE_SCAN, List.of())) {
         if (predicateParseResult != newCandidateOptional.orElse(null)) {
           nESIWithIdx += predicateParseResult.getnESI() * percentSelectedWithIdx;
           percentSelectedWithIdx *= predicateParseResult.getPercentSelected();
@@ -441,7 +440,7 @@ public class QueryInvertedSortedIndexRecommender {
       }
 
       for (PredicateParseResult predicateParseResult : groupedPredicates
-          .getOrDefault(RecommendationPriorityEnum.NON_CANDIDATE_SCAN, Collections.emptyList())) {
+          .getOrDefault(RecommendationPriorityEnum.NON_CANDIDATE_SCAN, List.of())) {
         nESIWithIdx += predicateParseResult.getnESI() * percentSelectedWithIdx;
         percentSelectedWithIdx *= predicateParseResult.getPercentSelected();
       }

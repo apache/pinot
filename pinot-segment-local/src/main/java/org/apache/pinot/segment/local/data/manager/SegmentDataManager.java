@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.segment.local.data.manager;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -74,12 +75,30 @@ public abstract class SegmentDataManager {
 
   public abstract IndexSegment getSegment();
 
+  @Nullable
+  public String getTier() {
+    IndexSegment segment = getSegment();
+    return segment instanceof ImmutableSegment ? ((ImmutableSegment) segment).getTier() : null;
+  }
+
   public boolean hasMultiSegments() {
     return false;
   }
 
   public List<IndexSegment> getSegments() {
-    return Collections.emptyList();
+    return List.of();
+  }
+
+  /**
+   * The index segment(s) this manager exposes.
+   * Defaults to the single backing segment.
+   */
+  public List<IndexSegment> getReportableSegments() {
+    return List.of(getSegment());
+  }
+
+  public String getCrc() {
+    return getSegment().getSegmentMetadata().getCrc();
   }
 
   /**

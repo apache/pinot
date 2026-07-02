@@ -282,7 +282,7 @@ public class PinotTableReloadStatusReporter {
       Map<String, List<String>> serverToSegments = new HashMap<>();
       Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
       for (String server : servers) {
-        serverToSegments.put(server, Collections.singletonList(segmentName));
+        serverToSegments.put(server, List.of(segmentName));
       }
       return serverToSegments;
     }

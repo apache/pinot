@@ -556,7 +556,7 @@ public class QueryEnvironment {
       return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
     }
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()),
-        _envConfig.defaultHashFunction());
+        _envConfig.defaultHashFunction(), pruneUnnestColumns(plannerContext.getOptions()));
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
@@ -739,6 +739,23 @@ public class QueryEnvironment {
     return Boolean.parseBoolean(optionValue);
   }
 
+  /**
+   * Whether to prune unused input (passthrough) columns from the UNNEST output. Defaults to the broker config
+   * {@link Config#defaultUnnestColumnPruning()} (itself {@code false} by default) because a broker emitting the
+   * smaller schema cannot be honored by an un-upgraded server; enable only once all servers support it. Can be
+   * overridden per query via {@link CommonConstants.Broker.Request.QueryOptionKey#UNNEST_COLUMN_PRUNING}.
+   * <p>
+   * NOTE: This is a no-op under {@code usePhysicalOptimizer} (the v2 path does not go through
+   * {@link org.apache.pinot.query.planner.logical.RelToPlanNodeConverter}).
+   */
+  public boolean pruneUnnestColumns(Map<String, String> options) {
+    String optionValue = options.get(CommonConstants.Broker.Request.QueryOptionKey.UNNEST_COLUMN_PRUNING);
+    if (optionValue == null) {
+      return _envConfig.defaultUnnestColumnPruning();
+    }
+    return Boolean.parseBoolean(optionValue);
+  }
+
   @Value.Immutable
   public interface Config {
 
@@ -798,6 +815,18 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultUseSpools() {
       return CommonConstants.Broker.DEFAULT_OF_SPOOLS;
+    }
+
+    /**
+     * Whether to prune unused input (passthrough) columns from the UNNEST output by default.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#UNNEST_COLUMN_PRUNING}.
+     */
+    @Value.Default
+    default boolean defaultUnnestColumnPruning() {
+      return CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING;
     }
 
     /// Whether to only use servers for leaf stages as the workers for the intermediate stages.

@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -135,7 +134,7 @@ public class PinotAggregateExchangeNodeInsertRule {
       if (!isGroupTrimmingEnabled(call, hintOptions, aggRel)) {
         return;
       } else if (hintOptions == null) {
-        hintOptions = Collections.emptyMap();
+        hintOptions = Map.of();
       }
 
       Sort sortRel = call.rel(0);
@@ -189,7 +188,7 @@ public class PinotAggregateExchangeNodeInsertRule {
       if (!isGroupTrimmingEnabled(call, hintOptions, aggRel)) {
         return;
       } else if (hintOptions == null) {
-        hintOptions = Collections.emptyMap();
+        hintOptions = Map.of();
       }
 
       Sort sortRel = call.rel(0);

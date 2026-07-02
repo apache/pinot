@@ -21,7 +21,6 @@ package org.apache.pinot.client.admin;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -51,7 +50,7 @@ public class ClusterAdminClient extends BaseServiceAdminClient {
       throws PinotAdminException {
     try {
       return updateClusterConfig(
-          PinotAdminTransport.getObjectMapper().writeValueAsString(Collections.singletonMap(configName, configValue)));
+          PinotAdminTransport.getObjectMapper().writeValueAsString(Map.of(configName, configValue)));
     } catch (JsonProcessingException e) {
       throw new PinotAdminException("Failed to serialize cluster config update for: " + configName, e);
     }

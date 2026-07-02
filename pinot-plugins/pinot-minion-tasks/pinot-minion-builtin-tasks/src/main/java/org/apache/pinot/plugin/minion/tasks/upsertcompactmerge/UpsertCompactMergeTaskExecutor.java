@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -119,7 +118,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
 
     List<RecordReader> recordReaders = segmentMetadataList.stream().map(x -> {
       RoaringBitmap validDocIds = MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
-          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc(), consensusMode);
+          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc(), x.getDataCrc(), consensusMode);
       if (validDocIds == null) {
         // no valid crc match found or no validDocIds obtained from all servers
         // error out the task instead of silently failing so that we can track it via task-error metrics
@@ -151,7 +150,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     List<File> outputSegmentDirs;
     _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
     SegmentProcessorFramework framework = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
-        recordReaderFileConfigs, Collections.emptyList(), new DefaultSegmentNumRowProvider(Integer.parseInt(
+        recordReaderFileConfigs, List.of(), new DefaultSegmentNumRowProvider(Integer.parseInt(
         configs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY))));
     outputSegmentDirs = framework.process();
     _eventObserver.notifyProgress(_pinotTaskConfig,

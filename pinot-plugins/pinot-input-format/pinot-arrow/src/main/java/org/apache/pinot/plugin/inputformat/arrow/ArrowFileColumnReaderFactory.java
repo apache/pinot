@@ -89,13 +89,13 @@ public class ArrowFileColumnReaderFactory implements ColumnReaderFactory {
   @Override
   public void init(Schema targetSchema)
       throws IOException {
-    init(targetSchema, null, Collections.emptyMap());
+    init(targetSchema, null, Map.of());
   }
 
   @Override
   public void init(Schema targetSchema, Set<String> colsToRead)
       throws IOException {
-    init(targetSchema, colsToRead, Collections.emptyMap());
+    init(targetSchema, colsToRead, Map.of());
   }
 
   /**

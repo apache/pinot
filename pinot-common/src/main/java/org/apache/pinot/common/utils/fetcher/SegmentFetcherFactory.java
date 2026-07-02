@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
 import java.net.URI;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +59,7 @@ public class SegmentFetcherFactory {
     HTTPS_SEGMENT_FETCHER.init(config); // directly, without sub-namespace
     PINOT_FS_SEGMENT_FETCHER.init(config); // directly, without sub-namespace
 
-    List<String> protocols = config.getProperty(PROTOCOLS_KEY, Collections.emptyList());
+    List<String> protocols = config.getProperty(PROTOCOLS_KEY, List.of());
     for (String protocol : protocols) {
       String segmentFetcherClassName = config.getProperty(protocol + SEGMENT_FETCHER_CLASS_KEY_SUFFIX);
       SegmentFetcher segmentFetcher;

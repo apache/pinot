@@ -20,7 +20,6 @@ package org.apache.pinot.queries;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.calcite.avatica.util.Base64;
@@ -56,7 +55,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
         new DataSchema(new String[]{"countmv(column6)"}, new DataSchema.ColumnDataType[]
             {DataSchema.ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{426752L};
-    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
@@ -110,7 +109,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     expectedDataSchema = new DataSchema(new String[]{"daysSinceEpoch", "countmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
     expectedResultTable =
-        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1756015683, 426752L}));
+        new ResultTable(expectedDataSchema, List.<Object[]>of(new Object[]{1756015683, 426752L}));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable);
 
     query = "SELECT TIMECONVERT(daysSinceEpoch, 'DAYS', 'HOURS') AS key, COUNTMV(column6) FROM testTable"
@@ -119,7 +118,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     expectedDataSchema = new DataSchema(new String[]{"key", "countmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
     expectedResultTable =
-        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{42144376392L, 426752L}));
+        new ResultTable(expectedDataSchema, List.<Object[]>of(new Object[]{42144376392L, 426752L}));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable);
   }
 
@@ -132,7 +131,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.DOUBLE});
     ResultTable expectedResultTable =
-        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2147483647.0}));
+        new ResultTable(expectedDataSchema, List.<Object[]>of(new Object[]{2147483647.0}));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 0L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
@@ -160,7 +159,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.DOUBLE});
     Object[] expectedResults = new Object[]{1001.0};
-    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 0L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
@@ -194,7 +193,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.DOUBLE});
     Object[] expectedResults = new Object[]{484324601810280.0};
-    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
@@ -226,7 +225,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.DOUBLE});
     Object[] expectedResults = new Object[]{1134908803.7321};
-    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable, 1e-5);
 
     brokerResponse = getBrokerResponse(query + FILTER);
@@ -260,7 +259,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.DOUBLE});
     Object[] expectedResults = new Object[]{2147482646.0};
-    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 0L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
@@ -293,7 +292,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.INT});
     Object[] expectedResults = new Object[]{18499};
-    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
@@ -326,7 +325,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{20039L};
-    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
@@ -359,7 +358,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{18651L};
-    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
@@ -394,7 +393,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{20039L};
-    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable,
         cardinalityExtractor);
 
@@ -436,7 +435,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{18651L};
-    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable,
         cardinalityExtractor);
 
@@ -478,7 +477,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
         {DataSchema.ColumnDataType.DOUBLE});
     ResultTable expectedResultTable =
-        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2147483647.0}));
+        new ResultTable(expectedDataSchema, List.<Object[]>of(new Object[]{2147483647.0}));
     for (String query : queries) {
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
       QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
@@ -514,7 +513,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
       DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
           {DataSchema.ColumnDataType.LONG});
       ResultTable expectedResultTable =
-          new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2147483647L}));
+          new ResultTable(expectedDataSchema, List.<Object[]>of(new Object[]{2147483647L}));
       QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
 
       brokerResponse = getBrokerResponse(query + FILTER);
@@ -675,7 +674,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*) FILTER(WHERE column1 > '5')"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
     ResultTable expectedResultTable =
-        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{370236L}));
+        new ResultTable(expectedDataSchema, List.<Object[]>of(new Object[]{370236L}));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 370236L, 400000L, 0L, 400000L, expectedResultTable);
   }
 

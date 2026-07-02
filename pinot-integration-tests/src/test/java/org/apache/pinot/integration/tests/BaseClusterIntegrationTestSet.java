@@ -22,7 +22,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -660,11 +659,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       checkForInstanceInRoutingTable(serverInstance, false);
 
       _helixAdmin.setConfig(scope,
-          Collections.singletonMap(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.TRUE.toString()));
+          Map.of(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.TRUE.toString()));
       checkForInstanceInRoutingTable(serverInstance, false);
 
       _helixAdmin.setConfig(scope,
-          Collections.singletonMap(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString()));
+          Map.of(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString()));
 
       // queriesDisabled was set via a separate field-scoped write, so the server must still be out of routing
       checkForInstanceInRoutingTable(serverInstance, false);
@@ -691,7 +690,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       }
       try {
         _helixAdmin.setConfig(scope,
-            Collections.singletonMap(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString()));
+            Map.of(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString()));
       } catch (Exception ignored) {
       }
     }

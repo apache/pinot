@@ -528,6 +528,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
               "Invalid aggregation type: " + entry.getValue() + " for column: " + column, e);
         }
         MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, column, entry.getValue());
+        MergeTaskUtils.validateAggregationColumnType(schema, column, entry.getValue());
       }
     }
     // check no mis-configured aggregation function parameters

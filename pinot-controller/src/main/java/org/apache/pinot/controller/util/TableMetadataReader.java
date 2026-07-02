@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.BiMap;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -234,7 +233,7 @@ public class TableMetadataReader {
     Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
 
     Map<String, List<String>> serverToSegments =
-        servers.stream().collect(Collectors.toMap(s -> s, s -> Collections.singletonList(segmentName)));
+        servers.stream().collect(Collectors.toMap(s -> s, s -> List.of(segmentName)));
 
     BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(servers);
     ServerSegmentMetadataReader serverSegmentMetadataReader =

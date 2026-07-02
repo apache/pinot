@@ -28,10 +28,10 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
@@ -63,7 +63,7 @@ public class JsonUtilsTest {
       JsonNode jsonNode = JsonUtils.stringToJsonNode("123");
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
       assertEquals(flattenedRecords.size(), 1);
-      assertEquals(flattenedRecords.get(0), Collections.singletonMap("", "123"));
+      assertEquals(flattenedRecords.get(0), Map.of("", "123"));
     }
     {
       JsonNode jsonNode = JsonUtils.stringToJsonNode("[]");
@@ -362,7 +362,7 @@ public class JsonUtilsTest {
       jsonIndexConfig.setMaxLevels(2);
       flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
       assertEquals(flattenedRecords.size(), 1);
-      assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "adam"));
+      assertEquals(flattenedRecords.get(0), Map.of(".name", "adam"));
 
       jsonIndexConfig.setMaxLevels(1);
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
@@ -442,12 +442,12 @@ public class JsonUtilsTest {
             + "\"office\"]}," + "{\"country\":\"ca\",\"street\":\"second st\"}]}");
 
     JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
-    jsonIndexConfig.setIncludePaths(Collections.singleton("$.name"));
+    jsonIndexConfig.setIncludePaths(Set.of("$.name"));
     List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 1);
-    assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "charles"));
+    assertEquals(flattenedRecords.get(0), Map.of(".name", "charles"));
 
-    jsonIndexConfig.setIncludePaths(Collections.singleton("$.addresses"));
+    jsonIndexConfig.setIncludePaths(Set.of("$.addresses"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 3);
     Map<String, String> flattenedRecord0 = flattenedRecords.get(0);
@@ -470,10 +470,10 @@ public class JsonUtilsTest {
     assertEquals(flattenedRecord2.get(".addresses..country"), "ca");
     assertEquals(flattenedRecord2.get(".addresses..street"), "second st");
 
-    jsonIndexConfig.setIncludePaths(Collections.singleton("$.addresses[*]"));
+    jsonIndexConfig.setIncludePaths(Set.of("$.addresses[*]"));
     assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
-    jsonIndexConfig.setIncludePaths(Collections.singleton("$.addresses[*].types"));
+    jsonIndexConfig.setIncludePaths(Set.of("$.addresses[*].types"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 2);
     flattenedRecord0 = flattenedRecords.get(0);
@@ -503,7 +503,7 @@ public class JsonUtilsTest {
     assertEquals(flattenedRecord1.get(".addresses..types.$index"), "1");
     assertEquals(flattenedRecord1.get(".addresses..types."), "office");
 
-    jsonIndexConfig.setIncludePaths(Collections.singleton("$.no_match"));
+    jsonIndexConfig.setIncludePaths(Set.of("$.no_match"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertTrue(flattenedRecords.isEmpty());
   }
@@ -519,10 +519,10 @@ public class JsonUtilsTest {
     jsonIndexConfig.setExcludeArray(true);
     List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 1);
-    assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "charles"));
+    assertEquals(flattenedRecords.get(0), Map.of(".name", "charles"));
 
     jsonIndexConfig = new JsonIndexConfig();
-    jsonIndexConfig.setExcludePaths(Collections.singleton("$.name"));
+    jsonIndexConfig.setExcludePaths(Set.of("$.name"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 3);
     Map<String, String> flattenedRecord0 = flattenedRecords.get(0);
@@ -545,21 +545,21 @@ public class JsonUtilsTest {
     assertEquals(flattenedRecord2.get(".addresses..country"), "ca");
     assertEquals(flattenedRecord2.get(".addresses..street"), "second st");
 
-    jsonIndexConfig.setExcludePaths(Collections.singleton("$.addresses"));
+    jsonIndexConfig.setExcludePaths(Set.of("$.addresses"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 1);
-    assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "charles"));
+    assertEquals(flattenedRecords.get(0), Map.of(".name", "charles"));
 
-    jsonIndexConfig.setExcludePaths(Collections.singleton("$.addresses[*]"));
+    jsonIndexConfig.setExcludePaths(Set.of("$.addresses[*]"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 1);
-    assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "charles"));
+    assertEquals(flattenedRecords.get(0), Map.of(".name", "charles"));
 
     jsonIndexConfig = new JsonIndexConfig();
-    jsonIndexConfig.setExcludeFields(Collections.singleton("addresses"));
+    jsonIndexConfig.setExcludeFields(Set.of("addresses"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 1);
-    assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "charles"));
+    assertEquals(flattenedRecords.get(0), Map.of(".name", "charles"));
   }
 
   @Test
@@ -599,7 +599,7 @@ public class JsonUtilsTest {
 
     // unnest collection entries
     inferredPinotSchema =
-        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Collections.singletonList("entries"),
+        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, List.of("entries"),
             ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
     expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
         .addMetric("m1", FieldSpec.DataType.INT)
@@ -613,7 +613,7 @@ public class JsonUtilsTest {
 
     // change delimiter
     inferredPinotSchema =
-        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Collections.singletonList(""), "_",
+        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, List.of(""), "_",
             ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
     expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
         .addMetric("m1", FieldSpec.DataType.INT)
@@ -626,7 +626,7 @@ public class JsonUtilsTest {
 
     // change the handling of collection-to-json option, d2 will become string
     inferredPinotSchema =
-        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Collections.singletonList("entries"),
+        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, List.of("entries"),
             ".", ComplexTypeConfig.CollectionNotUnnestedToJson.ALL);
     expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
         .addMetric("m1", FieldSpec.DataType.INT)
@@ -673,11 +673,11 @@ public class JsonUtilsTest {
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
 
       // flatten everything within 2 layers
-      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*"));
+      jsonIndexConfig.setIndexPaths(Set.of("*.*"));
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
       // flatten "a." prefix till 2 layers
-      jsonIndexConfig.setIndexPaths(Collections.singleton("a.*"));
+      jsonIndexConfig.setIndexPaths(Set.of("a.*"));
       flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
       assertTrue(flattenedRecords.isEmpty());
     }
@@ -706,11 +706,11 @@ public class JsonUtilsTest {
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
 
       // flatten everything
-      jsonIndexConfig.setIndexPaths(Collections.singleton("**"));
+      jsonIndexConfig.setIndexPaths(Set.of("**"));
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
       // flatten everything within 3 layers
-      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*.*"));
+      jsonIndexConfig.setIndexPaths(Set.of("*.*.*"));
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
       // flatten "name" 1 layer and "addresses" infinite layers
@@ -718,13 +718,13 @@ public class JsonUtilsTest {
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
       // flatten everything within 2 layers
-      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*"));
+      jsonIndexConfig.setIndexPaths(Set.of("*.*"));
       flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
       assertEquals(flattenedRecords.size(), 1);
-      assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "adam"));
+      assertEquals(flattenedRecords.get(0), Map.of(".name", "adam"));
 
       // flatten "name." prefix with infinite layers
-      jsonIndexConfig.setIndexPaths(Collections.singleton("name.**"));
+      jsonIndexConfig.setIndexPaths(Set.of("name.**"));
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
     }
     {
@@ -751,11 +751,11 @@ public class JsonUtilsTest {
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
 
       // flatten everything
-      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*.**"));
+      jsonIndexConfig.setIndexPaths(Set.of("*.*.**"));
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
       // flatten addresses array with one more layer
-      jsonIndexConfig.setIndexPaths(Collections.singleton("addresses..*"));
+      jsonIndexConfig.setIndexPaths(Set.of("addresses..*"));
       flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
       assertEquals(flattenedRecords.size(), 2);
       Map<String, String> flattenedRecord0 = flattenedRecords.get(0);

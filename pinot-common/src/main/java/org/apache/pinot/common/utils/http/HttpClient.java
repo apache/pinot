@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -157,7 +156,7 @@ public class HttpClient implements AutoCloseable {
    */
   public SimpleHttpResponse sendDeleteRequest(URI uri)
       throws IOException {
-    return sendDeleteRequest(uri, Collections.emptyMap());
+    return sendDeleteRequest(uri, Map.of());
   }
 
   public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable Map<String, String> headers)

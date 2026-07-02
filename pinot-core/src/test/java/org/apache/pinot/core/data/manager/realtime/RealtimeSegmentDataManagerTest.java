@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -70,7 +71,10 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -865,6 +869,109 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test
+  public void testServerIngestionOomProtectionWaitsAndResumesWhileInitialConsuming()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), "10m", null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+
+      ServerIngestionOomProtectionManager oomProtectionManager = mock(ServerIngestionOomProtectionManager.class);
+      when(oomProtectionManager.waitIfProtectionNeeded(any())).thenReturn(true, false);
+      segmentDataManager.setServerIngestionOomProtectionManager(oomProtectionManager);
+
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      final LongMsgOffset endOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      segmentDataManager._consumeOffsets.add(endOffset);
+      SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(endOffset.toString()));
+      segmentDataManager._responses.add(response);
+
+      consumer.run();
+
+      verify(oomProtectionManager, atLeast(1)).waitIfProtectionNeeded(any());
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  @Test
+  public void testServerIngestionOomProtectionStopPredicateDoesNotMutateEndCriteria()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), "10m", null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+
+      ServerIngestionOomProtectionManager oomProtectionManager = mock(ServerIngestionOomProtectionManager.class);
+      when(oomProtectionManager.waitIfProtectionNeeded(any())).thenAnswer(invocation -> {
+        BooleanSupplier stopCondition = invocation.getArgument(0);
+        long consumeEndTime = segmentDataManager.getConsumeEndTime();
+        timeSupplier.set(consumeEndTime);
+
+        Assert.assertTrue(stopCondition.getAsBoolean());
+        Assert.assertEquals(segmentDataManager.getConsumeEndTime(), consumeEndTime);
+        return true;
+      });
+      segmentDataManager.setServerIngestionOomProtectionManager(oomProtectionManager);
+
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      final LongMsgOffset endOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      segmentDataManager._consumeOffsets.add(endOffset);
+      SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(endOffset.toString()));
+      segmentDataManager._responses.add(response);
+
+      consumer.run();
+
+      verify(oomProtectionManager, atLeast(1)).waitIfProtectionNeeded(any());
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  @Test
+  public void testServerIngestionOomProtectionIsSkippedWhileCatchingUp()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), "10m", null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      LongMsgOffset finalOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      Field finalOffsetField = RealtimeSegmentDataManager.class.getDeclaredField("_finalOffset");
+      finalOffsetField.setAccessible(true);
+      finalOffsetField.set(segmentDataManager, finalOffset);
+
+      ServerIngestionOomProtectionManager oomProtectionManager = mock(ServerIngestionOomProtectionManager.class);
+      when(oomProtectionManager.waitIfProtectionNeeded(any())).thenReturn(true);
+      segmentDataManager.setServerIngestionOomProtectionManager(oomProtectionManager);
+
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(finalOffset.toString()));
+      segmentDataManager._responses.add(response);
+
+      consumer.run();
+
+      verify(oomProtectionManager, never()).waitIfProtectionNeeded(any());
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  @Test
   public void testCompletionModeDownloadWithUrlValidation()
       throws Exception {
     // Test the new validation logic for CompletionMode.DOWNLOAD
@@ -1267,6 +1374,10 @@ public class RealtimeSegmentDataManagerTest {
       setLong(endTime, "_consumeEndTime");
     }
 
+    public long getConsumeEndTime() {
+      return getLong("_consumeEndTime");
+    }
+
     public void setNumRowsConsumed(int numRows) {
       setInt(numRows, "_numRowsConsumed");
     }
@@ -1319,6 +1430,19 @@ public class RealtimeSegmentDataManagerTest {
       } catch (IllegalAccessException e) {
         Assert.fail();
       }
+    }
+
+    private long getLong(String fieldName) {
+      try {
+        Field field = RealtimeSegmentDataManager.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.getLong(this);
+      } catch (NoSuchFieldException e) {
+        Assert.fail();
+      } catch (IllegalAccessException e) {
+        Assert.fail();
+      }
+      throw new RuntimeException("Cannot get here");
     }
 
     private void setOffset(long value, String fieldName) {

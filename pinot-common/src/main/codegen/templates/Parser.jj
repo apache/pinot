@@ -139,7 +139,6 @@ import java.io.Reader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -5313,7 +5312,7 @@ SqlCall ArrayLiteral() :
         e = ArrayLiteral() { list = startList(e); }
         ( <COMMA> e = ArrayLiteral() { list.add(e); } )*
     |
-        { list = Collections.emptyList(); }
+        { list = List.of(); }
     )
     <RBRACE> {
        return SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR.createCall(s.end(this), list);
@@ -5955,7 +5954,7 @@ SqlNodeList SimpleIdentifierOrList() :
 }
 {
     id = SimpleIdentifier() {
-        return new SqlNodeList(Collections.singletonList(id), id.getParserPosition());
+        return new SqlNodeList(List.of(id), id.getParserPosition());
     }
 |
     list = ParenthesizedSimpleIdentifierList() {

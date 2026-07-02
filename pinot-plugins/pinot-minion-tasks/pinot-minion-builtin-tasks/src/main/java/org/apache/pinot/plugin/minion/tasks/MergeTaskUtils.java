@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,7 +97,7 @@ public class MergeTaskUtils {
       Map<String, String> taskConfig) {
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (segmentPartitionConfig == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     List<PartitionerConfig> partitionerConfigs = new ArrayList<>();
     Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
@@ -164,6 +163,25 @@ public class MergeTaskUtils {
     Preconditions.checkState(schema.getSpecForTimeColumn(timeColumn) != null,
         "Aggregation type: %s on column: %s requires the time column: %s to be a DateTime column in schema!",
         aggregationType, column, timeColumn);
+  }
+
+  /// Validates that a column configured with a bytes-backed rollup aggregation (sketches, AvgPair, TDigest, ...) is
+  /// declared as a `BYTES` column in the schema. These aggregators read the stored column value as a serialized
+  /// object, so a non-BYTES column would fail with a ClassCastException at task runtime. No-op for other (numeric or
+  /// time-ordered) aggregation types. The given aggregation type must be parseable (see
+  /// [AggregationFunctionType#getAggregationFunctionType(String)]).
+  public static void validateAggregationColumnType(Schema schema, String column, String aggregationType) {
+    AggregationFunctionType aggregationFunctionType = AggregationFunctionType.getAggregationFunctionType(
+        aggregationType);
+    if (!ValueAggregatorFactory.isBytesBacked(aggregationFunctionType)) {
+      return;
+    }
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    Preconditions.checkState(fieldSpec != null,
+        "Aggregation type: %s on column: %s requires the column to exist in schema!", aggregationType, column);
+    Preconditions.checkState(fieldSpec.getDataType() == FieldSpec.DataType.BYTES,
+        "Aggregation type: %s on column: %s requires the column to be of type BYTES in schema, but found: %s",
+        aggregationType, column, fieldSpec.getDataType());
   }
 
   /**

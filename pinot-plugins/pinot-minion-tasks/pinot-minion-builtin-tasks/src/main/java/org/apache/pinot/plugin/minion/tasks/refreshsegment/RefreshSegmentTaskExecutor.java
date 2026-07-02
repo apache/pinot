@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.refreshsegment;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -207,7 +206,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-        Collections.singletonMap(MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
+        Map.of(MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             MinionTaskUtils.toUTCString(_taskStartTime)));
   }
 }

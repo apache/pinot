@@ -22,7 +22,6 @@ import com.google.protobuf.ByteString;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -325,7 +324,7 @@ public class MultiStageStatsTreeEncoderTest {
   private static MultiStageOperator mockOperator(MultiStageOperator... children) {
     MultiStageOperator op = Mockito.mock(MultiStageOperator.class);
     Mockito.when(op.getChildOperators()).thenReturn(children.length == 0
-        ? Collections.emptyList()
+        ? List.of()
         : Arrays.asList(children));
     return op;
   }

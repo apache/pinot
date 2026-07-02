@@ -21,7 +21,6 @@ package org.apache.pinot.materializedview.scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -922,7 +921,7 @@ public class MaterializedViewTaskScheduler {
         MaterializedViewTask.DEFAULT_STALENESS_THRESHOLD_MS);
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         viewTableWithType,
-        Collections.singletonList(sourceTableName),
+        List.of(sourceTableName),
         definedSQL,
         partitionExprMaps,
         splitSpec,

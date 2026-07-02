@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -696,7 +695,7 @@ public class SchemaTest {
 
     Schema withoutVirtualColumns = schema.withoutVirtualColumns();
 
-    Assert.assertEquals(withoutVirtualColumns.getPrimaryKeyColumns(), Collections.singletonList("metric"),
+    Assert.assertEquals(withoutVirtualColumns.getPrimaryKeyColumns(), List.of("metric"),
         "Unexpected primary key columns");
   }
 

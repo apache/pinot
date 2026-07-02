@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.lineage;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
@@ -264,7 +263,7 @@ public class DefaultLineageManagerTest {
     long recentTimestamp = System.currentTimeMillis();
     SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
     lineage.addLineageEntry(entryId,
-        new LineageEntry(Collections.emptyList(), Arrays.asList("dst1"), LineageEntryState.IN_PROGRESS,
+        new LineageEntry(List.of(), Arrays.asList("dst1"), LineageEntryState.IN_PROGRESS,
             recentTimestamp));
 
     List<String> segmentsToDelete = new ArrayList<>();
@@ -284,7 +283,7 @@ public class DefaultLineageManagerTest {
     long oldTimestamp = System.currentTimeMillis() - 2 * 24 * 60 * 60 * 1000L; // 2 days ago
     SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
     lineage.addLineageEntry(entryId,
-        new LineageEntry(Collections.emptyList(), Arrays.asList("dst1"), LineageEntryState.IN_PROGRESS, oldTimestamp));
+        new LineageEntry(List.of(), Arrays.asList("dst1"), LineageEntryState.IN_PROGRESS, oldTimestamp));
 
     List<String> segmentsToDelete = new ArrayList<>();
     _lineageManager.updateLineageForRetention(tableConfig, lineage, Arrays.asList("dst1"), segmentsToDelete,
@@ -303,7 +302,7 @@ public class DefaultLineageManagerTest {
     long recentTimestamp = System.currentTimeMillis() - 1; // 1ms in the past to satisfy strict < with 0 retention
     SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
     lineage.addLineageEntry(entryId,
-        new LineageEntry(Collections.emptyList(), Arrays.asList("dst1"), LineageEntryState.IN_PROGRESS,
+        new LineageEntry(List.of(), Arrays.asList("dst1"), LineageEntryState.IN_PROGRESS,
             recentTimestamp));
 
     List<String> segmentsToDelete = new ArrayList<>();
@@ -346,7 +345,7 @@ public class DefaultLineageManagerTest {
     long recentTimestamp = System.currentTimeMillis();
     SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
     lineage.addLineageEntry(entryId,
-        new LineageEntry(Collections.emptyList(), Arrays.asList("dst1"), LineageEntryState.IN_PROGRESS,
+        new LineageEntry(List.of(), Arrays.asList("dst1"), LineageEntryState.IN_PROGRESS,
             recentTimestamp));
 
     List<String> segmentsToDelete = new ArrayList<>();

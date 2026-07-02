@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -62,7 +61,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
   protected IngestionConfig getIngestionConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(
-        new StreamIngestionConfig(Collections.singletonList(getStreamConfigMap())));
+        new StreamIngestionConfig(List.of(getStreamConfigMap())));
     FilterConfig filterConfig =
         new FilterConfig("Groovy({AirlineID == 19393 || ArrDelayMinutes <= 5 }, AirlineID, ArrDelayMinutes)");
     ingestionConfig.setFilterConfig(filterConfig);

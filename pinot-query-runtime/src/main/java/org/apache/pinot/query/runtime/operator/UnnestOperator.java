@@ -50,6 +50,8 @@ public class UnnestOperator extends MultiStageOperator {
   private final boolean _withOrdinality;
   private final List<Integer> _elementIndexes;
   private final int _ordinalityIndex;
+  private final int[] _passthroughInputIndexes;
+  private final boolean _prunedPassthrough;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
   private boolean _loggedElementOverflow;
 
@@ -66,6 +68,13 @@ public class UnnestOperator extends MultiStageOperator {
     _withOrdinality = node.isWithOrdinality();
     _elementIndexes = node.getElementIndexes();
     _ordinalityIndex = node.getOrdinalityIndex();
+    // Resolve to a primitive array once so the per-row hot path avoids List.get + unboxing.
+    List<Integer> passthroughInputIndexes = node.getPassthroughInputIndexes();
+    _passthroughInputIndexes = new int[passthroughInputIndexes.size()];
+    for (int i = 0; i < _passthroughInputIndexes.length; i++) {
+      _passthroughInputIndexes[i] = passthroughInputIndexes.get(i);
+    }
+    _prunedPassthrough = node.isPrunedPassthrough();
   }
 
   @Override
@@ -226,10 +235,21 @@ public class UnnestOperator extends MultiStageOperator {
   private Object[] appendElements(Object[] inputRow, List<Object> elements, int ordinality) {
     int outSize = _resultSchema.size();
     Object[] out = new Object[outSize];
-    // Copy left columns at beginning
-    System.arraycopy(inputRow, 0, out, 0, inputRow.length);
-    // Determine positions for elements. Track next free slot after the copied input row.
-    int base = inputRow.length;
+    // Copy passthrough (left) columns at the beginning of the output row.
+    int base;
+    if (_prunedPassthrough) {
+      // Only the input columns referenced downstream are retained, in output order.
+      int numPassthrough = _passthroughInputIndexes.length;
+      for (int o = 0; o < numPassthrough; o++) {
+        out[o] = inputRow[_passthroughInputIndexes[o]];
+      }
+      base = numPassthrough;
+    } else {
+      // Legacy behavior: copy the whole input row (including the unnested source array).
+      System.arraycopy(inputRow, 0, out, 0, inputRow.length);
+      base = inputRow.length;
+    }
+    // Determine positions for elements. Track next free slot after the copied passthrough columns.
     int nextFreePos = base;
     for (int i = 0; i < elements.size(); i++) {
       int elemPos = -1;

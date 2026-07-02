@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -188,7 +189,7 @@ public class StreamOp extends BaseOp {
       config.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
       AdminClient adminClient = KafkaAdminClient.create(config);
       NewTopic topic = new NewTopic(topicName, partitions, KAFKA_REPLICATION_FACTOR);
-      adminClient.createTopics(Collections.singletonList(topic)).all().get();
+      adminClient.createTopics(List.of(topic)).all().get();
     } catch (Exception e) {
       LOGGER.error("Failed to create Kafka topic with stream config file: {}", _streamConfigFileName, e);
       return false;

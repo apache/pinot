@@ -19,7 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -849,7 +849,7 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
   public void showMaterializedViewsEmptyCluster() {
     PinotDdlRestletResource resource = newResource();
     when(resource._pinotHelixResourceManager.getAllRawMaterializedViewNames("default"))
-        .thenReturn(Collections.emptyList());
+        .thenReturn(List.of());
 
     Response response = resource.executeDdl(new DdlExecutionRequest("SHOW MATERIALIZED VIEWS"),
         false, mockHeaders(), mockRequest());
@@ -993,7 +993,7 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
   /// stub on a per-test basis after seeding (Mockito's last-stubbing-wins semantics).
   private static void quietActiveTaskScan(PinotDdlRestletResource resource) {
     when(resource._pinotHelixTaskResourceManager.getTaskStatesByTable(anyString(), anyString()))
-        .thenReturn(Collections.emptyMap());
+        .thenReturn(Map.of());
   }
 
   /// Returns an open [MockedStatic] that stubs
@@ -1006,7 +1006,7 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
   private static MockedStatic<ZKMetadataProvider> stubNoLogicalTableConfigs() {
     MockedStatic<ZKMetadataProvider> stub = Mockito.mockStatic(ZKMetadataProvider.class);
     stub.when(() -> ZKMetadataProvider.getAllLogicalTableConfigs(any()))
-        .thenReturn(Collections.emptyList());
+        .thenReturn(List.of());
     return stub;
   }
 

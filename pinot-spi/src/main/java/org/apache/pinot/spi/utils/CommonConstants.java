@@ -552,6 +552,15 @@ public class CommonConstants {
     public static final String CONFIG_OF_SPOOLS = "pinot.broker.multistage.spools";
     public static final boolean DEFAULT_OF_SPOOLS = false;
 
+    /**
+     * Whether the multistage query engine prunes unused input (passthrough) columns - notably the unnested source
+     * array - from the UNNEST output by default. This value can always be overridden by the
+     * {@link Request.QueryOptionKey#UNNEST_COLUMN_PRUNING} query option. Keep it disabled until all servers support
+     * it (a broker emitting the smaller UNNEST schema cannot be honored by an un-upgraded server).
+     */
+    public static final String CONFIG_OF_UNNEST_COLUMN_PRUNING = "pinot.broker.multistage.unnest.column.pruning";
+    public static final boolean DEFAULT_UNNEST_COLUMN_PRUNING = false;
+
     /// Whether to only use servers for leaf stages as the workers for the intermediate stages.
     /// This value can always be overridden by [Request.QueryOptionKey#USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE].
     public static final String CONFIG_OF_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE =
@@ -852,6 +861,12 @@ public class CommonConstants {
         /// Maximum number of joins that the cost-based join-reordering phase will handle.
         /// Plans with more joins than this cap are left unchanged.
         public static final String JOIN_REORDER_MAX_JOINS = "joinReorderMaxJoins";
+        // When true, the multi-stage planner prunes input (passthrough) columns - notably the unnested source array -
+        // from the UNNEST output when they are not referenced downstream, avoiding copying them into every exploded
+        // row. Defaults to false: enabling it makes the broker emit a smaller UNNEST output schema, which an
+        // un-upgraded server cannot honor, so only enable it once all servers support it.
+        // NOTE: This is a no-op under usePhysicalOptimizer (the v2 path does not go through RelToPlanNodeConverter).
+        public static final String UNNEST_COLUMN_PRUNING = "unnestColumnPruning";
         /**
          * When set to true, the broker uses the long-lived {@code SubmitWithStream} bidi RPC to dispatch the query,
          * receiving stage stats out-of-band as {@code OpChainComplete} messages instead of via mailbox EOS. The
@@ -1618,6 +1633,24 @@ public class CommonConstants {
         "pinot.server.consumption.rate.limit.bytes";
     // Default to 0.0 (no limit)
     public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
+
+    // Configs for server-side realtime ingestion OOM protection. These are consumed from the instance data manager
+    // config subset, so the user-facing property prefix is pinot.server.instance.
+    public static final String CONFIG_OF_SERVER_INGESTION_OOM_PROTECTION_MODE =
+        "ingestion.oom.protection.mode";
+    public static final String DEFAULT_SERVER_INGESTION_OOM_PROTECTION_MODE = "DISABLE";
+    public static final String CONFIG_OF_SERVER_INGESTION_OOM_PROTECTION_HEAP_USAGE_THROTTLE_THRESHOLD =
+        "ingestion.oom.protection.heapUsageThrottleThreshold";
+    public static final double DEFAULT_SERVER_INGESTION_OOM_PROTECTION_HEAP_USAGE_THROTTLE_THRESHOLD = 0.95;
+    public static final String CONFIG_OF_SERVER_INGESTION_OOM_PROTECTION_HEAP_USAGE_RECOVERY_THRESHOLD =
+        "ingestion.oom.protection.heapUsageRecoveryThreshold";
+    public static final double DEFAULT_SERVER_INGESTION_OOM_PROTECTION_HEAP_USAGE_RECOVERY_THRESHOLD = 0.90;
+    public static final String CONFIG_OF_SERVER_INGESTION_OOM_PROTECTION_CHECK_INTERVAL_MS =
+        "ingestion.oom.protection.checkIntervalMs";
+    public static final long DEFAULT_SERVER_INGESTION_OOM_PROTECTION_CHECK_INTERVAL_MS = 1_000L;
+    public static final String CONFIG_OF_SERVER_INGESTION_OOM_PROTECTION_GC_INTERVAL_MS =
+        "ingestion.oom.protection.gcIntervalMs";
+    public static final long DEFAULT_SERVER_INGESTION_OOM_PROTECTION_GC_INTERVAL_MS = 30_000L;
 
     public static final String CONFIG_OF_MMAP_DEFAULT_ADVICE = "pinot.server.mmap.advice.default";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";

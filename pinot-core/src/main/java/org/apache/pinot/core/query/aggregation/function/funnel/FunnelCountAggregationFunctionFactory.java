@@ -168,6 +168,9 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
 
   ResultExtractionStrategy<DictIdsWrapper, List<Long>> bitmapPartitionedResultExtractionStrategy() {
     final MergeStrategy<List<RoaringBitmap>> bitmapMergeStrategy = bitmapMergeStrategy();
+    // For partitioned mode, each segment is self-contained: every row for a given correlation key
+    // appears in exactly one segment. Therefore we can count bitmap cardinality directly without
+    // converting segment-local composite IDs to global values — they will never be merged across segments.
     return dictIdsWrapper -> {
       if (dictIdsWrapper == null) {
         return Collections.nCopies(_numSteps, 0L);
@@ -226,7 +229,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
 
     public List<String> getLiterals(List<ExpressionContext> expressions) {
       List<ExpressionContext> inputExpressions =
-          find(expressions).map(exp -> exp.getFunction().getArguments()).orElseGet(Collections::emptyList);
+          find(expressions).map(exp -> exp.getFunction().getArguments()).orElseGet(List::of);
       Preconditions.checkArgument(
           inputExpressions.stream().allMatch(exp -> exp.getType() == ExpressionContext.Type.LITERAL),
           "FUNNELCOUNT: " + _name + " parameters must be literals");

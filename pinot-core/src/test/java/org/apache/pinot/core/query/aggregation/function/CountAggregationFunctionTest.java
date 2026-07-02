@@ -45,7 +45,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
             new Object[] {null}
         )
         .whenQuery("select myField from testTable order by myField")
-        .thenResultIs("INTEGER",
+        .thenResultIs("INT",
             "-2147483648",
             "1",
             "2"
@@ -65,7 +65,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
             new Object[] {null}
         )
         .whenQuery("select myField from testTable order by myField")
-        .thenResultIs("INTEGER",
+        .thenResultIs("INT",
             "1",
             "2",
             "null"
@@ -87,7 +87,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
             "null"
         )
         .whenQuery("select myField, COUNT(myField) from testTable group by myField order by myField")
-        .thenResultIs("INTEGER | LONG",
+        .thenResultIs("INT | LONG",
             "-2147483648 | 1",
             "1           | 1",
             "2           | 1"
@@ -111,7 +111,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
         )
         .whenQuery("select myField, COUNT(myField) from testTable group by myField order by myField")
         .thenResultIs(
-            "INTEGER | LONG",
+            "INT | LONG",
             "1    | 1",
             "2    | 1",
             "null | 0"
@@ -133,7 +133,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
             "null"
         )
         .whenQuery("select myField, COUNT(*) from testTable group by myField order by myField")
-        .thenResultIs("INTEGER | LONG",
+        .thenResultIs("INT | LONG",
             "-2147483648 | 1",
             "1    | 1",
             "2    | 1"
@@ -155,7 +155,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
             "null"
         )
         .whenQuery("select myField, COUNT(*) from testTable group by myField order by myField")
-        .thenResultIs("INTEGER | LONG",
+        .thenResultIs("INT | LONG",
             "1    | 1",
             "2    | 1",
             "null | 1"

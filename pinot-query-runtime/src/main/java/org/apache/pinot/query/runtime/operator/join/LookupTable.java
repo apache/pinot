@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator.join;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,13 +63,13 @@ public abstract class LookupTable {
   protected static void convertValueToList(Map.Entry<?, Object> entry) {
     Object value = entry.getValue();
     if (value instanceof Object[]) {
-      entry.setValue(Collections.singletonList(value));
+      entry.setValue(List.of(value));
     }
   }
 
   protected static Object convertValueToList(Object value) {
     if (value instanceof Object[]) {
-      return Collections.singletonList(value);
+      return List.of(value);
     }
     return value;
   }

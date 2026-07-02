@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.retention;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.lineage.LineageEntry;
@@ -261,7 +260,7 @@ public class SegmentLineageCleanupTest {
     // Second pass runs after the window — replaced segments must now be deleted.
     _retentionManager.processTable(RETENTION_WINDOW_OFFLINE_TABLE_NAME);
     verifySegmentsDeleted(RETENTION_WINDOW_OFFLINE_TABLE_NAME, 1);
-    assertEquals(getSegments(RETENTION_WINDOW_OFFLINE_TABLE_NAME), Collections.singletonList("merged_0"));
+    assertEquals(getSegments(RETENTION_WINDOW_OFFLINE_TABLE_NAME), List.of("merged_0"));
   }
 
   @AfterClass

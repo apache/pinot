@@ -175,7 +175,7 @@ public class ReducerTest {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d", DataType.INT).build();
     Pair<List<FieldSpec>, Integer> result =
-        SegmentProcessorUtils.getFieldSpecs(schema, MergeType.CONCAT, Collections.singletonList("d"));
+        SegmentProcessorUtils.getFieldSpecs(schema, MergeType.CONCAT, List.of("d"));
     GenericRowFileManager fileManager =
         new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
 
@@ -385,7 +385,7 @@ public class ReducerTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d1", DataType.INT)
         .addSingleValueDimension("d2", DataType.INT).addMetric("m", DataType.INT).build();
     Pair<List<FieldSpec>, Integer> result =
-        SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, Collections.singletonList("d2"));
+        SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, List.of("d2"));
     GenericRowFileManager fileManager =
         new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
 
@@ -772,7 +772,7 @@ public class ReducerTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d1", DataType.INT)
         .addSingleValueDimension("d2", DataType.INT).build();
     Pair<List<FieldSpec>, Integer> result =
-        SegmentProcessorUtils.getFieldSpecs(schema, MergeType.DEDUP, Collections.singletonList("d2"));
+        SegmentProcessorUtils.getFieldSpecs(schema, MergeType.DEDUP, List.of("d2"));
     GenericRowFileManager fileManager =
         new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
 

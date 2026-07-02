@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +65,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -127,7 +127,7 @@ public class MinionTaskUtilsTest {
   public void testExtractMinionAllowDownloadFromServer() {
     Map<String, String> configs = new HashMap<>();
     TableTaskConfig tableTaskConfig = new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+        Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
 
@@ -137,7 +137,7 @@ public class MinionTaskUtilsTest {
 
     // Test when the configuration is set to true
     configs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "true");
-    tableTaskConfig = new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+    tableTaskConfig = new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
     assertTrue(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
@@ -145,7 +145,7 @@ public class MinionTaskUtilsTest {
 
     // Test when the configuration is set to false
     configs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "false");
-    tableTaskConfig = new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+    tableTaskConfig = new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
     assertFalse(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
@@ -163,11 +163,12 @@ public class MinionTaskUtilsTest {
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
     assertEquals(result1, ValidDocIdsType.SNAPSHOT);
 
-    // Test 2: Default when delete is enabled
+    // Test 2: Default stays SNAPSHOT even when delete is enabled. Delete records are retained until they expire via
+    // deletedKeysTTL rather than being dropped eagerly.
     upsertConfig.setDeleteRecordColumn("deleted");
     ValidDocIdsType result2 =
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
-    assertEquals(result2, ValidDocIdsType.SNAPSHOT_WITH_DELETE);
+    assertEquals(result2, ValidDocIdsType.SNAPSHOT);
   }
 
   @Test
@@ -211,23 +212,24 @@ public class MinionTaskUtilsTest {
   }
 
   @Test
-  public void testGetValidDocIdsTypeBackwardCompatibilityAndOverride() {
-    // Test backward compatibility behavior when delete is enabled
+  public void testGetValidDocIdsTypeNotOverriddenForDeleteTable() {
+    // A user-specified validDocIdsType is always honored on a delete-enabled table; it is never silently overridden
+    // to SNAPSHOT_WITH_DELETE.
     UpsertConfig upsertConfig = new UpsertConfig();
     upsertConfig.setDeleteRecordColumn("deleted");
     Map<String, String> taskConfigs = new HashMap<>();
 
-    // Test 1: SNAPSHOT gets overridden to SNAPSHOT_WITH_DELETE
+    // Test 1: SNAPSHOT is honored (not overridden to SNAPSHOT_WITH_DELETE)
     taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "SNAPSHOT");
     ValidDocIdsType result1 =
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
-    assertEquals(result1, ValidDocIdsType.SNAPSHOT_WITH_DELETE);
+    assertEquals(result1, ValidDocIdsType.SNAPSHOT);
 
-    // Test 2: IN_MEMORY gets overridden to SNAPSHOT_WITH_DELETE
+    // Test 2: IN_MEMORY is honored (not overridden)
     taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "IN_MEMORY");
     ValidDocIdsType result2 =
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
-    assertEquals(result2, ValidDocIdsType.SNAPSHOT_WITH_DELETE);
+    assertEquals(result2, ValidDocIdsType.IN_MEMORY);
 
     // Test 3: SNAPSHOT_WITH_DELETE stays the same
     taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "SNAPSHOT_WITH_DELETE");
@@ -235,17 +237,17 @@ public class MinionTaskUtilsTest {
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
     assertEquals(result3, ValidDocIdsType.SNAPSHOT_WITH_DELETE);
 
-    // Test 4: IN_MEMORY_WITH_DELETE stays the same (not overridden)
+    // Test 4: IN_MEMORY_WITH_DELETE stays the same
     taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "IN_MEMORY_WITH_DELETE");
     ValidDocIdsType result4 =
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
     assertEquals(result4, ValidDocIdsType.IN_MEMORY_WITH_DELETE);
 
-    // Test 5: Case insensitive override behavior
-    taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "in_memory_with_delete");
+    // Test 5: Case-insensitive parsing, still honored without override
+    taskConfigs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, "snapshot");
     ValidDocIdsType result5 =
         MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
-    assertEquals(result5, ValidDocIdsType.IN_MEMORY_WITH_DELETE);
+    assertEquals(result5, ValidDocIdsType.SNAPSHOT);
   }
 
   @Test
@@ -332,9 +334,68 @@ public class MinionTaskUtilsTest {
         () -> MinionTaskUtils.parseValidDocIdsConsensusMode("INVALID_MODE"));
   }
 
-  /**
-   * Builds a RoaringBitmap with {@code numDocs} valid doc ids (0..numDocs-1).
-   */
+  @Test
+  public void testParseValidDocIdsValidationMode() {
+    // Blank/null defaults to STRICT
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode(null),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode(""),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("  "),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+
+    // Case-insensitive parsing
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("STRICT"),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("executor_only"),
+        MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("  EXECUTOR_ONLY  "),
+        MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY);
+
+    expectThrows(IllegalArgumentException.class,
+        () -> MinionTaskUtils.parseValidDocIdsValidationMode("INVALID_MODE"));
+  }
+
+  @Test
+  public void testResolveGeneratorConsensusMode() {
+    // EXECUTOR_ONLY downgrades the generator to UNSAFE regardless of the configured consensus mode.
+    for (MinionConstants.ValidDocIdsConsensusMode mode : MinionConstants.ValidDocIdsConsensusMode.values()) {
+      assertEquals(
+          MinionTaskUtils.resolveGeneratorConsensusMode(mode, MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY),
+          MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+      // STRICT keeps the configured mode.
+      assertEquals(
+          MinionTaskUtils.resolveGeneratorConsensusMode(mode, MinionConstants.ValidDocIdsValidationMode.STRICT), mode);
+    }
+  }
+
+  @Test
+  public void testCrcMatches() {
+    assertTrue(MinionTaskUtils.crcMatches(1000, 5000, 1000, 9999));
+    assertTrue(MinionTaskUtils.crcMatches(1000, 5000, 2000, 5000));
+    assertFalse(MinionTaskUtils.crcMatches(1000, 5000, 2000, 9999));
+    assertFalse(MinionTaskUtils.crcMatches(1000, 5000, 2000, -1));
+    assertFalse(MinionTaskUtils.crcMatches(1000, -1, 2000, 5000));
+    assertFalse(MinionTaskUtils.crcMatches(1000, -1, 2000, -1));
+  }
+
+  @Test
+  public void testExecutorDataCrcFallbackMatch() {
+    List<Object> responses = List.of(makeResponse("seg1", "2000", "5000", "server1", makeBitmap(4)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000",
+        "5000", "UNSAFE", responses, new String[]{"server1"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 4);
+  }
+
+  @Test
+  public void testExecutorDataCrcMismatchSkips() {
+    List<Object> responses = List.of(makeResponse("seg1", "2000", "9999", "server1", makeBitmap(4)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000",
+        "5000", "UNSAFE", responses, new String[]{"server1"}, this);
+    assertNull(result);
+  }
+
   private static RoaringBitmap makeBitmap(int numDocs) {
     RoaringBitmap b = new RoaringBitmap();
     for (int i = 0; i < numDocs; i++) {
@@ -348,7 +409,13 @@ public class MinionTaskUtilsTest {
    */
   private static ValidDocIdsBitmapResponse makeResponse(String segmentName, String crc, String instanceId,
       RoaringBitmap bitmap) {
-    return new ValidDocIdsBitmapResponse(segmentName, crc, ValidDocIdsType.SNAPSHOT,
+    return new ValidDocIdsBitmapResponse(segmentName, crc, null, ValidDocIdsType.SNAPSHOT,
+        RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD);
+  }
+
+  private static ValidDocIdsBitmapResponse makeResponse(String segmentName, String crc, String dataCrc,
+      String instanceId, RoaringBitmap bitmap) {
+    return new ValidDocIdsBitmapResponse(segmentName, crc, dataCrc, ValidDocIdsType.SNAPSHOT,
         RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD);
   }
 
@@ -394,6 +461,13 @@ public class MinionTaskUtilsTest {
   private static RoaringBitmap getValidDocIdFromServerMatchingCrcWithMockedReader(String tableName,
       String segmentName, String expectedCrc, String consensusMode, List<Object> responseOrThrowByCallOrder,
       String[] servers, MinionTaskUtilsTest testInstance) {
+    return getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc, null, consensusMode,
+        responseOrThrowByCallOrder, servers, testInstance);
+  }
+
+  private static RoaringBitmap getValidDocIdFromServerMatchingCrcWithMockedReader(String tableName,
+      String segmentName, String expectedCrc, String expectedDataCrc, String consensusMode,
+      List<Object> responseOrThrowByCallOrder, String[] servers, MinionTaskUtilsTest testInstance) {
     testInstance.setupMinionContextWithServers(tableName, segmentName, servers);
     // Shared across all mock instances (production creates one reader per server).
     AtomicInteger callIndex = new AtomicInteger(0);
@@ -413,7 +487,7 @@ public class MinionTaskUtilsTest {
               });
         })) {
       return MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableName, segmentName,
-          ValidDocIdsType.SNAPSHOT.name(), MinionContext.getInstance(), expectedCrc, consensusMode);
+          ValidDocIdsType.SNAPSHOT.name(), MinionContext.getInstance(), expectedCrc, expectedDataCrc, consensusMode);
     }
   }
 

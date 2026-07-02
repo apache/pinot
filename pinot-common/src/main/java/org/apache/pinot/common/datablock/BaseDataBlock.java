@@ -25,7 +25,6 @@ import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -144,7 +143,7 @@ public abstract class BaseDataBlock implements DataBlock {
 
   @Override
   public Map<String, String> getMetadata() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   @Nullable
@@ -485,6 +484,6 @@ public abstract class BaseDataBlock implements DataBlock {
   @Nullable
   @Override
   public List<DataBuffer> getStatsByStage() {
-    return Collections.emptyList();
+    return List.of();
   }
 }

@@ -1,0 +1,69 @@
+{
+  "direct_aggregate_object_intermediate": {
+    "comments": "Regression test for the HLL->Long ClassCastException. When a no-group-by aggregate is colocated on a single server, the v2 physical optimizer produces an AGGREGATE_DIRECT leaf that returns final results (SERVER_RETURN_FINAL_RESULT). Aggregations whose intermediate type differs from their final type (e.g. DISTINCTCOUNTHLLPLUS -> HyperLogLogPlus/LONG, DISTINCTCOUNT -> Set/INT) must be finalized before the leaf serializes its output. A 'replicated' table forces single-server colocation -> AGGREGATE_DIRECT. NOTE: the DISTINCTCOUNT* assertions use exact equality, which is only safe because the distinct cardinality here is tiny (2-3 values) where HLL is exact; do not raise the cardinality.",
+    "tables": {
+      "tbl": {
+        "replicated": true,
+        "schema": [
+          {"name": "amount", "type": "INT"},
+          {"name": "user_id", "type": "STRING"}
+        ],
+        "inputs": [
+          [10, "u1"],
+          [20, "u2"],
+          [30, "u1"],
+          [40, ""]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "SUM + DISTINCTCOUNTHLLPLUS FILTER (the reported failing shape)",
+        "sql": "SELECT SUM(amount) AS s, DISTINCTCOUNTHLLPLUS(user_id) FILTER (WHERE user_id <> '') AS dc FROM {tbl}",
+        "h2Sql": "SELECT SUM(amount) AS s, COUNT(DISTINCT CASE WHEN user_id <> '' THEN user_id END) AS dc FROM {tbl}"
+      },
+      {
+        "description": "Plain DISTINCTCOUNTHLLPLUS (no filter) still hits the same DIRECT path",
+        "sql": "SELECT DISTINCTCOUNTHLLPLUS(user_id) AS dc FROM {tbl}",
+        "h2Sql": "SELECT COUNT(DISTINCT user_id) AS dc FROM {tbl}"
+      },
+      {
+        "description": "DISTINCTCOUNT (Set intermediate, INT final) - same finalize requirement",
+        "sql": "SELECT DISTINCTCOUNT(user_id) AS dc FROM {tbl}",
+        "h2Sql": "SELECT COUNT(DISTINCT user_id) AS dc FROM {tbl}"
+      },
+      {
+        "description": "Primitive-only DIRECT aggregate (intermediate type == final type) - finalize loop must be a correct no-op",
+        "sql": "SELECT SUM(amount) AS s, COUNT(*) AS c FROM {tbl}",
+        "h2Sql": "SELECT SUM(amount) AS s, COUNT(*) AS c FROM {tbl}"
+      }
+    ]
+  },
+  "direct_aggregate_object_intermediate_null_handling": {
+    "comments": "Same DIRECT path with column-based null handling enabled and FILTERs that match zero rows, so the finalized value is NULL (SUM) / 0 (COUNT-family). Exercises the null finalization path of getRows() in SERVER_RETURN_FINAL_RESULT mode.",
+    "extraProps": {
+      "enableColumnBasedNullHandling": true
+    },
+    "tables": {
+      "tbl": {
+        "replicated": true,
+        "schema": [
+          {"name": "amount", "type": "INT"},
+          {"name": "user_id", "type": "STRING"}
+        ],
+        "inputs": [
+          [10, "u1"],
+          [20, "u2"],
+          [30, "u1"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Zero-match FILTERs: SUM finalizes to NULL, DISTINCTCOUNTHLLPLUS/COUNT finalize to 0",
+        "sql": "SELECT SUM(amount) FILTER (WHERE amount > 1000) AS s, COUNT(*) FILTER (WHERE amount > 1000) AS c, DISTINCTCOUNTHLLPLUS(user_id) FILTER (WHERE amount > 1000) AS dc FROM {tbl}",
+        "h2Sql": "SELECT SUM(CASE WHEN amount > 1000 THEN amount END) AS s, COUNT(CASE WHEN amount > 1000 THEN 1 END) AS c, COUNT(DISTINCT CASE WHEN amount > 1000 THEN user_id END) AS dc FROM {tbl}"
+      }
+    ]
+  }
+}

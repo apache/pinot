@@ -21,7 +21,6 @@ package org.apache.pinot.controller.helix.core;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -96,7 +95,7 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
   public void registersMvWithMissingDefinitionZnode()
       throws Exception {
     String mvWithType = "mv_OFFLINE";
-    PinotHelixResourceManager prm = newPartialMock(Collections.singletonList(mvWithType));
+    PinotHelixResourceManager prm = newPartialMock(List.of(mvWithType));
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     injectPropertyStore(prm, propertyStore);
     MaterializedViewConsistencyManager mgr = newConsistencyManagerWithEmptyZk();
@@ -116,7 +115,7 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
 
       prm.backfillMaterializedViewReverseIndex(mgr);
 
-      assertEquals(mgr.getDependentMaterializedViews(SOURCE_RAW), Collections.singletonList(mvWithType),
+      assertEquals(mgr.getDependentMaterializedViews(SOURCE_RAW), List.of(mvWithType),
           "Backfill must register the missing-znode MV in the reverse index using the "
               + "definedSQL fallback so DROP TABLE on its base table is blocked.");
     }
@@ -131,14 +130,14 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
   public void skipsMvWithExistingDefinitionZnode()
       throws Exception {
     String mvWithType = "mv_OFFLINE";
-    PinotHelixResourceManager prm = newPartialMock(Collections.singletonList(mvWithType));
+    PinotHelixResourceManager prm = newPartialMock(List.of(mvWithType));
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     injectPropertyStore(prm, propertyStore);
     MaterializedViewConsistencyManager mgr = newConsistencyManagerWithEmptyZk();
 
     TableConfig mvConfig = mvTableConfig(mvWithType, DEFINED_SQL);
     MaterializedViewDefinitionMetadata existingDef = new MaterializedViewDefinitionMetadata(
-        mvWithType, Collections.singletonList(SOURCE_RAW), DEFINED_SQL,
+        mvWithType, List.of(SOURCE_RAW), DEFINED_SQL,
         new HashMap<>(), null);
     try (MockedStatic<ZKMetadataProvider> zk = Mockito.mockStatic(ZKMetadataProvider.class);
          MockedStatic<MaterializedViewDefinitionMetadataUtils> def =
@@ -189,7 +188,7 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
 
       prm.backfillMaterializedViewReverseIndex(mgr);
 
-      assertEquals(mgr.getDependentMaterializedViews(SOURCE_RAW), Collections.singletonList(healthyMv),
+      assertEquals(mgr.getDependentMaterializedViews(SOURCE_RAW), List.of(healthyMv),
           "The healthy MV must register despite a sibling MV's unparseable definedSQL — a "
               + "single corrupt SQL must not wedge the rest of the cluster's reverse index.");
     }
@@ -204,7 +203,7 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
   public void skipsMvWithMissingTaskConfigs()
       throws Exception {
     String mvWithType = "mv_OFFLINE";
-    PinotHelixResourceManager prm = newPartialMock(Collections.singletonList(mvWithType));
+    PinotHelixResourceManager prm = newPartialMock(List.of(mvWithType));
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     injectPropertyStore(prm, propertyStore);
     MaterializedViewConsistencyManager mgr = newConsistencyManagerWithEmptyZk();
@@ -235,7 +234,7 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
   @Test
   public void emptyClusterIsNoOp()
       throws Exception {
-    PinotHelixResourceManager prm = newPartialMock(Collections.emptyList());
+    PinotHelixResourceManager prm = newPartialMock(List.of());
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     injectPropertyStore(prm, propertyStore);
     MaterializedViewConsistencyManager mgr = newConsistencyManagerWithEmptyZk();
@@ -257,7 +256,7 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
   @Test
   public void nullConsistencyManagerIsNoOp()
       throws Exception {
-    PinotHelixResourceManager prm = newPartialMock(Collections.singletonList("mv_OFFLINE"));
+    PinotHelixResourceManager prm = newPartialMock(List.of("mv_OFFLINE"));
     prm.backfillMaterializedViewReverseIndex(null);
     // No assertion needed — the test passes iff no NPE is thrown.
   }
@@ -284,7 +283,7 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
 
     // Pre-state: the MV is in the reverse index pointing at SOURCE_RAW.  This is what
     // backfill leaves behind, or what the in-session fallback at create time leaves behind.
-    mgr.onMaterializedViewTableCreated(mvWithType, Collections.singletonList(SOURCE_RAW));
+    mgr.onMaterializedViewTableCreated(mvWithType, List.of(SOURCE_RAW));
     assertFalse(mgr.getDependentMaterializedViews(SOURCE_RAW).isEmpty(),
         "Pre-condition: reverse index must hold an entry for the MV before drop.");
 
@@ -342,7 +341,7 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
     ZkHelixPropertyStore<ZNRecord> mgrStore = mock(ZkHelixPropertyStore.class);
     String defParent = ZKMetadataProvider.getPropertyStorePathForMaterializedViewDefinitionPrefix();
     when(mgrStore.getChildNames(eq(defParent), eq(AccessOption.PERSISTENT)))
-        .thenReturn(Collections.emptyList());
+        .thenReturn(List.of());
     MaterializedViewConsistencyManager mgr = new MaterializedViewConsistencyManager();
     mgr.init(mgrStore);
     return mgr;
