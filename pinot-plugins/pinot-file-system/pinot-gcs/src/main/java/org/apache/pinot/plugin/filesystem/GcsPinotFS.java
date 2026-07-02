@@ -400,6 +400,9 @@ public class GcsPinotFS extends BasePinotFS {
     }
     try {
       Blob blob = getBlob(new GcsUri(uri));
+      if (blob == null) {
+        throw new FileNotFoundException("File '" + uri + "' does not exist");
+      }
       // ReadChannel.limit is the absolute, exclusive end position; seek positions the start. This issues a
       // ranged GET so only [offset, offset + length) is transferred (truncated at end-of-file).
       ReadChannel reader = blob.reader();
