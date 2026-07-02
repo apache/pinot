@@ -52,6 +52,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskContext;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
@@ -72,6 +73,7 @@ import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -1396,6 +1398,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected boolean buildSegmentAndReplace()
       throws Exception {
+    return buildSegmentAndReplace(null);
+  }
+
+  /// Builds the segment from the in-memory rows and replaces the CONSUMING segment with the local copy.
+  ///
+  /// For upsert tables a locally-built segment can diverge from the one committed by the winning replica
+  /// (e.g. different docId ordering); swapping in a CRC-divergent copy leaves the upsert metadata inconsistent
+  /// across replicas. So when `committedSegmentZKMetadata` is given and the table is upsert-enabled, the local CRC
+  /// is checked against the committed CRC, and on a mismatch the local build is discarded (returns `false`) so the
+  /// caller downloads the committed segment instead.
+  ///
+  /// @param committedSegmentZKMetadata committed ZK metadata carrying the CRC, or `null` to skip the check
+  /// @return `true` if built and replaced locally; `false` if the build failed or was rejected on a CRC mismatch
+  protected boolean buildSegmentAndReplace(@Nullable SegmentZKMetadata committedSegmentZKMetadata)
+      throws Exception {
     SegmentBuildDescriptor descriptor;
     try {
       descriptor = buildSegmentInternal(false);
@@ -1405,8 +1422,37 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (descriptor == null) {
       return false;
     }
-    _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr, _segmentZKMetadata);
+    // For upsert tables, do not replace the CONSUMING segment with a locally-built segment whose CRC diverges from
+    // the segment committed in ZK. Returning false lets the caller download the committed segment instead.
+    boolean upsertCrcChecked = committedSegmentZKMetadata != null && _realtimeTableDataManager.isUpsertEnabled();
+    if (upsertCrcChecked && !isLocalSegmentCrcMatchingZk(committedSegmentZKMetadata)) {
+      _segmentLogger.warn("Locally-built segment: {} CRC does not match committed CRC: {} in zk for upsert table. "
+          + "Skipping local build to replace", _segmentNameStr, committedSegmentZKMetadata.getCrc());
+      return false;
+    }
+    // When the upsert CRC was validated above, swap in the committed metadata that was validated so the guard and the
+    // replace operate on the same object; otherwise preserve the existing behavior of using construction-time metadata.
+    _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr,
+        upsertCrcChecked ? committedSegmentZKMetadata : _segmentZKMetadata);
     return true;
+  }
+
+  /**
+   * Checks whether the CRC of the segment just built locally (under the resource data directory) matches the CRC of
+   * the committed segment recorded in ZK. If the local segment metadata cannot be read, this returns {@code false} so
+   * that the caller downloads the committed segment instead of failing the ONLINE transition.
+   */
+  @VisibleForTesting
+  protected boolean isLocalSegmentCrcMatchingZk(SegmentZKMetadata committedSegmentZKMetadata) {
+    File indexDir = new File(_resourceDataDir, _segmentNameStr);
+    try {
+      SegmentMetadataImpl localMetadata = new SegmentMetadataImpl(indexDir);
+      return BaseTableDataManager.hasSameCRC(committedSegmentZKMetadata, localMetadata);
+    } catch (Exception e) {
+      _segmentLogger.warn("Failed to read CRC of locally-built segment: {}; treating as CRC mismatch to download the "
+          + "committed segment", _segmentNameStr, e);
+      return false;
+    }
   }
 
   private void closeStreamConsumer() {
@@ -1609,7 +1655,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           } else if (_currentOffset.compareTo(endOffset) == 0) {
             _segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset,
                 endOffset);
-            if (!buildSegmentAndReplace()) {
+            // For upsert tables, the locally-built segment may diverge (e.g. different docId ordering) from the
+            // segment committed by the winning replica. We do not build locally when there is a CRC mismatch;
+            // buildSegmentAndReplace returns false in that case so we download the committed segment instead.
+            if (!buildSegmentAndReplace(segmentZKMetadata)) {
               _segmentLogger.warn("Failed to build the segment: {} and replace. Downloading to replace",
                   _segmentNameStr);
               downloadSegmentAndReplace(segmentZKMetadata);
@@ -1630,7 +1679,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
             if (success) {
               _segmentLogger.info("Caught up to offset {}", _currentOffset);
-              if (!buildSegmentAndReplace()) {
+              // After catching up the offset matches zk; apply the same upsert CRC guard as the matched-offset case.
+              if (!buildSegmentAndReplace(segmentZKMetadata)) {
                 _segmentLogger.warn("Failed to build the segment: {} after catchup. Downloading to replace",
                     _segmentNameStr);
                 downloadSegmentAndReplace(segmentZKMetadata);
