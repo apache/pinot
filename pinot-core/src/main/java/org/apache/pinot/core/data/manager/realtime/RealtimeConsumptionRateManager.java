@@ -48,17 +48,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class is responsible for creating realtime consumption rate limiters.
- * It contains one rate limiter for the entire server and multiple table partition level rate limiters.
- * Server rate limiter is used to throttle the overall consumption rate of the server and configured via
- * cluster or server config.
- * For table partition level rate limiter, the rate limit value specified in StreamConfig of table config, is for the
- * entire topic. The effective rate limit for each partition is simply the specified rate limit divided by the
- * partition count.
- * This class leverages a cache for storing partition count for different topics as retrieving partition count from
- * stream is a bit expensive and also the same count will be used of all partition consumers of the same topic.
- */
+/// This class is responsible for creating realtime consumption rate limiters.
+/// It contains one rate limiter for the entire server and multiple table partition level rate limiters.
+/// Server rate limiter is used to throttle the overall consumption rate of the server and configured via cluster or
+/// server config.
+/// For table partition level rate limiter, the rate limit can be specified in [StreamConfig] of table config in two
+/// ways:
+/// - Partition level rate limit: directly used as the rate limit for each partition. It doesn't need to be adjusted
+///   when the partition count of the topic changes.
+/// - Topic level rate limit: the rate limit for the entire topic. The effective rate limit for each partition is the
+///   specified rate limit divided by the partition count. When both are specified, partition level rate limit takes
+///   precedence.
+/// This class leverages a cache for storing partition count for different topics as retrieving partition count from
+/// stream is a bit expensive and also the same count will be used of all partition consumers of the same topic.
 public class RealtimeConsumptionRateManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeConsumptionRateManager.class);
   private static final int CACHE_ENTRY_EXPIRATION_TIME_IN_MINUTES = 10;
@@ -171,7 +173,14 @@ public class RealtimeConsumptionRateManager {
 
   public ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, String tableName,
       ServerMetrics serverMetrics, String metricKeyName) {
-    if (streamConfig.getTopicConsumptionRateLimit().isEmpty()) {
+    double partitionRateLimit = streamConfig.getPartitionConsumptionRateLimit();
+    if (partitionRateLimit > 0) {
+      LOGGER.info("A consumption rate limiter is set up for topic {} in table {} with partition rate limit: {}",
+          streamConfig.getTopicName(), tableName, partitionRateLimit);
+      return new PartitionRateLimiter(partitionRateLimit, serverMetrics, metricKeyName);
+    }
+    double topicRateLimit = streamConfig.getTopicConsumptionRateLimit();
+    if (topicRateLimit <= 0) {
       return NOOP_RATE_LIMITER;
     }
     int partitionCount;
@@ -181,8 +190,7 @@ public class RealtimeConsumptionRateManager {
       // Exception here means for some reason, partition count cannot be fetched from stream!
       throw new RuntimeException(e);
     }
-    double topicRateLimit = streamConfig.getTopicConsumptionRateLimit().get();
-    double partitionRateLimit = topicRateLimit / partitionCount;
+    partitionRateLimit = topicRateLimit / partitionCount;
     LOGGER.info("A consumption rate limiter is set up for topic {} in table {} with rate limit: {} "
             + "(topic rate limit: {}, partition count: {})", streamConfig.getTopicName(), tableName, partitionRateLimit,
         topicRateLimit, partitionCount);
