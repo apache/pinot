@@ -21,10 +21,13 @@ package org.apache.pinot.spi.query;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.LongAdder;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -84,6 +87,17 @@ public class QueryExecutionContext {
 
   /// Guards single-emission of the scan-based killing dry-run log line and metric for this query
   private final AtomicBoolean _scanKillingDryRunEmitted = new AtomicBoolean(false);
+
+  /// Generic, additive per-query counters keyed by an opaque string. This is a query-scoped
+  /// extension point: because this [QueryExecutionContext] is shared by reference across every
+  /// thread executing the query (the main request thread and all context-aware executor worker
+  /// threads), a counter incremented from any of those threads is visible to the thread that
+  /// drains these counters into the response metadata. Keys and their meaning are owned by the
+  /// producing code; core query execution never reads or interprets them. Created lazily so
+  /// queries that record nothing pay no allocation. Thread-safe via [ConcurrentHashMap] and
+  /// [LongAdder].
+  @Nullable
+  private volatile ConcurrentHashMap<String, LongAdder> _customStats;
 
   public QueryExecutionContext(QueryType queryType, long requestId, String cid, String workloadName, long startTimeMs,
       long activeDeadlineMs, long passiveDeadlineMs, String brokerId, String instanceId, String queryHash) {
@@ -273,5 +287,40 @@ public class QueryExecutionContext {
    */
   public boolean markScanKillingDryRunEmitted() {
     return _scanKillingDryRunEmitted.compareAndSet(false, true);
+  }
+
+  /**
+   * Adds {@code delta} to the per-query counter identified by {@code key}, creating it on first
+   * use. Safe to call from any thread executing this query, including asynchronous worker threads
+   * that share this context by reference. Keys are opaque to core query execution.
+   */
+  public void addCustomStat(String key, long delta) {
+    ConcurrentHashMap<String, LongAdder> customStats = _customStats;
+    if (customStats == null) {
+      synchronized (this) {
+        customStats = _customStats;
+        if (customStats == null) {
+          customStats = new ConcurrentHashMap<>();
+          _customStats = customStats;
+        }
+      }
+    }
+    customStats.computeIfAbsent(key, k -> new LongAdder()).add(delta);
+  }
+
+  /**
+   * Returns a snapshot of the per-query custom counters as string values, or an empty map if none
+   * were recorded. Intended to be drained into response metadata at the end of query execution.
+   */
+  public Map<String, String> getCustomStats() {
+    ConcurrentHashMap<String, LongAdder> customStats = _customStats;
+    if (customStats == null || customStats.isEmpty()) {
+      return Map.of();
+    }
+    Map<String, String> snapshot = new HashMap<>();
+    for (Map.Entry<String, LongAdder> entry : customStats.entrySet()) {
+      snapshot.put(entry.getKey(), Long.toString(entry.getValue().sum()));
+    }
+    return snapshot;
   }
 }

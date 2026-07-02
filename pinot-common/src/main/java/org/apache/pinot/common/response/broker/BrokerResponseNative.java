@@ -58,7 +58,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed", "materializedViewQueried", "serverStats"
+    "pools", "rlsFiltersApplied", "groupsTrimmed", "materializedViewQueried", "serverStats", "customStats"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -128,6 +128,12 @@ public class BrokerResponseNative implements BrokerResponse {
 
   @Nullable
   private String _serverStats;
+
+  /// Generic, additive per-query statistics keyed by an opaque string. Populated during broker
+  /// reduce from server [org.apache.pinot.common.datatable.DataTable] metadata; omitted from JSON
+  /// when empty. Keys and their meaning are owned by the producing code.
+  @Nullable
+  private Map<String, String> _customStats;
 
   public BrokerResponseNative() {
   }
@@ -663,5 +669,25 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public String getServerStats() {
     return _serverStats;
+  }
+
+  @JsonProperty("customStats")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Override
+  public Map<String, String> getCustomStats() {
+    return _customStats == null ? Map.of() : _customStats;
+  }
+
+  @JsonProperty("customStats")
+  public void setCustomStats(@Nullable Map<String, String> customStats) {
+    _customStats = customStats;
+  }
+
+  @Override
+  public void putCustomStat(String key, String value) {
+    if (_customStats == null) {
+      _customStats = new HashMap<>();
+    }
+    _customStats.put(key, value);
   }
 }
