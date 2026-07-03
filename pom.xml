@@ -185,7 +185,7 @@
     <zstd-jni.version>1.5.7-11</zstd-jni.version>
     <lz4-java.version>1.11.0</lz4-java.version>
     <libthrift.version>0.23.0</libthrift.version>
-    <log4j.version>2.26.0</log4j.version>
+    <log4j.version>2.26.1</log4j.version>
     <slf4j.version>2.0.18</slf4j.version>
     <netty.version>4.1.135.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
