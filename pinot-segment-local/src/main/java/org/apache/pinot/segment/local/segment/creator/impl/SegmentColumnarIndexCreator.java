@@ -147,7 +147,7 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
 
   /**
    * Index a column using a ColumnReader (column-major approach).
-   * This method processes the column values using the iterator pattern from ColumnReader.
+   * This method processes the column values by document ID using random access from ColumnReader.
    *
    * @param columnName Name of the column to index
    * @param columnReader ColumnReader for the column data
@@ -156,6 +156,8 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
   @Override
   public void indexColumn(String columnName, ColumnReader columnReader)
       throws IOException {
+    // The statistics pass already traversed this reader; reset it to document 0 for this index-writing pass.
+    columnReader.rewind();
     List<IndexCreator> creatorsByIndex = _colIndexes.get(columnName).getIndexCreators();
     NullValueVectorCreator nullVec = _colIndexes.get(columnName).getNullValueVectorCreator();
     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
@@ -163,20 +165,19 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
 
     PinotDataType destDataType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
 
-    // Reset column reader to start from beginning
-    columnReader.rewind();
+    int numDocs = columnReader.getTotalDocs();
 
     // Typed fast path: for a single-value INT/LONG/FLOAT/DOUBLE column the reader can serve a primitive
-    // directly (ColumnReader.isInt()/...), the dictionary offers indexOfSV(primitive), and every index
+    // directly (ColumnReader.getValueType()), the dictionary offers indexOfSV(primitive), and every index
     // creator offers addInt/addLong/... (ForwardIndexCreator, CombinedInvertedIndexCreator and
     // DictionaryBasedInvertedIndexCreator de-box; any other creator falls back to the boxing default).
     // Driving the column through those eliminates the per-value Integer/Long/Float/Double box that
-    // next() -> indexOfSV(Object) -> add(Object, ...) incurs. Null docs (rare) and everything else
+    // getValue(docId) -> indexOfSV(Object) -> add(Object, ...) incurs. Null docs (rare) and everything else
     // (multi-value, BIG_DECIMAL/STRING/BYTES, BOOLEAN/TIMESTAMP coercion) fall through to the Object
     // path below, which stays the single source of truth for null and type handling.
     if (fieldSpec.isSingleValueField()
         && indexSingleValuePrimitive(columnName, fieldSpec, destDataType, columnReader, dictionaryCreator,
-            creatorsByIndex, nullVec)) {
+            creatorsByIndex, nullVec, numDocs)) {
       _columnMajorTypedFastPathColumns++;
       return;
     }
@@ -186,9 +187,8 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     _columnMajorObjectPathColumns++;
 
     Object reuseColumnValueToIndex;
-    int docId = 0;
-    while (columnReader.hasNext()) {
-      Object rawValue = columnReader.next();
+    for (int docId = 0; docId < numDocs; docId++) {
+      Object rawValue = columnReader.getValue(docId);
 
       // Record whole-value-null docs in the null-value vector BEFORE substituting the default (matching
       // the row-major path, which marks null only for whole-value nulls). The column-major driver runs
@@ -209,100 +209,94 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
       } catch (JsonParseException jpe) {
         throw new ColumnJsonParserException(columnName, jpe);
       }
-
-      docId++;
     }
   }
 
   /**
    * Typed, allocation-free index write for a single-value primitive column. Returns {@code true} if it consumed
    * the column (the reader served it as INT / LONG / FLOAT / DOUBLE directly). Otherwise it returns {@code false}
-   * — without advancing the reader — either because the column is not a fast-path primitive, or because it is
+   * — without reading any value — either because the column is not a fast-path primitive, or because it is
    * one but the reader serves a different physical type, so the caller falls back to the Object path. Drives each
-   * value through {@code ColumnReader.nextInt()}/... -> {@code indexOfSV(primitive)} -> {@code
-   * IndexCreator.addInt(primitive, dictId)}, avoiding the box that {@code next() -> indexOfSV(Object) ->
+   * value through {@code ColumnReader.getInt(docId)}/... -> {@code indexOfSV(primitive)} -> {@code
+   * IndexCreator.addInt(primitive, dictId)}, avoiding the box that {@code getValue(docId) -> indexOfSV(Object) ->
    * add(Object, ...)} incurs. Null docs (rare) are routed through the shared Object handling for exact parity,
    * including whole-value-null marking in the null-value vector.
    */
   private boolean indexSingleValuePrimitive(String columnName, FieldSpec fieldSpec, PinotDataType destDataType,
       ColumnReader columnReader, SegmentDictionaryCreator dictionaryCreator, List<IndexCreator> creatorsByIndex,
-      NullValueVectorCreator nullVec)
+      NullValueVectorCreator nullVec, int numDocs)
       throws IOException {
-    int docId = 0;
+    PinotDataType valueType = columnReader.getValueType();
     switch (fieldSpec.getDataType()) {
       case INT: {
-        if (!columnReader.isInt()) {
+        if (valueType != PinotDataType.INT) {
           return false;
         }
-        while (columnReader.hasNext()) {
-          if (columnReader.isNextNull()) {
+        for (int docId = 0; docId < numDocs; docId++) {
+          if (columnReader.isNull(docId)) {
             indexSingleValueRow(dictionaryCreator,
                 normalizeNullRow(columnName, fieldSpec, destDataType, columnReader, nullVec, docId), creatorsByIndex);
           } else {
-            int value = columnReader.nextInt();
+            int value = columnReader.getInt(docId);
             int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
             for (IndexCreator creator : creatorsByIndex) {
               creator.addInt(value, dictId);
             }
           }
-          docId++;
         }
         return true;
       }
       case LONG: {
-        if (!columnReader.isLong()) {
+        if (valueType != PinotDataType.LONG) {
           return false;
         }
-        while (columnReader.hasNext()) {
-          if (columnReader.isNextNull()) {
+        for (int docId = 0; docId < numDocs; docId++) {
+          if (columnReader.isNull(docId)) {
             indexSingleValueRow(dictionaryCreator,
                 normalizeNullRow(columnName, fieldSpec, destDataType, columnReader, nullVec, docId), creatorsByIndex);
           } else {
-            long value = columnReader.nextLong();
+            long value = columnReader.getLong(docId);
             int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
             for (IndexCreator creator : creatorsByIndex) {
               creator.addLong(value, dictId);
             }
           }
-          docId++;
         }
         return true;
       }
       case FLOAT: {
-        if (!columnReader.isFloat()) {
+        if (valueType != PinotDataType.FLOAT) {
           return false;
         }
-        while (columnReader.hasNext()) {
-          if (columnReader.isNextNull()) {
+        for (int docId = 0; docId < numDocs; docId++) {
+          if (columnReader.isNull(docId)) {
             indexSingleValueRow(dictionaryCreator,
                 normalizeNullRow(columnName, fieldSpec, destDataType, columnReader, nullVec, docId), creatorsByIndex);
           } else {
-            float value = columnReader.nextFloat();
+            float value = columnReader.getFloat(docId);
             int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
             for (IndexCreator creator : creatorsByIndex) {
               creator.addFloat(value, dictId);
             }
           }
-          docId++;
         }
         return true;
       }
       case DOUBLE: {
-        if (!columnReader.isDouble()) {
+        if (valueType != PinotDataType.DOUBLE) {
           return false;
         }
-        while (columnReader.hasNext()) {
-          if (columnReader.isNextNull()) {
+        for (int docId = 0; docId < numDocs; docId++) {
+          if (columnReader.isNull(docId)) {
             indexSingleValueRow(dictionaryCreator,
                 normalizeNullRow(columnName, fieldSpec, destDataType, columnReader, nullVec, docId), creatorsByIndex);
           } else {
-            double value = columnReader.nextDouble();
+            double value = columnReader.getDouble(docId);
             int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
             for (IndexCreator creator : creatorsByIndex) {
               creator.addDouble(value, dictId);
             }
           }
-          docId++;
         }
         return true;
       }
@@ -320,7 +314,7 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
   private Object normalizeNullRow(String columnName, FieldSpec fieldSpec, PinotDataType destDataType,
       ColumnReader columnReader, NullValueVectorCreator nullVec, int docId)
       throws IOException {
-    Object rawValue = columnReader.next();
+    Object rawValue = columnReader.getValue(docId);
     if (rawValue == null && nullVec != null) {
       nullVec.setNull(docId);
     }

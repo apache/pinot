@@ -24,6 +24,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /**
@@ -37,6 +38,7 @@ public class DefaultValueColumnReader implements ColumnReader {
   private final String _columnName;
   private final int _numDocs;
   private final Object _defaultValue;
+  private final Object _logicalValue;
   private final FieldSpec _fieldSpec;
   private final DataType _dataType;
 
@@ -49,8 +51,6 @@ public class DefaultValueColumnReader implements ColumnReader {
   private String[] _defaultStringMV;
   private byte[][] _defaultBytesMV;
 
-  private int _currentIndex;
-
   /**
    * Create a DefaultValueColumnReader for a new column.
    *
@@ -61,7 +61,6 @@ public class DefaultValueColumnReader implements ColumnReader {
   public DefaultValueColumnReader(String columnName, int numDocs, FieldSpec fieldSpec) {
     _columnName = columnName;
     _numDocs = numDocs;
-    _currentIndex = 0;
     _fieldSpec = fieldSpec;
     _dataType = fieldSpec.getDataType();
 
@@ -120,213 +119,20 @@ public class DefaultValueColumnReader implements ColumnReader {
           break;
       }
     }
-  }
-
-  @Override
-  public boolean hasNext() {
-    return _currentIndex < _numDocs;
-  }
-
-  @Override
-  @Nullable
-  public Object next() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return _defaultValue;
-  }
-
-  @Override
-  public void rewind() {
-    _currentIndex = 0;
-  }
-
-  @Override
-  public boolean isNextNull() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _defaultValue == null;
-  }
-
-  @Override
-  public void skipNext() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-  }
-
-  @Override
-  public boolean isSingleValue() {
-    return _fieldSpec.isSingleValueField();
-  }
-
-  @Override
-  public boolean isInt() {
-    return _dataType == DataType.INT;
-  }
-
-  @Override
-  public boolean isLong() {
-    return _dataType == DataType.LONG;
-  }
-
-  @Override
-  public boolean isFloat() {
-    return _dataType == DataType.FLOAT;
-  }
-
-  @Override
-  public boolean isDouble() {
-    return _dataType == DataType.DOUBLE;
-  }
-
-  @Override
-  public boolean isBigDecimal() {
-    return _dataType == DataType.BIG_DECIMAL;
-  }
-
-  @Override
-  public boolean isString() {
-    return _dataType == DataType.STRING;
-  }
-
-  @Override
-  public boolean isBytes() {
-    return _dataType == DataType.BYTES;
-  }
-
-  @Override
-  public int nextInt() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return ((Number) _defaultValue).intValue();
-  }
-
-  @Override
-  public long nextLong() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return ((Number) _defaultValue).longValue();
-  }
-
-  @Override
-  public float nextFloat() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return ((Number) _defaultValue).floatValue();
-  }
-
-  @Override
-  public double nextDouble() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return ((Number) _defaultValue).doubleValue();
-  }
-
-  @Override
-  public BigDecimal nextBigDecimal() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return (BigDecimal) _defaultValue;
-  }
-
-  @Override
-  public String nextString() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return (String) _defaultValue;
-  }
-
-  @Override
-  public byte[] nextBytes() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return (byte[]) _defaultValue;
-  }
-
-  @Override
-  public MultiValueResult<int[]> nextIntMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return MultiValueResult.of(_defaultIntMV, null);
-  }
-
-  @Override
-  public MultiValueResult<long[]> nextLongMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return MultiValueResult.of(_defaultLongMV, null);
-  }
-
-  @Override
-  public MultiValueResult<float[]> nextFloatMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return MultiValueResult.of(_defaultFloatMV, null);
-  }
-
-  @Override
-  public MultiValueResult<double[]> nextDoubleMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return MultiValueResult.of(_defaultDoubleMV, null);
-  }
-
-  @Override
-  public BigDecimal[] nextBigDecimalMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return _defaultBigDecimalMV;
-  }
-
-  @Override
-  public String[] nextStringMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return _defaultStringMV;
-  }
-
-  @Override
-  public byte[][] nextBytesMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return _defaultBytesMV;
+    // getValue() surfaces the logical object; the segment stores BOOLEAN as int and TIMESTAMP as long, so the
+    // physical default is converted once here. Typed accessors keep using the physical _defaultValue.
+    _logicalValue = ColumnReader.toLogicalValue(_defaultValue, _dataType);
   }
 
   @Override
   public String getColumnName() {
     return _columnName;
+  }
+
+  @Nullable
+  @Override
+  public PinotDataType getValueType() {
+    return ColumnReader.toValueType(_dataType, _fieldSpec.isSingleValueField());
   }
 
   @Override
@@ -338,6 +144,12 @@ public class DefaultValueColumnReader implements ColumnReader {
   public boolean isNull(int docId) {
     validateDocId(docId);
     return _defaultValue == null;
+  }
+
+  @Override
+  public Object getValue(int docId) {
+    validateDocId(docId);
+    return _logicalValue;
   }
 
   // Single-value accessors
@@ -382,12 +194,6 @@ public class DefaultValueColumnReader implements ColumnReader {
   public byte[] getBytes(int docId) {
     validateDocId(docId);
     return (byte[]) _defaultValue;
-  }
-
-  @Override
-  public Object getValue(int docId) {
-    validateDocId(docId);
-    return _defaultValue;
   }
 
   // Multi-value accessors
