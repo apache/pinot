@@ -1464,7 +1464,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
   }
 
-  private static class ConsumptionStopIndicator {
+  @VisibleForTesting
+  static class ConsumptionStopIndicator {
     final StreamPartitionMsgOffset _offset;
     final String _segmentName;
     final String _instanceId;
@@ -1498,13 +1499,39 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     ConsumptionStopIndicator indicator = new ConsumptionStopIndicator(_currentOffset,
         _segmentNameStr, _instanceId, _protocolHandler, reason, _segmentLogger);
     do {
-      SegmentCompletionProtocol.Response response = indicator.postSegmentStoppedConsuming();
+      if (hasDifferentSegmentDataManagerRegistered()) {
+        _segmentLogger.info(
+            "Skip segmentStoppedConsuming for segment: {}, another segment data manager is already registered",
+            _segmentNameStr);
+        return;
+      }
+      SegmentCompletionProtocol.Response response = postSegmentStoppedConsuming(indicator);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
         break;
       }
       Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
       _segmentLogger.info("Retrying after response {}", response.toJsonString());
     } while (!_shouldStop);
+  }
+
+  @VisibleForTesting
+  SegmentCompletionProtocol.Response postSegmentStoppedConsuming(ConsumptionStopIndicator indicator) {
+    return indicator.postSegmentStoppedConsuming();
+  }
+
+  /**
+   * Returns true when another manager is currently registered for this segment.
+   */
+  @VisibleForTesting
+  boolean hasDifferentSegmentDataManagerRegistered() {
+    if (_realtimeTableDataManager == null) {
+      return false;
+    }
+    SegmentDataManager segmentDataManager = _realtimeTableDataManager.getSegmentDataManager(_segmentNameStr);
+    if (segmentDataManager == null) {
+      return false;
+    }
+    return segmentDataManager != this;
   }
 
   public StreamMetadataProvider getPartitionMetadataProvider() {
