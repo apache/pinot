@@ -41,10 +41,10 @@ public final class ServerMetricsInitUtils {
     boolean registered = ServerMetrics.register(serverMetrics);
     if (registered) {
       LOGGER.info("ServerMetrics successfully registered");
+      return serverMetrics;
     } else {
-      LOGGER.error("Failed to register ServerMetrics; an instance was already registered");
-      throw new IllegalStateException("Failed to register ServerMetrics; an instance was already registered");
+      LOGGER.warn("ServerMetrics already registered; returning existing instance");
+      return ServerMetrics.get();
     }
-    return serverMetrics;
   }
 }

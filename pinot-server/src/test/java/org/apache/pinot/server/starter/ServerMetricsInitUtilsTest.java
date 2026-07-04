@@ -28,7 +28,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTO
 import static org.apache.pinot.spi.utils.CommonConstants.Server.METRICS_CONFIG_PREFIX;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertThrows;
 
 
 public class ServerMetricsInitUtilsTest {
@@ -55,11 +54,12 @@ public class ServerMetricsInitUtilsTest {
   }
 
   @Test
-  public void testInitServerMetricsThrowsWhenAlreadyRegistered()
+  public void testInitServerMetricsReturnsExistingWhenAlreadyRegistered()
       throws Exception {
     ServerConf serverConf = buildServerConf();
-    ServerMetricsInitUtils.initServerMetrics(serverConf);
+    ServerMetrics first = ServerMetricsInitUtils.initServerMetrics(serverConf);
+    ServerMetrics second = ServerMetricsInitUtils.initServerMetrics(serverConf);
 
-    assertThrows(IllegalStateException.class, () -> ServerMetricsInitUtils.initServerMetrics(serverConf));
+    assertSame(second, first, "Should return the already-registered instance");
   }
 }
