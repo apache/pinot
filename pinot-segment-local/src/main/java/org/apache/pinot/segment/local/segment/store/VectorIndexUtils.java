@@ -18,16 +18,21 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.codecs.lucene912.Lucene912Codec;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneCombinedTextIndexConstants;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswCodec;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
+import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
+import org.apache.pinot.segment.local.segment.index.vector.IvfPqIndexFormat;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
@@ -109,16 +114,23 @@ public class VectorIndexUtils {
   /// Returns the {@code columns.psf} typed-entry buffer holding the column's consolidated vector
   /// index, or {@code null} when no such entry has been packed into {@code columns.psf} yet.
   ///
-  /// Unlike {@link SegmentDirectory.Reader#hasIndexFor}, this does NOT report a legacy on-disk
-  /// sidecar (an IVF flat file or an HNSW Lucene directory) as a match — only a real packed
-  /// `_columnEntries` slot counts. The store implementations that back {@code getIndexFor}
-  /// ({@link SingleFileIndexDirectory} for V3 and {@link FilePerIndexDirectory} for V1/V2) both
-  /// signal an absent slot by throwing an unchecked exception whose message starts with
-  /// {@link SingleFileIndexDirectory#INDEX_NOT_FOUND_MESSAGE_PREFIX} (the shared constant both
-  /// classes build their message from); that is mapped to {@code null} here. Any other
-  /// {@code RuntimeException} (e.g. a corruption marker) is rethrown rather than masked as "absent",
-  /// so the migration / crash-recovery paths do not proceed on a broken segment. Genuine
-  /// {@link IOException}s also propagate.
+  /// **Contract per store implementation.** On a V3 {@link SingleFileIndexDirectory}, unlike
+  /// {@link SegmentDirectory.Reader#hasIndexFor}, this does NOT report a legacy on-disk sidecar (an
+  /// IVF flat file or an HNSW Lucene directory) as a match — only a real packed `_columnEntries`
+  /// slot counts; an absent slot (signalled by an unchecked exception whose message starts with
+  /// {@link SingleFileIndexDirectory#INDEX_NOT_FOUND_MESSAGE_PREFIX}) maps to {@code null}. On a
+  /// V1/V2 {@link FilePerIndexDirectory} there is no {@code columns.psf}: a still-present legacy
+  /// HNSW Lucene *directory* fails to map (message ending with
+  /// {@link FilePerIndexDirectory#NOT_A_REGULAR_FILE_MESSAGE_SUFFIX}) and also maps to {@code null}
+  /// here — a directory can never be a packed typed entry — but a legacy IVF sidecar *file* IS
+  /// mapped and returned as if it were a consolidated entry (same bytes, directory-owned buffer).
+  /// Callers that must distinguish "truly consolidated" from "V1/V2 sidecar" must gate on the
+  /// segment version or on-disk artifacts first, as the {@code VectorIndexHandler} (v3 gate) and
+  /// the HNSW reader factory (legacy-directory-first) call sites do.
+  ///
+  /// Any other {@code RuntimeException} (e.g. a corruption marker) is rethrown rather than masked
+  /// as "absent", so the migration / crash-recovery paths do not proceed on a broken segment.
+  /// Genuine {@link IOException}s also propagate.
   ///
   /// Callers use this to tell "a prior absorb already committed bytes" (crash recovery) apart from
   /// "first absorb of an existing sidecar", and to select the {@code columns.psf} read path only
@@ -136,9 +148,69 @@ public class VectorIndexUtils {
         // No typed entry in columns.psf yet — the expected "not consolidated" case.
         return null;
       }
+      // FilePerIndexDirectory (V1/V2) resolves a still-present legacy Lucene DIRECTORY as the
+      // vector artifact and fails to map it. A directory can never be a packed typed entry, so
+      // treat it as "no consolidated entry" rather than killing the caller's segment load.
+      if (e instanceof IllegalArgumentException && message != null
+          && message.endsWith(FilePerIndexDirectory.NOT_A_REGULAR_FILE_MESSAGE_SUFFIX)) {
+        return null;
+      }
       // Anything else (corruption, unexpected state) must not be silently treated as "absent".
       throw e;
     }
+  }
+
+  /// Sniffs the vector backend that produced a consolidated {@code columns.psf} payload from its
+  /// leading magic bytes, or {@code null} when the column has no consolidated entry or the payload
+  /// starts with an unknown magic. Complements {@link #detectVectorIndexBackend}, which only sees
+  /// on-disk sidecar files — a consolidated-only column is invisible to it, so backend-drift
+  /// detection must use this probe instead.
+  ///
+  /// {@code IVF_ON_DISK} shares the IVF_FLAT file format, so its payloads report
+  /// {@link VectorBackendType#IVF_FLAT} — mirroring what {@link #detectVectorIndexBackend} reports
+  /// for the shared file extension.
+  @Nullable
+  public static VectorBackendType detectConsolidatedVectorBackend(SegmentDirectory.Reader reader, String column)
+      throws IOException {
+    PinotDataBuffer entry = getConsolidatedVectorEntry(reader, column);
+    return entry == null ? null : sniffVectorPayloadBackend(entry);
+  }
+
+  /// Maps a configured backend to the storage format it reads/writes. {@code IVF_ON_DISK} shares
+  /// the IVF_FLAT file format (only the reader class differs), so backend-drift comparisons must
+  /// normalize through this helper before comparing against a detected/sniffed backend — otherwise
+  /// a valid {@code IVF_ON_DISK} column would report perpetual drift (the payload always sniffs as
+  /// {@code IVF_FLAT}) and be destroyed and rebuilt on every segment load.
+  public static VectorBackendType storageFormatOf(VectorBackendType backendType) {
+    return backendType == VectorBackendType.IVF_ON_DISK ? VectorBackendType.IVF_FLAT : backendType;
+  }
+
+  /// Classifies a vector payload by its leading magic bytes: the HNSW combined pack starts with the
+  /// {@code LUCENE_V2} magic string, IVF payloads start with their 4-byte big-endian format magic
+  /// ({@code IVFF} / {@code IVPQ}). Returns {@code null} for anything else. Bytes are assembled
+  /// manually so the result does not depend on the buffer view's byte order.
+  @Nullable
+  @VisibleForTesting
+  static VectorBackendType sniffVectorPayloadBackend(PinotDataBuffer payload) {
+    int hnswMagicLength = LuceneCombinedTextIndexConstants.MAGIC_NUMBER_LENGTH;
+    if (payload.size() >= hnswMagicLength) {
+      byte[] head = new byte[hnswMagicLength];
+      payload.copyTo(0, head, 0, hnswMagicLength);
+      if (LuceneCombinedTextIndexConstants.MAGIC_NUMBER.equals(new String(head, StandardCharsets.US_ASCII))) {
+        return VectorBackendType.HNSW;
+      }
+    }
+    if (payload.size() >= Integer.BYTES) {
+      int magic = ((payload.getByte(0) & 0xFF) << 24) | ((payload.getByte(1) & 0xFF) << 16)
+          | ((payload.getByte(2) & 0xFF) << 8) | (payload.getByte(3) & 0xFF);
+      if (magic == IvfFlatVectorIndexCreator.MAGIC) {
+        return VectorBackendType.IVF_FLAT;
+      }
+      if (magic == IvfPqIndexFormat.MAGIC) {
+        return VectorBackendType.IVF_PQ;
+      }
+    }
+    return null;
   }
 
   @Nullable

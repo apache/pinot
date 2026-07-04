@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
@@ -215,6 +217,91 @@ public class VectorIndexUtilsTest {
     Assert.assertFalse(hnswDir.exists(), "recognised legacy HNSW directory must be deleted");
     Assert.assertTrue(tempFile.exists(), "temp extract file must survive cleanup");
     Assert.assertTrue(tempDir.isDirectory(), "temp extract directory must survive cleanup");
+  }
+
+  @Test
+  public void testSniffVectorPayloadBackendClassifiesByMagic()
+      throws IOException {
+    // HNSW combined pack: "LUCENE_V2" magic string.
+    Assert.assertEquals(sniff("LUCENE_V2".getBytes(StandardCharsets.US_ASCII)), VectorBackendType.HNSW);
+    // IVF magics: 4 ASCII bytes in file order.
+    Assert.assertEquals(sniff(new byte[]{'I', 'V', 'F', 'F', 0, 0, 0, 1}), VectorBackendType.IVF_FLAT);
+    Assert.assertEquals(sniff(new byte[]{'I', 'V', 'P', 'Q', 0, 0, 0, 1}), VectorBackendType.IVF_PQ);
+    // Unknown magic and too-short payloads classify as null, never as a wrong backend.
+    Assert.assertNull(sniff(new byte[]{(byte) 0xAB, (byte) 0xCD, (byte) 0xEF, 0x01}));
+    Assert.assertNull(sniff(new byte[]{'I', 'V'}));
+  }
+
+  @Test
+  public void testDetectConsolidatedVectorBackendReadsTypedEntryMagic()
+      throws IOException {
+    SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+    byte[] payload = {'I', 'V', 'P', 'Q', 2, 0, 0, 0};
+    PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(payload.length, ByteOrder.BIG_ENDIAN,
+        "sniff-test");
+    try {
+      buffer.readFrom(0, payload, 0, payload.length);
+      when(reader.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector()))).thenReturn(buffer);
+      Assert.assertEquals(VectorIndexUtils.detectConsolidatedVectorBackend(reader, COLUMN),
+          VectorBackendType.IVF_PQ);
+    } finally {
+      buffer.close();
+    }
+    // Absent entry maps to null via getConsolidatedVectorEntry.
+    SegmentDirectory.Reader emptyReader = mock(SegmentDirectory.Reader.class);
+    when(emptyReader.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector())))
+        .thenThrow(new RuntimeException(
+            SingleFileIndexDirectory.INDEX_NOT_FOUND_MESSAGE_PREFIX + ": " + COLUMN));
+    Assert.assertNull(VectorIndexUtils.detectConsolidatedVectorBackend(emptyReader, COLUMN));
+  }
+
+  /**
+   * V1/V2 {@code FilePerIndexDirectory} resolves a still-present legacy HNSW Lucene DIRECTORY as
+   * the vector artifact and throws {@code IllegalArgumentException(... must be a regular file)}
+   * from {@code mapForReads}. A directory can never be a packed typed entry, so the probe must map
+   * that to null ("no consolidated entry") instead of killing the caller's segment load.
+   */
+  @Test
+  public void testGetConsolidatedVectorEntryTreatsUnmappableDirectoryAsAbsent()
+      throws IOException {
+    SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+    when(reader.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector())))
+        .thenThrow(new IllegalArgumentException("File: /seg/" + COLUMN + ".vector.v912.hnsw.index"
+            + FilePerIndexDirectory.NOT_A_REGULAR_FILE_MESSAGE_SUFFIX));
+    Assert.assertNull(VectorIndexUtils.getConsolidatedVectorEntry(reader, COLUMN),
+        "unmappable-directory resolution must map to 'no consolidated entry'");
+
+    // Any other IllegalArgumentException must still propagate — only the directory case is benign.
+    SegmentDirectory.Reader otherReader = mock(SegmentDirectory.Reader.class);
+    when(otherReader.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector())))
+        .thenThrow(new IllegalArgumentException("File size must be less than 2GB"));
+    try {
+      VectorIndexUtils.getConsolidatedVectorEntry(otherReader, COLUMN);
+      Assert.fail("unrelated IllegalArgumentException must propagate");
+    } catch (IllegalArgumentException expected) {
+      Assert.assertTrue(expected.getMessage().contains("2GB"));
+    }
+  }
+
+  @Test
+  public void testStorageFormatOfAliasesIvfOnDiskToIvfFlat() {
+    Assert.assertEquals(VectorIndexUtils.storageFormatOf(VectorBackendType.IVF_ON_DISK),
+        VectorBackendType.IVF_FLAT, "IVF_ON_DISK shares the IVF_FLAT storage format");
+    Assert.assertEquals(VectorIndexUtils.storageFormatOf(VectorBackendType.IVF_FLAT), VectorBackendType.IVF_FLAT);
+    Assert.assertEquals(VectorIndexUtils.storageFormatOf(VectorBackendType.IVF_PQ), VectorBackendType.IVF_PQ);
+    Assert.assertEquals(VectorIndexUtils.storageFormatOf(VectorBackendType.HNSW), VectorBackendType.HNSW);
+  }
+
+  private static VectorBackendType sniff(byte[] payload)
+      throws IOException {
+    PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(payload.length, ByteOrder.BIG_ENDIAN,
+        "sniff-test");
+    try {
+      buffer.readFrom(0, payload, 0, payload.length);
+      return VectorIndexUtils.sniffVectorPayloadBackend(buffer);
+    } finally {
+      buffer.close();
+    }
   }
 
   private void touch(String fileName)
