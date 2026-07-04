@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
@@ -368,7 +369,7 @@ public class PredownloadSchedulerTest {
 
   private PredownloadScheduler buildPeerEnabledScheduler(PropertiesConfiguration properties)
       throws Exception {
-    properties.setProperty("pinot.server.peer.download.enabled", true);
+    properties.setProperty(CommonConstants.Server.CONFIG_OF_PEER_DOWNLOAD_ENABLED, true);
     PredownloadScheduler scheduler = spy(new PredownloadScheduler(properties));
     scheduler._executor = Runnable::run;
 
@@ -416,7 +417,7 @@ public class PredownloadSchedulerTest {
     assertEquals(enabledField.get(disabled), false);
     disabled.stop();
 
-    properties.setProperty("pinot.server.peer.download.enabled", true);
+    properties.setProperty(CommonConstants.Server.CONFIG_OF_PEER_DOWNLOAD_ENABLED, true);
     PredownloadScheduler enabled = new PredownloadScheduler(properties);
     assertEquals(enabledField.get(enabled), true);
     enabled.stop();

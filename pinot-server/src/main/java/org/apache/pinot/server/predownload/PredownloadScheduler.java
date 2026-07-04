@@ -114,7 +114,8 @@ public class PredownloadScheduler {
     _executor = Executors.newFixedThreadPool(predownloadParallelism);
     LOGGER.info("Created thread pool with num of threads: {}", predownloadParallelism);
 
-    _peerDownloadEnabled = properties.getBoolean("pinot.server.peer.download.enabled", false);
+    _peerDownloadEnabled = properties.getBoolean(CommonConstants.Server.CONFIG_OF_PEER_DOWNLOAD_ENABLED,
+        CommonConstants.Server.DEFAULT_PEER_DOWNLOAD_ENABLED);
     _peerDownloadScheme = _instanceDataManagerConfig.getSegmentPeerDownloadScheme();
     if (_peerDownloadScheme != null) {
       _peerDownloadScheme = _peerDownloadScheme.toLowerCase();
@@ -322,22 +323,21 @@ public class PredownloadScheduler {
       try {
         downloadFromDeepStore(predownloadSegmentInfo);
         _predownloadMetrics.deepStoreSegmentDownloaded();
-      } catch (Exception e) {
-        if (_peerDownloadEnabled && _peerDownloadScheme != null) {
-          LOGGER.warn("Deep store download failed for segment: {} of table: {}, falling back to peer download",
-              predownloadSegmentInfo.getSegmentName(), predownloadSegmentInfo.getTableNameWithType(), e);
-          long peerStartTime = System.currentTimeMillis();
-          try {
-            downloadFromPeers(predownloadSegmentInfo);
-            _predownloadMetrics.peerSegmentDownloaded(true, predownloadSegmentInfo.getSegmentName(),
-                predownloadSegmentInfo.getLocalSizeBytes(),
-                System.currentTimeMillis() - peerStartTime);
-          } catch (Exception peerEx) {
-            _predownloadMetrics.peerSegmentDownloaded(false, predownloadSegmentInfo.getSegmentName(), 0, 0);
-            throw peerEx;
-          }
-        } else {
-          throw e;
+      } catch (Exception deepStoreException) {
+        if (!_peerDownloadEnabled || _peerDownloadScheme == null) {
+          throw deepStoreException;
+        }
+        LOGGER.warn("Deep store download failed for segment: {} of table: {}, falling back to peer download",
+            predownloadSegmentInfo.getSegmentName(), predownloadSegmentInfo.getTableNameWithType(), deepStoreException);
+        long peerStartTime = System.currentTimeMillis();
+        try {
+          downloadFromPeers(predownloadSegmentInfo);
+          _predownloadMetrics.peerSegmentDownloaded(true, predownloadSegmentInfo.getSegmentName(),
+              predownloadSegmentInfo.getLocalSizeBytes(),
+              System.currentTimeMillis() - peerStartTime);
+        } catch (Exception peerEx) {
+          _predownloadMetrics.peerSegmentDownloaded(false, predownloadSegmentInfo.getSegmentName(), 0, 0);
+          throw deepStoreException;
         }
       }
       _failedSegments.remove(predownloadSegmentInfo.getSegmentName());
@@ -380,6 +380,9 @@ public class PredownloadScheduler {
 
   private void downloadFromPeers(PredownloadSegmentInfo predownloadSegmentInfo)
       throws Exception {
+    if (!_peerDownloadEnabled || _peerDownloadScheme == null) {
+      throw new PredownloadException("Peer download is not enabled or scheme is not configured");
+    }
     String segmentName = predownloadSegmentInfo.getSegmentName();
     String tableNameWithType = predownloadSegmentInfo.getTableNameWithType();
     LOGGER.info("Downloading segment: {} of table: {} from peers using scheme: {}", segmentName, tableNameWithType,

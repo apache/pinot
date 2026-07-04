@@ -34,7 +34,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 public class PredownloadMetricsTest {
 
   @Test
-  public void testPeerSegmentDownloadedFailureEmitsSegmentTaggedMeter() {
+  public void testPeerSegmentDownloadedFailureEmitsGlobalMeter() {
     ServerMetrics mockServerMetrics = mock(ServerMetrics.class);
     try (MockedStatic<ServerMetrics> serverMetricsMock = mockStatic(ServerMetrics.class)) {
       serverMetricsMock.when(ServerMetrics::get).thenReturn(mockServerMetrics);
@@ -42,8 +42,7 @@ public class PredownloadMetricsTest {
 
       predownloadMetrics.peerSegmentDownloaded(false, "testSegment", 0, 0);
 
-      verify(mockServerMetrics).addMeteredValue(eq(ServerMeter.PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_FAILURE_COUNT), eq(1L),
-          eq("testSegment"));
+      verify(mockServerMetrics).addMeteredGlobalValue(ServerMeter.PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_FAILURE_COUNT, 1);
       verifyNoMoreInteractions(mockServerMetrics);
     }
   }
@@ -58,7 +57,7 @@ public class PredownloadMetricsTest {
       predownloadMetrics.peerSegmentDownloaded(true, "testSegment", 1024 * 1024, 1000);
 
       verify(mockServerMetrics).addMeteredGlobalValue(ServerMeter.PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_COUNT, 1);
-      verify(mockServerMetrics).setValueOfGlobalGauge(eq(ServerGauge.PEER_DOWNLOAD_SPEED), eq(0L));
+      verify(mockServerMetrics).setValueOfGlobalGauge(eq(ServerGauge.PEER_DOWNLOAD_SPEED_MBPS), eq(0L));
       verifyNoMoreInteractions(mockServerMetrics);
     }
   }
