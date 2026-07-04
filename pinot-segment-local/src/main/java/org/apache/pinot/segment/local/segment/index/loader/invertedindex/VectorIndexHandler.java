@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
@@ -66,7 +67,8 @@ public class VectorIndexHandler extends BaseIndexHandler {
   }
 
   @Override
-  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
+      throws Exception {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_vectorConfigs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.vector());
@@ -80,9 +82,21 @@ public class VectorIndexHandler extends BaseIndexHandler {
       VectorIndexConfig desiredConfig = _vectorConfigs.get(column);
       VectorBackendType desiredBackend = desiredConfig.resolveBackendType();
       VectorBackendType existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
-      if (existingBackend != null && existingBackend != desiredBackend) {
+      // Both detectVectorIndexBackend and the consolidated sniff report the STORAGE format
+      // (IVF_ON_DISK payloads/files register as IVF_FLAT), so compare against the desired
+      // backend's storage format — a raw enum comparison would flag a valid IVF_ON_DISK column
+      // as drifted on every load and rebuild it forever.
+      if (existingBackend != null && existingBackend != VectorIndexUtils.storageFormatOf(desiredBackend)) {
         LOGGER.info("Need to rebuild Vector index for segment: {}, column: {} (backend changed from {} to {})",
             segmentName, column, existingBackend, desiredBackend);
+        return true;
+      }
+      VectorBackendType driftedConsolidatedBackend =
+          getDriftedConsolidatedBackend(segmentReader, column, existingBackend, desiredBackend);
+      if (driftedConsolidatedBackend != null) {
+        LOGGER.info("Need to rebuild Vector index for segment: {}, column: {} "
+            + "(consolidated backend changed from {} to {})", segmentName, column, driftedConsolidatedBackend,
+            desiredBackend);
         return true;
       }
       // Migration: sidecar -> columns.psf. Fires either when the offline writer just wrote a
@@ -120,6 +134,30 @@ public class VectorIndexHandler extends BaseIndexHandler {
       }
     }
     return false;
+  }
+
+  /// Returns the consolidated payload's backend when it drifts from the desired backend's storage
+  /// format, or {@code null} when the column has an on-disk sidecar (the sidecar drift check owns
+  /// that case), the segment is not V3 (consolidated entries only exist in {@code columns.psf}),
+  /// there is no consolidated entry, the payload magic is unknown, or the formats match.
+  ///
+  /// Shared by {@code needUpdateIndices} and {@code updateIndices} so the check-and-act pair cannot
+  /// drift apart. Comparison is by storage format ({@link VectorIndexUtils#storageFormatOf}):
+  /// {@code IVF_ON_DISK} payloads sniff as {@code IVF_FLAT} because they share the file format, and
+  /// a raw enum comparison would flag a healthy IVF_ON_DISK column as drifted on every load,
+  /// rebuilding it forever.
+  @Nullable
+  private VectorBackendType getDriftedConsolidatedBackend(SegmentDirectory.Reader reader, String column,
+      @Nullable VectorBackendType existingBackend, VectorBackendType desiredBackend)
+      throws IOException {
+    if (existingBackend != null || _segmentDirectory.getSegmentMetadata().getVersion() != SegmentVersion.v3) {
+      return null;
+    }
+    VectorBackendType consolidatedBackend = VectorIndexUtils.detectConsolidatedVectorBackend(reader, column);
+    if (consolidatedBackend != null && consolidatedBackend != VectorIndexUtils.storageFormatOf(desiredBackend)) {
+      return consolidatedBackend;
+    }
+    return null;
   }
 
   /// Absorbs a vector index sidecar into {@code columns.psf} as a typed entry, then deletes the
@@ -457,9 +495,24 @@ public class VectorIndexHandler extends BaseIndexHandler {
       VectorIndexConfig desiredConfig = _vectorConfigs.get(column);
       VectorBackendType desiredBackend = desiredConfig.resolveBackendType();
       VectorBackendType existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
-      if (existingBackend != null && existingBackend != desiredBackend) {
+      // Storage-format comparison — see the twin check in needUpdateIndices.
+      if (existingBackend != null && existingBackend != VectorIndexUtils.storageFormatOf(desiredBackend)) {
         LOGGER.info("Rebuilding Vector index for segment: {}, column: {} (backend changed from {} to {})",
             segmentName, column, existingBackend, desiredBackend);
+        segmentWriter.removeIndex(column, StandardIndexes.vector());
+        columnsToAddIdx.add(column);
+        continue;
+      }
+      // Consolidated-only backend drift (see needUpdateIndices): the old payload lives solely in
+      // columns.psf, so sniff its magic. On a mismatch, rebuild — running the absorb/extract
+      // migrations below would carry the OLD backend's bytes under the NEW backend's slot or
+      // extension, and the next load would parse them with the wrong reader.
+      VectorBackendType driftedConsolidatedBackend =
+          getDriftedConsolidatedBackend(segmentWriter, column, existingBackend, desiredBackend);
+      if (driftedConsolidatedBackend != null) {
+        LOGGER.info("Rebuilding Vector index for segment: {}, column: {} "
+            + "(consolidated backend changed from {} to {})", segmentName, column, driftedConsolidatedBackend,
+            desiredBackend);
         segmentWriter.removeIndex(column, StandardIndexes.vector());
         columnsToAddIdx.add(column);
         continue;

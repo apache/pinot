@@ -332,6 +332,208 @@ public class VectorIndexHandlerTest {
   }
 
   /**
+   * Backend drift on a consolidated-only column: the payload lives solely in {@code columns.psf},
+   * so {@code detectVectorIndexBackend} (sidecar files only) returns null and the plain drift check
+   * cannot fire. The handler must sniff the typed entry's magic and report an update need when the
+   * configured backend differs. Uses {@code storeInSegmentFile=true} so no other branch (absorb:
+   * needs a combined file; extract: needs flag=false) can mask a regression here.
+   */
+  @Test
+  public void testNeedUpdateIndicesReturnsTrueWhenConsolidatedBackendDiffers()
+      throws Exception {
+    File indexDir = createEmptyV3SegmentDir();
+    try {
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir, SegmentVersion.v3);
+      SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+      when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
+      // Consolidated HNSW payload: LUCENE_V2 pack magic.
+      byte[] payload = "LUCENE_V2-rest-of-header".getBytes(StandardCharsets.US_ASCII);
+      PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(payload.length, ByteOrder.BIG_ENDIAN,
+          "consolidated-drift-test");
+      try {
+        buffer.readFrom(0, payload, 0, payload.length);
+        when(reader.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector()))).thenReturn(buffer);
+
+        VectorIndexHandler handler = createHandler(segmentDirectory,
+            vectorIndexConfigWithConsolidation("IVF_PQ", /* storeInSegmentFile */ true));
+        assertTrue(handler.needUpdateIndices(reader),
+            "consolidated HNSW payload + configured IVF_PQ backend must need a rebuild");
+      } finally {
+        buffer.close();
+      }
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
+   * Regression for the consolidated backend-drift bug: with the payload only in {@code columns.psf}
+   * ({@code existingBackend == null}) and the flag flipped off, the extract branch used to treat a
+   * backend flip as a plain columns.psf → sidecar migration and stream the OLD backend's bytes out
+   * under the NEW backend's extension (e.g. HNSW pack bytes as {@code .vector.ivfpq.index}), which
+   * the next load would parse with the wrong reader. The handler must rebuild instead.
+   */
+  @Test
+  public void testUpdateIndicesRebuildsInsteadOfExtractingWhenConsolidatedBackendDiffers()
+      throws Exception {
+    File indexDir = createEmptyV3SegmentDir();
+    try {
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir, SegmentVersion.v3);
+      SegmentDirectory.Writer writer = mock(SegmentDirectory.Writer.class);
+      when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
+      byte[] payload = "LUCENE_V2-rest-of-header".getBytes(StandardCharsets.US_ASCII);
+      PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(payload.length, ByteOrder.BIG_ENDIAN,
+          "consolidated-drift-extract-test");
+      try {
+        buffer.readFrom(0, payload, 0, payload.length);
+        when(writer.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector()))).thenReturn(buffer);
+
+        VectorIndexHandler handler = createHandler(segmentDirectory,
+            vectorIndexConfigWithConsolidation("IVF_PQ", /* storeInSegmentFile */ false));
+        handler.updateIndices(writer);
+
+        // Rebuild path: the stale consolidated entry is dropped...
+        verify(writer).removeIndex(eq(COLUMN), eq(StandardIndexes.vector()));
+        // ...the column is re-queued for a rebuild (reaches the add loop's metadata lookup)...
+        verify(segmentDirectory.getSegmentMetadata()).getColumnMetadataFor(COLUMN);
+        // ...and the HNSW bytes must NOT have been extracted under the IVF_PQ extension.
+        File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+        assertFalse(new File(v3Dir, COLUMN + V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION).exists(),
+            "old HNSW payload must not be written out under the new backend's extension");
+        assertFalse(new File(v3Dir, COLUMN + ".vector.extract-tmp").exists(),
+            "no extract temp file may be left behind");
+      } finally {
+        buffer.close();
+      }
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
+   * IVF_ON_DISK shares the IVF_FLAT file format, so a consolidated IVF_ON_DISK payload sniffs as
+   * IVF_FLAT ({@code IVFF} magic). The drift check must compare storage formats — a raw enum
+   * comparison would flag a healthy IVF_ON_DISK column as drifted on EVERY load and destroy and
+   * rebuild the index forever (the rebuilt payload again carries the IVFF magic, so the check
+   * would never converge).
+   */
+  @Test
+  public void testNeedUpdateIndicesReturnsFalseForConsolidatedIvfOnDiskColumn()
+      throws Exception {
+    File indexDir = createEmptyV3SegmentDir();
+    try {
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir, SegmentVersion.v3);
+      SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+      when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
+      byte[] payload = {'I', 'V', 'F', 'F', 0, 0, 0, 1};
+      PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(payload.length, ByteOrder.BIG_ENDIAN,
+          "ivf-on-disk-drift-test");
+      try {
+        buffer.readFrom(0, payload, 0, payload.length);
+        when(reader.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector()))).thenReturn(buffer);
+
+        VectorIndexHandler handler = createHandler(segmentDirectory,
+            vectorIndexConfigWithConsolidation("IVF_ON_DISK", /* storeInSegmentFile */ true));
+        assertFalse(handler.needUpdateIndices(reader),
+            "IVF_ON_DISK shares the IVF_FLAT storage format; a consolidated IVFF payload is NOT drift");
+      } finally {
+        buffer.close();
+      }
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /** Mirror of the needUpdateIndices IVF_ON_DISK test for the act side: no destroy-and-rebuild. */
+  @Test
+  public void testUpdateIndicesDoesNotRebuildConsolidatedIvfOnDiskColumn()
+      throws Exception {
+    File indexDir = createEmptyV3SegmentDir();
+    try {
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir, SegmentVersion.v3);
+      SegmentDirectory.Writer writer = mock(SegmentDirectory.Writer.class);
+      when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
+      byte[] payload = {'I', 'V', 'F', 'F', 0, 0, 0, 1};
+      PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(payload.length, ByteOrder.BIG_ENDIAN,
+          "ivf-on-disk-update-test");
+      try {
+        buffer.readFrom(0, payload, 0, payload.length);
+        when(writer.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector()))).thenReturn(buffer);
+
+        VectorIndexHandler handler = createHandler(segmentDirectory,
+            vectorIndexConfigWithConsolidation("IVF_ON_DISK", /* storeInSegmentFile */ true));
+        handler.updateIndices(writer);
+
+        verify(writer, never()).removeIndex(eq(COLUMN), eq(StandardIndexes.vector()));
+      } finally {
+        buffer.close();
+      }
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
+   * Sidecar flavor of the IVF_ON_DISK aliasing: an on-disk {@code .vector.ivfflat.index} sidecar
+   * detects as IVF_FLAT, which must not count as drift from a configured IVF_ON_DISK backend.
+   */
+  @Test
+  public void testNeedUpdateIndicesReturnsFalseForIvfOnDiskSidecarColumn()
+      throws Exception {
+    File indexDir = createSegmentDirWithVectorIndex(V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+    try {
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir, SegmentVersion.v3);
+      SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+      when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
+
+      VectorIndexHandler handler = createHandler(segmentDirectory,
+          vectorIndexConfigWithConsolidation("IVF_ON_DISK", /* storeInSegmentFile */ false));
+      assertFalse(handler.needUpdateIndices(reader),
+          "an IVF_FLAT-format sidecar is the correct storage for IVF_ON_DISK; not drift");
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
+   * Complement to the drift-rebuild test: when the consolidated payload's magic MATCHES the
+   * configured backend, the flag-off extract must still run (no false-positive rebuild from the
+   * magic sniff).
+   */
+  @Test
+  public void testUpdateIndicesExtractsWhenConsolidatedBackendMatches()
+      throws Exception {
+    File indexDir = createEmptyV3SegmentDir();
+    try {
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir, SegmentVersion.v3);
+      SegmentDirectory.Writer writer = mock(SegmentDirectory.Writer.class);
+      when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
+      // Payload with a real IVF_FLAT magic ("IVFF") matching the configured backend.
+      byte[] payload = {'I', 'V', 'F', 'F', 0, 0, 0, 1};
+      PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(payload.length, ByteOrder.BIG_ENDIAN,
+          "consolidated-match-extract-test");
+      try {
+        buffer.readFrom(0, payload, 0, payload.length);
+        when(writer.getIndexFor(eq(COLUMN), eq(StandardIndexes.vector()))).thenReturn(buffer);
+
+        VectorIndexHandler handler = createHandler(segmentDirectory,
+            vectorIndexConfigWithConsolidation("IVF_FLAT", /* storeInSegmentFile */ false));
+        handler.updateIndices(writer);
+
+        File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+        File extracted = new File(v3Dir, COLUMN + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+        assertTrue(extracted.exists(), "matching-backend payload must still be extracted to the sidecar");
+        assertEquals(Files.readAllBytes(extracted.toPath()), payload,
+            "extracted bytes must match the consolidated payload");
+      } finally {
+        buffer.close();
+      }
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
    * Crash-recovery: if a previous absorb run committed bytes into {@code columns.psf} but then
    * died before deleting the sidecar, the next load should detect the duplicate via
    * {@code hasIndexFor} + size check and clean up the orphan sidecar instead of re-running the
