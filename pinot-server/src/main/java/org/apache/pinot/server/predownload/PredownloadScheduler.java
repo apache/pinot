@@ -38,17 +38,15 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.server.conf.ServerConf;
+import org.apache.pinot.server.starter.ServerMetricsInitUtils;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.slf4j.Logger;
@@ -168,17 +166,7 @@ public class PredownloadScheduler {
 
     try {
       ServerConf serverConf = new ServerConf(_pinotConfig);
-      PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(serverConf.getMetricsConfig());
-      ServerMetrics serverMetrics =
-          new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
-              serverConf.getAllowedTablesForEmittingMetrics());
-      serverMetrics.initializeGlobalMeters();
-      boolean registered = ServerMetrics.register(serverMetrics);
-      if (registered) {
-        LOGGER.info("ServerMetrics successfully registered for predownload container");
-      } else {
-        LOGGER.error("Failed to register ServerMetrics; an instance was already registered");
-      }
+      ServerMetricsInitUtils.initServerMetrics(serverConf);
     } catch (Exception e) {
       LOGGER.error("Failed to initialize ServerMetrics in predownload container; "
           + "continuing with the currently registered ServerMetrics instance", e);
