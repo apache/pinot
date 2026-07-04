@@ -58,4 +58,10 @@ public interface SegmentFetcher {
    * @throws Exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
    */
   void fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest) throws Exception;
+
+  /**
+   * Fetches a segment from any uri in the given supplier's list, and untars it to local in a streamed manner.
+   */
+  File fetchUntarSegmentToLocalStreamed(String segmentName, Supplier<List<URI>> uriSupplier, File dest,
+      long maxStreamRateInByte) throws Exception;
 }

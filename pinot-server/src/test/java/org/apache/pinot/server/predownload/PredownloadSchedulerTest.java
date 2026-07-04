@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.InstanceConfig;
@@ -473,6 +474,61 @@ public class PredownloadSchedulerTest {
 
     assertFalse(scheduler._failedSegments.contains(SEGMENT_NAME),
         "Segment should be removed from failed set after successful peer download");
+    scheduler._executor = null; // lambda can't be cast to ThreadPoolExecutor
+    scheduler.stop();
+  }
+
+  @Test
+  public void testDownloadSegmentPeerDownloadStreamedOnDeepStoreFailure()
+      throws Exception {
+    String propertiesFilePath =
+        this.getClass().getClassLoader().getResource(SAMPLE_PROPERTIES_FILE_NAME).getPath();
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromPath(propertiesFilePath);
+    properties.setProperty("pinot.server.instance.segment.stream.download.untar", true);
+    setUp(properties);
+
+    PredownloadScheduler scheduler = buildPeerEnabledScheduler(properties);
+    PredownloadZKClient mockZkClient = mock(PredownloadZKClient.class);
+    when(mockZkClient.getPeerServerURIs(any(), anyString(), anyString(), anyString())).thenReturn(new ArrayList<>());
+    injectMockZkClient(scheduler, mockZkClient);
+
+    PredownloadSegmentInfo segment = new PredownloadSegmentInfo(TABLE_NAME, SEGMENT_NAME);
+    SegmentZKMetadata zkMetadataWithoutCrypterName = createSegmentZKMetadata();
+    zkMetadataWithoutCrypterName.setCrypterName(null);
+    segment.updateSegmentInfo(zkMetadataWithoutCrypterName);
+    scheduler._failedSegments.add(SEGMENT_NAME);
+
+    File testFolder = new File(_temporaryFolder, "peerStreamedFallbackTest");
+    testFolder.mkdirs();
+    String dataDir = testFolder.getAbsolutePath();
+    int lastIndex = dataDir.lastIndexOf(File.separator);
+    when(_predownloadTableInfo.getInstanceDataManagerConfig()).thenReturn(_instanceDataManagerConfig);
+    when(_predownloadTableInfo.getTableConfig()).thenReturn(_tableConfig);
+    when(_instanceDataManagerConfig.getInstanceDataDir()).thenReturn(dataDir.substring(0, lastIndex));
+    when(_tableConfig.getTableName()).thenReturn(dataDir.substring(lastIndex + 1));
+    when(_predownloadTableInfo.loadSegmentFromLocal(any())).thenReturn(false);
+    injectSegmentState(scheduler, List.of(segment), Map.of(TABLE_NAME, _predownloadTableInfo));
+
+    File untarDir = new File(testFolder, "untared_peer_streamed");
+    untarDir.mkdirs();
+
+    try (MockedStatic<SegmentFetcherFactory> sfMock = mockStatic(SegmentFetcherFactory.class)) {
+      // deep store streamed (single-URI) download throws — simulating exhausted deep store retries
+      sfMock.when(
+              () -> SegmentFetcherFactory.fetchAndStreamUntarToLocal(anyString(), any(File.class), anyLong(),
+                  any(AtomicInteger.class)))
+          .thenThrow(new AttemptsExceededException("deep store streamed failed", 3));
+      // peer streamed (multi-peer supplier) download succeeds
+      sfMock.when(
+              () -> SegmentFetcherFactory.fetchAndStreamUntarToLocal(anyString(), anyString(), any(), any(File.class),
+                  anyLong()))
+          .thenReturn(untarDir);
+
+      scheduler.downloadSegment(segment);
+    }
+
+    assertFalse(scheduler._failedSegments.contains(SEGMENT_NAME),
+        "Segment should be removed from failed set after successful streamed peer download");
     scheduler._executor = null; // lambda can't be cast to ThreadPoolExecutor
     scheduler.stop();
   }

@@ -39,6 +39,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -384,18 +385,28 @@ public class PredownloadScheduler {
     LOGGER.info("Downloading segment: {} of table: {} from peers using scheme: {}", segmentName, tableNameWithType,
         _peerDownloadScheme);
     File tempRootDir = getTmpSegmentDataDir(predownloadSegmentInfo);
+    Supplier<List<URI>> uriSupplier = () -> {
+      List<URI> peerURIs =
+          _predownloadZkClient.getPeerServerURIs(_predownloadZkClient.getDataAccessor(), tableNameWithType,
+              segmentName, _peerDownloadScheme);
+      Collections.shuffle(peerURIs);
+      return peerURIs;
+    };
     try {
-      File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
-      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
-        List<URI> peerURIs =
-            _predownloadZkClient.getPeerServerURIs(_predownloadZkClient.getDataAccessor(), tableNameWithType,
-                segmentName, _peerDownloadScheme);
-        Collections.shuffle(peerURIs);
-        return peerURIs;
-      }, segmentTarFile, predownloadSegmentInfo.getCrypterName());
-      LOGGER.info("Downloaded segment: {} from peers to: {}, file length: {}", segmentName, segmentTarFile,
-          segmentTarFile.length());
-      untarAndMoveSegment(predownloadSegmentInfo, segmentTarFile, tempRootDir);
+      if (_instanceDataManagerConfig.isStreamSegmentDownloadUntar()
+          && predownloadSegmentInfo.getCrypterName() == null) {
+        File untaredSegDir = SegmentFetcherFactory.fetchAndStreamUntarToLocal(segmentName, _peerDownloadScheme,
+            uriSupplier, tempRootDir, _instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit());
+        LOGGER.info("Downloaded and untarred segment: {} from peers to: {}", segmentName, untaredSegDir);
+        moveSegment(predownloadSegmentInfo, untaredSegDir);
+      } else {
+        File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, uriSupplier,
+            segmentTarFile, predownloadSegmentInfo.getCrypterName());
+        LOGGER.info("Downloaded segment: {} from peers to: {}, file length: {}", segmentName, segmentTarFile,
+            segmentTarFile.length());
+        untarAndMoveSegment(predownloadSegmentInfo, segmentTarFile, tempRootDir);
+      }
     } finally {
       FileUtils.deleteQuietly(tempRootDir);
     }
