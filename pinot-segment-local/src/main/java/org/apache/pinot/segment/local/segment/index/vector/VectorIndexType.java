@@ -215,23 +215,34 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
       if (backendType == VectorBackendType.HNSW) {
         // Combined form: load the HNSW index from the typed entry inside columns.psf when one
-        // actually exists. getConsolidatedVectorEntry (unlike hasIndexFor) does not mistake the
-        // legacy Lucene directory for a packed entry, so a segment whose handler has not yet
-        // migrated falls through to the legacy path below instead of failing the whole load. The
+        // actually exists. Legacy-directory-first: if the on-disk HNSW artifact is still the Lucene
+        // directory (a V3 segment the handler has not migrated yet, or a V1/V2 segment backed by
+        // FilePerIndexDirectory), read it directly and skip the columns.psf probe entirely —
+        // FilePerIndexDirectory would resolve getIndexFor to that directory and fail to map it
+        // (not a regular file), killing the load before any fallback could run. This keeps
+        // storeInSegmentFile=true rolling-upgrade-safe for existing HNSW segments. The probed
         // buffer is owned by the segment directory — this reader must not close it.
         if (indexConfig.isStoreInSegmentFile()) {
-          PinotDataBuffer buffer;
-          try {
-            buffer = VectorIndexUtils.getConsolidatedVectorEntry(segmentReader, column);
-          } catch (IOException e) {
-            throw new RuntimeException(
-                "Failed to read consolidated HNSW vector index from columns.psf for column: " + column, e);
+          File onDiskHnsw = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, column,
+              VectorBackendType.HNSW);
+          if (onDiskHnsw == null || !onDiskHnsw.isDirectory()) {
+            PinotDataBuffer buffer;
+            try {
+              buffer = VectorIndexUtils.getConsolidatedVectorEntry(segmentReader, column);
+            } catch (IOException e) {
+              throw new RuntimeException(
+                  "Failed to read consolidated HNSW vector index from columns.psf for column: " + column, e);
+            }
+            if (buffer != null) {
+              return new HnswVectorIndexReader(column, buffer, metadata.getTotalDocs(), indexConfig);
+            }
+            // This branch is only reachable when no legacy Lucene directory exists either (the
+            // gate above short-circuits to the directory when one is present), so the legacy read
+            // below is expected to fail — surface the real state to the operator.
+            LOGGER.warn("storeInSegmentFile=true but neither a consolidated HNSW entry in columns.psf nor a legacy "
+                + "Lucene directory was found for column: {} in segment: {} (on-disk artifact: {}); attempting the "
+                + "legacy directory read path", column, segmentDir, onDiskHnsw);
           }
-          if (buffer != null) {
-            return new HnswVectorIndexReader(column, buffer, metadata.getTotalDocs(), indexConfig);
-          }
-          LOGGER.warn("storeInSegmentFile=true but no consolidated HNSW entry found in columns.psf for column: {} "
-              + "in segment: {}; falling back to the on-disk Lucene directory", column, segmentDir);
         }
         // Legacy path: load the HNSW index from the Lucene directory on disk.
         return new HnswVectorIndexReader(column, segmentDir, metadata.getTotalDocs(), indexConfig);
