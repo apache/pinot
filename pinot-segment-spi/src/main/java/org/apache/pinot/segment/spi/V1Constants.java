@@ -73,6 +73,24 @@ public class V1Constants {
     public static final String VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".vector.hnsw.mapping";
     public static final String VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION = ".vector.ivfflat.index";
     public static final String VECTOR_IVF_PQ_INDEX_FILE_EXTENSION = ".vector.ivfpq.index";
+    /**
+     * Combined-form IVF file extensions. Written by the IVF creators when
+     * {@code VectorIndexConfig.storeInSegmentFile} is {@code true}; consumed (and removed) by the
+     * V2→V3 format converter, which packs the bytes into {@code columns.psf} as a typed entry via
+     * the standard {@code copyIndexIfExists} loop. Mirrors the text-index {@code .text.index}
+     * extension that signals "ready to be consolidated into the combined segment file."
+     */
+    public static final String VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION = ".vector.ivfflat.combined.index";
+    public static final String VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION = ".vector.ivfpq.combined.index";
+    /**
+     * Combined-form HNSW file — packs the Lucene HNSW directory's files (and the optional docId
+     * mapping file) into a single file using the same LUCENE_V2 layout the text index uses.
+     * Build-time transient: the V2→V3 converter packs it into {@code columns.psf} and removes the
+     * sibling. At read time the bytes are exposed as a Lucene {@code Directory} backed by a
+     * {@code PinotDataBuffer} slice, so {@code KnnVectorsReader} works against the consolidated
+     * entry without re-extracting to disk.
+     */
+    public static final String VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION = ".vector.hnsw.combined.index";
   }
 
   public static class MetadataKeys {
