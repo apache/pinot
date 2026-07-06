@@ -291,12 +291,31 @@ public class SchemaUtilsTest {
 
   @Test
   public void testValidateMultiValueFieldSpec() {
-    Schema pinotSchema = new Schema.SchemaBuilder()
-        .setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", DataType.STRING)
-        .addMultiValueDimension("myJsonCol", DataType.JSON)
-        .build();
+    Schema pinotSchema;
+
+    // JSON MV is rejected by SchemaUtils.validate() — the multi-value compatibility check lives there
+    // (controller-side ingest validation), not in Schema.validate() (pure schema DTO validation).
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
     checkValidationFails(pinotSchema);
+
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
+    SchemaUtils.validate(pinotSchema);
+
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL)
+        .addMultiValueDimension("myBigDecimalMvCol", FieldSpec.DataType.BIG_DECIMAL).build();
+    SchemaUtils.validate(pinotSchema);
+
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myUuidCol", FieldSpec.DataType.UUID)
+        .addMultiValueDimension("myUuidMvCol", FieldSpec.DataType.UUID).build();
+    SchemaUtils.validate(pinotSchema);
   }
 
   @Test
