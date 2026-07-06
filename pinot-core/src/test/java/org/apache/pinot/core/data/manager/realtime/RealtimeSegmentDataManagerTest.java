@@ -141,27 +141,41 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testPostStopConsumedMsgSkippedWhenDifferentSegmentManagerRegistered()
+  public void testInitializationErrorStopMsgSkippedWhenDifferentSegmentManagerRegistered()
       throws Exception {
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
       RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
       SegmentDataManager registeredSegmentDataManager = mock(SegmentDataManager.class);
       when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(registeredSegmentDataManager);
 
-      segmentDataManager.invokePostStopConsumedMsg("init error");
+      segmentDataManager.postStopConsumedMsgForInitializationError();
 
       Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
     }
   }
 
   @Test
-  public void testPostStopConsumedMsgSentWhenCurrentSegmentManagerRegistered()
+  public void testInitializationErrorStopMsgSentWhenCurrentSegmentManagerRegistered()
       throws Exception {
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
       RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
       when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(segmentDataManager);
 
-      segmentDataManager.invokePostStopConsumedMsg("init error");
+      segmentDataManager.postStopConsumedMsgForInitializationError();
+
+      Assert.assertTrue(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test
+  public void testPostStopConsumedMsgDoesNotCheckRegisteredSegmentManager()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      SegmentDataManager registeredSegmentDataManager = mock(SegmentDataManager.class);
+      when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(registeredSegmentDataManager);
+
+      segmentDataManager.invokePostStopConsumedMsg("consumer error");
 
       Assert.assertTrue(segmentDataManager._postConsumeStoppedCalled);
     }
@@ -1380,7 +1394,6 @@ public class RealtimeSegmentDataManagerTest {
     public RealtimeTableDataManager _tableDataManager;
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
-    private final RealtimeTableDataManager _tableDataManager;
 
     private static InstanceDataManagerConfig makeInstanceDataManagerConfig() {
       InstanceDataManagerConfig dataManagerConfig = mock(InstanceDataManagerConfig.class);
@@ -1416,7 +1429,6 @@ public class RealtimeSegmentDataManagerTest {
       _streamMsgOffsetFactory.setAccessible(true);
       _streamMsgOffsetFactory.set(this, new LongMsgOffsetFactory());
       _timeSupplier = timeSupplier;
-      _tableDataManager = realtimeTableDataManager;
     }
 
     public RealtimeTableDataManager getTableDataManager() {

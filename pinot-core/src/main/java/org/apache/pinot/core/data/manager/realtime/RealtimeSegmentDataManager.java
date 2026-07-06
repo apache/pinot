@@ -1540,12 +1540,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     ConsumptionStopIndicator indicator = new ConsumptionStopIndicator(_currentOffset,
         _segmentNameStr, _instanceId, _protocolHandler, reason, _segmentLogger);
     do {
-      if (hasDifferentSegmentDataManagerRegistered()) {
-        _segmentLogger.info(
-            "Skip segmentStoppedConsuming for segment: {}, another segment data manager is already registered",
-            _segmentNameStr);
-        return;
-      }
       SegmentCompletionProtocol.Response response = postSegmentStoppedConsuming(indicator);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
         break;
@@ -1553,6 +1547,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
       _segmentLogger.info("Retrying after response {}", response.toJsonString());
     } while (!_shouldStop);
+  }
+
+  @VisibleForTesting
+  void postStopConsumedMsgForInitializationError() {
+    if (hasDifferentSegmentDataManagerRegistered()) {
+      _segmentLogger.info(
+          "Skip segmentStoppedConsuming for segment: {}, another segment data manager is already registered",
+          _segmentNameStr);
+      return;
+    }
+    postStopConsumedMsg("Consuming segment initialization error");
   }
 
   @VisibleForTesting
@@ -2012,7 +2017,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         // we are about to receive an ERROR->OFFLINE state transition once we call
         // postSegmentStoppedConsuming() method.
         Uninterruptibles.sleepUninterruptibly(30, TimeUnit.SECONDS);
-        postStopConsumedMsg("Consuming segment initialization error");
+        postStopConsumedMsgForInitializationError();
       }).start();
       throw t;
     }

@@ -236,15 +236,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "ERROR", to = "OFFLINE")
     public void onBecomeOfflineFromError(Message message, NotificationContext context) {
       _logger.info("SegmentOnlineOfflineStateModel.onBecomeOfflineFromError() : {}", message);
-      try {
-        _instanceDataManager.offloadSegment(message.getResourceName(), message.getPartitionName());
-      } catch (Exception e) {
-        // Do not block the ERROR -> OFFLINE transition if best-effort cleanup fails.
-        _logger.error(
-            "Caught exception while processing SegmentOnlineOfflineStateModel.onBecomeOfflineFromError() for table: "
-                + "{}, segment: {}",
-            message.getResourceName(), message.getPartitionName(), e);
-      }
     }
 
     @Transition(from = "ERROR", to = "DROPPED")
