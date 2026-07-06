@@ -404,7 +404,8 @@ public class MergeRollupTaskGeneratorTest {
     // Skip task generation, if the table is a realtime table and all segments are skipped
     // We don't test realtime REFRESH table because this combination does not make sense
     assertTrue(MergeRollupTaskGenerator.filterSegmentsforRealtimeTable(
-            Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2)
+            Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2),
+            getTableConfig(TableType.REALTIME, new HashMap<>())
     ).isEmpty());
     TableConfig realtimeTableConfig = getTableConfig(TableType.REALTIME, new HashMap<>());
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
@@ -454,7 +455,8 @@ public class MergeRollupTaskGeneratorTest {
 
     List<SegmentZKMetadata> filterResult = MergeRollupTaskGenerator.filterSegmentsforRealtimeTable(
             Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2,
-                    realtimeTableSegmentMetadata3));
+                    realtimeTableSegmentMetadata3),
+            getTableConfig(TableType.REALTIME, new HashMap<>()));
     assertEquals(filterResult.size(), 1);
     assertEquals(filterResult.get(0).getSegmentName(), "testTable__0__0__20250224T0900Z");
   }

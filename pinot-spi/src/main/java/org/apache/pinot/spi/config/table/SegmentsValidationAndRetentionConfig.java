@@ -57,6 +57,15 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _untrackedSegmentsRetentionTimeUnit;
   private String _untrackedSegmentsRetentionTimeValue;
 
+  /**
+   * When true and the table has multiple stream configs, new LLC segments use the multi-topic format
+   * ({@code tableName__topicId__partitionId__seq__date}) instead of the old format.
+   *
+   * <p>WARNING: Do not enable until ALL controllers and servers are upgraded to a version that can parse the new
+   * 5-part segment name format. Old nodes will fail to parse new-format segment names.
+   */
+  private boolean _enableTopicIdInSegmentName;
+
   public String getTimeColumnName() {
     return _timeColumnName;
   }
@@ -285,5 +294,13 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setUntrackedSegmentsRetentionTimeValue(String untrackedSegmentsRetentionTimeValue) {
     _untrackedSegmentsRetentionTimeValue = untrackedSegmentsRetentionTimeValue;
+  }
+
+  public boolean isEnableTopicIdInSegmentName() {
+    return _enableTopicIdInSegmentName;
+  }
+
+  public void setEnableTopicIdInSegmentName(boolean enableTopicIdInSegmentName) {
+    _enableTopicIdInSegmentName = enableTopicIdInSegmentName;
   }
 }

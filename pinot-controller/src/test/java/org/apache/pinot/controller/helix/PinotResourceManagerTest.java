@@ -215,7 +215,7 @@ public class PinotResourceManagerTest {
       int partitionId;
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
       if (llcSegmentName != null) {
-        partitionId = llcSegmentName.getTopicPartitionId().getPartitionId();
+        partitionId = llcSegmentName.getTopicPartitionId().toMultiTopicPinotPartitionId();
       } else {
         partitionId = Integer.parseInt(segment.substring(1, 2));
       }

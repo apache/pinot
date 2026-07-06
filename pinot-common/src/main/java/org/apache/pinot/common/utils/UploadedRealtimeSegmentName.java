@@ -104,7 +104,7 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
       numSeparators++;
       index += 2; // SEPARATOR.length()
     }
-    return numSeparators == 4;
+    return numSeparators == 4 && !LLCSegmentName.isLLCSegment(segmentName);
   }
 
   @Nullable

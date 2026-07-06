@@ -30,6 +30,7 @@ import java.util.Set;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -39,6 +40,7 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,7 +110,7 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       // For realtime tables, build a map of partition to latest segment to avoid deleting last segments
       Set<String> lastLLCSegmentPerPartition = new HashSet<>();
       if (tableConfig.getTableType() == TableType.REALTIME) {
-        lastLLCSegmentPerPartition = getLastLLCSegmentPerPartition(segmentsZKMetadata);
+        lastLLCSegmentPerPartition = getLastLLCSegmentPerPartition(segmentsZKMetadata, tableConfig);
       }
       for (SegmentZKMetadata segmentZKMetadata : notpurgedSegmentsZKMetadata) {
         String segmentName = segmentZKMetadata.getSegmentName();
@@ -163,13 +165,15 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  private Set<String> getLastLLCSegmentPerPartition(List<SegmentZKMetadata> segmentsZKMetadata) {
-    Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
+  private Set<String> getLastLLCSegmentPerPartition(List<SegmentZKMetadata> segmentsZKMetadata,
+      TableConfig tableConfig) {
+    boolean hasMultipleStreams = IngestionConfigUtils.hasMultipleStreams(tableConfig);
+    Map<TopicPartitionId, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       // Skip UPLOADED segments that don't conform to the LLC segment name
-      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName());
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName(), hasMultipleStreams);
       if (llcSegmentName != null) {
-        latestLLCSegmentNameMap.compute(llcSegmentName.getTopicPartitionId().getPartitionId(),
+        latestLLCSegmentNameMap.compute(llcSegmentName.getTopicPartitionId(),
             (k, latestLLCSegmentName) -> {
               if (latestLLCSegmentName == null
                   || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {

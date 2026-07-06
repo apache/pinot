@@ -453,6 +453,11 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
 
   @VisibleForTesting
   static int inferPartitionId(String segmentName, int numPartitions) {
+    // TODO: Thread hasMultipleStreams through the call chain from _tableCache so that
+    //  multi-stream composite partition IDs are properly decomposed into raw stream partition IDs.
+    //  Currently uses the deprecated no-arg parse, which treats composite IDs as single-stream
+    //  partition IDs. This is correct for single-stream tables; for multi-stream tables the
+    //  modulo result may differ but worker assignment remains deterministic.
     if (LLCSegmentName.isLLCSegment(segmentName)) {
       LLCSegmentName llc = LLCSegmentName.of(segmentName);
       return llc != null ? (llc.getTopicPartitionId().getPartitionId() % numPartitions) : -1;

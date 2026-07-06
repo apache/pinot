@@ -122,10 +122,12 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
       throws Exception {
     Preconditions.checkNotNull(indexLoadingConfig.getTableConfig(), "Table config must be set in index loading config");
     Preconditions.checkNotNull(indexLoadingConfig.getSchema(), "Schema must be set in index loading config");
-    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
+    LLCSegmentName llcSegmentName =
+        new LLCSegmentName(segmentZKMetadata.getSegmentName(),
+            IngestionConfigUtils.hasMultipleStreams(indexLoadingConfig.getTableConfig()));
 
     _segmentName = segmentZKMetadata.getSegmentName();
-    _partitionGroupId = llcSegmentName.getTopicPartitionId().getPartitionId();
+    _partitionGroupId = llcSegmentName.getTopicPartitionId().toMultiTopicPinotPartitionId();
     _segBuildSemaphore = segBuildSemaphore;
     _tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(llcSegmentName.getTableName());
     _segmentZKMetadata = segmentZKMetadata;
@@ -196,7 +198,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         .setConsumerDir(_resourceDataDir.getAbsolutePath())
         .setDropRecordOnPartitionMismatch(ingestionConfig != null
             && ingestionConfig.getStreamIngestionConfig() != null
-            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
+            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch())
+        .setHasMultipleStreams(IngestionConfigUtils.hasMultipleStreams(_tableConfig));
 
     setPartitionParameters(realtimeSegmentConfigBuilder, _tableConfig.getIndexingConfig().getSegmentPartitionConfig());
 

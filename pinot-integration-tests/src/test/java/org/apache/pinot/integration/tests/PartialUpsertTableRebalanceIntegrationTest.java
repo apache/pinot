@@ -407,7 +407,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       case UPLOADED_SEGMENT_3:
         return 1;
       default:
-        return new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId();
+        return new LLCSegmentName(segmentName).getTopicPartitionId().toMultiTopicPinotPartitionId();
     }
   }
 

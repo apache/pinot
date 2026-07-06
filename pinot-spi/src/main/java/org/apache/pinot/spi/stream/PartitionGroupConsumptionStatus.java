@@ -33,6 +33,9 @@ package org.apache.pinot.spi.stream;
  * 6. status - the consumption status IN_PROGRESS/DONE
  *
  * This information is needed by the stream, when grouping the partitions/shards into new partition groups.
+ *
+ * TODO: Add an overloaded constructor that accepts TopicPartitionId instead of int partitionGroupId,
+ *  to avoid callers needing to decompose/recompose composite partition IDs.
  */
 public class PartitionGroupConsumptionStatus {
   private final int _partitionGroupId;

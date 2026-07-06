@@ -36,10 +36,11 @@ public class MutableIndexContext {
   private final String _segmentName;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final File _consumerDir;
+  private final boolean _hasMultipleStreams;
 
   public MutableIndexContext(FieldSpec fieldSpec, int fixedLengthBytes, boolean hasDictionary, String segmentName,
       PinotDataBufferMemoryManager memoryManager, int capacity, boolean offHeap, int estimatedColSize,
-      int estimatedCardinality, int avgNumMultiValues, File consumerDir) {
+      int estimatedCardinality, int avgNumMultiValues, File consumerDir, boolean hasMultipleStreams) {
     _fieldSpec = fieldSpec;
     _fixedLengthBytes = fixedLengthBytes;
     _hasDictionary = hasDictionary;
@@ -51,6 +52,7 @@ public class MutableIndexContext {
     _estimatedCardinality = estimatedCardinality;
     _avgNumMultiValues = avgNumMultiValues;
     _consumerDir = consumerDir;
+    _hasMultipleStreams = hasMultipleStreams;
   }
 
   public PinotDataBufferMemoryManager getMemoryManager() {
@@ -97,6 +99,10 @@ public class MutableIndexContext {
     return _consumerDir;
   }
 
+  public boolean hasMultipleStreams() {
+    return _hasMultipleStreams;
+  }
+
   public static Builder builder() {
     return new Builder();
   }
@@ -113,6 +119,7 @@ public class MutableIndexContext {
     private int _estimatedCardinality;
     private int _avgNumMultiValues;
     private File _consumerDir;
+    private boolean _hasMultipleStreams;
 
     public Builder withMemoryManager(PinotDataBufferMemoryManager memoryManager) {
       _memoryManager = memoryManager;
@@ -164,6 +171,11 @@ public class MutableIndexContext {
       return this;
     }
 
+    public Builder withHasMultipleStreams(boolean hasMultipleStreams) {
+      _hasMultipleStreams = hasMultipleStreams;
+      return this;
+    }
+
     public Builder withFixedLengthBytes(int fixedLengthBytes) {
       _fixedLengthBytes = fixedLengthBytes;
       return this;
@@ -172,7 +184,7 @@ public class MutableIndexContext {
     public MutableIndexContext build() {
       return new MutableIndexContext(Objects.requireNonNull(_fieldSpec), _fixedLengthBytes, _hasDictionary,
           Objects.requireNonNull(_segmentName), Objects.requireNonNull(_memoryManager), _capacity, _offHeap,
-          _estimatedColSize, _estimatedCardinality, _avgNumMultiValues, _consumerDir);
+          _estimatedColSize, _estimatedCardinality, _avgNumMultiValues, _consumerDir, _hasMultipleStreams);
     }
   }
 }

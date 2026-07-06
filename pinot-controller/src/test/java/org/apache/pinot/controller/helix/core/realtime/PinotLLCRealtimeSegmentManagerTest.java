@@ -65,6 +65,7 @@ import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -259,7 +260,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Verify segments are created with the explicit sequence numbers
     for (String segmentName : instanceStatesMap.keySet()) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-      int partitionGroupId = llcSegmentName.getTopicPartitionId().getPartitionId();
+      int partitionGroupId = llcSegmentName.getTopicPartitionId().toMultiTopicPinotPartitionId();
       int sequence = llcSegmentName.getSequenceNumber();
       if (partitionGroupId == 0) {
         assertEquals(sequence, 5);
@@ -297,7 +298,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       assertEquals(llcSegmentName.getSequenceNumber(), 0,
           "Default sequence number -1 should resolve to 0 for partition "
-              + llcSegmentName.getTopicPartitionId().getPartitionId());
+              + llcSegmentName.getTopicPartitionId().toMultiTopicPinotPartitionId());
     }
   }
 
@@ -779,7 +780,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertTrue(segmentZKMetadataMap.containsKey(segmentName));
       assertEquals(segmentZKMetadataMap.get(segmentName), oldSegmentZKMetadataMap.get(segmentName));
       oldNumPartitions = Math.max(oldNumPartitions,
-          new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId() + 1);
+          new LLCSegmentName(segmentName).getTopicPartitionId().toMultiTopicPinotPartitionId() + 1);
     }
 
     // Check that for new partition groups, each partition group should have exactly 1 new segment in CONSUMING
@@ -788,7 +789,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Map<Integer, List<String>> partitionGroupIdToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : instanceStatesMap.entrySet()) {
       String segmentName = entry.getKey();
-      int partitionGroupId = new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId();
+      int partitionGroupId = new LLCSegmentName(segmentName).getTopicPartitionId().toMultiTopicPinotPartitionId();
       partitionGroupIdToSegmentsMap.computeIfAbsent(partitionGroupId, k -> new ArrayList<>()).add(segmentName);
     }
     for (int partitionGroupId = oldNumPartitions; partitionGroupId < segmentManager._numPartitions;
@@ -1156,7 +1157,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap.containsValue(
           SegmentStateModel.CONSUMING)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-        int partitionsId = llcSegmentName.getTopicPartitionId().getPartitionId();
+        int partitionsId = llcSegmentName.getTopicPartitionId().toMultiTopicPinotPartitionId();
         Map<Integer, String> sequenceNumberToSegmentMap = partitionGroupIdToSegmentsMap.get(partitionsId);
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         assertFalse(sequenceNumberToSegmentMap.containsKey(sequenceNumber));
@@ -1954,7 +1955,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._numPartitions = 2;
 
     // Test empty ideal state
-    Set<Integer> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState);
+    Set<TopicPartitionId> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState);
     Assert.assertEquals(partitionIds.size(), 2);
     partitionIds.clear();
 
@@ -1995,10 +1996,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     // Build latestSegmentZKMetadataMap from the fake ZK metadata (same logic as getLatestSegmentZKMetadataMap)
-    Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = new HashMap<>();
+    Map<TopicPartitionId, SegmentZKMetadata> latestSegmentZKMetadataMap = new HashMap<>();
     for (Map.Entry<String, SegmentZKMetadata> entry : segmentManager._segmentZKMetadataMap.entrySet()) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(entry.getKey());
-      int partitionId = llcSegmentName.getTopicPartitionId().getPartitionId();
+      TopicPartitionId partitionId = llcSegmentName.getTopicPartitionId();
       latestSegmentZKMetadataMap.merge(partitionId, entry.getValue(), (existing, candidate) -> {
         int existingSeq = new LLCSegmentName(existing.getSegmentName()).getSequenceNumber();
         int candidateSeq = new LLCSegmentName(candidate.getSegmentName()).getSequenceNumber();
@@ -2374,11 +2375,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // No SegmentPartitionConfig → null
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
         .setStreamConfigs(singleStreamConfigMap).build();
-    assertNull(segmentManager.getPartitionMetadataFromTableConfig(tableConfig, 2, 4));
+    assertNull(segmentManager.getPartitionMetadataFromTableConfig(tableConfig, new TopicPartitionId(2), 4));
 
     // Single-stream: perStreamNumPartitions = numPartitionGroups
     tableConfig.getIndexingConfig().setSegmentPartitionConfig(partitionConfig);
-    SegmentPartitionMetadata metadata = segmentManager.getPartitionMetadataFromTableConfig(tableConfig, 2, 4);
+    SegmentPartitionMetadata metadata =
+        segmentManager.getPartitionMetadataFromTableConfig(tableConfig, new TopicPartitionId(2), 4);
     assertNotNull(metadata);
     ColumnPartitionMetadata colMetadata = metadata.getColumnPartitionMap().get("col");
     assertEquals(colMetadata.getNumPartitions(), 4);
@@ -2394,16 +2396,17 @@ public class PinotLLCRealtimeSegmentManagerTest {
             .build();
     multiStreamTableConfig.getIndexingConfig().setSegmentPartitionConfig(partitionConfig);
 
-    // Stream 0, partition 2: Pinot partition ID = 0 * 10000 + 2 = 2
-    metadata = segmentManager.getPartitionMetadataFromTableConfig(multiStreamTableConfig, 2, 8);
+    // Stream 0, partition 2: TopicPartitionId(topicId=0, partitionId=2)
+    metadata = segmentManager.getPartitionMetadataFromTableConfig(multiStreamTableConfig,
+        new TopicPartitionId(0, 2), 8);
     assertNotNull(metadata);
     colMetadata = metadata.getColumnPartitionMap().get("col");
     assertEquals(colMetadata.getNumPartitions(), 4,
         "Multi-stream partition count must be per-stream (numPartitionGroups / numStreams), not total");
     assertEquals(colMetadata.getPartitions(), Set.of(2));
 
-    // Stream 1, partition 3: Pinot partition ID = 1 * 10000 + 3 = 10003
-    int stream1Partition3 = IngestionConfigUtils.PARTITION_PADDING_OFFSET + 3;
+    // Stream 1, partition 3: TopicPartitionId(topicId=1, partitionId=3)
+    TopicPartitionId stream1Partition3 = new TopicPartitionId(1, 3);
     metadata = segmentManager.getPartitionMetadataFromTableConfig(multiStreamTableConfig, stream1Partition3, 8);
     assertNotNull(metadata);
     colMetadata = metadata.getColumnPartitionMap().get("col");
@@ -2411,7 +2414,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(colMetadata.getPartitions(), Set.of(3));
 
     // Multi-stream, uneven distribution: numPartitionGroups not divisible by numStreams → null
-    assertNull(segmentManager.getPartitionMetadataFromTableConfig(multiStreamTableConfig, 0, 7),
+    assertNull(
+        segmentManager.getPartitionMetadataFromTableConfig(
+            multiStreamTableConfig, new TopicPartitionId(0, 0), 7),
         "Uneven partition distribution across streams must return null");
   }
 

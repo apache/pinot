@@ -97,4 +97,40 @@ public class TopicPartitionIdTest {
     TopicPartitionId id = new TopicPartitionId(2, 7);
     assertEquals(id.toString(), "2:7");
   }
+
+  @Test
+  public void testToMultiTopicPinotPartitionId() {
+    assertEquals(new TopicPartitionId(0, 5).toMultiTopicPinotPartitionId(), 5);
+    assertEquals(new TopicPartitionId(1, 3).toMultiTopicPinotPartitionId(), 10003);
+    assertEquals(new TopicPartitionId(2, 0).toMultiTopicPinotPartitionId(), 20000);
+    assertEquals(new TopicPartitionId(5).toMultiTopicPinotPartitionId(), 5);
+  }
+
+  @Test
+  public void testFromMultiTopicPinotPartitionId() {
+    TopicPartitionId id1 = TopicPartitionId.fromMultiTopicPinotPartitionId(10003);
+    assertEquals(id1.getTopicId(), 1);
+    assertEquals(id1.getPartitionId(), 3);
+
+    TopicPartitionId id2 = TopicPartitionId.fromMultiTopicPinotPartitionId(3);
+    assertEquals(id2.getTopicId(), 0);
+    assertEquals(id2.getPartitionId(), 3);
+
+    TopicPartitionId id3 = TopicPartitionId.fromMultiTopicPinotPartitionId(20000);
+    assertEquals(id3.getTopicId(), 2);
+    assertEquals(id3.getPartitionId(), 0);
+  }
+
+  @Test
+  public void testRoundTrip() {
+    TopicPartitionId original = new TopicPartitionId(1, 3);
+    TopicPartitionId roundTripped =
+        TopicPartitionId.fromMultiTopicPinotPartitionId(original.toMultiTopicPinotPartitionId());
+    assertEquals(roundTripped, original);
+
+    TopicPartitionId singleTopic = new TopicPartitionId(0, 42);
+    TopicPartitionId roundTripped2 =
+        TopicPartitionId.fromMultiTopicPinotPartitionId(singleTopic.toMultiTopicPinotPartitionId());
+    assertEquals(roundTripped2, singleTopic);
+  }
 }

@@ -54,5 +54,12 @@ public class UploadedRealtimeSegmentNameTest {
 
     String invalidSegmentName = "uploaded__table__0__20220101T0000Z";
     Assert.assertFalse(UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(invalidSegmentName));
+
+    // New multi-topic LLC format should NOT be identified as uploaded
+    String newLLCFormat = "myTable__1__3__5__20250101T0000Z";
+    Assert.assertFalse(UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(newLLCFormat));
+
+    // Verify LLC detection is correct for the same name
+    Assert.assertTrue(LLCSegmentName.isLLCSegment(newLLCFormat));
   }
 }

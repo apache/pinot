@@ -53,6 +53,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -108,7 +109,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // allows releasing the lock from a different thread.
   // The consumer coordinators will stay in the map even if the consuming partitions moved to a different server. We
   // expect a small number of consumer coordinators, so it should be fine to not remove them.
-  private final Map<Integer, ConsumerCoordinator> _partitionIdToConsumerCoordinatorMap = new ConcurrentHashMap<>();
+  private final Map<TopicPartitionId, ConsumerCoordinator> _partitionIdToConsumerCoordinatorMap =
+      new ConcurrentHashMap<>();
   // The old name of the stats file used to be stats.ser which we changed when we moved all packages
   // from com.linkedin to org.apache because of not being able to deserialize the old files using the newer classes
   private static final String STATS_FILE_NAME = "segment-stats.ser";
@@ -332,15 +334,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * Updates the ingestion metrics for the given partition.
    *
    * @param segmentName                      name of the consuming segment
-   * @param partitionId                      partition id of the consuming segment (directly passed in to avoid parsing
-   *                                         the segment name)
+   * @param partitionId                      partition id of the consuming segment (directly passed
+   *                                         in to avoid parsing the segment name)
    * @param ingestionTimeMs                  ingestion time of the last consumed message (from
    *                                         {@link StreamMessageMetadata})
    * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
    * {@link StreamMessageMetadata})
    * @param currentOffset                    offset of the last consumed message (from {@link StreamMessageMetadata})
    */
-  public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
+  public void updateIngestionMetrics(String segmentName, TopicPartitionId partitionId,
+      long ingestionTimeMs,
       long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
     _ingestionDelayTracker.updateMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
         currentOffset);
@@ -352,7 +355,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   public long getPartitionIngestionTimeMs(String segmentName) {
     return _ingestionDelayTracker.getPartitionIngestionTimeMs(
-        new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId());
+        new LLCSegmentName(segmentName).getTopicPartitionId());
   }
 
   /**
@@ -374,7 +377,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   public void onConsumingToDropped(String segmentName) {
     // NOTE: No need to mark segment ignored here because it should have already been dropped.
     _ingestionDelayTracker.stopTrackingPartition(
-        new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId());
+        new LLCSegmentName(segmentName).getTopicPartitionId());
   }
 
   /**
@@ -409,13 +412,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * Returns all partitionGroupIds for the partitions hosted by this server for current table.
    * @apiNote this involves Zookeeper read and should not be used frequently due to efficiency concerns.
    */
-  public Set<Integer> getHostedPartitionsGroupIds() {
-    Set<Integer> partitionsHostedByThisServer = new HashSet<>();
+  public Set<TopicPartitionId> getHostedPartitionsGroupIds() {
+    Set<TopicPartitionId> partitionsHostedByThisServer = new HashSet<>();
     List<String> segments = TableStateUtils.getSegmentsInGivenStateForThisInstance(_helixManager, _tableNameWithType,
         CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
     for (String segmentNameStr : segments) {
-      LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-      partitionsHostedByThisServer.add(segmentName.getTopicPartitionId().getPartitionId());
+      partitionsHostedByThisServer.add(
+          new LLCSegmentName(segmentNameStr).getTopicPartitionId());
     }
     return partitionsHostedByThisServer;
   }
@@ -526,7 +529,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (_enforceConsumptionInOrder) {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       if (llcSegmentName != null) {
-        getConsumerCoordinator(llcSegmentName.getTopicPartitionId().getPartitionId()).register(llcSegmentName);
+        getConsumerCoordinator(llcSegmentName.getTopicPartitionId())
+            .register(llcSegmentName);
       }
     }
   }
@@ -551,12 +555,24 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  public Set<Integer> stopTrackingPartitionIngestionDelay(@Nullable Set<Integer> partitionIds) {
+  /**
+   * Stops tracking ingestion delay for the given partition IDs (as raw integers).
+   * Kept for backward compatibility with the REST API which receives partition IDs
+   * as integers from query parameters.
+   */
+  public Set<Integer> stopTrackingPartitionIngestionDelay(
+      @Nullable Set<Integer> partitionIds) {
     if (CollectionUtils.isEmpty(partitionIds)) {
-      return _ingestionDelayTracker.stopTrackingAllPartitions();
+      Set<TopicPartitionId> removed = _ingestionDelayTracker.stopTrackingAllPartitions();
+      Set<Integer> result = new HashSet<>();
+      for (TopicPartitionId tpId : removed) {
+        result.add(tpId.toMultiTopicPinotPartitionId());
+      }
+      return result;
     }
-    for (Integer partitionId: partitionIds) {
-      _ingestionDelayTracker.stopTrackingPartition(partitionId);
+    for (Integer partitionId : partitionIds) {
+      _ingestionDelayTracker.stopTrackingPartition(
+          TopicPartitionId.fromMultiTopicPinotPartitionId(partitionId));
     }
     return partitionIds;
   }
@@ -601,15 +617,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     // Generates only one semaphore for every partition
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    int partitionGroupId = llcSegmentName.getTopicPartitionId().getPartitionId();
+    TopicPartitionId partitionGroupId = llcSegmentName.getTopicPartitionId();
     ConsumerCoordinator consumerCoordinator = getConsumerCoordinator(partitionGroupId);
 
     // Create the segment data manager and register it
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-        _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId)
+        _tableUpsertMetadataManager != null
+            ? _tableUpsertMetadataManager.getOrCreatePartitionManager(
+                partitionGroupId.getPartitionId())
             : null;
     PartitionDedupMetadataManager partitionDedupMetadataManager =
-        _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
+        _tableDedupMetadataManager != null
+            ? _tableDedupMetadataManager.getOrCreatePartitionManager(
+                partitionGroupId.getPartitionId())
             : null;
     RealtimeSegmentDataManager realtimeSegmentDataManager =
         createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
@@ -853,7 +873,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   @VisibleForTesting
-  ConsumerCoordinator getConsumerCoordinator(int partitionId) {
+  ConsumerCoordinator getConsumerCoordinator(TopicPartitionId partitionId) {
     return _partitionIdToConsumerCoordinatorMap.computeIfAbsent(partitionId,
         k -> new ConsumerCoordinator(_enforceConsumptionInOrder, this));
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.base.Preconditions;
 import java.util.Objects;
 
 
@@ -31,6 +32,9 @@ import java.util.Objects;
  * <p>Thread-safe: instances are immutable.
  */
 public final class TopicPartitionId implements Comparable<TopicPartitionId> {
+  // Must match IngestionConfigUtils.PARTITION_PADDING_OFFSET in pinot-spi
+  public static final int PARTITION_PADDING_OFFSET = 10000;
+
   private final int _topicId;
   private final int _partitionId;
 
@@ -72,6 +76,30 @@ public final class TopicPartitionId implements Comparable<TopicPartitionId> {
   @Override
   public int hashCode() {
     return Objects.hash(_topicId, _partitionId);
+  }
+
+  /** Recomposes the composite Pinot partition ID: {@code topicId * 10000 + partitionId}. */
+  public int toMultiTopicPinotPartitionId() {
+    return _topicId * PARTITION_PADDING_OFFSET + _partitionId;
+  }
+
+  /** Decomposes a composite Pinot partition ID into its topic and partition components. */
+  public static TopicPartitionId fromMultiTopicPinotPartitionId(int pinotPartitionId) {
+    Preconditions.checkArgument(pinotPartitionId >= 0, "Negative Pinot partition ID: %s", pinotPartitionId);
+    return new TopicPartitionId(pinotPartitionId / PARTITION_PADDING_OFFSET,
+        pinotPartitionId % PARTITION_PADDING_OFFSET);
+  }
+
+  /**
+   * Wraps a partition group ID from stream metadata into a {@link TopicPartitionId}.
+   * When {@code hasMultipleStreams} is true and the ID is composite-encoded (>= 10000),
+   * decomposes it into topic and partition components.
+   */
+  public static TopicPartitionId fromPartitionGroupMetadata(int partitionGroupId, boolean hasMultipleStreams) {
+    if (hasMultipleStreams && partitionGroupId >= PARTITION_PADDING_OFFSET) {
+      return fromMultiTopicPinotPartitionId(partitionGroupId);
+    }
+    return new TopicPartitionId(partitionGroupId);
   }
 
   @Override
