@@ -116,6 +116,18 @@ public class LeafStageWorkerAssignmentRuleTest {
   }
 
   @Test
+  public void testAssignTableScanWithEmptyTable() {
+    // An empty table (or one whose segments were all pruned) has a routing entry but no routable segments, so
+    // neither the offline nor the realtime segments map is populated. This should yield a zero-worker assignment
+    // (which is later short-circuited to an empty result on the broker), NOT throw. See LeafStageWorkerAssignmentRule.
+    InstanceIdToSegments emptyInstanceIdToSegments = new InstanceIdToSegments();
+    TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
+        emptyInstanceIdToSegments, Map.of(), false, false);
+    assertTrue(result._pinotDataDistribution.getWorkers().isEmpty(), "Empty table should assign zero workers");
+    assertTrue(result._workerIdToSegmentsMap.isEmpty(), "Empty table should have no worker-to-segments entries");
+  }
+
+  @Test
   public void testAssignTableScanPartitionedOfflineTable() {
     TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
         OFFLINE_INSTANCE_ID_TO_SEGMENTS, Map.of("OFFLINE", createOfflineTablePartitionInfo()), false, false);
