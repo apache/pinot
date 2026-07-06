@@ -23,6 +23,8 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
@@ -40,10 +42,13 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,10 +70,19 @@ public class JsonIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_jsonIndexConfigs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.json());
-    // Check if any existing index need to be removed.
+    // Load metadata properties once to avoid repeated disk reads when checking multiple columns.
+    PropertiesConfiguration properties = loadMetadataProperties();
+    // Check if any existing index need to be removed or if the config changed.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing json index from segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+      // Column exists in both existing indexes and config; check if config changed.
+      JsonIndexConfig currentConfig = _jsonIndexConfigs.get(column);
+      JsonIndexConfig storedConfig = readStoredJsonIndexConfig(column, properties);
+      if (storedConfig != null && !storedConfig.equals(currentConfig)) {
+        LOGGER.info("Need to rebuild json index for segment: {}, column: {} due to config change", segmentName, column);
         return true;
       }
     }
@@ -90,18 +104,91 @@ public class JsonIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_jsonIndexConfigs.keySet());
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.json());
+    // Load metadata properties once; track whether we need to save changes.
+    PropertiesConfiguration properties = loadMetadataProperties();
+    boolean metadataModified = false;
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing json index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.json());
         LOGGER.info("Removed existing json index from segment: {}, column: {}", segmentName, column);
+      } else {
+        // Column exists in both existing indexes and config; check if config changed and rebuild if needed.
+        JsonIndexConfig currentConfig = _jsonIndexConfigs.get(column);
+        JsonIndexConfig storedConfig = readStoredJsonIndexConfig(column, properties);
+        if (storedConfig != null && !storedConfig.equals(currentConfig)) {
+          LOGGER.info("Rebuilding json index for segment: {}, column: {} due to config change", segmentName, column);
+          segmentWriter.removeIndex(column, StandardIndexes.json());
+          columnsToAddIdx.add(column);
+        }
       }
     }
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateJsonIndex(columnMetadata)) {
         createJsonIndexForColumn(segmentWriter, columnMetadata);
+        if (properties != null) {
+          setStoredJsonIndexConfig(column, _jsonIndexConfigs.get(column), properties);
+          metadataModified = true;
+        }
       }
+    }
+    if (metadataModified && properties != null) {
+      SegmentMetadataUtils.savePropertiesConfiguration(properties,
+          _segmentDirectory.getSegmentMetadata().getIndexDir());
+    }
+  }
+
+  /// Loads the segment {@code metadata.properties} file, or returns {@code null} if unavailable (in-memory segments).
+  @Nullable
+  private PropertiesConfiguration loadMetadataProperties() {
+    try {
+      return SegmentMetadataUtils.getPropertiesConfiguration(_segmentDirectory.getSegmentMetadata());
+    } catch (Exception e) {
+      LOGGER.warn("Cannot load segment metadata properties for segment: {}, config-change detection disabled",
+          _segmentDirectory.getSegmentMetadata().getName(), e);
+      return null;
+    }
+  }
+
+  /// Reads the stored {@link JsonIndexConfig} from the given {@code properties}, or returns {@code null} if not
+  /// present (e.g., index was built before config persistence was added).
+  @Nullable
+  private static JsonIndexConfig readStoredJsonIndexConfig(String columnName,
+      @Nullable PropertiesConfiguration properties) {
+    if (properties == null) {
+      return null;
+    }
+    try {
+      String key = V1Constants.MetadataKeys.Column.getKeyFor(columnName, "jsonIndexConfig");
+      String escaped = properties.getString(key, null);
+      if (escaped == null) {
+        return null;
+      }
+      String serialized = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(escaped);
+      return JsonUtils.stringToObject(serialized, JsonIndexConfig.class);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read stored json index config for column: {}, will not trigger rebuild on config change",
+          columnName, e);
+      return null;
+    }
+  }
+
+  /// Writes the {@link JsonIndexConfig} for {@code columnName} into {@code properties} (without saving to disk).
+  private static void setStoredJsonIndexConfig(String columnName, JsonIndexConfig config,
+      PropertiesConfiguration properties) {
+    try {
+      String serialized = JsonUtils.objectToString(config);
+      String escaped = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(serialized);
+      if (escaped == null) {
+        LOGGER.warn("Cannot persist json index config for column: {} due to unsupported characters", columnName);
+        return;
+      }
+      String key = V1Constants.MetadataKeys.Column.getKeyFor(columnName, "jsonIndexConfig");
+      properties.setProperty(key, escaped);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to serialize json index config for column: {}, config changes will not trigger rebuild",
+          columnName, e);
     }
   }
 
