@@ -37,7 +37,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -887,17 +886,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     public boolean equals(Object value1, Object value2) {
-      if (this == UUID) {
-        return UuidUtils.equals(toBytesValue(value1), toBytesValue(value2));
-      }
-      return this == BYTES ? Arrays.equals(toBytesValue(value1), toBytesValue(value2)) : value1.equals(value2);
+      // UUID is stored as fixed 16-byte BYTES with byte-identity equality, so Arrays.equals matches UuidUtils.equals.
+      return (this == BYTES || this == UUID) ? Arrays.equals(toBytesValue(value1), toBytesValue(value2))
+          : value1.equals(value2);
     }
 
     public int hashCode(Object value) {
-      if (this == UUID) {
-        return UuidUtils.hashCode(toBytesValue(value));
-      }
-      return this == BYTES ? Arrays.hashCode(toBytesValue(value)) : value.hashCode();
+      // Arrays.hashCode over the 16 stored bytes is identical to UuidUtils.hashCode, so UUID shares the BYTES path.
+      return (this == BYTES || this == UUID) ? Arrays.hashCode(toBytesValue(value)) : value.hashCode();
     }
 
     /**
@@ -927,9 +923,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case JSON:
           return ((String) value1).compareTo((String) value2);
         case BYTES:
-          return ByteArray.compare(toBytesValue(value1), toBytesValue(value2));
         case UUID:
-          return UuidUtils.compare(toBytesValue(value1), toBytesValue(value2));
+          // UUID is stored as fixed 16-byte BYTES; ByteArray.compare is unsigned lexicographic, matching
+          // UuidUtils.compare on those bytes.
+          return ByteArray.compare(toBytesValue(value1), toBytesValue(value2));
         case MAP:
         case OPEN_STRUCT:
         case LIST:
@@ -947,9 +944,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         return ((BigDecimal) value).toPlainString();
       }
       if (this == UUID) {
-        if (value instanceof UUID) {
-          return UuidUtils.toString((UUID) value);
-        }
+        // Canonical 8-4-4-4-12 form (not raw hex like BYTES) so it round-trips through convert(...). The stored
+        // value is always byte[], so no separate UUID-instance branch is needed.
         return UuidUtils.toString(toBytesValue(value));
       }
       if (this == BYTES) {
@@ -1006,17 +1002,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     private byte[] toBytesValue(Object value) {
+      // BYTES and UUID stored values are always byte[] (or a ByteArray wrapper); UUID is never a java.util.UUID here.
       if (value instanceof byte[]) {
         return (byte[]) value;
       }
       if (value instanceof ByteArray) {
         return ((ByteArray) value).getBytes();
-      }
-      if (value instanceof UUID) {
-        return UuidUtils.toBytes((UUID) value);
-      }
-      if (value instanceof String && this == UUID) {
-        return UuidUtils.toBytes((String) value);
       }
       throw new IllegalArgumentException("Unsupported value for " + this + ": " + value);
     }
