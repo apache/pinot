@@ -50,7 +50,8 @@ import static org.testng.Assert.assertTrue;
  * <p>When a JSON index is created, the {@link JsonIndexConfig} is persisted into {@code metadata.properties} under
  * {@code column.<name>.jsonIndexConfig}. On subsequent segment reloads, {@link JsonIndexHandler#needUpdateIndices}
  * compares the stored config with the current table config; if they differ the index is rebuilt. If no stored config
- * is present (index built before this feature was added), no spurious rebuild is triggered.
+ * is present (index built before config persistence was added), the segment is treated as a legacy segment and a
+ * one-time rebuild is triggered to backfill the stored config and catch any config drift.
  */
 public class JsonIndexHandlerTest {
   private static final String COLUMN = "myJsonCol";
@@ -133,17 +134,18 @@ public class JsonIndexHandlerTest {
   }
 
   @Test
-  public void testNeedUpdateReturnsFalseWhenNoStoredConfig()
+  public void testNeedUpdateReturnsTrueWhenNoStoredConfig()
       throws Exception {
-    // No stored config — index was built before config persistence was added. Must NOT trigger a spurious rebuild.
+    // No stored config — index was built before config persistence was added (legacy segment).
+    // Must trigger a one-time rebuild to backfill the stored config and detect any config drift.
     createEmptyMetadataFile();
 
     JsonIndexConfig currentConfig = new JsonIndexConfig();
     JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
     SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN);
 
-    assertFalse(handler.needUpdateIndices(reader),
-        "No rebuild expected when no stored config is present (backward compatibility)");
+    assertTrue(handler.needUpdateIndices(reader),
+        "Rebuild expected for legacy segments with no stored config (one-time backfill)");
   }
 
   // --- helpers ---
