@@ -22,9 +22,12 @@ import java.util.Arrays;
 import java.util.HashSet;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -92,6 +95,15 @@ public class LazyRowTest {
     DataSource col2Datasource = mock(DataSource.class);
     when(segment.getDataSource("col1")).thenReturn(_col1Datasource);
     when(segment.getDataSource("col2")).thenReturn(col2Datasource);
+
+    DataSourceMetadata col1Metadata = mock(DataSourceMetadata.class);
+    DataSourceMetadata col2Metadata = mock(DataSourceMetadata.class);
+    FieldSpec col1FieldSpec = new DimensionFieldSpec("col1", FieldSpec.DataType.STRING, true);
+    FieldSpec col2FieldSpec = new DimensionFieldSpec("col2", FieldSpec.DataType.STRING, true);
+    when(col1Metadata.getFieldSpec()).thenReturn(col1FieldSpec);
+    when(col2Metadata.getFieldSpec()).thenReturn(col2FieldSpec);
+    when(_col1Datasource.getDataSourceMetadata()).thenReturn(col1Metadata);
+    when(col2Datasource.getDataSourceMetadata()).thenReturn(col2Metadata);
 
     NullValueVectorReader col1NullVectorReader = mock(NullValueVectorReader.class);
     when(col1NullVectorReader.isNull(1)).thenReturn(true);

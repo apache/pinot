@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -72,6 +73,33 @@ public class BloomFilterCreatorTest implements PinotBuffersAfterMethodCheckRule 
         Assert.assertFalse(onHeapBloomFilter.mightContain(Integer.toString(i)));
         Assert.assertFalse(offHeapBloomFilter.mightContain(Integer.toString(i)));
       }
+    }
+  }
+
+  @Test
+  public void testUuidBloomFilterCreatorWithBytesValues()
+      throws Exception {
+    int cardinality = 100;
+    String columnName = "uuidColumn";
+    String uuid0 = "550e8400-e29b-41d4-a716-446655440000";
+    String uuid1 = "550e8400-e29b-41d4-a716-446655440001";
+    try (BloomFilterCreator bloomFilterCreator = new OnHeapGuavaBloomFilterCreator(TEMP_DIR, columnName, cardinality,
+        new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false), FieldSpec.DataType.UUID)) {
+      bloomFilterCreator.add(UuidUtils.toBytes(uuid0), -1);
+      bloomFilterCreator.add(UuidUtils.toBytes(uuid1), -1);
+      bloomFilterCreator.seal();
+    }
+
+    File bloomFilterFile = new File(TEMP_DIR, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(bloomFilterFile);
+        BloomFilterReader onHeapBloomFilter = BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, true);
+        BloomFilterReader offHeapBloomFilter = BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, false)) {
+      Assert.assertTrue(onHeapBloomFilter.mightContain(uuid0));
+      Assert.assertTrue(onHeapBloomFilter.mightContain(uuid1));
+      Assert.assertFalse(onHeapBloomFilter.mightContain("550e8400-e29b-41d4-a716-4466554400ff"));
+      Assert.assertTrue(offHeapBloomFilter.mightContain(uuid0));
+      Assert.assertTrue(offHeapBloomFilter.mightContain(uuid1));
+      Assert.assertFalse(offHeapBloomFilter.mightContain("550e8400-e29b-41d4-a716-4466554400ff"));
     }
   }
 
