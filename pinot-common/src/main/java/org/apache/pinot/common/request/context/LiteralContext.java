@@ -31,6 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.PinotDataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -140,8 +141,11 @@ public class LiteralContext {
   @VisibleForTesting
   public LiteralContext(DataType type, @Nullable Object value) {
     _type = type;
-    _value = value;
-    _pinotDataType = getPinotDataType(type, value);
+    // UUID values flow through the type system as java.util.UUID (canonical form). Normalize string/byte inputs here
+    // so getStringValue() renders canonical lowercase and getBytesValue() (PinotDataType.UUID.toBytes casts to UUID)
+    // does not throw.
+    _value = (type == DataType.UUID && value != null) ? UuidUtils.toUUID(value) : value;
+    _pinotDataType = getPinotDataType(type, _value);
   }
 
   @Nullable
@@ -171,6 +175,9 @@ public class LiteralContext {
         return PinotDataType.BIG_DECIMAL;
       case STRING:
         return singleValue ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
+      case UUID:
+        Preconditions.checkState(singleValue, "UUID array is not supported");
+        return PinotDataType.UUID;
       default:
         throw new IllegalStateException("Unsupported DataType: " + type);
     }
