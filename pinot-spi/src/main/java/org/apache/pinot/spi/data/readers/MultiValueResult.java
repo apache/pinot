@@ -22,40 +22,36 @@ import java.util.BitSet;
 import javax.annotation.Nullable;
 
 
-/**
- * Result wrapper for multi-value column reads that tracks element-level nulls.
- *
- * <p>This class addresses a limitation where bulk reads from columnar formats (like Arrow)
- * don't check the validity bitmap for null elements. By returning both the values array
- * and a nulls BitSet, callers can properly handle null elements within multi-value columns.
- *
- * <p><b>BitSet Semantics:</b>
- * <ul>
- *   <li>Set bit (1) = null element</li>
- *   <li>Unset bit (0) = valid/non-null element</li>
- *   <li>Null nulls BitSet = no nulls in the range (fast path)</li>
- * </ul>
- *
- * <p><b>Usage Example:</b>
- * <pre>{@code
- * MultiValueResult<int[]> result = columnReader.nextIntMV();
- * int[] values = result.getValues();
- *
- * if (result.hasNulls()) {
- *   for (int i = 0; i < values.length; i++) {
- *     if (result.isNull(i)) {
- *       // Handle null element - values[i] contains default value (0 for int)
- *     } else {
- *       // Use values[i]
- *     }
- *   }
- * } else {
- *   // Fast path: no nulls, use values array directly
- * }
- * }</pre>
- *
- * @param <T> The array type (int[], long[], float[], double[])
- */
+/// Result wrapper for multi-value column reads that tracks element-level nulls.
+///
+/// This class addresses a limitation where bulk reads from columnar formats (like Arrow) don't check the validity
+/// bitmap for null elements. By returning both the values array and a nulls BitSet, callers can properly handle null
+/// elements within multi-value columns.
+///
+/// **BitSet semantics:**
+/// - Set bit (1) = null element
+/// - Unset bit (0) = valid / non-null element
+/// - Null nulls BitSet = no nulls in the range (fast path)
+///
+/// **Usage example:**
+/// ```
+/// MultiValueResult<int[]> result = columnReader.getIntMV(docId);
+/// int[] values = result.getValues();
+///
+/// if (result.hasNulls()) {
+///   for (int i = 0; i < values.length; i++) {
+///     if (result.isNull(i)) {
+///       // Handle null element - values[i] contains default value (0 for int)
+///     } else {
+///       // Use values[i]
+///     }
+///   }
+/// } else {
+///   // Fast path: no nulls, use values array directly
+/// }
+/// ```
+///
+/// @param <T> The array type (int[], long[], float[], double[])
 public class MultiValueResult<T> {
   private final T _values;
   @Nullable

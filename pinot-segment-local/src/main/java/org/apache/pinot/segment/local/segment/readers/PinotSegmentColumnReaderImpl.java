@@ -25,6 +25,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /**
@@ -43,8 +44,6 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   private final int _numDocs;
   private final DataType _dataType;
   private final boolean _skipDefaultNullValues;
-
-  private int _nextDocId;
 
   /**
    * Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
@@ -94,207 +93,14 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   }
 
   @Override
-  public boolean hasNext() {
-    return _nextDocId < _numDocs;
-  }
-
-  @Override
-  @Nullable
-  public Object next()
-      throws IOException {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-
-    // Return null if the value is null and skipDefaultNullValues is true
-    if (_skipDefaultNullValues && _segmentColumnReader.isNull(_nextDocId)) {
-      _nextDocId++;
-      return null;
-    }
-
-    return _segmentColumnReader.getValue(_nextDocId++);
-  }
-
-  @Override
-  public boolean isNextNull() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.isNull(_nextDocId);
-  }
-
-  @Override
-  public void skipNext() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _nextDocId++;
-  }
-
-  @Override
-  public boolean isSingleValue() {
-    return _segmentColumnReader.isSingleValue();
-  }
-
-  @Override
-  public boolean isInt() {
-    return _dataType == DataType.INT;
-  }
-
-  @Override
-  public boolean isLong() {
-    return _dataType == DataType.LONG;
-  }
-
-  @Override
-  public boolean isFloat() {
-    return _dataType == DataType.FLOAT;
-  }
-
-  @Override
-  public boolean isDouble() {
-    return _dataType == DataType.DOUBLE;
-  }
-
-  @Override
-  public boolean isBigDecimal() {
-    return _dataType == DataType.BIG_DECIMAL;
-  }
-
-  @Override
-  public boolean isString() {
-    return _dataType == DataType.STRING;
-  }
-
-  @Override
-  public boolean isBytes() {
-    return _dataType == DataType.BYTES;
-  }
-
-  @Override
-  public int nextInt() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getInt(_nextDocId++);
-  }
-
-  @Override
-  public long nextLong() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getLong(_nextDocId++);
-  }
-
-  @Override
-  public float nextFloat() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getFloat(_nextDocId++);
-  }
-
-  @Override
-  public double nextDouble() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getDouble(_nextDocId++);
-  }
-
-  @Override
-  public BigDecimal nextBigDecimal() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getBigDecimal(_nextDocId++);
-  }
-
-  @Override
-  public String nextString() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getString(_nextDocId++);
-  }
-
-  @Override
-  public byte[] nextBytes() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getBytes(_nextDocId++);
-  }
-
-  // For all multi-value primitive type methods (nextIntMV, nextLongMV, nextFloatMV, nextDoubleMV,
-  // getIntMV, getLongMV, getFloatMV, getDoubleMV), we pass null for the validity bitset since
-  // multi-value primitive types cannot have null elements. Nulls are removed by NullValueTransformer
-  @Override
-  public MultiValueResult<int[]> nextIntMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return MultiValueResult.of(_segmentColumnReader.getIntMV(_nextDocId++), null);
-  }
-
-  @Override
-  public MultiValueResult<long[]> nextLongMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return MultiValueResult.of(_segmentColumnReader.getLongMV(_nextDocId++), null);
-  }
-
-  @Override
-  public MultiValueResult<float[]> nextFloatMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return MultiValueResult.of(_segmentColumnReader.getFloatMV(_nextDocId++), null);
-  }
-
-  @Override
-  public MultiValueResult<double[]> nextDoubleMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return MultiValueResult.of(_segmentColumnReader.getDoubleMV(_nextDocId++), null);
-  }
-
-  @Override
-  public BigDecimal[] nextBigDecimalMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getBigDecimalMV(_nextDocId++);
-  }
-
-  @Override
-  public String[] nextStringMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getStringMV(_nextDocId++);
-  }
-
-  @Override
-  public byte[][] nextBytesMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getBytesMV(_nextDocId++);
-  }
-
-  @Override
-  public void rewind()
-      throws IOException {
-    _nextDocId = 0;
-  }
-
-  @Override
   public String getColumnName() {
     return _columnName;
+  }
+
+  @Nullable
+  @Override
+  public PinotDataType getValueType() {
+    return ColumnReader.toValueType(_dataType, _segmentColumnReader.isSingleValue());
   }
 
   @Override
@@ -306,6 +112,18 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   public boolean isNull(int docId) {
     validateDocId(docId);
     return _segmentColumnReader.isNull(docId);
+  }
+
+  @Override
+  public Object getValue(int docId)
+      throws IOException {
+    // Return null if the value is null and skipDefaultNullValues is true
+    if (_skipDefaultNullValues && _segmentColumnReader.isNull(docId)) {
+      return null;
+    }
+    // The segment stores physical values (e.g. int for BOOLEAN, long for TIMESTAMP); surface the logical object per
+    // the getValue() contract. Null entries return the segment's stored default, also converted to the logical type.
+    return ColumnReader.toLogicalValue(_segmentColumnReader.getValue(docId), _dataType);
   }
 
   // Single-value accessors
@@ -345,19 +163,11 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     return _segmentColumnReader.getBytes(docId);
   }
 
-  @Override
-  public Object getValue(int docId)
-      throws IOException {
-    // Return null if the value is null and skipDefaultNullValues is true
-    if (_skipDefaultNullValues && _segmentColumnReader.isNull(docId)) {
-      return null;
-    }
-    // Return the segment value (which contains the default for null entries)
-    return _segmentColumnReader.getValue(docId);
-  }
-
   // Multi-value accessors
 
+  // For all multi-value primitive type methods (getIntMV, getLongMV, getFloatMV, getDoubleMV), we pass null for
+  // the validity bitset since multi-value primitive types cannot have null elements. Nulls are removed by
+  // NullValueTransformer
   @Override
   public MultiValueResult<int[]> getIntMV(int docId) {
     return MultiValueResult.of(_segmentColumnReader.getIntMV(docId), null);
