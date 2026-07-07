@@ -222,9 +222,13 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         // (not a regular file), killing the load before any fallback could run. This keeps
         // storeInSegmentFile=true rolling-upgrade-safe for existing HNSW segments. The probed
         // buffer is owned by the segment directory — this reader must not close it.
+        // Probe only when the segment directory is a local directory: under a remote segment
+        // directory (e.g. tiered storage on S3) getPath() is not a local filesystem path, there
+        // can be no legacy sidecar on disk, and findFormatFile would reject the path outright.
         if (indexConfig.isStoreInSegmentFile()) {
-          File onDiskHnsw = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, column,
-              VectorBackendType.HNSW);
+          File onDiskHnsw = segmentDir.isDirectory()
+              ? SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, column, VectorBackendType.HNSW)
+              : null;
           if (onDiskHnsw == null || !onDiskHnsw.isDirectory()) {
             PinotDataBuffer buffer;
             try {
@@ -271,8 +275,12 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         // Fall back to the on-disk artifact. For storeInSegmentFile=true this keeps the index usable
         // while a legacy sidecar still awaits absorption (mirrors the HNSW path above, which falls
         // back to its Lucene directory) instead of silently disabling the index and forcing an exact
-        // scan until migration completes.
-        File configuredIndexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, column, indexConfig);
+        // scan until migration completes. Skip the probe when the segment directory is not a local
+        // directory (e.g. tiered storage on S3) — no sidecar can exist there and findFormatFile
+        // rejects non-local paths.
+        File configuredIndexFile = segmentDir.isDirectory()
+            ? SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, column, indexConfig)
+            : null;
         if (configuredIndexFile == null || !configuredIndexFile.exists()) {
           LOGGER.warn("Skipping vector index reader for column: {} because backend {} has neither a consolidated "
               + "columns.psf entry nor a matching on-disk artifact in segment: {}", column, backendType, segmentDir);
