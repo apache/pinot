@@ -257,7 +257,9 @@ public class OpChainSchedulerService {
       // RejectedExecutionException. When it does, the task never runs and the directExecutor FutureCallback above
       // (which decrements the active-opchain counter and removes the per-request context entry) never fires. Back
       // out that bookkeeping here so the entry — and the QueryExecutionContext it pins — does not leak until a later
-      // cancel. Then rethrow so the caller propagates the failure as a stage error.
+      // cancel. Then rethrow so the caller propagates the failure as a stage error. (The caller,
+      // QueryRunner#processQueryBlocking, close()s the op chain on this rethrow, releasing operator resources that
+      // the never-fired FutureCallback would otherwise have closed.)
       decrementActiveOpChains(requestId);
       throw e;
     }
