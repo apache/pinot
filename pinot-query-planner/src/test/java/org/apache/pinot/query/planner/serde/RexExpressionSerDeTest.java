@@ -36,11 +36,13 @@ public class RexExpressionSerDeTest {
   private static final List<ColumnDataType> SUPPORTED_DATE_TYPES =
       List.of(ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
           ColumnDataType.BIG_DECIMAL, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.STRING,
-          ColumnDataType.BYTES, ColumnDataType.UUID, ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY,
+          ColumnDataType.UUID, ColumnDataType.BYTES, ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY,
           ColumnDataType.FLOAT_ARRAY, ColumnDataType.DOUBLE_ARRAY, ColumnDataType.BOOLEAN_ARRAY,
-          ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.STRING_ARRAY, ColumnDataType.UUID_ARRAY,
+          ColumnDataType.TIMESTAMP_ARRAY,
+          ColumnDataType.STRING_ARRAY, ColumnDataType.BYTES_ARRAY, ColumnDataType.UUID_ARRAY,
           ColumnDataType.UNKNOWN);
   private static final Random RANDOM = new Random();
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
 
   @Test
   public void testNullLiteral() {
@@ -100,8 +102,7 @@ public class RexExpressionSerDeTest {
 
   @Test
   public void testUuidLiteral() {
-    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.UUID,
-        new ByteArray(UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000"))));
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.UUID, new ByteArray(UuidUtils.toBytes(UUID_VALUE))));
   }
 
   @Test
