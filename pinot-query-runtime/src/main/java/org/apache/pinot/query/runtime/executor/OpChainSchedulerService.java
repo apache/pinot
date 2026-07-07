@@ -254,12 +254,15 @@ public class OpChainSchedulerService {
       _executorService.submit(listenableFutureTask);
     } catch (RuntimeException e) {
       // The MSE executor is wrapped in HardLimitExecutor + heap throttling, so submit() can throw
-      // RejectedExecutionException. When it does, the task never runs and the directExecutor FutureCallback above
-      // (which decrements the active-opchain counter and removes the per-request context entry) never fires. Back
-      // out that bookkeeping here so the entry — and the QueryExecutionContext it pins — does not leak until a later
-      // cancel. Then rethrow so the caller propagates the failure as a stage error. (The caller,
-      // QueryRunner#processQueryBlocking, close()s the op chain on this rethrow, releasing operator resources that
-      // the never-fired FutureCallback would otherwise have closed.)
+      // RejectedExecutionException. When it does, the task never runs, so neither the directExecutor FutureCallback
+      // above (which decrements the active-opchain counter and removes the per-request context entry) nor runJob's
+      // _opChainCache.invalidate() ever fires. Back out both here: invalidate the cache entry this method put()
+      // above so it does not pin the rootOperator tree and QueryExecutionContext until TTL/weight eviction (the same
+      // prompt release cancel() performs for cancelled entries), and back out the active-opchain bookkeeping so the
+      // per-request context entry does not leak until a later cancel. Then rethrow so the caller propagates the
+      // failure as a stage error. The caller, QueryRunner#processQueryBlocking, close()s the op chain on this
+      // rethrow, releasing operator resources that the never-fired FutureCallback would otherwise have closed.
+      _opChainCache.invalidate(opChainId);
       decrementActiveOpChains(requestId);
       throw e;
     }
