@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -214,6 +215,62 @@ public class PinotSegmentConverterTest {
 
       assertFalse(recordReader.hasNext());
     }
+  }
+
+  private static final String UUID_SV_COLUMN = "uuidSVColumn";
+  private static final String UUID_MV_COLUMN = "uuidMVColumn";
+  private static final String UUID_SV_VALUE = "12345678-1234-1234-1234-1234567890ab";
+  private static final String UUID_MV_VALUE_1 = "550e8400-e29b-41d4-a716-446655440000";
+  private static final String UUID_MV_VALUE_2 = "550e8400-e29b-41d4-a716-446655440001";
+
+  /// Builds a segment with SV + MV UUID columns and converts it through both the Avro and Parquet converters. UUID is
+  /// stored as a 16-byte value but exported as a string{logicalType:uuid} field, so this exercises the uuid
+  /// Conversion registered on each writer's data model (getAvroDataModel) — including the distinct Parquet write path
+  /// (AvroParquetWriter.withDataModel), which a plain writer without the Conversion could not serialize.
+  @Test
+  public void testUuidConverters()
+      throws Exception {
+    Schema uuidSchema = new Schema.SchemaBuilder().addSingleValueDimension(UUID_SV_COLUMN, DataType.UUID)
+        .addMultiValueDimension(UUID_MV_COLUMN, DataType.UUID).build();
+    TableConfig uuidTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("uuidTable").build();
+
+    GenericRow record = new GenericRow();
+    record.putValue(UUID_SV_COLUMN, UUID_SV_VALUE);
+    record.putValue(UUID_MV_COLUMN, new Object[]{UUID_MV_VALUE_1, UUID_MV_VALUE_2});
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(uuidTableConfig, uuidSchema);
+    config.setTableName("uuidTable");
+    config.setSegmentName("uuidSegment");
+    config.setOutDir(new File(TEMP_DIR, "uuidSegment").getPath());
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(List.of(record)));
+    driver.build();
+    String segmentDir = driver.getOutputDirectory().getPath();
+
+    File avroOut = new File(TEMP_DIR, "uuidSegment.avro");
+    new PinotSegmentToAvroConverter(segmentDir, avroOut.getPath()).convert();
+    try (AvroRecordReader reader = new AvroRecordReader()) {
+      reader.init(avroOut, uuidSchema.getFieldSpecMap().keySet(), null);
+      assertUuidRecord(reader.next());
+      assertFalse(reader.hasNext());
+    }
+
+    File parquetOut = new File(TEMP_DIR, "uuidSegment.parquet");
+    new PinotSegmentToParquetConverter(segmentDir, parquetOut.getPath()).convert();
+    try (ParquetRecordReader reader = new ParquetRecordReader()) {
+      reader.init(parquetOut, uuidSchema.getFieldSpecMap().keySet(), null);
+      assertUuidRecord(reader.next());
+      assertFalse(reader.hasNext());
+    }
+  }
+
+  private static void assertUuidRecord(GenericRow record) {
+    // The reader may surface the uuid value as a String/UUID/byte[]; UuidUtils.toBytes normalizes all of them.
+    assertEquals(UuidUtils.toBytes(record.getValue(UUID_SV_COLUMN)), UuidUtils.toBytes(UUID_SV_VALUE));
+    Object[] mv = (Object[]) record.getValue(UUID_MV_COLUMN);
+    assertEquals(mv.length, 2);
+    assertEquals(UuidUtils.toBytes(mv[0]), UuidUtils.toBytes(UUID_MV_VALUE_1));
+    assertEquals(UuidUtils.toBytes(mv[1]), UuidUtils.toBytes(UUID_MV_VALUE_2));
   }
 
   @AfterClass

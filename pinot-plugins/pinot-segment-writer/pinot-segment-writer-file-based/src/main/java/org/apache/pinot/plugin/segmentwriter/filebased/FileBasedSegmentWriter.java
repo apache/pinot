@@ -132,7 +132,8 @@ public class FileBasedSegmentWriter implements SegmentWriter {
   private void resetBuffer()
       throws IOException {
     FileUtils.deleteQuietly(_bufferFile);
-    _recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
+    _recordWriter =
+        new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema, SegmentProcessorAvroUtils.getAvroDataModel()));
     _recordWriter.create(_avroSchema, _bufferFile);
   }
 

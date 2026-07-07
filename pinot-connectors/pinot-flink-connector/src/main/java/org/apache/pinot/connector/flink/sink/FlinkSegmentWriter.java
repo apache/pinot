@@ -191,7 +191,8 @@ public class FlinkSegmentWriter implements SegmentWriter {
       throws IOException {
     FileUtils.deleteQuietly(_bufferFile);
     _rowCount = 0;
-    _recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
+    _recordWriter =
+        new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema, SegmentProcessorAvroUtils.getAvroDataModel()));
     _recordWriter.create(_avroSchema, _bufferFile);
   }
 
