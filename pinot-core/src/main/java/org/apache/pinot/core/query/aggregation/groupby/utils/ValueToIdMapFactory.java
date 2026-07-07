@@ -38,6 +38,8 @@ public class ValueToIdMapFactory {
         return new FloatToIdMap();
       case DOUBLE:
         return new DoubleToIdMap();
+      case UUID:
+        return new UuidToIdMap();
       default:
         return new ObjectToIdMap();
     }
