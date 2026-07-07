@@ -355,6 +355,15 @@ public class IndexLoadingConfig {
     return _tableConfig != null && _tableConfig.getIndexingConfig().isSkipSegmentPreprocess();
   }
 
+  /**
+   * Whether columns that are physically present in a segment but no longer present in the table schema should be
+   * physically removed from the segment during reload (reclaiming disk). When {@code false} (default), such columns are
+   * only hidden from queries at load time and their on-disk index files are retained.
+   */
+  public boolean isReclaimDeletedColumnsOnReload() {
+    return _tableConfig != null && _tableConfig.getIndexingConfig().isReclaimDeletedColumnsOnReload();
+  }
+
   @Nullable
   public FieldIndexConfigs getFieldIndexConfig(String columnName) {
     if (_indexConfigsByColName == null || _dirty) {

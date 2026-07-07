@@ -210,15 +210,18 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Whether to reload the table after updating the schema") @DefaultValue("false")
       @QueryParam("reload") boolean reload,
       @ApiParam(value = "Whether to force update the schema even if the new schema is backward incompatible")
-      @DefaultValue("false") @QueryParam("force") boolean force, @Context HttpHeaders headers,
-      FormDataMultiPart multiPart) {
+      @DefaultValue("false") @QueryParam("force") boolean force,
+      @ApiParam(value = "Whether to allow removing columns that are present in the existing schema but absent from the "
+          + "new schema")
+      @DefaultValue("false") @QueryParam("allowColumnDeletion") boolean allowColumnDeletion,
+      @Context HttpHeaders headers, FormDataMultiPart multiPart) {
     schemaName = DatabaseUtils.translateTableName(schemaName, headers);
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
     validateSchemaName(schema);
     schema.setSchemaName(DatabaseUtils.translateTableName(schema.getSchemaName(), headers));
-    SuccessResponse successResponse = updateSchema(schemaName, schema, reload, force);
+    SuccessResponse successResponse = updateSchema(schemaName, schema, reload, force, allowColumnDeletion);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
 
@@ -240,15 +243,18 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Whether to reload the table after updating the schema") @DefaultValue("false")
       @QueryParam("reload") boolean reload,
       @ApiParam(value = "Whether to force update the schema even if the new schema is backward incompatible")
-      @DefaultValue("false") @QueryParam("force") boolean force, @Context HttpHeaders headers,
-      String schemaJsonString) {
+      @DefaultValue("false") @QueryParam("force") boolean force,
+      @ApiParam(value = "Whether to allow removing columns that are present in the existing schema but absent from the "
+          + "new schema")
+      @DefaultValue("false") @QueryParam("allowColumnDeletion") boolean allowColumnDeletion,
+      @Context HttpHeaders headers, String schemaJsonString) {
     schemaName = DatabaseUtils.translateTableName(schemaName, headers);
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromJson(schemaJsonString);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
     validateSchemaName(schema);
     schema.setSchemaName(DatabaseUtils.translateTableName(schema.getSchemaName(), headers));
-    SuccessResponse successResponse = updateSchema(schemaName, schema, reload, force);
+    SuccessResponse successResponse = updateSchema(schemaName, schema, reload, force, allowColumnDeletion);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
 
@@ -453,7 +459,8 @@ public class PinotSchemaRestletResource {
    * @param reload  set to true to reload the tables using the schema, so committed segments can pick up the new schema
    * @return SuccessResponse
    */
-  private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload, boolean force) {
+  private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload, boolean force,
+      boolean allowColumnDeletion) {
     validateSchemaInternal(schema);
 
     if (!schemaName.equals(schema.getSchemaName())) {
@@ -464,7 +471,7 @@ public class PinotSchemaRestletResource {
     }
 
     try {
-      _pinotHelixResourceManager.updateSchema(schema, reload, force);
+      _pinotHelixResourceManager.updateSchema(schema, reload, force, allowColumnDeletion);
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
@@ -477,7 +484,7 @@ public class PinotSchemaRestletResource {
     } catch (SchemaBackwardIncompatibleException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
-          String.format("Backward incompatible schema %s. Only allow adding new columns", schemaName),
+          String.format("Backward incompatible schema %s. %s", schemaName, e.getMessage()),
           Response.Status.BAD_REQUEST, e);
     } catch (TableNotFoundException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);

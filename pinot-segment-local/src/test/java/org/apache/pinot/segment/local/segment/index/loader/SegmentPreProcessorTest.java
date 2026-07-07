@@ -39,6 +39,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -176,6 +178,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
+  private boolean _reclaimDeletedColumnsOnReload;
 
   public SegmentPreProcessorTest()
       throws IOException {
@@ -245,6 +248,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _jsonIndexConfigs = null;
     _starTreeIndexConfigs = null;
     _enableDefaultStarTree = false;
+    _reclaimDeletedColumnsOnReload = false;
   }
 
   @AfterMethod
@@ -309,6 +313,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
       indexingConfig.setEnableDefaultStarTree(_enableDefaultStarTree);
     }
+    indexingConfig.setReclaimDeletedColumnsOnReload(_reclaimDeletedColumnsOnReload);
     return tableConfig;
   }
 
@@ -1157,6 +1162,56 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     expectedDefaultValue = new ByteArray((byte[]) tDigestMetricFieldSpec.getDefaultNullValue());
     assertEquals(tDigestMetricMetadata.getMinValue(), expectedDefaultValue);
     assertEquals(tDigestMetricMetadata.getMaxValue(), expectedDefaultValue);
+  }
+
+  @Test(dataProvider = "bothV1AndV3")
+  public void testReclaimDeletedColumnsOnReload(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    // The ingested column exists physically in the freshly built segment.
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertNotNull(segmentMetadata.getColumnMetadataFor(COLUMN1_NAME));
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      assertTrue(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.forward()));
+    }
+
+    // Build a schema that drops the ingested column.
+    Schema reducedSchema = Schema.fromString(_schema.toSingleLineJsonString());
+    reducedSchema.removeField(COLUMN1_NAME);
+
+    // With reclamation disabled (default), reloading with the reduced schema must NOT physically remove the column.
+    runPreProcessor(reducedSchema);
+    segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertNotNull(segmentMetadata.getColumnMetadataFor(COLUMN1_NAME),
+        "Ingested column must be retained on reload when reclamation is disabled");
+
+    // With reclamation enabled, reloading with the reduced schema physically removes the dropped ingested column.
+    _reclaimDeletedColumnsOnReload = true;
+    runPreProcessor(reducedSchema);
+
+    segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertNull(segmentMetadata.getColumnMetadataFor(COLUMN1_NAME),
+        "Ingested column must be physically removed on reload when reclamation is enabled");
+    // The segment remains valid: other columns are intact and their indexes are preserved.
+    assertNotNull(segmentMetadata.getColumnMetadataFor(COLUMN7_NAME));
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      assertFalse(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.forward()));
+      assertFalse(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.dictionary()));
+      assertTrue(reader.hasIndexFor(COLUMN7_NAME, StandardIndexes.forward()));
+      assertTrue(reader.hasIndexFor(COLUMN7_NAME, StandardIndexes.inverted()));
+    }
+
+    // The segment can still be loaded end-to-end against the reduced schema.
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(INDEX_DIR, createIndexLoadingConfig(reducedSchema));
+    try {
+      assertFalse(indexSegment.getColumnNames().contains(COLUMN1_NAME));
+      assertTrue(indexSegment.getColumnNames().contains(COLUMN7_NAME));
+    } finally {
+      indexSegment.destroy();
+    }
   }
 
   private void checkUpdateDefaultColumns()

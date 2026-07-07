@@ -131,9 +131,22 @@ public class SchemaAdminClient extends BaseServiceAdminClient {
    */
   public String updateSchema(String schemaName, String schemaConfig, boolean reloadTables, boolean force)
       throws PinotAdminException {
+    return updateSchema(schemaName, schemaConfig, reloadTables, force, false);
+  }
+
+  /**
+   * Updates an existing schema with optional reload, force, and column-deletion controls.
+   *
+   * @param allowColumnDeletion Whether to allow removing columns present in the existing schema but absent from the new
+   *                            schema. Only relaxes column removal; primary-key and type changes are still rejected.
+   */
+  public String updateSchema(String schemaName, String schemaConfig, boolean reloadTables, boolean force,
+      boolean allowColumnDeletion)
+      throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     queryParams.put("reload", String.valueOf(reloadTables));
     queryParams.put("force", String.valueOf(force));
+    queryParams.put("allowColumnDeletion", String.valueOf(allowColumnDeletion));
 
     JsonNode response = _transport.executePut(_controllerAddress, "/schemas/" + schemaName, schemaConfig,
         queryParams, _headers);

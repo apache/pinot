@@ -918,6 +918,18 @@ public final class Schema implements Serializable {
    * @param oldSchema old schema
    */
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
+    return isBackwardCompatibleWith(oldSchema, false);
+  }
+
+  /**
+   * Same as {@link #isBackwardCompatibleWith(Schema)}, but when {@code allowColumnDeletion} is set, columns present in
+   * oldSchema but absent from this schema are treated as intentional drops rather than incompatibilities. Primary-key
+   * changes and incompatible field-spec changes for retained columns are still rejected.
+   *
+   * @param oldSchema old schema
+   * @param allowColumnDeletion whether removing columns present in oldSchema is allowed
+   */
+  public boolean isBackwardCompatibleWith(Schema oldSchema, boolean allowColumnDeletion) {
     List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
     List<String> newPrimaryKeys = getPrimaryKeyColumns();
     // Allow adding primary keys if not present. Helps add upsert and dedup configs to existing tables.
@@ -931,6 +943,9 @@ public final class Schema implements Serializable {
     for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
       String oldSchemaColumnName = entry.getKey();
       if (!columnNames.contains(oldSchemaColumnName)) {
+        if (allowColumnDeletion) {
+          continue;
+        }
         return false;
       }
       FieldSpec oldSchemaFieldSpec = entry.getValue();
