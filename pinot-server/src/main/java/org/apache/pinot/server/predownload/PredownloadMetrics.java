@@ -47,6 +47,20 @@ public class PredownloadMetrics {
     }
   }
 
+  public void peerSegmentDownloaded(boolean succeed, String segmentName, long segmentSizeBytes, long downloadTimeMs) {
+    if (succeed) {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_COUNT, 1);
+      _serverMetrics.setValueOfGlobalGauge(ServerGauge.PEER_DOWNLOAD_SPEED_MBPS,
+          (segmentSizeBytes / BYTES_TO_MB) / (downloadTimeMs / 1000 + 1));
+    } else {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_FAILURE_COUNT, 1);
+    }
+  }
+
+  public void deepStoreSegmentDownloaded() {
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.PREDOWNLOAD_DEEPSTORE_DOWNLOAD_COUNT, 1);
+  }
+
   public void preDownloadSucceed(long totalSegmentSizeBytes, long totalDownloadTimeMs) {
     _serverMetrics.setValueOfGlobalGauge(ServerGauge.PREDOWNLOAD_SPEED,
         (totalSegmentSizeBytes / BYTES_TO_MB) / (totalDownloadTimeMs / 1000 + 1));
