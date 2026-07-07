@@ -79,9 +79,11 @@ public class JsonIndexHandler extends BaseIndexHandler {
         return true;
       }
       // Column exists in both existing indexes and config; check if config changed.
+      // When properties != null but storedConfig is null the index predates config persistence (legacy segment):
+      // treat as a one-time rebuild to backfill the stored config and catch any config drift.
       JsonIndexConfig currentConfig = _jsonIndexConfigs.get(column);
       JsonIndexConfig storedConfig = readStoredJsonIndexConfig(column, properties);
-      if (storedConfig != null && !storedConfig.equals(currentConfig)) {
+      if (properties != null && (storedConfig == null || !storedConfig.equals(currentConfig))) {
         LOGGER.info("Need to rebuild json index for segment: {}, column: {} due to config change", segmentName, column);
         return true;
       }
@@ -114,9 +116,11 @@ public class JsonIndexHandler extends BaseIndexHandler {
         LOGGER.info("Removed existing json index from segment: {}, column: {}", segmentName, column);
       } else {
         // Column exists in both existing indexes and config; check if config changed and rebuild if needed.
+        // When properties != null but storedConfig is null the index predates config persistence (legacy segment):
+        // treat as a one-time rebuild to backfill the stored config and catch any config drift.
         JsonIndexConfig currentConfig = _jsonIndexConfigs.get(column);
         JsonIndexConfig storedConfig = readStoredJsonIndexConfig(column, properties);
-        if (storedConfig != null && !storedConfig.equals(currentConfig)) {
+        if (properties != null && (storedConfig == null || !storedConfig.equals(currentConfig))) {
           LOGGER.info("Rebuilding json index for segment: {}, column: {} due to config change", segmentName, column);
           segmentWriter.removeIndex(column, StandardIndexes.json());
           columnsToAddIdx.add(column);
