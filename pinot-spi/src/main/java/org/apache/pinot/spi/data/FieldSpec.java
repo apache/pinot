@@ -44,6 +44,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -417,8 +418,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return _defaultNullValue;
   }
 
+  @JsonIgnore
   public String getDefaultNullValueString() {
-    return getStringValue(_defaultNullValue);
+    return _dataType.toString(_defaultNullValue);
   }
 
   /// Returns the [String] representation of the given object.
@@ -514,6 +516,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_JSON;
             case BYTES:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+            case UUID:
+              // The nil UUID is the default null sentinel. Tables that ingest nil UUID as a real value should enable
+              // column-based null handling to distinguish it from null rows.
+              return UuidUtils.nullUuidBytes();
             case BIG_DECIMAL:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL;
             default:
@@ -668,6 +674,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case BYTES:
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
+        case UUID:
+          jsonNode.put(key, UuidUtils.toString((byte[]) _defaultNullValue));
+          break;
         case MAP:
         case OPEN_STRUCT:
         case LIST:
@@ -730,9 +739,25 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     DIMENSION, METRIC, TIME, DATE_TIME, COMPLEX
   }
 
-  /**
-   * The <code>DataType</code> enum is used to demonstrate the data type of a field.
-   */
+  /// The `DataType` enum represents the data type of a field.
+  ///
+  /// A value of a given type is held in memory as a fixed Java class, and every value-handling method on this enum
+  /// (`convert`, `equals`, `hashCode`, `compare`, `toString`) expects and produces that representation:
+  /// - `INT` → [Integer]
+  /// - `LONG` → [Long]
+  /// - `FLOAT` → [Float]
+  /// - `DOUBLE` → [Double]
+  /// - `BIG_DECIMAL` → [BigDecimal]
+  /// - `BOOLEAN` → [Integer] (`0` or `1`)
+  /// - `TIMESTAMP` → [Long] (epoch millis)
+  /// - `STRING` / `JSON` → [String]
+  /// - `BYTES` → `byte[]`
+  /// - `UUID` → `byte[]` (fixed 16-byte big-endian form)
+  /// - `MAP` / `OPEN_STRUCT` → [Map]
+  /// - `LIST` → [List]
+  ///
+  /// `convertInternal` is the exception: it returns the internal storage form, which for `BYTES` and `UUID` is
+  /// [ByteArray] rather than `byte[]`.
   @SuppressWarnings("rawtypes")
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
@@ -747,6 +772,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     STRING(false),
     JSON(STRING, false),
     BYTES(false),
+    // UUID is a logical type stored as fixed-width 16-byte BYTES, kept right after its stored type BYTES.
+    UUID(BYTES, UuidUtils.UUID_NUM_BYTES, false),
     STRUCT(false),
     MAP(false),
     OPEN_STRUCT(false),
@@ -772,6 +799,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     DataType(DataType storedType, boolean numeric) {
       _storedType = storedType;
       _size = storedType._size;
+      _numeric = numeric;
+    }
+
+    // Logical type stored as another type with an explicit fixed size (e.g. UUID stored as fixed 16-byte BYTES).
+    DataType(DataType storedType, int size, boolean numeric) {
+      _storedType = storedType;
+      _size = size;
       _numeric = numeric;
     }
 
@@ -819,7 +853,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Converts the given string value to the data type. Returns byte[] for BYTES.
+     * Converts the given string value to the data type. Returns byte[] for BYTES and UUID.
      */
     public Object convert(String value) {
       try {
@@ -843,6 +877,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toBytes(value);
+          case UUID:
+            return UuidUtils.toBytes(value);
           case MAP:
           case OPEN_STRUCT:
             return JsonUtils.stringToObject(value, Map.class);
@@ -857,11 +893,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     public boolean equals(Object value1, Object value2) {
-      return this == BYTES ? Arrays.equals((byte[]) value1, (byte[]) value2) : value1.equals(value2);
+      return this == BYTES || this == UUID ? Arrays.equals((byte[]) value1, (byte[]) value2) : value1.equals(value2);
     }
 
     public int hashCode(Object value) {
-      return this == BYTES ? Arrays.hashCode((byte[]) value) : value.hashCode();
+      return this == BYTES || this == UUID ? Arrays.hashCode((byte[]) value) : value.hashCode();
     }
 
     /**
@@ -874,8 +910,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     public int compare(Object value1, Object value2) {
       switch (this) {
         case INT:
+        case BOOLEAN:
           return Integer.compare((int) value1, (int) value2);
         case LONG:
+        case TIMESTAMP:
           return Long.compare((long) value1, (long) value2);
         case FLOAT:
           return Float.compare((float) value1, (float) value2);
@@ -883,14 +921,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           return Double.compare((double) value1, (double) value2);
         case BIG_DECIMAL:
           return ((BigDecimal) value1).compareTo((BigDecimal) value2);
-        case BOOLEAN:
-          return Boolean.compare((boolean) value1, (boolean) value2);
-        case TIMESTAMP:
-          return Long.compare((long) value1, (long) value2);
         case STRING:
         case JSON:
           return ((String) value1).compareTo((String) value2);
         case BYTES:
+        case UUID:
           return ByteArray.compare((byte[]) value1, (byte[]) value2);
         case MAP:
         case OPEN_STRUCT:
@@ -902,7 +937,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Converts the given value of the data type to string.The input value for BYTES type should be byte[].
+     * Converts the given value of the data type to string. The input value for BYTES/UUID should be byte[].
      */
     public String toString(Object value) {
       if (this == BIG_DECIMAL) {
@@ -910,6 +945,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       }
       if (this == BYTES) {
         return BytesUtils.toHexString((byte[]) value);
+      }
+      if (this == UUID) {
+        return UuidUtils.toString((byte[]) value);
       }
       if (this == MAP || this == OPEN_STRUCT || this == LIST) {
         try {
@@ -922,7 +960,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Converts the given string value to the data type. Returns ByteArray for BYTES.
+     * Converts the given string value to the data type. Returns ByteArray for BYTES and UUID.
      */
     public Comparable convertInternal(String value) {
       try {
@@ -946,6 +984,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toByteArray(value);
+          case UUID:
+            return new ByteArray(UuidUtils.toBytes(value));
           case MAP:
           case OPEN_STRUCT:
           case LIST:

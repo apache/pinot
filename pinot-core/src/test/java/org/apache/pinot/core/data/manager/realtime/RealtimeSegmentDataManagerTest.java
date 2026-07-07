@@ -46,6 +46,7 @@ import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
@@ -137,6 +138,47 @@ public class RealtimeSegmentDataManagerTest {
   private FakeRealtimeSegmentDataManager createFakeSegmentManager()
       throws Exception {
     return createFakeSegmentManager(false, new TimeSupplier(), null, null, null);
+  }
+
+  @Test
+  public void testInitializationErrorStopMsgSkippedWhenDifferentSegmentManagerRegistered()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      SegmentDataManager registeredSegmentDataManager = mock(SegmentDataManager.class);
+      when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(registeredSegmentDataManager);
+
+      segmentDataManager.postStopConsumedMsgForInitializationError();
+
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test
+  public void testInitializationErrorStopMsgSentWhenCurrentSegmentManagerRegistered()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(segmentDataManager);
+
+      segmentDataManager.postStopConsumedMsgForInitializationError();
+
+      Assert.assertTrue(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test
+  public void testPostStopConsumedMsgDoesNotCheckRegisteredSegmentManager()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      SegmentDataManager registeredSegmentDataManager = mock(SegmentDataManager.class);
+      when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(registeredSegmentDataManager);
+
+      segmentDataManager.invokePostStopConsumedMsg("consumer error");
+
+      Assert.assertTrue(segmentDataManager._postConsumeStoppedCalled);
+    }
   }
 
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
@@ -1372,6 +1414,7 @@ public class RealtimeSegmentDataManagerTest {
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
           consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null,
           () -> true);
+      _tableDataManager = realtimeTableDataManager;
       _state = RealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = RealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
@@ -1386,7 +1429,10 @@ public class RealtimeSegmentDataManagerTest {
       _streamMsgOffsetFactory.setAccessible(true);
       _streamMsgOffsetFactory.set(this, new LongMsgOffsetFactory());
       _timeSupplier = timeSupplier;
-      _tableDataManager = realtimeTableDataManager;
+    }
+
+    public RealtimeTableDataManager getTableDataManager() {
+      return _tableDataManager;
     }
 
     public String getStopReason() {
@@ -1459,6 +1505,18 @@ public class RealtimeSegmentDataManagerTest {
     @Override
     protected void postStopConsumedMsg(String reason) {
       _postConsumeStoppedCalled = true;
+    }
+
+    public void invokePostStopConsumedMsg(String reason) {
+      super.postStopConsumedMsg(reason);
+    }
+
+    @Override
+    SegmentCompletionProtocol.Response postSegmentStoppedConsuming(ConsumptionStopIndicator indicator) {
+      _postConsumeStoppedCalled = true;
+      return new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+              SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED));
     }
 
     @Override
