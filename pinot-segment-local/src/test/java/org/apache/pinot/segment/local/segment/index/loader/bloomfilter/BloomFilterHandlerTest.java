@@ -41,7 +41,6 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -52,27 +51,26 @@ import static org.testng.Assert.assertTrue;
 /**
  * Unit tests for {@link BloomFilterHandler} fpp-change detection.
  *
- * <p>The key invariant being tested: when the bloom filter configuration changes, even if the change does NOT
- * alter the number of hash functions (k), it may still change the bit-array size (numLongs). Both dimensions
- * must be compared to correctly detect a rebuild requirement.
+ * <p>The key invariant being tested: fpp-change detection reads the effective fpp stored directly
+ * in the v2 bloom filter header, rather than inferring it from Guava-internal fields (numHashFunctions,
+ * numLongs).  This avoids a fragile dependency on Guava's internal serialisation layout.
  *
- * <p>Concretely, for cardinality=1000:
+ * <p>Bloom filter file format versions:
  * <ul>
- *   <li>fpp=0.05 → k=4, numLongs=98</li>
- *   <li>fpp=0.045 → k=4, numLongs=101</li>
+ *   <li><b>v1 (legacy):</b> {@code [TYPE_VALUE=1 (int)][VERSION (int)][Guava bytes...]} — fpp not stored.</li>
+ *   <li><b>v2:</b> {@code [TYPE_VALUE_V2=2 (int)][VERSION (int)][FPP (double)][Guava bytes...]} — fpp stored
+ *       explicitly at byte offset {@link OnHeapGuavaBloomFilterCreator#FPP_OFFSET}.</li>
  * </ul>
- * The old check (numHashFunctions only) silently kept the stale index; the new check catches the difference.
+ *
+ * <p>Legacy v1 segments skip fpp-change detection (return false) because the fpp is absent from the
+ * header.  They are upgraded to v2 the next time the bloom filter is rebuilt for any other reason.
  */
 public class BloomFilterHandlerTest {
   private static final String COLUMN = "myBloomCol";
   private static final int CARDINALITY = 1000;
 
-  // With cardinality=1000 and fpp=0.05: k=4, numLongs=98
   private static final double FPP_STORED = 0.05;
-  // With cardinality=1000 and fpp=0.045: k=4 (same!), numLongs=101 (different!)
-  private static final double FPP_NEW_SAME_K = 0.045;
-  // With cardinality=1000 and fpp=0.01: k=7 (different from k=4) — sanity check
-  private static final double FPP_NEW_DIFF_K = 0.01;
+  private static final double FPP_DIFFERENT = 0.01;
 
   private File _tempDir;
   private File _bloomFilterFile;
@@ -91,63 +89,78 @@ public class BloomFilterHandlerTest {
   }
 
   /**
-   * Regression test: fpp=0.05 → 0.045 both yield k=4 but different numLongs (98 vs 101) for cardinality=1000.
-   * The old check (numHashFunctions only) would return false (no rebuild), leaving a stale index.
-   * The new check (numHashFunctions + numLongs) must return true (rebuild needed).
+   * Legacy v1 segments do not carry fpp in the header; fpp-change detection must be skipped regardless
+   * of what the current config says.  The segment will be upgraded to v2 on its next rebuild.
    */
   @Test
-  public void testNeedUpdateReturnsTrueWhenSameKButDifferentNumLongs()
+  public void testV1LegacyFileSkipsFppChangeDetection()
       throws Exception {
-    writeBloomFilter(CARDINALITY, FPP_STORED);
+    writeV1BloomFilter(CARDINALITY, FPP_STORED);
 
-    BloomFilterHandler handler = createHandler(COLUMN, new BloomFilterConfig(FPP_NEW_SAME_K, 0, false));
+    // Config uses a clearly different fpp, but because the file is v1 the handler must not trigger a rebuild.
+    BloomFilterHandler handler = createHandler(COLUMN, new BloomFilterConfig(FPP_DIFFERENT, 0, false));
     SegmentDirectory.Reader reader = mockReaderWithBloomFilter(COLUMN, _bloomFilterFile);
 
-    assertTrue(handler.needUpdateIndices(reader),
-        "Rebuild expected: fpp 0.05→0.045 keeps k=4 but changes numLongs (98→101)");
+    assertFalse(handler.needUpdateIndices(reader),
+        "No rebuild expected for legacy v1 segments — fpp is not stored in the header");
   }
 
   /**
-   * Sanity check: when fpp is unchanged the handler must not trigger a spurious rebuild.
+   * Sanity check: when the v2 header fpp matches the current config, the handler must not trigger a rebuild.
    */
   @Test
-  public void testNeedUpdateReturnsFalseWhenFppUnchanged()
+  public void testNeedUpdateReturnsFalseWhenFppUnchangedV2()
       throws Exception {
-    writeBloomFilter(CARDINALITY, FPP_STORED);
+    writeV2BloomFilter(CARDINALITY, FPP_STORED);
 
     BloomFilterHandler handler = createHandler(COLUMN, new BloomFilterConfig(FPP_STORED, 0, false));
     SegmentDirectory.Reader reader = mockReaderWithBloomFilter(COLUMN, _bloomFilterFile);
 
     assertFalse(handler.needUpdateIndices(reader),
-        "No rebuild expected when fpp is unchanged");
+        "No rebuild expected when stored v2 fpp matches the current config");
   }
 
   /**
-   * Sanity check: when fpp changes enough to alter k the handler must trigger a rebuild (pre-existing behavior).
+   * When the v2 header fpp differs from the current config, the handler must trigger a rebuild.
    */
   @Test
-  public void testNeedUpdateReturnsTrueWhenKChanges()
+  public void testNeedUpdateReturnsTrueWhenFppChangedV2()
       throws Exception {
-    writeBloomFilter(CARDINALITY, FPP_STORED);
+    writeV2BloomFilter(CARDINALITY, FPP_STORED);
 
-    BloomFilterHandler handler = createHandler(COLUMN, new BloomFilterConfig(FPP_NEW_DIFF_K, 0, false));
+    BloomFilterHandler handler = createHandler(COLUMN, new BloomFilterConfig(FPP_DIFFERENT, 0, false));
     SegmentDirectory.Reader reader = mockReaderWithBloomFilter(COLUMN, _bloomFilterFile);
 
     assertTrue(handler.needUpdateIndices(reader),
-        "Rebuild expected: fpp 0.05→0.01 changes k from 4 to 7");
+        "Rebuild expected when stored v2 fpp differs from the current config");
   }
 
   // --- helpers ---
 
   /**
-   * Writes a Pinot-format bloom filter file: [TYPE_VALUE(int)][VERSION(int)][Guava bytes].
+   * Writes a legacy v1 Pinot bloom filter file: {@code [TYPE_VALUE=1 (int)][VERSION (int)][Guava bytes]}.
    */
-  private void writeBloomFilter(int cardinality, double fpp)
+  private void writeV1BloomFilter(int cardinality, double fpp)
       throws Exception {
     BloomFilter<String> bf = BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8), cardinality, fpp);
     try (DataOutputStream out = new DataOutputStream(new FileOutputStream(_bloomFilterFile))) {
       out.writeInt(OnHeapGuavaBloomFilterCreator.TYPE_VALUE);
       out.writeInt(OnHeapGuavaBloomFilterCreator.VERSION);
+      bf.writeTo(out);
+    }
+  }
+
+  /**
+   * Writes a v2 Pinot bloom filter file:
+   * {@code [TYPE_VALUE_V2=2 (int)][VERSION (int)][FPP (double)][Guava bytes]}.
+   */
+  private void writeV2BloomFilter(int cardinality, double fpp)
+      throws Exception {
+    BloomFilter<String> bf = BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8), cardinality, fpp);
+    try (DataOutputStream out = new DataOutputStream(new FileOutputStream(_bloomFilterFile))) {
+      out.writeInt(OnHeapGuavaBloomFilterCreator.TYPE_VALUE_V2);
+      out.writeInt(OnHeapGuavaBloomFilterCreator.VERSION);
+      out.writeDouble(fpp);
       bf.writeTo(out);
     }
   }

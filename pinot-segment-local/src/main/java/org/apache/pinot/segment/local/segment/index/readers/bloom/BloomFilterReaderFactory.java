@@ -30,15 +30,29 @@ public class BloomFilterReaderFactory {
 
   private static final int TYPE_VALUE_OFFSET = 0;
   private static final int VERSION_OFFSET = 4;
-  private static final int HEADER_SIZE = 8;
+  /** Byte offset at which Guava bloom filter bytes start in the legacy v1 format. */
+  private static final int GUAVA_PAYLOAD_OFFSET_V1 = 8;
+  /**
+   * Byte offset at which Guava bloom filter bytes start in the v2 format.
+   * V2 header: [TYPE_VALUE_V2 (int, 4)][VERSION (int, 4)][FPP (double, 8)] = 16 bytes.
+   */
+  private static final int GUAVA_PAYLOAD_OFFSET_V2 = 16;
 
   public static BloomFilterReader getBloomFilterReader(PinotDataBuffer dataBuffer, boolean onHeap) {
     int typeValue = dataBuffer.getInt(TYPE_VALUE_OFFSET);
     int version = dataBuffer.getInt(VERSION_OFFSET);
+    if (typeValue == OnHeapGuavaBloomFilterCreator.TYPE_VALUE_V2
+        && version == OnHeapGuavaBloomFilterCreator.VERSION) {
+      // V2 format: [TYPE_VALUE_V2][VERSION][FPP (double)][Guava bytes]
+      PinotDataBuffer bloomFilterDataBuffer = dataBuffer.view(GUAVA_PAYLOAD_OFFSET_V2, dataBuffer.size());
+      return onHeap ? new OnHeapGuavaBloomFilterReader(bloomFilterDataBuffer)
+          : new OffHeapGuavaBloomFilterReader(bloomFilterDataBuffer);
+    }
+    // Legacy v1 format: [TYPE_VALUE=1][VERSION][Guava bytes]
     Preconditions.checkState(
         typeValue == OnHeapGuavaBloomFilterCreator.TYPE_VALUE && version == OnHeapGuavaBloomFilterCreator.VERSION,
         "Unsupported bloom filter type value: %s and version: %s", typeValue, version);
-    PinotDataBuffer bloomFilterDataBuffer = dataBuffer.view(HEADER_SIZE, dataBuffer.size());
+    PinotDataBuffer bloomFilterDataBuffer = dataBuffer.view(GUAVA_PAYLOAD_OFFSET_V1, dataBuffer.size());
     return onHeap ? new OnHeapGuavaBloomFilterReader(bloomFilterDataBuffer)
         : new OffHeapGuavaBloomFilterReader(bloomFilterDataBuffer);
   }
