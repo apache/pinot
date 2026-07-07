@@ -175,6 +175,8 @@ public class BloomFilterHandlerTest {
 
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getTotalDocs()).thenReturn(CARDINALITY);
+    when(segmentMetadata.getAllColumns()).thenReturn(Set.of(columnName));
     when(segmentMetadata.getColumnMetadataFor(columnName)).thenReturn(columnMetadata);
 
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
