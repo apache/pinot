@@ -45,6 +45,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.server.conf.ServerConf;
+import org.apache.pinot.server.starter.ServerMetricsInitUtils;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
@@ -181,6 +182,14 @@ public class PredownloadScheduler {
 
   void initializeMetricsReporter() {
     LOGGER.info("Initializing metrics reporter");
+
+    try {
+      ServerConf serverConf = new ServerConf(_pinotConfig);
+      ServerMetricsInitUtils.initServerMetrics(serverConf);
+    } catch (Exception e) {
+      LOGGER.error("Failed to initialize ServerMetrics in predownload container; "
+          + "continuing with the currently registered ServerMetrics instance", e);
+    }
 
     _predownloadMetrics = new PredownloadMetrics();
     PredownloadStatusRecorder.registerMetrics(_predownloadMetrics);
