@@ -22,7 +22,9 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -31,14 +33,16 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 
 public class DataSchemaTest {
   private static final String[] COLUMN_NAMES = {
-      "int", "long", "float", "double", "string", "object", "int_array", "long_array", "float_array", "double_array",
-      "string_array", "boolean_array", "timestamp_array", "bytes_array"
+      "int", "long", "float", "double", "string", "uuid", "object", "int_array", "long_array", "float_array",
+      "double_array", "string_array", "boolean_array", "timestamp_array", "bytes_array", "uuid_array"
   };
   private static final int NUM_COLUMNS = COLUMN_NAMES.length;
   private static final DataSchema.ColumnDataType[] COLUMN_DATA_TYPES = {
-      INT, LONG, FLOAT, DOUBLE, STRING, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY,
-      BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY
+      INT, LONG, FLOAT, DOUBLE, STRING, UUID, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY,
+      BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY, UUID_ARRAY
   };
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
+  private static final String UUID_VALUE_2 = "550e8400-e29b-41d4-a716-446655440001";
 
   @Test
   public void testGetters() {
@@ -71,9 +75,10 @@ public class DataSchemaTest {
   public void testToString() {
     DataSchema dataSchema = new DataSchema(COLUMN_NAMES, COLUMN_DATA_TYPES);
     Assert.assertEquals(dataSchema.toString(),
-        "[int(INT),long(LONG),float(FLOAT),double(DOUBLE),string(STRING),object(OBJECT),int_array(INT_ARRAY),"
-            + "long_array(LONG_ARRAY),float_array(FLOAT_ARRAY),double_array(DOUBLE_ARRAY),string_array(STRING_ARRAY),"
-            + "boolean_array(BOOLEAN_ARRAY),timestamp_array(TIMESTAMP_ARRAY),bytes_array(BYTES_ARRAY)]");
+        "[int(INT),long(LONG),float(FLOAT),double(DOUBLE),string(STRING),uuid(UUID),object(OBJECT),"
+            + "int_array(INT_ARRAY),long_array(LONG_ARRAY),float_array(FLOAT_ARRAY),double_array(DOUBLE_ARRAY),"
+            + "string_array(STRING_ARRAY),boolean_array(BOOLEAN_ARRAY),timestamp_array(TIMESTAMP_ARRAY),"
+            + "bytes_array(BYTES_ARRAY),uuid_array(UUID_ARRAY)]");
   }
 
   @Test
@@ -115,6 +120,16 @@ public class DataSchemaTest {
     Assert.assertFalse(STRING.isCompatible(STRING_ARRAY));
     Assert.assertFalse(STRING.isCompatible(BYTES_ARRAY));
 
+    Assert.assertFalse(UUID.isNumber());
+    Assert.assertFalse(UUID.isWholeNumber());
+    Assert.assertFalse(UUID.isArray());
+    Assert.assertFalse(UUID.isNumberArray());
+    Assert.assertFalse(UUID.isWholeNumberArray());
+    Assert.assertFalse(UUID.isCompatible(DOUBLE));
+    Assert.assertTrue(UUID.isCompatible(UUID));
+    Assert.assertFalse(UUID.isCompatible(BYTES));
+    Assert.assertFalse(UUID.isCompatible(STRING));
+
     Assert.assertFalse(OBJECT.isNumber());
     Assert.assertFalse(OBJECT.isWholeNumber());
     Assert.assertFalse(OBJECT.isArray());
@@ -154,7 +169,7 @@ public class DataSchemaTest {
     }
 
     for (DataSchema.ColumnDataType columnDataType : new DataSchema.ColumnDataType[]{
-        STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY
+        STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY, UUID_ARRAY
     }) {
       Assert.assertFalse(columnDataType.isNumber());
       Assert.assertFalse(columnDataType.isWholeNumber());
@@ -178,6 +193,8 @@ public class DataSchemaTest {
     Assert.assertEquals(fromDataType(FieldSpec.DataType.DOUBLE, false), DOUBLE_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.STRING, true), STRING);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.STRING, false), STRING_ARRAY);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.UUID, true), UUID);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.UUID, false), UUID_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.BOOLEAN, false), BOOLEAN_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.TIMESTAMP, false), TIMESTAMP_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.BYTES, false), BYTES_ARRAY);
@@ -186,7 +203,30 @@ public class DataSchemaTest {
     Assert.assertEquals(BIG_DECIMAL.format(bigDecimalValue), bigDecimalValue.toPlainString());
     Timestamp timestampValue = new Timestamp(1234567890123L);
     Assert.assertEquals(TIMESTAMP.format(timestampValue), timestampValue.toString());
+    byte[] uuidBytes = UuidUtils.toBytes(UUID_VALUE);
+    ByteArray uuidValue = new ByteArray(uuidBytes);
+    Assert.assertEquals(UUID.convert(uuidValue), java.util.UUID.fromString(UUID_VALUE));
+    Assert.assertEquals(UUID.format(uuidValue), UUID_VALUE);
+    Assert.assertEquals(UUID.convertAndFormat(uuidValue), UUID_VALUE);
+    byte[][] uuidArrayBytesValue = {UuidUtils.toBytes(UUID_VALUE), UuidUtils.toBytes(UUID_VALUE_2)};
+    ByteArray[] uuidArrayValue = (ByteArray[]) UUID_ARRAY.toInternal(new String[]{UUID_VALUE, UUID_VALUE_2});
+    java.util.UUID[] expectedUuidArray = {
+        java.util.UUID.fromString(UUID_VALUE), java.util.UUID.fromString(UUID_VALUE_2)
+    };
+    Assert.assertEquals(UUID_ARRAY.toExternal(uuidArrayValue), expectedUuidArray);
+    Assert.assertEquals(UUID_ARRAY.toExternal(uuidArrayBytesValue), expectedUuidArray);
+    Assert.assertEquals(UUID_ARRAY.convert(uuidArrayValue), expectedUuidArray);
+    Assert.assertEquals(UUID_ARRAY.format(uuidArrayBytesValue), new String[]{UUID_VALUE, UUID_VALUE_2});
+    Assert.assertEquals(UUID_ARRAY.format(expectedUuidArray), new String[]{UUID_VALUE, UUID_VALUE_2});
+    Assert.assertEquals(UUID_ARRAY.convertAndFormat(uuidArrayValue), new String[]{UUID_VALUE, UUID_VALUE_2});
+    Assert.assertEquals(UUID_ARRAY.convertAndFormat(uuidArrayBytesValue), new String[]{UUID_VALUE, UUID_VALUE_2});
     byte[] bytesValue = {12, 34, 56};
     Assert.assertEquals(BYTES.format(bytesValue), BytesUtils.toHexString(bytesValue));
+
+    ByteArray firstUuidNullPlaceholder = (ByteArray) UUID.getNullPlaceholder();
+    ByteArray secondUuidNullPlaceholder = (ByteArray) UUID.getNullPlaceholder();
+    Assert.assertNotSame(firstUuidNullPlaceholder, secondUuidNullPlaceholder);
+    firstUuidNullPlaceholder.getBytes()[0] = 1;
+    Assert.assertEquals(secondUuidNullPlaceholder, new ByteArray(UuidUtils.nullUuidBytes()));
   }
 }
