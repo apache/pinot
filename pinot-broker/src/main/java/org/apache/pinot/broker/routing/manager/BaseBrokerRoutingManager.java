@@ -1490,8 +1490,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
-        return new InstanceSelector.SelectionResult(Pair.of(Map.of(), Map.of()),
-            List.of(), numPrunedSegments);
+        return InstanceSelector.SelectionResult.empty(numPrunedSegments);
       }
     }
 
