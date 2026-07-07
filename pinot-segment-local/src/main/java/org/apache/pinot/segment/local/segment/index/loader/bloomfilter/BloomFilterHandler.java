@@ -56,11 +56,7 @@ import org.slf4j.LoggerFactory;
 public class BloomFilterHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
-  // Offsets within the bloom filter file:
-  // [0..3] TYPE_VALUE (int), [4..7] VERSION (int), [8] strategy ordinal, [9] numHashFunctions, [10..13] numLongs
-  private static final int VERSION_OFFSET = 4;
-  private static final int NUM_HASH_FUNCTIONS_OFFSET = 9;
-  private static final int NUM_LONGS_OFFSET = 10;
+  private static final int TYPE_VALUE_OFFSET = 0;
 
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
@@ -99,84 +95,53 @@ public class BloomFilterHandler extends BaseIndexHandler {
   }
 
   /**
-   * Checks whether the bloom filter config has changed by comparing both the number of hash functions and the
-   * bit-array size (numLongs) in the existing bloom filter with what the new config would produce.
+   * Checks whether the effective fpp config has changed by comparing the fpp stored in the v2 bloom filter
+   * header with the effective fpp derived from the current {@link BloomFilterConfig}.
    *
-   * <p>Comparing only numHashFunctions is insufficient: different fpp values can round to the same k while
-   * producing a different bit-array size. For example, with cardinality 1000, fpp 0.05 and 0.045 both use k=4
-   * but Guava allocates different underlying long-array sizes, so the old bloom filter would remain in place
-   * even though the configured fpp changed.
+   * <p>The v2 format stores the effective fpp (post {@code maxSizeInBytes} cap) explicitly at byte offset
+   * {@link OnHeapGuavaBloomFilterCreator#FPP_OFFSET} so comparisons are exact and do not depend on Guava's
+   * internal serialisation layout.
+   *
+   * <p>Legacy v1 segments (TYPE_VALUE = 1) do not carry fpp in the header; fpp-change detection is skipped
+   * for those segments. They will be upgraded to v2 the next time the bloom filter is rebuilt for any reason.
    *
    * <p>Accepts both Reader and Writer since Writer extends Reader, allowing this method to be called from
    * both needUpdateIndices and updateIndices.
    */
   private boolean isFppChanged(SegmentDirectory.Reader segmentReader, String segmentName, String column) {
-    ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-    if (columnMetadata == null) {
-      return false;
-    }
-    int existingNumHashFunctions;
-    int existingNumLongs;
     try {
       PinotDataBuffer dataBuffer = segmentReader.getIndexFor(column, StandardIndexes.bloomFilter());
-      int version = dataBuffer.getInt(VERSION_OFFSET);
-      if (version != OnHeapGuavaBloomFilterCreator.VERSION) {
-        LOGGER.warn("Unexpected bloom filter version {} for segment: {}, column: {}; skipping fpp check", version,
-            segmentName, column);
+      int typeValue = dataBuffer.getInt(TYPE_VALUE_OFFSET);
+      if (typeValue != OnHeapGuavaBloomFilterCreator.TYPE_VALUE_V2) {
+        // Legacy v1 format — fpp is not stored in the header; skip fpp-change detection.
+        // The index will be upgraded to v2 the next time it is rebuilt.
         return false;
       }
-      existingNumHashFunctions = dataBuffer.getByte(NUM_HASH_FUNCTIONS_OFFSET) & 0xFF;
-      existingNumLongs = dataBuffer.getInt(NUM_LONGS_OFFSET);
+      double storedFpp = dataBuffer.getDouble(OnHeapGuavaBloomFilterCreator.FPP_OFFSET);
+      BloomFilterConfig config = _bloomFilterConfigs.get(column);
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      double expectedFpp = computeEffectiveFpp(columnMetadata, config);
+      if (Double.compare(storedFpp, expectedFpp) != 0) {
+        LOGGER.info("Bloom filter fpp config changed for segment: {}, column: {}, stored fpp: {}, "
+                + "expected fpp: {}. Index needs to be rebuilt.",
+            segmentName, column, storedFpp, expectedFpp);
+        return true;
+      }
+      return false;
     } catch (Exception e) {
       LOGGER.warn("Failed to read existing bloom filter for segment: {}, column: {}", segmentName, column, e);
       return false;
     }
-    BloomFilterConfig config = _bloomFilterConfigs.get(column);
-    int expectedNumHashFunctions = computeExpectedNumHashFunctions(columnMetadata, config);
-    int expectedNumLongs = computeExpectedNumLongs(columnMetadata, config);
-    if (expectedNumHashFunctions != existingNumHashFunctions || expectedNumLongs != existingNumLongs) {
-      LOGGER.info("Bloom filter config changed for segment: {}, column: {}, "
-              + "existing numHashFunctions: {}, expected numHashFunctions: {}, "
-              + "existing numLongs: {}, expected numLongs: {}. Index needs to be rebuilt.",
-          segmentName, column, existingNumHashFunctions, expectedNumHashFunctions,
-          existingNumLongs, expectedNumLongs);
-      return true;
-    }
-    return false;
   }
 
   /**
-   * Computes the effective fpp after applying the maxSizeInBytes constraint, then returns the
-   * number of hash functions Guava would use: {@code k = max(1, round(-ln(p) / ln(2)))}.
+   * Computes the effective fpp for a new bloom filter: applies the {@code maxSizeInBytes} cap if set.
+   * This matches the fpp computation in {@link OnHeapGuavaBloomFilterCreator}.
    */
-  private int computeExpectedNumHashFunctions(ColumnMetadata columnMetadata, BloomFilterConfig bloomFilterConfig) {
-    double fpp = effectiveFpp(columnMetadata, bloomFilterConfig);
-    // Matches Guava BloomFilter.optimalNumOfHashFunctions() exactly
-    return Math.max(1, (int) Math.round(-Math.log(fpp) / Math.log(2)));
-  }
-
-  /**
-   * Computes the number of longs Guava would allocate for the bit array:
-   * {@code numLongs = ceil(optimalNumOfBits(n, p) / 64)}, where
-   * {@code optimalNumOfBits = max(1, (long)(-n * ln(p) / ln(2)^2))}.
-   */
-  private int computeExpectedNumLongs(ColumnMetadata columnMetadata, BloomFilterConfig bloomFilterConfig) {
-    double fpp = effectiveFpp(columnMetadata, bloomFilterConfig);
-    int cardinality = columnMetadata.getCardinality();
-    if (cardinality <= 0) {
-      cardinality = columnMetadata.getTotalNumberOfEntries();
-    }
-    long numBits = Math.max(1L, (long) (-cardinality * Math.log(fpp) / (Math.log(2) * Math.log(2))));
-    return (int) ((numBits + 63) / 64);
-  }
-
-  /**
-   * Returns the effective fpp after applying the maxSizeInBytes cap (if set).
-   */
-  private double effectiveFpp(ColumnMetadata columnMetadata, BloomFilterConfig bloomFilterConfig) {
+  private double computeEffectiveFpp(ColumnMetadata columnMetadata, BloomFilterConfig bloomFilterConfig) {
     double fpp = bloomFilterConfig.getFpp();
     int maxSizeInBytes = bloomFilterConfig.getMaxSizeInBytes();
-    if (maxSizeInBytes > 0) {
+    if (maxSizeInBytes > 0 && columnMetadata != null) {
       int cardinality = columnMetadata.getCardinality();
       if (cardinality <= 0) {
         cardinality = columnMetadata.getTotalNumberOfEntries();
