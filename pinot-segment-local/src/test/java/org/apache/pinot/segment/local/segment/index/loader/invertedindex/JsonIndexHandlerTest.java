@@ -50,8 +50,9 @@ import static org.testng.Assert.assertTrue;
 ///
 /// Covers two axes:
 /// - Column lifecycle: needUpdateIndices / updateIndices when a column is added, removed, or unchanged.
-/// - Config-change detection: needUpdateIndices triggers a rebuild when any JsonIndexConfig field changes,
-///   and is backward-compatible when no stored config is present.
+/// - Config-change detection: needUpdateIndices triggers a rebuild when any [JsonIndexConfig] field
+///   changes. Legacy segments with no stored config trigger a one-time rebuild to backfill the
+///   stored config and catch any config drift.
 public class JsonIndexHandlerTest {
   private static final String COLUMN = "myJsonCol";
 
@@ -221,17 +222,18 @@ public class JsonIndexHandlerTest {
   }
 
   @Test
-  public void testNeedUpdateReturnsFalseWhenNoStoredConfig()
+  public void testNeedUpdateReturnsTrueWhenNoStoredConfig()
       throws Exception {
-    // No stored config — index was built before config persistence was added. Must NOT trigger a spurious rebuild.
+    // No stored config — index was built before config persistence was added (legacy segment).
+    // Must trigger a one-time rebuild to backfill the stored config and detect any config drift.
     createEmptyMetadataFile();
 
     JsonIndexConfig currentConfig = new JsonIndexConfig();
     JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
     SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN);
 
-    assertFalse(handler.needUpdateIndices(reader),
-        "No rebuild expected when no stored config is present (backward compatibility)");
+    assertTrue(handler.needUpdateIndices(reader),
+        "Rebuild expected for legacy segments with no stored config (one-time backfill)");
   }
 
   // --- helpers (mock-based) ---
