@@ -44,6 +44,12 @@ enum ColumnDataType {
   UNKNOWN = 19;
   MAP = 20;
   BIG_DECIMAL_ARRAY = 21;
+  // Rolling-upgrade limitation for UUID columns: in a mixed-version multi-stage query, an older broker/server that
+  // does not know UUID = 22 / UUID_ARRAY = 23 will fail planning with UnknownEnumValueException when receiving a plan
+  // that includes a UUID literal. Avoid issuing UUID queries until all brokers and servers are upgraded. See the
+  // matching note on DataSchema.toBytes and ProtoExpressionToRexExpression#convertColumnDataType.
+  UUID = 22;
+  UUID_ARRAY = 23;
 }
 
 message InputRef {

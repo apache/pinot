@@ -23,11 +23,14 @@ import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -39,6 +42,16 @@ public class EnrichedHashJoinOperatorTest {
   private MultiStageOperator _rightInput;
   private static final DataSchema DEFAULT_CHILD_SCHEMA = new DataSchema(new String[]{"int_col", "string_col"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+
+  private static final ByteArray UUID_A = uuid("550e8400-e29b-41d4-a716-446655440000");
+  private static final ByteArray UUID_B = uuid("550e8400-e29b-41d4-a716-446655440001");
+  private static final ByteArray UUID_C = uuid("550e8400-e29b-41d4-a716-446655440002");
+  private static final DataSchema UUID_CHILD_SCHEMA = new DataSchema(new String[]{"uuid_col", "int_col"},
+      new ColumnDataType[]{ColumnDataType.UUID, ColumnDataType.INT});
+
+  private static ByteArray uuid(String value) {
+    return new ByteArray(UuidUtils.toBytes(value));
+  }
 
   @Test
   public void shouldHandleBasicInnerJoin() {
@@ -577,6 +590,63 @@ public class EnrichedHashJoinOperatorTest {
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0)[1], "BB");
     assertEquals(resultRows.get(1), new Object[]{null, null, 4, "Bd"});
+  }
+
+  /**
+   * Regression: {@link EnrichedHashJoinOperator} overrides {@code buildJoinedDataBlock*} from
+   * {@link HashJoinOperator}. Without re-applying {@code _rightTable.normalizeKey(...)} in the overrides, a
+   * UUID equi-join would lookup the {@link org.apache.pinot.query.runtime.operator.join.UuidLookupTable} with
+   * the raw {@code ByteArray} from the row, never match (the table is keyed by
+   * {@link org.apache.pinot.spi.utils.UuidKey}), and INNER joins would silently return zero rows.
+   */
+  @Test
+  public void shouldHandleInnerJoinOnUuid() {
+    _leftInput = new BlockListMultiStageOperator.Builder(UUID_CHILD_SCHEMA)
+        .addRow(UUID_A, 1)
+        .addRow(UUID_B, 2)
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(UUID_CHILD_SCHEMA)
+        .addRow(UUID_B, 20)
+        .addRow(UUID_C, 30)
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"uuid_col1", "int_col1", "uuid_col2", "int_col2"},
+        new ColumnDataType[]{ColumnDataType.UUID, ColumnDataType.INT, ColumnDataType.UUID, ColumnDataType.INT});
+
+    HashJoinOperator operator =
+        getOperator(UUID_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(0), List.of(0),
+            List.of(), PlanNode.NodeHint.EMPTY, null, null, null);
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 1, "UUID equi-join must produce the single matching row");
+    assertEquals(resultRows.get(0), new Object[]{UUID_B, 2, UUID_B, 20});
+  }
+
+  /**
+   * Regression: SEMI-join on UUID exercises the {@code _rightTable.containsKey} path in the override; with the
+   * raw-key bug, SEMI-join returned zero rows for every left row.
+   */
+  @Test
+  public void shouldHandleSemiJoinOnUuid() {
+    _leftInput = new BlockListMultiStageOperator.Builder(UUID_CHILD_SCHEMA)
+        .addRow(UUID_A, 1)
+        .addRow(UUID_B, 2)
+        .addRow(UUID_C, 3)
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(UUID_CHILD_SCHEMA)
+        .addRow(UUID_B, 20)
+        .addRow(UUID_C, 30)
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"uuid_col", "int_col"},
+        new ColumnDataType[]{ColumnDataType.UUID, ColumnDataType.INT});
+
+    HashJoinOperator operator =
+        getOperator(UUID_CHILD_SCHEMA, resultSchema, JoinRelType.SEMI, List.of(0), List.of(0),
+            List.of(), PlanNode.NodeHint.EMPTY, null, null, null);
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 2, "SEMI-join on UUID must emit left rows whose key exists in the right table");
+    assertEquals(resultRows.get(0), new Object[]{UUID_B, 2});
+    assertEquals(resultRows.get(1), new Object[]{UUID_C, 3});
   }
 
   // utils ----
