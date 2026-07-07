@@ -26,6 +26,7 @@ import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -176,7 +177,7 @@ public class BloomFilterHandlerTest {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
     when(segmentMetadata.getTotalDocs()).thenReturn(CARDINALITY);
-    when(segmentMetadata.getAllColumns()).thenReturn(Set.of(columnName));
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(columnName)));
     when(segmentMetadata.getColumnMetadataFor(columnName)).thenReturn(columnMetadata);
 
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
