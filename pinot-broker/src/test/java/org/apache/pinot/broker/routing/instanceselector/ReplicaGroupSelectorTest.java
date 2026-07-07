@@ -400,14 +400,14 @@ public class ReplicaGroupSelectorTest {
     assertNotNull(instanceSelector._priorityPoolInstanceSelector);
 
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(AR_SERVER_RANKS);
-    Pair<Map<String, String>, Map<String, String>> result =
+    InstanceSelector.InstanceMapping result =
         instanceSelector.select(AR_SEGMENTS, 0, buildArSegmentStates(), null);
 
     // AR prefers the better-ranked server when all candidates are ranked:
     // segment0: instance1 (rank 3) over instance0 (rank 4)
     // segment1: instance3 (rank 1) over instance2 (rank 2)
     // segment2: instance4 unranked → AR falls back to round-robin → index 0 = instance4
-    assertEquals(result.getLeft(), Map.of(
+    assertEquals(result.segmentToInstanceMap(), Map.of(
         AR_SEGMENT0, AR_INSTANCE1,
         AR_SEGMENT1, AR_INSTANCE3,
         AR_SEGMENT2, AR_INSTANCE4));
@@ -423,7 +423,7 @@ public class ReplicaGroupSelectorTest {
     assertNull(instanceSelector._adaptiveServerSelector);
     assertNull(instanceSelector._priorityPoolInstanceSelector);
 
-    Pair<Map<String, String>, Map<String, String>> result =
+    InstanceSelector.InstanceMapping result =
         instanceSelector.select(AR_SEGMENTS, 0, buildArSegmentStates(), null);
 
     // hybridSelector never consulted during routing despite being passed to the factory
@@ -431,7 +431,7 @@ public class ReplicaGroupSelectorTest {
 
     // Round-robin with requestId=0 picks candidate index 0 per segment — opposite of AR result above,
     // which returns {segment0→instance1, segment1→instance3} for the same rankings.
-    assertEquals(result.getLeft(), Map.of(
+    assertEquals(result.segmentToInstanceMap(), Map.of(
         AR_SEGMENT0, AR_INSTANCE0,
         AR_SEGMENT1, AR_INSTANCE2,
         AR_SEGMENT2, AR_INSTANCE4));
