@@ -113,6 +113,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to UUID");
+    }
+
+    @Override
     public Boolean convert(Object value, PinotDataType sourceType) {
       return sourceType.toBoolean(value);
     }
@@ -168,6 +173,11 @@ public enum PinotDataType {
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BYTE to BYTES");
     }
+
+    @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTE to UUID");
+    }
   },
 
   CHARACTER {
@@ -214,6 +224,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from CHARACTER to BYTES");
+    }
+
+    @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from CHARACTER to UUID");
     }
   },
 
@@ -262,6 +277,11 @@ public enum PinotDataType {
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from SHORT to BYTES");
     }
+
+    @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from SHORT to UUID");
+    }
   },
 
   INT {
@@ -308,6 +328,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from INT to BYTES");
+    }
+
+    @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from INT to UUID");
     }
 
     @Override
@@ -366,6 +391,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from LONG to UUID");
+    }
+
+    @Override
     public Long convert(Object value, PinotDataType sourceType) {
       return sourceType.toLong(value);
     }
@@ -417,6 +447,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from FLOAT to BYTES");
+    }
+
+    @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from FLOAT to UUID");
     }
 
     @Override
@@ -474,6 +509,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DOUBLE to UUID");
+    }
+
+    @Override
     public Double convert(Object value, PinotDataType sourceType) {
       return sourceType.toDouble(value);
     }
@@ -523,6 +563,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       return BigDecimalUtils.serialize((BigDecimal) value);
+    }
+
+    @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BIG_DECIMAL to UUID");
     }
 
     @Override
@@ -589,6 +634,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to UUID");
+    }
+
+    @Override
     public Timestamp convert(Object value, PinotDataType sourceType) {
       return sourceType.toTimestamp(value);
     }
@@ -652,6 +702,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from DATE to BYTES");
+    }
+
+    @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DATE to UUID");
     }
 
     @Override
@@ -739,6 +794,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from TIME to BYTES");
+    }
+
+    @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to UUID");
     }
 
     @Override
@@ -891,6 +951,17 @@ public enum PinotDataType {
     }
 
     @Override
+    public UUID toUUID(Object value) {
+      // JSON-encoded UUID is a quoted JSON string; Jackson's UUIDDeserializer handles both the canonical-string form
+      // and 16-byte binary form natively.
+      try {
+        return JsonUtils.stringToObject(value.toString(), UUID.class);
+      } catch (IOException e) {
+        throw new RuntimeException("Cannot parse JSON value as UUID: " + value, e);
+      }
+    }
+
+    @Override
     public String convert(Object value, PinotDataType sourceType) {
       return sourceType.toJson(value);
     }
@@ -944,7 +1015,7 @@ public enum PinotDataType {
 
     @Override
     public UUID toUUID(Object value) {
-      return UuidUtils.toUUID(value);
+      return UuidUtils.toUUID((byte[]) value);
     }
 
     @Override
@@ -1001,52 +1072,22 @@ public enum PinotDataType {
 
     @Override
     public String toString(Object value) {
-      return UuidUtils.toUUID(value).toString();
+      return value.toString();
     }
 
     @Override
     public byte[] toBytes(Object value) {
-      return UuidUtils.toBytes(value);
+      return UuidUtils.toBytes((UUID) value);
     }
 
     @Override
     public UUID toUUID(Object value) {
-      return UuidUtils.toUUID(value);
+      return (UUID) value;
     }
 
     @Override
     public UUID convert(Object value, PinotDataType sourceType) {
-      switch (sourceType) {
-        case UUID:
-          return UuidUtils.toUUID(value);
-        case STRING:
-          return UuidUtils.toUUID(value.toString().trim());
-        case JSON:
-          try {
-            // JSON-encoded UUID is a quoted JSON string; Jackson's UUIDDeserializer handles both the
-            // canonical-string form and 16-byte binary form natively.
-            return JsonUtils.stringToObject(value.toString(), UUID.class);
-          } catch (IOException e) {
-            throw new RuntimeException("Cannot parse JSON value as UUID: " + value, e);
-          }
-        case BYTES:
-          return UuidUtils.toUUID(value);
-        case OBJECT:
-        case COLLECTION:
-        case UUID_ARRAY:
-        case BYTES_ARRAY:
-        case STRING_ARRAY:
-        case OBJECT_ARRAY:
-          // OBJECT, collections and single-element arrays can carry a UUID (e.g., scalar-function arguments
-          // resolved by FunctionInvoker, or an MV source feeding an SV UUID column); these types have meaningful
-          // toUUID implementations.
-          return sourceType.toUUID(value);
-        default:
-          // Numeric and other types have no meaningful UUID interpretation; fail with an explicit message instead
-          // of the confusing "There is no single-value type ..." from the generic single-value fallback.
-          throw new UnsupportedOperationException(
-              "Cannot convert value from " + sourceType + " to UUID. Input value: " + value);
-      }
+      return sourceType.toUUID(value);
     }
 
     @Override
@@ -1129,6 +1170,11 @@ public enum PinotDataType {
     public byte[] toBytes(Object value) {
       //noinspection unchecked
       return MapUtils.serializeMap((Map<String, Object>) value);
+    }
+
+    @Override
+    public UUID toUUID(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from MAP to UUID");
     }
 
     @Override
@@ -1272,7 +1318,7 @@ public enum PinotDataType {
 
   TIMESTAMP_ARRAY {
     @Override
-    public Object convert(Object value, PinotDataType sourceType) {
+    public Timestamp[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toTimestampArray(value);
     }
 
@@ -1342,13 +1388,19 @@ public enum PinotDataType {
 
   UUID_ARRAY {
     @Override
-    public byte[][] convert(Object value, PinotDataType sourceType) {
-      return sourceType.toUuidBytesArray(value);
+    public UUID[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toUuidArray(value);
     }
 
     @Override
     public byte[][] toInternal(Object value) {
-      return toUuidBytesArray(value);
+      UUID[] uuidArray = (UUID[]) value;
+      int length = uuidArray.length;
+      byte[][] bytesArray = new byte[length][];
+      for (int i = 0; i < length; i++) {
+        bytesArray[i] = UuidUtils.toBytes(uuidArray[i]);
+      }
+      return bytesArray;
     }
   },
 
@@ -1707,28 +1759,6 @@ public enum PinotDataType {
     }
   }
 
-  public byte[][] toUuidBytesArray(Object value) {
-    if (value instanceof byte[][]) {
-      byte[][] values = (byte[][]) value;
-      byte[][] uuidBytes = new byte[values.length][];
-      for (int i = 0; i < values.length; i++) {
-        uuidBytes[i] = UuidUtils.toBytes(values[i]);
-      }
-      return uuidBytes;
-    }
-    if (isSingleValue()) {
-      return new byte[][]{UuidUtils.toBytes(value)};
-    } else {
-      Object[] valueArray = toObjectArray(value);
-      int length = valueArray.length;
-      byte[][] uuidBytes = new byte[length][];
-      for (int i = 0; i < length; i++) {
-        uuidBytes[i] = UuidUtils.toBytes(valueArray[i]);
-      }
-      return uuidBytes;
-    }
-  }
-
   public LocalDate[] toLocalDateArray(Object value) {
     if (value instanceof LocalDate[]) {
       return (LocalDate[]) value;
@@ -2024,10 +2054,10 @@ public enum PinotDataType {
           return JSON;
         }
         throw new IllegalStateException("There is no multi-value type for JSON");
-      case UUID:
-        return fieldSpec.isSingleValueField() ? UUID : UUID_ARRAY;
       case BYTES:
         return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
+      case UUID:
+        return fieldSpec.isSingleValueField() ? UUID : UUID_ARRAY;
       case MAP:
         if (fieldSpec.isSingleValueField()) {
           return MAP;

@@ -32,16 +32,13 @@ public class UuidUtils {
   }
 
   public static final int UUID_NUM_BYTES = 16;
-  private static final byte[] NULL_UUID_BYTES = new byte[UUID_NUM_BYTES];
 
   // Gregorian-to-Unix offset in 100-nanosecond units. Matches RFC 4122 / RFC 9562.
   // This is the count of 100-ns intervals between 1582-10-15T00:00:00Z and 1970-01-01T00:00:00Z.
   private static final long GREGORIAN_TO_UNIX_OFFSET_100NS = 0x01b21dd213814000L;
 
   public static byte[] nullUuidBytes() {
-    byte[] uuidBytes = new byte[UUID_NUM_BYTES];
-    System.arraycopy(NULL_UUID_BYTES, 0, uuidBytes, 0, UUID_NUM_BYTES);
-    return uuidBytes;
+    return new byte[UUID_NUM_BYTES];
   }
 
   public static byte[] toBytes(long mostSignificantBits, long leastSignificantBits) {
@@ -60,6 +57,14 @@ public class UuidUtils {
     try {
       uuid = UUID.fromString(uuidString);
     } catch (Exception e) {
+      try {
+        // Try parsing the string as hex-encoded bytes
+        byte[] bytes = BytesUtils.toBytes(uuidString);
+        if (bytes.length == UUID_NUM_BYTES) {
+          return bytes;
+        }
+      } catch (Exception ignore) {
+      }
       throw new IllegalArgumentException("Invalid UUID value: '" + uuidString + "'", e);
     }
     String canonical = uuid.toString();

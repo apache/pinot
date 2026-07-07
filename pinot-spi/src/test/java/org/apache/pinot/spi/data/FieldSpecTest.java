@@ -227,6 +227,7 @@ public class FieldSpecTest {
   @Test
   public void testUUIDConversions() {
     byte[] uuidBytes = UuidUtils.toBytes(UUID_VALUE);
+    byte[] equalUuidBytes = UuidUtils.toBytes(UUID_VALUE);
     byte[] largerUuidBytes = UuidUtils.toBytes(LARGER_UUID_VALUE);
     String mixedCaseUuidValue = UUID_VALUE.toUpperCase();
     ByteArray uuidInternal = new ByteArray(uuidBytes);
@@ -236,10 +237,9 @@ public class FieldSpecTest {
     Assert.assertEquals(UUID.convertInternal(UUID_VALUE), uuidInternal);
     Assert.assertEquals(UUID.convertInternal(mixedCaseUuidValue), uuidInternal);
     Assert.assertEquals(UUID.toString(uuidBytes), UUID_VALUE);
-    Assert.assertEquals(UUID.toString(uuidInternal), UUID_VALUE);
-    Assert.assertTrue(UUID.equals(uuidBytes, uuidInternal));
-    Assert.assertEquals(UUID.hashCode(uuidBytes), uuidInternal.hashCode());
-    Assert.assertEquals(UUID.compare(uuidBytes, uuidInternal), 0);
+    Assert.assertTrue(UUID.equals(uuidBytes, equalUuidBytes));
+    Assert.assertEquals(UUID.hashCode(uuidBytes), UUID.hashCode(equalUuidBytes));
+    Assert.assertEquals(UUID.compare(uuidBytes, equalUuidBytes), 0);
     Assert.assertTrue(UUID.compare(uuidBytes, largerUuidBytes) < 0);
     Assert.assertTrue(UUID.compare(largerUuidBytes, uuidBytes) > 0);
   }
@@ -248,7 +248,19 @@ public class FieldSpecTest {
   public void testInvalidUUIDConversion() {
     IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
         () -> UUID.convert("not-a-uuid"));
-    assertThat(exception).hasMessageContaining("Invalid UUID");
+    assertThat(exception).hasMessageContaining("Cannot convert value: 'not-a-uuid' to type: UUID");
+  }
+
+  @Test
+  public void testCompare() {
+    // BOOLEAN values are held as Integer (0/1) and TIMESTAMP as Long (epoch millis), so compare dispatches them
+    // through the INT and LONG cases respectively.
+    Assert.assertTrue(BOOLEAN.compare(0, 1) < 0);
+    Assert.assertTrue(BOOLEAN.compare(1, 0) > 0);
+    Assert.assertEquals(BOOLEAN.compare(1, 1), 0);
+    Assert.assertTrue(TIMESTAMP.compare(1000L, 2000L) < 0);
+    Assert.assertTrue(TIMESTAMP.compare(2000L, 1000L) > 0);
+    Assert.assertEquals(TIMESTAMP.compare(1000L, 1000L), 0);
   }
 
   /**

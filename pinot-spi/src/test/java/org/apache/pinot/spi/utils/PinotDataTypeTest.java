@@ -160,14 +160,16 @@ public class PinotDataTypeTest {
         {BYTES_ARRAY, BYTES_ARRAY, new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) },
             new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) }},
         {STRING_ARRAY, UUID_ARRAY, new String[] {UUID_VALUE},
-            new byte[][] {UuidUtils.toBytes(UUID_VALUE)}},
+            new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)}},
         {UUID_ARRAY, UUID_ARRAY, new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)},
-            new byte[][] {UuidUtils.toBytes(UUID_VALUE)}},
+            new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)}},
         {COLLECTION, STRING_ARRAY, Arrays.asList("test1", "test2"), new String[] {"test1", "test2"}},
-        {COLLECTION, UUID_ARRAY, Arrays.asList(UUID_VALUE), new byte[][] {UuidUtils.toBytes(UUID_VALUE)}},
+        {COLLECTION, UUID_ARRAY, Arrays.asList(UUID_VALUE),
+            new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)}},
         {COLLECTION, FLOAT_ARRAY, Arrays.asList(1.0f, 2.0f), new Float[] {1.0f, 2.0f}},
         {OBJECT_ARRAY, STRING_ARRAY, new Object[] {"test1", "test2"}, new String[] {"test1", "test2"}},
-        {OBJECT_ARRAY, UUID_ARRAY, new Object[] {UUID_VALUE}, new byte[][] {UuidUtils.toBytes(UUID_VALUE)}},
+        {OBJECT_ARRAY, UUID_ARRAY, new Object[] {UUID_VALUE},
+            new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)}},
         {OBJECT_ARRAY, FLOAT_ARRAY, new Object[] {1.0f, 2.0f}, new Float[] {1.0f, 2.0f}},
     };
   }
@@ -336,14 +338,18 @@ public class PinotDataTypeTest {
     UUID u1 = java.util.UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
     UUID u2 = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
     UUID[] uuids = {u1, u2};
-    byte[][] convertedBytes = (byte[][]) UUID_ARRAY.convert(uuids, UUID_ARRAY);
-    assertEquals(UUID.convert(convertedBytes[0], BYTES), u1);
-    assertEquals(UUID.convert(convertedBytes[1], BYTES), u2);
+    UUID[] converted = (UUID[]) UUID_ARRAY.convert(uuids, UUID_ARRAY);
+    assertEquals(converted[0], u1);
+    assertEquals(converted[1], u2);
     // STRING_ARRAY → UUID_ARRAY: per-element parse.
-    byte[][] convertedStringBytes = (byte[][]) UUID_ARRAY.convert(
+    UUID[] convertedFromStrings = (UUID[]) UUID_ARRAY.convert(
         new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"}, STRING_ARRAY);
-    assertEquals(UUID.convert(convertedStringBytes[0], BYTES), u1);
-    assertEquals(UUID.convert(convertedStringBytes[1], BYTES), u2);
+    assertEquals(convertedFromStrings[0], u1);
+    assertEquals(convertedFromStrings[1], u2);
+    // toInternal yields the 16-byte big-endian form per element.
+    byte[][] internal = (byte[][]) UUID_ARRAY.toInternal(uuids);
+    assertEquals(UUID.convert(internal[0], BYTES), u1);
+    assertEquals(UUID.convert(internal[1], BYTES), u2);
     // STRING_ARRAY destination: canonical strings.
     assertEquals(STRING_ARRAY.convert(uuids, UUID_ARRAY),
         new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"});
