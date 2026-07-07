@@ -51,6 +51,8 @@ public class PartitionFunctionFactoryTest {
     assertTrue(
         PartitionFunctionFactory.getPartitionFunction("ByteArray", 4, null) instanceof ByteArrayPartitionFunction);
     assertTrue(
+        PartitionFunctionFactory.getPartitionFunction("Uuid", 4, null) instanceof UuidPartitionFunction);
+    assertTrue(
         PartitionFunctionFactory.getPartitionFunction("BoundedColumnValue", 2,
             Map.of("columnValues", "a", "columnValuesDelimiter", "|"))
             instanceof BoundedColumnValuePartitionFunction);

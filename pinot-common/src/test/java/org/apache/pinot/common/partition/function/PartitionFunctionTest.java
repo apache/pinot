@@ -755,6 +755,20 @@ public class PartitionFunctionTest {
     testPartitionFunction(byteArrayPartitionFunction, expectedPartitions);
   }
 
+  @Test
+  public void testUuidPartitionFunction() {
+    String uuid = "550e8400-e29b-41d4-a716-446655440000";
+    String hex = "550e8400e29b41d4a716446655440000";
+    UuidPartitionFunction partitionFunction = new UuidPartitionFunction(64, null);
+    assertEquals(partitionFunction.getPartition(uuid), 30);
+    assertEquals(partitionFunction.getPartition(hex), 30);
+
+    Map<String, String> functionConfig = Map.of("partitionIdNormalizer", "abs");
+    partitionFunction = new UuidPartitionFunction(64, functionConfig);
+    assertEquals(partitionFunction.getPartition(uuid), 34);
+    assertEquals(partitionFunction.getFunctionConfig(), functionConfig);
+  }
+
   private void testPartitionInExpectedRange(PartitionFunction partitionFunction, Object value, int numPartitions) {
     int partition = partitionFunction.getPartition(value.toString());
     assertTrue(partition >= 0 && partition < numPartitions);
