@@ -74,6 +74,7 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// The `AggregationFunctionUtils` class provides utility methods for aggregation function.
@@ -580,23 +581,23 @@ public class AggregationFunctionUtils {
         break;
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTHLLMV:
-        result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountHLLResult(dataSource,
             (DistinctCountHLLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTRAWHLL:
       case DISTINCTCOUNTRAWHLLMV:
-        result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountHLLResult(dataSource,
             ((DistinctCountRawHLLAggregationFunction) aggregationFunction).getDistinctCountHLLAggregationFunction(),
             explainPlanName);
         break;
       case DISTINCTCOUNTHLLPLUS:
       case DISTINCTCOUNTHLLPLUSMV:
-        result = getDistinctCountHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountHLLPlusResult(dataSource,
             (DistinctCountHLLPlusAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTRAWHLLPLUS:
       case DISTINCTCOUNTRAWHLLPLUSMV:
-        result = getDistinctCountHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountHLLPlusResult(dataSource,
             ((DistinctCountRawHLLPlusAggregationFunction) aggregationFunction)
                 .getDistinctCountHLLPlusAggregationFunction(), explainPlanName);
         break;
@@ -612,7 +613,7 @@ public class AggregationFunctionUtils {
             (DistinctCountSmartHLLPlusAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTULL:
-        result = getDistinctCountULLResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountULLResult(dataSource,
             (DistinctCountULLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTSMARTULL:
@@ -620,7 +621,7 @@ public class AggregationFunctionUtils {
             (DistinctCountSmartULLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTRAWULL:
-        result = getDistinctCountULLResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountULLResult(dataSource,
             (DistinctCountULLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       default:
@@ -769,8 +770,20 @@ public class AggregationFunctionUtils {
     return hllPlus;
   }
 
-  private static HyperLogLog getDistinctCountHLLResult(Dictionary dictionary,
+  private static HyperLogLog getDistinctCountHLLResult(DataSource dataSource,
       DistinctCountHLLAggregationFunction function, String explainPlanName) {
+    Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
+    // UUID dictionary entries are logical scalar values, not serialized HyperLogLogs. Offer their canonical string
+    // representation to match the scan-based path and DISTINCTCOUNTHLL(CAST(uuidColumn AS STRING)).
+    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.UUID) {
+      HyperLogLog hll = new HyperLogLog(function.getLog2m());
+      int length = dictionary.length();
+      for (int i = 0; i < length; i++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
+        hll.offer(UuidUtils.toString(dictionary.getBytesValue(i)));
+      }
+      return hll;
+    }
     if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLog
       try {
@@ -790,8 +803,20 @@ public class AggregationFunctionUtils {
     }
   }
 
-  private static HyperLogLogPlus getDistinctCountHLLPlusResult(Dictionary dictionary,
+  private static HyperLogLogPlus getDistinctCountHLLPlusResult(DataSource dataSource,
       DistinctCountHLLPlusAggregationFunction function, String explainPlanName) {
+    Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
+    // UUID dictionary entries are logical scalar values, not serialized HyperLogLogPluses. Offer their canonical
+    // string representation to match the scan-based path and DISTINCTCOUNTHLLPLUS(CAST(uuidColumn AS STRING)).
+    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.UUID) {
+      HyperLogLogPlus hllPlus = new HyperLogLogPlus(function.getP(), function.getSp());
+      int length = dictionary.length();
+      for (int i = 0; i < length; i++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
+        hllPlus.offer(UuidUtils.toString(dictionary.getBytesValue(i)));
+      }
+      return hllPlus;
+    }
     if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLogPlus
       try {
@@ -831,8 +856,20 @@ public class AggregationFunctionUtils {
     }
   }
 
-  private static UltraLogLog getDistinctCountULLResult(Dictionary dictionary,
+  private static UltraLogLog getDistinctCountULLResult(DataSource dataSource,
       DistinctCountULLAggregationFunction function, String explainPlanName) {
+    Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
+    // UUID dictionary entries are logical scalar values, not serialized UltraLogLogs. Hash their canonical string
+    // representation to match the scan-based path and DISTINCTCOUNTULL(CAST(uuidColumn AS STRING)).
+    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.UUID) {
+      UltraLogLog ull = UltraLogLog.create(function.getP());
+      int length = dictionary.length();
+      for (int i = 0; i < length; i++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
+        UltraLogLogUtils.hashObject(UuidUtils.toString(dictionary.getBytesValue(i))).ifPresent(ull::add);
+      }
+      return ull;
+    }
     if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
       // Treat BYTES value as serialized UltraLogLog and merge
       try {
