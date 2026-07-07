@@ -41,7 +41,6 @@ public class UuidUtilsTest {
         {"550e8400-e29b-41d4-a716-44665544000"},
         {"550e8400-e29b-41d4-a716-4466554400000"},
         {"550e8400-e29b-41d4-a716-44665544000g"},
-        {"550e8400e29b41d4a716446655440000"},
         {""}
     };
   }
@@ -70,6 +69,16 @@ public class UuidUtilsTest {
     assertEquals(UuidUtils.toBytes(mixedCaseUuid), UuidUtils.toBytes(UUID_VALUE));
     assertEquals(UuidUtils.toUUID(mixedCaseUuid), UUID.fromString(UUID_VALUE));
     assertTrue(UuidUtils.isUuid(mixedCaseUuid));
+  }
+
+  @Test
+  public void testDashlessHexStringRoundTrips() {
+    String hexUuid = "550e8400e29b41d4a716446655440000";
+
+    assertEquals(UuidUtils.toBytes(hexUuid), UuidUtils.toBytes(UUID_VALUE));
+    assertEquals(UuidUtils.toString(UuidUtils.toBytes(hexUuid)), UUID_VALUE);
+    assertEquals(UuidUtils.toUUID(hexUuid), UUID.fromString(UUID_VALUE));
+    assertTrue(UuidUtils.isUuid(hexUuid));
   }
 
   @Test(dataProvider = "invalidUuidStrings")
