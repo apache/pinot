@@ -353,18 +353,4 @@ public final class IngestionUtils {
     }
     return result;
   }
-
-  public static Long extractTimeValue(Comparable time) {
-    if (time != null) {
-      if (time instanceof Number) {
-        return ((Number) time).longValue();
-      } else {
-        String stringValue = time.toString();
-        if (StringUtils.isNumeric(stringValue)) {
-          return Long.parseLong(stringValue);
-        }
-      }
-    }
-    return null;
-  }
 }

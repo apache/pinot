@@ -77,7 +77,6 @@ import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.upsert.UpsertViewManager;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.IdMap;
-import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -149,7 +148,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private final String _realtimeTableName;
   private final String _segmentName;
   private final Schema _schema;
-  private final String _timeColumnName;
   private final int _capacity;
   private final SegmentMetadata _segmentMetadata;
   private final boolean _offHeap;
@@ -210,7 +208,6 @@ public class MutableSegmentImpl implements MutableSegment {
     _realtimeTableName = config.getTableNameWithType();
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
-    _timeColumnName = config.getTimeColumnName();
     _capacity = config.getCapacity();
     SegmentZKMetadata segmentZKMetadata = config.getSegmentZKMetadata();
     _segmentMetadata = new SegmentMetadataImpl(TableNameBuilder.extractRawTableName(_realtimeTableName),
@@ -608,30 +605,6 @@ public class MutableSegmentImpl implements MutableSegment {
     } else {
       return null;
     }
-  }
-
-  /**
-   * Get min time from the segment, based on the time column, only used by Kafka HLC.
-   */
-  @Deprecated
-  public long getMinTime() {
-    Long minTime = IngestionUtils.extractTimeValue(_indexContainerMap.get(_timeColumnName)._minValue);
-    if (minTime != null) {
-      return minTime;
-    }
-    return Long.MAX_VALUE;
-  }
-
-  /**
-   * Get max time from the segment, based on the time column, only used by Kafka HLC.
-   */
-  @Deprecated
-  public long getMaxTime() {
-    Long maxTime = IngestionUtils.extractTimeValue(_indexContainerMap.get(_timeColumnName)._maxValue);
-    if (maxTime != null) {
-      return maxTime;
-    }
-    return Long.MIN_VALUE;
   }
 
   @Override

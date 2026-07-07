@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.stream;
 
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 
@@ -62,28 +61,22 @@ public abstract class StreamConsumerFactory {
     return new LongMsgOffsetFactory();
   }
 
-  /**
-   * Creates a partition group consumer, which can fetch messages from a partition group
-   */
-  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
-      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
-    return createPartitionLevelConsumer(clientId, partitionGroupConsumptionStatus.getStreamPartitionGroupId());
-  }
+  /// Creates a [PartitionGroupConsumer] that fetches messages from the partition group described by
+  /// `partitionGroupConsumptionStatus`.
+  ///
+  /// Every [StreamConsumerFactory] implementation must override this method. The returned consumer is owned by
+  /// the caller, which is responsible for closing it via [PartitionGroupConsumer#close()]. Each invocation returns
+  /// a new consumer instance; implementations are not required to make the returned consumer thread-safe.
+  ///
+  /// @param clientId identifies the creator of this consumer
+  /// @param partitionGroupConsumptionStatus the partition group to consume and the offsets to start from
+  /// @return a new, non-null partition group consumer
+  public abstract PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus);
 
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus, RetryPolicy retryPolicy) {
     return createPartitionGroupConsumer(clientId, partitionGroupConsumptionStatus);
-  }
-
-  @Deprecated
-  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
-      String groupId) {
-    throw new UnsupportedOperationException();
   }
 
   public static String getUniqueClientId(String prefix) {
