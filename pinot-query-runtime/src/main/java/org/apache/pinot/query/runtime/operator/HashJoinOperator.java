@@ -27,6 +27,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
@@ -38,6 +39,7 @@ import org.apache.pinot.query.runtime.operator.join.IntLookupTable;
 import org.apache.pinot.query.runtime.operator.join.LongLookupTable;
 import org.apache.pinot.query.runtime.operator.join.LookupTable;
 import org.apache.pinot.query.runtime.operator.join.ObjectLookupTable;
+import org.apache.pinot.query.runtime.operator.join.UuidLookupTable;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -97,7 +99,11 @@ public class HashJoinOperator extends BaseJoinOperator {
     if (joinKeys.size() > 1) {
       return new ObjectLookupTable();
     }
-    switch (schema.getColumnDataType(joinKeys.get(0)).getStoredType()) {
+    ColumnDataType columnDataType = schema.getColumnDataType(joinKeys.get(0));
+    if (columnDataType == ColumnDataType.UUID) {
+      return new UuidLookupTable();
+    }
+    switch (columnDataType.getStoredType()) {
       case INT:
         return new IntLookupTable();
       case LONG:
@@ -207,7 +213,8 @@ public class HashJoinOperator extends BaseJoinOperator {
       if (handleNullKey(key, leftRow, rows)) {
         continue;
       }
-      Object[] rightRow = (Object[]) _rightTable.lookup(key);
+      Object normalizedKey = _rightTable.normalizeKey(key);
+      Object[] rightRow = (Object[]) _rightTable.lookup(normalizedKey);
       if (rightRow == null) {
         handleUnmatchedLeftRow(leftRow, rows);
       } else {
@@ -220,7 +227,7 @@ public class HashJoinOperator extends BaseJoinOperator {
           checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
           rows.add(resultRowView.toArray());
           if (_matchedRightRows != null) {
-            _matchedRightRows.put(key, BIT_SET_PLACEHOLDER);
+            _matchedRightRows.put(normalizedKey, BIT_SET_PLACEHOLDER);
           }
         } else {
           handleUnmatchedLeftRow(leftRow, rows);
@@ -242,7 +249,8 @@ public class HashJoinOperator extends BaseJoinOperator {
       if (handleNullKey(key, leftRow, rows)) {
         continue;
       }
-      List<Object[]> rightRows = (List<Object[]>) _rightTable.lookup(key);
+      Object normalizedKey = _rightTable.normalizeKey(key);
+      List<Object[]> rightRows = (List<Object[]>) _rightTable.lookup(normalizedKey);
       if (rightRows == null) {
         handleUnmatchedLeftRow(leftRow, rows);
       } else {
@@ -260,7 +268,7 @@ public class HashJoinOperator extends BaseJoinOperator {
             rows.add(resultRowView.toArray());
             hasMatchForLeftRow = true;
             if (_matchedRightRows != null) {
-              _matchedRightRows.computeIfAbsent(key, k -> new BitSet(numRightRows)).set(i);
+              _matchedRightRows.computeIfAbsent(normalizedKey, k -> new BitSet(numRightRows)).set(i);
             }
           }
         }
@@ -293,7 +301,7 @@ public class HashJoinOperator extends BaseJoinOperator {
 
     for (Object[] leftRow : leftRows) {
       Object key = _leftKeySelector.getKey(leftRow);
-      if (_rightTable.containsKey(key)) {
+      if (_rightTable.containsKey(_rightTable.normalizeKey(key))) {
         checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
         rows.add(leftRow);
       }
@@ -309,7 +317,7 @@ public class HashJoinOperator extends BaseJoinOperator {
 
     for (Object[] leftRow : leftRows) {
       Object key = _leftKeySelector.getKey(leftRow);
-      if (!_rightTable.containsKey(key)) {
+      if (!_rightTable.containsKey(_rightTable.normalizeKey(key))) {
         checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
         rows.add(leftRow);
       }
