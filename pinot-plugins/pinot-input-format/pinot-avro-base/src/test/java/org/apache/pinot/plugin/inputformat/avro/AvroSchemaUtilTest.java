@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.avro.Schema;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
@@ -58,16 +59,60 @@ public class AvroSchemaUtilTest {
         () -> AvroSchemaUtil.toAvroSchemaJsonObject(new DimensionFieldSpec("col", DataType.BIG_DECIMAL, true)));
   }
 
-  /// A UUID column is represented faithfully as an Avro string annotated with logicalType "uuid".
-  /// `DataGenerator#buildSpec` always marks the recommender schema FieldSpec single-value, so this emits a scalar
-  /// union like every sibling type.
+  /// UUID is a logical type; a single-value column maps to an Avro string carrying the "uuid" logical type.
   @Test
   public void testToAvroSchemaJsonObjectForUuid() {
     JsonNode type = typeOf(DataType.UUID);
     assertEquals(type.get(0).asText(), "null");
-    JsonNode uuidBranch = type.get(1);
-    assertEquals(uuidBranch.get("type").asText(), "string");
-    assertEquals(uuidBranch.get("logicalType").asText(), "uuid");
+    assertEquals(type.get(1).get("type").asText(), "string");
+    assertEquals(type.get(1).get("logicalType").asText(), "uuid");
+  }
+
+  /// A multi-value UUID column maps to an Avro array of "uuid"-logical-type strings.
+  @Test
+  public void testToAvroSchemaJsonObjectForUuidArray() {
+    ObjectNode jsonSchema =
+        AvroSchemaUtil.toAvroSchemaJsonObject(new DimensionFieldSpec("col", DataType.UUID, false));
+    JsonNode type = jsonSchema.get("type");
+    assertEquals(type.get(0).asText(), "null");
+    assertEquals(type.get(1).get("type").asText(), "array");
+    assertEquals(type.get(1).get("items").get("type").asText(), "string");
+    assertEquals(type.get(1).get("items").get("logicalType").asText(), "uuid");
+  }
+
+  @Test
+  public void testValueOfUuidStringLogicalType() {
+    Schema schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"r\",\"fields\":[{\"name\":\"id\","
+        + "\"type\":{\"type\":\"string\",\"logicalType\":\"uuid\"}}]}");
+    assertEquals(AvroSchemaUtil.valueOf(schema.getField("id").schema()), DataType.UUID,
+        "STRING logicalType:uuid should map to UUID");
+  }
+
+  @Test
+  public void testValueOfUuidFixed16LogicalType() {
+    // FIXED(16) + logicalType:uuid — produced by Confluent fixed-uuid mode and Parquet uuid
+    Schema schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"r\",\"fields\":[{\"name\":\"id\","
+        + "\"type\":{\"type\":\"fixed\",\"name\":\"uuid_fixed\",\"size\":16,\"logicalType\":\"uuid\"}}]}");
+    assertEquals(AvroSchemaUtil.valueOf(schema.getField("id").schema()), DataType.UUID,
+        "FIXED(16) logicalType:uuid should map to UUID");
+  }
+
+  @Test
+  public void testValueOfFixed16WithoutLogicalTypeIsBytes() {
+    // FIXED(16) without logicalType should stay as BYTES
+    Schema schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"r\",\"fields\":[{\"name\":\"raw\","
+        + "\"type\":{\"type\":\"fixed\",\"name\":\"raw16\",\"size\":16}}]}");
+    assertEquals(AvroSchemaUtil.valueOf(schema.getField("raw").schema()), DataType.BYTES,
+        "FIXED(16) without logicalType:uuid should stay BYTES");
+  }
+
+  @Test
+  public void testValueOfFixedWrongSizeWithUuidLogicalTypeIsBytes() {
+    // FIXED of non-16 size with logicalType:uuid should not map to UUID
+    Schema schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"r\",\"fields\":[{\"name\":\"id\","
+        + "\"type\":{\"type\":\"fixed\",\"name\":\"uuid32\",\"size\":32,\"logicalType\":\"uuid\"}}]}");
+    assertEquals(AvroSchemaUtil.valueOf(schema.getField("id").schema()), DataType.BYTES,
+        "FIXED(32) with logicalType:uuid should stay BYTES");
   }
 
   private static void assertPrimitiveType(DataType dataType, String expectedAvroType) {

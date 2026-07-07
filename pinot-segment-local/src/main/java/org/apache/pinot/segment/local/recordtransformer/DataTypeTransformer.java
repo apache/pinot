@@ -19,8 +19,12 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -52,21 +56,52 @@ public class DataTypeTransformer implements RecordTransformer {
   private final Map<String, PinotDataType> _dataTypes;
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
+  // UUID primary key columns for upsert/dedup tables; non-null and non-empty when applicable.
+  // Non-canonical (uppercase) UUID strings in these columns will be rejected at ingest time because
+  // Kafka partition routing is decided by the producer before Pinot normalises the value. Accepting
+  // uppercase UUIDs as primary keys silently causes dedup failures in multi-partition realtime
+  // upsert tables when the same logical UUID is routed to different partitions.
+  @Nullable
+  private final Set<String> _upsertUuidPrimaryKeyColumns;
 
   /// Creates a [DataTypeTransformer] that converts the (non-virtual) schema columns to the data types defined in the
   /// [Schema].
   public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
-    this(tableConfig, extractSchemaDataTypes(schema));
+    this(tableConfig, extractSchemaDataTypes(schema), schema);
   }
 
   /// Creates a [DataTypeTransformer] that converts the given columns to the provided [PinotDataType]s. This is useful
   /// for fixing the data types of source fields before other transformers (such as [ExpressionTransformer]) consume
   /// them.
   public DataTypeTransformer(TableConfig tableConfig, Map<String, PinotDataType> dataTypes) {
+    this(tableConfig, dataTypes, null);
+  }
+
+  private DataTypeTransformer(TableConfig tableConfig, Map<String, PinotDataType> dataTypes, @Nullable Schema schema) {
     _dataTypes = dataTypes;
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
     _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
+
+    // Enforce canonical-form UUID PKs only when upsert/dedup is actually enabled — a present-but-disabled config
+    // (e.g., UpsertConfig with Mode.NONE) must not reject otherwise-valid rows.
+    if (schema != null && (tableConfig.isUpsertEnabled() || tableConfig.isDedupEnabled())) {
+      List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+      if (primaryKeyColumns != null && !primaryKeyColumns.isEmpty()) {
+        Set<String> uuidPkCols = new HashSet<>();
+        for (String col : primaryKeyColumns) {
+          FieldSpec spec = schema.getFieldSpecFor(col);
+          if (spec != null && spec.getDataType() == FieldSpec.DataType.UUID) {
+            uuidPkCols.add(col);
+          }
+        }
+        _upsertUuidPrimaryKeyColumns = uuidPkCols.isEmpty() ? null : Set.copyOf(uuidPkCols);
+      } else {
+        _upsertUuidPrimaryKeyColumns = null;
+      }
+    } else {
+      _upsertUuidPrimaryKeyColumns = null;
+    }
   }
 
   private static Map<String, PinotDataType> extractSchemaDataTypes(Schema schema) {
@@ -95,6 +130,10 @@ public class DataTypeTransformer implements RecordTransformer {
       String column = entry.getKey();
       try {
         Object value = record.getValue(column);
+        if (_upsertUuidPrimaryKeyColumns != null && _upsertUuidPrimaryKeyColumns.contains(column)
+            && value instanceof CharSequence) {
+          validateCanonicalUuidPrimaryKey(column, value.toString());
+        }
         value = DataTypeTransformerUtils.transformValue(column, value, entry.getValue());
         record.putValue(column, value);
       } catch (Exception e) {
@@ -105,6 +144,43 @@ public class DataTypeTransformer implements RecordTransformer {
         record.putValue(column, null);
         record.markIncomplete();
       }
+    }
+  }
+
+  /**
+   * Validates that a UUID primary key string value is in canonical lowercase RFC 4122 form.
+   *
+   * <p>UUID primary keys in upsert/dedup realtime tables must be canonical because Kafka partition routing
+   * is determined by the raw string value that the producer sends. If the producer sends the same logical
+   * UUID with different casing (e.g. uppercase vs lowercase), Kafka will hash the strings differently
+   * and the messages may land on different partitions. Pinot then normalises them to the same bytes
+   * inside each consuming segment, so within-segment dedup works, but cross-partition dedup never
+   * fires - producing duplicate or stale rows silently.
+   *
+   * <p>By rejecting any non-canonical UUID here (before bytes conversion loses the original string),
+   * we ensure that a producer-side inconsistency surfaces as an ingestion error rather than a silent
+   * correctness failure. This covers not only casing but also the dash-less 32-hex form and
+   * whitespace-padded values: {@code UuidUtils.toBytes(String)} (used by the downstream conversion)
+   * accepts those and would normalise them to the same bytes as the canonical string, so they must be
+   * rejected here too. Producers must canonicalise UUID primary keys to lowercase RFC 4122 form before
+   * publishing to Kafka.
+   */
+  private static void validateCanonicalUuidPrimaryKey(String column, String uuidStr) {
+    String canonical = null;
+    try {
+      canonical = UUID.fromString(uuidStr).toString();
+    } catch (IllegalArgumentException e) {
+      // Not parseable as a dashed RFC 4122 UUID (e.g. dash-less 32-hex or whitespace-padded). Reject below rather
+      // than defer to DataTypeTransformerUtils.transformValue, whose UuidUtils.toBytes would accept it as a
+      // non-canonical value and defeat the Kafka partition-routing guarantee.
+    }
+    if (!uuidStr.equals(canonical)) {
+      throw new IllegalArgumentException(
+          "Non-canonical UUID primary key value '" + uuidStr + "' in upsert/dedup column '" + column + "'. "
+              + "Expected canonical lowercase RFC 4122 form"
+              + (canonical != null ? ": '" + canonical + "'" : " (8-4-4-4-12 dashed lowercase)") + ". "
+              + "UUID primary keys must be in canonical lowercase form to ensure consistent Kafka partition "
+              + "routing. Non-canonical values cause silent dedup failures in multi-partition realtime tables.");
     }
   }
 }
