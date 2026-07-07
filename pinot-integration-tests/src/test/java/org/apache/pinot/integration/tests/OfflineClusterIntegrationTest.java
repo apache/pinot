@@ -128,13 +128,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
 
   // For range index triggering test
-  private static final List<String> UPDATED_RANGE_INDEX_COLUMNS = List.of("DivActualElapsedTime");
+  private static final List<String> UPDATED_RANGE_INDEX_COLUMNS = List.of("ArrTime");
   private static final String TEST_UPDATED_RANGE_INDEX_QUERY =
-      "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime > 305";
+      "SELECT COUNT(*) FROM mytable WHERE ArrTime > 305";
 
   // For bloom filter triggering test
   private static final List<String> UPDATED_BLOOM_FILTER_COLUMNS = List.of("Carrier");
   private static final String TEST_UPDATED_BLOOM_FILTER_QUERY = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'CA'";
+
 
   // For star-tree triggering test
   private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_1 =
@@ -620,7 +621,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private void addRangeIndex(boolean shouldReload)
       throws Exception {
-    // Update table config to add Range index on DivActualElapsedTime column, and
+    // Update table config to add Range index on ArrTime column, and
     // reload the table to get config change into effect and add the Range index.
     TableConfig tableConfig = createOfflineTableConfig();
     tableConfig.getIndexingConfig().setRangeIndexColumns(UPDATED_RANGE_INDEX_COLUMNS);
@@ -1477,6 +1478,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, false, numTotalDocs);
     assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
   }
+
 
   @Test
   public void testBloomFilterTriggering()
@@ -4109,52 +4111,32 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     long numTotalDocs = getCountStarResult();
-    assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+    assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
 
-    // Update table config to add range and inverted index, and trigger reload
+    // Update table config to add inverted index, and trigger reload
     TableConfig tableConfig = createOfflineTableConfig();
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    indexingConfig.setRangeIndexColumns(UPDATED_RANGE_INDEX_COLUMNS);
     indexingConfig.setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
-    reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, false, numTotalDocs);
-    assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+    reloadAllSegments(TEST_UPDATED_INVERTED_INDEX_QUERY, false, numTotalDocs);
 
-    // Ensure inv index is operational
     assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
 
-    // disallow use of range index on DivActualElapsedTime, inverted should be unaffected
-    String skipIndexes = buildSkipIndexesOption("DivActualElapsedTime=range");
-    assertEquals(postQuery(skipIndexes + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(),
-        0L);
-    assertEquals(postQuery(skipIndexes + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(),
-        numTotalDocs);
-
-    // disallow use of inverted index on DivActualElapsedTime, range should be unaffected
-    skipIndexes = buildSkipIndexesOption("DivActualElapsedTime=inverted");
+    // disallow use of inverted index on DivActualElapsedTime
+    String skipIndexes = buildSkipIndexesOption("DivActualElapsedTime=inverted");
     // Confirm that inverted index is not used
     assertFalse(postQuery(skipIndexes + " EXPLAIN PLAN FOR " + TEST_UPDATED_INVERTED_INDEX_QUERY).toString()
         .contains("FILTER_INVERTED_INDEX"));
 
-    // EQ predicate type allows for using range index if one exists, even if inverted index is skipped. That is why
-    // we still see no docs scanned even though we skip the inverted index. This is a good test to show that using
-    // the skipIndexes can allow fine-grained experimentation of index usage at query time.
-    assertEquals(postQuery(skipIndexes + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(),
-        0L);
-    assertEquals(postQuery(skipIndexes + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
-
-    // disallow use of both range and inverted indexes on DivActualElapsedTime, neither should be used at query time
-    skipIndexes = buildSkipIndexesOption("DivActualElapsedTime=inverted,range");
     assertEquals(postQuery(skipIndexes + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(),
         numTotalDocs);
-    assertEquals(postQuery(skipIndexes + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(),
-        numTotalDocs);
 
-    // Update table config to remove the new indexes, and check if the new indexes are removed
+    // Update table config to remove the new index, and check if the new index is removed
     updateTableConfig(_tableConfig);
-    reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, false, numTotalDocs);
-    assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+    reloadAllSegments(TEST_UPDATED_INVERTED_INDEX_QUERY, false, numTotalDocs);
+    assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
   }
+
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault(boolean useMultiStageQueryEngine)

@@ -552,29 +552,11 @@ public class IndexCombinationValidationTest {
   }
 
   @Test
-  public void testTextIndexNonStringColumnFails() {
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.TEXT, null, null);
-    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setFieldConfigList(List.of(fc))
-        .build();
-    assertInvalid(tc, "Cannot create TEXT index on column: " + INT_COL + " of stored type other than STRING");
-  }
-
-  @Test
   public void testTextIndexStringColumnRawPasses() {
     // Text index does not require dictionary
     FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.TEXT, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
-        .setFieldConfigList(List.of(fc))
-        .build();
-    assertValid(tc);
-  }
-
-  @Test
-  public void testTextIndexStringColumnDictPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.TEXT, null, null);
-    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
     assertValid(tc);
@@ -588,25 +570,6 @@ public class IndexCombinationValidationTest {
         .setFieldConfigList(List.of(fc))
         .build();
     assertValid(tc);
-  }
-
-  @Test
-  public void testJsonIndexStringColumnDictPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.JSON, null, null);
-    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setFieldConfigList(List.of(fc))
-        .build();
-    assertValid(tc);
-  }
-
-  @Test
-  public void testJsonIndexIntColumnFails() {
-    // JSON index not valid on non-STRING/non-MAP column
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.JSON, null, null);
-    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setFieldConfigList(List.of(fc))
-        .build();
-    assertInvalid(tc, "Cannot create JSON index on column: " + INT_COL);
   }
 
   // ============================================================

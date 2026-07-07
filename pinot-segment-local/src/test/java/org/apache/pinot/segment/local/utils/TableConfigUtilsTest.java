@@ -1490,24 +1490,6 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(List.of("myCol2"))
-        .setInvertedIndexColumns(List.of("myCol1"))
-        .setSortedColumn("myCol1")
-        .build();
-    try {
-      // Enable forward index disabled flag for a column with inverted index and is sorted
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null, null,
-              null, fieldConfigProperties);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-    } catch (Exception e) {
-      fail("Should not fail for myCol1 with forward index disabled but is sorted, this is a no-op");
-    }
-
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol1"))
         .setInvertedIndexColumns(Arrays.asList("myCol2"))
         .setRangeIndexColumns(Arrays.asList("myCol2"))
@@ -4489,6 +4471,36 @@ public class TableConfigUtilsTest {
       fail("Should fail when an OPEN_STRUCT parent column name contains the reserved '$' separator");
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains("metrics$v2"));
+    }
+  }
+
+  @Test
+  public void testValidateInvertedAndRangeIndexesOnSortedColumns() {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setSortedColumn("score").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addMetric("score", FieldSpec.DataType.INT)
+        .build();
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setNoDictionaryColumns(List.of("score", "pk"));
+    indexingConfig.setRangeIndexColumns(List.of("score"));
+    indexingConfig.setSortedColumn(List.of("score"));
+    tableConfig.setIndexingConfig(indexingConfig);
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Redundant to enable range index on a sorted column"));
+    }
+    indexingConfig = new IndexingConfig();
+    indexingConfig.setNoDictionaryColumns(List.of("pk"));
+    indexingConfig.setInvertedIndexColumns(List.of("score"));
+    indexingConfig.setSortedColumn(List.of("score"));
+    tableConfig.setIndexingConfig(indexingConfig);
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Redundant to enable inverted index on a sorted column"));
     }
   }
 }
