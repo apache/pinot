@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -72,27 +71,38 @@ public interface InstanceSelector {
   /// Returns the enabled server instances currently serving the table.
   Set<String> getServingInstances();
 
+  /// Holds the result of an instance selection: `segmentToInstanceMap` maps each segment to its selected server
+  /// instance, and `optionalSegmentToInstanceMap` maps segments not yet fully online that the server may skip.
+  record InstanceMapping(Map<String, String> segmentToInstanceMap,
+      Map<String, String> optionalSegmentToInstanceMap) {
+    static final InstanceMapping EMPTY = new InstanceMapping(Map.of(), Map.of());
+  }
+
   class SelectionResult {
-    private final Pair<Map<String, String>, Map<String, String>/*optional segments*/> _segmentToInstanceMap;
+    private final InstanceMapping _instanceMapping;
     private final List<String> _unavailableSegments;
     private int _numPrunedSegments;
 
-    public SelectionResult(Pair<Map<String, String>, Map<String, String>> segmentToInstanceMap,
+    public SelectionResult(InstanceMapping instanceMapping,
         List<String> unavailableSegments, int numPrunedSegments) {
-      _segmentToInstanceMap = segmentToInstanceMap;
+      _instanceMapping = instanceMapping;
       _unavailableSegments = unavailableSegments;
       _numPrunedSegments = numPrunedSegments;
     }
 
+    public static SelectionResult empty(int numPrunedSegments) {
+      return new SelectionResult(InstanceMapping.EMPTY, List.of(), numPrunedSegments);
+    }
+
     /// Returns the map from segment to selected server instance hosting the segment.
     public Map<String, String> getSegmentToInstanceMap() {
-      return _segmentToInstanceMap.getLeft();
+      return _instanceMapping.segmentToInstanceMap();
     }
 
     /// Returns the map from optional segment to selected server instance hosting the optional segment.
     /// Optional segments can be skipped by broker or server upon any issue w/o failing the query.
     public Map<String, String> getOptionalSegmentToInstanceMap() {
-      return _segmentToInstanceMap.getRight();
+      return _instanceMapping.optionalSegmentToInstanceMap();
     }
 
     /// Returns the unavailable segments (no enabled instance or all enabled instances are in ERROR state).
