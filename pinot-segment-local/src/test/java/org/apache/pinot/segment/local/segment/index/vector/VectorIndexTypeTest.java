@@ -19,16 +19,19 @@
 package org.apache.pinot.segment.local.segment.index.vector;
 
 import java.io.File;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -297,6 +300,81 @@ public class VectorIndexTypeTest {
       Mockito.verify(segmentReader, Mockito.never()).getIndexFor("embedding", StandardIndexes.vector());
     } finally {
       FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /**
+   * Regression: when the segment directory path is not a local filesystem directory (e.g. a
+   * {@code SegmentDirectory} backed by remote storage), the legacy-directory probe must be skipped
+   * — {@code SegmentDirectoryPaths.findFormatFile} rejects non-directory paths with
+   * {@code IllegalArgumentException}, which used to fail the whole segment load. The factory must
+   * go straight to the consolidated columns.psf entry and return a working reader.
+   */
+  @Test
+  public void testReaderFactoryLoadsConsolidatedHnswWhenSegmentDirectoryIsNotLocal()
+      throws Exception {
+    File buildDir = new File(FileUtils.getTempDirectory(), "vector-index-type-nonlocal-" + System.nanoTime());
+    FileUtils.deleteQuietly(buildDir);
+    PinotDataBuffer buffer = null;
+    try {
+      Assert.assertTrue(buildDir.mkdirs());
+      int dimension = 4;
+      int numDocs = 8;
+      // Build a legacy HNSW directory, then pack it into a combined buffer standing in for the
+      // consolidated columns.psf entry.
+      Map<String, String> creatorProps = new HashMap<>();
+      creatorProps.put("commit", "true");
+      creatorProps.put("useCompoundFile", "false");
+      VectorIndexConfig creatorConfig = new VectorIndexConfig(false, "HNSW", dimension, 1,
+          VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, creatorProps);
+      try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("embedding", buildDir, creatorConfig)) {
+        for (int i = 0; i < numDocs; i++) {
+          creator.add(new float[] {i, i + 1, i + 2, i + 3});
+        }
+        creator.seal();
+      }
+      File hnswDir = new File(buildDir, "embedding" + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+      File combinedFile =
+          new File(buildDir, "embedding" + V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
+      HnswVectorIndexCombined.combineHnswIndexFiles(hnswDir, combinedFile.getAbsolutePath(), null, null);
+      // BIG_ENDIAN mirrors how columns.psf entries are mapped in production.
+      buffer = PinotDataBuffer.mapFile(combinedFile, /* readOnly */ true, 0, combinedFile.length(),
+          ByteOrder.BIG_ENDIAN, "vector-index-type-nonlocal-test");
+
+      SegmentDirectory segmentDirectory = Mockito.mock(SegmentDirectory.class);
+      SegmentDirectory.Reader segmentReader = Mockito.mock(SegmentDirectory.Reader.class);
+      // A path that exists nowhere on the local filesystem, as getPath() yields for remote-backed
+      // segment directories.
+      Mockito.when(segmentDirectory.getPath())
+          .thenReturn(new File("/segments/vectorTest/nonexistent-" + System.nanoTime()).toPath());
+      Mockito.when(segmentReader.toSegmentDirectory()).thenReturn(segmentDirectory);
+      Mockito.when(segmentReader.getIndexFor("embedding", StandardIndexes.vector())).thenReturn(buffer);
+
+      ColumnMetadata metadata = Mockito.mock(ColumnMetadata.class);
+      Mockito.when(metadata.getColumnName()).thenReturn("embedding");
+      Mockito.when(metadata.getDataType()).thenReturn(FieldSpec.DataType.FLOAT);
+      Mockito.when(metadata.getTotalDocs()).thenReturn(numDocs);
+      Mockito.when(metadata.getFieldSpec())
+          .thenReturn(new DimensionFieldSpec("embedding", FieldSpec.DataType.FLOAT, false));
+
+      Map<String, String> readerProps = new HashMap<>(creatorProps);
+      readerProps.put(VectorIndexConfig.STORE_IN_SEGMENT_FILE, "true");
+      VectorIndexConfig readerConfig = new VectorIndexConfig(false, "HNSW", dimension, 1,
+          VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, readerProps);
+      FieldIndexConfigs fieldIndexConfigs =
+          new FieldIndexConfigs.Builder().add(StandardIndexes.vector(), readerConfig).build();
+
+      VectorIndexReader reader = StandardIndexes.vector().getReaderFactory()
+          .createIndexReader(segmentReader, fieldIndexConfigs, metadata);
+      Assert.assertNotNull(reader,
+          "consolidated HNSW entry must load when the segment directory is not a local path");
+      // The buffer is owned by the segment directory; closing the reader must not close it.
+      reader.close();
+    } finally {
+      if (buffer != null) {
+        buffer.close();
+      }
+      FileUtils.deleteQuietly(buildDir);
     }
   }
 }
