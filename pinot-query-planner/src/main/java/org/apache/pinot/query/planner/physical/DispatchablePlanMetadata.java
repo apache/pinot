@@ -71,6 +71,9 @@ public class DispatchablePlanMetadata implements Serializable {
   // Available for leaf stage only
   // Map from workerId -> {tableType -> segments}
   private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
+  // Map from workerId -> {tableType -> optional segments}, parallel to _workerIdToSegmentsMap when present
+  @Nullable
+  private Map<Integer, Map<String, List<String>>> _workerIdToOptionalSegmentsMap;
   // Map from tableType -> segments, available when 'is_replicated' hint is set to true
   private Map<String, List<String>> _replicatedSegments;
   private TimeBoundaryInfo _timeBoundaryInfo;
@@ -85,6 +88,8 @@ public class DispatchablePlanMetadata implements Serializable {
    * Map from workerId -> {physicalTableName -> segments} is required for logical tables.
    */
   private Map<Integer, Map<String, List<String>>> _workerIdToTableSegmentsMap;
+  @Nullable
+  private Map<Integer, Map<String, List<String>>> _workerIdToOptionalTableSegmentsMap;
   private LogicalTableRouteInfo _logicalTableRouteInfo;
 
   public List<String> getScannedTables() {
@@ -123,6 +128,16 @@ public class DispatchablePlanMetadata implements Serializable {
 
   public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
+  }
+
+  @Nullable
+  public Map<Integer, Map<String, List<String>>> getWorkerIdToOptionalSegmentsMap() {
+    return _workerIdToOptionalSegmentsMap;
+  }
+
+  public void setWorkerIdToOptionalSegmentsMap(
+      @Nullable Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap) {
+    _workerIdToOptionalSegmentsMap = workerIdToOptionalSegmentsMap;
   }
 
   @Nullable
@@ -203,5 +218,15 @@ public class DispatchablePlanMetadata implements Serializable {
   public void setWorkerIdToTableSegmentsMap(
       Map<Integer, Map<String, List<String>>> workerIdToTableSegmentsMap) {
     _workerIdToTableSegmentsMap = workerIdToTableSegmentsMap;
+  }
+
+  @Nullable
+  public Map<Integer, Map<String, List<String>>> getWorkerIdToOptionalTableSegmentsMap() {
+    return _workerIdToOptionalTableSegmentsMap;
+  }
+
+  public void setWorkerIdToOptionalTableSegmentsMap(
+      @Nullable Map<Integer, Map<String, List<String>>> workerIdToOptionalTableSegmentsMap) {
+    _workerIdToOptionalTableSegmentsMap = workerIdToOptionalTableSegmentsMap;
   }
 }
