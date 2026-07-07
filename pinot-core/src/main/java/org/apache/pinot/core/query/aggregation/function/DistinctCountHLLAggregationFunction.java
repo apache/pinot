@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -81,8 +82,24 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns are stored as 16-byte BYTES, but a UUID value is a logical scalar — not a serialized
+    // HyperLogLog. Offer the canonical UUID string so the result matches DISTINCTCOUNTHLL on a STRING column
+    // holding the same logical UUIDs. NOTE: fetch raw bytes and convert explicitly — for identifier expressions
+    // the BlockValSet is a ProjectionBlockValSet whose getStringValuesSV() renders stored BYTES as bare hex,
+    // not the canonical RFC-4122 form.
+    if (dataType == DataType.UUID) {
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
+      HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
+      for (int i = 0; i < length; i++) {
+        hyperLogLog.offer(UuidUtils.toString(uuidBytesValues[i]));
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized HyperLogLog
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
@@ -232,8 +249,19 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns: offer canonical UUID strings converted from raw bytes (see aggregate() for rationale).
+    if (dataType == DataType.UUID) {
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(UuidUtils.toString(uuidBytesValues[i]));
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized HyperLogLog
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
@@ -381,8 +409,22 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns: offer canonical UUID strings converted from raw bytes (see aggregate() for rationale).
+    if (dataType == DataType.UUID) {
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        String canonical = UuidUtils.toString(uuidBytesValues[i]);
+        for (int groupKey : groupKeysArray[i]) {
+          getHyperLogLog(groupByResultHolder, groupKey).offer(canonical);
+        }
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized HyperLogLog
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
