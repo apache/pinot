@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
@@ -160,6 +161,16 @@ public class AvroUtils {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
 
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
+      if (fieldSpec.getDataType() == DataType.UUID) {
+        org.apache.avro.Schema uuidSchema = LogicalTypes.uuid().addToSchema(org.apache.avro.Schema.create(
+            org.apache.avro.Schema.Type.STRING));
+        if (fieldSpec.isSingleValueField()) {
+          fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type(uuidSchema).noDefault();
+        } else {
+          fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items(uuidSchema).noDefault();
+        }
+        continue;
+      }
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (fieldSpec.isSingleValueField()) {
         switch (storedType) {
@@ -244,12 +255,13 @@ public class AvroUtils {
   public static DataType extractFieldDataType(Field field) {
     try {
       org.apache.avro.Schema fieldSchema = extractSupportedSchema(field.schema());
-      org.apache.avro.Schema.Type fieldType = fieldSchema.getType();
-      if (fieldType == org.apache.avro.Schema.Type.ARRAY) {
-        return AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()).getType());
+      if (fieldSchema.getType() == org.apache.avro.Schema.Type.ARRAY) {
+        return AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()));
       } else {
-        return AvroSchemaUtil.valueOf(fieldType);
+        return AvroSchemaUtil.valueOf(fieldSchema);
       }
+    } catch (RuntimeException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while extracting data type from field: " + field.name(), e);
     }
@@ -323,16 +335,17 @@ public class AvroUtils {
           extractSchemaWithComplexTypeHandling(elementType, fieldsToUnnest, delimiter, path, pinotSchema, fieldTypeMap,
               timeUnit, collectionNotUnnestedToJson);
         } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE
-            && AvroSchemaUtil.isPrimitiveType(elementType.getType())) {
-          addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType.getType()), path, false, fieldTypeMap,
-              timeUnit);
+            && (AvroSchemaUtil.isPrimitiveType(elementType.getType())
+                || AvroSchemaUtil.valueOf(elementType) == DataType.UUID)) {
+          DataType elementDataType = AvroSchemaUtil.valueOf(elementType);
+          addFieldToPinotSchema(pinotSchema, elementDataType, path, false, fieldTypeMap, timeUnit);
         } else if (shallConvertToJson(collectionNotUnnestedToJson, elementType)) {
           addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
         }
         // do not include the node for other cases
         break;
       default:
-        DataType dataType = AvroSchemaUtil.valueOf(fieldType);
+        DataType dataType = AvroSchemaUtil.valueOf(fieldSchema);
         addFieldToPinotSchema(pinotSchema, dataType, path, true, fieldTypeMap, timeUnit);
         break;
     }

@@ -360,6 +360,8 @@ public class ColumnMinMaxValueGenerator {
           break;
         }
         case BYTES: {
+          // ByteArray.compare is unsigned byte-wise lexicographic; for canonical 16-byte big-endian UUIDs this is
+          // identical to UuidUtils.compare's unsigned 64-bit-word ordering, so a single comparator is sufficient.
           byte[] min = null;
           byte[] max = null;
           if (isSingleValue) {
