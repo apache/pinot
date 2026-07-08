@@ -85,11 +85,18 @@ public interface InstanceSelector {
 
   /**
    * Holds the result of an instance selection: {@code segmentToInstanceMap} maps each segment to its selected server
-   * instance, and {@code optionalSegmentToInstanceMap} maps segments not yet fully online that the server may skip.
+   * instance, {@code optionalSegmentToInstanceMap} maps segments not yet fully online that the server may skip, and
+   * {@code unavailableSegments} lists segments that have candidates but could not be routed.
    */
   record InstanceMapping(Map<String, String> segmentToInstanceMap,
-      Map<String, String> optionalSegmentToInstanceMap) {
-    static final InstanceMapping EMPTY = new InstanceMapping(Collections.emptyMap(), Collections.emptyMap());
+      Map<String, String> optionalSegmentToInstanceMap,
+      List<String> unavailableSegments) {
+    static final InstanceMapping EMPTY =
+        new InstanceMapping(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyList());
+
+    InstanceMapping(Map<String, String> segmentToInstanceMap, Map<String, String> optionalSegmentToInstanceMap) {
+      this(segmentToInstanceMap, optionalSegmentToInstanceMap, Collections.emptyList());
+    }
   }
 
   class SelectionResult {

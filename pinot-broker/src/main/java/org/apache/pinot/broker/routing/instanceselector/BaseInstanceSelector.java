@@ -466,11 +466,12 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     SegmentStates segmentStates = _segmentStates;
     InstanceMapping mapping = select(segments, requestIdInt, segmentStates, queryOptions);
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
+    List<String> mappingUnavailable = mapping.unavailableSegments();
 
-    if (unavailableSegments.isEmpty()) {
+    if (unavailableSegments.isEmpty() && mappingUnavailable.isEmpty()) {
       return new SelectionResult(mapping, Collections.emptyList(), 0);
     } else {
-      List<String> unavailableSegmentsForRequest = new ArrayList<>();
+      List<String> unavailableSegmentsForRequest = new ArrayList<>(mappingUnavailable);
       for (String segment : segments) {
         if (unavailableSegments.contains(segment)) {
           unavailableSegmentsForRequest.add(segment);

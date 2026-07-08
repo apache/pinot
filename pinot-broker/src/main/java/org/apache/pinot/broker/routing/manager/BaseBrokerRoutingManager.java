@@ -768,8 +768,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
       AdaptiveServerSelector adaptiveServerSelector =
           AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
-      // StrictReplicaGroupInstanceSelector is incompatible with adaptive routing;
-      // InstanceSelectorFactory will nullify the selector for such tables automatically.
+      // For StrictReplicaGroupInstanceSelector tables, pool-level adaptive routing is used,
+      // preserving the same-replica-group guarantee while benefiting from adaptive server selection.
       InstanceSelector instanceSelector =
           InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
               adaptiveServerSelector, _pinotConfig, _routableServerInstanceMap.keySet(), _enabledServerInstanceMap,
