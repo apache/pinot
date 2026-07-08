@@ -514,8 +514,8 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
       return EMPTY_PLACEHOLDER;
     }
 
-    if (result instanceof DictIdsWrapper dictIdsWrapper) {
-      return convertToValueSet(dictIdsWrapper);
+    if (result instanceof DictIdsWrapper) {
+      return convertToValueSet((DictIdsWrapper) result);
     } else {
       return result;
     }
