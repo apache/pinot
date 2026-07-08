@@ -473,6 +473,69 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 2);
   }
 
+  /**
+   * COMMITTING segments of pauseless tables have been consumed but are still being built and uploaded by the server,
+   * so they should be treated like consuming (IN_PROGRESS) segments rather than committed ones: a recently created one
+   * is skipped from the checks during the wait-for-push grace period, and none of them is flagged for an invalid time
+   * range since their time range is only finalized once they become DONE.
+   */
+  @Test
+  public void realtimeCommittingSegmentTest() {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName("timeColumn")
+            .setNumReplicas(3).setStreamConfigs(getStreamConfigMap()).build();
+
+    long now = System.currentTimeMillis();
+    String recentCommittingSegment = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, now).getSegmentName();
+    String oldCommittingSegment = new LLCSegmentName(RAW_TABLE_NAME, 2, 0, now).getSegmentName();
+
+    // Both segments are ONLINE on all three replicas in the ideal state, but only one replica is ONLINE in the
+    // external view, mimicking replicas that are still building/downloading the freshly committed segment.
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    for (String segment : List.of(recentCommittingSegment, oldCommittingSegment)) {
+      idealState.setPartitionState(segment, "pinot1", "ONLINE");
+      idealState.setPartitionState(segment, "pinot2", "ONLINE");
+      idealState.setPartitionState(segment, "pinot3", "ONLINE");
+      externalView.setState(segment, "pinot1", "ONLINE");
+      externalView.setState(segment, "pinot2", "OFFLINE");
+      externalView.setState(segment, "pinot3", "OFFLINE");
+    }
+    idealState.setReplicas("3");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
+    when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
+    when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
+    when(resourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    SegmentZKMetadata recentCommittingSegmentZKMetadata = mockCommittingSegmentZKMetadata(now);
+    when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, recentCommittingSegment)).thenReturn(
+        recentCommittingSegmentZKMetadata);
+    SegmentZKMetadata oldCommittingSegmentZKMetadata = mockCommittingSegmentZKMetadata(11111L);
+    when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, oldCommittingSegment)).thenReturn(
+        oldCommittingSegmentZKMetadata);
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    ZNRecord znRecord = new ZNRecord("0");
+    znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
+    when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+
+    // Use a large wait-for-push window so the recently created COMMITTING segment is skipped while the old one is not.
+    runSegmentStatusChecker(resourceManager, 3600);
+
+    // Only the old COMMITTING segment is checked for replica availability; the recent one is skipped entirely.
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 1);
+    // COMMITTING segments have not finalized their time range yet, so neither should be flagged for invalid time.
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.SEGMENTS_WITH_INVALID_START_TIME), 0);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.SEGMENTS_WITH_INVALID_END_TIME), 0);
+  }
+
   private Map<String, String> getStreamConfigMap() {
     return Map.of("streamType", "kafka", "stream.kafka.topic.name", "test", "stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder", "stream.kafka.consumer.factory.class.name",
@@ -490,6 +553,14 @@ public class SegmentStatusCheckerTest {
   private SegmentZKMetadata mockConsumingSegmentZKMetadata(long creationTimeMs) {
     SegmentZKMetadata segmentZKMetadata = mock(SegmentZKMetadata.class);
     when(segmentZKMetadata.getStatus()).thenReturn(Status.IN_PROGRESS);
+    when(segmentZKMetadata.getSizeInBytes()).thenReturn(-1L);
+    when(segmentZKMetadata.getCreationTime()).thenReturn(creationTimeMs);
+    return segmentZKMetadata;
+  }
+
+  private SegmentZKMetadata mockCommittingSegmentZKMetadata(long creationTimeMs) {
+    SegmentZKMetadata segmentZKMetadata = mock(SegmentZKMetadata.class);
+    when(segmentZKMetadata.getStatus()).thenReturn(Status.COMMITTING);
     when(segmentZKMetadata.getSizeInBytes()).thenReturn(-1L);
     when(segmentZKMetadata.getCreationTime()).thenReturn(creationTimeMs);
     return segmentZKMetadata;
