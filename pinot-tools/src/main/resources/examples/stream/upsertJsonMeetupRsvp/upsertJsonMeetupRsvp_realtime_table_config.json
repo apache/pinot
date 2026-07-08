@@ -107,13 +107,6 @@
       "indexTypes": [
         "TEXT"
       ]
-    },
-    {
-      "name": "venue_json",
-      "encodingType": "RAW",
-      "indexTypes": [
-        "TEXT"
-      ]
     }
   ],
   "metadata": {
