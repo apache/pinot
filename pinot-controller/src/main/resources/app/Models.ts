@@ -37,6 +37,13 @@ export enum AuthWorkflow {
   NONE = 'NONE',
   BASIC = 'BASIC',
   OIDC = 'OIDC',
+  /**
+   * SESSION workflow: credentials are validated once at POST /auth/login.
+   * The server issues an HttpOnly cookie. Subsequent requests carry the cookie automatically –
+   * no Authorization header is sent. Logout calls GET /auth/logout which immediately invalidates
+   * the server-side session (Trino/Ambari style).
+   */
+  SESSION = 'SESSION',
 }
 
 export enum AuthLocalStorageKeys {

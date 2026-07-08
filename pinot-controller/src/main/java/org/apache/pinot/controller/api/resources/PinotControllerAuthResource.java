@@ -36,6 +36,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -55,6 +56,9 @@ public class PinotControllerAuthResource {
 
   @Inject
   private AccessControlFactory _accessControlFactory;
+
+  @Inject
+  private ControllerConf _controllerConf;
 
   @Context
   HttpHeaders _httpHeaders;
@@ -106,8 +110,15 @@ public class PinotControllerAuthResource {
     return accessControl.hasAccess(_httpHeaders, TargetType.CLUSTER);
   }
 
-  /// Provide the auth workflow configuration for the Pinot UI to perform user authentication. Currently supports NONE
-  /// (no auth) and BASIC (basic auth with username and password)
+  /// Provide the auth workflow configuration for the Pinot UI to perform user authentication.
+  ///
+  /// When `controller.ui.session.authentication.enabled=true`, returns
+  /// `{"workflow":"SESSION","inactivityTimeoutSeconds":<n>}` regardless of which
+  /// AccessControlFactory is configured. The session layer is independent of the auth backend
+  /// (BasicAuth, ZkBasicAuth, LDAP/PasswordAuth, or any custom factory).
+  ///
+  /// When session mode is disabled (default), the underlying factory's workflow is returned
+  /// (NONE, BASIC, OIDC, etc.), preserving backward compatibility.
   ///
   /// @return auth workflow info/configuration
   @GET
@@ -117,6 +128,13 @@ public class PinotControllerAuthResource {
   @ApiOperation(value = "Retrieve auth workflow info")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Auth workflow info provided")})
   public AccessControl.AuthWorkflowInfo info() {
+    if (_controllerConf != null
+        && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)) {
+      long inactivityTimeout = _controllerConf.getProperty(
+          ControllerConf.CONTROLLER_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS,
+          ControllerConf.DEFAULT_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS);
+      return new AccessControl.AuthWorkflowInfo(AccessControl.WORKFLOW_SESSION, inactivityTimeout);
+    }
     return _accessControlFactory.create().getAuthWorkflowInfo();
   }
 }

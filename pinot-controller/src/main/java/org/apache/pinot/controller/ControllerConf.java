@@ -357,6 +357,48 @@ public class ControllerConf extends PinotConfiguration {
   public static final String INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM =
       "controller.ingestFromURI.allowLocalFileSystem";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
+
+  /**
+   * When set to {@code true}, the Pinot UI uses session-based authentication (Trino/Ambari-style).
+   *
+   * <p>This is a UI-layer setting that is independent of the configured
+   * {@code controller.admin.access.control.factory.class}. It works with any auth backend:
+   * BasicAuth, ZkBasicAuth, LDAP/PasswordAuth, or custom factories.
+   *
+   * <p>When enabled:
+   * <ul>
+   *   <li>{@code GET /auth/info} returns {@code {"workflow":"SESSION"}}</li>
+   *   <li>The UI uses {@code POST /auth/login} to authenticate (no Authorization header)</li>
+   *   <li>An HttpOnly {@code SameSite=Strict} session cookie is issued on successful login</li>
+   *   <li>{@code GET /auth/logout} immediately invalidates the server-side session</li>
+   * </ul>
+   *
+   * <p>Default: {@code false} (backward compatible – existing BASIC/NONE/OIDC workflows unchanged)
+   */
+  public static final String CONTROLLER_UI_SESSION_ENABLED = "controller.ui.session.authentication.enabled";
+
+  /**
+   * When set to {@code true}, the HttpOnly session cookie is flagged as {@code Secure}, meaning the
+   * browser will only send it over HTTPS connections. Set to {@code false} only for local HTTP dev.
+   *
+   * <p>Default: {@code true}
+   */
+  public static final String CONTROLLER_UI_SESSION_COOKIE_SECURE = "controller.ui.session.cookie.secure";
+
+  /**
+   * Inactivity timeout in seconds for the Pinot UI session.
+   *
+   * <p>After this many seconds of user inactivity, the UI shows a 60-second warning dialog and then
+   * calls {@code GET /auth/logout} to invalidate the server-side session. This value is returned to
+   * the browser via {@code GET /auth/info} so both the UI timer and server-side TTL derive from one config.
+   * Server-side session TTL is set automatically to this value + 120s buffer.
+   *
+   * <p>Default: {@code 300} (5 minutes)
+   */
+  public static final String CONTROLLER_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS =
+      "controller.ui.session.inactivity.timeout.seconds";
+  public static final long DEFAULT_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS = 300L;
+
   public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
   public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
   public static final String LINEAGE_MANAGER_CLASS = "controller.lineage.manager.class";
