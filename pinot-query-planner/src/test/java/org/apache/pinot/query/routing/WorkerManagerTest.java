@@ -257,7 +257,7 @@ public class WorkerManagerTest {
   }
 
   @Test
-  public void testBrokerPruningDefaultsToUnfilteredRoutingOnThisPath() {
+  public void testBrokerPruningOnByDefaultAndExplicitlyDisabledOnThisPath() {
     Schema schema = getSchemaBuilder("testTable").build();
     ServerInstance server = getServerInstance("localhost", 1);
     Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
@@ -280,16 +280,24 @@ public class WorkerManagerTest {
     QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
         workerManager);
 
-    // Without SET useBrokerPruning=true, this path should fall back to unfiltered SELECT * routing.
+    // Broker pruning is on by default: without any SET, the routing query should carry the leaf filter.
     try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
         "SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
       DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
       assertNotNull(dispatchableSubPlan);
     }
-
     BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
     assertNotNull(brokerRequest);
-    // No filter should be present — the routing query is a plain SELECT * used for segment lookup only.
+    assertNotNull(brokerRequest.getPinotQuery().getFilterExpression());
+
+    // Explicitly disabling falls back to unfiltered SELECT * routing (segment lookup only).
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=false; SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+    }
+    brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest);
     assertNull(brokerRequest.getPinotQuery().getFilterExpression());
   }
 
@@ -398,12 +406,29 @@ public class WorkerManagerTest {
   }
 
   @Test
-  public void testBrokerPruningPartitionedLeafDisabledKeepsAllPartitions() {
-    // Without SET useBrokerPruning=true the logical planner default (false) applies, so no pruning occurs.
+  public void testBrokerPruningPartitionedLeafOnByDefault() {
+    // Broker pruning is on by default: without any SET, the partitioned leaf prunes non-matching partitions.
     QueryEnvironment queryEnvironment =
         newPartitionedQueryEnvironment(new int[]{0, 1, 2, 3}, 4, List.of("seg2"), 3);
     try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
         "SELECT col2 FROM testTable "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ "
+            + "WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 3);
+      DispatchablePlanFragment leaf = leafFragment(dispatchableSubPlan);
+      assertNotNull(leaf);
+      assertEquals(leaf.getWorkerIdToSegmentsMap().size(), 1);
+    }
+  }
+
+  @Test
+  public void testBrokerPruningPartitionedLeafDisabledKeepsAllPartitions() {
+    // Explicitly disabling broker pruning keeps all partitions assigned.
+    QueryEnvironment queryEnvironment =
+        newPartitionedQueryEnvironment(new int[]{0, 1, 2, 3}, 4, List.of("seg2"), 3);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=false; SELECT col2 FROM testTable "
             + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ "
             + "WHERE col1 = 'foo'")) {
       DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
