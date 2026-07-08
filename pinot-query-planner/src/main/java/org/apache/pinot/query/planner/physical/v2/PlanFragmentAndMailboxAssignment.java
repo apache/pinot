@@ -274,6 +274,15 @@ public class PlanFragmentAndMailboxAssignment {
   private void computeMailboxInfos(int senderStageId, int receiverStageId,
       Map<Integer, QueryServerInstance> senderWorkers, Map<Integer, QueryServerInstance> receiverWorkers,
       ExchangeStrategy exchangeDesc, Context context) {
+    if (senderWorkers.isEmpty() && receiverWorkers.isEmpty()) {
+      // Both stages have no workers, which happens for an all-empty subtree: a leaf stage with no routable segments
+      // (e.g. an empty table or all segments pruned by the broker) whose emptiness propagates up. There is no data to
+      // route and no receiver to inform, and these stages are discarded by the empty-leaf short-circuit in
+      // PinotDispatchPlanner#finalizeDispatchableSubPlan. Skipping avoids the single-instance-receiver check below for
+      // a degenerate SINGLETON gather. When only the sender is empty (e.g. the empty side of a union or join), the
+      // exchange-specific logic below still wires the receiver with an empty sender list so it knows to expect no rows.
+      return;
+    }
     DispatchablePlanMetadata senderMetadata = context._fragmentMetadataMap.get(senderStageId);
     DispatchablePlanMetadata receiverMetadata = context._fragmentMetadataMap.get(receiverStageId);
     Map<Integer, Map<Integer, MailboxInfos>> senderMailboxMap = senderMetadata.getWorkerIdToMailboxesMap();
