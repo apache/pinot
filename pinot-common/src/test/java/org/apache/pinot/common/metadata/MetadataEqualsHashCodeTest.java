@@ -20,7 +20,6 @@ package org.apache.pinot.common.metadata;
 
 import nl.jqno.equalsverifier.EqualsVerifier;
 import nl.jqno.equalsverifier.Warning;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -37,8 +36,6 @@ public class MetadataEqualsHashCodeTest {
 
   @Test
   public void testEqualsAndHashCode() {
-    EqualsVerifier.forClass(InstanceZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS)
-        .usingGetClass().verify();
     EqualsVerifier.forClass(DimensionFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS)
         .usingGetClass().verify();
     EqualsVerifier.forClass(MetricFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS)

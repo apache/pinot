@@ -49,7 +49,7 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
    * Creates a new instance of {@link PulsarClient} and {@link Reader}
    */
   protected PulsarPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig) {
-    _config = new PulsarConfig(streamConfig, clientId);
+    _config = new PulsarConfig(streamConfig);
     _clientId = clientId;
     _pulsarClient = createPulsarClient();
   }
