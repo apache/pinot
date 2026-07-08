@@ -776,6 +776,19 @@ public class DateTimeFunctionsTest {
   }
 
   @Test
+  public void testDateTimeConvertNumericStringEpoch() {
+    // EPOCH input arriving as a numeric string is read as LONG via PinotDataType. Decimal and scientific-notation
+    // forms (e.g. a numeric column stringified upstream) must parse rather than throw; the fractional part is
+    // truncated toward zero.
+    testDateTimeConvert("1505898960000", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS",
+        1505898960000L);
+    testDateTimeConvert("1505898960000.0", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS",
+        1505898960000L);
+    testDateTimeConvert("1.50589896E12", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS",
+        1505898960000L);
+  }
+
+  @Test
   private void testTimestampAdd() {
     long currentTimestamp = System.currentTimeMillis();
     long timestampHalfHourBack = currentTimestamp - (30 * 60 * 1000);

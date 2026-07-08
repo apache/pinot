@@ -51,6 +51,11 @@ public class DateTimeFormatSpecTest {
     entries.add(new Object[]{"1:MILLISECONDS:EPOCH", "1498892400000", 1498892400000L});
     entries.add(new Object[]{"1:HOURS:EPOCH", "0", 0L});
     entries.add(new Object[]{"5:MINUTES:EPOCH", "4996308", 1498892400000L});
+    // Numeric EPOCH values may arrive as decimal or scientific-notation strings (e.g. from a numeric column
+    // stringified upstream); the fractional part is truncated toward zero.
+    entries.add(new Object[]{"1:HOURS:EPOCH", "416359.0", 1498892400000L});
+    entries.add(new Object[]{"1:MILLISECONDS:EPOCH", "1.4988924E12", 1498892400000L});
+    entries.add(new Object[]{"5:MINUTES:EPOCH", "4996308.9", 1498892400000L});
     entries.add(new Object[]{
         "1:MILLISECONDS:TIMESTAMP", "2017-07-01 00:00:00", Timestamp.valueOf("2017-07-01 00:00:00").getTime()
     });
