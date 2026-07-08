@@ -123,7 +123,7 @@ public class PinotQueryResource {
   ControllerConf _controllerConf;
 
   @Inject
-  @org.glassfish.hk2.api.Optional
+  @org.jvnet.hk2.annotations.Optional
   SessionManager _sessionManager;
 
   @POST
