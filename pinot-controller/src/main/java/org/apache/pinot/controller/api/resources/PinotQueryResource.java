@@ -122,6 +122,8 @@ public class PinotQueryResource {
   @Inject
   ControllerConf _controllerConf;
 
+  // @Optional: SessionManager is always bound in production but may be absent in unit-test contexts
+  // where HK2 is not fully configured. Without @Optional, injection would fail in those environments.
   @Inject
   @org.jvnet.hk2.annotations.Optional
   SessionManager _sessionManager;
@@ -414,15 +416,11 @@ public class PinotQueryResource {
       throw QueryErrorCode.INTERNAL.asException("V2 Multi-Stage query engine not enabled.");
     }
 
-    // Compute session validity once here so both DQL paths don't each look up the session independently.
-    boolean sessionValid = hasValidSessionCookie(httpHeaders);
-
     switch (sqlType) {
       case DQL:
         return isMse
-            ? getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, traceEnabled, sessionValid)
-            : getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders,
-                sessionValid);
+            ? getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, traceEnabled)
+            : getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
       case DML:
         Map<String, String> headers = extractHeaders(httpHeaders);
         return output -> {
@@ -435,38 +433,13 @@ public class PinotQueryResource {
     }
   }
 
-  /**
-   * Returns {@code true} if the request carries a valid server-side session cookie.
-   *
-   * <p>When session mode is enabled, browser UI requests carry an HttpOnly cookie instead of an
-   * Authorization header. If a valid session is present, the access-control check that expects an
-   * Authorization header is skipped to avoid a spurious 403 that would redirect the user to login.
-   */
-  private boolean hasValidSessionCookie(HttpHeaders httpHeaders) {
-    if (_sessionManager == null
-        || _controllerConf == null
-        || !_controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)) {
-      return false;
-    }
-    Cookie sessionCookie = httpHeaders.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
-    if (sessionCookie == null || sessionCookie.getValue() == null) {
-      return false;
-    }
-    return _sessionManager.getUsername(sessionCookie.getValue()).isPresent();
-  }
-
   private StreamingOutput getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
-      String traceEnabled, boolean sessionValid) {
-
-    // SESSION WORKFLOW: If the request has a valid session cookie, skip the Authorization-header
-    // access check. The session was already validated by SessionAuthenticationFilter before this method.
-    if (!sessionValid) {
-      // Validate data access
-      // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
-      AccessControl accessControl = _accessControlFactory.create();
-      if (!accessControl.hasAccess(AccessType.READ, httpHeaders, "/sql")) {
-        throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
-      }
+      String traceEnabled) {
+    // Validate data access
+    // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
+    AccessControl accessControl = _accessControlFactory.create();
+    if (!accessControl.hasAccess(AccessType.READ, httpHeaders, "/sql")) {
+      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
@@ -525,7 +498,7 @@ public class PinotQueryResource {
   }
 
   private StreamingOutput getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled,
-      String queryOptions, HttpHeaders httpHeaders, boolean sessionValid) {
+      String queryOptions, HttpHeaders httpHeaders) {
     // Get resource table name.
     String tableName;
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
@@ -558,14 +531,10 @@ public class PinotQueryResource {
     }
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
-    // SESSION WORKFLOW: If the request has a valid session cookie, skip the Authorization-header
-    // access check. The session was already validated by SessionAuthenticationFilter before this method.
-    if (!sessionValid) {
-      // Validate data access
-      AccessControl accessControl = _accessControlFactory.create();
-      if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
-        throw QueryErrorCode.ACCESS_DENIED.asException();
-      }
+    // Validate data access
+    AccessControl accessControl = _accessControlFactory.create();
+    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
+      throw QueryErrorCode.ACCESS_DENIED.asException();
     }
 
     // Get brokers for the resource table.

@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -93,20 +92,15 @@ public class AuthenticationFilter implements ContainerRequestFilter {
       return;
     }
 
-    // SESSION WORKFLOW: If session mode is enabled and the request carries a valid HttpOnly session
-    // cookie (set by POST /auth/login), skip Authorization-header validation entirely.
-    // The SessionAuthenticationFilter (priority AUTHENTICATION-10) already validated the cookie
-    // before this filter runs. Repeating the check here would fail because browser requests in
-    // SESSION mode never send an Authorization header.
-    if (_controllerConf != null
-        && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)
-        && _sessionManager != null) {
+    // SESSION WORKFLOW: If session mode is enabled and the request carries a valid session cookie,
+    // retrieve the stored Basic-auth token and inject it as an Authorization header. This lets
+    // validatePermission() and FineGrainedAuthUtils below run with the session user's credentials
+    // instead of skipping authorization entirely.
+    if (isSessionEnabled()) {
       Cookie sessionCookie = requestContext.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
       if (sessionCookie != null && sessionCookie.getValue() != null) {
-        Optional<String> username = _sessionManager.getUsername(sessionCookie.getValue());
-        if (username.isPresent()) {
-          return;
-        }
+        _sessionManager.getBasicAuthToken(sessionCookie.getValue()).ifPresent(
+            authToken -> requestContext.getHeaders().putSingle(HttpHeaders.AUTHORIZATION, authToken));
       }
     }
 
@@ -176,6 +170,12 @@ public class AuthenticationFilter implements ContainerRequestFilter {
       return mmap.getFirst(KEY_SCHEMA_NAME);
     }
     return null;
+  }
+
+  private boolean isSessionEnabled() {
+    return _controllerConf != null
+        && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)
+        && _sessionManager != null;
   }
 
   private static boolean isBaseFile(String path) {
