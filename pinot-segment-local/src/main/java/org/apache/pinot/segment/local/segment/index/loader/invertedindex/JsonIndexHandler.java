@@ -49,6 +49,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -277,8 +278,13 @@ public class JsonIndexHandler extends BaseIndexHandler {
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         JsonIndexCreator jsonIndexCreator = StandardIndexes.json().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
+      boolean isMapType = columnMetadata.getDataType() == DataType.MAP;
       for (int i = 0; i < numDocs; i++) {
-        jsonIndexCreator.add(forwardIndexReader.getString(i, readerContext));
+        // MAP columns store binary-encoded data; getString() returns garbled bytes.
+        // Use getMap() + MapUtils.toString() to produce the JSON string the index creator expects.
+        String value = isMapType ? MapUtils.toString(forwardIndexReader.getMap(i, readerContext))
+            : forwardIndexReader.getString(i, readerContext);
+        jsonIndexCreator.add(value);
       }
       jsonIndexCreator.seal();
     }
