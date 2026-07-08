@@ -453,6 +453,35 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     super.testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
+  /**
+   * End-to-end smoke test that enabling broker segment pruning on the MSE logical-planner path executes cleanly for a
+   * logical table and does not change results. It exercises the logical-table routing path where the leaf-stage filter
+   * is forwarded (via {@code WorkerManager.buildLogicalTableRoutingBrokerRequest}) into each physical table's routing
+   * request so the {@code LogicalTableRouteProvider} runs segment pruners over a filter-bearing request rather than a
+   * bare {@code SELECT *}. A malformed forwarded request would surface here as an exception or a changed result.
+   *
+   * <p>Note: these physical tables carry no segment-pruner config, so this asserts correctness, not that a segment was
+   * actually pruned; the exact pruning behavior is unit-tested in {@code WorkerManagerTest}.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testBrokerPruningPreservesLogicalTableResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String logicalTableName = getLogicalTableName();
+    String filteredQuery = "SELECT COUNT(*) FROM " + logicalTableName + " WHERE DaysSinceEpoch > 16312";
+
+    JsonNode withoutPruning = postQuery(filteredQuery);
+    assertTrue(withoutPruning.get("exceptions").isEmpty(), "Unexpected exceptions without broker pruning");
+
+    JsonNode withPruning = postQuery("SET useBrokerPruning=true; " + filteredQuery);
+    assertTrue(withPruning.get("exceptions").isEmpty(), "Unexpected exceptions with broker pruning");
+
+    // Broker pruning is a routing optimization only; the result must be identical to the unpruned run.
+    assertEquals(withPruning.get("resultTable").get("rows").get(0).get(0).asLong(),
+        withoutPruning.get("resultTable").get("rows").get(0).get(0).asLong(),
+        "Broker pruning changed the result of a logical table query");
+  }
+
   @Test
   public void testDisableGroovyQueryTableConfigOverride()
       throws Exception {
