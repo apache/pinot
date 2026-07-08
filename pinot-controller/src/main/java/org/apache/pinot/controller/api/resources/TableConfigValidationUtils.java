@@ -46,21 +46,12 @@ public final class TableConfigValidationUtils {
   private TableConfigValidationUtils() {
   }
 
-  /**
-   * Validates a table config against the given schema and controller configuration.
-   *
-   * @param tableConfig   the table config to validate
-   * @param schema        the schema for the table (must not be null)
-   * @param typesToSkip   comma-separated list of validation types to skip (ALL|TASK|UPSERT), or null
-   * @param resourceManager the Helix resource manager
-   * @param controllerConf  the controller configuration
-   * @param taskManager     the task manager, or null to skip task validation
-   */
   public static void validateTableConfig(TableConfig tableConfig, Schema schema,
       @Nullable String typesToSkip, PinotHelixResourceManager resourceManager,
-      ControllerConf controllerConf, @Nullable PinotTaskManager taskManager) {
+      ControllerConf controllerConf, @Nullable PinotTaskManager taskManager,
+      @Nullable TableConfig existingTableConfig) {
     validateEnvironmentVariables(tableConfig);
-    TableConfigUtils.validate(tableConfig, schema, typesToSkip);
+    TableConfigUtils.validate(tableConfig, schema, typesToSkip, existingTableConfig);
     TableConfigUtils.validateTableName(tableConfig);
     TableConfigUtils.ensureMinReplicas(tableConfig, controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, controllerConf.getDimTableMaxSize());

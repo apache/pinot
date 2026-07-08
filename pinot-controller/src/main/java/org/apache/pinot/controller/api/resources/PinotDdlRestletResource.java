@@ -600,7 +600,7 @@ public class PinotDdlRestletResource {
   private void validateTableConfig(Schema schema, TableConfig tableConfig) {
     try {
       TableConfigValidationUtils.validateTableConfig(tableConfig, schema, null,
-          _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
+          _pinotHelixResourceManager, _controllerConf, _pinotTaskManager, null);
     } catch (ControllerApplicationException e) {
       throw e;
     } catch (IllegalArgumentException | IllegalStateException e) {

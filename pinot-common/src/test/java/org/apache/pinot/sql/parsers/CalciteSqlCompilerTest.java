@@ -18,12 +18,8 @@
  */
 package org.apache.pinot.sql.parsers;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -47,8 +43,6 @@ import org.testng.annotations.Test;
  * Some tests for the SQL compiler.
  */
 public class CalciteSqlCompilerTest {
-  private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
-
   /* Verify all lists in PinotQuery are ArrayLists because we might need to modify them during query optimization */
 
   private Expression compileToExpression(String expressionStr) {
@@ -92,6 +86,22 @@ public class CalciteSqlCompilerTest {
       verifyListInExpression(havingExpression);
     }
     return query;
+  }
+
+  private boolean containsFunction(Expression expression, String operator) {
+    if (expression == null || !expression.isSetFunctionCall()) {
+      return false;
+    }
+    Function function = expression.getFunctionCall();
+    if (function.getOperator().equals(operator)) {
+      return true;
+    }
+    for (Expression operand : function.getOperands()) {
+      if (containsFunction(operand, operator)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Test
@@ -241,8 +251,8 @@ public class CalciteSqlCompilerTest {
   public void testCaseWhenScalar() {
     PinotQuery pinotQuery = compileToPinotQuery("SELECT CASE WHEN NOW() > 0 THEN 1 ELSE -1 END FROM myTable");
     Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
-    Assert.assertTrue(pinotQuery.getSelectList().get(0).isSetLiteral());
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getIntValue(), 1);
+    Assert.assertTrue(pinotQuery.getSelectList().get(0).isSetFunctionCall());
+    Assert.assertTrue(containsFunction(pinotQuery.getSelectList().get(0), "now"));
 
     Assert.assertThrows(SqlCompilationException.class,
         () -> compileToPinotQuery("SELECT CASE WHEN 1 > 0 END FROM myTable"));
@@ -2376,44 +2386,34 @@ public class CalciteSqlCompilerTest {
   @Test
   public void testCompilationInvokedFunction() {
     String query = "SELECT now() FROM foo";
-    long lowerBound = System.currentTimeMillis();
     PinotQuery pinotQuery = compileToPinotQuery(query);
-    long nowTs = pinotQuery.getSelectList().get(0).getLiteral().getLongValue();
-    long upperBound = System.currentTimeMillis();
-    Assert.assertTrue(nowTs >= lowerBound);
-    Assert.assertTrue(nowTs <= upperBound);
+    Expression nowExpression = pinotQuery.getSelectList().get(0);
+    Assert.assertTrue(nowExpression.isSetFunctionCall());
+    Assert.assertEquals(nowExpression.getFunctionCall().getOperator(), "now");
+    Assert.assertTrue(nowExpression.getFunctionCall().getOperands().isEmpty());
 
     query = "SELECT a FROM foo where time_col > now()";
-    lowerBound = System.currentTimeMillis();
     pinotQuery = compileToPinotQuery(query);
     Function greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
-    nowTs = greaterThan.getOperands().get(1).getLiteral().getLongValue();
-    upperBound = System.currentTimeMillis();
-    Assert.assertTrue(nowTs >= lowerBound);
-    Assert.assertTrue(nowTs <= upperBound);
+    Assert.assertTrue(containsFunction(pinotQuery.getFilterExpression(), "now"));
 
     query = "SELECT a FROM foo where time_col > fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z')";
     pinotQuery = compileToPinotQuery(query);
     greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
-    nowTs = greaterThan.getOperands().get(1).getLiteral().getLongValue();
-    Assert.assertEquals(nowTs, 1577836800000L);
+    long timestamp = greaterThan.getOperands().get(1).getLiteral().getLongValue();
+    Assert.assertEquals(timestamp, 1577836800000L);
 
     query = "SELECT ago('PT1H') FROM foo";
-    lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     pinotQuery = compileToPinotQuery(query);
-    nowTs = pinotQuery.getSelectList().get(0).getLiteral().getLongValue();
-    upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
-    Assert.assertTrue(nowTs >= lowerBound);
-    Assert.assertTrue(nowTs <= upperBound);
+    Expression agoExpression = pinotQuery.getSelectList().get(0);
+    Assert.assertTrue(agoExpression.isSetFunctionCall());
+    Assert.assertEquals(agoExpression.getFunctionCall().getOperator(), "ago");
+    Assert.assertEquals(agoExpression.getFunctionCall().getOperands().get(0).getLiteral().getStringValue(), "PT1H");
 
     query = "SELECT a FROM foo where time_col > ago('PT1H')";
-    lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     pinotQuery = compileToPinotQuery(query);
     greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
-    nowTs = greaterThan.getOperands().get(1).getLiteral().getLongValue();
-    upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
-    Assert.assertTrue(nowTs >= lowerBound);
-    Assert.assertTrue(nowTs <= upperBound);
+    Assert.assertTrue(containsFunction(pinotQuery.getFilterExpression(), "ago"));
 
     query = "SELECT rand() FROM foo";
     pinotQuery = compileToPinotQuery(query);
@@ -2646,73 +2646,53 @@ public class CalciteSqlCompilerTest {
   public void testCompilationInvokedNestedFunctions() {
     String query = "SELECT a FROM foo where time_col > toDateTime(now(), 'yyyy-MM-dd z')";
     PinotQuery pinotQuery = compileToPinotQuery(query);
-    Function greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
-    String today = greaterThan.getOperands().get(1).getLiteral().getStringValue();
-    String expectedTodayStr =
-        Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
-    Assert.assertEquals(today, expectedTodayStr);
+    Assert.assertTrue(containsFunction(pinotQuery.getFilterExpression(), "todatetime"));
+    Assert.assertTrue(containsFunction(pinotQuery.getFilterExpression(), "now"));
   }
 
   @Test
   public void testCompileTimeExpression() {
-    long lowerBound = System.currentTimeMillis();
     Expression expression = compileToExpression("now()");
     Assert.assertNotNull(expression.getFunctionCall());
     expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
-    Assert.assertNotNull(expression.getLiteral());
-    long upperBound = System.currentTimeMillis();
-    long result = expression.getLiteral().getLongValue();
-    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+    Assert.assertTrue(containsFunction(expression, "now"));
+    Assert.assertFalse(expression.isSetLiteral());
 
     expression = compileToExpression("now() - 0");
     Assert.assertNotNull(expression.getFunctionCall());
     expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
-    Assert.assertNotNull(expression.getLiteral());
-    upperBound = System.currentTimeMillis();
-    result = expression.getLiteral().getLongValue();
-    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+    Assert.assertTrue(containsFunction(expression, "now"));
+    Assert.assertFalse(expression.isSetLiteral());
 
     expression = compileToExpression("now() + 0");
     Assert.assertNotNull(expression.getFunctionCall());
     expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
-    Assert.assertNotNull(expression.getLiteral());
-    upperBound = System.currentTimeMillis();
-    result = expression.getLiteral().getLongValue();
-    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+    Assert.assertTrue(containsFunction(expression, "now"));
+    Assert.assertFalse(expression.isSetLiteral());
 
     expression = compileToExpression("now() * 1");
     Assert.assertNotNull(expression.getFunctionCall());
     expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
-    Assert.assertNotNull(expression.getLiteral());
-    upperBound = System.currentTimeMillis();
-    result = expression.getLiteral().getLongValue();
-    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+    Assert.assertTrue(containsFunction(expression, "now"));
+    Assert.assertFalse(expression.isSetLiteral());
 
-    lowerBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
     expression = compileToExpression("to_epoch_hours(now() + 3600000)");
     Assert.assertNotNull(expression.getFunctionCall());
     expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
-    upperBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
-    result = expression.getLiteral().getLongValue();
-    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+    Assert.assertTrue(containsFunction(expression, "now"));
+    Assert.assertFalse(expression.isSetLiteral());
 
-    lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     expression = compileToExpression("ago('PT1H')");
     Assert.assertNotNull(expression.getFunctionCall());
     expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
-    Assert.assertNotNull(expression.getLiteral());
-    upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
-    result = expression.getLiteral().getLongValue();
-    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+    Assert.assertTrue(containsFunction(expression, "ago"));
+    Assert.assertFalse(expression.isSetLiteral());
 
-    lowerBound = System.currentTimeMillis() + ONE_HOUR_IN_MS;
     expression = compileToExpression("ago('PT-1H')");
     Assert.assertNotNull(expression.getFunctionCall());
     expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
-    Assert.assertNotNull(expression.getLiteral());
-    upperBound = System.currentTimeMillis() + ONE_HOUR_IN_MS;
-    result = expression.getLiteral().getLongValue();
-    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+    Assert.assertTrue(containsFunction(expression, "ago"));
+    Assert.assertFalse(expression.isSetLiteral());
 
     expression = compileToExpression("toDateTime(millisSinceEpoch)");
     Assert.assertNotNull(expression.getFunctionCall());

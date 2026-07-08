@@ -30,6 +30,7 @@ import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 
 
@@ -54,6 +55,13 @@ public class FunctionUtilsTest {
     assertEquals(FunctionUtils.getArgumentType((byte) 1), PinotDataType.BYTE);
     assertEquals(FunctionUtils.getArgumentType('a'), PinotDataType.CHARACTER);
     assertEquals(FunctionUtils.getArgumentType((short) 1), PinotDataType.SHORT);
+  }
+
+  @Test
+  public void testRequestTimeFunctionsAreNonDeterministic() {
+    assertFalse(FunctionRegistry.lookupFunctionInfo("now", 0).isDeterministic());
+    assertFalse(FunctionRegistry.lookupFunctionInfo("ago", 1).isDeterministic());
+    assertFalse(FunctionRegistry.lookupFunctionInfo("agomv", 1).isDeterministic());
   }
 
   @Test

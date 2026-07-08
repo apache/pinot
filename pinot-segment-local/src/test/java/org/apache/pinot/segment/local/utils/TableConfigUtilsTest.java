@@ -385,6 +385,32 @@ public class TableConfigUtilsTest {
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "reverse(anotherCol)")));
     TableConfigUtils.validate(tableConfig, schema);
 
+    Schema transformSchema = schema;
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "now()")));
+    IllegalStateException nonDeterministicError =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Non-deterministic function 'now'"));
+
+    IngestionConfig existingIngestionConfig = new IngestionConfig();
+    existingIngestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "now()")));
+    TableConfig existingTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(existingIngestionConfig)
+        .build();
+    TableConfigUtils.validate(tableConfig, schema, null, existingTableConfig);
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "plus(now(), 1)")));
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(tableConfig, transformSchema, null, existingTableConfig));
+    assertTrue(nonDeterministicError.getMessage().contains("Non-deterministic function 'now'"));
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "rand()")));
+    nonDeterministicError =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Non-deterministic function 'rand'"));
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "rand(123)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
     // valid transform configs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", DataType.STRING)
@@ -581,7 +607,7 @@ public class TableConfigUtilsTest {
         new SourceFieldConfig("shared", PinotDataType.LONG, true),
         new SourceFieldConfig("shared", PinotDataType.INT, false)
     ));
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
 
     // The same field twice within the same phase is rejected.
     ingestionConfig.setSourceFieldConfigs(List.of(
@@ -589,7 +615,7 @@ public class TableConfigUtilsTest {
         new SourceFieldConfig("dup", PinotDataType.INT, false)
     ));
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail on duplicate SourceFieldConfig within the same phase");
     } catch (IllegalStateException e) {
       // expected
@@ -608,7 +634,7 @@ public class TableConfigUtilsTest {
         .setIngestionConfig(ingestionConfig)
         .build();
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail due to destination column not being in schema");
     } catch (IllegalStateException e) {
       // expected
@@ -617,7 +643,7 @@ public class TableConfigUtilsTest {
     schema.addField(new DimensionFieldSpec("d1", DataType.DOUBLE, true));
     tableConfig.getIndexingConfig().setAggregateMetrics(true);
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail due to aggregateMetrics being set");
     } catch (IllegalStateException e) {
       // expected
@@ -625,7 +651,7 @@ public class TableConfigUtilsTest {
 
     tableConfig.getIndexingConfig().setAggregateMetrics(false);
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail due to aggregation column being a dimension");
     } catch (IllegalStateException e) {
       // expected
@@ -640,7 +666,7 @@ public class TableConfigUtilsTest {
 
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig(null, null)));
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail due to null columnName/aggregationFunction");
     } catch (IllegalStateException e) {
       // expected
@@ -649,7 +675,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setAggregationConfigs(
         Arrays.asList(new AggregationConfig("m1", "SUM(s1)"), new AggregationConfig("m1", "SUM(s2)")));
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail due to duplicate destination column");
     } catch (IllegalStateException e) {
       // expected
@@ -657,7 +683,7 @@ public class TableConfigUtilsTest {
 
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("m1", "SUM s1")));
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail due to invalid aggregation function");
     } catch (IllegalStateException e) {
       // expected
@@ -665,22 +691,22 @@ public class TableConfigUtilsTest {
 
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("m1", "SUM(s1 - s2)")));
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail due to inner value not being a column");
     } catch (IllegalStateException e) {
       // expected
     }
 
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("m1", "SUM(m1)")));
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
 
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("m1", "SUM(s1)")));
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
 
     schema.addField(new MetricFieldSpec("m2", DataType.DOUBLE));
     indexingConfig.setNoDictionaryColumns(List.of("m1", "m2"));
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail due to one metric column not being aggregated");
     } catch (IllegalStateException e) {
       // expected
@@ -697,7 +723,7 @@ public class TableConfigUtilsTest {
         .build();
 
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail due to not supported aggregation function");
     } catch (IllegalStateException e) {
       // expected
@@ -724,7 +750,7 @@ public class TableConfigUtilsTest {
         .build();
 
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
     } catch (IllegalStateException e) {
       fail("Should not fail due to valid aggregation function", e);
     }
@@ -744,7 +770,7 @@ public class TableConfigUtilsTest {
         .build();
 
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
     } catch (IllegalStateException e) {
       fail("Should not fail due to valid aggregation function", e);
     }
@@ -761,7 +787,7 @@ public class TableConfigUtilsTest {
         .build();
 
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
     } catch (IllegalStateException e) {
       fail("Log2m should have defaulted to 8", e);
     }
@@ -775,7 +801,7 @@ public class TableConfigUtilsTest {
         .build();
 
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail due to multiple arguments");
     } catch (IllegalArgumentException e) {
       // expected
@@ -800,7 +826,7 @@ public class TableConfigUtilsTest {
         .setIngestionConfig(ingestionConfig)
         .setNoDictionaryColumns(List.of("d1", "d2", "d3", "d4", "d5"))
         .build();
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
 
     // with too many arguments should fail
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -818,7 +844,7 @@ public class TableConfigUtilsTest {
         .build();
 
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should have failed with too many arguments but didn't");
     } catch (IllegalStateException e) {
       // Expected
@@ -909,13 +935,13 @@ public class TableConfigUtilsTest {
         .setAggregateMetrics(true)
         .setNoDictionaryColumns(List.of("m1"))
         .build();
-    TableConfigUtils.validateIngestionConfig(validConfig, schemaWithSvColumns);
+    TableConfigUtils.validateIngestionConfig(validConfig, schemaWithSvColumns, null);
   }
 
   private void assertMetricsAggregationValidationFails(TableConfig tableConfig, Schema schema,
       String expectedMessageSubstring) {
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail with message containing: " + expectedMessageSubstring);
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains(expectedMessageSubstring),
@@ -938,14 +964,14 @@ public class TableConfigUtilsTest {
 
     // Multiple stream configs are allowed
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
     } catch (IllegalStateException e) {
       fail("Multiple stream configs should be supported");
     }
 
     // stream config should be valid
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigs)));
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
 
     // validate the proto decoder
     streamConfigs = getKafkaStreamConfigs();
@@ -1084,19 +1110,19 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setIngestionConfig(ingestionConfig)
         .build();
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
 
     streamIngestionConfig.setOomProtection(Enablement.ENABLE);
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
 
     streamIngestionConfig.setOomProtection(Enablement.DISABLE);
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
 
     streamIngestionConfig.setOomProtection(Enablement.DEFAULT);
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
 
     streamIngestionConfig.setOomProtection(null);
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
   }
 
   @Test
@@ -1117,7 +1143,7 @@ public class TableConfigUtilsTest {
         new BatchIngestionConfig(Arrays.asList(batchConfigMap, batchConfigMap), null, null));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
   }
 
   @Test
@@ -1140,12 +1166,12 @@ public class TableConfigUtilsTest {
         .setIsDimTable(true)
         .setIngestionConfig(ingestionConfig)
         .build();
-    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
 
     // dimension tables should have batch ingestion config
     ingestionConfig.setBatchIngestionConfig(null);
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail for Dimension table without batch ingestion config");
     } catch (IllegalStateException e) {
       // expected
@@ -1155,7 +1181,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setBatchIngestionConfig(
         new BatchIngestionConfig(List.of(batchConfigMap), "APPEND", null));
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema, null);
       fail("Should fail for Dimension table with ingestion type APPEND (should be REFRESH)");
     } catch (IllegalStateException e) {
       // expected
@@ -2634,7 +2660,7 @@ public class TableConfigUtilsTest {
         .setAggregateMetrics(true)
         .build();
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, validSchema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, validSchema, null);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Metrics aggregation and upsert cannot be enabled together");
@@ -2649,7 +2675,7 @@ public class TableConfigUtilsTest {
         .setIngestionConfig(ingestionConfig)
         .build();
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, validSchema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, validSchema, null);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Metrics aggregation and upsert cannot be enabled together");
@@ -2663,7 +2689,7 @@ public class TableConfigUtilsTest {
         .setIngestionConfig(ingestionConfig)
         .build();
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, validSchema);
+      TableConfigUtils.validateIngestionConfig(tableConfig, validSchema, null);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(),

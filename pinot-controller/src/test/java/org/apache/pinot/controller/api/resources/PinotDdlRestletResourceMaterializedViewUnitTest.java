@@ -1064,7 +1064,7 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
       try {
         validation = Mockito.mockStatic(TableConfigValidationUtils.class);
         validation.when(() -> TableConfigValidationUtils.validateTableConfig(
-            any(), any(), any(), any(), any(), any())).then(invocation -> null);
+            any(), any(), any(), any(), any(), any(), any())).then(invocation -> null);
 
         tableResource = Mockito.mockStatic(PinotTableRestletResource.class);
         tableResource.when(() -> PinotTableRestletResource.tableTasksValidation(any(), any()))

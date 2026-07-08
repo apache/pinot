@@ -107,39 +107,29 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
         "Expected TIMESTAMP literal folded to BIGINT and column unwrapped. Got:\n" + plan);
   }
 
-  /**
-   * When a TIMESTAMP column is compared to a non-column TIMESTAMP-typed expression (e.g. {@code NOW() - 1000}, which
-   * after binary-arithmetic coercion is BIGINT-typed and then folded back to TIMESTAMP for the comparison), the
-   * resulting plan must keep the column unwrapped and constant-fold the right-hand side to a TIMESTAMP literal.
-   */
+  /// When a TIMESTAMP column is compared to a non-column TIMESTAMP-typed expression (e.g. `NOW() - 1000`,
+  /// which after binary-arithmetic coercion is BIGINT-typed and then cast back to TIMESTAMP for the comparison),
+  /// the resulting plan must keep the column unwrapped.
   @Test
-  public void testTimestampColumnVsConstantSubexpressionKeepsColumnUnwrapped() {
-    // NOW() - 1000 is a constant for the lifetime of the query: arithmetic coercion casts NOW() to BIGINT, the
-    // subtraction is BIGINT - INT = BIGINT, and our comparison rule then casts that BIGINT result to TIMESTAMP.
-    // After constant folding, the right-hand side is rendered as a single TIMESTAMP literal.
+  public void testTimestampColumnVsNonDeterministicSubexpressionKeepsColumnUnwrapped() {
     String plan = explain("SELECT ts_timestamp FROM a WHERE ts_timestamp > NOW() - 1000");
     assertFalse(plan.contains("CAST(" + TS_TIMESTAMP_ORD + ")"),
-        "TIMESTAMP column should not be wrapped in CAST when right-hand side is constant. Got:\n" + plan);
-    // The fractional part is optional here: NOW()/ago() produce non-deterministic millis that may land on a whole
-    // second (rendered without a fractional part). The deterministic millis-preservation guard is in
-    // testTimestampColumnVsSubSecondLiteralPreservesMillis below.
+        "TIMESTAMP column should not be wrapped in CAST when right-hand side is non-column expression. Got:\n" + plan);
     assertTrue(
-        plan.matches("(?s).*>\\(\\" + TS_TIMESTAMP_ORD + ", \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(\\.\\d+)?\\).*"),
-        "Right-hand side should be constant-folded to a TIMESTAMP literal. Got:\n" + plan);
+        plan.contains(">(" + TS_TIMESTAMP_ORD + ", CAST(-(CAST(NOW()):BIGINT NOT NULL, 1000)):TIMESTAMP(3)"),
+        "Right-hand side should preserve the non-deterministic NOW() call. Got:\n" + plan);
   }
 
-  /**
-   * When a BIGINT column is compared to a non-column TIMESTAMP-typed expression (e.g. {@code NOW()}), the existing
-   * behavior of casting the TIMESTAMP side to BIGINT must be preserved: the BIGINT column stays unwrapped, and the
-   * TIMESTAMP function is folded to a BIGINT literal.
-   */
+  /// When a BIGINT column is compared to a non-column TIMESTAMP-typed expression (e.g. `NOW()`), the existing
+  /// behavior of casting the TIMESTAMP side to BIGINT must be preserved: the BIGINT column stays unwrapped, and the
+  /// non-deterministic TIMESTAMP function is not constant-folded.
   @Test
   public void testBigintColumnVsTimestampFunctionKeepsColumnUnwrapped() {
     String plan = explain("SELECT col7 FROM a WHERE col7 < NOW()");
     assertFalse(plan.contains("CAST(" + COL7_ORD + ")"),
         "BIGINT column should not be wrapped in CAST. Got:\n" + plan);
-    assertTrue(plan.matches("(?s).*<\\(\\" + COL7_ORD + ", \\d+\\).*"),
-        "Right-hand side should be folded to a BIGINT literal. Got:\n" + plan);
+    assertTrue(plan.contains("<(" + COL7_ORD + ", CAST(NOW()):BIGINT"),
+        "Right-hand side should preserve the non-deterministic NOW() call. Got:\n" + plan);
   }
 
   /**
@@ -166,24 +156,18 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
         "No CAST should appear in the plan. Got:\n" + plan);
   }
 
-  /**
-   * Regression for the {@code ago()}-style use case: {@code __time > ago('PT5M')} should keep the column unwrapped.
-   * {@code ago(String)} is a scalar function that returns {@code long} (rendered as BIGINT in SQL), so the comparison
-   * is TIMESTAMP-vs-BIGINT and the new rule applies. Before this rule, the column was wrapped in {@code CAST(.. AS
-   * BIGINT)} per row, which made the query significantly slower than the workaround {@code __time > concat(ago(...),
-   * '')} that happened to push the cast onto the literal side via the VARCHAR coercion path.
-   */
+  /// Regression for the `ago()`-style use case: `__time > ago('PT5M')` should keep the column unwrapped.
+  /// `ago(String)` is a scalar function that returns `long` (rendered as BIGINT in SQL), so the comparison is
+  /// TIMESTAMP-vs-BIGINT and the new rule applies. Before this rule, the column was wrapped in `CAST(.. AS BIGINT)`
+  /// per row, which made the query significantly slower than the workaround `__time > concat(ago(...), '')` that
+  /// happened to push the cast onto the literal side via the VARCHAR coercion path.
   @Test
   public void testTimestampColumnVsAgoFunctionKeepsColumnUnwrapped() {
     String plan = explain("SELECT ts_timestamp FROM a WHERE ts_timestamp > ago('PT5M')");
     assertFalse(plan.contains("CAST(" + TS_TIMESTAMP_ORD + ")"),
         "TIMESTAMP column should not be wrapped in CAST when compared to ago(...). Got:\n" + plan);
-    // The fractional part is optional here: NOW()/ago() produce non-deterministic millis that may land on a whole
-    // second (rendered without a fractional part). The deterministic millis-preservation guard is in
-    // testTimestampColumnVsSubSecondLiteralPreservesMillis below.
-    assertTrue(
-        plan.matches("(?s).*>\\(\\" + TS_TIMESTAMP_ORD + ", \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(\\.\\d+)?\\).*"),
-        "Right-hand side should be constant-folded to a TIMESTAMP literal. Got:\n" + plan);
+    assertTrue(plan.contains(">(" + TS_TIMESTAMP_ORD + ", CAST(AGO(_UTF-8'PT5M')):TIMESTAMP(3)"),
+        "Right-hand side should preserve the non-deterministic ago(...) call. Got:\n" + plan);
   }
 
   /**
