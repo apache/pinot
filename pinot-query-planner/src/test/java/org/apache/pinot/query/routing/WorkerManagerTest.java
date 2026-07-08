@@ -564,6 +564,94 @@ public class WorkerManagerTest {
     }
   }
 
+  @Test
+  public void testBrokerPruningPartitionedLeafHybridTable() {
+    // Hybrid table: partition p holds offline segment segO{p} and realtime segment segR{p}, both colocated on
+    // server p. The routing manager reports segO2 surviving on the offline side and segR1 on the realtime side, so
+    // partitions {1, 2} are kept (a partition survives if a segment of EITHER type matches) and {0, 3} are pruned.
+    QueryEnvironment queryEnvironment = newHybridPartitionedQueryEnvironment(List.of("segO2"), List.of("segR1"));
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SELECT col2 FROM testTable "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ "
+            + "WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      // Pruned = both segments of partitions 0 and 3.
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 4);
+      DispatchablePlanFragment leaf = leafFragment(dispatchableSubPlan);
+      assertNotNull(leaf);
+      assertEquals(leaf.getWorkerIdToSegmentsMap().size(), 2);
+      // Pruning is partition-level: surviving partitions dispatch ALL their segments, so the non-matching segO1 and
+      // segR2 are still included alongside the matching segR1 and segO2.
+      assertEquals(new HashSet<>(assignedSegments(leaf)), Set.of("segO1", "segR1", "segO2", "segR2"));
+    }
+  }
+
+  /**
+   * Builds a QueryEnvironment for a hybrid partitioned table "testTable" (function Hashcode on col1, 4 partitions).
+   * Partition {@code p} holds offline segment {@code "segO{p}"} and realtime segment {@code "segR{p}"}, both fully
+   * replicated on server {@code p}. The given surviving segment lists are what the {@link RoutingManager} returns for
+   * the filtered routing query of each table type.
+   */
+  private static QueryEnvironment newHybridPartitionedQueryEnvironment(List<String> survivingOfflineSegments,
+      List<String> survivingRealtimeSegments) {
+    int numPartitions = 4;
+    ServerInstance[] servers = new ServerInstance[numPartitions];
+    Map<String, ServerInstance> enabledServers = new HashMap<>();
+    for (int i = 0; i < numPartitions; i++) {
+      servers[i] = getServerInstance("localhost", i + 1);
+      enabledServers.put(servers[i].getInstanceId(), servers[i]);
+    }
+    TablePartitionReplicatedServersInfo.PartitionInfo[] offlinePartitions =
+        new TablePartitionReplicatedServersInfo.PartitionInfo[numPartitions];
+    TablePartitionReplicatedServersInfo.PartitionInfo[] realtimePartitions =
+        new TablePartitionReplicatedServersInfo.PartitionInfo[numPartitions];
+    for (int p = 0; p < numPartitions; p++) {
+      Set<String> partitionServers = Set.of(servers[p].getInstanceId());
+      offlinePartitions[p] = new TablePartitionReplicatedServersInfo.PartitionInfo(partitionServers,
+          List.of("segO" + p));
+      realtimePartitions[p] = new TablePartitionReplicatedServersInfo.PartitionInfo(partitionServers,
+          List.of("segR" + p));
+    }
+    String realtimeTableName = PARTITIONED_TABLE + "_REALTIME";
+    TablePartitionReplicatedServersInfo offlineInfo = new TablePartitionReplicatedServersInfo(
+        PARTITIONED_TABLE_OFFLINE, "col1", "Hashcode", numPartitions, offlinePartitions, List.of());
+    TablePartitionReplicatedServersInfo realtimeInfo = new TablePartitionReplicatedServersInfo(
+        realtimeTableName, "col1", "Hashcode", numPartitions, realtimePartitions, List.of());
+
+    PartitionedRoutingManager routingManager = new PartitionedRoutingManager(enabledServers,
+        Map.of(PARTITIONED_TABLE_OFFLINE, offlineInfo, realtimeTableName, realtimeInfo),
+        Map.of(PARTITIONED_TABLE_OFFLINE, hybridRoutingTable(servers, survivingOfflineSegments),
+            realtimeTableName, hybridRoutingTable(servers, survivingRealtimeSegments)),
+        false, new TimeBoundaryInfo("col3", "100"));
+
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put(PARTITIONED_TABLE_OFFLINE, PARTITIONED_TABLE_OFFLINE);
+    tableNameMap.put(realtimeTableName, realtimeTableName);
+    tableNameMap.put(PARTITIONED_TABLE, PARTITIONED_TABLE);
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(getSchemaBuilder(PARTITIONED_TABLE).build());
+    when(tableCache.getTableConfig(PARTITIONED_TABLE_OFFLINE)).thenReturn(mock(TableConfig.class));
+    when(tableCache.getTableConfig(realtimeTableName)).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 5, routingManager);
+    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
+  }
+
+  /** Buckets the given surviving segments onto their owning server (partition p's segment lives on server p). */
+  private static RoutingTable hybridRoutingTable(ServerInstance[] servers, List<String> survivingSegments) {
+    Map<ServerInstance, List<String>> serverToSegmentList = new HashMap<>();
+    for (String segment : survivingSegments) {
+      int partition = Integer.parseInt(segment.substring("segO".length()));
+      serverToSegmentList.computeIfAbsent(servers[partition], k -> new ArrayList<>()).add(segment);
+    }
+    Map<ServerInstance, SegmentsToQuery> serverToSegments = new HashMap<>();
+    serverToSegmentList.forEach((server, segments) -> serverToSegments.put(server,
+        new SegmentsToQuery(segments, List.of())));
+    return new RoutingTable(serverToSegments, List.of(), 0);
+  }
+
   private static QueryEnvironment newPartitionedQueryEnvironment(int[] serverIdxPerPartition, int numServers,
       List<String> survivingSegments, int reportedPrunedByRouting) {
     return newPartitionedQueryEnvironment(serverIdxPerPartition, numServers, 1, survivingSegments, List.of(),
@@ -1005,14 +1093,24 @@ public class WorkerManagerTest {
     private final Map<String, TablePartitionReplicatedServersInfo> _partitionInfoByTable;
     private final Map<String, RoutingTable> _routingTableByTable;
     private final boolean _throwOnRouting;
+    @Nullable
+    private final TimeBoundaryInfo _timeBoundaryInfo;
 
     PartitionedRoutingManager(Map<String, ServerInstance> enabledServers,
         Map<String, TablePartitionReplicatedServersInfo> partitionInfoByTable,
         Map<String, RoutingTable> routingTableByTable, boolean throwOnRouting) {
+      this(enabledServers, partitionInfoByTable, routingTableByTable, throwOnRouting, null);
+    }
+
+    PartitionedRoutingManager(Map<String, ServerInstance> enabledServers,
+        Map<String, TablePartitionReplicatedServersInfo> partitionInfoByTable,
+        Map<String, RoutingTable> routingTableByTable, boolean throwOnRouting,
+        @Nullable TimeBoundaryInfo timeBoundaryInfo) {
       _enabledServers = enabledServers;
       _partitionInfoByTable = partitionInfoByTable;
       _routingTableByTable = routingTableByTable;
       _throwOnRouting = throwOnRouting;
+      _timeBoundaryInfo = timeBoundaryInfo;
     }
 
     @Override
@@ -1049,7 +1147,7 @@ public class WorkerManagerTest {
     @Nullable
     @Override
     public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
-      return null;
+      return _timeBoundaryInfo;
     }
 
     @Nullable

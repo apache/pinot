@@ -495,8 +495,10 @@ public class WorkerManager {
       if (partitionKey != null) {
         // Broker pruning: build a filter-bearing routing query (null when disabled/unsupported) so the partitioned
         // assignment can drop partitions with no matching segments. Reuses the same gate as the non-partitioned path.
-        PinotQuery routingPinotQuery =
-            extractRoutingQuery(fragment.getFragmentRoot(), metadata.getScannedTables().get(0), context);
+        // Skip pre-partitioned leaves up front: pruning is disabled for them (see computePartitionsToKeep), so don't
+        // spend planning time building the routing query, e.g. for colocated-join leaves.
+        PinotQuery routingPinotQuery = metadata.isPrePartitioned() ? null
+            : extractRoutingQuery(fragment.getFragmentRoot(), metadata.getScannedTables().get(0), context);
         assignWorkersToPartitionedLeafFragment(metadata, context, partitionKey, tableOptions, routingPinotQuery);
         updateContextForLeafStage(metadata, context);
         return;
@@ -988,6 +990,12 @@ public class WorkerManager {
    * partition id from the table-level function name (which lacks the per-segment function config). A partition is
    * dropped only when every one of its segments was pruned; a segment that merely became unavailable keeps its
    * partition alive so matching data is never silently dropped.
+   *
+   * <p>Note that pruning here is partition-level, not segment-level: a surviving partition dispatches all of its
+   * segments, including ones the pruners eliminated (the server-side pruners drop those again cheaply). This keeps
+   * surviving partitions' assignments identical to the unpruned path -- the only behavioral delta is dropped
+   * workers -- at the cost of a lower pruning ceiling than the non-partitioned path for partitions with mixed-match
+   * segments. Segment-level pruning within surviving partitions is a possible follow-up.
    */
   @Nullable
   private Set<Integer> computePartitionsToKeep(@Nullable PinotQuery routingPinotQuery,
