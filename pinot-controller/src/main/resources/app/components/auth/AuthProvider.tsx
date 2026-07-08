@@ -29,7 +29,9 @@ interface AuthProviderContextProps {
     authUserName: string;
     authUserEmail: string;
     authenticated: boolean;
-    authWorkflow: AuthWorkflow
+    authWorkflow: AuthWorkflow;
+    /** UI inactivity timeout in seconds from controller config. -1 if not applicable (non-SESSION). */
+    inactivityTimeoutSeconds: number;
 }
 
 export const AuthProvider = ({ children }) => {
@@ -37,6 +39,7 @@ export const AuthProvider = ({ children }) => {
     const [redirectUri, setRedirectUri] = useState<string | null>(null);
     const [clientId, setClientId] = useState<string | null>(null);
     const [authWorkflow, setAuthWorkflow] = useState<AuthWorkflow | null>(null);
+    const [inactivityTimeoutSeconds, setInactivityTimeoutSeconds] = useState<number>(-1);
     const [accessToken, setAccessToken] = useState<string>("");
     const [authUserName, setAuthUserName] = useState<string>("");
     const [authUserEmail, setAuthUserEmail] = useState<string>("");
@@ -83,6 +86,13 @@ export const AuthProvider = ({ children }) => {
         // set auth workflow
         setAuthWorkflow(authWorkFlowInternal);
 
+        // Read inactivity timeout from auth/info response (SESSION workflow only).
+        if (authWorkFlowInternal === AuthWorkflow.SESSION
+            && authInfoResponse && authInfoResponse.inactivityTimeoutSeconds
+            && authInfoResponse.inactivityTimeoutSeconds > 0) {
+            setInactivityTimeoutSeconds(authInfoResponse.inactivityTimeoutSeconds);
+        }
+
         if (authWorkFlowInternal === AuthWorkflow.NONE) {
             // No authentication required
             setAuthenticated(true);
@@ -90,6 +100,23 @@ export const AuthProvider = ({ children }) => {
 
         if (authWorkFlowInternal === AuthWorkflow.BASIC) {
             // basic auth is handled by login page
+        }
+
+        if (authWorkFlowInternal === AuthWorkflow.SESSION) {
+            // Session auth: check if there is an active server-side session by calling /auth/session.
+            // The HttpOnly cookie is sent automatically by the browser – no JS token needed.
+            try {
+                const sessionResponse = await fetch('/auth/session', { credentials: 'include' });
+                if (sessionResponse.ok) {
+                    const sessionData = await sessionResponse.json();
+                    if (sessionData && sessionData.username) {
+                        setAuthenticated(true);
+                    }
+                }
+                // If not ok (401), the user needs to log in
+            } catch (e) {
+                // Network error – stay unauthenticated
+            }
         }
 
         // set OIDC auth details
@@ -223,7 +250,8 @@ export const AuthProvider = ({ children }) => {
         accessToken: accessToken,
         authUserName: authUserName,
         authUserEmail: authUserEmail,
-        authenticated: authenticated
+        authenticated: authenticated,
+        inactivityTimeoutSeconds: inactivityTimeoutSeconds,
     }
 
     if (loading) {

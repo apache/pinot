@@ -22,26 +22,48 @@ import { AuthWorkflow } from 'Models';
 import app_state from '../app_state';
 import { AxiosError, AxiosRequestConfig } from "axios";
 
-const isDev = process.env.NODE_ENV !== 'production';
-
-// Returns axios request interceptor
+/**
+ * Returns axios request interceptor.
+ *
+ * When using SESSION workflow, no Authorization header is attached.
+ * The browser automatically sends the HttpOnly session cookie with every request.
+ * This eliminates the "Authorization: Basic <base64-credentials>" visible in browser
+ * dev-tools network tab.
+ *
+ * Flow:
+ *   NONE     → no auth header, no cookie (open access)
+ *   BASIC    → Authorization: Basic <token> header (legacy)
+ *   SESSION  → no Authorization header; browser sends HttpOnly cookie automatically
+ *   OIDC     → Authorization: Bearer <token> header
+ */
 export const getAxiosRequestInterceptor = (
     accessToken?: string
 ): ((requestConfig: AxiosRequestConfig) => AxiosRequestConfig) => {
     const requestInterceptor = (
         requestConfig: AxiosRequestConfig
     ): AxiosRequestConfig => {
-        // If access token is available, attach it to the request
-        // basic auth
+        // SESSION workflow: rely entirely on the HttpOnly cookie set by POST /auth/login.
+        // Do NOT attach any Authorization header.
+        if (app_state.authWorkflow === AuthWorkflow.SESSION) {
+            if (requestConfig.headers) {
+                delete requestConfig.headers['Authorization'];
+                delete requestConfig.headers['authorization'];
+            }
+            return requestConfig;
+        }
+
+        // BASIC auth: attach the stored token as Authorization header (legacy behaviour)
         if (app_state.authWorkflow === AuthWorkflow.BASIC && app_state.authToken) {
             requestConfig.headers = {
+                ...requestConfig.headers,
                 Authorization: app_state.authToken,
             };
         }
 
-        // OIDC auth
+        // OIDC auth: attach the Bearer access token
         if (accessToken) {
             requestConfig.headers = {
+                ...requestConfig.headers,
                 Authorization: accessToken,
             };
         }
@@ -52,13 +74,28 @@ export const getAxiosRequestInterceptor = (
     return requestInterceptor;
 };
 
-// Returns axios rejected response interceptor
+/**
+ * Returns axios rejected response interceptor.
+ *
+ * For SESSION workflow, 401/403 responses redirect to the login page so the user
+ * must re-authenticate. For other workflows, the provided callback is invoked.
+ */
 export const getAxiosErrorInterceptor = (
     unauthenticatedAccessFn?: () => void
 ): ((error: AxiosError) => void) => {
     const rejectedResponseInterceptor = (error: AxiosError): any => {
         if (error && error.response && (error.response.status === 401 || error.response.status === 403)) {
-            // Unauthenticated access
+            // SESSION workflow: session has expired. Redirect to login.
+            if (app_state.authWorkflow === AuthWorkflow.SESSION) {
+                app_state.authToken = null;
+                if (window.location.hash && !window.location.hash.includes('/login')) {
+                    window.location.href = '/#/login';
+                } else if (!window.location.hash) {
+                    window.location.href = '/#/login';
+                }
+                return error.response || error;
+            }
+            // Other workflows: invoke the callback
             unauthenticatedAccessFn && unauthenticatedAccessFn();
         }
 

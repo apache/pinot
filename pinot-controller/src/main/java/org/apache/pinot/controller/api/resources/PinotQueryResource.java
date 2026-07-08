@@ -53,6 +53,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -74,6 +75,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.SessionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
@@ -119,6 +121,10 @@ public class PinotQueryResource {
 
   @Inject
   ControllerConf _controllerConf;
+
+  @Inject
+  @org.glassfish.hk2.api.Optional
+  SessionManager _sessionManager;
 
   @POST
   @Path("sql")
@@ -408,11 +414,15 @@ public class PinotQueryResource {
       throw QueryErrorCode.INTERNAL.asException("V2 Multi-Stage query engine not enabled.");
     }
 
+    // Compute session validity once here so both DQL paths don't each look up the session independently.
+    boolean sessionValid = hasValidSessionCookie(httpHeaders);
+
     switch (sqlType) {
       case DQL:
         return isMse
-            ? getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, traceEnabled)
-            : getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
+            ? getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, traceEnabled, sessionValid)
+            : getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders,
+                sessionValid);
       case DML:
         Map<String, String> headers = extractHeaders(httpHeaders);
         return output -> {
@@ -425,14 +435,38 @@ public class PinotQueryResource {
     }
   }
 
-  private StreamingOutput getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
-      String traceEnabled) {
+  /**
+   * Returns {@code true} if the request carries a valid server-side session cookie.
+   *
+   * <p>When session mode is enabled, browser UI requests carry an HttpOnly cookie instead of an
+   * Authorization header. If a valid session is present, the access-control check that expects an
+   * Authorization header is skipped to avoid a spurious 403 that would redirect the user to login.
+   */
+  private boolean hasValidSessionCookie(HttpHeaders httpHeaders) {
+    if (_sessionManager == null
+        || _controllerConf == null
+        || !_controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)) {
+      return false;
+    }
+    Cookie sessionCookie = httpHeaders.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
+    if (sessionCookie == null || sessionCookie.getValue() == null) {
+      return false;
+    }
+    return _sessionManager.getUsername(sessionCookie.getValue()).isPresent();
+  }
 
-    // Validate data access
-    // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
-    AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(AccessType.READ, httpHeaders, "/sql")) {
-      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+  private StreamingOutput getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
+      String traceEnabled, boolean sessionValid) {
+
+    // SESSION WORKFLOW: If the request has a valid session cookie, skip the Authorization-header
+    // access check. The session was already validated by SessionAuthenticationFilter before this method.
+    if (!sessionValid) {
+      // Validate data access
+      // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
+      AccessControl accessControl = _accessControlFactory.create();
+      if (!accessControl.hasAccess(AccessType.READ, httpHeaders, "/sql")) {
+        throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+      }
     }
 
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
@@ -491,7 +525,7 @@ public class PinotQueryResource {
   }
 
   private StreamingOutput getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled,
-      String queryOptions, HttpHeaders httpHeaders) {
+      String queryOptions, HttpHeaders httpHeaders, boolean sessionValid) {
     // Get resource table name.
     String tableName;
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
@@ -524,10 +558,14 @@ public class PinotQueryResource {
     }
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
-    // Validate data access
-    AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
-      throw QueryErrorCode.ACCESS_DENIED.asException();
+    // SESSION WORKFLOW: If the request has a valid session cookie, skip the Authorization-header
+    // access check. The session was already validated by SessionAuthenticationFilter before this method.
+    if (!sessionValid) {
+      // Validate data access
+      AccessControl accessControl = _accessControlFactory.create();
+      if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
+        throw QueryErrorCode.ACCESS_DENIED.asException();
+      }
     }
 
     // Get brokers for the resource table.
@@ -610,6 +648,21 @@ public class PinotQueryResource {
 
     // Forward client-supplied headers
     Map<String, String> headers = extractHeaders(httpHeaders);
+
+    // SESSION WORKFLOW: Inject Authorization header for broker (server-to-server).
+    // Browser UI requests carry only the HttpOnly session cookie – no Authorization header.
+    // The broker requires auth, so we retrieve the stored Basic-auth token from the session
+    // and inject it as an Authorization header for the controller→broker request.
+    // This token is stored server-side only (never sent to the browser).
+    if (_sessionManager != null
+        && _controllerConf != null
+        && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)) {
+      Cookie sessionCookie = httpHeaders.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
+      if (sessionCookie != null && sessionCookie.getValue() != null) {
+        _sessionManager.getBasicAuthToken(sessionCookie.getValue()).ifPresent(
+            authToken -> headers.put(HttpHeaders.AUTHORIZATION, authToken));
+      }
+    }
 
     return sendRequestRaw(url, "POST", query, requestJson, headers);
   }
@@ -806,9 +859,14 @@ public class PinotQueryResource {
   }
 
   private Map<String, String> extractHeaders(HttpHeaders httpHeaders) {
+    // In SESSION mode, exclude the Authorization header from being forwarded to the broker.
+    // The broker auth is injected server-side from the session store in sendRequestToBroker().
+    boolean isSessionMode = _controllerConf != null
+        && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false);
     return httpHeaders.getRequestHeaders().entrySet().stream()
-      .filter(entry -> !entry.getValue().isEmpty())
-      .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().get(0)));
+        .filter(entry -> !entry.getValue().isEmpty())
+        .filter(entry -> !isSessionMode || !entry.getKey().equalsIgnoreCase(HttpHeaders.AUTHORIZATION))
+        .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().get(0)));
   }
 
   private InstanceConfig getInstanceConfig(String instanceId) {

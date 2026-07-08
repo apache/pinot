@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -34,11 +35,13 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.glassfish.grizzly.http.server.Request;
@@ -51,7 +54,8 @@ import org.glassfish.grizzly.http.server.Request;
 @javax.ws.rs.ext.Provider
 public class AuthenticationFilter implements ContainerRequestFilter {
   private static final Set<String> UNPROTECTED_PATHS =
-      new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "auth/verify/v2", "health"));
+      new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "auth/verify/v2", "auth/login",
+          "auth/logout", "auth/session", "health"));
   private static final String KEY_TABLE_NAME = "tableName";
   private static final String KEY_TABLE_NAME_WITH_TYPE = "tableNameWithType";
   private static final String KEY_SCHEMA_NAME = "schemaName";
@@ -61,6 +65,12 @@ public class AuthenticationFilter implements ContainerRequestFilter {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  SessionManager _sessionManager;
+
+  @Inject
+  ControllerConf _controllerConf;
 
   @Context
   ResourceInfo _resourceInfo;
@@ -81,6 +91,23 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     if (isBaseFile(AuthProviderUtils.stripMatrixParams(uriInfo.getPath()))
         || UNPROTECTED_PATHS.contains(AuthProviderUtils.stripMatrixParams(uriInfo.getPath()))) {
       return;
+    }
+
+    // SESSION WORKFLOW: If session mode is enabled and the request carries a valid HttpOnly session
+    // cookie (set by POST /auth/login), skip Authorization-header validation entirely.
+    // The SessionAuthenticationFilter (priority AUTHENTICATION-10) already validated the cookie
+    // before this filter runs. Repeating the check here would fail because browser requests in
+    // SESSION mode never send an Authorization header.
+    if (_controllerConf != null
+        && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)
+        && _sessionManager != null) {
+      Cookie sessionCookie = requestContext.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
+      if (sessionCookie != null && sessionCookie.getValue() != null) {
+        Optional<String> username = _sessionManager.getUsername(sessionCookie.getValue());
+        if (username.isPresent()) {
+          return;
+        }
+      }
     }
 
     // check if authentication is required implicitly

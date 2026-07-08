@@ -97,6 +97,7 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.SessionManager;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
@@ -746,6 +747,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     final MetadataEventNotifierFactory metadataEventNotifierFactory =
         MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX), _helixResourceManager);
 
+    // Create a singleton SessionManager for session-based UI authentication.
+    // Server-side TTL = inactivity timeout + 120s buffer so the server doesn't evict a session
+    // that the UI hasn't timed out yet (e.g. user is active but a background API call races with eviction).
+    long uiInactivityTimeoutSeconds = _config.getProperty(
+        ControllerConf.CONTROLLER_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS,
+        ControllerConf.DEFAULT_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS);
+    long serverSessionTtlSeconds = uiInactivityTimeoutSeconds + 120;
+    final SessionManager sessionManager = new SessionManager(serverSessionTtlSeconds);
+
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
     // register all the controller objects for injection to jersey resources
@@ -775,6 +785,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
+        bind(sessionManager).to(SessionManager.class);
 
         bindAsContract(PinotTableReloadService.class).in(Singleton.class);
         bindAsContract(PinotTableReloadStatusReporter.class).in(Singleton.class);
