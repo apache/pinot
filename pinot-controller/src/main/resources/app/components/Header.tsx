@@ -18,12 +18,15 @@
  */
 
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { AppBar, Box, makeStyles, Paper } from '@material-ui/core';
+import { Link, useHistory } from 'react-router-dom';
+import { AppBar, Box, IconButton, makeStyles, Paper, Tooltip } from '@material-ui/core';
 import MenuIcon from '@material-ui/icons/Menu';
+import ExitToAppIcon from '@material-ui/icons/ExitToApp';
 import Logo from './SvgIcons/Logo';
 import BreadcrumbsComponent from './Breadcrumbs';
 import TimezoneSelector from './TimezoneSelector';
+import app_state from '../app_state';
+import { AuthWorkflow } from 'Models';
 
 type Props = {
   highlightSidebarLink: (id: number) => void;
@@ -100,6 +103,10 @@ const useStyles = makeStyles((theme) => ({
       fontWeight: 500
     }
   },
+  logoutButton: {
+    color: '#ffffff',
+    marginLeft: theme.spacing(1),
+  },
   timezoneContainer: {
     display: 'flex',
     alignItems: 'center',
@@ -130,6 +137,35 @@ const useStyles = makeStyles((theme) => ({
 
 const Header = ({ highlightSidebarLink, showHideSideBarHandler, openSidebar, clusterName, ...props }: Props) => {
   const classes = useStyles();
+  const history = useHistory();
+
+  const handleLogout = async () => {
+    if (app_state.authWorkflow === AuthWorkflow.SESSION) {
+      // SESSION logout: call the server to invalidate the session immediately.
+      // The server removes the session from its store and returns a Max-Age=0 cookie.
+      try {
+        await fetch('/auth/logout', {
+          method: 'GET',
+          credentials: 'include',
+        });
+      } catch (e) {
+        // Even if the request fails, clear local state and redirect
+      }
+      app_state.authToken = null;
+      app_state.authWorkflow = null;
+      app_state.username = null;
+      history.push('/login');
+    } else if (app_state.authWorkflow === AuthWorkflow.BASIC) {
+      app_state.authToken = null;
+      app_state.authWorkflow = null;
+      app_state.username = null;
+      history.push('/login');
+    }
+  };
+
+  const showLogout = app_state.authWorkflow === AuthWorkflow.SESSION
+    || app_state.authWorkflow === AuthWorkflow.BASIC;
+
   return (
     <AppBar position="static">
       <Box display="flex">
@@ -175,6 +211,13 @@ const Header = ({ highlightSidebarLink, showHideSideBarHandler, openSidebar, clu
               </a>
             </Box>
           </Box>
+          {showLogout && (
+            <Tooltip title="Logout">
+              <IconButton className={classes.logoutButton} onClick={handleLogout} size="small">
+                <ExitToAppIcon />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
       </Box>
     </AppBar>

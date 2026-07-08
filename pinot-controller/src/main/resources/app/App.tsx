@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Switch, Route, Redirect, useHistory } from 'react-router-dom';
 import Layout from './components/Layout';
 import RouterData from './router';
@@ -26,6 +26,12 @@ import app_state from './app_state';
 import { useAuthProvider } from './components/auth/AuthProvider';
 import { AppLoadingIndicator } from './components/AppLoadingIndicator';
 import { AuthWorkflow } from 'Models';
+import Button from '@material-ui/core/Button';
+import Dialog from '@material-ui/core/Dialog';
+import DialogActions from '@material-ui/core/DialogActions';
+import DialogContent from '@material-ui/core/DialogContent';
+import DialogContentText from '@material-ui/core/DialogContentText';
+import DialogTitle from '@material-ui/core/DialogTitle';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { runBootstrapRequest } from './utils/bootstrap';
 
@@ -38,14 +44,13 @@ export const App = () => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [role, setRole] = useState('');
-  const { authUserName, authUserEmail, authenticated, authWorkflow } = useAuthProvider();
+  const { authUserName, authUserEmail, authenticated, authWorkflow, inactivityTimeoutSeconds } = useAuthProvider();
   const history = useHistory();
 
   useEffect(() => {
     // authentication already handled by authProvider
     if (authUserEmail && authenticated) {
       // Authenticated with an auth method that supports user identity
-      // Any code that needs user identity can go here
     }
 
     if (authenticated) {
@@ -54,10 +59,77 @@ export const App = () => {
   }, [authUserName, authUserEmail, authenticated]);
 
   useEffect(() => {
-    if(authWorkflow === AuthWorkflow.BASIC) {
+    // Both BASIC and SESSION workflows are handled by the login page.
+    if (authWorkflow === AuthWorkflow.BASIC || authWorkflow === AuthWorkflow.SESSION) {
       setLoading(false);
     }
-  }, [authWorkflow])
+  }, [authWorkflow]);
+
+  // ─── SESSION INACTIVITY TIMEOUT ───────────────────────────────────────────
+  // Timeout duration comes from /auth/info (controller.ui.session.inactivity.timeout.seconds).
+  // Falls back to 300s (5 min) if not set.
+  //
+  // Timeline:
+  //   t=0           user active
+  //   t=timeout-60s show warning dialog with 60s countdown
+  //   t=timeout     call /auth/logout (server invalidates session), redirect to /login
+  //
+  // Any user interaction (mouse/key/click/scroll) resets the full timer.
+
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState<boolean>(false);
+  const [warningCountdown, setWarningCountdown] = useState<number>(60);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const performSessionLogout = async () => {
+    setShowTimeoutWarning(false);
+    try {
+      await fetch('/auth/logout', { method: 'GET', credentials: 'include' });
+    } catch (e) {
+      // Even on network error, clear local state and redirect
+    }
+    app_state.authToken = null;
+    app_state.authWorkflow = null;
+    app_state.username = null;
+    setIsAuthenticated(false);
+    window.location.href = '/#/login';
+  };
+
+  const resetInactivityTimer = () => {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    setShowTimeoutWarning(false);
+
+    const timeoutMs = (inactivityTimeoutSeconds > 0 ? inactivityTimeoutSeconds : 300) * 1000;
+    const warningMs = Math.max(0, timeoutMs - 60000);
+
+    warningTimerRef.current = setTimeout(() => {
+      setWarningCountdown(60);
+      setShowTimeoutWarning(true);
+      countdownIntervalRef.current = setInterval(() => {
+        setWarningCountdown((c) => c - 1);
+      }, 1000);
+    }, warningMs);
+
+    inactivityTimerRef.current = setTimeout(performSessionLogout, timeoutMs);
+  };
+
+  useEffect(() => {
+    if (authWorkflow !== AuthWorkflow.SESSION || !isAuthenticated) return;
+
+    const events = ['mousedown', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach((e) => window.addEventListener(e, resetInactivityTimer));
+    resetInactivityTimer();
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, resetInactivityTimer));
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    };
+  }, [authWorkflow, isAuthenticated, inactivityTimeoutSeconds]);
 
   const applyClusterConfig = (clusterConfig?: Record<string, string>) => {
     const nextQueryConsoleOnlyView = clusterConfig?.queryConsoleOnlyView === 'true';
@@ -192,6 +264,30 @@ export const App = () => {
 
   return (
     <TimezoneProvider>
+      {/* SESSION inactivity warning dialog */}
+      <Dialog open={showTimeoutWarning} disableBackdropClick disableEscapeKeyDown>
+        <DialogTitle>Session Expiring Soon</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Your session will expire in {warningCountdown} second{warningCountdown !== 1 ? 's' : ''} due to inactivity.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={async () => {
+              // Slide the server-side TTL without logging out
+              await fetch('/auth/session', { credentials: 'include' });
+              resetInactivityTimer();
+            }}
+            color="primary"
+          >
+            Stay Logged In
+          </Button>
+          <Button onClick={performSessionLogout} color="secondary">
+            Logout Now
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Switch>
         {getRouterData().map(({ path, Component }, key) => (
           <Route
