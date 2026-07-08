@@ -104,4 +104,3 @@ public class SessionBasicAuthAccessControlFactory implements AccessControlFactor
     }
   }
 }
-

@@ -118,7 +118,7 @@ public class SessionAuthenticationFilter implements ContainerRequestFilter {
       return;
     }
 
-    
+
     // Server-to-server API calls (e.g., pinot-admin.sh AddTable -authToken "Basic ...") carry an
     // Authorization header. This filter handles session validation for browser UI requests only.
     // Requests with an Authorization header are passed through here so the downstream
@@ -133,7 +133,7 @@ public class SessionAuthenticationFilter implements ContainerRequestFilter {
       LOGGER.debug("Request has Authorization header, bypassing session filter for path '{}'", path);
       return;
     }
-    
+
 
     // Check for a valid session cookie (browser UI requests)
     Cookie sessionCookie = requestContext.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
@@ -176,4 +176,3 @@ public class SessionAuthenticationFilter implements ContainerRequestFilter {
     return !path.contains("/") && path.contains(".");
   }
 }
-

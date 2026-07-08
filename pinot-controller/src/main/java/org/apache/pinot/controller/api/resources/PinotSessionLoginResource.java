@@ -320,7 +320,7 @@ public class PinotSessionLoginResource {
           || "authorization".equalsIgnoreCase(name)) {
         return Collections.singletonList(_authorizationValue);
       }
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override
@@ -343,7 +343,7 @@ public class PinotSessionLoginResource {
 
     @Override
     public List<java.util.Locale> getAcceptableLanguages() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override
@@ -358,7 +358,7 @@ public class PinotSessionLoginResource {
 
     @Override
     public Map<String, Cookie> getCookies() {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     @Override
@@ -372,4 +372,3 @@ public class PinotSessionLoginResource {
     }
   }
 }
-

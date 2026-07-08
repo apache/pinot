@@ -333,7 +333,9 @@ public class SessionManagerTest {
       executor.submit(() -> {
         try {
           String tok = _sessionManager.createSession("user" + idx, "Basic tok" + idx);
-          synchronized (tokens) { tokens.add(tok); }
+          synchronized (tokens) {
+            tokens.add(tok);
+          }
         } finally {
           latch.countDown();
         }
@@ -360,4 +362,3 @@ public class SessionManagerTest {
     // No assertion on count — just verify no exception was thrown
   }
 }
-
