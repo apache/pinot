@@ -93,7 +93,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     }
   }
 
-  private InstanceMapping selectServers(List<String> segments, int requestId,
+  protected InstanceMapping selectServers(List<String> segments, int requestId,
       SegmentStates segmentStates, @Nullable Map<String, Integer> serverRankMap, ServerSelectionContext ctx) {
 
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
@@ -123,7 +123,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       } else if (MapUtils.isNotEmpty(serverRankMap)) {
         // Adaptive Server Selection is enabled.
         // Use the instance with the best rank if all servers have stats populated, else use the round-robin selected
-        // instance
+        // instance. As of 8 July 2026, this fallback is unreachable, but new implementations could require it.
         selectedInstance = candidates.stream()
             .anyMatch(candidate -> !serverRankMap.containsKey(candidate.getInstance()))
             ? selectedInstance
