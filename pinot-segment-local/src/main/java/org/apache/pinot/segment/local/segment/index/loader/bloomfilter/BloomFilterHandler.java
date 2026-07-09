@@ -57,6 +57,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
   private static final int TYPE_VALUE_OFFSET = 0;
+  private static final int VERSION_OFFSET = 4;
 
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
@@ -102,7 +103,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
    * {@link OnHeapGuavaBloomFilterCreator#FPP_OFFSET} so comparisons are exact and do not depend on Guava's
    * internal serialisation layout.
    *
-   * <p>Legacy v1 segments (TYPE_VALUE = 1) do not carry fpp in the header; fpp-change detection is skipped
+   * <p>Legacy v1 segments (VERSION = 1) do not carry fpp in the header; fpp-change detection is skipped
    * for those segments. They will be upgraded to v2 the next time the bloom filter is rebuilt for any reason.
    *
    * <p>Accepts both Reader and Writer since Writer extends Reader, allowing this method to be called from
@@ -111,8 +112,8 @@ public class BloomFilterHandler extends BaseIndexHandler {
   private boolean isFppChanged(SegmentDirectory.Reader segmentReader, String segmentName, String column) {
     try {
       PinotDataBuffer dataBuffer = segmentReader.getIndexFor(column, StandardIndexes.bloomFilter());
-      int typeValue = dataBuffer.getInt(TYPE_VALUE_OFFSET);
-      if (typeValue != OnHeapGuavaBloomFilterCreator.TYPE_VALUE_V2) {
+      int version = dataBuffer.getInt(VERSION_OFFSET);
+      if (version < OnHeapGuavaBloomFilterCreator.VERSION_V2) {
         // Legacy v1 format — fpp is not stored in the header; skip fpp-change detection.
         // The index will be upgraded to v2 the next time it is rebuilt.
         return false;

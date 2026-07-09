@@ -43,17 +43,16 @@ import org.slf4j.LoggerFactory;
 public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapGuavaBloomFilterCreator.class);
 
-  /** Legacy format: {@code [TYPE_VALUE=1 (int)][VERSION (int)][Guava bytes...]} — no fpp in header. */
   public static final int TYPE_VALUE = 1;
-  /**
-   * V2 format: {@code [TYPE_VALUE_V2=2 (int)][VERSION (int)][effective FPP (double)][Guava bytes...]}.
+  /** Legacy v1 format: {@code [TYPE_VALUE=1 (int)][VERSION=1 (int)][Guava bytes...]} — no fpp in header. */
+  public static final int VERSION = 1;
+  /** V2 format: {@code [TYPE_VALUE=1 (int)][VERSION_V2=2 (int)][effective FPP (double)][Guava bytes...]}.
    * The effective fpp (after applying any {@code maxSizeInBytes} cap) is stored at byte offset 8 so that
    * {@link org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler} can compare it
    * directly without depending on Guava's internal serialisation layout.
    */
-  public static final int TYPE_VALUE_V2 = 2;
-  public static final int VERSION = 1;
-  /** Byte offset of the fpp field in a v2 bloom filter file (after TYPE_VALUE_V2 + VERSION). */
+  public static final int VERSION_V2 = 2;
+  /** Byte offset of the fpp field in a v2 bloom filter file (after TYPE_VALUE + VERSION_V2). */
   public static final int FPP_OFFSET = 8;
 
   private final File _bloomFilterFile;
@@ -99,8 +98,8 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   public void seal()
       throws IOException {
     try (DataOutputStream out = new DataOutputStream(new FileOutputStream(_bloomFilterFile))) {
-      out.writeInt(TYPE_VALUE_V2);
-      out.writeInt(VERSION);
+      out.writeInt(TYPE_VALUE);
+      out.writeInt(VERSION_V2);
       out.writeDouble(_effectiveFpp);
       _bloomFilter.writeTo(out);
     }

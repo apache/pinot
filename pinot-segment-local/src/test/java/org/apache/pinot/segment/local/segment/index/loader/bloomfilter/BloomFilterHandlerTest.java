@@ -59,7 +59,7 @@ import static org.testng.Assert.assertTrue;
  * <p>Bloom filter file format versions:
  * <ul>
  *   <li><b>v1 (legacy):</b> {@code [TYPE_VALUE=1 (int)][VERSION (int)][Guava bytes...]} — fpp not stored.</li>
- *   <li><b>v2:</b> {@code [TYPE_VALUE_V2=2 (int)][VERSION (int)][FPP (double)][Guava bytes...]} — fpp stored
+ *   <li><b>v2:</b> {@code [TYPE_VALUE=1 (int)][VERSION_V2=2 (int)][FPP (double)][Guava bytes...]} — fpp stored
  *       explicitly at byte offset {@link OnHeapGuavaBloomFilterCreator#FPP_OFFSET}.</li>
  * </ul>
  *
@@ -153,14 +153,14 @@ public class BloomFilterHandlerTest {
 
   /**
    * Writes a v2 Pinot bloom filter file:
-   * {@code [TYPE_VALUE_V2=2 (int)][VERSION (int)][FPP (double)][Guava bytes]}.
+   * {@code [TYPE_VALUE=1 (int)][VERSION_V2=2 (int)][FPP (double)][Guava bytes]}.
    */
   private void writeV2BloomFilter(int cardinality, double fpp)
       throws Exception {
     BloomFilter<String> bf = BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8), cardinality, fpp);
     try (DataOutputStream out = new DataOutputStream(new FileOutputStream(_bloomFilterFile))) {
-      out.writeInt(OnHeapGuavaBloomFilterCreator.TYPE_VALUE_V2);
-      out.writeInt(OnHeapGuavaBloomFilterCreator.VERSION);
+      out.writeInt(OnHeapGuavaBloomFilterCreator.TYPE_VALUE);
+      out.writeInt(OnHeapGuavaBloomFilterCreator.VERSION_V2);
       out.writeDouble(fpp);
       bf.writeTo(out);
     }
