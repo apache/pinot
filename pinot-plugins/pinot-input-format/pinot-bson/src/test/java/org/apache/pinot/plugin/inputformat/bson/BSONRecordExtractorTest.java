@@ -106,6 +106,14 @@ public class BSONRecordExtractorTest {
   }
 
   @Test
+  public void testDecimal128NegativeZeroConvertedToZero() {
+    // Negative zero is a legal Decimal128 value that bigDecimalValue() rejects; it is numerically zero. It is
+    // negative-zero at any exponent, so "-0.00" must be handled too (it is not equal to Decimal128.NEGATIVE_ZERO).
+    assertEquals(extract(Decimal128.parse("-0")), BigDecimal.ZERO);
+    assertEquals(extract(Decimal128.parse("-0.00")), BigDecimal.ZERO);
+  }
+
+  @Test
   public void testBinaryConvertedToByteArray() {
     byte[] data = {1, 2, 3, 4};
     Object result = extract(new Binary(data));

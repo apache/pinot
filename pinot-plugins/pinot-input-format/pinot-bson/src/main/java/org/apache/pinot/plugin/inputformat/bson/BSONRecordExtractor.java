@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.inputformat.bson;
 
 import com.google.common.collect.Maps;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
@@ -40,13 +41,18 @@ import org.bson.types.ObjectId;
 /// - `Array` → `Object[]` (elements recursively converted)
 /// - `ObjectId` → `String` (24-char hex)
 /// - `DateTime` → `java.sql.Timestamp`
-/// - `Decimal128` → `BigDecimal` (`NaN` / `Infinity` → `null`, as `BigDecimal` cannot represent them)
+/// - `Decimal128` → `BigDecimal` (`NaN` / `Infinity` → `null`, as `BigDecimal` cannot represent them; negative
+///   zero → `BigDecimal.ZERO`)
 /// - `Binary` → `byte[]`
 /// - `null` → `null`
 ///
-/// Any other (rare, deprecated, or internal) BSON type falls back to `value.toString()`. The converted values
-/// follow the shared `RecordExtractor` contract, so the downstream data-type transformer coerces them to the
-/// declared column type.
+/// Every other BSON type falls back to `value.toString()` — this covers the internal `Timestamp` type, the
+/// deprecated `Symbol` / `Undefined` / `DBPointer` types, JavaScript `Code`, regular expressions,
+/// `MinKey` / `MaxKey`, and the binary vector types (`Float32BinaryVector` and friends), which the standard
+/// codec decodes to their own classes rather than to `Binary`.
+///
+/// The converted values follow the shared `RecordExtractor` contract, so the downstream data-type transformer
+/// coerces them to the declared column type.
 public class BSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
 
   @Override
@@ -81,9 +87,17 @@ public class BSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
     }
     if (value instanceof Decimal128) {
       Decimal128 decimal128 = (Decimal128) value;
-      // NaN / Infinity are legal Decimal128 values with no BigDecimal representation; surface them as null
-      // instead of letting bigDecimalValue() throw.
-      return decimal128.isNaN() || decimal128.isInfinite() ? null : decimal128.bigDecimalValue();
+      // NaN / Infinity are legal Decimal128 values with no BigDecimal representation; surface them as null.
+      if (decimal128.isNaN() || decimal128.isInfinite()) {
+        return null;
+      }
+      try {
+        return decimal128.bigDecimalValue();
+      } catch (ArithmeticException e) {
+        // The only remaining value bigDecimalValue() rejects is negative zero (legal in BSON, at any exponent,
+        // and not detectable via a public predicate). It is numerically zero.
+        return BigDecimal.ZERO;
+      }
     }
     if (value instanceof Binary) {
       return ((Binary) value).getData();

@@ -39,6 +39,10 @@ import org.bson.Document;
 public class BSONRecordReader implements RecordReader {
   // Minimum size of a BSON document: 4-byte length prefix + 1-byte terminating NUL of an empty document.
   private static final int MIN_DOCUMENT_LENGTH = 5;
+  // MongoDB caps BSON documents at 16MB. Without an upper bound, a corrupt length prefix (up to ~2GB) would
+  // reach `new byte[length]` and raise OutOfMemoryError -- an Error, so it would escape the recoverable
+  // exception handling in next()/advance() and abort the whole segment build.
+  private static final int MAX_DOCUMENT_LENGTH = 16 * 1024 * 1024;
 
   private File _dataFile;
   private BSONRecordExtractor _recordExtractor;
@@ -65,7 +69,12 @@ public class BSONRecordReader implements RecordReader {
       throws IOException {
     _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
     _fetchError = null;
-    _nextDocument = readNextDocument();
+    try {
+      _nextDocument = readNextDocument();
+    } catch (IOException e) {
+      _inputStream.close();
+      throw e;
+    }
   }
 
   @Override
@@ -123,8 +132,10 @@ public class BSONRecordReader implements RecordReader {
     }
     // BSON length prefix is a little-endian int32 inclusive of these 4 bytes.
     int length = (b0 & 0xFF) | ((b1 & 0xFF) << 8) | ((b2 & 0xFF) << 16) | ((b3 & 0xFF) << 24);
-    if (length < MIN_DOCUMENT_LENGTH) {
-      throw new IOException("Invalid BSON document length: " + length);
+    if (length < MIN_DOCUMENT_LENGTH || length > MAX_DOCUMENT_LENGTH) {
+      throw new IOException(
+          "Invalid BSON document length: " + length + " (expected " + MIN_DOCUMENT_LENGTH + ".."
+              + MAX_DOCUMENT_LENGTH + " bytes)");
     }
     byte[] document = new byte[length];
     document[0] = (byte) b0;

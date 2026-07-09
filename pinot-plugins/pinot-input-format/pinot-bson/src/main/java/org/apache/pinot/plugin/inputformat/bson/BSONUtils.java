@@ -32,6 +32,7 @@ public final class BSONUtils {
   }
 
   private static final DocumentCodec DOCUMENT_CODEC = new DocumentCodec();
+  private static final DecoderContext DECODER_CONTEXT = DecoderContext.builder().build();
 
   /// Decodes a whole BSON document from the given byte array.
   public static Document decodeDocument(byte[] bytes) {
@@ -42,7 +43,7 @@ public final class BSONUtils {
   public static Document decodeDocument(byte[] bytes, int offset, int length) {
     ByteBuffer buffer = ByteBuffer.wrap(bytes, offset, length).slice();
     try (BsonBinaryReader reader = new BsonBinaryReader(buffer)) {
-      return DOCUMENT_CODEC.decode(reader, DecoderContext.builder().build());
+      return DOCUMENT_CODEC.decode(reader, DECODER_CONTEXT);
     }
   }
 }

@@ -118,6 +118,14 @@ public class BSONRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Test
+  public void testLengthAboveMaximumThrowsInsteadOfAllocating()
+      throws Exception {
+    // Declared length 0x7FFFFFFF (~2GB) exceeds the 16MB BSON maximum. It must be rejected before `new
+    // byte[length]` runs, otherwise an OutOfMemoryError (an Error) would escape the recoverable error paths.
+    assertInitThrowsIOException("oversized-length.bson", new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, 0x7F});
+  }
+
+  @Test
   public void testTruncatedBodyThrows()
       throws Exception {
     // Declared length 16 but only 2 body bytes follow the prefix.
