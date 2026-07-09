@@ -371,6 +371,67 @@ public class ServerPlanRequestUtilsTest {
   }
 
   @Test
+  public void testSingleKeyNaNDoubleAbandonsExactIn() {
+    PinotQuery pinotQuery = queryWithProbeColumns("fk");
+    DataSchema buildSchema = new DataSchema(new String[]{"k"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
+    // Exact IN canonicalizes NaN in its literals but the leaf compares raw bits, so a NaN key can't be
+    // reduced faithfully -> abandon (the join stays the source of truth).
+    ServerPlanRequestUtils.attachRuntimeFilter(pinotQuery, List.of(0), List.of(0), rowsOf(1.0, Double.NaN), buildSchema,
+        RuntimeFilterNode.Type.IN);
+    assertNull(pinotQuery.getFilterExpression(), "a single-key DOUBLE exact IN with NaN must abandon");
+  }
+
+  @Test
+  public void testSingleKeyNaNFloatAbandonsExactIn() {
+    PinotQuery pinotQuery = queryWithProbeColumns("fk");
+    DataSchema buildSchema = new DataSchema(new String[]{"k"}, new ColumnDataType[]{ColumnDataType.FLOAT});
+    ServerPlanRequestUtils.attachRuntimeFilter(pinotQuery, List.of(0), List.of(0), rowsOf(1.0f, Float.NaN), buildSchema,
+        RuntimeFilterNode.Type.IN);
+    assertNull(pinotQuery.getFilterExpression(), "a single-key FLOAT exact IN with NaN must abandon");
+  }
+
+  @Test
+  public void testMultiKeyNonCanonicalNaNDoubleAbandonsExactIn() {
+    PinotQuery pinotQuery = queryWithProbeColumns("fk1", "fk2");
+    DataSchema buildSchema =
+        new DataSchema(new String[]{"k1", "k2"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<Object[]> rows = new ArrayList<>();
+    // A non-canonical NaN payload (still NaN) in a composite key: the multi-key hash join canonicalizes it,
+    // so it can match a differently-encoded probe NaN the exact IN would drop. Must abandon.
+    rows.add(new Object[]{1, Double.longBitsToDouble(0x7ff8000000000001L)});
+    rows.add(new Object[]{2, 2.0});
+    ServerPlanRequestUtils.attachRuntimeFilter(pinotQuery, List.of(0, 1), List.of(0, 1), rows, buildSchema,
+        RuntimeFilterNode.Type.AUTO);
+    assertNull(pinotQuery.getFilterExpression(), "a multi-key exact IN with a NaN float/double key must abandon");
+  }
+
+  @Test
+  public void testNonNaNDoubleKeyKeepsExactIn() {
+    PinotQuery pinotQuery = queryWithProbeColumns("fk1", "fk2");
+    DataSchema buildSchema =
+        new DataSchema(new String[]{"k1", "k2"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{1, 1.0});
+    rows.add(new Object[]{2, 2.0});
+    // The guard is targeted at NaN: a FLOAT/DOUBLE key with no NaN still gets an exact IN per key.
+    ServerPlanRequestUtils.attachRuntimeFilter(pinotQuery, List.of(0, 1), List.of(0, 1), rows, buildSchema,
+        RuntimeFilterNode.Type.AUTO);
+    assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), FilterKind.AND.name());
+  }
+
+  @Test
+  public void testSingleKeyNaNDoubleStillUsesBloom() {
+    PinotQuery pinotQuery = queryWithProbeColumns("fk");
+    DataSchema buildSchema = new DataSchema(new String[]{"k"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
+    // The bloom tier keeps NaN faithfully (raw bits, matching the single-key hash join), so the NaN guard
+    // (which only gates exact IN) must NOT abandon a bloom. maxInSize = 1 with 2 rows -> AUTO picks bloom.
+    ServerPlanRequestUtils.attachRuntimeFilter(pinotQuery, List.of(0), List.of(0), rowsOf(1.0, Double.NaN), buildSchema,
+        RuntimeFilterNode.Type.AUTO, 1, 0.01, 16 * 1024 * 1024, 1000);
+    assertNotNull(findFunction(pinotQuery.getFilterExpression(), "inIdSet"),
+        "single-key NaN DOUBLE above maxInSize must still use a bloom (NaN-safe)");
+  }
+
+  @Test
   public void testExistingFilterPreserved() {
     PinotQuery pinotQuery = queryWithProbeColumns("fk");
     Expression existing = RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN.name(),

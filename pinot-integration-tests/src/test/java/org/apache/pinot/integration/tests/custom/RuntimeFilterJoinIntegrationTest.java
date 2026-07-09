@@ -236,6 +236,23 @@ public class RuntimeFilterJoinIntegrationTest extends CustomDataQueryClusterInte
   }
 
   @Test
+  public void testCompositeNaNKeyMatchesBaseline()
+      throws Exception {
+    // Composite (DOUBLE, INT) key where the DOUBLE column is NaN for ids 0..2: an end-to-end parity guard
+    // for a NaN float/double key in a composite (always exact-IN) join. Every mode must match the baseline
+    // -- each (NaN, id) self-matches under the hash join's composite key equality -> 3 rows. This fixture
+    // uses the canonical Double.NaN, which round-trips faithfully, so it does not by itself discriminate
+    // the exact-IN NaN abandon; that is pinned by the non-canonical-payload unit test in
+    // ServerPlanRequestUtilsTest. Here we confirm the full planner + leaf path stays correct.
+    String rest = "FROM " + TABLE_NAME + " t1 JOIN " + TABLE_NAME + " t2 ON t1." + NANKEY + " = t2." + NANKEY
+        + " AND t1." + ID + " = t2." + ID + " WHERE t2." + ID + " < 3";
+    assertAllModesMatchBaseline("COUNT(*)", rest);
+    JsonNode baseline = runMse("SELECT COUNT(*) " + rest);
+    assertEquals(baseline.get("rows").get(0).get(0).asLong(), 3L,
+        "composite (NaN, id) key self-joins on the 3 NaN rows");
+  }
+
+  @Test
   public void testEmptyBuildYieldsEmptyResult()
       throws Exception {
     // Build side matches nothing -> the probe is pruned entirely (constant-false). Result must be empty

@@ -331,6 +331,9 @@ public class ServerPlanRequestUtils {
    * </ul>
    * Build sides larger than {@code maxBuildRows}, or any predicate (bloom or exact {@code IN}) whose
    * estimated serialized size exceeds {@code maxBytes}, are abandoned (no filter), which is always correct.
+   * An exact {@code IN} over a FLOAT/DOUBLE key that contains {@code NaN} is likewise abandoned: its
+   * literals canonicalize NaN, which the leaf's raw-bit membership test cannot match faithfully, whereas
+   * the bloom tier reduces NaN keys correctly.
    */
   static void attachRuntimeFilter(PinotQuery pinotQuery, List<Integer> probeKeys, List<Integer> buildKeys,
       List<Object[]> dataContainer, DataSchema dataSchema, RuntimeFilterNode.Type type) {
@@ -389,6 +392,15 @@ public class ServerPlanRequestUtils {
     }
 
     if (!useBloom) {
+      // A FLOAT/DOUBLE exact IN cannot faithfully reduce a NaN key. The IN literals canonicalize NaN (the
+      // value round-trips through "NaN" as a string), while the leaf set compares probe values by raw
+      // bits; and the hash join's key equality matches neither (multi-key canonicalizes NaN, single-key
+      // compares raw bits). A NaN build key could therefore drop a joinable probe row (false negative), so
+      // abandon exact IN when one is present. The bloom tier (single-key) keeps NaN faithfully -> only the
+      // exact-IN path needs this guard.
+      if (hasNaNFloatOrDoubleKey(rows, buildKeys, dataSchema)) {
+        return;
+      }
       // Apply the same footprint ceiling the bloom tier honors. The exact-IN path (IN mode, or any
       // multi-key, or AUTO below the threshold) emits up to maxBuildRows literals per key, AND'd across
       // keys, which can be multi-MB. Abandon if the estimated serialized size exceeds maxBytes so there is
@@ -428,6 +440,32 @@ public class ServerPlanRequestUtils {
       }
     }
     return result;
+  }
+
+  /**
+   * Returns true if any FLOAT or DOUBLE join-key column holds a {@code NaN} value. Such a key cannot be
+   * reduced by an exact {@code IN} without risking a false negative against the hash join (see the caller),
+   * so the exact-IN tier is abandoned when this is true.
+   */
+  private static boolean hasNaNFloatOrDoubleKey(List<Object[]> rows, List<Integer> buildKeys,
+      DataSchema dataSchema) {
+    for (int buildKey : buildKeys) {
+      FieldSpec.DataType storedType = dataSchema.getColumnDataType(buildKey).getStoredType().toDataType();
+      if (storedType == FieldSpec.DataType.FLOAT) {
+        for (Object[] row : rows) {
+          if (Float.isNaN((float) row[buildKey])) {
+            return true;
+          }
+        }
+      } else if (storedType == FieldSpec.DataType.DOUBLE) {
+        for (Object[] row : rows) {
+          if (Double.isNaN((double) row[buildKey])) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   /** Rough per-literal overhead (proto Expression + Literal wrapping) used by {@link #estimateExactInBytes}. */
