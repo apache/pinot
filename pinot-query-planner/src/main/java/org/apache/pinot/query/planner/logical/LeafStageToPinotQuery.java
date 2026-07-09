@@ -160,8 +160,12 @@ public class LeafStageToPinotQuery {
    * <p>
    * Note: This method mutates the input expression's operand lists in-place for AND/OR/NOT nodes.
    * It assumes the expression tree is freshly constructed and not shared across concurrent callers.
+   *
+   * @return the pruner-safe filter expression, or {@code null} when the input carries no filter constraint (e.g.
+   *         LITERAL true, or an AND/OR/NOT that reduces away entirely).
    */
-  public static Expression ensureFilterIsFunctionExpression(Expression expression) {
+  @Nullable
+  public static Expression ensureFilterIsFunctionExpression(@Nullable Expression expression) {
     if (expression == null) {
       return null;
     }
