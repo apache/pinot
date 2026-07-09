@@ -20,12 +20,15 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -149,6 +152,29 @@ public class DistinctCountSmartHLLAggregationFunctionTest {
     assertNotNull(merged);
     long mergedCardinality = merged.cardinality();
     assertTrue(mergedCardinality >= 700 && mergedCardinality <= 800, "Merged cardinality: " + mergedCardinality);
+  }
+
+  @Test
+  public void itExtractsHLLFromGroupByResultHolderWhenSketchConverted() {
+    DistinctCountSmartHLLAggregationFunction function = new DistinctCountSmartHLLAggregationFunction(
+        List.of(ExpressionContext.forIdentifier("col"),
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "threshold=5;dictThreshold=5")));
+
+    ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
+
+    HyperLogLog hll = new HyperLogLog(12);
+    for (int i = 0; i < 100; i++) {
+      hll.offer(i);
+    }
+    holder.setValueForKey(0, hll);
+
+    Object extracted = function.extractGroupByResult(holder, 0);
+    assertTrue(extracted instanceof HyperLogLog,
+        "Expected HyperLogLog but got: " + (extracted == null ? "null" : extracted.getClass().getName()));
+    assertFalse(extracted instanceof Set, "HyperLogLog must not be cast to Set");
+
+    int cardinality = function.extractFinalResult(extracted);
+    assertTrue(cardinality >= 90 && cardinality <= 110, "Cardinality out of range: " + cardinality);
   }
 
   @Test
