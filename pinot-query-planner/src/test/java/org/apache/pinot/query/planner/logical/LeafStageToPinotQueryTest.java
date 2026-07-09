@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -93,6 +94,29 @@ public class LeafStageToPinotQueryTest {
 
     assertSame(result, funcExpr);
     assertEquals(result.getFunctionCall().getOperator(), "EQUALS");
+  }
+
+  @DataProvider(name = "validFilterKindOperators")
+  public static Object[][] validFilterKindOperators() {
+    // Function-style predicates whose operator IS a FilterKind must NOT be wrapped as EQUALS(fn, true) -- only
+    // non-FilterKind scalar functions (e.g. contains) are wrapped. This guards the !isValidEnum boundary.
+    return new Object[][]{
+        {"IN"}, {"NOT_IN"}, {"RANGE"}, {"LIKE"}, {"REGEXP_LIKE"}, {"TEXT_MATCH"}, {"JSON_MATCH"},
+        {"IS_NULL"}, {"IS_NOT_NULL"}, {"NOT_EQUALS"}, {"BETWEEN"}
+    };
+  }
+
+  @Test(dataProvider = "validFilterKindOperators")
+  public void testValidFilterKindFunctionPassedThroughUnchanged(String operator) {
+    Function function = new Function(operator);
+    function.setOperands(new ArrayList<>(List.of(RequestUtils.getIdentifierExpression("col"))));
+    Expression funcExpr = new Expression(ExpressionType.FUNCTION);
+    funcExpr.setFunctionCall(function);
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(funcExpr);
+
+    assertSame(result, funcExpr, operator + " (a valid FilterKind) must not be wrapped");
+    assertEquals(result.getFunctionCall().getOperator(), operator);
   }
 
   @Test

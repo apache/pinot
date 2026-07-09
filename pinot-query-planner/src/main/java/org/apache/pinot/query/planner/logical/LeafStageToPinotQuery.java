@@ -40,6 +40,11 @@ import org.apache.pinot.sql.FilterKind;
 
 /**
  * Utility to convert a leaf stage to a {@link PinotQuery}.
+ *
+ * <p>{@link #createPinotQueryForRouting} folds a Calcite {@link RelNode} leaf stage into a routing query for the
+ * physical optimizer; {@code PlanNodeRoutingQueryBuilder} is the {@code PlanNode} (logical-planner) counterpart that
+ * must be kept in sync (same leaf-boundary stop and filter-combining behavior). The shared filter-normalization
+ * helpers ({@link #ensureFilterIsFunctionExpression} and {@link #addFilterExpression}) live here and are used by both.
  */
 public class LeafStageToPinotQuery {
   private LeafStageToPinotQuery() {
@@ -112,15 +117,18 @@ public class LeafStageToPinotQuery {
       RexExpression rexExpression = RexExpressionUtils.fromRexNode(filter.getCondition());
       Expression filterExpression = CalciteRexExpressionParser.toExpression(rexExpression,
           pinotQuery.getSelectList());
-      setOrAndFilterExpression(pinotQuery, ensureFilterIsFunctionExpression(filterExpression));
+      addFilterExpression(pinotQuery, ensureFilterIsFunctionExpression(filterExpression));
     }
   }
 
   /**
-   * Sets the given filter on the query, AND-ing it with any previously set filter (rather than overwriting it, which
+   * Adds the given filter to the query, AND-ing it with any previously set filter (rather than overwriting it, which
    * would silently discard a genuine row-level condition when a leaf stage contains multiple filter nodes).
+   * <p>
+   * Note: this mutates {@code pinotQuery} (and, when combining, reuses the existing filter expression in-place). It
+   * assumes the query is freshly constructed for routing and not shared across concurrent callers.
    */
-  public static void setOrAndFilterExpression(PinotQuery pinotQuery, @Nullable Expression filterExpression) {
+  public static void addFilterExpression(PinotQuery pinotQuery, @Nullable Expression filterExpression) {
     if (filterExpression == null) {
       return;
     }

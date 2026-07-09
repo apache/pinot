@@ -38,6 +38,13 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
  * Converts an MSE leaf stage {@link PlanNode} tree to a {@link PinotQuery} for routing purposes. Used by the broker
  * pruning path in {@link WorkerManager} to build a filter-bearing routing query that enables segment pruning at the
  * broker.
+ *
+ * <p>This is the {@link PlanNode} (logical-planner) counterpart of {@link LeafStageToPinotQuery}, which performs the
+ * same leaf-stage → routing-query fold over Calcite {@link org.apache.calcite.rel.RelNode}s for the physical
+ * optimizer. The two traversals are intentionally kept as separate builders because they walk different node
+ * hierarchies; the shared filter-normalization logic ({@code ensureFilterIsFunctionExpression} /
+ * {@code addFilterExpression}) lives in {@link LeafStageToPinotQuery}. Keep the leaf-boundary and filter-combining
+ * behavior of the two in sync.
  */
 public class PlanNodeRoutingQueryBuilder {
   private PlanNodeRoutingQueryBuilder() {
@@ -109,7 +116,7 @@ public class PlanNodeRoutingQueryBuilder {
   private static void handleFilter(FilterNode filter, PinotQuery pinotQuery) {
     Expression filterExpression = CalciteRexExpressionParser.toExpression(filter.getCondition(),
         pinotQuery.getSelectList());
-    LeafStageToPinotQuery.setOrAndFilterExpression(pinotQuery,
+    LeafStageToPinotQuery.addFilterExpression(pinotQuery,
         LeafStageToPinotQuery.ensureFilterIsFunctionExpression(filterExpression));
   }
 }

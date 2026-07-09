@@ -366,6 +366,75 @@ public class WorkerManagerTest {
   }
 
   @Test
+  public void testBrokerPruningPhysicalOptimizerRoutingFilterExcludesHaving() {
+    // The physical optimizer (usePhysicalOptimizer=true, where broker pruning is already on by default) builds its
+    // routing query via the shared LeafStageToPinotQuery. This exercises that path end-to-end: the captured routing
+    // filter must carry only the WHERE predicate and must NOT contain the HAVING predicate. (On the v2 path the
+    // aggregate is split across an exchange, so HAVING stays out of the leaf; this guards that the shared builder
+    // produces a correct WHERE-only routing filter on the v2 path -- the un-split-aggregate boundary case that the
+    // leaf-boundary break specifically protects is covered on the logical path by
+    // testBrokerPruningIgnoresFilterAboveLeafAggregate and PlanNodeRoutingQueryBuilderTest.)
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+    RoutingTable routingTable = new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("segment1"), List.of())),
+        List.of(), 0);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", routingTable));
+
+    QueryEnvironment queryEnvironment = newQueryEnvironment(schema, routingManager);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET usePhysicalOptimizer=true; SELECT col1, SUM(col3) FROM testTable "
+            + "WHERE col2 = 'x' GROUP BY col1 HAVING SUM(col3) > 10")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+    }
+
+    BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest, "Physical optimizer should route through the capturing routing manager");
+    Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
+    assertNotNull(filterExpression);
+    // The routing filter is the WHERE predicate only; the HAVING (GREATER_THAN on SUM) must not appear.
+    assertFalse(containsOperatorOnColumn(filterExpression, "GREATER_THAN"),
+        "HAVING predicate leaked into the physical-optimizer routing filter: " + filterExpression);
+    assertTrue(containsIdentifier(filterExpression, "col2"),
+        "WHERE predicate missing from the physical-optimizer routing filter: " + filterExpression);
+  }
+
+  private static boolean containsOperatorOnColumn(Expression expression, String operator) {
+    if (expression == null || expression.getFunctionCall() == null) {
+      return false;
+    }
+    Function function = expression.getFunctionCall();
+    if (function.getOperator().equals(operator)) {
+      return true;
+    }
+    for (Expression operand : function.getOperands()) {
+      if (containsOperatorOnColumn(operand, operator)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean containsIdentifier(Expression expression, String identifier) {
+    if (expression == null) {
+      return false;
+    }
+    if (expression.getIdentifier() != null) {
+      return expression.getIdentifier().getName().equals(identifier);
+    }
+    if (expression.getFunctionCall() != null) {
+      for (Expression operand : expression.getFunctionCall().getOperands()) {
+        if (containsIdentifier(operand, identifier)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  @Test
   public void testBrokerPruningAllPrunedLeafPlansAcrossExchangeShapes() {
     // When the filter prunes every segment, the leaf gets zero workers. Planning (including mailbox assignment,
     // which runs before the all-leaves-empty short-circuit rewrite) must still succeed for every exchange shape a
