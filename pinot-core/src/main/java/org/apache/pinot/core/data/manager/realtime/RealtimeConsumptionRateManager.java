@@ -144,12 +144,11 @@ public class RealtimeConsumptionRateManager {
         // result of it, But the metric related to throttling won't be emitted since as a result of here above the
         // AsyncMetricEmitter will be closed. It's recommended to forceCommit segments to avoid this.
       }
-      // Expose the (disabled) configured limit and reset utilization to 0 so the two server gauges stay consistent
-      // (otherwise the utilization gauge freezes at its last value once the emitter is closed).
+      // Expose the configured cap (-1 when disabled) so operators can see that rate limiting is off. The utilization
+      // gauge is intentionally not touched here: like the per-partition utilization gauge it is a live measurement
+      // that simply stops updating once the limiter is gone (rate-limit updates keep the emitter running, so it
+      // self-corrects on the common update path), and the -1 cap already signals that any last value is stale.
       emitServerRateLimit(serverMetrics, -1);
-      if (serverMetrics != null) {
-        serverMetrics.setValueOfGlobalGauge(ServerGauge.SERVER_CONSUMPTION_QUOTA_UTILIZATION, 0);
-      }
       return;
     }
 
