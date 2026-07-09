@@ -18,21 +18,81 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.volcano.VolcanoPlanner;
+import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.apache.calcite.rel.logical.LogicalFilter;
+import org.apache.calcite.rel.logical.LogicalTableScan;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.query.type.TypeFactory;
+import org.mockito.Mockito;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 public class LeafStageToPinotQueryTest {
+
+  // --- RelNode leaf-boundary handling (createPinotQueryForRouting, the physical-optimizer path) ---
+
+  @Test
+  public void testCreatePinotQueryForRoutingStopsAtLeafBoundary() {
+    // Build a RelNode leaf tree: TableScan(col1 INT, col2 INT) -> Filter(col1 = 5) -> Aggregate -> Filter($1 > 10).
+    // The Aggregate is a leaf boundary: InputRefs above it index the aggregate output, not the scan columns, so its
+    // HAVING filter must NOT be folded into the routing query. The routing filter must be exactly the WHERE (col1 = 5).
+    // Removing the leaf-boundary break in createPinotQueryForRouting makes this fail (HAVING folds in against the wrong
+    // row space). This is the RelNode-path mirror of PlanNodeRoutingQueryBuilderTest#...StopsAtLeafBoundary.
+    TypeFactory typeFactory = new TypeFactory();
+    RexBuilder rexBuilder = new RexBuilder(typeFactory);
+    RelOptCluster cluster = RelOptCluster.create(new VolcanoPlanner(), rexBuilder);
+    RelDataType intType = typeFactory.createSqlType(SqlTypeName.INTEGER);
+    RelDataType rowType = typeFactory.builder().add("col1", intType).add("col2", intType).build();
+
+    RelOptTable table = Mockito.mock(RelOptTable.class);
+    Mockito.when(table.getRowType()).thenReturn(rowType);
+    Mockito.when(table.getRelOptSchema()).thenReturn(null);
+    LogicalTableScan tableScan = LogicalTableScan.create(cluster, table, List.of());
+
+    RexNode whereCondition = rexBuilder.makeCall(SqlStdOperatorTable.EQUALS,
+        rexBuilder.makeInputRef(intType, 0), rexBuilder.makeExactLiteral(BigDecimal.valueOf(5), intType));
+    LogicalFilter whereFilter = LogicalFilter.create(tableScan, whereCondition);
+
+    LogicalAggregate aggregate =
+        LogicalAggregate.create(whereFilter, List.of(), ImmutableBitSet.of(0), null, List.of());
+
+    // HAVING references the aggregate's output (index 0 here = the group key). Its InputRef space is the aggregate
+    // output, so folding it into the routing query would mis-resolve against the scan columns.
+    RexNode havingCondition = rexBuilder.makeCall(SqlStdOperatorTable.GREATER_THAN,
+        rexBuilder.makeInputRef(aggregate.getRowType().getFieldList().get(0).getType(), 0),
+        rexBuilder.makeExactLiteral(BigDecimal.valueOf(10), intType));
+    LogicalFilter havingFilter = LogicalFilter.create(aggregate, havingCondition);
+
+    PinotQuery pinotQuery = LeafStageToPinotQuery.createPinotQueryForRouting("testTable", havingFilter, false);
+
+    Expression filter = pinotQuery.getFilterExpression();
+    assertNotNull(filter);
+    assertEquals(filter.getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(filter.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+  }
 
   // --- Basic expression type handling ---
 
@@ -92,6 +152,89 @@ public class LeafStageToPinotQueryTest {
 
     assertSame(result, funcExpr);
     assertEquals(result.getFunctionCall().getOperator(), "EQUALS");
+  }
+
+  @DataProvider(name = "validFilterKindOperators")
+  public static Object[][] validFilterKindOperators() {
+    // Function-style predicates whose operator IS a FilterKind must NOT be wrapped as EQUALS(fn, true) -- only
+    // non-FilterKind scalar functions (e.g. contains) are wrapped. This guards the !isValidEnum boundary.
+    return new Object[][]{
+        {"IN"}, {"NOT_IN"}, {"RANGE"}, {"LIKE"}, {"REGEXP_LIKE"}, {"TEXT_MATCH"}, {"JSON_MATCH"},
+        {"IS_NULL"}, {"IS_NOT_NULL"}, {"NOT_EQUALS"}, {"BETWEEN"}
+    };
+  }
+
+  @Test(dataProvider = "validFilterKindOperators")
+  public void testValidFilterKindFunctionPassedThroughUnchanged(String operator) {
+    Function function = new Function(operator);
+    function.setOperands(new ArrayList<>(List.of(RequestUtils.getIdentifierExpression("col"))));
+    Expression funcExpr = new Expression(ExpressionType.FUNCTION);
+    funcExpr.setFunctionCall(function);
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(funcExpr);
+
+    assertSame(result, funcExpr, operator + " (a valid FilterKind) must not be wrapped");
+    assertEquals(result.getFunctionCall().getOperator(), operator);
+  }
+
+  @Test
+  public void testBooleanScalarFunctionWrappedAsEqualsTrue() {
+    // A boolean scalar function used directly as a predicate (WHERE contains(col, 'foo')) is not a FilterKind;
+    // segment pruners resolve operators via FilterKind.valueOf and would throw on it. It must be wrapped as
+    // EQUALS(contains(col, 'foo'), true), mirroring the single-stage engine's PredicateComparisonRewriter.
+    Expression containsExpr = makeCompound("contains",
+        RequestUtils.getIdentifierExpression("col"), RequestUtils.getLiteralExpression("foo"));
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(containsExpr);
+
+    assertNotNull(result);
+    assertEquals(result.getFunctionCall().getOperator(), "EQUALS");
+    List<Expression> operands = result.getFunctionCall().getOperands();
+    assertEquals(operands.size(), 2);
+    assertEquals(operands.get(0).getFunctionCall().getOperator(), "contains");
+    assertTrue(operands.get(1).getLiteral().getBoolValue());
+  }
+
+  @Test
+  public void testAndWithBooleanScalarFunctionWrapsIt() {
+    assertCompoundWithBooleanScalarFunctionWraps("AND");
+  }
+
+  @Test
+  public void testOrWithBooleanScalarFunctionWrapsIt() {
+    assertCompoundWithBooleanScalarFunctionWraps("OR");
+  }
+
+  private void assertCompoundWithBooleanScalarFunctionWraps(String op) {
+    // OP(contains(col, 'foo'), EQUALS(col2, 'val')) → OP(EQUALS(contains(col, 'foo'), true), EQUALS(col2, 'val'))
+    Expression containsExpr = makeCompound("contains",
+        RequestUtils.getIdentifierExpression("col"), RequestUtils.getLiteralExpression("foo"));
+    Expression compoundExpr = makeCompound(op, containsExpr, makeEquals("col2", "val"));
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(compoundExpr);
+
+    assertNotNull(result);
+    assertEquals(result.getFunctionCall().getOperator(), op);
+    List<Expression> operands = result.getFunctionCall().getOperands();
+    assertEquals(operands.size(), 2);
+    assertEquals(operands.get(0).getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(operands.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "contains");
+    assertEquals(operands.get(1).getFunctionCall().getOperator(), "EQUALS");
+  }
+
+  @Test
+  public void testNotWithBooleanScalarFunctionWrapsOperand() {
+    Expression containsExpr = makeCompound("contains",
+        RequestUtils.getIdentifierExpression("col"), RequestUtils.getLiteralExpression("foo"));
+    Expression notExpr = makeCompound("NOT", containsExpr);
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(notExpr);
+
+    assertNotNull(result);
+    assertEquals(result.getFunctionCall().getOperator(), "NOT");
+    Expression operand = result.getFunctionCall().getOperands().get(0);
+    assertEquals(operand.getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(operand.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "contains");
   }
 
   // --- AND/OR handling (shared logic, tested symmetrically) ---

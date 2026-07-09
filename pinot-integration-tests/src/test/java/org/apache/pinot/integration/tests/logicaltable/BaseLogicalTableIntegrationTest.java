@@ -470,10 +470,12 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     String logicalTableName = getLogicalTableName();
     String filteredQuery = "SELECT COUNT(*) FROM " + logicalTableName + " WHERE DaysSinceEpoch > 16312";
 
-    JsonNode withoutPruning = postQuery(filteredQuery);
+    // Broker pruning is on by default on the MSE logical planner path; disable it explicitly for the baseline so the
+    // two runs exercise different routing paths.
+    JsonNode withoutPruning = postQuery("SET useBrokerPruning=false; " + filteredQuery);
     assertTrue(withoutPruning.get("exceptions").isEmpty(), "Unexpected exceptions without broker pruning");
 
-    JsonNode withPruning = postQuery("SET useBrokerPruning=true; " + filteredQuery);
+    JsonNode withPruning = postQuery(filteredQuery);
     assertTrue(withPruning.get("exceptions").isEmpty(), "Unexpected exceptions with broker pruning");
 
     // Broker pruning is a routing optimization only; the result must be identical to the unpruned run.

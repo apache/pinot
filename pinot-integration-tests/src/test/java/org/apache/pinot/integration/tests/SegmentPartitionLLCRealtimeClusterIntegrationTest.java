@@ -215,20 +215,22 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       // 'CA' hashes to partition 0, so only that partition's segments should be routed when broker pruning is enabled.
       String filteredQuery = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
 
-      // Baseline: the multi-stage engine without broker pruning scans all segments across both partitions.
-      JsonNode unpruned = postQuery(filteredQuery);
+      // Baseline: with broker pruning explicitly disabled, the query scans all segments across both partitions.
+      JsonNode unpruned = postQuery("SET useBrokerPruning=false; " + filteredQuery);
       assertTrue(unpruned.get("exceptions").isEmpty(), "Unexpected exceptions without broker pruning");
       int unprunedSegmentsQueried = unpruned.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt();
 
-      // With broker pruning enabled, the non-matching partition's segments are pruned at the broker before dispatch.
-      JsonNode pruned = postQuery("SET useBrokerPruning=true; " + filteredQuery);
+      // Broker pruning is on by default: without any SET, the non-matching partition's segments are pruned at the
+      // broker before dispatch.
+      JsonNode pruned = postQuery(filteredQuery);
       assertTrue(pruned.get("exceptions").isEmpty(), "Unexpected exceptions with broker pruning");
 
       // Broker pruning is a routing optimization only; the result must be identical to the unpruned run.
       assertEquals(pruned.get("resultTable").get("rows").get(0).get(0).asLong(),
           unpruned.get("resultTable").get("rows").get(0).get(0).asLong(),
           "Broker pruning changed the query result");
-      // Broker pruning actually engaged: the non-matching partition's segments were dropped, so fewer were queried.
+      // Broker pruning actually engaged by default: the non-matching partition's segments were dropped, so fewer
+      // were queried.
       assertTrue(pruned.get("numSegmentsPrunedByBroker").asInt() > 0,
           "Expected the broker to prune the non-matching partition's segments");
       assertTrue(pruned.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt() < unprunedSegmentsQueried,
