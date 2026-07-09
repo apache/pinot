@@ -39,6 +39,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.sql.FilterKind;
 import org.mockito.Mockito;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -235,6 +236,43 @@ public class LeafStageToPinotQueryTest {
     Expression operand = result.getFunctionCall().getOperands().get(0);
     assertEquals(operand.getFunctionCall().getOperator(), "EQUALS");
     assertEquals(operand.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "contains");
+  }
+
+  @Test
+  public void testMixedPredicateYieldsOnlyFilterKindOperatorsForPruners() {
+    // Shape of a reported failure: a scalar function canonicalizes to a lowercase operator
+    // ("arraycontainsstring") and sits directly under AND, so pruners threw
+    // "No enum constant org.apache.pinot.sql.FilterKind.arraycontainsstring".
+    // Assert the invariant pruners actually rely on: every operator they traverse resolves via
+    // FilterKind.valueOf. This covers the whole normalized tree rather than a single wrapped node.
+    Expression notEquals = makeCompound("NOT_EQUALS",
+        RequestUtils.getIdentifierExpression("label"), RequestUtils.getLiteralExpression("Low"));
+    Expression scalarFn = makeCompound("arraycontainsstring",
+        RequestUtils.getIdentifierExpression("groups"), RequestUtils.getLiteralExpression("y"));
+    Expression andExpr = makeCompound("AND", notEquals, scalarFn, makeEquals("status", "open"));
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(andExpr);
+
+    assertNotNull(result);
+    assertPrunerTraversableOperatorsAreFilterKinds(result);
+  }
+
+  /**
+   * Mirrors how segment pruners walk a filter: they call {@code FilterKind.valueOf(operator)} on each node they
+   * visit (which must not throw) and only recurse into the operands of AND/OR/NOT.
+   */
+  private static void assertPrunerTraversableOperatorsAreFilterKinds(Expression expression) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    // Must not throw — this is exactly what segment pruners call on every node they visit.
+    FilterKind filterKind = FilterKind.valueOf(function.getOperator());
+    if (filterKind == FilterKind.AND || filterKind == FilterKind.OR || filterKind == FilterKind.NOT) {
+      for (Expression operand : function.getOperands()) {
+        assertPrunerTraversableOperatorsAreFilterKinds(operand);
+      }
+    }
   }
 
   // --- AND/OR handling (shared logic, tested symmetrically) ---

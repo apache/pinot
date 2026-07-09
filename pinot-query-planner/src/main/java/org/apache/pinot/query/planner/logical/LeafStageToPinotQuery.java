@@ -30,7 +30,6 @@ import org.apache.calcite.rel.core.TableScan;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -137,11 +136,8 @@ public class LeafStageToPinotQuery {
       pinotQuery.setFilterExpression(filterExpression);
       return;
     }
-    Function andFunction = new Function(FilterKind.AND.name());
-    andFunction.setOperands(new ArrayList<>(List.of(existingFilter, filterExpression)));
-    Expression combined = new Expression(ExpressionType.FUNCTION);
-    combined.setFunctionCall(andFunction);
-    pinotQuery.setFilterExpression(combined);
+    pinotQuery.setFilterExpression(
+        RequestUtils.getFunctionExpression(FilterKind.AND.name(), existingFilter, filterExpression));
   }
 
   /**
@@ -218,24 +214,20 @@ public class LeafStageToPinotQuery {
     // don't unnecessarily scan everything.
     if (expression.getLiteral() != null && expression.getLiteral().isSetBoolValue()
         && !expression.getLiteral().getBoolValue()) {
-      Function alwaysFalse = new Function(FilterKind.EQUALS.name());
-      alwaysFalse.setOperands(new ArrayList<>(List.of(
-          RequestUtils.getLiteralExpression(0),
-          RequestUtils.getLiteralExpression(1))));
-      Expression wrapped = new Expression(ExpressionType.FUNCTION);
-      wrapped.setFunctionCall(alwaysFalse);
-      return wrapped;
+      // EQUALS(0, 1) — a predicate that is always false.
+      return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(),
+          RequestUtils.getLiteralExpression(0), RequestUtils.getLiteralExpression(1));
     }
     // LITERAL true or non-boolean literals have no filter constraint so we skip pruning
     return null;
   }
 
-  /** Wraps a boolean-valued expression as the standard predicate {@code EQUALS(expression, true)}. */
+  /**
+   * Wraps a boolean-valued expression as the standard predicate {@code EQUALS(expression, true)}. The operand list
+   * is mutable so downstream rewriters (e.g. {@code PredicateComparisonRewriter}) can modify it.
+   */
   private static Expression wrapAsEqualsTrue(Expression expression) {
-    Function equalsFunction = new Function(FilterKind.EQUALS.name());
-    equalsFunction.setOperands(new ArrayList<>(List.of(expression, RequestUtils.getLiteralExpression(true))));
-    Expression wrapped = new Expression(ExpressionType.FUNCTION);
-    wrapped.setFunctionCall(equalsFunction);
-    return wrapped;
+    return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), expression,
+        RequestUtils.getLiteralExpression(true));
   }
 }
