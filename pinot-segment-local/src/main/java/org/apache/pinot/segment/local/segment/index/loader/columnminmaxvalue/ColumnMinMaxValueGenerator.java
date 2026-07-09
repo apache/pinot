@@ -365,10 +365,10 @@ public class ColumnMinMaxValueGenerator {
           if (isSingleValue) {
             for (int docId = 0; docId < numDocs; docId++) {
               byte[] value = rawIndexReader.getBytes(docId, readerContext);
-              if (min == null || ByteArray.compare(value, min) > 0) {
+              if (min == null || ByteArray.compare(value, min) < 0) {
                 min = value;
               }
-              if (max == null || ByteArray.compare(value, max) < 0) {
+              if (max == null || ByteArray.compare(value, max) > 0) {
                 max = value;
               }
             }
@@ -376,17 +376,17 @@ public class ColumnMinMaxValueGenerator {
             for (int docId = 0; docId < numDocs; docId++) {
               byte[][] values = rawIndexReader.getBytesMV(docId, readerContext);
               for (byte[] value : values) {
-                if (min == null || ByteArray.compare(value, min) > 0) {
+                if (min == null || ByteArray.compare(value, min) < 0) {
                   min = value;
                 }
-                if (max == null || ByteArray.compare(value, max) < 0) {
+                if (max == null || ByteArray.compare(value, max) > 0) {
                   max = value;
                 }
               }
             }
           }
-          minValue = new ByteArray(min);
-          maxValue = new ByteArray(max);
+          minValue = min != null ? new ByteArray(min) : null;
+          maxValue = max != null ? new ByteArray(max) : null;
           break;
         }
         default:
