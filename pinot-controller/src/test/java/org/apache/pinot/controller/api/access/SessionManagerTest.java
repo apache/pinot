@@ -36,7 +36,7 @@ import static org.testng.Assert.*;
 
 
 /**
- * Unit tests for {@link SessionManager}.
+ * Unit tests for {@link InMemorySessionManager}.
  *
  * <p>Covers:
  * <ul>
@@ -55,7 +55,7 @@ public class SessionManagerTest {
   @BeforeMethod
   public void setUp() {
     // 10-second TTL for most tests — long enough not to expire during assertions
-    _sessionManager = new SessionManager(10L);
+    _sessionManager = new InMemorySessionManager(10L);
   }
 
   @AfterMethod
@@ -125,7 +125,7 @@ public class SessionManagerTest {
   @Test
   public void testGetUsernameAfterExpiryReturnsEmpty() throws InterruptedException {
     // Create a session with 1-second TTL
-    SessionManager shortTtlManager = new SessionManager(1L);
+    SessionManager shortTtlManager = new InMemorySessionManager(1L);
     try {
       String token = shortTtlManager.createSession("bob", "Basic xyz");
       // Verify it works immediately
@@ -141,7 +141,7 @@ public class SessionManagerTest {
 
   @Test
   public void testExpiredSessionRemovedFromStore() throws InterruptedException {
-    SessionManager shortTtlManager = new SessionManager(1L);
+    SessionManager shortTtlManager = new InMemorySessionManager(1L);
     try {
       String token = shortTtlManager.createSession("bob", "Basic xyz");
       Thread.sleep(1500);
@@ -160,7 +160,7 @@ public class SessionManagerTest {
   @Test
   public void testSlidingWindowExtendsExpiry() throws InterruptedException {
     // TTL = 2 seconds. Access at t=1.5s should slide expiry to t=3.5s.
-    SessionManager slidingManager = new SessionManager(2L);
+    SessionManager slidingManager = new InMemorySessionManager(2L);
     try {
       String token = slidingManager.createSession("carol", "Basic zzz");
       Thread.sleep(1500); // t=1.5s — still valid
@@ -261,7 +261,7 @@ public class SessionManagerTest {
   @Test
   public void testGetSessionTtlSeconds() {
     assertEquals(_sessionManager.getSessionTtlSeconds(), 10L);
-    SessionManager custom = new SessionManager(42L);
+    SessionManager custom = new InMemorySessionManager(42L);
     try {
       assertEquals(custom.getSessionTtlSeconds(), 42L);
     } finally {
@@ -271,7 +271,7 @@ public class SessionManagerTest {
 
   @Test
   public void testDefaultConstructorUsesFallbackTtl() {
-    SessionManager defaultManager = new SessionManager();
+    SessionManager defaultManager = new InMemorySessionManager();
     try {
       assertEquals(defaultManager.getSessionTtlSeconds(), SessionManager.DEFAULT_SESSION_TTL_SECONDS);
     } finally {
