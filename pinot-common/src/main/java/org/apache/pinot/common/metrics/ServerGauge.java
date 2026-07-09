@@ -48,6 +48,14 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   // Dedup metrics
   DEDUP_PRIMARY_KEYS_COUNT("dedupPrimaryKeysCount", false),
   CONSUMPTION_QUOTA_UTILIZATION("ratio", false),
+  // Server-level consumption rate limiting is server-wide, so these are global gauges (no table/partition
+  // dimension), kept distinct from the per-partition CONSUMPTION_QUOTA_UTILIZATION above.
+  SERVER_CONSUMPTION_QUOTA_UTILIZATION("ratio", true),
+  // Configured consumption rate limits, emitted when the limiter is created or its config changes; the server gauge
+  // is set to -1 when server-level rate limiting is disabled. Units follow the active throttling strategy
+  // (bytes/sec in byte mode, messages/sec in message mode).
+  SERVER_CONSUMPTION_RATE_LIMIT("perSecond", true),
+  CONSUMPTION_RATE_LIMIT("perSecond", false),
   JVM_HEAP_USED_BYTES("bytes", true),
   NETTY_POOLED_USED_DIRECT_MEMORY("bytes", true),
   NETTY_POOLED_USED_HEAP_MEMORY("bytes", true),
