@@ -44,6 +44,7 @@ public class RecordReaderFactory {
   static final String DEFAULT_CSV_RECORD_READER_CONFIG_CLASS =
       "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig";
   static final String DEFAULT_JSON_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.json.JSONRecordReader";
+  static final String DEFAULT_BSON_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.bson.BSONRecordReader";
   static final String DEFAULT_THRIFT_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader";
   static final String DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS =
@@ -76,6 +77,7 @@ public class RecordReaderFactory {
     register(FileFormat.GZIPPED_AVRO, DEFAULT_AVRO_RECORD_READER_CLASS, DEFAULT_AVRO_RECORD_READER_CONFIG_CLASS);
     register(FileFormat.CSV, DEFAULT_CSV_RECORD_READER_CLASS, DEFAULT_CSV_RECORD_READER_CONFIG_CLASS);
     register(FileFormat.JSON, DEFAULT_JSON_RECORD_READER_CLASS, null);
+    register(FileFormat.BSON, DEFAULT_BSON_RECORD_READER_CLASS, null);
     register(FileFormat.THRIFT, DEFAULT_THRIFT_RECORD_READER_CLASS, DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS);
     register(FileFormat.ORC, DEFAULT_ORC_RECORD_READER_CLASS, null);
     register(FileFormat.PARQUET, DEFAULT_PARQUET_RECORD_READER_CLASS, DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS);
