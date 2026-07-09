@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
@@ -60,13 +61,20 @@ public class LeafStageToPinotQuery {
         "Could not find table scan");
     TableScan tableScan = (TableScan) bottomToTopNodes.get(0);
     PinotQuery pinotQuery = initializePinotQueryForTableScan(tableName, tableScan);
-    for (RelNode parentNode : bottomToTopNodes) {
+    for (int i = 1; i < bottomToTopNodes.size(); i++) {
+      RelNode parentNode = bottomToTopNodes.get(i);
       if (parentNode instanceof Filter) {
         if (!skipFilter) {
           handleFilter((Filter) parentNode, pinotQuery);
         }
       } else if (parentNode instanceof Project) {
         handleProject((Project) parentNode, pinotQuery);
+      } else {
+        // Leaf boundary: the first node that is neither Filter nor Project (e.g. an un-split DIRECT aggregate)
+        // changes the row space -- InputRefs in nodes above it index that node's output, not the scan/project
+        // columns -- so folding anything above it (e.g. a HAVING filter) would mis-resolve columns and corrupt the
+        // routing filter. Everything below this boundary is a genuine row-level condition; ignore everything above.
+        break;
       }
     }
     return pinotQuery;
@@ -104,8 +112,28 @@ public class LeafStageToPinotQuery {
       RexExpression rexExpression = RexExpressionUtils.fromRexNode(filter.getCondition());
       Expression filterExpression = CalciteRexExpressionParser.toExpression(rexExpression,
           pinotQuery.getSelectList());
-      pinotQuery.setFilterExpression(ensureFilterIsFunctionExpression(filterExpression));
+      setOrAndFilterExpression(pinotQuery, ensureFilterIsFunctionExpression(filterExpression));
     }
+  }
+
+  /**
+   * Sets the given filter on the query, AND-ing it with any previously set filter (rather than overwriting it, which
+   * would silently discard a genuine row-level condition when a leaf stage contains multiple filter nodes).
+   */
+  public static void setOrAndFilterExpression(PinotQuery pinotQuery, @Nullable Expression filterExpression) {
+    if (filterExpression == null) {
+      return;
+    }
+    Expression existingFilter = pinotQuery.getFilterExpression();
+    if (existingFilter == null) {
+      pinotQuery.setFilterExpression(filterExpression);
+      return;
+    }
+    Function andFunction = new Function(FilterKind.AND.name());
+    andFunction.setOperands(new ArrayList<>(List.of(existingFilter, filterExpression)));
+    Expression combined = new Expression(ExpressionType.FUNCTION);
+    combined.setFunctionCall(andFunction);
+    pinotQuery.setFilterExpression(combined);
   }
 
   /**

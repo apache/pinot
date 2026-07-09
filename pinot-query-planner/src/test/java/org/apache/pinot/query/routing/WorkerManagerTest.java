@@ -335,6 +335,75 @@ public class WorkerManagerTest {
   }
 
   @Test
+  public void testBrokerPruningIgnoresFilterAboveLeafAggregate() {
+    // is_partitioned_by_group_by_keys produces a DIRECT (un-split) aggregate with no exchange under it, so the
+    // HAVING filter lands in the SAME leaf fragment, above the aggregate. Its InputRefs index the aggregate's
+    // OUTPUT row space ([col1, SUM(col3)]), not the scan columns: folding it into the routing query would
+    // mis-resolve the refs against scan columns AND overwrite the genuine WHERE filter, causing incorrect
+    // pruning. The routing query must carry exactly the WHERE filter and nothing above the aggregate boundary.
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+    RoutingTable routingTable = new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("segment1"), List.of())),
+        List.of(), 0);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", routingTable));
+
+    QueryEnvironment queryEnvironment = newQueryEnvironment(schema, routingManager);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, SUM(col3) FROM testTable "
+            + "WHERE col2 = 'x' GROUP BY col1 HAVING SUM(col3) > 10")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+    }
+
+    BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest);
+    Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
+    assertNotNull(filterExpression);
+    assertEquals(filterExpression.getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(filterExpression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col2");
+  }
+
+  @Test
+  public void testBrokerPruningAllPrunedLeafPlansAcrossExchangeShapes() {
+    // When the filter prunes every segment, the leaf gets zero workers. Planning (including mailbox assignment,
+    // which runs before the all-leaves-empty short-circuit rewrite) must still succeed for every exchange shape a
+    // leaf can feed: plain select, global sort/limit (singleton receiver), aggregations, empty OVER() windows and
+    // set-ops. A planning exception here is a regression: the same query planned fine with pruning off.
+    List<String> queries = List.of(
+        "SELECT col2 FROM testTable WHERE col1 = 'foo'",
+        "SELECT col2 FROM testTable WHERE col1 = 'foo' ORDER BY col2 LIMIT 5",
+        "SELECT COUNT(*) FROM testTable WHERE col1 = 'foo'",
+        "SELECT col1, COUNT(*) FROM testTable WHERE col1 = 'foo' GROUP BY col1 ORDER BY COUNT(*) LIMIT 3",
+        "SELECT SUM(col3) OVER () FROM testTable WHERE col1 = 'foo'",
+        "SELECT col2 FROM testTable WHERE col1 = 'foo' UNION ALL SELECT col2 FROM testTable",
+        "SELECT DISTINCT col2 FROM testTable WHERE col1 = 'foo' LIMIT 4",
+        // Dynamic-broadcast semi-join: the build side (subquery) is a separate prunable leaf feeding a
+        // PIPELINE_BREAKER exchange into the main-scan leaf.
+        "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col2 FROM testTable "
+            + "WHERE col2 IN (SELECT col2 FROM testTable WHERE col1 = 'foo')");
+    for (String query : queries) {
+      Schema schema = getSchemaBuilder("testTable").build();
+      ServerInstance server = getServerInstance("localhost", 1);
+      Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+      RoutingTable routingTable = new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("segment1"),
+          List.of())), List.of(), 0);
+      CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+          Map.of("testTable_OFFLINE", routingTable));
+      routingManager.setEmptyOnFilteredRouting(true);
+
+      QueryEnvironment queryEnvironment = newQueryEnvironment(schema, routingManager);
+      try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+        DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+        assertNotNull(dispatchableSubPlan, "Planning failed for all-pruned query: " + query);
+      } catch (RuntimeException e) {
+        throw new AssertionError("All-pruned leaf broke planning for query: " + query + " -- " + e, e);
+      }
+    }
+  }
+
+  @Test
   public void testBrokerPruningFallsBackToUnfilteredRoutingOnRoutingFailure() {
     // Pruning is best-effort: if routing the filtered query throws (e.g. a segment pruner failing on an exotic
     // filter shape), the query must still plan via the unfiltered SELECT * fallback rather than fail.
@@ -1127,6 +1196,7 @@ public class WorkerManagerTest {
     private final Map<String, ServerInstance> _serverInstanceMap;
     private final Map<String, RoutingTable> _routingTableByName;
     private final boolean _throwOnFilteredRouting;
+    private boolean _emptyOnFilteredRouting;
     private final Map<String, BrokerRequest> _capturedRoutingRequests = new LinkedHashMap<>();
 
     CapturingRoutingManager(Map<String, ServerInstance> serverInstanceMap,
@@ -1139,6 +1209,11 @@ public class WorkerManagerTest {
       _serverInstanceMap = serverInstanceMap;
       _routingTableByName = routingTableByName;
       _throwOnFilteredRouting = throwOnFilteredRouting;
+    }
+
+    /** When set, filter-bearing routing requests return an all-pruned (empty) routing table. */
+    void setEmptyOnFilteredRouting(boolean emptyOnFilteredRouting) {
+      _emptyOnFilteredRouting = emptyOnFilteredRouting;
     }
 
     @Nullable
@@ -1160,6 +1235,9 @@ public class WorkerManagerTest {
       validatePrunableFilter(brokerRequest.getPinotQuery().getFilterExpression());
       String tableNameWithType = brokerRequest.getQuerySource().getTableName();
       _capturedRoutingRequests.put(tableNameWithType, brokerRequest);
+      if (_emptyOnFilteredRouting && brokerRequest.getPinotQuery().getFilterExpression() != null) {
+        return new RoutingTable(Map.of(), List.of(), 1);
+      }
       return _routingTableByName.get(tableNameWithType);
     }
 

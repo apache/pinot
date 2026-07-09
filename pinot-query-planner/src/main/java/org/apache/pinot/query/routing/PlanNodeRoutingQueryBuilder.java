@@ -44,9 +44,11 @@ public class PlanNodeRoutingQueryBuilder {
   }
 
   /**
-   * Converts a PlanNode leaf stage root to a {@link PinotQuery} for routing purposes. Only handles Project, Filter
-   * and TableScan nodes — other node types in the chain are silently skipped. Callers should expect this method
-   * to throw on malformed trees (e.g., missing TableScanNode, multi-input nodes) and handle failures gracefully.
+   * Converts a PlanNode leaf stage root to a {@link PinotQuery} for routing purposes. Folds Filter and Project nodes
+   * bottom-up starting from the TableScan, stopping at the first node of any other type (a leaf boundary such as an
+   * un-split aggregate): nodes above the boundary operate on a different row space and must not contribute to the
+   * routing filter. Callers should expect this method to throw on malformed trees (e.g., missing TableScanNode,
+   * multi-input nodes) and handle failures gracefully.
    *
    * @param tableName the table name (with or without type suffix). Passed explicitly because PlanNode trees
    *                  don't carry the resolved table name.
@@ -61,13 +63,20 @@ public class PlanNodeRoutingQueryBuilder {
         "Could not find table scan");
     TableScanNode tableScan = (TableScanNode) bottomToTopNodes.get(0);
     PinotQuery pinotQuery = initializePinotQueryForTableScan(tableName, tableScan);
-    for (PlanNode parentNode : bottomToTopNodes) {
+    for (int i = 1; i < bottomToTopNodes.size(); i++) {
+      PlanNode parentNode = bottomToTopNodes.get(i);
       if (parentNode instanceof FilterNode) {
         if (!skipFilter) {
           handleFilter((FilterNode) parentNode, pinotQuery);
         }
       } else if (parentNode instanceof ProjectNode) {
         handleProject((ProjectNode) parentNode, pinotQuery);
+      } else {
+        // Leaf boundary: the first node that is neither Filter nor Project (e.g. an un-split DIRECT aggregate)
+        // changes the row space -- InputRefs in nodes above it index that node's output, not the scan/project
+        // columns -- so folding anything above it (e.g. a HAVING filter) would mis-resolve columns and corrupt the
+        // routing filter. Everything below this boundary is a genuine row-level condition; ignore everything above.
+        break;
       }
     }
     return pinotQuery;
@@ -100,6 +109,7 @@ public class PlanNodeRoutingQueryBuilder {
   private static void handleFilter(FilterNode filter, PinotQuery pinotQuery) {
     Expression filterExpression = CalciteRexExpressionParser.toExpression(filter.getCondition(),
         pinotQuery.getSelectList());
-    pinotQuery.setFilterExpression(LeafStageToPinotQuery.ensureFilterIsFunctionExpression(filterExpression));
+    LeafStageToPinotQuery.setOrAndFilterExpression(pinotQuery,
+        LeafStageToPinotQuery.ensureFilterIsFunctionExpression(filterExpression));
   }
 }
