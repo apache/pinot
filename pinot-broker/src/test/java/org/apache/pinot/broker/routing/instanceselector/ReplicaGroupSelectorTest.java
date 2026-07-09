@@ -374,7 +374,7 @@ public class ReplicaGroupSelectorTest {
   }
 
   private ReplicaGroupInstanceSelector buildArSelector(String selectorType, HybridSelector hybridSelector) {
-    return buildArSelector(selectorType, hybridSelector, new PinotConfiguration(Collections.emptyMap()));
+    return buildArSelector(selectorType, hybridSelector, new PinotConfiguration(Map.of()));
   }
 
   private ReplicaGroupInstanceSelector buildArSelector(String selectorType, HybridSelector hybridSelector,
@@ -500,7 +500,7 @@ public class ReplicaGroupSelectorTest {
   private StrictReplicaGroupInstanceSelector buildStrictReplicaGroupArSelector(HybridSelector hybridSelector,
       BrokerMetrics brokerMetrics) {
     return buildStrictReplicaGroupArSelector(hybridSelector, brokerMetrics,
-        new PinotConfiguration(Collections.emptyMap()));
+        new PinotConfiguration(Map.of()));
   }
 
   private StrictReplicaGroupInstanceSelector buildStrictReplicaGroupArSelector(HybridSelector hybridSelector,
@@ -596,7 +596,7 @@ public class ReplicaGroupSelectorTest {
     HybridSelector hybridSelector = mock(HybridSelector.class);
     StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
 
-    when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(Collections.emptyList());
+    when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(List.of());
 
     // requestId=0 → picks group at index 0 (pool 0)
     InstanceSelector.InstanceMapping result =
@@ -680,7 +680,7 @@ public class ReplicaGroupSelectorTest {
     StrictReplicaGroupInstanceSelector instanceSelector =
         (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
             mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), hybridSelector,
-            new PinotConfiguration(Collections.emptyMap()),
+            new PinotConfiguration(Map.of()),
             Set.of(SRG_SERVER_A, SRG_SERVER_B, serverC),
             serverMap, idealState, externalView, new HashSet<>(SRG_SEGMENTS));
 
@@ -738,7 +738,7 @@ public class ReplicaGroupSelectorTest {
     StrictReplicaGroupInstanceSelector instanceSelector =
         (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
             mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), hybridSelector,
-            new PinotConfiguration(Collections.emptyMap()),
+            new PinotConfiguration(Map.of()),
             Set.of(serverA),
             Map.of(serverA, serverAInstance),
             idealState, externalView, new HashSet<>(List.of(seg0)));
@@ -791,7 +791,7 @@ public class ReplicaGroupSelectorTest {
     StrictReplicaGroupInstanceSelector instanceSelector =
             (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
                     mock(ZkHelixPropertyStore.class), brokerMetrics, hybridSelector,
-                    new PinotConfiguration(Collections.emptyMap()),
+                    new PinotConfiguration(Map.of()),
                     Set.of(serverA, serverC),
                     serverMap, idealState, externalView, new HashSet<>(segments));
 
@@ -859,7 +859,7 @@ public class ReplicaGroupSelectorTest {
     StrictReplicaGroupInstanceSelector instanceSelector =
         (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
             mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), hybridSelector,
-            new PinotConfiguration(Collections.emptyMap()),
+            new PinotConfiguration(Map.of()),
             Set.of(SRG_SERVER_A, SRG_SERVER_B, SRG_SERVER_C, SRG_SERVER_D, serverE),
             serverMap, idealState, externalView, allSegments);
 

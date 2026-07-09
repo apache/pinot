@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -120,7 +119,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     }
 
     if (replicaGroupToQueryServers.isEmpty()) {
-      return new InstanceMapping(Collections.emptyMap(), Collections.emptyMap());
+      return new InstanceMapping(Map.of(), Map.of());
     }
 
     // Collect all distinct query-relevant candidates from replicaGroupToQueryServers, which already

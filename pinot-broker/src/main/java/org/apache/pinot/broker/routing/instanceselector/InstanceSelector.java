@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import java.time.Clock;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -92,10 +91,10 @@ public interface InstanceSelector {
       Map<String, String> optionalSegmentToInstanceMap,
       List<String> unavailableSegments) {
     static final InstanceMapping EMPTY =
-        new InstanceMapping(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyList());
+        new InstanceMapping(Map.of(), Map.of(), List.of());
 
     InstanceMapping(Map<String, String> segmentToInstanceMap, Map<String, String> optionalSegmentToInstanceMap) {
-      this(segmentToInstanceMap, optionalSegmentToInstanceMap, Collections.emptyList());
+      this(segmentToInstanceMap, optionalSegmentToInstanceMap, List.of());
     }
   }
 
@@ -112,7 +111,7 @@ public interface InstanceSelector {
     }
 
     public static SelectionResult empty(int numPrunedSegments) {
-      return new SelectionResult(InstanceMapping.EMPTY, Collections.emptyList(), numPrunedSegments);
+      return new SelectionResult(InstanceMapping.EMPTY, List.of(), numPrunedSegments);
     }
 
     /**

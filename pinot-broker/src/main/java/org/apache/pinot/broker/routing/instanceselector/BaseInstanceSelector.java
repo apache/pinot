@@ -469,7 +469,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     List<String> mappingUnavailable = mapping.unavailableSegments();
 
     if (unavailableSegments.isEmpty() && mappingUnavailable.isEmpty()) {
-      return new SelectionResult(mapping, Collections.emptyList(), 0);
+      return new SelectionResult(mapping, List.of(), 0);
     } else {
       List<String> unavailableSegmentsForRequest = new ArrayList<>(mappingUnavailable);
       for (String segment : segments) {
