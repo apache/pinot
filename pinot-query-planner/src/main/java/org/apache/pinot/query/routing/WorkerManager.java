@@ -538,9 +538,19 @@ public class WorkerManager {
     PinotQuery routingPinotQuery = extractRoutingQuery(fragment.getFragmentRoot(), tableName, context);
     // When broker pruning is enabled, routingPinotQuery carries the leaf stage filter so that segment pruners can
     // eliminate segments. When disabled (null), fall back to an unfiltered SELECT * routing request.
-    Map<String, RoutingTable> routingTableMap = routingPinotQuery != null
-        ? getRoutingTable(routingPinotQuery, context.getRequestId())
-        : getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
+    Map<String, RoutingTable> routingTableMap = null;
+    if (routingPinotQuery != null) {
+      try {
+        routingTableMap = getRoutingTable(routingPinotQuery, context.getRequestId());
+      } catch (RuntimeException e) {
+        // Pruning is best-effort: never fail a query that would otherwise route successfully unpruned.
+        LOGGER.warn("Broker pruning skipped for table {} due to routing failure", tableName, e);
+        routingPinotQuery = null;
+      }
+    }
+    if (routingTableMap == null) {
+      routingTableMap = getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
+    }
     Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
 
     // acquire time boundary info if it is a hybrid table.
@@ -807,18 +817,40 @@ public class WorkerManager {
             : logicalTableRouteInfo.getRealtimeTableName());
     PinotQuery routingPinotQuery = extractRoutingQuery(fragment.getFragmentRoot(), rawTableName, context);
 
+    boolean routed = false;
+    if (routingPinotQuery != null) {
+      try {
+        calculateLogicalTableRoutes(tableRouteProvider, logicalTableRouteInfo, routingPinotQuery, queryOptions,
+            context);
+        context.addNumSegmentsPrunedByBroker(logicalTableRouteInfo.getNumPrunedSegmentsTotal());
+        routed = true;
+      } catch (RuntimeException e) {
+        // Pruning is best-effort: never fail a query that would otherwise route successfully unpruned. Re-running
+        // unfiltered below is safe because calculateRoutes assigns (rather than accumulates) the per-table routing
+        // state, fully overwriting anything the failed attempt wrote.
+        LOGGER.warn("Broker pruning skipped for logical table {} due to routing failure", rawTableName, e);
+      }
+    }
+    if (!routed) {
+      calculateLogicalTableRoutes(tableRouteProvider, logicalTableRouteInfo, null, queryOptions, context);
+    }
+
+    assignTableSegmentsToWorkers(logicalTableRouteInfo, metadata);
+  }
+
+  /**
+   * Builds the per-table-type routing {@link BrokerRequest}s for a logical table (filter-bearing when
+   * {@code routingPinotQuery} is non-null, bare {@code SELECT *} otherwise) and calculates the routes.
+   */
+  private void calculateLogicalTableRoutes(LogicalTableRouteProvider tableRouteProvider,
+      LogicalTableRouteInfo logicalTableRouteInfo, @Nullable PinotQuery routingPinotQuery,
+      Map<String, String> queryOptions, DispatchablePlanContext context) {
     BrokerRequest offlineBrokerRequest = logicalTableRouteInfo.hasOffline() ? buildLogicalTableRoutingBrokerRequest(
         logicalTableRouteInfo.getOfflineTableName(), routingPinotQuery, queryOptions) : null;
     BrokerRequest realtimeBrokerRequest = logicalTableRouteInfo.hasRealtime() ? buildLogicalTableRoutingBrokerRequest(
         logicalTableRouteInfo.getRealtimeTableName(), routingPinotQuery, queryOptions) : null;
-
     tableRouteProvider.calculateRoutes(logicalTableRouteInfo, _routingManager, offlineBrokerRequest,
         realtimeBrokerRequest, context.getRequestId());
-    if (routingPinotQuery != null) {
-      context.addNumSegmentsPrunedByBroker(logicalTableRouteInfo.getNumPrunedSegmentsTotal());
-    }
-
-    assignTableSegmentsToWorkers(logicalTableRouteInfo, metadata);
   }
 
   /**
@@ -1008,8 +1040,8 @@ public class WorkerManager {
       routingTableMap = getRoutingTable(routingPinotQuery, requestId);
     } catch (RuntimeException e) {
       // Pruning is best-effort: never fail a query that would otherwise route successfully unpruned.
-      LOGGER.warn("Broker pruning skipped for partitioned table {} due to routing failure: {}",
-          routingPinotQuery.getDataSource().getTableName(), e.getMessage());
+      LOGGER.warn("Broker pruning skipped for partitioned table {} due to routing failure",
+          routingPinotQuery.getDataSource().getTableName(), e);
       return null;
     }
     if (routingTableMap.isEmpty()) {

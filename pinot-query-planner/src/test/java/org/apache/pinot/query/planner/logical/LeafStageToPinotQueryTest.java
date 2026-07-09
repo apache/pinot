@@ -30,6 +30,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 public class LeafStageToPinotQueryTest {
@@ -92,6 +93,66 @@ public class LeafStageToPinotQueryTest {
 
     assertSame(result, funcExpr);
     assertEquals(result.getFunctionCall().getOperator(), "EQUALS");
+  }
+
+  @Test
+  public void testBooleanScalarFunctionWrappedAsEqualsTrue() {
+    // A boolean scalar function used directly as a predicate (WHERE contains(col, 'foo')) is not a FilterKind;
+    // segment pruners resolve operators via FilterKind.valueOf and would throw on it. It must be wrapped as
+    // EQUALS(contains(col, 'foo'), true), mirroring the single-stage engine's PredicateComparisonRewriter.
+    Expression containsExpr = makeCompound("contains",
+        RequestUtils.getIdentifierExpression("col"), RequestUtils.getLiteralExpression("foo"));
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(containsExpr);
+
+    assertNotNull(result);
+    assertEquals(result.getFunctionCall().getOperator(), "EQUALS");
+    List<Expression> operands = result.getFunctionCall().getOperands();
+    assertEquals(operands.size(), 2);
+    assertEquals(operands.get(0).getFunctionCall().getOperator(), "contains");
+    assertTrue(operands.get(1).getLiteral().getBoolValue());
+  }
+
+  @Test
+  public void testAndWithBooleanScalarFunctionWrapsIt() {
+    assertCompoundWithBooleanScalarFunctionWraps("AND");
+  }
+
+  @Test
+  public void testOrWithBooleanScalarFunctionWrapsIt() {
+    assertCompoundWithBooleanScalarFunctionWraps("OR");
+  }
+
+  private void assertCompoundWithBooleanScalarFunctionWraps(String op) {
+    // OP(contains(col, 'foo'), EQUALS(col2, 'val')) → OP(EQUALS(contains(col, 'foo'), true), EQUALS(col2, 'val'))
+    Expression containsExpr = makeCompound("contains",
+        RequestUtils.getIdentifierExpression("col"), RequestUtils.getLiteralExpression("foo"));
+    Expression compoundExpr = makeCompound(op, containsExpr, makeEquals("col2", "val"));
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(compoundExpr);
+
+    assertNotNull(result);
+    assertEquals(result.getFunctionCall().getOperator(), op);
+    List<Expression> operands = result.getFunctionCall().getOperands();
+    assertEquals(operands.size(), 2);
+    assertEquals(operands.get(0).getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(operands.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "contains");
+    assertEquals(operands.get(1).getFunctionCall().getOperator(), "EQUALS");
+  }
+
+  @Test
+  public void testNotWithBooleanScalarFunctionWrapsOperand() {
+    Expression containsExpr = makeCompound("contains",
+        RequestUtils.getIdentifierExpression("col"), RequestUtils.getLiteralExpression("foo"));
+    Expression notExpr = makeCompound("NOT", containsExpr);
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(notExpr);
+
+    assertNotNull(result);
+    assertEquals(result.getFunctionCall().getOperator(), "NOT");
+    Expression operand = result.getFunctionCall().getOperands().get(0);
+    assertEquals(operand.getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(operand.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "contains");
   }
 
   // --- AND/OR handling (shared logic, tested symmetrically) ---

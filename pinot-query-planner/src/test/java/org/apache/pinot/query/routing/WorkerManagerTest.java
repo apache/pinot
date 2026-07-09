@@ -31,6 +31,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
@@ -46,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.annotations.Test;
 
@@ -299,6 +301,96 @@ public class WorkerManagerTest {
     brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
     assertNotNull(brokerRequest);
     assertNull(brokerRequest.getPinotQuery().getFilterExpression());
+  }
+
+  @Test
+  public void testBrokerPruningWrapsBooleanScalarFunctionPredicate() {
+    // Regression: a boolean scalar function used directly as a predicate (WHERE contains(...)) is not a FilterKind,
+    // and segment pruners resolve filter operators via FilterKind.valueOf. The routing query must carry it wrapped
+    // as EQUALS(contains(...), true); before this was handled, such queries failed to plan with
+    // "No enum constant FilterKind.contains" when broker pruning was enabled.
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+    RoutingTable routingTable = new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("segment1"), List.of())),
+        List.of(), 0);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", routingTable));
+
+    QueryEnvironment queryEnvironment = newQueryEnvironment(schema, routingManager);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SELECT col2 FROM testTable WHERE contains(col1, 'foo')")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+    }
+
+    BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest);
+    Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
+    assertNotNull(filterExpression);
+    assertEquals(filterExpression.getFunctionCall().getOperator(), "EQUALS");
+    Expression wrappedFunction = filterExpression.getFunctionCall().getOperands().get(0);
+    assertNotNull(wrappedFunction.getFunctionCall());
+    assertEquals(wrappedFunction.getFunctionCall().getOperator(), "contains");
+  }
+
+  @Test
+  public void testBrokerPruningFallsBackToUnfilteredRoutingOnRoutingFailure() {
+    // Pruning is best-effort: if routing the filtered query throws (e.g. a segment pruner failing on an exotic
+    // filter shape), the query must still plan via the unfiltered SELECT * fallback rather than fail.
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+    RoutingTable routingTable = new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("segment1"), List.of())),
+        List.of(), 0);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", routingTable), true);
+
+    QueryEnvironment queryEnvironment = newQueryEnvironment(schema, routingManager);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
+    }
+
+    // The captured request is the fallback: unfiltered SELECT * (the filtered attempt threw and was not recorded).
+    BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest);
+    assertNull(brokerRequest.getPinotQuery().getFilterExpression());
+  }
+
+  /**
+   * Mimics how segment pruners consume a routing filter: operators are resolved via {@code FilterKind.valueOf}
+   * (which throws on non-FilterKind operators, e.g. bare boolean scalar functions like {@code contains}) and
+   * AND/OR/NOT operands are walked recursively. Keeps the mock routing managers honest: a routing query that would
+   * crash the real segment pruners also fails the unit tests.
+   */
+  private static void validatePrunableFilter(@Nullable Expression expression) {
+    if (expression == null || expression.getFunctionCall() == null) {
+      return;
+    }
+    Function function = expression.getFunctionCall();
+    FilterKind filterKind = FilterKind.valueOf(function.getOperator());
+    if (filterKind == FilterKind.AND || filterKind == FilterKind.OR || filterKind == FilterKind.NOT) {
+      for (Expression operand : function.getOperands()) {
+        validatePrunableFilter(operand);
+      }
+    }
+  }
+
+  /** Builds a QueryEnvironment over a single offline table "testTable" backed by the given routing manager. */
+  private static QueryEnvironment newQueryEnvironment(Schema schema, RoutingManager routingManager) {
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("testTable_OFFLINE", "testTable_OFFLINE");
+    tableNameMap.put("testTable", "testTable");
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(schema);
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
   }
 
   @Test
@@ -1034,12 +1126,19 @@ public class WorkerManagerTest {
   private static class CapturingRoutingManager implements RoutingManager {
     private final Map<String, ServerInstance> _serverInstanceMap;
     private final Map<String, RoutingTable> _routingTableByName;
+    private final boolean _throwOnFilteredRouting;
     private final Map<String, BrokerRequest> _capturedRoutingRequests = new LinkedHashMap<>();
 
     CapturingRoutingManager(Map<String, ServerInstance> serverInstanceMap,
         Map<String, RoutingTable> routingTableByName) {
+      this(serverInstanceMap, routingTableByName, false);
+    }
+
+    CapturingRoutingManager(Map<String, ServerInstance> serverInstanceMap,
+        Map<String, RoutingTable> routingTableByName, boolean throwOnFilteredRouting) {
       _serverInstanceMap = serverInstanceMap;
       _routingTableByName = routingTableByName;
+      _throwOnFilteredRouting = throwOnFilteredRouting;
     }
 
     @Nullable
@@ -1055,6 +1154,10 @@ public class WorkerManagerTest {
     @Nullable
     @Override
     public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
+      if (_throwOnFilteredRouting && brokerRequest.getPinotQuery().getFilterExpression() != null) {
+        throw new RuntimeException("Simulated routing failure for filtered request");
+      }
+      validatePrunableFilter(brokerRequest.getPinotQuery().getFilterExpression());
       String tableNameWithType = brokerRequest.getQuerySource().getTableName();
       _capturedRoutingRequests.put(tableNameWithType, brokerRequest);
       return _routingTableByName.get(tableNameWithType);
@@ -1149,6 +1252,7 @@ public class WorkerManagerTest {
       if (_throwOnRouting) {
         throw new RuntimeException("Simulated routing failure");
       }
+      validatePrunableFilter(brokerRequest.getPinotQuery().getFilterExpression());
       return _routingTableByTable.get(brokerRequest.getQuerySource().getTableName());
     }
 
