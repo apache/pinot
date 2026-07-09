@@ -59,6 +59,18 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   /// Handles exceptions here so that execution stats can be attached.
   @Override
   protected BaseResultsBlock getNextBlock() {
+    try {
+      return mergeResultsAndAttachExecutionStats();
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while attaching execution stats (query: {})", _queryContext, e);
+      QueryErrorMessage errMsg =
+          QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL, "Caught exception while attaching execution stats");
+      return new ExceptionResultsBlock(errMsg);
+    }
+  }
+
+  /// Merges the results and waits for all worker threads to finish before attaching execution statistics.
+  private BaseResultsBlock mergeResultsAndAttachExecutionStats() {
     BaseResultsBlock mergedBlock = null;
     Exception mergeException = null;
     try {
