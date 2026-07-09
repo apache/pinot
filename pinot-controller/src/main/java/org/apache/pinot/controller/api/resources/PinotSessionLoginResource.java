@@ -152,7 +152,7 @@ public class PinotSessionLoginResource {
     AccessControl accessControl = _accessControlFactory.create();
     boolean valid;
     try {
-      valid = accessControl.hasAccess(null, AccessType.READ,
+      valid = accessControl.hasAccess(AccessType.READ,
           new SyntheticHttpHeaders(basicAuthToken), AUTH_LOGIN_PATH);
     } catch (javax.ws.rs.NotAuthorizedException e) {
       valid = false;

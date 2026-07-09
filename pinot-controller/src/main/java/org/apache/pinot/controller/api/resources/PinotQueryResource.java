@@ -615,23 +615,9 @@ public class PinotQueryResource {
     String url = getQueryURL(protocol, hostName, port);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions);
 
-    // Forward client-supplied headers
+    // Forward client-supplied headers, then inject session credential for broker auth.
     Map<String, String> headers = extractHeaders(httpHeaders);
-
-    // SESSION WORKFLOW: Inject Authorization header for broker (server-to-server).
-    // Browser UI requests carry only the HttpOnly session cookie – no Authorization header.
-    // The broker requires auth, so we retrieve the stored Basic-auth token from the session
-    // and inject it as an Authorization header for the controller→broker request.
-    // This token is stored server-side only (never sent to the browser).
-    if (_sessionManager != null
-        && _controllerConf != null
-        && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)) {
-      Cookie sessionCookie = httpHeaders.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
-      if (sessionCookie != null && sessionCookie.getValue() != null) {
-        _sessionManager.getBasicAuthToken(sessionCookie.getValue()).ifPresent(
-            authToken -> headers.put(HttpHeaders.AUTHORIZATION, authToken));
-      }
-    }
+    injectSessionCredentialIfNeeded(headers, httpHeaders);
 
     return sendRequestRaw(url, "POST", query, requestJson, headers);
   }
@@ -767,8 +753,9 @@ public class PinotQueryResource {
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int port = getPort(instanceConfig);
 
-    // Forward client-supplied headers
+    // Forward client-supplied headers, then inject session credential for broker auth.
     Map<String, String> headers = extractHeaders(httpHeaders);
+    injectSessionCredentialIfNeeded(headers, httpHeaders);
 
     if (useBrokerCompatibleApi) {
       // Use POST /query/timeseries endpoint (broker compatible API)
@@ -827,9 +814,26 @@ public class PinotQueryResource {
     }
   }
 
+  /**
+   * Injects the stored Basic-auth token from the server-side session store into the forwarded
+   * broker request headers. This is needed because browser UI requests carry only the session
+   * cookie, not an Authorization header; the broker still requires one for server-to-server auth.
+   */
+  private void injectSessionCredentialIfNeeded(Map<String, String> headers, HttpHeaders httpHeaders) {
+    if (_sessionManager == null || _controllerConf == null
+        || !_controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)) {
+      return;
+    }
+    Cookie sessionCookie = httpHeaders.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
+    if (sessionCookie != null && sessionCookie.getValue() != null) {
+      _sessionManager.getBasicAuthToken(sessionCookie.getValue()).ifPresent(
+          authToken -> headers.put(HttpHeaders.AUTHORIZATION, authToken));
+    }
+  }
+
   private Map<String, String> extractHeaders(HttpHeaders httpHeaders) {
     // In SESSION mode, exclude the Authorization header from being forwarded to the broker.
-    // The broker auth is injected server-side from the session store in sendRequestToBroker().
+    // The stored session credential is injected separately via injectSessionCredentialIfNeeded().
     boolean isSessionMode = _controllerConf != null
         && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false);
     return httpHeaders.getRequestHeaders().entrySet().stream()

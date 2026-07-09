@@ -149,16 +149,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     public void filter(ContainerRequestContext containerRequestContext,
         ContainerResponseContext containerResponseContext)
         throws IOException {
-      // For session-based auth with withCredentials:true, reflect the actual request origin
-      // instead of "*". Browsers reject "Access-Control-Allow-Origin: *" when
-      // "Access-Control-Allow-Credentials: true" is set.
-      String origin = containerRequestContext.getHeaderString("Origin");
-      if (origin != null && !origin.isEmpty()) {
-        containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", origin);
-        containerResponseContext.getHeaders().add("Access-Control-Allow-Credentials", "true");
-      } else {
-        containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
-      }
+      containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
       containerResponseContext.getHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS, DELETE");
       containerResponseContext.getHeaders()
           .add("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, Origin, X-Requested-With");
