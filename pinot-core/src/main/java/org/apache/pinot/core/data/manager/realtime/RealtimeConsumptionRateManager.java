@@ -144,10 +144,10 @@ public class RealtimeConsumptionRateManager {
         // result of it, But the metric related to throttling won't be emitted since as a result of here above the
         // AsyncMetricEmitter will be closed. It's recommended to forceCommit segments to avoid this.
       }
-      // Expose the configured cap (-1 when disabled) so operators can see that rate limiting is off. The utilization
-      // gauge is intentionally not touched here: like the per-partition utilization gauge it is a live measurement
-      // that simply stops updating once the limiter is gone (rate-limit updates keep the emitter running, so it
-      // self-corrects on the common update path), and the -1 cap already signals that any last value is stale.
+      // Expose the configured cap (-1 when disabled) so operators can see that rate limiting is off. The server
+      // utilization gauge is intentionally not touched here: it is a global gauge seeded at server startup, so
+      // removing it would be undone on restart, and rate-limit updates keep the emitter running so it self-corrects
+      // on the common update path. The -1 cap already signals that any last utilization value is stale.
       emitServerRateLimit(serverMetrics, -1);
       return;
     }
@@ -184,6 +184,16 @@ public class RealtimeConsumptionRateManager {
     }
   }
 
+  // Removes the per-partition rate limit gauges when a consumer is created without a rate limit, so that a
+  // previously configured limit that has since been removed does not linger as stale series. Removing a gauge that
+  // was never emitted is a no-op, so this is safe (and cheap) for partitions that never had a limit.
+  private static void removePartitionRateLimitGauges(ServerMetrics serverMetrics, String metricKeyName) {
+    if (serverMetrics != null && metricKeyName != null) {
+      serverMetrics.removeTableGauge(metricKeyName, ServerGauge.CONSUMPTION_RATE_LIMIT);
+      serverMetrics.removeTableGauge(metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION);
+    }
+  }
+
   public void updateServerRateLimiter(ServerRateLimitConfig serverRateLimitConfig, ServerMetrics serverMetrics) {
     LOGGER.info("Updating serverRateLimiter from: {} to: {}", _serverRateLimiter,
         serverRateLimitConfig._serverRateLimit);
@@ -205,6 +215,9 @@ public class RealtimeConsumptionRateManager {
     }
     double topicRateLimit = streamConfig.getTopicConsumptionRateLimit();
     if (topicRateLimit <= 0) {
+      // No rate limit configured (possibly removed since the previous consuming segment): clean up any gauges left
+      // behind by a previous limiter for this partition so the metrics reflect the current config.
+      removePartitionRateLimitGauges(serverMetrics, metricKeyName);
       return NOOP_RATE_LIMITER;
     }
     int partitionCount;

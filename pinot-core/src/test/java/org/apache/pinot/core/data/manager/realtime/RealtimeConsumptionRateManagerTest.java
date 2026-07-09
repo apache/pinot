@@ -399,12 +399,15 @@ public class RealtimeConsumptionRateManagerTest {
     CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_D, TABLE_NAME, directMetrics, "tableD_REALTIME-topicD-0");
     verify(directMetrics).setValueOfTableGauge("tableD_REALTIME-topicD-0", ServerGauge.CONSUMPTION_RATE_LIMIT, 4L);
 
-    // No rate limit configured (STREAM_CONFIG_C) -> NOOP limiter, no gauge emitted.
+    // No rate limit configured (STREAM_CONFIG_C) -> NOOP limiter, no gauge emitted, and any gauges left behind by a
+    // previously configured (since removed) limit are cleaned up so they do not linger as stale series.
     ServerMetrics noneMetrics = mock(ServerMetrics.class);
     ConsumptionRateLimiter limiter =
         CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME, noneMetrics, "keyC");
     assertEquals(limiter, NOOP_RATE_LIMITER);
     verify(noneMetrics, never()).setValueOfTableGauge(anyString(), eq(ServerGauge.CONSUMPTION_RATE_LIMIT), anyLong());
+    verify(noneMetrics).removeTableGauge("keyC", ServerGauge.CONSUMPTION_RATE_LIMIT);
+    verify(noneMetrics).removeTableGauge("keyC", ServerGauge.CONSUMPTION_QUOTA_UTILIZATION);
   }
 
   @Test
