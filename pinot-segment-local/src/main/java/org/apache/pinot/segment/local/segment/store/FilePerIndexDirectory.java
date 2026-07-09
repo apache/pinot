@@ -39,6 +39,13 @@ import org.apache.pinot.spi.utils.ReadMode;
 
 
 class FilePerIndexDirectory extends ColumnIndexDirectory {
+  /// Suffix of the {@link IllegalArgumentException} message thrown when {@code getIndexFor} resolves
+  /// an on-disk artifact that is a directory (e.g. a legacy HNSW/text Lucene directory) rather than
+  /// a mappable regular file. {@code VectorIndexUtils#getConsolidatedVectorEntry} matches against
+  /// this constant (same package) to treat that case as "no consolidated entry" instead of failing
+  /// the caller — keep the precondition message wired to it so the two sides cannot drift.
+  static final String NOT_A_REGULAR_FILE_MESSAGE_SUFFIX = " must be a regular file";
+
   private final File _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
@@ -144,9 +151,11 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
     File file = getFileFor(key._name, key._type);
     if (!file.exists()) {
+      // Same "absent index" signal as SingleFileIndexDirectory; share its prefix so the
+      // VectorIndexUtils#getConsolidatedVectorEntry match stays valid for V1/V2-backed readers too.
       throw new RuntimeException(
-          "Could not find index for column: " + key._name + ", type: " + key._type + ", segment: " + _segmentDirectory
-              .toString());
+          SingleFileIndexDirectory.INDEX_NOT_FOUND_MESSAGE_PREFIX + ": " + key._name + ", type: " + key._type
+              + ", segment: " + _segmentDirectory.toString());
     }
     PinotDataBuffer buffer = mapForReads(file, key._type.getId() + ".reader");
     _indexBuffers.put(key, buffer);
@@ -201,7 +210,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     Preconditions.checkNotNull(file);
     Preconditions.checkNotNull(context);
     Preconditions.checkArgument(file.exists(), "File: " + file + " must exist");
-    Preconditions.checkArgument(file.isFile(), "File: " + file + " must be a regular file");
+    Preconditions.checkArgument(file.isFile(), "File: " + file + NOT_A_REGULAR_FILE_MESSAGE_SUFFIX);
     String allocationContext = allocationContext(file, context);
 
     // Backward-compatible: index file is always big-endian

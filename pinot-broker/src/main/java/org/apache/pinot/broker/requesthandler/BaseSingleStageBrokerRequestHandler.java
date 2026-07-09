@@ -732,7 +732,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     Set<ServerInstance> offlineExecutionServers = routeInfo.getOfflineExecutionServers();
     Set<ServerInstance> realtimeExecutionServers = routeInfo.getRealtimeExecutionServers();
-    List<String> unavailableSegments = routeInfo.getUnavailableSegments();
+    List<String> unavailableSegments = getUnavailableSegments(serverBrokerRequest, routeInfo);
     int numPrunedSegmentsTotal = routeInfo.getNumPrunedSegmentsTotal();
 
     // Rewrite the broker requests as the rest of the code expects them to be null or not based on whether the routing
@@ -913,7 +913,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       /// as-is — its metric was already recorded at pre-split time.
       offlineExecutionServers = routeInfo.getOfflineExecutionServers();
       realtimeExecutionServers = routeInfo.getRealtimeExecutionServers();
-      unavailableSegments = routeInfo.getUnavailableSegments();
+      unavailableSegments = getUnavailableSegments(serverBrokerRequest, routeInfo);
       numPrunedSegmentsTotal = routeInfo.getNumPrunedSegmentsTotal();
     }
 
@@ -2628,6 +2628,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
+
+  /**
+   * Returns the segments to report as unavailable for this query. The default returns the route's unavailable
+   * segments unchanged. A subclass may narrow the set, e.g. to the segments the query will actually read after
+   * routing-level pruning, so the "segments unavailable" warning does not include segments the query never touches.
+   */
+  protected List<String> getUnavailableSegments(BrokerRequest serverBrokerRequest, TableRouteInfo routeInfo) {
+    return routeInfo.getUnavailableSegments();
+  }
 
   /// Processes an MV-split query by issuing two independent scatter-gather requests - one to the
   /// base table (for recent data beyond the MV boundary) and one to the materialized view table (for historical

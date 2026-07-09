@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorInd
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfOnDiskVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfPqVectorIndexReader;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -59,20 +61,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Index type for vector columns.
- *
- * <p>Supports multiple vector index backends via the {@link VectorBackendType} enum.
- * Currently supported backends:
- * <ul>
- *   <li>{@link VectorBackendType#HNSW} - Lucene-based HNSW graph index (mutable and immutable segments)</li>
- *   <li>{@link VectorBackendType#IVF_FLAT} - Inverted file with flat vectors (immutable segments only)</li>
- *   <li>{@link VectorBackendType#IVF_PQ} - Inverted file with residual product quantization (immutable only)</li>
- * </ul>
- *
- * <p>If the {@code vectorIndexType} field is absent in the config, it defaults to HNSW for
- * backward compatibility with existing table configurations.</p>
- */
+/// Index type for vector columns.
+///
+/// Supports multiple vector index backends via the {@link VectorBackendType} enum.
+/// Currently supported backends:
+///   - {@link VectorBackendType#HNSW} - Lucene-based HNSW graph index (mutable and immutable segments)
+///   - {@link VectorBackendType#IVF_FLAT} - Inverted file with flat vectors (immutable segments only)
+///   - {@link VectorBackendType#IVF_PQ} - Inverted file with residual product quantization (immutable only)
+///
+/// If the {@code vectorIndexType} field is absent in the config, it defaults to HNSW for
+/// backward compatibility with existing table configurations.
 public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator> {
   private static final Logger LOGGER = LoggerFactory.getLogger(VectorIndexType.class);
   public static final String INDEX_DISPLAY_NAME = "vector";
@@ -175,7 +173,9 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
   @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     // NOTE: IVF_ON_DISK intentionally reuses the IVF_FLAT file extension since it reads the
-    // same on-disk format via FileChannel rather than memory-mapped I/O.
+    // same on-disk format. The `*.combined.index` entries are the transient single-file
+    // form written by the IVF creator when storeInSegmentFile=true; the V2→V3 converter
+    // consumes them via the standard copyIndexIfExists loop and packs the bytes into columns.psf.
     return List.of(V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_V99_INDEX_FILE_EXTENSION,
@@ -183,12 +183,13 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         V1Constants.Indexes.VECTOR_V912_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
-        V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+        V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
   }
 
-  /**
-   * Reader factory that dispatches to the correct vector index reader based on backend type.
-   */
+  /// Reader factory that dispatches to the correct vector index reader based on backend type.
   private static class ReaderFactory implements IndexReaderFactory<VectorIndexReader> {
 
     public static final VectorIndexType.ReaderFactory INSTANCE = new VectorIndexType.ReaderFactory();
@@ -210,25 +211,104 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         return null;
       }
       VectorBackendType backendType = indexConfig.resolveBackendType();
-      File configuredIndexFile =
-          SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, metadata.getColumnName(), indexConfig);
-      if (configuredIndexFile == null || !configuredIndexFile.exists()) {
-        LOGGER.warn("Skipping vector index reader for column: {} because configured backend {} does not have a "
-                + "matching on-disk artifact in segment: {}",
-            metadata.getColumnName(), backendType, segmentDir);
-        return null;
+      String column = metadata.getColumnName();
+
+      if (backendType == VectorBackendType.HNSW) {
+        // Combined form: load the HNSW index from the typed entry inside columns.psf when one
+        // actually exists. Legacy-directory-first: if the on-disk HNSW artifact is still the Lucene
+        // directory (a V3 segment the handler has not migrated yet, or a V1/V2 segment backed by
+        // FilePerIndexDirectory), read it directly and skip the columns.psf probe entirely —
+        // FilePerIndexDirectory would resolve getIndexFor to that directory and fail to map it
+        // (not a regular file), killing the load before any fallback could run. This keeps
+        // storeInSegmentFile=true rolling-upgrade-safe for existing HNSW segments. The probed
+        // buffer is owned by the segment directory — this reader must not close it.
+        // Probe only when the segment directory is a local directory: under a remote segment
+        // directory (e.g. tiered storage on S3) getPath() is not a local filesystem path, there
+        // can be no legacy sidecar on disk, and findFormatFile would reject the path outright.
+        if (indexConfig.isStoreInSegmentFile()) {
+          File onDiskHnsw = segmentDir.isDirectory()
+              ? SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, column, VectorBackendType.HNSW)
+              : null;
+          if (onDiskHnsw == null || !onDiskHnsw.isDirectory()) {
+            PinotDataBuffer buffer;
+            try {
+              buffer = VectorIndexUtils.getConsolidatedVectorEntry(segmentReader, column);
+            } catch (IOException e) {
+              throw new RuntimeException(
+                  "Failed to read consolidated HNSW vector index from columns.psf for column: " + column, e);
+            }
+            if (buffer != null) {
+              return new HnswVectorIndexReader(column, buffer, metadata.getTotalDocs(), indexConfig);
+            }
+            // This branch is only reachable when no legacy Lucene directory exists either (the
+            // gate above short-circuits to the directory when one is present), so the legacy read
+            // below is expected to fail — surface the real state to the operator.
+            LOGGER.warn("storeInSegmentFile=true but neither a consolidated HNSW entry in columns.psf nor a legacy "
+                + "Lucene directory was found for column: {} in segment: {} (on-disk artifact: {}); attempting the "
+                + "legacy directory read path", column, segmentDir, onDiskHnsw);
+          }
+        }
+        // Legacy path: load the HNSW index from the Lucene directory on disk.
+        return new HnswVectorIndexReader(column, segmentDir, metadata.getTotalDocs(), indexConfig);
+      }
+
+      // IVF backends accept a PinotDataBuffer that comes from one of two places:
+      //   - the consolidated typed entry inside columns.psf (storeInSegmentFile=true, post-absorb);
+      //   - an on-disk sidecar/combined file (storeInSegmentFile=false, OR =true before the handler
+      //     has absorbed a pre-existing legacy sidecar into columns.psf).
+      // Ownership follows the source: a columns.psf buffer is owned by the segment directory and the
+      // reader must NOT close it; a sidecar mmap buffer is owned by the reader.
+      PinotDataBuffer buffer = null;
+      if (indexConfig.isStoreInSegmentFile()) {
+        try {
+          buffer = VectorIndexUtils.getConsolidatedVectorEntry(segmentReader, column);
+        } catch (IOException e) {
+          throw new RuntimeException(
+              "Failed to read consolidated vector index from columns.psf for column: " + column, e);
+        }
+      }
+      boolean ownsBuffer;
+      if (buffer != null) {
+        // Consolidated entry inside columns.psf — owned by the segment directory.
+        ownsBuffer = false;
+      } else {
+        // Fall back to the on-disk artifact. For storeInSegmentFile=true this keeps the index usable
+        // while a legacy sidecar still awaits absorption (mirrors the HNSW path above, which falls
+        // back to its Lucene directory) instead of silently disabling the index and forcing an exact
+        // scan until migration completes. Skip the probe when the segment directory is not a local
+        // directory (e.g. tiered storage on S3) — no sidecar can exist there and findFormatFile
+        // rejects non-local paths.
+        File configuredIndexFile = segmentDir.isDirectory()
+            ? SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, column, indexConfig)
+            : null;
+        if (configuredIndexFile == null || !configuredIndexFile.exists()) {
+          LOGGER.warn("Skipping vector index reader for column: {} because backend {} has neither a consolidated "
+              + "columns.psf entry nor a matching on-disk artifact in segment: {}", column, backendType, segmentDir);
+          return null;
+        }
+        buffer = IvfCombinedBuffers.mapCombinedFile(configuredIndexFile, column,
+            "vector-" + backendType.name().toLowerCase());
+        // Sidecar mmap buffer — owned by the reader.
+        ownsBuffer = true;
       }
 
       switch (backendType) {
-        case HNSW:
-          return new HnswVectorIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
         case IVF_FLAT:
-          return new IvfFlatVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
+          return new IvfFlatVectorIndexReader(column, buffer, indexConfig, ownsBuffer);
         case IVF_PQ:
-          return new IvfPqVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
+          return new IvfPqVectorIndexReader(column, buffer, indexConfig, ownsBuffer);
         case IVF_ON_DISK:
-          return new IvfOnDiskVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
+          return new IvfOnDiskVectorIndexReader(column, buffer, indexConfig, ownsBuffer);
         default:
+          // Close the buffer only if we own it (a sidecar mmap). A columns.psf buffer is owned by the
+          // segment directory and must not be closed here.
+          if (ownsBuffer) {
+            try {
+              buffer.close();
+            } catch (IOException ignored) {
+              // best-effort cleanup; surface the original "unsupported" error.
+            }
+          }
           throw new IllegalStateException("Unsupported vector backend type: " + backendType);
       }
     }

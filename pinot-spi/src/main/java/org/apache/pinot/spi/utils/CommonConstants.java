@@ -640,11 +640,13 @@ public class CommonConstants {
     /**
      * Whether to use broker pruning by default on the logical planner (non-physical-optimizer) path.
      * This value can always be overridden by {@link Request.QueryOptionKey#USE_BROKER_PRUNING} query option.
-     * Separated from {@link #CONFIG_OF_USE_BROKER_PRUNING} so the two paths can be rolled out independently.
+     * Separated from {@link #CONFIG_OF_USE_BROKER_PRUNING} so the two paths can be rolled out independently; both
+     * default to enabled now that all logical-planner leaf paths (non-partitioned, partitioned, logical tables)
+     * support broker pruning. Actual pruning still requires segment pruners to be configured on the table.
      */
     public static final String CONFIG_OF_LOGICAL_PLANNER_USE_BROKER_PRUNING =
         "pinot.broker.multistage.logical.planner.use.broker.pruning";
-    public static final boolean DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING = false;
+    public static final boolean DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING = true;
 
     /**
      * Default server stage limit for lite mode queries.
@@ -1000,8 +1002,8 @@ public class CommonConstants {
         // Not user-settable; used by servers to detect silent truncation at execution time.
         public static final String LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT = "liteModeImplicitLeafStageLimit";
         // Used by the MSE engine to enable broker-side segment pruning during routing. The physical optimizer
-        // path defaults to DEFAULT_USE_BROKER_PRUNING (true); the logical planner path defaults to
-        // DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING (false). Both can be overridden per-query.
+        // path defaults to DEFAULT_USE_BROKER_PRUNING and the logical planner path defaults to
+        // DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING (both true). Both can be overridden per-query.
         public static final String USE_BROKER_PRUNING = "useBrokerPruning";
         // When lite mode is enabled, if this flag is set, we will run all the non-leaf stage operators within the
         // broker itself. That way, the MSE queries will model the scatter gather pattern used by the V1 Engine.
@@ -1727,6 +1729,8 @@ public class CommonConstants {
     // Predownload related configs
     public static final String CONFIG_OF_PREDOWNLOAD_PARALLELISM = "pinot.server.predownload.parallelism";
     public static final int DEFAULT_PREDOWNLOAD_PARALLELISM = -1; // Use numProcessors * 3 as default
+    public static final String CONFIG_OF_PEER_DOWNLOAD_ENABLED = "pinot.server.peer.download.enabled";
+    public static final boolean DEFAULT_PEER_DOWNLOAD_ENABLED = false;
 
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
 

@@ -133,11 +133,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // When servers are configured to return final aggregate state, the input DataTables hold final
     // (not intermediate) values, so the merge-only contract — "produce an intermediate DataTable that
     // can be re-merged via the normal reduce path" — cannot be honored.
-    if (_queryContext.isServerReturnFinalResult()) {
+    if (_queryContext.isServerReturnFinalResult() || _queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
       throw new UnsupportedOperationException(
           "Merge-only reduction is not supported when servers return final aggregate results "
-              + "(server.returnFinalResult / isServerReturnFinalResult); input would be final-typed, "
-              + "not intermediate.");
+              + "(serverReturnFinalResult / serverReturnFinalResultKeyUnpartitioned); input would be "
+              + "final-typed, not intermediate.");
     }
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(_queryContext, dataSchema);
     try {
@@ -147,6 +147,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
       Collection<DataTable> dataTables = dataTableMap.values();
       // Reuse the regular reduce's merge: builds the IndexedTable of group keys + intermediate agg state.
       IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
+      // Keep aggregate values as intermediates so the output can be re-merged through the regular reduce path.
+      indexedTable.finish(false, false);
       DataTable mergedDataTable = buildIntermediateDataTable(dataSchema, indexedTable);
       if (indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
         mergedDataTable.getMetadata().put(MetadataKey.GROUPS_TRIMMED.getName(), "true");
@@ -175,6 +177,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
       BrokerMetrics brokerMetrics) {
     // NOTE: This step will modify the data schema and also return final aggregate results.
     IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
+    // Sort + finalize: mutate _dataSchema column types to final-result types and replace each row's value
+    // with extractFinalResult(...). Required by the regular reduce path: the downstream consumers
+    // (PostAggregationHandler, HavingFilterHandler, ResultTable serialization) expect final scalars.
+    indexedTable.finish(true, true);
     if (indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
       brokerResponseNative.setGroupsTrimmed(true);
     }
@@ -408,7 +414,12 @@ public class GroupByDataTableReducer implements DataTableReducer {
       }
     }
 
-    indexedTable.finish(true, true);
+    // NOTE: finish(...) is invoked by the caller, not here. The two callers want different semantics:
+    //   - reduceResult (regular reduce → ResultTable) needs finish(true, true) to extract final results.
+    //   - mergeDataTablesOnly (merge-only intermediate output) needs finish(true, false) so the aggregate
+    //     values stay as intermediates (e.g. Set for DISTINCTCOUNT, not Integer); otherwise the next
+    //     buildIntermediateDataTable's serializeIntermediateResult(...) call casts the final scalar back to
+    //     the intermediate type and throws ClassCastException.
     return indexedTable;
   }
 

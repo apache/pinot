@@ -22,6 +22,7 @@ import java.io.File;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
@@ -148,6 +149,44 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
    * {@link #fetchSegmentToLocal(URI, File)}.
    */
   protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
+      throws Exception {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public File fetchUntarSegmentToLocalStreamed(String segmentName, Supplier<List<URI>> uriSupplier, File dest,
+      long maxStreamRateInByte) throws Exception {
+    AtomicReference<File> ret = new AtomicReference<>();
+    try {
+      int attempt =
+          RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+            List<URI> suppliedURIs = uriSupplier.get();
+            // Go through the list of URIs to fetch and untar the segment until success.
+            for (URI uri : suppliedURIs) {
+              try {
+                ret.set(fetchUntarSegmentToLocalWithoutRetry(uri, dest, maxStreamRateInByte));
+                return true;
+              } catch (Exception e) {
+                _logger.warn("Stream download-untar segment {} from peer {} failed.", segmentName, uri, e);
+              }
+            }
+            // None of the URI works. Return false for retry.
+            return false;
+          });
+      _logger.info("Stream downloaded and untarred segment {} successfully with {} attempts.", segmentName,
+          attempt + 1);
+      return ret.get();
+    } catch (Exception e) {
+      _logger.error("Failed to stream download-untar segment {} after retries.", segmentName, e);
+      throw e;
+    }
+  }
+
+  /**
+   * Fetches a segment from URI location and untars it to local in a streamed manner, without retry. Sub-class
+   * should override this to support {@link #fetchUntarSegmentToLocalStreamed(String, Supplier, File, long)}.
+   */
+  protected File fetchUntarSegmentToLocalWithoutRetry(URI uri, File dest, long maxStreamRateInByte)
       throws Exception {
     throw new UnsupportedOperationException();
   }
