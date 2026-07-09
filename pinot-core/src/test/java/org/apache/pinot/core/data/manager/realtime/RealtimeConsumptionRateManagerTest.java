@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
@@ -44,6 +45,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class RealtimeConsumptionRateManagerTest {
@@ -408,6 +410,27 @@ public class RealtimeConsumptionRateManagerTest {
     verify(noneMetrics, never()).setValueOfTableGauge(anyString(), eq(ServerGauge.CONSUMPTION_RATE_LIMIT), anyLong());
     verify(noneMetrics).removeTableGauge("keyC", ServerGauge.CONSUMPTION_RATE_LIMIT);
     verify(noneMetrics).removeTableGauge("keyC", ServerGauge.CONSUMPTION_QUOTA_UTILIZATION);
+  }
+
+  @Test
+  public void testPartitionRateLimitGaugeLifecycle() {
+    // set -> removed -> set again across consuming segments, against a real metrics registry to verify the gauge is
+    // registered, removed and cleanly re-registered as each new consumer picks up the current config.
+    ServerMetrics metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    String key = "tableL_REALTIME-topicL-3";
+    String capGaugeName = ServerGauge.CONSUMPTION_RATE_LIMIT.getGaugeName() + "." + key;
+
+    // Limit set (STREAM_CONFIG_D: direct partition limit 4): cap gauge registered with the configured value.
+    CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_D, TABLE_NAME, metrics, key);
+    assertEquals(metrics.getGaugeValue(capGaugeName), Long.valueOf(4));
+
+    // Limit removed (STREAM_CONFIG_C: no limit): the next consumer creation removes the series.
+    CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME, metrics, key);
+    assertNull(metrics.getGaugeValue(capGaugeName));
+
+    // Limit set again (STREAM_CONFIG_A: topic limit 50 over 10 partitions): gauge re-registers with the new value.
+    CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_A, TABLE_NAME, metrics, key);
+    assertEquals(metrics.getGaugeValue(capGaugeName), Long.valueOf(5));
   }
 
   @Test
