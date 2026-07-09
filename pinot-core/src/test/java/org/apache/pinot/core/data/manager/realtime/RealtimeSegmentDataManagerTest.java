@@ -1200,7 +1200,8 @@ public class RealtimeSegmentDataManagerTest {
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          consumerCoordinatorMap.get(llcSegmentName.getTopicPartitionId().getPartitionId()), serverMetrics, null, null,
+          consumerCoordinatorMap.get(llcSegmentName.getTopicPartitionId().toMultiTopicPinotPartitionId()),
+          serverMetrics, null, null,
           () -> true);
       _state = RealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);

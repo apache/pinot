@@ -30,6 +30,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.InjectMocks;
@@ -87,31 +88,31 @@ public class PinotSegmentRestletResourceTest {
     when(znRecord.getMapFields()).thenReturn(segmentsToInstanceState);
 
     // Create the partition to oldest segment map
-    Map<Integer, LLCSegmentName> partitionToOldestSegment = Map.of(
-        0, new LLCSegmentName(tableName, 0, 3, currentTime),
-        1, new LLCSegmentName(tableName, 1, 5, currentTime)
+    Map<TopicPartitionId, LLCSegmentName> partitionToOldestSegment = Map.of(
+        new TopicPartitionId(0), new LLCSegmentName(tableName, 0, 3, currentTime),
+        new TopicPartitionId(1), new LLCSegmentName(tableName, 1, 5, currentTime)
     );
 
     // This map will be populated by the method
-    Map<Integer, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
+    Map<TopicPartitionId, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
 
     // Create the expected response map
-    Map<Integer, Set<String>> expectedResponse = new HashMap<>();
-    expectedResponse.put(0,
+    Map<TopicPartitionId, Set<String>> expectedResponse = new HashMap<>();
+    expectedResponse.put(new TopicPartitionId(0),
         getSegmentForPartition(tableName, 0, 3, 7, currentTime).stream().collect(Collectors.toSet()));
-    expectedResponse.put(1,
+    expectedResponse.put(new TopicPartitionId(1),
         getSegmentForPartition(tableName, 1, 5, 5, currentTime).stream().collect(Collectors.toSet()));
 
     // Call the method and check the result
-    Map<Integer, Set<String>> result = _pinotSegmentRestletResource.getPartitionIdToSegmentsToDeleteMap(
+    Map<TopicPartitionId, Set<String>> result = _pinotSegmentRestletResource.getPartitionIdToSegmentsToDeleteMap(
         partitionToOldestSegment, segmentsToInstanceState.keySet(), partitionIdToLatestSegment);
 
     assertEquals(expectedResponse, result);
 
     // Verify that partitionIdToLatestSegment has been populated with the latest segment for each partition
     assertEquals(2, partitionIdToLatestSegment.size());
-    assertEquals(9, partitionIdToLatestSegment.get(0).getSequenceNumber());
-    assertEquals(9, partitionIdToLatestSegment.get(1).getSequenceNumber());
+    assertEquals(9, partitionIdToLatestSegment.get(new TopicPartitionId(0)).getSequenceNumber());
+    assertEquals(9, partitionIdToLatestSegment.get(new TopicPartitionId(1)).getSequenceNumber());
   }
 
   @Test
@@ -132,12 +133,12 @@ public class PinotSegmentRestletResourceTest {
         getSegmentForPartition(tableName + "fake", 0, 1, 3, currentTime)); // Segments with seq 1,2,3 for partition 0
 
     // Create expected result map
-    Map<Integer, LLCSegmentName> expectedResult = new HashMap<>();
-    expectedResult.put(0, new LLCSegmentName(tableName, 0, 3, currentTime));
-    expectedResult.put(1, new LLCSegmentName(tableName, 1, 4, currentTime));
+    Map<TopicPartitionId, LLCSegmentName> expectedResult = new HashMap<>();
+    expectedResult.put(new TopicPartitionId(0), new LLCSegmentName(tableName, 0, 3, currentTime));
+    expectedResult.put(new TopicPartitionId(1), new LLCSegmentName(tableName, 1, 4, currentTime));
 
     // Call the method and check the result
-    Map<Integer, LLCSegmentName> result =
+    Map<TopicPartitionId, LLCSegmentName> result =
         _pinotSegmentRestletResource.getPartitionIDToOldestSegment(segments, idealStateSegmentSet);
 
     assertEquals(expectedResult, result);

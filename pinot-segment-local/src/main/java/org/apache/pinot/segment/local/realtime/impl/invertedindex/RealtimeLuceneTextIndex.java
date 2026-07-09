@@ -71,8 +71,10 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
    * @param segmentIndexDir realtime segment consumer dir
    * @param segmentName realtime segment name
    * @param config the table index config
+   * @param hasMultipleStreams whether the table has multiple stream configs
    */
-  public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName, TextIndexConfig config) {
+  public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName, TextIndexConfig config,
+      boolean hasMultipleStreams) {
     _column = column;
     _segmentName = segmentName;
     try {
@@ -90,7 +92,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
 
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName, hasMultipleStreams);
       _refreshListener = new RealtimeLuceneRefreshListener(llcSegmentName.getTableName(), segmentName, column,
           llcSegmentName.getTopicPartitionId().getPartitionId(), _indexCreator::getNumDocs);
       _searcherManager.addListener(_refreshListener);
@@ -109,6 +111,12 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
           e.getMessage());
       throw new RuntimeException(e);
     }
+  }
+
+  /** @deprecated Use {@link #RealtimeLuceneTextIndex(String, File, String, TextIndexConfig, boolean)}. */
+  @Deprecated
+  public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName, TextIndexConfig config) {
+    this(column, segmentIndexDir, segmentName, config, false);
   }
 
   /**

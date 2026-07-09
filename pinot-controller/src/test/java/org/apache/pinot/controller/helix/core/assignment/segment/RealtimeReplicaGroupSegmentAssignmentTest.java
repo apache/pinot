@@ -543,7 +543,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
 
       // Extract partition ID from segment name
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-      int partitionId = llcSegmentName.getTopicPartitionId().getPartitionId();
+      int partitionId = llcSegmentName.getTopicPartitionId().toMultiTopicPinotPartitionId();
 
       // Verify the partition ID is one of our subset partitions
       boolean isSubsetPartition = false;

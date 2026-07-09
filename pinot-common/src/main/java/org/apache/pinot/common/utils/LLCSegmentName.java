@@ -28,6 +28,10 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
 
+/**
+ * Represents an LLC (Low-Level Consumer) segment name in the format:
+ * {@code {tableName}__{partitionGroupId}__{sequenceNumber}__{date}}
+ */
 public class LLCSegmentName implements Comparable<LLCSegmentName> {
   private static final String SEPARATOR = "__";
   private static final String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
@@ -39,37 +43,59 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   private final String _creationTime;
   private final String _segmentName;
 
-  public LLCSegmentName(String segmentName) {
+  /**
+   * Parses a segment name string.
+   *
+   * <p>When {@code hasMultipleStreams} is true, composite partition IDs (>= 10000)
+   * are decomposed into their topic and partition components. This ensures that
+   * segment {@code table__10003__5__date} produces {@code TopicPartitionId(1, 3)}
+   * instead of {@code TopicPartitionId(0, 10003)}.
+   */
+  public LLCSegmentName(String segmentName, boolean hasMultipleStreams) {
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
     Preconditions.checkArgument(parts.length == 4, "Invalid LLC segment name: %s", segmentName);
     _tableName = parts[0];
-    _topicPartitionId = new TopicPartitionId(Integer.parseInt(parts[1]));
+    int rawId = Integer.parseInt(parts[1]);
+    if (hasMultipleStreams && rawId >= TopicPartitionId.PARTITION_PADDING_OFFSET) {
+      _topicPartitionId = TopicPartitionId.fromMultiTopicPinotPartitionId(rawId);
+    } else {
+      _topicPartitionId = new TopicPartitionId(rawId);
+    }
     _sequenceNumber = Integer.parseInt(parts[2]);
     _creationTime = parts[3];
     _segmentName = segmentName;
   }
 
+  /** @deprecated Use {@link #LLCSegmentName(String, boolean)} to provide multi-stream context. */
+  @Deprecated
+  public LLCSegmentName(String segmentName) {
+    this(segmentName, false);
+  }
+
+  @Deprecated
   public LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
     Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
     _tableName = tableName;
     _topicPartitionId = new TopicPartitionId(partitionGroupId);
     _sequenceNumber = sequenceNumber;
-    // ISO8601 date: 20160120T1234Z
     _creationTime = DATE_FORMATTER.print(msSinceEpoch);
     _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
-  /**
-   * Returns the {@link LLCSegmentName} for the given segment name, or {@code null} if the given segment name does not
-   * represent an LLC segment.
-   */
   @Nullable
-  public static LLCSegmentName of(String segmentName) {
+  public static LLCSegmentName of(String segmentName, boolean hasMultipleStreams) {
     try {
-      return new LLCSegmentName(segmentName);
+      return new LLCSegmentName(segmentName, hasMultipleStreams);
     } catch (Exception e) {
       return null;
     }
+  }
+
+  /** @deprecated Use {@link #of(String, boolean)} to provide multi-stream context. */
+  @Deprecated
+  @Nullable
+  public static LLCSegmentName of(String segmentName) {
+    return of(segmentName, false);
   }
 
   /**

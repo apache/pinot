@@ -131,6 +131,7 @@ import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
@@ -1156,7 +1157,7 @@ public class PinotHelixResourceManager {
   /// segments of a table and want to derive the last-completed LLC segment per partition without
   /// re-reading the property store).
   public Collection<String> getLastLLCCompletedSegments(List<? extends SegmentZKMetadata> segmentZKMetadataList) {
-    Map<Integer, String> partitionIdToLastLLCCompletedSegmentMap = new HashMap<>();
+    Map<TopicPartitionId, String> partitionIdToLastLLCCompletedSegmentMap = new HashMap<>();
     for (SegmentZKMetadata zkMetadata : segmentZKMetadataList) {
       if (zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
         LLCSegmentName llcName = LLCSegmentName.of(zkMetadata.getSegmentName());
@@ -1164,7 +1165,7 @@ public class PinotHelixResourceManager {
           // llcName can be null if the segment is uploaded through offline ingestion
           continue;
         }
-        int partitionGroupId = llcName.getTopicPartitionId().getPartitionId();
+        TopicPartitionId partitionGroupId = llcName.getTopicPartitionId();
         int sequenceNumber = llcName.getSequenceNumber();
         String lastCompletedSegName = partitionIdToLastLLCCompletedSegmentMap.get(partitionGroupId);
         if (lastCompletedSegName == null

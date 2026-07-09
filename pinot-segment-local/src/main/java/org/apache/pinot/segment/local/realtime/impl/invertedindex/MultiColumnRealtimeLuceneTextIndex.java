@@ -83,13 +83,15 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
    * @param segmentIndexDir realtime segment consumer dir
    * @param segmentName realtime segment name
    * @param mcTextConfig the table index config
+   * @param hasMultipleStreams whether the table has multiple stream configs
    */
   public MultiColumnRealtimeLuceneTextIndex(
       List<String> columns,
       BooleanList columnsSV,
       File segmentIndexDir,
       String segmentName,
-      MultiColumnTextIndexConfig mcTextConfig) {
+      MultiColumnTextIndexConfig mcTextConfig,
+      boolean hasMultipleStreams) {
     _columns = columns;
     _segmentName = segmentName;
     try {
@@ -112,7 +114,7 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
 
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName, hasMultipleStreams);
       _refreshListener = new RealtimeLuceneRefreshListener(llcSegmentName.getTableName(), segmentName,
           MultiColumnTextIndexConstants.INDEX_DIR_NAME,
           llcSegmentName.getTopicPartitionId().getPartitionId(), _indexCreator::getNumDocs);
@@ -133,6 +135,13 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
           e.getMessage());
       throw new RuntimeException(e);
     }
+  }
+
+  /** @deprecated Use the constructor with {@code hasMultipleStreams} parameter. */
+  @Deprecated
+  public MultiColumnRealtimeLuceneTextIndex(List<String> columns, BooleanList columnsSV, File segmentIndexDir,
+      String segmentName, MultiColumnTextIndexConfig mcTextConfig) {
+    this(columns, columnsSV, segmentIndexDir, segmentName, mcTextConfig, false);
   }
 
   public void add(List<Object> values) {

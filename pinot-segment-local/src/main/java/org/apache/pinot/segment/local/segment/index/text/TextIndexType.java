@@ -174,6 +174,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       return null;
     }
     return new RealtimeLuceneTextIndex(context.getFieldSpec().getName(), context.getConsumerDir(),
-        context.getSegmentName(), config);
+        context.getSegmentName(), config, context.hasMultipleStreams());
   }
 }

@@ -95,4 +95,22 @@ public class LLCSegmentNameTest {
     Arrays.sort(testSorted);
     Assert.assertEquals(testSorted, new LLCSegmentName[]{segName5, segName1, segName6, segName3, segName4});
   }
+
+  @Test
+  public void testContextAwareParsing() {
+    // Old format with hasMultipleStreams=true decomposes composite
+    LLCSegmentName withContext = new LLCSegmentName("myTable__10003__5__20250101T0000Z", true);
+    assertEquals(withContext.getTopicPartitionId().getTopicId(), 1);
+    assertEquals(withContext.getTopicPartitionId().getPartitionId(), 3);
+
+    // Old format with hasMultipleStreams=false keeps raw partition
+    LLCSegmentName withoutContext = new LLCSegmentName("myTable__10003__5__20250101T0000Z", false);
+    assertEquals(withoutContext.getTopicPartitionId().getTopicId(), 0);
+    assertEquals(withoutContext.getTopicPartitionId().getPartitionId(), 10003);
+
+    // Small partition ID stays unchanged even with hasMultipleStreams=true
+    LLCSegmentName small = new LLCSegmentName("myTable__5__3__20250101T0000Z", true);
+    assertEquals(small.getTopicPartitionId().getTopicId(), 0);
+    assertEquals(small.getTopicPartitionId().getPartitionId(), 5);
+  }
 }

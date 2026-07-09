@@ -52,6 +52,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskContext;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
@@ -306,13 +307,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS = 31;
 
   private Thread _consumerThread;
-  // _partitionGroupId represents the Pinot's internal partition number which will eventually be used as part of
-  // segment name.
+  // _partitionGroupId is a TopicPartitionId that encodes both the topic index and stream partition. It is used
+  // to derive the Pinot partition number (for segment names) via toMultiTopicPinotPartitionId().
   // _streamPartitionId represents the partition number in the stream topic, which could be derived from the
   // _partitionGroupId and identify which partition of the stream topic this consumer is consuming from.
   // Note that in traditional single topic ingestion mode, those two concepts were identical which got separated
   // in multi-topic ingestion mode.
-  private final int _partitionGroupId;
+  private final TopicPartitionId _partitionGroupId;
   private final int _streamPartitionId;
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
@@ -1129,7 +1130,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Returns the current offset for the partition group.
    */
   public Map<String, String> getPartitionToCurrentOffset() {
-    return Map.of(String.valueOf(_partitionGroupId), _currentOffset.toString());
+    return Map.of(_partitionGroupId.toString(), _currentOffset.toString());
   }
 
   /**
@@ -1151,7 +1152,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   public Map<String, ConsumerPartitionState> getConsumerPartitionState(
       @Nullable StreamPartitionMsgOffset latestMsgOffset) {
-    String partitionGroupId = String.valueOf(_partitionGroupId);
+    String partitionGroupId = _partitionGroupId.toString();
     return Map.of(partitionGroupId,
         new ConsumerPartitionState(partitionGroupId, getCurrentOffset(), getLastConsumedTimestamp(), latestMsgOffset,
             _lastRowMetadata));
@@ -1784,21 +1785,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    _partitionGroupId = llcSegmentName.getTopicPartitionId().getPartitionId();
+    _partitionGroupId = llcSegmentName.getTopicPartitionId();
     List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(_tableConfig);
     int numStreams = streamConfigMaps.size();
     if (numStreams == 1) {
-      // Single stream
-      // NOTE: We skip partition id translation logic to handle cases where custom stream might return partition id
-      // larger than 10000.
-      _streamPartitionId = _partitionGroupId;
+      _streamPartitionId = _partitionGroupId.getPartitionId();
       _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(0));
     } else {
-      // Multiple streams
-      _streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
-      int index = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId);
-      Preconditions.checkState(numStreams > index, "Cannot find stream config of index: %s for table: %s", index,
-          _tableNameWithType);
+      _streamPartitionId = _partitionGroupId.getPartitionId();
+      int index = _partitionGroupId.getTopicId();
+      Preconditions.checkState(numStreams > index,
+          "Cannot find stream config of index: %s for table: %s", index, _tableNameWithType);
       _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(index));
     }
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
@@ -1806,7 +1803,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String streamTopic = _streamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _partitionGroupConsumptionStatus =
-        new PartitionGroupConsumptionStatus(_partitionGroupId, _streamPartitionId, llcSegmentName.getSequenceNumber(),
+        new PartitionGroupConsumptionStatus(_partitionGroupId.toMultiTopicPinotPartitionId(),
+            _streamPartitionId, llcSegmentName.getSequenceNumber(),
             _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
             _segmentZKMetadata.getEndOffset() == null ? null
                 : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
@@ -1875,7 +1873,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .setTextIndexConfig(consumingIndexLoadingConfig.getMultiColTextIndexConfig())
         .setDropRecordOnPartitionMismatch(ingestionConfig != null
             && ingestionConfig.getStreamIngestionConfig() != null
-            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
+            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch())
+        .setHasMultipleStreams(IngestionConfigUtils.hasMultipleStreams(_tableConfig));
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
@@ -2082,7 +2081,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         realtimeSegmentConfigBuilder.setPartitionFunction(
             PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
                 columnPartitionConfig.getFunctionConfig()));
-        realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
+        realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId.toMultiTopicPinotPartitionId());
       } else {
         _segmentLogger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());
       }
@@ -2157,8 +2156,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
-    _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, currentTimeMs,
-        null);
+    _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId,
+        currentTimeMs, currentTimeMs, null);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

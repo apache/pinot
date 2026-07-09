@@ -43,6 +43,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -168,7 +169,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
               tableConfig.getTableType() == TableType.OFFLINE
                       ? getSegmentsZKMetadataForTable(tableNameWithType)
                       : filterSegmentsforRealtimeTable(
-                              getNonConsumingSegmentsZKMetadataForRealtimeTable(tableNameWithType));
+                              getNonConsumingSegmentsZKMetadataForRealtimeTable(tableNameWithType),
+                              tableConfig);
 
       // Select current segment snapshot based on lineage, filter out empty segments
       SegmentLineage segmentLineage = _clusterInfoAccessor.getSegmentLineage(tableNameWithType);
@@ -577,7 +579,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  static List<SegmentZKMetadata> filterSegmentsforRealtimeTable(List<SegmentZKMetadata> allSegments) {
+  static List<SegmentZKMetadata> filterSegmentsforRealtimeTable(List<SegmentZKMetadata> allSegments,
+      TableConfig tableConfig) {
     // For realtime table, don't process
     // 1. in-progress segments (Segment.Realtime.Status.IN_PROGRESS), this has been taken care of in
     //    getNonConsumingSegmentsZKMetadataForRealtimeTable()
@@ -598,12 +601,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
     //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
     //    records correctly.
-    Map<Integer, LLCSegmentName> partitionIdToLatestCompletedSegment = new HashMap<>();
+    boolean hasMultipleStreams = IngestionConfigUtils.hasMultipleStreams(tableConfig);
+    Map<TopicPartitionId, LLCSegmentName> partitionIdToLatestCompletedSegment = new HashMap<>();
     for (SegmentZKMetadata segmentZKMetadata : allSegments) {
       String segmentName = segmentZKMetadata.getSegmentName();
       if (LLCSegmentName.isLLCSegment(segmentName)) {
-        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-        partitionIdToLatestCompletedSegment.compute(llcSegmentName.getTopicPartitionId().getPartitionId(),
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName, hasMultipleStreams);
+        partitionIdToLatestCompletedSegment.compute(llcSegmentName.getTopicPartitionId(),
             (partId, latestSegment) -> {
               if (latestSegment == null) {
                 return llcSegmentName;

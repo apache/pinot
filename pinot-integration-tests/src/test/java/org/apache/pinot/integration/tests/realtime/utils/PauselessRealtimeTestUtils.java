@@ -71,7 +71,8 @@ public class PauselessRealtimeTestUtils {
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
       String segmentKey =
-          llcSegmentName.getTopicPartitionId().getPartitionId() + "_" + llcSegmentName.getSequenceNumber();
+          llcSegmentName.getTopicPartitionId().toMultiTopicPinotPartitionId()
+              + "_" + llcSegmentName.getSequenceNumber();
       segmentZKMetadataMap.put(segmentKey, segmentZKMetadata);
     }
     return segmentZKMetadataMap;
