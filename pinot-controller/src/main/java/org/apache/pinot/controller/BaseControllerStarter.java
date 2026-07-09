@@ -97,6 +97,7 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.InMemorySessionManager;
 import org.apache.pinot.controller.api.access.SessionManager;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
@@ -754,7 +755,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         ControllerConf.CONTROLLER_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS,
         ControllerConf.DEFAULT_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS);
     long serverSessionTtlSeconds = uiInactivityTimeoutSeconds + 120;
-    final SessionManager sessionManager = new SessionManager(serverSessionTtlSeconds);
+    final SessionManager sessionManager = new InMemorySessionManager(serverSessionTtlSeconds);
 
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
