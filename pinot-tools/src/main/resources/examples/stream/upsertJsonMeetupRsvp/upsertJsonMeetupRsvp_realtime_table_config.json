@@ -87,27 +87,7 @@
     "mode": "FULL"
   },
   "fieldConfigList": [
-    {
-      "name": "event_json",
-      "encodingType": "RAW",
-      "indexTypes": [
-        "TEXT"
-      ]
-    },
-    {
-      "name": "group_json",
-      "encodingType": "RAW",
-      "indexTypes": [
-        "TEXT"
-      ]
-    },
-    {
-      "name": "member_json",
-      "encodingType": "RAW",
-      "indexTypes": [
-        "TEXT"
-      ]
-    }
+
   ],
   "metadata": {
     "customConfigs": {}
