@@ -146,6 +146,23 @@ public class BSONRecordReaderTest extends AbstractRecordReaderTest {
     }
   }
 
+  @Test
+  public void testValidRecordEmittedBeforeTruncatedTail()
+      throws Exception {
+    // A complete document followed by a truncated frame (declares 16 bytes, only 2 body bytes present). The
+    // valid record is still emitted; the truncation surfaces on the following next() call.
+    byte[] truncatedFrame = {0x10, 0x00, 0x00, 0x00, 0x01, 0x02};
+    byte[] content = concat(encode(new Document("a", 1)), truncatedFrame);
+    try (BSONRecordReader reader = readerOver("truncated-tail.bson", content)) {
+      assertTrue(reader.hasNext());
+      assertEquals(reader.next().getValue("a"), 1);
+
+      assertTrue(reader.hasNext());
+      assertThrows(IOException.class, reader::next);
+      assertFalse(reader.hasNext());
+    }
+  }
+
   private BSONRecordReader readerOver(String name, byte[] content)
       throws IOException {
     BSONRecordReader reader = new BSONRecordReader();

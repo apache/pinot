@@ -36,7 +36,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertSame;
 
 
 public class BSONMessageDecoderTest {
@@ -124,7 +124,7 @@ public class BSONMessageDecoderTest {
 
     GenericRow row = new GenericRow();
     GenericRow result = decoder.decode(padded, offset, encoded.length, row);
-    assertTrue(result == row);
+    assertSame(result, row);
     assertEquals(row.getValue("k"), "v");
   }
 

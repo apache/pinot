@@ -45,6 +45,9 @@ public class BSONRecordReader implements RecordReader {
   private InputStream _inputStream;
   // Bytes of the next framed document, or null once the stream is exhausted.
   private byte[] _nextDocument;
+  // A read error hit while fetching the next document. Deferred so the current record is still emitted; it
+  // surfaces on the following next() call rather than discarding an already-read valid record.
+  private IOException _fetchError;
 
   public BSONRecordReader() {
   }
@@ -61,34 +64,46 @@ public class BSONRecordReader implements RecordReader {
   private void open()
       throws IOException {
     _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
+    _fetchError = null;
     _nextDocument = readNextDocument();
   }
 
   @Override
   public boolean hasNext() {
-    return _nextDocument != null;
+    return _nextDocument != null || _fetchError != null;
   }
 
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    byte[] documentBytes = _nextDocument;
-    // Advance the look-ahead first so that, even if the current record is corrupt, the reader has already moved
-    // past it and the caller can skip the failure and continue.
-    try {
-      _nextDocument = readNextDocument();
-    } catch (IOException e) {
-      _nextDocument = null;
-      throw new RecordFetchException("Failed to read next BSON record", e);
+    if (_fetchError != null) {
+      IOException error = _fetchError;
+      _fetchError = null;
+      throw new RecordFetchException("Failed to read next BSON record", error);
     }
+    byte[] documentBytes = _nextDocument;
     Document document;
     try {
       document = BSONUtils.decodeDocument(documentBytes);
     } catch (RuntimeException e) {
+      // Corrupt frame: advance past it (bytes already consumed) so we don't retry, then report a parse error.
+      advance();
       throw new IOException("Failed to decode BSON record", e);
     }
     _recordExtractor.extract(document, reuse);
+    advance();
     return reuse;
+  }
+
+  /// Advances the look-ahead to the next framed document. A read error is stashed rather than thrown so the
+  /// record just returned by next() is still emitted; the error surfaces on the following next() call.
+  private void advance() {
+    try {
+      _nextDocument = readNextDocument();
+    } catch (IOException e) {
+      _nextDocument = null;
+      _fetchError = e;
+    }
   }
 
   /// Reads the next framed BSON document in full, or returns `null` at a clean end-of-stream. Throws when the
