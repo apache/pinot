@@ -41,6 +41,9 @@ public class JSONMessageDecoderBinaryTest {
   private static final Set<String> RICH_FIELDS = Set.of("name", "count", "ratio");
   private static final Set<String> SINGLE_FIELD = Set.of("a");
 
+  /// AUTO is opt-in, so detection tests must ask for it explicitly.
+  private static final Map<String, String> AUTO = Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "AUTO");
+
   private static byte[] smile(Map<String, Object> value)
       throws Exception {
     return new ObjectMapper(new SmileFactory()).writeValueAsBytes(value);
@@ -89,11 +92,24 @@ public class JSONMessageDecoderBinaryTest {
     return Map.of("name", "pinot", "count", 7, "ratio", 2.5);
   }
 
-  /// The default is AUTO (per-message detection), not a pinned TEXT format; text JSON must still decode.
+  /// An unset jsonFormat means TEXT -- the decoder's historical behavior, with no detection at all.
   @Test
-  public void testUnsetFormatAutoDetectsText()
+  public void testUnsetFormatIsText()
       throws Exception {
     assertRich(decode(Map.of(), RICH_FIELDS, TEXT_DOC));
+  }
+
+  /// An unset jsonFormat must not silently auto-detect binary payloads: those streams keep failing as they did
+  /// before this feature existed, rather than being decoded (or worse, ingested as a partial row).
+  @Test
+  public void testUnsetFormatDoesNotAutoDetectBinary()
+      throws Exception {
+    assertThrows(RuntimeException.class, () -> decode(Map.of(), SINGLE_FIELD, SQLITE_A1));
+    assertThrows(RuntimeException.class, () -> decode(Map.of(), SINGLE_FIELD, POSTGRES_A1));
+    assertThrows(RuntimeException.class, () -> decode(Map.of(), RICH_FIELDS, smile(richDoc())));
+    assertThrows(RuntimeException.class, () -> decode(Map.of(), RICH_FIELDS, cbor(richDoc())));
+    // A lone 0x0C is a validly-exact empty SQLite object, but must not become an empty row on a text stream.
+    assertThrows(RuntimeException.class, () -> decode(Map.of(), SINGLE_FIELD, bytes(0x0C)));
   }
 
   @Test
@@ -127,33 +143,31 @@ public class JSONMessageDecoderBinaryTest {
   @Test
   public void testAutoDetectsSmile()
       throws Exception {
-    // No jsonFormat configured -> AUTO detects Smile from its header.
-    assertRich(decode(Map.of(), RICH_FIELDS, smile(richDoc())));
+    assertRich(decode(AUTO, RICH_FIELDS, smile(richDoc())));
   }
 
   @Test
   public void testAutoDetectsCbor()
       throws Exception {
-    assertRich(decode(Map.of(), RICH_FIELDS, cbor(richDoc())));
+    assertRich(decode(AUTO, RICH_FIELDS, cbor(richDoc())));
   }
 
   @Test
   public void testAutoDetectsSqlite()
       throws Exception {
-    assertEquals(decode(Map.of(), SINGLE_FIELD, SQLITE_A1).getValue("a"), 1);
+    assertEquals(decode(AUTO, SINGLE_FIELD, SQLITE_A1).getValue("a"), 1);
   }
 
   @Test
   public void testAutoDetectsPostgres()
       throws Exception {
-    assertEquals(decode(Map.of(), SINGLE_FIELD, POSTGRES_A1).getValue("a"), 1);
+    assertEquals(decode(AUTO, SINGLE_FIELD, POSTGRES_A1).getValue("a"), 1);
   }
 
   @Test
   public void testAutoStillDecodesText()
       throws Exception {
-    assertRich(decode(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "AUTO"), RICH_FIELDS,
-        TEXT_DOC));
+    assertRich(decode(AUTO, RICH_FIELDS, TEXT_DOC));
   }
 
   @Test
@@ -164,7 +178,7 @@ public class JSONMessageDecoderBinaryTest {
     assertThrows(RuntimeException.class,
         () -> decode(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "SMILE"), RICH_FIELDS, badSmile));
     // Same via AUTO, which detects Smile from the header and then fails to parse the body.
-    assertThrows(RuntimeException.class, () -> decode(Map.of(), RICH_FIELDS, badSmile));
+    assertThrows(RuntimeException.class, () -> decode(AUTO, RICH_FIELDS, badSmile));
     // Truncated SQLite object.
     assertThrows(RuntimeException.class,
         () -> decode(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "SQLITE_JSONB"), SINGLE_FIELD,
@@ -174,10 +188,11 @@ public class JSONMessageDecoderBinaryTest {
   @Test
   public void testSqliteTrailingBytesAreRejectedRatherThanIngestedAsAPartialRow() {
     // A SQLite JSONB payload whose top-level element declares a short size (here an empty object) used to
-    // decode to an empty row, silently discarding the trailing "a": 1 -- via AUTO, which claims any payload
-    // whose first byte has the OBJECT nibble. It must fail the message instead.
+    // decode to an empty row, silently discarding the trailing "a": 1. Detection no longer claims it (the
+    // declared size does not fill the payload) and the parser rejects it outright; either way the message
+    // must fail rather than yield a partial row.
     byte[] shortObjectThenData = bytes(0x0C, 0x17, 0x61, 0x13, 0x31);
-    assertThrows(RuntimeException.class, () -> decode(Map.of(), SINGLE_FIELD, shortObjectThenData));
+    assertThrows(RuntimeException.class, () -> decode(AUTO, SINGLE_FIELD, shortObjectThenData));
     assertThrows(RuntimeException.class,
         () -> decode(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "SQLITE_JSONB"), SINGLE_FIELD,
             shortObjectThenData));

@@ -22,10 +22,16 @@ import java.util.Locale;
 import javax.annotation.Nullable;
 
 
-/// The payload encodings the JSON stream decoder understands. Selected through the `jsonFormat` decoder
-/// property; [#AUTO] (the default) sniffs each message's leading bytes.
+/// The payload encodings the JSON stream decoder understands, selected through the `jsonFormat` decoder
+/// property.
+///
+/// An unset property means [#TEXT], preserving the decoder's historical behavior exactly. [#AUTO] is opt-in:
+/// detection is a heuristic over a few leading bytes, and while it never mis-routes a well-formed text JSON
+/// document, it can claim a corrupt message that text decoding would have rejected outright. Turning that on
+/// for every existing stream would be a silent correctness change, so operators ask for it explicitly.
 public enum JsonPayloadFormat {
   /// Detect the encoding per message from its leading magic / version bytes, falling back to text JSON.
+  /// Opt-in; see the note on this enum.
   AUTO(new AutoDetectPayloadParser()),
   /// UTF-8 text JSON (the historical default).
   TEXT(new TextJsonPayloadParser()),
@@ -55,10 +61,11 @@ public enum JsonPayloadFormat {
     return _parser;
   }
 
-  /// Resolves a configured format name (case-insensitive), returning [#AUTO] when unset.
+  /// Resolves a configured format name (case-insensitive). An unset value means [#TEXT], the decoder's
+  /// historical behavior; [#AUTO] must be requested explicitly.
   public static JsonPayloadFormat fromConfig(@Nullable String value) {
     if (value == null || value.trim().isEmpty()) {
-      return AUTO;
+      return TEXT;
     }
     try {
       return valueOf(value.trim().toUpperCase(Locale.ROOT));

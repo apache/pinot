@@ -61,9 +61,62 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
 
   @Override
   public boolean matches(byte[] payload, int offset, int length) {
-    // Top-level element must be an OBJECT (low nibble == 12) to produce a row. This never collides with text
-    // JSON, whose first byte is '{' (0x7B) or '[' (0x5B) -- both low nibble 0x0B (ARRAY), never 0x0C.
-    return length >= 1 && (payload[offset] & 0x0F) == TYPE_OBJECT;
+    // The top-level element must be an OBJECT (low nibble == 12) to produce a row. That never collides with
+    // text JSON, whose first byte is '{' (0x7B) or '[' (0x5B) -- both low nibble 0x0B (ARRAY), never 0x0C.
+    if (length < 1 || (payload[offset] & 0x0F) != TYPE_OBJECT) {
+      return false;
+    }
+    // The nibble alone is a weak signal: one byte in sixteen of arbitrary binary would claim the payload. Also
+    // require the object's declared size to exactly fill the payload -- the same validity rule parse() enforces
+    // -- so AUTO cannot hand a corrupt message to this parser on the strength of a single nibble.
+    int sizeDescriptor = (payload[offset] & 0xFF) >>> 4;
+    int headerLength;
+    long declaredSize;
+    switch (sizeDescriptor) {
+      case 12:
+        headerLength = 2;
+        if (length < headerLength) {
+          return false;
+        }
+        declaredSize = payload[offset + 1] & 0xFF;
+        break;
+      case 13:
+        headerLength = 3;
+        if (length < headerLength) {
+          return false;
+        }
+        declaredSize = ((payload[offset + 1] & 0xFFL) << 8) | (payload[offset + 2] & 0xFFL);
+        break;
+      case 14:
+        headerLength = 5;
+        if (length < headerLength) {
+          return false;
+        }
+        declaredSize = readUnsignedBE(payload, offset + 1, 4);
+        break;
+      case 15:
+        headerLength = 9;
+        if (length < headerLength) {
+          return false;
+        }
+        declaredSize = readUnsignedBE(payload, offset + 1, 8);
+        break;
+      default:
+        headerLength = 1;
+        declaredSize = sizeDescriptor;
+        break;
+    }
+    return declaredSize == (long) length - headerLength;
+  }
+
+  /// Reads {@code count} big-endian bytes as an unsigned value. Only used for the 4- and 8-byte size fields, so
+  /// an 8-byte field with the sign bit set yields a negative long, which never equals a payload length.
+  private static long readUnsignedBE(byte[] payload, int offset, int count) {
+    long value = 0;
+    for (int i = 0; i < count; i++) {
+      value = (value << 8) | (payload[offset + i] & 0xFFL);
+    }
+    return value;
   }
 
   @Override

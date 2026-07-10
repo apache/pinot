@@ -33,12 +33,14 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
  * An implementation of StreamMessageDecoder to read JSON records from a stream.
  *
  * <p>Set the {@value #JSON_FORMAT_CONFIG_KEY} decoder property to pin the payload encoding to one of
- * {@code TEXT}, {@code POSTGRES_JSONB}, {@code SQLITE_JSONB}, {@code SMILE} or {@code CBOR}.
+ * {@code TEXT}, {@code POSTGRES_JSONB}, {@code SQLITE_JSONB}, {@code SMILE} or {@code CBOR}. When unset the
+ * encoding is {@code TEXT}, the decoder's historical behavior.
  *
- * <p>When unset (equivalently {@code AUTO}) the encoding is detected per message from its leading magic /
- * version bytes, falling back to text JSON. Detection is allocation-free and cannot mis-route a well-formed
- * text JSON document: a top-level <code>&#123;</code> or <code>[</code> (optionally after whitespace) collides
- * with none of the binary signatures. Pin {@code TEXT} to skip detection entirely.
+ * <p>Set it to {@code AUTO} to instead detect the encoding per message from its leading magic / version bytes,
+ * falling back to text JSON. Detection is allocation-free and cannot mis-route a well-formed text JSON
+ * document: a top-level <code>&#123;</code> or <code>[</code> (optionally after whitespace) collides with none
+ * of the binary signatures. It is opt-in rather than the default because it is still a heuristic over a few
+ * leading bytes, so it may claim a corrupt message that text decoding would have rejected outright.
  * See {@link JsonPayloadFormat}.
  */
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {

@@ -87,10 +87,14 @@ public class JsonPayloadFormatTest {
 
   @Test
   public void testFromConfig() {
-    assertEquals(JsonPayloadFormat.fromConfig(null), JsonPayloadFormat.AUTO);
-    assertEquals(JsonPayloadFormat.fromConfig(""), JsonPayloadFormat.AUTO);
-    assertEquals(JsonPayloadFormat.fromConfig("  "), JsonPayloadFormat.AUTO);
+    // An unset property means TEXT -- the decoder's historical behavior. AUTO is opt-in, never implicit,
+    // because detection can claim a corrupt message that text decoding would have rejected.
+    assertEquals(JsonPayloadFormat.fromConfig(null), JsonPayloadFormat.TEXT);
+    assertEquals(JsonPayloadFormat.fromConfig(""), JsonPayloadFormat.TEXT);
+    assertEquals(JsonPayloadFormat.fromConfig("  "), JsonPayloadFormat.TEXT);
+
     assertEquals(JsonPayloadFormat.fromConfig("text"), JsonPayloadFormat.TEXT);
+    assertEquals(JsonPayloadFormat.fromConfig("auto"), JsonPayloadFormat.AUTO);
     assertEquals(JsonPayloadFormat.fromConfig("  Smile "), JsonPayloadFormat.SMILE);
     assertEquals(JsonPayloadFormat.fromConfig("POSTGRES_JSONB"), JsonPayloadFormat.POSTGRES_JSONB);
     // AUTO resolves the concrete format per message, so every format has a non-null parser.
@@ -454,6 +458,34 @@ public class JsonPayloadFormatTest {
     assertSame(JsonPayloadFormat.detectParser(pg, 0, pg.length).getClass(), PostgresJsonbPayloadParser.class);
     byte[] sqlite = bytes(0x3C, 0x17, 0x62, 0x01);
     assertSame(JsonPayloadFormat.detectParser(sqlite, 0, sqlite.length).getClass(), SqliteJsonbPayloadParser.class);
+  }
+
+  @Test
+  public void testSqliteDetectionRequiresAnExactlyFillingObject() {
+    JsonPayloadParser sqlite = JsonPayloadFormat.SQLITE_JSONB.getParser();
+    // The OBJECT low nibble alone would claim one arbitrary binary byte in sixteen, so detection additionally
+    // requires the declared top-level size to exactly fill the payload.
+    assertTrue(sqlite.matches(bytes(0x4C, 0x17, 0x61, 0x13, 0x31), 0, 5));   // size 4, 4 bytes follow
+    assertFalse(sqlite.matches(bytes(0x4C, 0x17, 0x61), 0, 3));              // size 4, only 2 bytes follow
+    assertFalse(sqlite.matches(bytes(0x0C, 0x17, 0x61, 0x13, 0x31), 0, 5));  // size 0, but 4 bytes follow
+    assertFalse(sqlite.matches(bytes(0x4C, 0x17, 0x61, 0x13, 0x31, 0xFF), 0, 6)); // size 4, trailing byte
+
+    // Random binary that merely happens to carry the OBJECT nibble is no longer claimed ...
+    assertFalse(sqlite.matches(bytes(0xFC, 0xDE, 0xAD, 0xBE, 0xEF), 0, 5));
+    assertSame(JsonPayloadFormat.detectParser(bytes(0x0C, 0x17, 0x61, 0x13, 0x31), 0, 5).getClass(),
+        TextJsonPayloadParser.class);
+
+    // ... but the degenerate empty object, which does exactly fill its payload, still is.
+    assertTrue(sqlite.matches(bytes(0x0C), 0, 1));
+
+    // Wide size descriptors participate in the same check.
+    assertTrue(sqlite.matches(bytes(0xEC, 0x00, 0x00, 0x00, 0x04, 0x17, 0x61, 0x13, 0x31), 0, 9));
+    assertFalse(sqlite.matches(bytes(0xEC, 0x00, 0x00, 0x00, 0x05, 0x17, 0x61, 0x13, 0x31), 0, 9));
+    // An 8-byte size with the sign bit set decodes negative and can never equal a length.
+    assertFalse(sqlite.matches(bytes(0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x17), 0, 10));
+    // Truncated headers must not read past the payload.
+    assertFalse(sqlite.matches(bytes(0xCC), 0, 1));
+    assertFalse(sqlite.matches(bytes(0xEC, 0x00), 0, 2));
   }
 
   @Test
