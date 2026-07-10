@@ -531,6 +531,7 @@ org.jooq:joou-java-6:0.9.5
 org.jspecify:jspecify:1.0.0
 org.locationtech.proj4j:proj4j:1.2.2
 org.lz4:lz4-java:1.8.0
+org.mongodb:bson:5.6.1
 org.quartz-scheduler:quartz:2.5.2
 org.roaringbitmap:RoaringBitmap:1.6.12
 org.scala-lang.modules:scala-collection-compat_2.13:2.10.0

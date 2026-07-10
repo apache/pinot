@@ -153,6 +153,12 @@
       <destName>plugins/pinot-input-format/pinot-json/pinot-json-${project.version}-shaded.jar</destName>
     </file>
     <file>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-bson/target/pinot-bson-${project.version}-shaded.jar
+      </source>
+      <destName>plugins/pinot-input-format/pinot-bson/pinot-bson-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
       <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-orc/target/pinot-orc-${project.version}-shaded.jar
       </source>
       <destName>plugins/pinot-input-format/pinot-orc/pinot-orc-${project.version}-shaded.jar</destName>

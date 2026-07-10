@@ -34,6 +34,7 @@ public class RecordReaderFactoryTest {
     assertEquals(getRecordReaderClassName("gzipped_avro"), DEFAULT_AVRO_RECORD_READER_CLASS);
     assertEquals(getRecordReaderClassName("csv"), DEFAULT_CSV_RECORD_READER_CLASS);
     assertEquals(getRecordReaderClassName("json"), DEFAULT_JSON_RECORD_READER_CLASS);
+    assertEquals(getRecordReaderClassName("bson"), DEFAULT_BSON_RECORD_READER_CLASS);
     assertEquals(getRecordReaderClassName("thrift"), DEFAULT_THRIFT_RECORD_READER_CLASS);
     assertEquals(getRecordReaderClassName("orc"), DEFAULT_ORC_RECORD_READER_CLASS);
     assertEquals(getRecordReaderClassName("parquet"), DEFAULT_PARQUET_RECORD_READER_CLASS);
@@ -46,6 +47,7 @@ public class RecordReaderFactoryTest {
     assertEquals(getRecordReaderConfigClassName("gzipped_avro"), DEFAULT_AVRO_RECORD_READER_CONFIG_CLASS);
     assertEquals(getRecordReaderConfigClassName("csv"), DEFAULT_CSV_RECORD_READER_CONFIG_CLASS);
     assertNull(getRecordReaderConfigClassName("json"));
+    assertNull(getRecordReaderConfigClassName("bson"));
     assertEquals(getRecordReaderConfigClassName("thrift"), DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS);
     assertNull(getRecordReaderConfigClassName("orc"));
     assertEquals(getRecordReaderConfigClassName("parquet"), DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS);
@@ -115,6 +117,7 @@ public class RecordReaderFactoryTest {
     assertNotNull(DEFAULT_AVRO_RECORD_READER_CLASS);
     assertNotNull(DEFAULT_CSV_RECORD_READER_CLASS);
     assertNotNull(DEFAULT_JSON_RECORD_READER_CLASS);
+    assertNotNull(DEFAULT_BSON_RECORD_READER_CLASS);
     assertNotNull(DEFAULT_THRIFT_RECORD_READER_CLASS);
     assertNotNull(DEFAULT_ORC_RECORD_READER_CLASS);
     assertNotNull(DEFAULT_PARQUET_RECORD_READER_CLASS);
@@ -124,6 +127,7 @@ public class RecordReaderFactoryTest {
     assertEquals(DEFAULT_AVRO_RECORD_READER_CLASS, "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader");
     assertEquals(DEFAULT_CSV_RECORD_READER_CLASS, "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader");
     assertEquals(DEFAULT_JSON_RECORD_READER_CLASS, "org.apache.pinot.plugin.inputformat.json.JSONRecordReader");
+    assertEquals(DEFAULT_BSON_RECORD_READER_CLASS, "org.apache.pinot.plugin.inputformat.bson.BSONRecordReader");
     assertEquals(DEFAULT_PROTO_RECORD_READER_CLASS,
         "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReader");
   }
