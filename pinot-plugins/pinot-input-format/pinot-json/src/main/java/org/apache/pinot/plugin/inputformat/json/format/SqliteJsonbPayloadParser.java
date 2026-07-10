@@ -74,6 +74,13 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
     if (!(value instanceof Map)) {
       throw new IllegalArgumentException("Top-level SQLite JSONB element must be an object");
     }
+    // SQLite's validity rule: the outer element must exactly fill the BLOB. Without this, a payload whose
+    // top-level element declares a short size (e.g. a bare 0x0C followed by data) would decode to a partial --
+    // possibly empty -- row and silently discard the trailing bytes instead of rejecting a corrupt message.
+    if (cursor._pos != limit) {
+      throw new IllegalArgumentException(
+          "Top-level SQLite JSONB element consumed " + (cursor._pos - offset) + " of " + length + " bytes");
+    }
     //noinspection unchecked
     return (Map<String, Object>) value;
   }

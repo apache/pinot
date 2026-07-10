@@ -36,8 +36,9 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
  *
  * <p>When unset (equivalently {@code AUTO}) the encoding is detected per message from its leading magic /
  * version bytes, falling back to text JSON. Detection is allocation-free and cannot mis-route a well-formed
- * text JSON document: a top-level {@code {} / {@code [} (optionally after whitespace) collides with none of the
- * binary signatures. Pin {@code TEXT} to skip detection entirely. See {@link JsonPayloadFormat}.
+ * text JSON document: a top-level <code>&#123;</code> or <code>[</code> (optionally after whitespace) collides
+ * with none of the binary signatures. Pin {@code TEXT} to skip detection entirely.
+ * See {@link JsonPayloadFormat}.
  */
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String JSON_FORMAT_CONFIG_KEY = "jsonFormat";

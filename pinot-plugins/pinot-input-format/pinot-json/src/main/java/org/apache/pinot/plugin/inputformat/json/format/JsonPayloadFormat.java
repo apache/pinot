@@ -65,7 +65,7 @@ public enum JsonPayloadFormat {
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
           "Unsupported jsonFormat '" + value + "'. Supported values: AUTO, TEXT, POSTGRES_JSONB, SQLITE_JSONB, "
-              + "SMILE, CBOR");
+              + "SMILE, CBOR", e);
     }
   }
 

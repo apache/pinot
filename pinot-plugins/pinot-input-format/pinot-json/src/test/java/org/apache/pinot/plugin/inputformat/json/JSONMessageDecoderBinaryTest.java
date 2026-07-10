@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -58,6 +59,10 @@ public class JSONMessageDecoderBinaryTest {
     return result;
   }
 
+  // Explicit UTF-8 so fixtures do not depend on the platform default charset.
+  private static final byte[] TEXT_DOC =
+      "{\"name\":\"pinot\",\"count\":7,\"ratio\":2.5}".getBytes(StandardCharsets.UTF_8);
+
   // Hand-built {"a": 1} fixtures matching the parser unit tests.
   // SQLite: object(size 4){ text("a"), int("1") }.
   private static final byte[] SQLITE_A1 = bytes(0x4C, 0x17, 0x61, 0x13, 0x31);
@@ -82,10 +87,11 @@ public class JSONMessageDecoderBinaryTest {
     return Map.of("name", "pinot", "count", 7, "ratio", 2.5);
   }
 
+  /// The default is AUTO (per-message detection), not a pinned TEXT format; text JSON must still decode.
   @Test
-  public void testDefaultIsText()
+  public void testUnsetFormatAutoDetectsText()
       throws Exception {
-    assertRich(decode(Map.of(), RICH_FIELDS, "{\"name\":\"pinot\",\"count\":7,\"ratio\":2.5}".getBytes()));
+    assertRich(decode(Map.of(), RICH_FIELDS, TEXT_DOC));
   }
 
   @Test
@@ -145,7 +151,7 @@ public class JSONMessageDecoderBinaryTest {
   public void testAutoStillDecodesText()
       throws Exception {
     assertRich(decode(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "AUTO"), RICH_FIELDS,
-        "{\"name\":\"pinot\",\"count\":7,\"ratio\":2.5}".getBytes()));
+        TEXT_DOC));
   }
 
   @Test
@@ -161,6 +167,18 @@ public class JSONMessageDecoderBinaryTest {
     assertThrows(RuntimeException.class,
         () -> decode(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "SQLITE_JSONB"), SINGLE_FIELD,
             bytes(0x5C, 0x17)));
+  }
+
+  @Test
+  public void testSqliteTrailingBytesAreRejectedRatherThanIngestedAsAPartialRow() {
+    // A SQLite JSONB payload whose top-level element declares a short size (here an empty object) used to
+    // decode to an empty row, silently discarding the trailing "a": 1 -- via AUTO, which claims any payload
+    // whose first byte has the OBJECT nibble. It must fail the message instead.
+    byte[] shortObjectThenData = bytes(0x0C, 0x17, 0x61, 0x13, 0x31);
+    assertThrows(RuntimeException.class, () -> decode(Map.of(), SINGLE_FIELD, shortObjectThenData));
+    assertThrows(RuntimeException.class,
+        () -> decode(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "SQLITE_JSONB"), SINGLE_FIELD,
+            shortObjectThenData));
   }
 
   @Test

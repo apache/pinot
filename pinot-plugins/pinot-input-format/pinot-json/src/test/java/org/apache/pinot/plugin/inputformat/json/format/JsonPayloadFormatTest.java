@@ -48,9 +48,14 @@ public class JsonPayloadFormatTest {
     return result;
   }
 
+  /// Explicit UTF-8 so fixtures do not depend on the platform default charset.
+  private static byte[] utf8(String value) {
+    return value.getBytes(StandardCharsets.UTF_8);
+  }
+
   /// PostgreSQL `jsonb_send` framing: version byte 1 followed by the text JSON body.
   private static byte[] postgres(String json) {
-    byte[] body = json.getBytes(StandardCharsets.UTF_8);
+    byte[] body = utf8(json);
     byte[] result = new byte[body.length + 1];
     result[0] = 1;
     System.arraycopy(body, 0, result, 1, body.length);
@@ -99,11 +104,11 @@ public class JsonPayloadFormatTest {
   public void testText()
       throws Exception {
     JsonPayloadParser parser = JsonPayloadFormat.TEXT.getParser();
-    Map<String, Object> map = parse(parser, "  {\"a\": 1, \"b\": \"x\"}".getBytes());
+    Map<String, Object> map = parse(parser, utf8("  {\"a\": 1, \"b\": \"x\"}"));
     assertEquals(map.get("a"), 1);
     assertEquals(map.get("b"), "x");
-    assertTrue(parser.matches("{\"a\":1}".getBytes(), 0, 7));
-    assertTrue(parser.matches("  [1,2]".getBytes(), 0, 7));
+    assertTrue(parser.matches(utf8("{\"a\":1}"), 0, 7));
+    assertTrue(parser.matches(utf8("  [1,2]"), 0, 7));
     assertFalse(parser.matches(bytes(0xFF), 0, 1));
   }
 
@@ -345,6 +350,69 @@ public class JsonPayloadFormatTest {
     assertThrows(IllegalArgumentException.class, () -> parse(parser, bytes(0x13, 0x35)));
     // Truncated: object claims 5 payload bytes but only 1 follows.
     assertThrows(IllegalArgumentException.class, () -> parse(parser, bytes(0x5C, 0x17)));
+    // Object payload ends after a label, with no value for it.
+    assertThrows(IllegalArgumentException.class, () -> parse(parser, bytes(0x2C, 0x17, 0x61)));
+    // Object label must be a text element, not an int.
+    assertThrows(IllegalArgumentException.class, () -> parse(parser, bytes(0x3C, 0x13, 0x31, 0x01)));
+  }
+
+  @Test
+  public void testSqliteTopLevelElementMustExactlyFillThePayload()
+      throws Exception {
+    JsonPayloadParser parser = JsonPayloadFormat.SQLITE_JSONB.getParser();
+    // A bare empty object consumes the whole payload and is valid.
+    assertEquals(parse(parser, bytes(0x0C)), Map.of());
+
+    // SQLite's validity rule requires the outer element to exactly fill the BLOB. Previously a top-level
+    // element declaring a short size decoded to a partial row and silently dropped the trailing bytes:
+    // an empty object (size 0) followed by real data ...
+    assertThrows(IllegalArgumentException.class, () -> parse(parser, bytes(0x0C, 0x17, 0x61, 0x13, 0x31)));
+    // ... and a well-formed {"a": 1} object with a stray trailing byte.
+    assertThrows(IllegalArgumentException.class, () -> parse(parser, bytes(0x4C, 0x17, 0x61, 0x13, 0x31, 0xFF)));
+  }
+
+  @Test
+  public void testSqliteWideSizeDescriptors()
+      throws Exception {
+    JsonPayloadParser parser = JsonPayloadFormat.SQLITE_JSONB.getParser();
+    // Descriptor 14: object size as a 4-byte big-endian int. Payload is text("a") + int("1").
+    assertEquals(parse(parser, bytes(0xEC, 0x00, 0x00, 0x00, 0x04, 0x17, 0x61, 0x13, 0x31)), Map.of("a", 1));
+    // Descriptor 15: object size as an 8-byte big-endian int.
+    assertEquals(parse(parser,
+            bytes(0xFC, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x17, 0x61, 0x13, 0x31)),
+        Map.of("a", 1));
+
+    // A uint64 size with the sign bit set decodes to a negative long and must be rejected, not wrapped.
+    assertThrows(IllegalArgumentException.class, () -> parse(parser,
+        bytes(0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x17)));
+    // A large positive size must be rejected by comparison, without overflowing when added to the offset.
+    assertThrows(IllegalArgumentException.class, () -> parse(parser,
+        bytes(0xFC, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x17)));
+  }
+
+  @Test
+  public void testSqliteJson5NumberVariants()
+      throws Exception {
+    JsonPayloadParser parser = JsonPayloadFormat.SQLITE_JSONB.getParser();
+    // {"h": -0x10} -> int5 with a sign and hex radix -> -16
+    assertEquals(parse(parser, bytes(0x8C, 0x17, 0x68, 0x54, 0x2D, 0x30, 0x78, 0x31, 0x30)), Map.of("h", -16));
+    // {"p": +1.5} -> float5 with a leading '+' (rejected by Double.parseDouble until stripped)
+    assertEquals(parse(parser, bytes(0x7C, 0x17, 0x70, 0x46, 0x2B, 0x31, 0x2E, 0x35)), Map.of("p", 1.5));
+  }
+
+  @Test
+  public void testSqliteTextEscapeVariants()
+      throws Exception {
+    JsonPayloadParser parser = JsonPayloadFormat.SQLITE_JSONB.getParser();
+    // TEXTJ \\u escape: {"u": "A"} -> "A"
+    assertEquals(parse(parser, bytes(0x9C, 0x17, 0x75, 0x68, 0x5C, 0x75, 0x30, 0x30, 0x34, 0x31)), Map.of("u", "A"));
+    // TEXT5 extensions, one payload each: \' -> ' , \v -> VT, \0 -> NUL, \q -> q (passthrough)
+    assertEquals(parse(parser, bytes(0x5C, 0x17, 0x65, 0x29, 0x5C, 0x27)), Map.of("e", "'"));
+    assertEquals(parse(parser, bytes(0x5C, 0x17, 0x65, 0x29, 0x5C, 0x76)), Map.of("e", "\u000B"));
+    assertEquals(parse(parser, bytes(0x5C, 0x17, 0x65, 0x29, 0x5C, 0x30)), Map.of("e", "\0"));
+    assertEquals(parse(parser, bytes(0x5C, 0x17, 0x65, 0x29, 0x5C, 0x71)), Map.of("e", "q"));
+    // TEXT5 line continuation: "a\<LF>b" -> "ab"
+    assertEquals(parse(parser, bytes(0x7C, 0x17, 0x65, 0x49, 0x61, 0x5C, 0x0A, 0x62)), Map.of("e", "ab"));
   }
 
   @Test
@@ -365,7 +433,7 @@ public class JsonPayloadFormatTest {
   @Test
   public void testAutoDetection()
       throws Exception {
-    assertSame(JsonPayloadFormat.detectParser("{\"a\":1}".getBytes(), 0, 7).getClass(), TextJsonPayloadParser.class);
+    assertSame(JsonPayloadFormat.detectParser(utf8("{\"a\":1}"), 0, 7).getClass(), TextJsonPayloadParser.class);
     byte[] smile = smile(Map.of("a", 1));
     assertSame(JsonPayloadFormat.detectParser(smile, 0, smile.length).getClass(), SmileJsonPayloadParser.class);
     byte[] cbor = cborSelfDescribed(Map.of("a", 1));
@@ -396,7 +464,7 @@ public class JsonPayloadFormatTest {
     expected.put("count", 7);
     expected.put("ok", true);
 
-    byte[] text = "{\"count\":7,\"ok\":true}".getBytes();
+    byte[] text = utf8("{\"count\":7,\"ok\":true}");
     byte[] pg = postgres("{\"count\":7,\"ok\":true}");
     byte[] smile = smile(expected);
     byte[] cbor = new ObjectMapper(new CBORFactory()).writeValueAsBytes(expected);
@@ -416,7 +484,7 @@ public class JsonPayloadFormatTest {
     JsonPayloadParser auto = JsonPayloadFormat.AUTO.getParser();
     assertTrue(auto.matches(bytes(0x00), 0, 1));
     assertEquals(parse(auto, postgres("{\"a\":1}")), Map.of("a", 1));
-    assertEquals(parse(auto, "{\"a\":1}".getBytes()), Map.of("a", 1));
+    assertEquals(parse(auto, utf8("{\"a\":1}")), Map.of("a", 1));
     assertEquals(parse(auto, smile(Map.of("a", 1))), Map.of("a", 1));
   }
 }
