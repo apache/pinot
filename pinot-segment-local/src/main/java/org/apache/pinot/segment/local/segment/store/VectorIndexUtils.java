@@ -20,8 +20,11 @@ package org.apache.pinot.segment.local.segment.store;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Properties;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.codecs.lucene912.Lucene912Codec;
@@ -43,7 +46,50 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 
 
 public class VectorIndexUtils {
+  private static final String METADATA_KEY_DIMENSION = "dimension";
+  private static final String METADATA_KEY_DISTANCE_FUNCTION = "distanceFunction";
+
   private VectorIndexUtils() {
+  }
+
+  /**
+   * Writes a lightweight metadata file next to the HNSW index directory, recording the vector dimension and
+   * similarity function. This file is used by
+   * {@link org.apache.pinot.segment.local.segment.index.loader.invertedindex.VectorIndexHandler}
+   * to detect config changes and trigger an index rebuild when necessary.
+   *
+   * <p>Legacy segments built before this method existed have no metadata file; the handler skips config-change
+   * detection for those segments (treating the absence of the file as "unknown, assume unchanged").
+   */
+  public static void writeVectorIndexMetadata(File segmentIndexDir, String column, int dimension,
+      VectorSimilarityFunction similarityFunction)
+      throws IOException {
+    File metadataFile = new File(segmentIndexDir, column + Indexes.VECTOR_HNSW_INDEX_METADATA_FILE_EXTENSION);
+    Properties props = new Properties();
+    props.setProperty(METADATA_KEY_DIMENSION, String.valueOf(dimension));
+    props.setProperty(METADATA_KEY_DISTANCE_FUNCTION, similarityFunction.name());
+    try (FileOutputStream out = new FileOutputStream(metadataFile)) {
+      props.store(out, null);
+    }
+  }
+
+  /**
+   * Reads the HNSW vector index metadata file for the given column. Returns {@code null} if the file does not
+   * exist (legacy segment) or cannot be parsed.
+   */
+  @Nullable
+  public static Properties readVectorIndexMetadata(File segmentIndexDir, String column) {
+    File metadataFile = new File(segmentIndexDir, column + Indexes.VECTOR_HNSW_INDEX_METADATA_FILE_EXTENSION);
+    if (!metadataFile.exists()) {
+      return null;
+    }
+    Properties props = new Properties();
+    try (FileInputStream in = new FileInputStream(metadataFile)) {
+      props.load(in);
+      return props;
+    } catch (IOException e) {
+      return null;
+    }
   }
 
   static void cleanupVectorIndex(File segDir, String column) {
@@ -81,6 +127,10 @@ public class VectorIndexUtils {
     // handled above via the per-version VECTOR_HNSW_INDEX_FILE_EXTENSION entries).
     File hnswCombinedFile = new File(segDir, column + Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(hnswCombinedFile);
+
+    // Remove the HNSW metadata file
+    File metadataFile = new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_METADATA_FILE_EXTENSION);
+    FileUtils.deleteQuietly(metadataFile);
   }
 
   /// Returns {@code true} when the V1/V2 segment directory holds a vector index file that should

@@ -61,10 +61,10 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
 
   public HnswVectorIndexCreator(String column, File segmentIndexDir, VectorIndexConfig vectorIndexConfig) {
     _vectorColumn = column;
+    _segmentIndexDir = segmentIndexDir;
     _vectorDimension = vectorIndexConfig.getVectorDimension();
     _vectorSimilarityFunction = VectorIndexUtils.toSimilarityFunction(vectorIndexConfig.getVectorDistanceFunction());
     _storeInSegmentFile = vectorIndexConfig.isStoreInSegmentFile();
-    _segmentIndexDir = segmentIndexDir;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
@@ -110,6 +110,8 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
     try {
       LOGGER.info("Sealing HNSW index for column: {}", _vectorColumn);
       _indexWriter.forceMerge(1);
+      VectorIndexUtils.writeVectorIndexMetadata(_segmentIndexDir, _vectorColumn, _vectorDimension,
+          _vectorSimilarityFunction);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while sealing the HNSW index for column: " + _vectorColumn, e);
     }

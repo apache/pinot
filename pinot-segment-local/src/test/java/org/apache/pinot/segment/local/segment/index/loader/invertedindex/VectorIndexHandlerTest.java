@@ -31,7 +31,9 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -60,21 +62,35 @@ import static org.testng.Assert.fail;
 
 
 /**
- * Unit tests for {@link VectorIndexHandler} backend-drift handling.
+ * Unit tests for {@link VectorIndexHandler}.
+ *
+ * <p>Covers:
+ * <ul>
+ *   <li>Backend drift detection (HNSW → IVF_PQ triggers rebuild)</li>
+ *   <li>Dimension change detection (metadata file present, dimension differs → rebuild)</li>
+ *   <li>Distance function change detection (metadata file present, function differs → rebuild)</li>
+ *   <li>No rebuild when config is unchanged</li>
+ *   <li>Legacy segments without metadata file skip config-change detection</li>
+ *   <li>L2 and EUCLIDEAN are treated as equivalent (same Lucene similarity function)</li>
+ * </ul>
  */
 public class VectorIndexHandlerTest {
   private static final String COLUMN = "embedding";
+  private static final int DIM = 4;
+
+  // ---------------------------------------------------------------------------
+  // Backend drift
+  // ---------------------------------------------------------------------------
 
   @Test
   public void testNeedUpdateIndicesReturnsTrueWhenVectorBackendChanges()
       throws Exception {
-    File indexDir = createSegmentDirWithVectorIndex(V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    File indexDir = createSegmentDirWithHnswIndex();
     try {
       SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir);
-      SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
-      when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
+      SegmentDirectory.Reader reader = mockReader(segmentDirectory);
 
-      VectorIndexHandler handler = createHandler(segmentDirectory, vectorIndexConfig("IVF_PQ"));
+      VectorIndexHandler handler = createHandler(segmentDirectory, ivfPqConfig());
 
       assertTrue(handler.needUpdateIndices(reader));
     } finally {
@@ -85,13 +101,13 @@ public class VectorIndexHandlerTest {
   @Test
   public void testUpdateIndicesRemovesIndexWhenVectorBackendChanges()
       throws Exception {
-    File indexDir = createSegmentDirWithVectorIndex(V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    File indexDir = createSegmentDirWithHnswIndex();
     try {
       SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir);
       SegmentDirectory.Writer writer = mock(SegmentDirectory.Writer.class);
       when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
 
-      VectorIndexHandler handler = createHandler(segmentDirectory, vectorIndexConfig("IVF_PQ"));
+      VectorIndexHandler handler = createHandler(segmentDirectory, ivfPqConfig());
       handler.updateIndices(writer);
 
       verify(writer).removeIndex(COLUMN, StandardIndexes.vector());
@@ -99,6 +115,137 @@ public class VectorIndexHandlerTest {
       FileUtils.deleteQuietly(indexDir);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Config unchanged → no rebuild
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testNeedUpdateReturnsFalseWhenConfigUnchanged()
+      throws Exception {
+    File indexDir = createSegmentDirWithHnswIndex();
+    try {
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      VectorIndexUtils.writeVectorIndexMetadata(v3Dir, COLUMN, DIM, VectorSimilarityFunction.COSINE);
+
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir);
+      SegmentDirectory.Reader reader = mockReader(segmentDirectory);
+
+      VectorIndexHandler handler = createHandler(segmentDirectory,
+          hnswConfig(DIM, VectorIndexConfig.VectorDistanceFunction.COSINE));
+
+      assertFalse(handler.needUpdateIndices(reader));
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dimension change
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testNeedUpdateReturnsTrueWhenDimensionChanged()
+      throws Exception {
+    File indexDir = createSegmentDirWithHnswIndex();
+    try {
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      VectorIndexUtils.writeVectorIndexMetadata(v3Dir, COLUMN, DIM, VectorSimilarityFunction.COSINE);
+
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir);
+      SegmentDirectory.Reader reader = mockReader(segmentDirectory);
+
+      // New config requests dimension 8, but index was built with dimension 4
+      VectorIndexHandler handler = createHandler(segmentDirectory,
+          hnswConfig(DIM * 2, VectorIndexConfig.VectorDistanceFunction.COSINE));
+
+      assertTrue(handler.needUpdateIndices(reader),
+          "Rebuild expected when vector dimension changes");
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Distance function change
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testNeedUpdateReturnsTrueWhenDistanceFunctionChanged()
+      throws Exception {
+    File indexDir = createSegmentDirWithHnswIndex();
+    try {
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      VectorIndexUtils.writeVectorIndexMetadata(v3Dir, COLUMN, DIM, VectorSimilarityFunction.COSINE);
+
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir);
+      SegmentDirectory.Reader reader = mockReader(segmentDirectory);
+
+      // Config now requests EUCLIDEAN but index was built with COSINE
+      VectorIndexHandler handler = createHandler(segmentDirectory,
+          hnswConfig(DIM, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
+
+      assertTrue(handler.needUpdateIndices(reader),
+          "Rebuild expected when distance function changes");
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Legacy segment — no metadata file → skip config-change detection
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testLegacySegmentWithoutMetadataFileSkipsConfigChangeDetection()
+      throws Exception {
+    File indexDir = createSegmentDirWithHnswIndex();
+    try {
+      // No metadata file written — simulates a legacy segment built before this feature
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir);
+      SegmentDirectory.Reader reader = mockReader(segmentDirectory);
+
+      // Even though dimension "differs" (handler doesn't know the stored value), no rebuild expected
+      VectorIndexHandler handler = createHandler(segmentDirectory,
+          hnswConfig(DIM * 2, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
+
+      assertFalse(handler.needUpdateIndices(reader),
+          "No rebuild expected for legacy segments without metadata file");
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // L2 and EUCLIDEAN are equivalent
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testL2AndEuclideanAreEquivalent()
+      throws Exception {
+    File indexDir = createSegmentDirWithHnswIndex();
+    try {
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      // Index was built with EUCLIDEAN (stored as VectorSimilarityFunction.EUCLIDEAN)
+      VectorIndexUtils.writeVectorIndexMetadata(v3Dir, COLUMN, DIM, VectorSimilarityFunction.EUCLIDEAN);
+
+      SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir);
+      SegmentDirectory.Reader reader = mockReader(segmentDirectory);
+
+      // Config uses L2 — which maps to the same Lucene similarity function as EUCLIDEAN
+      VectorIndexHandler handler = createHandler(segmentDirectory,
+          hnswConfig(DIM, VectorIndexConfig.VectorDistanceFunction.L2));
+
+      assertFalse(handler.needUpdateIndices(reader),
+          "L2 and EUCLIDEAN map to the same Lucene similarity function; no rebuild expected");
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
 
   private static VectorIndexHandler createHandler(SegmentDirectory segmentDirectory,
       VectorIndexConfig vectorIndexConfig) {
@@ -117,6 +264,7 @@ public class VectorIndexHandlerTest {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
     when(segmentMetadata.getIndexDir()).thenReturn(indexDir);
+    when(segmentMetadata.getVersion()).thenReturn(SegmentVersion.v3);
     when(segmentMetadata.getTotalDocs()).thenReturn(10);
     when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(COLUMN)));
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>());
@@ -128,8 +276,19 @@ public class VectorIndexHandlerTest {
     return segmentDirectory;
   }
 
-  private static VectorIndexConfig vectorIndexConfig(String backend) {
-    return new VectorIndexConfig(false, backend, 4, 1, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
+  private static SegmentDirectory.Reader mockReader(SegmentDirectory segmentDirectory) {
+    SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+    when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
+    return reader;
+  }
+
+  private static VectorIndexConfig hnswConfig(int dimension,
+      VectorIndexConfig.VectorDistanceFunction distanceFunction) {
+    return new VectorIndexConfig(false, "HNSW", dimension, 1, distanceFunction, Map.of());
+  }
+
+  private static VectorIndexConfig ivfPqConfig() {
+    return new VectorIndexConfig(false, "IVF_PQ", DIM, 1, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
         Map.of("nlist", "2", "pqM", "2", "pqNbits", "4", "trainSampleSize", "8"));
   }
 
@@ -857,6 +1016,11 @@ public class VectorIndexHandlerTest {
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
+  }
+
+  private static File createSegmentDirWithHnswIndex()
+      throws Exception {
+    return createSegmentDirWithVectorIndex(V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
   }
 
   private static File createSegmentDirWithVectorIndex(String suffix)
