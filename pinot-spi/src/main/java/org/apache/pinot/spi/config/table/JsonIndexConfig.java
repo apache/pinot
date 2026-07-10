@@ -212,13 +212,14 @@ public class JsonIndexConfig extends IndexConfig {
     return _maxLevels == config._maxLevels && _excludeArray == config._excludeArray
         && _disableCrossArrayUnnest == config._disableCrossArrayUnnest && Objects.equals(_includePaths,
         config._includePaths) && Objects.equals(_excludePaths, config._excludePaths) && Objects.equals(_excludeFields,
-        config._excludeFields) && _maxValueLength == config._maxValueLength
-        && _skipInvalidJson == config._skipInvalidJson;
+        config._excludeFields) && Objects.equals(_indexPaths, config._indexPaths)
+        && _maxValueLength == config._maxValueLength && _skipInvalidJson == config._skipInvalidJson
+        && Objects.equals(_maxBytesSize, config._maxBytesSize);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _maxLevels, _excludeArray, _disableCrossArrayUnnest, _includePaths,
-        _excludePaths, _excludeFields, _maxValueLength, _skipInvalidJson);
+        _excludePaths, _excludeFields, _indexPaths, _maxValueLength, _skipInvalidJson, _maxBytesSize);
   }
 }
