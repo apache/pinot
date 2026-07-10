@@ -414,6 +414,48 @@ public class JsonPayloadFormatTest {
     assertEquals(parse(parser, bytes(0x8C, 0x17, 0x68, 0x54, 0x2D, 0x30, 0x78, 0x31, 0x30)), Map.of("h", -16));
     // {"p": +1.5} -> float5 with a leading '+' (rejected by Double.parseDouble until stripped)
     assertEquals(parse(parser, bytes(0x7C, 0x17, 0x70, 0x46, 0x2B, 0x31, 0x2E, 0x35)), Map.of("p", 1.5));
+    // JSON5 floats may be non-finite: FLOAT5 "NaN" / "Infinity".
+    assertEquals(parse(parser, bytes(0x6C, 0x17, 0x78, 0x36, 0x4E, 0x61, 0x4E)).get("x"), Double.NaN);
+    assertEquals(parse(parser, bytes(0xBC, 0x17, 0x78, 0x86, 0x49, 0x6E, 0x66, 0x69, 0x6E, 0x69, 0x74, 0x79)).get("x"),
+        Double.POSITIVE_INFINITY);
+  }
+
+  @Test
+  public void testSqliteCanonicalNumbersRejectNonCanonicalTokens()
+      throws Exception {
+    JsonPayloadParser parser = JsonPayloadFormat.SQLITE_JSONB.getParser();
+    // TYPE_FLOAT is canonical RFC 8259 and must reject the permissive tokens Double.parseDouble accepts, so a
+    // malformed float fails the record rather than ingesting a non-finite / non-canonical value.
+    assertThrows(IllegalArgumentException.class,                            // {"x": NaN}
+        () -> parse(parser, bytes(0x6C, 0x17, 0x78, 0x35, 0x4E, 0x61, 0x4E)));
+    assertThrows(IllegalArgumentException.class,                            // {"x": Infinity}
+        () -> parse(parser, bytes(0xBC, 0x17, 0x78, 0x85, 0x49, 0x6E, 0x66, 0x69, 0x6E, 0x69, 0x74, 0x79)));
+    assertThrows(IllegalArgumentException.class,                            // {"x": +1.5}
+        () -> parse(parser, bytes(0x7C, 0x17, 0x78, 0x45, 0x2B, 0x31, 0x2E, 0x35)));
+    assertThrows(IllegalArgumentException.class,                            // {"x": 0x1p4} (Java hex float)
+        () -> parse(parser, bytes(0x8C, 0x17, 0x78, 0x55, 0x30, 0x78, 0x31, 0x70, 0x34)));
+
+    // TYPE_INT is likewise canonical: no leading '+' or leading zeros.
+    assertThrows(IllegalArgumentException.class,                            // {"x": +5}
+        () -> parse(parser, bytes(0x5C, 0x17, 0x78, 0x23, 0x2B, 0x35)));
+    assertThrows(IllegalArgumentException.class,                            // {"x": 007}
+        () -> parse(parser, bytes(0x6C, 0x17, 0x78, 0x33, 0x30, 0x30, 0x37)));
+
+    // The canonical happy paths still decode.
+    assertEquals(parse(parser, bytes(0x6C, 0x17, 0x78, 0x35, 0x31, 0x2E, 0x35)), Map.of("x", 1.5)); // 1.5
+    assertEquals(parse(parser, bytes(0x5C, 0x17, 0x78, 0x23, 0x2D, 0x35)), Map.of("x", -5));         // -5
+  }
+
+  @Test
+  public void testSqliteTextMustBeValidUtf8()
+      throws Exception {
+    JsonPayloadParser parser = JsonPayloadFormat.SQLITE_JSONB.getParser();
+    // Valid multibyte UTF-8 (é = 0xC3 0xA9) decodes.
+    assertEquals(parse(parser, bytes(0x5C, 0x17, 0x78, 0x27, 0xC3, 0xA9)), Map.of("x", "é"));
+    // A lone 0x80 (invalid UTF-8) in a value must fail the record rather than becoming U+FFFD.
+    assertThrows(IllegalArgumentException.class, () -> parse(parser, bytes(0x4C, 0x17, 0x78, 0x17, 0x80)));
+    // Same for a field name.
+    assertThrows(IllegalArgumentException.class, () -> parse(parser, bytes(0x4C, 0x17, 0x80, 0x13, 0x31)));
   }
 
   @Test

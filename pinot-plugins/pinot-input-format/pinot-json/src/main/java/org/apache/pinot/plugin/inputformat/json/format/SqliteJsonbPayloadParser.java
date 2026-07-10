@@ -20,10 +20,15 @@ package org.apache.pinot.plugin.inputformat.json.format;
 
 import com.google.common.collect.Maps;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 
 /// Parses the <a href="https://sqlite.org/jsonb.html">SQLite JSONB</a> binary format (SQLite 3.45+).
@@ -58,6 +63,13 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
   private static final BigInteger INT_MAX = BigInteger.valueOf(Integer.MAX_VALUE);
   private static final BigInteger LONG_MIN = BigInteger.valueOf(Long.MIN_VALUE);
   private static final BigInteger LONG_MAX = BigInteger.valueOf(Long.MAX_VALUE);
+
+  // RFC 8259 number grammar for the canonical TYPE_INT / TYPE_FLOAT forms: an optional minus, an integer part
+  // with no leading zeros, and (for floats) an optional fraction and exponent. No leading '+', NaN, Infinity or
+  // hex -- the tokens Double.parseDouble / Long.parseLong would otherwise accept.
+  private static final Pattern CANONICAL_INT = Pattern.compile("-?(?:0|[1-9][0-9]*)");
+  private static final Pattern CANONICAL_NUMBER =
+      Pattern.compile("-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?");
 
   @Override
   public boolean matches(byte[] payload, int offset, int length) {
@@ -169,14 +181,16 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
         result = Boolean.FALSE;
         break;
       case TYPE_INT:
-        result = parseInt(cursor.ascii(start, end), 10);
+        result = parseCanonicalInt(cursor.ascii(start, end));
         break;
       case TYPE_INT5:
         result = parseInt5(cursor.ascii(start, end));
         break;
       case TYPE_FLOAT:
+        result = parseCanonicalFloat(cursor.ascii(start, end));
+        break;
       case TYPE_FLOAT5:
-        result = parseFloat(cursor.ascii(start, end));
+        result = parseJson5Float(cursor.ascii(start, end));
         break;
       case TYPE_TEXT:
       case TYPE_TEXTRAW:
@@ -220,6 +234,17 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
       map.put((String) label, readElement(cursor, end));
     }
     return map;
+  }
+
+  /// Parses a canonical (RFC 8259) integer, the SQLite `TYPE_INT` form. Validated as strictly as text JSON:
+  /// the permissive tokens `Long.parseLong` / `BigInteger` accept -- a leading `+` or leading zeros -- are
+  /// rejected, so a malformed `TYPE_INT` fails the record rather than decoding to a value Jackson would refuse.
+  /// The JSON5 forms (hex, leading sign) live in [#parseInt5].
+  private static Object parseCanonicalInt(String text) {
+    if (!CANONICAL_INT.matcher(text).matches()) {
+      throw new IllegalArgumentException("Invalid canonical SQLite JSONB integer: " + text);
+    }
+    return parseInt(text, 10);
   }
 
   private static Object parseInt(String text, int radix) {
@@ -272,7 +297,19 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
     return value;
   }
 
-  private static Double parseFloat(String text) {
+  /// Parses a canonical (RFC 8259) float, the SQLite `TYPE_FLOAT` form. `Double.parseDouble` is far more
+  /// permissive than JSON -- it accepts `NaN`, `Infinity`, a leading `+`, Java hex floats and type suffixes --
+  /// so the text is first validated against the JSON number grammar. That rejects the non-finite and other
+  /// non-canonical tokens exactly as Jackson would, rather than ingesting them. The JSON5 forms live in
+  /// [#parseJson5Float].
+  private static Double parseCanonicalFloat(String text) {
+    if (!CANONICAL_NUMBER.matcher(text).matches()) {
+      throw new IllegalArgumentException("Invalid canonical SQLite JSONB float: " + text);
+    }
+    return Double.parseDouble(text);
+  }
+
+  private static Double parseJson5Float(String text) {
     // JSON5 permits a leading '+' and the tokens Infinity / NaN, all of which Double.parseDouble accepts once
     // the '+' is stripped.
     String normalized = !text.isEmpty() && text.charAt(0) == '+' ? text.substring(1) : text;
@@ -426,8 +463,18 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
       return new String(_buf, start, end - start, StandardCharsets.US_ASCII);
     }
 
+    /// Decodes text strictly as UTF-8. Unlike `new String(..., UTF_8)`, which substitutes U+FFFD for malformed
+    /// bytes, a `CodingErrorAction.REPORT` decoder throws, so a corrupt JSONB record fails rather than ingesting
+    /// mutated field names or values -- matching how text JSON / Jackson reject invalid UTF-8.
     private String utf8(int start, int end) {
-      return new String(_buf, start, end - start, StandardCharsets.UTF_8);
+      CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
+          .onMalformedInput(CodingErrorAction.REPORT)
+          .onUnmappableCharacter(CodingErrorAction.REPORT);
+      try {
+        return decoder.decode(ByteBuffer.wrap(_buf, start, end - start)).toString();
+      } catch (CharacterCodingException e) {
+        throw new IllegalArgumentException("Invalid UTF-8 in SQLite JSONB text", e);
+      }
     }
   }
 }
