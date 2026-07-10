@@ -30,8 +30,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/// The `DataTypeColumnTransformer` is the column-major counterpart of the row-major `DataTypeTransformer`. It converts
+/// the values read from a [ColumnReader] to a target [PinotDataType]. It has two usages:
+/// - Schema columns: constructed from a [FieldSpec], it converts the values to the data type defined for the column in
+///   the [org.apache.pinot.spi.data.Schema].
+/// - Source fields: constructed from an explicit [PinotDataType] (see `IngestionConfig.sourceFieldConfigs`), it fixes
+///   the data type of a source field before other transformers (such as the expression transformer) consume it.
 public class DataTypeColumnTransformer implements ColumnTransformer {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTypeColumnTransformer.class);
 
   private final PinotDataType _destDataType;
@@ -39,12 +44,17 @@ public class DataTypeColumnTransformer implements ColumnTransformer {
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
 
-  /**
-   * @param fieldSpec - The field spec for the column being created in Pinot.
-   * @param columnReader - The column reader to read the source data.
-   */
+  /// Creates a transformer that converts the values read from `columnReader` to the data type defined for the column
+  /// in the [org.apache.pinot.spi.data.Schema] (derived from the given [FieldSpec]).
   public DataTypeColumnTransformer(TableConfig tableConfig, FieldSpec fieldSpec, ColumnReader columnReader) {
-    _destDataType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
+    this(tableConfig, PinotDataType.getPinotDataTypeForIngestion(fieldSpec), columnReader);
+  }
+
+  /// Creates a transformer that converts the values read from `columnReader` to the given [PinotDataType]. This is
+  /// useful for fixing the data type of a source field before other transformers (such as the expression transformer)
+  /// consume it.
+  public DataTypeColumnTransformer(TableConfig tableConfig, PinotDataType destDataType, ColumnReader columnReader) {
+    _destDataType = destDataType;
     _columnReader = columnReader;
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();

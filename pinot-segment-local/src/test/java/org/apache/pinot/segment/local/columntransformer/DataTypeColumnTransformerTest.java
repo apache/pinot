@@ -600,4 +600,15 @@ public class DataTypeColumnTransformerTest {
     Object result = transformer.transform("not_a_number");
     assertNull(result, "Invalid conversion should return null when continueOnError=true");
   }
+
+  @Test
+  public void testExplicitDestDataTypeConstructor() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    ColumnReader reader = mockReader(PinotDataType.STRING);
+    // The explicit target type drives the conversion, independent of any field spec.
+    DataTypeColumnTransformer transformer = new DataTypeColumnTransformer(tableConfig, PinotDataType.LONG, reader);
+
+    assertFalse(transformer.isNoOp(), "STRING source, LONG dest should not be a no-op");
+    assertEquals(transformer.transform("12345"), 12345L);
+  }
 }
