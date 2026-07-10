@@ -202,13 +202,33 @@ public class JSONMessageDecoderBinaryTest {
     message = decodeFailureMessage(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "SMILE"), badSmile);
     assertTrue(message.contains("7 bytes: 0x3a290a04ffffff"), message);
 
-    // ... and an oversized payload is truncated instead of echoed in full.
-    byte[] huge = new byte[8192];
-    Arrays.fill(huge, (byte) 'x');
-    message = decodeFailureMessage(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "TEXT"), huge);
+    // ... an oversized text payload is truncated to the 512-byte window instead of echoed in full ...
+    byte[] hugeText = new byte[8192];
+    Arrays.fill(hugeText, (byte) 'x');
+    message = decodeFailureMessage(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "TEXT"), hugeText);
     assertTrue(message.contains("8192 bytes: "), message);
     assertTrue(message.contains("...(truncated)"), message);
-    assertTrue(message.length() < 512, "diagnostic should stay bounded, was " + message.length());
+    assertEquals(preview(message), "x".repeat(512));
+
+    // ... and an oversized binary payload is capped at 128 hex-rendered bytes (256 characters).
+    byte[] hugeBinary = new byte[8192];
+    Arrays.fill(hugeBinary, (byte) 0x01);
+    hugeBinary[0] = 0x3A;
+    hugeBinary[1] = 0x29;
+    hugeBinary[2] = 0x0A;
+    message = decodeFailureMessage(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "SMILE"), hugeBinary);
+    assertTrue(message.contains("8192 bytes: 0x3a290a01"), message);
+    assertTrue(message.contains("...(truncated)"), message);
+    // "0x" prefix + 128 rendered bytes at two hex characters each.
+    assertEquals(preview(message).length(), 2 + 2 * 128, message);
+  }
+
+  /// The rendered payload window of a decode-failure message: what sits between "<n> bytes: " and the
+  /// truncation marker. Isolates the assertion from the message's surrounding prose.
+  private static String preview(String message) {
+    int start = message.indexOf("bytes: ") + "bytes: ".length();
+    int end = message.indexOf("...(truncated)");
+    return message.substring(start, end < 0 ? message.length() : end);
   }
 
   /// Decodes an intentionally malformed payload and returns the resulting exception message.

@@ -44,8 +44,10 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String JSON_FORMAT_CONFIG_KEY = "jsonFormat";
 
-  /// Cap on the payload bytes echoed into a decode-failure message.
-  private static final int MAX_DIAGNOSTIC_BYTES = 128;
+  /// Caps on the payload bytes echoed into a decode-failure message. Hex renders two characters per byte, so
+  /// the binary cap is a quarter of the text one to keep both messages a comparable length.
+  private static final int MAX_DIAGNOSTIC_TEXT_BYTES = 512;
+  private static final int MAX_DIAGNOSTIC_HEX_BYTES = 128;
 
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
@@ -91,14 +93,16 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   /// Renders a bounded, log-safe description of a payload for an error message.
   ///
   /// The payload may now be any of the binary encodings, so it is neither necessarily text nor necessarily
-  /// small. Only the first {@value #MAX_DIAGNOSTIC_BYTES} bytes are rendered, as UTF-8 when they look like text
-  /// (no control characters other than whitespace) and as hex otherwise, so a binary message cannot flood the
-  /// log with megabytes of mojibake. The charset is always explicit rather than the platform default.
+  /// small. A leading window is rendered as UTF-8 when it looks like text (no control characters other than
+  /// whitespace) and as hex otherwise, so a binary message cannot flood the log with megabytes of mojibake,
+  /// while a malformed text record still shows enough of itself to be identified. The charset is always
+  /// explicit rather than the platform default.
   private static String describePayload(byte[] payload, int offset, int length) {
-    int previewLength = Math.min(length, MAX_DIAGNOSTIC_BYTES);
-    StringBuilder description = new StringBuilder(64 + 2 * previewLength);
+    boolean text = looksLikeText(payload, offset, Math.min(length, MAX_DIAGNOSTIC_TEXT_BYTES));
+    int previewLength = Math.min(length, text ? MAX_DIAGNOSTIC_TEXT_BYTES : MAX_DIAGNOSTIC_HEX_BYTES);
+    StringBuilder description = new StringBuilder(32 + (text ? previewLength : 2 * previewLength));
     description.append(length).append(" bytes: ");
-    if (looksLikeText(payload, offset, previewLength)) {
+    if (text) {
       // Truncation may split a multi-byte character; UTF-8 decoding substitutes U+FFFD rather than throwing.
       description.append(new String(payload, offset, previewLength, StandardCharsets.UTF_8));
     } else {
