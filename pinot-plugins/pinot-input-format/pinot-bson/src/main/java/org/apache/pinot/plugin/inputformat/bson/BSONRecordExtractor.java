@@ -45,9 +45,10 @@ import org.bson.types.ObjectId;
 /// - `Decimal128` → `BigDecimal` (`NaN` / `Infinity` → `null`, as `BigDecimal` cannot represent them; negative
 ///   zero → `BigDecimal.ZERO`)
 /// - `Timestamp` (the internal replication type, e.g. the oplog / change-stream `ts` and `clusterTime` fields)
-///   → `java.sql.Timestamp` at second granularity, matching MongoDB's own `$toDate`. The ordinal counter that
-///   disambiguates operations within the same second is not representable in a `Timestamp` and is dropped, so
-///   this value orders operations only to the second.
+///   → `java.sql.Timestamp` at second granularity, matching MongoDB's own `$toDate`. The seconds field is
+///   unsigned, so it is read as such and remains correct past 2038. The ordinal counter that disambiguates
+///   operations within the same second is not representable in a `Timestamp` and is dropped, so this value
+///   orders operations only to the second.
 /// - `Binary` → `byte[]`. This includes the UUID subtypes (`0x03` legacy, `0x04` standard): the standard codec
 ///   is constructed with `UuidRepresentation.UNSPECIFIED`, so it hands back the raw 16 bytes rather than a
 ///   `java.util.UUID`.
@@ -95,8 +96,10 @@ public class BSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
       return new Timestamp(((Date) value).getTime());
     }
     if (value instanceof BsonTimestamp) {
-      // getTime() is the seconds component; the ordinal counter in the low 32 bits is dropped.
-      return new Timestamp(((BsonTimestamp) value).getTime() * 1000L);
+      // getTime() is the seconds component; the ordinal counter in the low 32 bits is dropped. BSON stores
+      // those seconds unsigned but getTime() returns a signed int, so mask before widening -- otherwise every
+      // timestamp from 2038-01-19 onward wraps to a pre-1970 date.
+      return new Timestamp((((BsonTimestamp) value).getTime() & 0xFFFFFFFFL) * 1000L);
     }
     // NOTE: Decimal128 extends Number, so this must stay above the Number pass-through below.
     if (value instanceof Decimal128) {

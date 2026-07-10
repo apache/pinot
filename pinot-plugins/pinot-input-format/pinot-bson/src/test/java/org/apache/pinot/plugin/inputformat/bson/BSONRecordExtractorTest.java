@@ -142,6 +142,19 @@ public class BSONRecordExtractorTest {
   }
 
   @Test
+  public void testBsonTimestampAfter2038IsNotSignWrapped() {
+    // BSON stores the seconds component as an UNSIGNED 32-bit field, but BsonTimestamp#getTime() returns it as
+    // a signed int. From 2038-01-19T03:14:08Z onward the high bit is set, so a naive read wraps to a pre-1970
+    // date. 2039-01-01T00:00:00Z = 2_177_452_800 seconds, which does not fit a positive signed int.
+    long seconds = 2_177_452_800L;
+    BsonTimestamp afterY2038 = new BsonTimestamp((int) seconds, 1);
+    assertTrue(afterY2038.getTime() < 0, "precondition: the driver reports these seconds as a negative int");
+
+    Object result = extract(afterY2038);
+    assertEquals(result, new Timestamp(seconds * 1000L));
+  }
+
+  @Test
   public void testUuidBinarySubtypesConvertedToRawBytes() {
     // Subtypes 0x03 (legacy) and 0x04 (standard) are how MongoDB stores UUIDs. The standard DocumentCodec is
     // built with UuidRepresentation.UNSPECIFIED, so it decodes them to Binary -- not java.util.UUID -- and they
