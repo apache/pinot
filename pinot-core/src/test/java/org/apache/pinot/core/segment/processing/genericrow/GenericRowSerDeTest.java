@@ -55,6 +55,8 @@ public class GenericRowSerDeTest {
         new DimensionFieldSpec("floatMV", DataType.FLOAT, false),
         new DimensionFieldSpec("doubleMV", DataType.DOUBLE, false),
         new DimensionFieldSpec("stringMV", DataType.STRING, false),
+        new DimensionFieldSpec("bytesMV", DataType.BYTES, false),
+        new DimensionFieldSpec("bigDecimalMV", DataType.BIG_DECIMAL, false),
         new DimensionFieldSpec("nullMV", DataType.LONG, false));
 
     _row = new GenericRow();
@@ -78,6 +80,8 @@ public class GenericRowSerDeTest {
     _row.putValue("floatMV", new Object[]{123.0f, 456.0f});
     _row.putValue("doubleMV", new Object[]{123.0, 456.0});
     _row.putValue("stringMV", new Object[]{"123", "456"});
+    _row.putValue("bytesMV", new Object[]{new byte[]{1, 2, 3}, new byte[]{4, 5}});
+    _row.putValue("bigDecimalMV", new Object[]{new BigDecimal("122333"), new BigDecimal("-4.5")});
     _row.putDefaultNullValue("nullMV", new Object[]{Long.MIN_VALUE});
   }
 
@@ -144,6 +148,46 @@ public class GenericRowSerDeTest {
     for (int i = 0; i < numFields; i++) {
       assertEquals(deserializer.compare(0L, numBytes, i), 0);
     }
+  }
+
+  @Test
+  public void testMvBytesAndBigDecimalCompare() {
+    // Exercises the non-zero branch of the MV BYTES / BIG_DECIMAL compare paths (differing element and differing
+    // cardinality), which the byte-identical rows in testCompare never reach.
+    List<FieldSpec> fieldSpecs = Arrays.asList(new DimensionFieldSpec("bytesMV", DataType.BYTES, false),
+        new DimensionFieldSpec("bigDecimalMV", DataType.BIG_DECIMAL, false));
+
+    GenericRow low = new GenericRow();
+    low.putValue("bytesMV", new Object[]{new byte[]{1, 2}, new byte[]{3}});
+    low.putValue("bigDecimalMV", new Object[]{new BigDecimal("1.5"), new BigDecimal("2.5")});
+
+    // Differs from `low` only in the last element of each MV column, with a larger value.
+    GenericRow high = new GenericRow();
+    high.putValue("bytesMV", new Object[]{new byte[]{1, 2}, new byte[]{4}});
+    high.putValue("bigDecimalMV", new Object[]{new BigDecimal("1.5"), new BigDecimal("9.9")});
+
+    // Same last element but fewer values, to exercise the differing-cardinality early return.
+    GenericRow shorter = new GenericRow();
+    shorter.putValue("bytesMV", new Object[]{new byte[]{1, 2}});
+    shorter.putValue("bigDecimalMV", new Object[]{new BigDecimal("1.5")});
+
+    for (int field = 0; field < fieldSpecs.size(); field++) {
+      assertTrue(compareRows(fieldSpecs, low, high, field + 1) < 0);
+      assertTrue(compareRows(fieldSpecs, high, low, field + 1) > 0);
+      assertTrue(compareRows(fieldSpecs, shorter, low, field + 1) < 0);
+      assertTrue(compareRows(fieldSpecs, low, shorter, field + 1) > 0);
+    }
+  }
+
+  private static int compareRows(List<FieldSpec> fieldSpecs, GenericRow row1, GenericRow row2, int numFieldsToCompare) {
+    GenericRowSerializer serializer = new GenericRowSerializer(fieldSpecs, false);
+    byte[] bytes1 = serializer.serialize(row1);
+    byte[] bytes2 = serializer.serialize(row2);
+    long numBytes = Math.max(bytes1.length, bytes2.length);
+    PinotDataBuffer dataBuffer = PinotDataBuffer.allocateDirect(numBytes * 2, PinotDataBuffer.NATIVE_ORDER, null);
+    dataBuffer.readFrom(0L, bytes1);
+    dataBuffer.readFrom(numBytes, bytes2);
+    return new GenericRowDeserializer(dataBuffer, fieldSpecs, false).compare(0L, numBytes, numFieldsToCompare);
   }
 
   @Test

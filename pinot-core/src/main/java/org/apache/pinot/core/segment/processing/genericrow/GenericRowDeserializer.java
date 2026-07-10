@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -162,6 +163,26 @@ public class GenericRowDeserializer {
               _dataBuffer.copyTo(offset, stringBytes);
               offset += numBytes;
               multiValue[j] = new String(stringBytes, UTF_8);
+            }
+            break;
+          case BYTES:
+            for (int j = 0; j < numValues; j++) {
+              int numBytes = _dataBuffer.getInt(offset);
+              offset += Integer.BYTES;
+              byte[] bytes = new byte[numBytes];
+              _dataBuffer.copyTo(offset, bytes);
+              offset += numBytes;
+              multiValue[j] = bytes;
+            }
+            break;
+          case BIG_DECIMAL:
+            for (int j = 0; j < numValues; j++) {
+              int numBytes = _dataBuffer.getInt(offset);
+              offset += Integer.BYTES;
+              byte[] bigDecimalBytes = new byte[numBytes];
+              _dataBuffer.copyTo(offset, bigDecimalBytes);
+              offset += numBytes;
+              multiValue[j] = BigDecimalUtils.deserialize(bigDecimalBytes);
             }
             break;
           default:
@@ -359,6 +380,44 @@ public class GenericRowDeserializer {
               byte[] stringBytes2 = new byte[numBytes2];
               _dataBuffer.copyTo(offset2, stringBytes2);
               int result = new String(stringBytes1, UTF_8).compareTo(new String(stringBytes2, UTF_8));
+              if (result != 0) {
+                return result;
+              }
+              offset1 += numBytes1;
+              offset2 += numBytes2;
+            }
+            break;
+          case BYTES:
+            for (int j = 0; j < numValues; j++) {
+              int numBytes1 = _dataBuffer.getInt(offset1);
+              offset1 += Integer.BYTES;
+              byte[] bytes1 = new byte[numBytes1];
+              _dataBuffer.copyTo(offset1, bytes1);
+              int numBytes2 = _dataBuffer.getInt(offset2);
+              offset2 += Integer.BYTES;
+              byte[] bytes2 = new byte[numBytes2];
+              _dataBuffer.copyTo(offset2, bytes2);
+              int result = ByteArray.compare(bytes1, bytes2);
+              if (result != 0) {
+                return result;
+              }
+              offset1 += numBytes1;
+              offset2 += numBytes2;
+            }
+            break;
+          case BIG_DECIMAL:
+            for (int j = 0; j < numValues; j++) {
+              int numBytes1 = _dataBuffer.getInt(offset1);
+              offset1 += Integer.BYTES;
+              byte[] bigDecimalBytes1 = new byte[numBytes1];
+              _dataBuffer.copyTo(offset1, bigDecimalBytes1);
+              int numBytes2 = _dataBuffer.getInt(offset2);
+              offset2 += Integer.BYTES;
+              byte[] bigDecimalBytes2 = new byte[numBytes2];
+              _dataBuffer.copyTo(offset2, bigDecimalBytes2);
+              BigDecimal bigDecimal1 = BigDecimalUtils.deserialize(bigDecimalBytes1);
+              BigDecimal bigDecimal2 = BigDecimalUtils.deserialize(bigDecimalBytes2);
+              int result = bigDecimal1.compareTo(bigDecimal2);
               if (result != 0) {
                 return result;
               }
