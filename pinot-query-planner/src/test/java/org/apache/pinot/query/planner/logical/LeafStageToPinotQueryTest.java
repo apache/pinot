@@ -243,29 +243,35 @@ public class LeafStageToPinotQueryTest {
     // Shape of a reported failure: a scalar function canonicalizes to a lowercase operator
     // ("arraycontainsstring") and sits directly under AND, so pruners threw
     // "No enum constant org.apache.pinot.sql.FilterKind.arraycontainsstring".
-    // Assert the invariant pruners actually rely on: every operator they traverse resolves via
-    // FilterKind.valueOf. This covers the whole normalized tree rather than a single wrapped node.
+    // Assert the two invariants pruners actually rely on, over the whole normalized tree rather than a single
+    // wrapped node: every visited node is a FUNCTION (pruners dereference getFunctionCall() unconditionally),
+    // and every operator resolves via FilterKind.valueOf.
+    // The AND mixes all the shapes that arrive non-FUNCTION or non-FilterKind: a boolean scalar function, a
+    // bare boolean identifier, and a constant-folded FALSE literal.
     Expression notEquals = makeCompound("NOT_EQUALS",
         RequestUtils.getIdentifierExpression("label"), RequestUtils.getLiteralExpression("Low"));
     Expression scalarFn = makeCompound("arraycontainsstring",
         RequestUtils.getIdentifierExpression("groups"), RequestUtils.getLiteralExpression("y"));
-    Expression andExpr = makeCompound("AND", notEquals, scalarFn, makeEquals("status", "open"));
+    Expression andExpr = makeCompound("AND", notEquals, scalarFn, makeEquals("status", "open"),
+        RequestUtils.getIdentifierExpression("isActive"), RequestUtils.getLiteralExpression(false));
 
     Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(andExpr);
 
     assertNotNull(result);
+    assertEquals(result.getFunctionCall().getOperator(), "AND");
+    assertEquals(result.getFunctionCall().getOperands().size(), 5, "No operand should be dropped");
     assertPrunerTraversableOperatorsAreFilterKinds(result);
   }
 
   /**
-   * Mirrors how segment pruners walk a filter: they call {@code FilterKind.valueOf(operator)} on each node they
-   * visit (which must not throw) and only recurse into the operands of AND/OR/NOT.
+   * Mirrors how segment pruners walk a filter: on each node they visit they dereference the function call and
+   * resolve its operator via {@code FilterKind.valueOf}, then recurse only into the operands of AND/OR/NOT.
+   * A non-FUNCTION node would NPE the pruners and an unknown operator would throw, so both are asserted here.
    */
   private static void assertPrunerTraversableOperatorsAreFilterKinds(Expression expression) {
+    // Pruners dereference getFunctionCall() unconditionally, so a non-FUNCTION node here would NPE them.
     Function function = expression.getFunctionCall();
-    if (function == null) {
-      return;
-    }
+    assertNotNull(function, "Pruner-visited node must be a FUNCTION expression, got: " + expression);
     // Must not throw — this is exactly what segment pruners call on every node they visit.
     FilterKind filterKind = FilterKind.valueOf(function.getOperator());
     if (filterKind == FilterKind.AND || filterKind == FilterKind.OR || filterKind == FilterKind.NOT) {
