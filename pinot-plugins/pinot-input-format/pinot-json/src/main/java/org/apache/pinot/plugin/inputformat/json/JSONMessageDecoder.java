@@ -20,34 +20,50 @@ package org.apache.pinot.plugin.inputformat.json;
 
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.plugin.inputformat.json.format.JsonPayloadFormat;
+import org.apache.pinot.plugin.inputformat.json.format.JsonPayloadParser;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
  * An implementation of StreamMessageDecoder to read JSON records from a stream.
+ *
+ * <p>Set the {@value #JSON_FORMAT_CONFIG_KEY} decoder property to pin the payload encoding to one of
+ * {@code TEXT}, {@code POSTGRES_JSONB}, {@code SQLITE_JSONB}, {@code SMILE} or {@code CBOR}.
+ *
+ * <p>When unset (equivalently {@code AUTO}) the encoding is detected per message from its leading magic /
+ * version bytes, falling back to text JSON. Detection is allocation-free and cannot mis-route a well-formed
+ * text JSON document: a top-level {@code {} / {@code [} (optionally after whitespace) collides with none of the
+ * binary signatures. Pin {@code TEXT} to skip detection entirely. See {@link JsonPayloadFormat}.
  */
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
+  public static final String JSON_FORMAT_CONFIG_KEY = "jsonFormat";
+
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
+  // For AUTO this resolves the concrete format per message; otherwise it is the pinned format's parser.
+  private JsonPayloadParser _parser;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
     String recordExtractorClass = null;
+    String jsonFormat = null;
     if (props != null) {
       recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
+      jsonFormat = props.get(JSON_FORMAT_CONFIG_KEY);
     }
     if (recordExtractorClass == null) {
       recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
     }
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _jsonRecordExtractor.init(fieldsToRead, null);
+    _parser = JsonPayloadFormat.fromConfig(jsonFormat).getParser();
   }
 
   @Override
@@ -58,8 +74,8 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
-      // Parse directly to Map, avoiding intermediate JsonNode representation for better performance
-      Map<String, Object> jsonMap = JsonUtils.bytesToMap(payload, offset, length);
+      // Parse directly to Map, avoiding an intermediate JsonNode representation for better performance.
+      Map<String, Object> jsonMap = _parser.parse(payload, offset, length);
       return _jsonRecordExtractor.extract(jsonMap, destination);
     } catch (Exception e) {
       throw new RuntimeException(
