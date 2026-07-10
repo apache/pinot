@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
 
@@ -148,6 +149,30 @@ public class VectorIndexConfig extends IndexConfig {
    */
   public VectorBackendType resolveBackendType() {
     return VectorIndexConfigValidator.resolveBackendType(this);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    VectorIndexConfig that = (VectorIndexConfig) o;
+    return _vectorDimension == that._vectorDimension && _version == that._version
+        && Objects.equals(_vectorIndexType, that._vectorIndexType)
+        && _vectorDistanceFunction == that._vectorDistanceFunction
+        && Objects.equals(_properties, that._properties);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _vectorIndexType, _vectorDimension, _version,
+        _vectorDistanceFunction, _properties);
   }
 
   public String toString() {
