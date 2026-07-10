@@ -210,7 +210,6 @@ public final class TableConfigUtils {
 
     if (!skipTypes.contains(ValidationType.UPSERT)) {
       validateUpsertAndDedupConfig(tableConfig, schema);
-      validatePartialUpsertStrategies(tableConfig, schema);
     }
 
     validateTaskConfig(tableConfig);
@@ -903,43 +902,25 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the upsert-related configurations
-   *  - check table type supports the configured mode
-   *  - the primary key exists on the schema
-   *  - strict replica-group is configured for routing type
-   *  - consumer type must be low-level
-   *  - comparison column exists
-   */
+  /// Validates the upsert- and dedup-related configuration. Returns early when neither is enabled; otherwise checks
+  /// the shared requirements (upsert and dedup are mutually exclusive, primary keys exist and are single-valued,
+  /// strict replica-group routing, no COMPLETED instance partitions, valid tenant tag override for REALTIME, OFFLINE
+  /// restrictions) and then, per the enabled mode:
+  /// - Upsert: no multi-tier / star-tree, comparison / delete-record / out-of-order columns are valid, deleted-keys
+  ///   compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and delegates to
+  ///   [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
+  /// - Dedup: delegates to [#validateTTLForDedupConfig]; rejects MD5 when disabled.
   @VisibleForTesting
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
-    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE && (tableConfig.getDedupConfig() == null
-        || !tableConfig.getDedupConfig().isDedupEnabled())) {
+    boolean upsertEnabled = tableConfig.isUpsertEnabled();
+    boolean dedupEnabled = tableConfig.isDedupEnabled();
+    if (!upsertEnabled && !dedupEnabled) {
       return;
     }
 
-    boolean isUpsertEnabled = tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE;
-    DedupConfig dedupConfig = tableConfig.getDedupConfig();
-    boolean isDedupEnabled = dedupConfig != null && dedupConfig.isDedupEnabled();
-
     // check both upsert and dedup are not enabled simultaneously
-    Preconditions.checkState(!(isUpsertEnabled && isDedupEnabled),
+    Preconditions.checkState(!(upsertEnabled && dedupEnabled),
         "A table can have either Upsert or Dedup enabled, but not both");
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      Preconditions.checkState(isUpsertEnabled && !isDedupEnabled,
-          "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
-      Preconditions.checkState(tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL,
-          "Partial upsert is not supported for OFFLINE table");
-      // Offline upsert tables require segment partition config so that segments are assigned to servers
-      // based on partition, ensuring all segments of a partition land on the same server for correct dedup.
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      SegmentPartitionConfig segmentPartitionConfig =
-          indexingConfig != null ? indexingConfig.getSegmentPartitionConfig() : null;
-      Preconditions.checkState(
-          segmentPartitionConfig != null && MapUtils.isNotEmpty(segmentPartitionConfig.getColumnPartitionMap()),
-          "Offline upsert table must have segment partition config to ensure correct partition-based "
-              + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
-    }
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
@@ -955,26 +936,39 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
+
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
               tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
                   && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
           "Invalid tenant tag override used for Upsert/Dedup table");
+      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+      Preconditions.checkState(instanceAssignmentConfigMap == null || !instanceAssignmentConfigMap.containsKey(
+              InstancePartitionsType.COMPLETED.name()),
+          "COMPLETED instance partitions can't be configured for upsert / dedup tables");
+    } else {
+      Preconditions.checkState(!dedupEnabled,
+          "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
+      assert upsertConfig != null;
+      Preconditions.checkState(upsertConfig.getMode() != UpsertConfig.Mode.PARTIAL,
+          "Partial upsert is not supported for OFFLINE table");
+      // Offline upsert tables require segment partition config so that segments are assigned to servers
+      // based on partition, ensuring all segments of a partition land on the same server for correct dedup.
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      SegmentPartitionConfig segmentPartitionConfig =
+          indexingConfig != null ? indexingConfig.getSegmentPartitionConfig() : null;
+      Preconditions.checkState(
+          segmentPartitionConfig != null && MapUtils.isNotEmpty(segmentPartitionConfig.getColumnPartitionMap()),
+          "Offline upsert table must have segment partition config to ensure correct partition-based "
+              + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
     }
 
-    // specifically for upsert
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    if (PinotMd5Mode.isPinotMd5Disabled()) {
-      if (isUpsertEnabled && upsertConfig != null && upsertConfig.getHashFunction() == HashFunction.MD5) {
-        throw new IllegalStateException(String.format(
-            "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
-      }
-      if (isDedupEnabled && dedupConfig.getHashFunction() == HashFunction.MD5) {
-        throw new IllegalStateException(String.format(
-            "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
-      }
-    }
-    if (upsertConfig != null) {
+    if (upsertEnabled) {
+      // specifically for upsert
+      assert upsertConfig != null;
+
       // Currently, only one tier is allowed for upsert table, as the committed segments can't be moved to other tiers.
       Preconditions.checkState(tableConfig.getTierConfigsList() == null, "The upsert table cannot have multi-tiers");
       // no startree index
@@ -1006,7 +1000,7 @@ public final class TableConfigUtils {
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
       if (outOfOrderRecordColumn != null) {
-        Preconditions.checkState(!Boolean.TRUE.equals(upsertConfig.isDropOutOfOrderRecord()),
+        Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
             "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
         FieldSpec fieldSpec = schema.getFieldSpecFor(outOfOrderRecordColumn);
         Preconditions.checkState(
@@ -1113,17 +1107,21 @@ public final class TableConfigUtils {
                 + "Out-of-order record marking is only supported in NONE consistency mode.",
             upsertConfig.getConsistencyMode());
       }
-    }
 
-    if (tableConfig.getTableType() == TableType.REALTIME) {
+      validateTTLForUpsertConfig(tableConfig, schema);
+      validatePartialUpsertStrategies(tableConfig, schema);
       Preconditions.checkState(
-          tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
-              .containsKey(InstancePartitionsType.COMPLETED.name()),
-          "COMPLETED instance partitions can't be configured for upsert / dedup tables");
+          !(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
+          "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
+    } else {
+      // specifically for dedup
+      assert dedupConfig != null;
+
+      validateTTLForDedupConfig(tableConfig, schema);
+      Preconditions.checkState(
+          !(PinotMd5Mode.isPinotMd5Disabled() && dedupConfig.getHashFunction() == HashFunction.MD5),
+          "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
     }
-    validateAggregateMetricsForUpsertConfig(tableConfig);
-    validateTTLForUpsertConfig(tableConfig, schema);
-    validateTTLForDedupConfig(tableConfig, schema);
   }
 
   /**
@@ -1144,7 +1142,8 @@ public final class TableConfigUtils {
   @VisibleForTesting
   static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    if (upsertConfig == null || (upsertConfig.getMetadataTTL() == 0 && upsertConfig.getDeletedKeysTTL() == 0)) {
+    assert upsertConfig != null;
+    if (upsertConfig.getMetadataTTL() <= 0 && upsertConfig.getDeletedKeysTTL() <= 0) {
       return;
     }
 
@@ -1185,7 +1184,8 @@ public final class TableConfigUtils {
   @VisibleForTesting
   static void validateTTLForDedupConfig(TableConfig tableConfig, Schema schema) {
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
-    if (dedupConfig == null || (dedupConfig.getMetadataTTL() <= 0)) {
+    assert dedupConfig != null;
+    if (dedupConfig.getMetadataTTL() <= 0) {
       return;
     }
 
@@ -1317,23 +1317,6 @@ public final class TableConfigUtils {
   }
 
   /**
-   * Validates metrics aggregation when upsert config is enabled
-   * - Metrics aggregation cannot be enabled when Upsert Config is enabled.
-   * - Aggregation cannot be enabled in the Ingestion Config and Indexing Config at the same time.
-   */
-  private static void validateAggregateMetricsForUpsertConfig(TableConfig config) {
-    boolean isAggregateMetricsEnabledInIndexingConfig = config.getIndexingConfig().isAggregateMetrics();
-    boolean hasAggregationConfigs = config.getIngestionConfig() != null && CollectionUtils.isNotEmpty(
-        config.getIngestionConfig().getAggregationConfigs());
-    boolean bothAggregationConfigsEnabled = isAggregateMetricsEnabledInIndexingConfig && hasAggregationConfigs;
-    boolean anyOneAggregationConfigsEnabled = isAggregateMetricsEnabledInIndexingConfig || hasAggregationConfigs;
-    Preconditions.checkState(!bothAggregationConfigsEnabled,
-        "Metrics aggregation cannot be enabled in the Indexing Config and Ingestion Config at the same time");
-    Preconditions.checkState(!anyOneAggregationConfigsEnabled,
-        "Metrics aggregation and upsert cannot be enabled together");
-  }
-
-  /**
    * Validates the partial upsert-related configurations:
    *  - Null handling must be enabled
    *  - Merger cannot be applied to private key columns
@@ -1344,7 +1327,9 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validatePartialUpsertStrategies(TableConfig tableConfig, Schema schema) {
-    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    if (upsertConfig.getMode() != UpsertConfig.Mode.PARTIAL) {
       return;
     }
 
@@ -1352,8 +1337,6 @@ public final class TableConfigUtils {
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled(),
         "Null handling must be enabled for partial upsert tables");
 
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    assert upsertConfig != null;
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
     String partialUpsertMergerClass = upsertConfig.getPartialUpsertMergerClass();
 
@@ -1453,25 +1436,25 @@ public final class TableConfigUtils {
       if (!Objects.equals(existingUpsertConfig.getComparisonColumns(), newUpsertConfig.getComparisonColumns())) {
         violations.add(
             String.format("upsertConfig.comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
-              newUpsertConfig.getComparisonColumns()));
+                newUpsertConfig.getComparisonColumns()));
       }
       List<String> existingComparisonColumns = existingUpsertConfig.getComparisonColumns();
       if (existingComparisonColumns == null || existingComparisonColumns.isEmpty()) {
         String existingTimeColumn =
             existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
-              : null;
+                : null;
         String newTimeColumn =
             newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
         if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
           violations.add(
               String.format("timeColumnName (%s -> %s) - used as default comparison column", existingTimeColumn,
-                newTimeColumn));
+                  newTimeColumn));
         }
       }
       if (existingUpsertConfig.isDropOutOfOrderRecord() != newUpsertConfig.isDropOutOfOrderRecord()) {
         violations.add(
             String.format("upsertConfig.dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
-              newUpsertConfig.isDropOutOfOrderRecord()));
+                newUpsertConfig.isDropOutOfOrderRecord()));
       }
       if (!Objects.equals(existingUpsertConfig.getOutOfOrderRecordColumn(),
           newUpsertConfig.getOutOfOrderRecordColumn())) {
@@ -2167,10 +2150,8 @@ public final class TableConfigUtils {
   }
 
   public static boolean isCommitTimeCompactionEnabled(TableConfig tableConfig) {
-    if (tableConfig.getUpsertConfig() == null) {
-      return false;
-    }
-    return tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    return upsertConfig != null && upsertConfig.isEnableCommitTimeCompaction();
   }
 
   /**
@@ -2377,10 +2358,10 @@ public final class TableConfigUtils {
   }
 
   private static boolean hasConsumingSegmentTierOverwriteForRealtimeTable(TableConfig tableConfig) {
-    if (tableConfig.getTableType() != TableType.REALTIME
-        || (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())
-            && tableConfig.getTierConfigsList().stream()
-                .anyMatch(tierConfig -> CONSUMING_SEGMENT_TIER.equals(tierConfig.getName())))) {
+    if (tableConfig.getTableType() != TableType.REALTIME || (
+        CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList()) && tableConfig.getTierConfigsList()
+            .stream()
+            .anyMatch(tierConfig -> CONSUMING_SEGMENT_TIER.equals(tierConfig.getName())))) {
       return false;
     }
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
