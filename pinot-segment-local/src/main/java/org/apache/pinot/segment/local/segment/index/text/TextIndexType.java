@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.text;
 
 import com.google.common.base.Preconditions;
@@ -40,6 +39,7 @@ import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
@@ -86,6 +86,20 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     if (textIndexConfig.isEnabled()) {
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
           "Cannot create TEXT index on column: %s of stored type other than STRING", fieldSpec.getName());
+      for (IndexType<?, ?, ?> indexType : List.of(
+          StandardIndexes.bloomFilter(),
+          StandardIndexes.dictionary(),
+          StandardIndexes.inverted(),
+          StandardIndexes.vector(),
+          StandardIndexes.range(),
+          StandardIndexes.json(),
+          StandardIndexes.fst(),
+          StandardIndexes.h3(),
+          StandardIndexes.ifst())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both text index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 

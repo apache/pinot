@@ -105,6 +105,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(getTableName())
         .setIngestionConfig(ingestionConfig)
+        .setNoDictionaryColumns(List.of(MY_MAP_STR_FIELD_NAME))
         .setJsonIndexColumns(List.of(MY_MAP_STR_FIELD_NAME))
         .build();
   }

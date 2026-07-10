@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.h3;
 
 import com.google.common.base.Preconditions;
@@ -84,6 +83,20 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
           column);
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == DataType.BYTES,
           "Cannot create H3 index on column: %s of stored type other than BYTES", column);
+      for (IndexType<?, ?, ?> indexType : List.of(
+          StandardIndexes.bloomFilter(),
+          StandardIndexes.dictionary(),
+          StandardIndexes.inverted(),
+          StandardIndexes.vector(),
+          StandardIndexes.range(),
+          StandardIndexes.json(),
+          StandardIndexes.text(),
+          StandardIndexes.fst(),
+          StandardIndexes.ifst())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both h3 index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 

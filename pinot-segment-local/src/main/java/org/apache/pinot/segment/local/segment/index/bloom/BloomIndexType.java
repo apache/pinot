@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.bloom;
 
 import com.google.common.base.Preconditions;
@@ -76,6 +75,17 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
           fieldSpec.getName());
       Preconditions.checkState(dataType != DataType.MAP, "Cannot create bloom filter on MAP column: %s",
           fieldSpec.getName());
+      for (IndexType<?, ?, ?> indexType : List.of(
+          StandardIndexes.vector(),
+          StandardIndexes.json(),
+          StandardIndexes.text(),
+          StandardIndexes.fst(),
+          StandardIndexes.h3(),
+          StandardIndexes.ifst())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both bloom filter and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 

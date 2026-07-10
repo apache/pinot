@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.json;
 
 import com.google.common.base.Preconditions;
@@ -84,6 +83,20 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
       DataType storedType = fieldSpec.getDataType().getStoredType();
       Preconditions.checkState(storedType == DataType.STRING || storedType == DataType.MAP,
           "Cannot create JSON index on column: %s of stored type other than STRING or MAP", column);
+      for (IndexType<?, ?, ?> indexType : List.of(
+          StandardIndexes.bloomFilter(),
+          StandardIndexes.dictionary(),
+          StandardIndexes.inverted(),
+          StandardIndexes.vector(),
+          StandardIndexes.range(),
+          StandardIndexes.text(),
+          StandardIndexes.fst(),
+          StandardIndexes.h3(),
+          StandardIndexes.ifst())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both json index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 

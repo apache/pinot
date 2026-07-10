@@ -121,9 +121,11 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode intIndexesJson = objectMapper.valueToTree(intIndexes);
 
     FieldConfig stringMapFieldConfig =
-        new FieldConfig.Builder(STRING_MAP_FIELD_NAME).withIndexes(stringIndexesJson).build();
+        new FieldConfig.Builder(STRING_MAP_FIELD_NAME).withIndexes(stringIndexesJson).withEncodingType(
+            FieldConfig.EncodingType.RAW).build();
 
-    FieldConfig intMapFieldConfig = new FieldConfig.Builder(INT_MAP_FIELD_NAME).withIndexes(intIndexesJson).build();
+    FieldConfig intMapFieldConfig = new FieldConfig.Builder(INT_MAP_FIELD_NAME).withEncodingType(
+        FieldConfig.EncodingType.RAW).withIndexes(intIndexesJson).build();
     return Arrays.asList(stringMapFieldConfig, intMapFieldConfig);
   }
 
