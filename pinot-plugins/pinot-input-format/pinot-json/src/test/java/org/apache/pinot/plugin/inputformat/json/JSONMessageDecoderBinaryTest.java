@@ -23,6 +23,7 @@ import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -30,6 +31,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 /// End-to-end coverage of {@link JSONMessageDecoder} decoding each configured / auto-detected payload format
@@ -186,5 +188,37 @@ public class JSONMessageDecoderBinaryTest {
     JSONMessageDecoder decoder = new JSONMessageDecoder();
     assertThrows(IllegalArgumentException.class,
         () -> decoder.init(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "bson"), SINGLE_FIELD, "topic"));
+  }
+
+  @Test
+  public void testDecodeFailureMessageIsBoundedAndCharsetSafe()
+      throws Exception {
+    // A malformed *text* payload keeps its readable rendering ...
+    String message = decodeFailureMessage(Map.of(), "{\"name\":".getBytes(StandardCharsets.UTF_8));
+    assertTrue(message.contains("8 bytes: {\"name\":"), message);
+
+    // ... while a malformed *binary* payload is hex-encoded rather than dumped as mojibake.
+    byte[] badSmile = bytes(0x3A, 0x29, 0x0A, 0x04, 0xFF, 0xFF, 0xFF);
+    message = decodeFailureMessage(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "SMILE"), badSmile);
+    assertTrue(message.contains("7 bytes: 0x3a290a04ffffff"), message);
+
+    // ... and an oversized payload is truncated instead of echoed in full.
+    byte[] huge = new byte[8192];
+    Arrays.fill(huge, (byte) 'x');
+    message = decodeFailureMessage(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "TEXT"), huge);
+    assertTrue(message.contains("8192 bytes: "), message);
+    assertTrue(message.contains("...(truncated)"), message);
+    assertTrue(message.length() < 512, "diagnostic should stay bounded, was " + message.length());
+  }
+
+  /// Decodes an intentionally malformed payload and returns the resulting exception message.
+  private String decodeFailureMessage(Map<String, String> props, byte[] payload)
+      throws Exception {
+    try {
+      decode(props, SINGLE_FIELD, payload);
+      throw new AssertionError("expected decode to fail");
+    } catch (RuntimeException e) {
+      return e.getMessage();
+    }
   }
 }

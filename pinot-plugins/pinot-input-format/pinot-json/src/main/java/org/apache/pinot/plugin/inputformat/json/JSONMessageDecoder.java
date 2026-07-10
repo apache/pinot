@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.plugin.inputformat.json.format.JsonPayloadFormat;
@@ -42,6 +43,9 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
  */
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String JSON_FORMAT_CONFIG_KEY = "jsonFormat";
+
+  /// Cap on the payload bytes echoed into a decode-failure message.
+  private static final int MAX_DIAGNOSTIC_BYTES = 128;
 
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
@@ -80,7 +84,45 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
       return _jsonRecordExtractor.extract(jsonMap, destination);
     } catch (Exception e) {
       throw new RuntimeException(
-          "Caught exception while decoding JSON record with payload: " + new String(payload, offset, length), e);
+          "Caught exception while decoding JSON record with payload: " + describePayload(payload, offset, length), e);
     }
+  }
+
+  /// Renders a bounded, log-safe description of a payload for an error message.
+  ///
+  /// The payload may now be any of the binary encodings, so it is neither necessarily text nor necessarily
+  /// small. Only the first {@value #MAX_DIAGNOSTIC_BYTES} bytes are rendered, as UTF-8 when they look like text
+  /// (no control characters other than whitespace) and as hex otherwise, so a binary message cannot flood the
+  /// log with megabytes of mojibake. The charset is always explicit rather than the platform default.
+  private static String describePayload(byte[] payload, int offset, int length) {
+    int previewLength = Math.min(length, MAX_DIAGNOSTIC_BYTES);
+    StringBuilder description = new StringBuilder(64 + 2 * previewLength);
+    description.append(length).append(" bytes: ");
+    if (looksLikeText(payload, offset, previewLength)) {
+      // Truncation may split a multi-byte character; UTF-8 decoding substitutes U+FFFD rather than throwing.
+      description.append(new String(payload, offset, previewLength, StandardCharsets.UTF_8));
+    } else {
+      description.append("0x");
+      for (int i = 0; i < previewLength; i++) {
+        description.append(Character.forDigit((payload[offset + i] >> 4) & 0xF, 16))
+            .append(Character.forDigit(payload[offset + i] & 0xF, 16));
+      }
+    }
+    if (previewLength < length) {
+      description.append("...(truncated)");
+    }
+    return description.toString();
+  }
+
+  /// Whether the region contains no control characters other than JSON's insignificant whitespace. Bytes at or
+  /// above 0x80 are accepted so non-ASCII UTF-8 text still renders as text.
+  private static boolean looksLikeText(byte[] payload, int offset, int length) {
+    for (int i = offset, end = offset + length; i < end; i++) {
+      byte b = payload[i];
+      if (b >= 0 && b < 0x20 && b != '\t' && b != '\n' && b != '\r') {
+        return false;
+      }
+    }
+    return true;
   }
 }
