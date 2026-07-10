@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -773,6 +774,101 @@ public class FieldSpecTest {
     DimensionFieldSpec newSpec = new DimensionFieldSpec("col1", STRING, true);
     newSpec.setFieldId(42);
     newSpec.setAliases(Arrays.asList("uid"));
+
+    assertThat(newSpec.isBackwardCompatibleWith(oldSpec)).isTrue();
+  }
+
+  @Test
+  public void testMetadataSerdeRoundtrip()
+      throws Exception {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("addr", JSON, true);
+    fieldSpec.setMetadata(Map.of("2", "person"));
+
+    String json = fieldSpec.toJsonObject().toString();
+    assertThat(json).contains("\"metadata\":{\"2\":\"person\"}");
+
+    DimensionFieldSpec deserialized = JsonUtils.stringToObject(json, DimensionFieldSpec.class);
+    assertThat(deserialized.getMetadata()).isEqualTo(Map.of("2", "person"));
+
+    String jacksonJson = JsonUtils.objectToString(fieldSpec);
+    DimensionFieldSpec fromJackson = JsonUtils.stringToObject(jacksonJson, DimensionFieldSpec.class);
+    assertThat(fromJackson.getMetadata()).isEqualTo(Map.of("2", "person"));
+  }
+
+  @Test
+  public void testMetadataOmittedWhenNotSet()
+      throws Exception {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("col1", INT, true);
+
+    String json = fieldSpec.toJsonObject().toString();
+    assertThat(json).as("metadata should be absent when null").doesNotContain("metadata");
+
+    String jacksonJson = JsonUtils.objectToString(fieldSpec);
+    assertThat(jacksonJson).as("metadata should be absent when null").doesNotContain("metadata");
+  }
+
+  @Test
+  public void testEmptyMetadataOmittedFromJson()
+      throws Exception {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("col1", INT, true);
+    fieldSpec.setMetadata(Map.of());
+    assertThat(fieldSpec.getMetadata()).as("empty metadata normalizes to null").isNull();
+
+    String json = fieldSpec.toJsonObject().toString();
+    assertThat(json).as("empty metadata should be absent").doesNotContain("metadata");
+    assertThat(JsonUtils.stringToObject(json, DimensionFieldSpec.class)).isEqualTo(fieldSpec);
+
+    String jacksonJson = JsonUtils.objectToString(fieldSpec);
+    assertThat(jacksonJson).as("empty metadata absent (Jackson)").doesNotContain("metadata");
+    assertThat(JsonUtils.stringToObject(jacksonJson, DimensionFieldSpec.class)).isEqualTo(fieldSpec);
+  }
+
+  @Test
+  public void testTimeFieldSpecRoundTripsMetadataThroughSchema()
+      throws Exception {
+    // TimeFieldSpec.toJsonObject() builds its JSON via the shared appendFieldIdAndAliases helper;
+    // ensure metadata round-trips through schema (de)serialization for legacy TIME columns too.
+    TimeFieldSpec timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(LONG, TimeUnit.DAYS, "ts"));
+    timeFieldSpec.setMetadata(Map.of("7", "event_ts"));
+
+    Schema schema = new Schema();
+    schema.setSchemaName("ts_schema");
+    schema.addField(timeFieldSpec);
+
+    String json = schema.toSingleLineJsonString();
+    assertThat(json).contains("\"metadata\":{\"7\":\"event_ts\"}");
+
+    FieldSpec deserialized = Schema.fromString(json).getFieldSpecFor("ts");
+    assertThat(deserialized.getMetadata()).isEqualTo(Map.of("7", "event_ts"));
+  }
+
+  @Test
+  public void testOldJsonWithoutMetadataDeserializesCleanly()
+      throws Exception {
+    String oldJson = "{\"name\":\"col1\",\"dataType\":\"STRING\"}";
+    DimensionFieldSpec fieldSpec = JsonUtils.stringToObject(oldJson, DimensionFieldSpec.class);
+    assertThat(fieldSpec.getMetadata()).isNull();
+  }
+
+  @Test
+  public void testMetadataInEqualsAndHashCode() {
+    DimensionFieldSpec spec1 = new DimensionFieldSpec("col1", JSON, true);
+    DimensionFieldSpec spec2 = new DimensionFieldSpec("col1", JSON, true);
+    spec2.setMetadata(Map.of("2", "person"));
+
+    assertThat(spec1).isNotEqualTo(spec2);
+    assertThat(spec1.hashCode()).isNotEqualTo(spec2.hashCode());
+
+    spec1.setMetadata(Map.of("2", "person"));
+    assertThat(spec1).isEqualTo(spec2);
+    assertThat(spec1.hashCode()).isEqualTo(spec2.hashCode());
+  }
+
+  @Test
+  public void testMetadataNotInBackwardCompatibility() {
+    DimensionFieldSpec oldSpec = new DimensionFieldSpec("col1", JSON, true);
+    DimensionFieldSpec newSpec = new DimensionFieldSpec("col1", JSON, true);
+    newSpec.setMetadata(Map.of("2", "person"));
 
     assertThat(newSpec.isBackwardCompatibleWith(oldSpec)).isTrue();
   }
