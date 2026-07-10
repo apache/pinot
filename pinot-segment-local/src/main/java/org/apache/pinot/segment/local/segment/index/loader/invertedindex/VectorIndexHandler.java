@@ -25,9 +25,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -122,6 +124,9 @@ public class VectorIndexHandler extends BaseIndexHandler {
           && !hasCombinedFile(indexDir, column, desiredBackend)) {
         LOGGER.info("Need to extract Vector consolidated entry to sidecar file for segment: {}, column: {}",
             segmentName, column);
+        return true;
+      }
+      if (isVectorConfigChanged(indexDir, column, desiredConfig, segmentName)) {
         return true;
       }
     }
@@ -496,7 +501,8 @@ public class VectorIndexHandler extends BaseIndexHandler {
       VectorBackendType desiredBackend = desiredConfig.resolveBackendType();
       VectorBackendType existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
       // Storage-format comparison — see the twin check in needUpdateIndices.
-      if (existingBackend != null && existingBackend != VectorIndexUtils.storageFormatOf(desiredBackend)) {
+      if ((existingBackend != null && existingBackend != VectorIndexUtils.storageFormatOf(desiredBackend))
+          || isVectorConfigChanged(indexDir, column, desiredConfig, segmentName)) {
         LOGGER.info("Rebuilding Vector index for segment: {}, column: {} (backend changed from {} to {})",
             segmentName, column, existingBackend, desiredBackend);
         segmentWriter.removeIndex(column, StandardIndexes.vector());
@@ -543,6 +549,58 @@ public class VectorIndexHandler extends BaseIndexHandler {
         createVectorIndexForColumn(segmentWriter, columnMetadata);
       }
     }
+  }
+
+  /**
+   * Checks whether the HNSW vector index config has changed by comparing the metadata file written at index-creation
+   * time with the current {@link VectorIndexConfig}.
+   *
+   * <p>The metadata file (written by {@code HnswVectorIndexCreator}) records the vector dimension and
+   * {@link VectorSimilarityFunction} used to build the index. Changing either field
+   * produces a structurally incompatible index (wrong vector size) or silently wrong query results (wrong distance
+   * metric), so a rebuild is required.
+   *
+   * <p>Legacy segments built before this metadata was introduced have no metadata file; config-change detection is
+   * skipped for those segments (the file will be created the next time the index is rebuilt for any reason).
+   */
+  private boolean isVectorConfigChanged(File indexDir, String column, VectorIndexConfig desiredConfig,
+      String segmentName) {
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
+        _segmentDirectory.getSegmentMetadata().getVersion());
+    Properties metadata = VectorIndexUtils.readVectorIndexMetadata(segmentDirectory, column);
+    if (metadata == null) {
+      // No metadata file — legacy segment; skip config-change detection.
+      return false;
+    }
+    try {
+      int storedDimension = Integer.parseInt(metadata.getProperty("dimension"));
+      int desiredDimension = desiredConfig.getVectorDimension();
+      if (storedDimension != desiredDimension) {
+        LOGGER.info("Vector index config changed for segment: {}, column: {} "
+                + "(dimension: {} → {}). Index needs to be rebuilt.",
+            segmentName, column, storedDimension, desiredDimension);
+        return true;
+      }
+
+      VectorSimilarityFunction storedFunc =
+          VectorSimilarityFunction.valueOf(metadata.getProperty("distanceFunction"));
+      VectorIndexConfig.VectorDistanceFunction desiredDistanceFunc = desiredConfig.getVectorDistanceFunction();
+      // Null distanceFunction defaults to COSINE (see VectorIndexConfig.DEFAULT_VECTOR_DISTANCE_FUNCTION).
+      if (desiredDistanceFunc == null) {
+        desiredDistanceFunc = VectorIndexConfig.VectorDistanceFunction.COSINE;
+      }
+      VectorSimilarityFunction desiredFunc = VectorIndexUtils.toSimilarityFunction(desiredDistanceFunc);
+      if (storedFunc != desiredFunc) {
+        LOGGER.info("Vector index config changed for segment: {}, column: {} "
+                + "(distanceFunction: {} → {}). Index needs to be rebuilt.",
+            segmentName, column, storedFunc, desiredFunc);
+        return true;
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Failed to parse vector index metadata for segment: {}, column: {}; skipping config-change check",
+          segmentName, column, e);
+    }
+    return false;
   }
 
   private boolean shouldCreateVectorIndex(ColumnMetadata columnMetadata) {
