@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.bson.BsonBinaryWriter;
+import org.bson.BsonTimestamp;
 import org.bson.Document;
 import org.bson.codecs.DocumentCodec;
 import org.bson.codecs.EncoderContext;
@@ -54,7 +55,10 @@ public class BSONMessageDecoderTest {
         .append("price", 9.5d)
         .append("active", true)
         .append("amount", Decimal128.parse("123.456"))
-        .append("createdAt", new Date(epochMillis));
+        .append("createdAt", new Date(epochMillis))
+        // The oplog / change-stream replication timestamp, the field a Kafka-forwarded change stream is most
+        // likely to use as the Pinot time column.
+        .append("ts", new BsonTimestamp((int) (epochMillis / 1000), 3));
 
     Set<String> fields = document.keySet();
     BSONMessageDecoder decoder = new BSONMessageDecoder();
@@ -71,6 +75,7 @@ public class BSONMessageDecoderTest {
     assertEquals(row.getValue("active"), true);
     assertEquals(row.getValue("amount"), new BigDecimal("123.456"));
     assertEquals(row.getValue("createdAt"), new Timestamp(epochMillis));
+    assertEquals(row.getValue("ts"), new Timestamp(epochMillis));
   }
 
   @Test

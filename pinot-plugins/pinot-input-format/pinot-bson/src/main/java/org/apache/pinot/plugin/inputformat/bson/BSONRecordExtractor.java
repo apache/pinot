@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.bson.BsonTimestamp;
 import org.bson.types.Binary;
 import org.bson.types.Decimal128;
 import org.bson.types.ObjectId;
@@ -43,13 +44,21 @@ import org.bson.types.ObjectId;
 /// - `DateTime` → `java.sql.Timestamp`
 /// - `Decimal128` → `BigDecimal` (`NaN` / `Infinity` → `null`, as `BigDecimal` cannot represent them; negative
 ///   zero → `BigDecimal.ZERO`)
-/// - `Binary` → `byte[]`
+/// - `Timestamp` (the internal replication type, e.g. the oplog / change-stream `ts` and `clusterTime` fields)
+///   → `java.sql.Timestamp` at second granularity, matching MongoDB's own `$toDate`. The ordinal counter that
+///   disambiguates operations within the same second is not representable in a `Timestamp` and is dropped, so
+///   this value orders operations only to the second.
+/// - `Binary` → `byte[]`. This includes the UUID subtypes (`0x03` legacy, `0x04` standard): the standard codec
+///   is constructed with `UuidRepresentation.UNSPECIFIED`, so it hands back the raw 16 bytes rather than a
+///   `java.util.UUID`.
 /// - `null` → `null`
 ///
-/// Every other BSON type falls back to `value.toString()` — this covers the internal `Timestamp` type, the
-/// deprecated `Symbol` / `Undefined` / `DBPointer` types, JavaScript `Code`, regular expressions,
-/// `MinKey` / `MaxKey`, and the binary vector types (`Float32BinaryVector` and friends), which the standard
-/// codec decodes to their own classes rather than to `Binary`.
+/// Every other BSON type falls back to `value.toString()` — the deprecated `Symbol` / `Undefined` / `DBPointer`
+/// types, JavaScript `Code`, regular expressions, `MinKey` / `MaxKey`, and the binary vector types
+/// (`Float32BinaryVector` and friends), which the standard codec decodes to their own classes rather than to
+/// `Binary`. These renderings are not a documented contract of `org.mongodb:bson`, so `BSONRecordExtractorTest`
+/// pins the exact strings: a driver upgrade that changes them must fail the build rather than silently change
+/// the contents of every segment built from such a document.
 ///
 /// The converted values follow the shared `RecordExtractor` contract, so the downstream data-type transformer
 /// coerces them to the declared column type.
@@ -85,6 +94,11 @@ public class BSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
     if (value instanceof Date) {
       return new Timestamp(((Date) value).getTime());
     }
+    if (value instanceof BsonTimestamp) {
+      // getTime() is the seconds component; the ordinal counter in the low 32 bits is dropped.
+      return new Timestamp(((BsonTimestamp) value).getTime() * 1000L);
+    }
+    // NOTE: Decimal128 extends Number, so this must stay above the Number pass-through below.
     if (value instanceof Decimal128) {
       Decimal128 decimal128 = (Decimal128) value;
       // NaN / Infinity are legal Decimal128 values with no BigDecimal representation; surface them as null.

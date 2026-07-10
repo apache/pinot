@@ -27,11 +27,9 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.bson.Document;
 
 
-/**
- * An implementation of StreamMessageDecoder to read BSON records from a stream. Each message payload is expected
- * to be a single binary-encoded BSON document. The document is decoded into an {@link Document} (a
- * {@code Map<String, Object>}) and handed to a {@link BSONRecordExtractor}.
- */
+/// An implementation of [StreamMessageDecoder] to read BSON records from a stream. Each message payload is
+/// expected to be a single binary-encoded BSON document. The document is decoded into a [Document] (a
+/// `Map<String, Object>`) and handed to a [BSONRecordExtractor].
 public class BSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final String BSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.bson.BSONRecordExtractor";

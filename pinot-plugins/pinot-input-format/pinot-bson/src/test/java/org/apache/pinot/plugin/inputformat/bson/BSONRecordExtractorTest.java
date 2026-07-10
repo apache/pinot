@@ -19,18 +19,29 @@
 package org.apache.pinot.plugin.inputformat.bson;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.bson.BsonBinaryWriter;
+import org.bson.BsonTimestamp;
 import org.bson.Document;
+import org.bson.codecs.DocumentCodec;
+import org.bson.codecs.EncoderContext;
+import org.bson.io.BasicOutputBuffer;
 import org.bson.types.Binary;
+import org.bson.types.Code;
 import org.bson.types.Decimal128;
 import org.bson.types.MaxKey;
+import org.bson.types.MinKey;
 import org.bson.types.ObjectId;
+import org.bson.types.Symbol;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -122,10 +133,53 @@ public class BSONRecordExtractorTest {
   }
 
   @Test
-  public void testExoticTypeFallsBackToToString() {
-    // Rare / deprecated / internal types (MinKey, MaxKey, ...) have no Pinot-native representation.
-    MaxKey maxKey = new MaxKey();
-    assertEquals(extract(maxKey), maxKey.toString());
+  public void testBsonTimestampConvertedToTimestamp() {
+    // The internal replication timestamp: the oplog `ts` field and the change-stream `clusterTime` field. Its
+    // seconds component becomes a java.sql.Timestamp; the intra-second ordinal counter is dropped.
+    Object result = extract(new BsonTimestamp(1_588_469_340, 7));
+    assertTrue(result instanceof Timestamp);
+    assertEquals(result, new Timestamp(1_588_469_340_000L));
+  }
+
+  @Test
+  public void testUuidBinarySubtypesConvertedToRawBytes() {
+    // Subtypes 0x03 (legacy) and 0x04 (standard) are how MongoDB stores UUIDs. The standard DocumentCodec is
+    // built with UuidRepresentation.UNSPECIFIED, so it decodes them to Binary -- not java.util.UUID -- and they
+    // land as raw 16-byte BYTES. Round-trip through a real encode/decode so this pins the codec's behavior
+    // rather than our own hand-built Binary: if a driver upgrade flips the default representation, these
+    // columns would silently change from BYTES to a 36-char STRING.
+    UUID uuid = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    byte[] raw = new byte[16];
+    ByteBuffer.wrap(raw).putLong(uuid.getMostSignificantBits()).putLong(uuid.getLeastSignificantBits());
+
+    Document decoded = roundTrip(new Document()
+        .append("standard", new Binary((byte) 0x04, raw))
+        .append("legacy", new Binary((byte) 0x03, raw)));
+
+    GenericRow row = new GenericRow();
+    newExtractor().extract(decoded, row);
+    assertEquals((byte[]) row.getValue("standard"), raw);
+    assertEquals((byte[]) row.getValue("legacy"), raw);
+  }
+
+  @Test
+  public void testExoticTypesFallBackToPinnedToStringForms() {
+    // Rare / deprecated types with no Pinot-native representation fall back to value.toString(). Those strings
+    // are not a documented contract of org.mongodb:bson, and they get baked into segment data -- so pin them
+    // literally. A driver upgrade that reformats them must fail here rather than silently rewrite segments.
+    assertEquals(extract(new MaxKey()), "MaxKey");
+    assertEquals(extract(new MinKey()), "MinKey");
+    assertEquals(extract(new Symbol("sym")), "sym");
+    assertEquals(extract(new Code("function(){}")), "Code{code='function(){}'}");
+
+    // Regex and JS code survive an encode/decode round trip as BsonRegularExpression / Code.
+    Document decoded = roundTrip(new Document()
+        .append("regex", Pattern.compile("^a.*z$"))
+        .append("code", new Code("function(){}")));
+    GenericRow row = new GenericRow();
+    newExtractor().extract(decoded, row);
+    assertEquals(row.getValue("regex"), "BsonRegularExpression{pattern='^a.*z$', options=''}");
+    assertEquals(row.getValue("code"), "Code{code='function(){}'}");
   }
 
   // === Array (BSON array) → Object[] ===
@@ -198,12 +252,26 @@ public class BSONRecordExtractorTest {
 
   /// Run the extractor against a single-column input document and return the extracted value.
   private static Object extract(@Nullable Object input) {
-    BSONRecordExtractor extractor = new BSONRecordExtractor();
-    extractor.init(null, null);
     Document record = new Document();
     record.put(COLUMN, input);
     GenericRow row = new GenericRow();
-    extractor.extract(record, row);
+    newExtractor().extract(record, row);
     return row.getValue(COLUMN);
+  }
+
+  private static BSONRecordExtractor newExtractor() {
+    BSONRecordExtractor extractor = new BSONRecordExtractor();
+    extractor.init(null, null);
+    return extractor;
+  }
+
+  /// Encodes and re-decodes a document so the test sees the Java types the standard `DocumentCodec` actually
+  /// produces, rather than the ones the test handed in.
+  private static Document roundTrip(Document document) {
+    BasicOutputBuffer buffer = new BasicOutputBuffer();
+    try (BsonBinaryWriter writer = new BsonBinaryWriter(buffer)) {
+      new DocumentCodec().encode(writer, document, EncoderContext.builder().build());
+    }
+    return BSONUtils.decodeDocument(buffer.toByteArray());
   }
 }

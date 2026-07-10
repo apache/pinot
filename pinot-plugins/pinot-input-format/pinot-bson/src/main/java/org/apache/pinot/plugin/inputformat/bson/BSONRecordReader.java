@@ -31,11 +31,11 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.bson.Document;
 
 
-/**
- * Record reader for a BSON file: a concatenation of framed BSON documents (the {@code mongodump} layout), each
- * self-delimited by a leading little-endian int32 byte length. Documents are read sequentially, with the next
- * document's bytes fetched ahead so {@link #hasNext} does not perform I/O. GZIP-compressed files are supported.
- */
+/// Record reader for a BSON file: a concatenation of framed BSON documents (the `mongodump` layout), each
+/// self-delimited by a leading little-endian int32 byte length. Documents are read sequentially, with the next
+/// document's bytes fetched ahead so [#hasNext] does not perform I/O. GZIP-compressed files are supported.
+///
+/// Not thread-safe: a reader instance is single-threaded, like every other [RecordReader].
 public class BSONRecordReader implements RecordReader {
   // Minimum size of a BSON document: 4-byte length prefix + 1-byte terminating NUL of an empty document.
   private static final int MIN_DOCUMENT_LENGTH = 5;

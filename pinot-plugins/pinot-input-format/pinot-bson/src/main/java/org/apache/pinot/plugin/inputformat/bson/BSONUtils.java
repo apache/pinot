@@ -27,12 +27,20 @@ import org.bson.codecs.DocumentCodec;
 
 /// Decodes a single BSON binary document into an `org.bson.Document` (a `Map<String, Object>`). Shared by
 /// [BSONRecordReader] (batch) and [BSONMessageDecoder] (streaming).
+///
+/// Thread-safe: the shared [DocumentCodec] and [DecoderContext] are immutable after construction, and each
+/// [#decodeDocument] call reads through a reader over its own buffer. Callers on different ingestion threads
+/// may decode concurrently.
+///
+/// A malformed document raises `org.bson.BsonSerializationException` (a `RuntimeException`). Bogus internal
+/// length prefixes cannot over-allocate: the reader is bounded by the supplied `[offset, offset + length)`
+/// slice.
 public final class BSONUtils {
-  private BSONUtils() {
-  }
-
   private static final DocumentCodec DOCUMENT_CODEC = new DocumentCodec();
   private static final DecoderContext DECODER_CONTEXT = DecoderContext.builder().build();
+
+  private BSONUtils() {
+  }
 
   /// Decodes a whole BSON document from the given byte array.
   public static Document decodeDocument(byte[] bytes) {
