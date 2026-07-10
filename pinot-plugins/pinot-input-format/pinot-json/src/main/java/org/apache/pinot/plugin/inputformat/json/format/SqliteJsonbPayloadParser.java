@@ -70,47 +70,53 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
     // require the object's declared size to exactly fill the payload -- the same validity rule parse() enforces
     // -- so AUTO cannot hand a corrupt message to this parser on the strength of a single nibble.
     int sizeDescriptor = (payload[offset] & 0xFF) >>> 4;
-    int headerLength;
-    long declaredSize;
-    switch (sizeDescriptor) {
-      case 12:
-        headerLength = 2;
-        if (length < headerLength) {
-          return false;
-        }
-        declaredSize = payload[offset + 1] & 0xFF;
-        break;
-      case 13:
-        headerLength = 3;
-        if (length < headerLength) {
-          return false;
-        }
-        declaredSize = ((payload[offset + 1] & 0xFFL) << 8) | (payload[offset + 2] & 0xFFL);
-        break;
-      case 14:
-        headerLength = 5;
-        if (length < headerLength) {
-          return false;
-        }
-        declaredSize = readUnsignedBE(payload, offset + 1, 4);
-        break;
-      case 15:
-        headerLength = 9;
-        if (length < headerLength) {
-          return false;
-        }
-        declaredSize = readUnsignedBE(payload, offset + 1, 8);
-        break;
-      default:
-        headerLength = 1;
-        declaredSize = sizeDescriptor;
-        break;
+    int headerLength = headerLength(sizeDescriptor);
+    if (length < headerLength) {
+      return false;
     }
-    return declaredSize == (long) length - headerLength;
+    return declaredSize(payload, offset, sizeDescriptor) == (long) length - headerLength;
   }
 
-  /// Reads {@code count} big-endian bytes as an unsigned value. Only used for the 4- and 8-byte size fields, so
-  /// an 8-byte field with the sign bit set yields a negative long, which never equals a payload length.
+  /// Bytes occupied by an element header: the type/size-descriptor byte plus the width of any explicit size
+  /// field. Descriptors 0-11 encode the size in the byte itself; 12-15 prepend a 1-, 2-, 4- or 8-byte
+  /// big-endian size.
+  ///
+  /// Shared by [#matches] and [#readElement] so detection and parsing can never disagree about the layout.
+  private static int headerLength(int sizeDescriptor) {
+    switch (sizeDescriptor) {
+      case 12:
+        return 2;
+      case 13:
+        return 3;
+      case 14:
+        return 5;
+      case 15:
+        return 9;
+      default:
+        return 1;
+    }
+  }
+
+  /// Payload size declared by the element header starting at {@code offset}. The caller must first ensure
+  /// [#headerLength] bytes are available. A descriptor-15 size with its sign bit set yields a negative value,
+  /// which every caller rejects (it can neither be a valid length nor equal a payload length).
+  private static long declaredSize(byte[] payload, int offset, int sizeDescriptor) {
+    switch (sizeDescriptor) {
+      case 12:
+        return readUnsignedBE(payload, offset + 1, 1);
+      case 13:
+        return readUnsignedBE(payload, offset + 1, 2);
+      case 14:
+        return readUnsignedBE(payload, offset + 1, 4);
+      case 15:
+        return readUnsignedBE(payload, offset + 1, 8);
+      default:
+        return sizeDescriptor;
+    }
+  }
+
+  /// Reads {@code count} big-endian bytes as an unsigned value. An 8-byte field with the sign bit set yields a
+  /// negative long, which never equals a payload length and is rejected by the bounds checks.
   private static long readUnsignedBE(byte[] payload, int offset, int count) {
     long value = 0;
     for (int i = 0; i < count; i++) {
@@ -142,27 +148,13 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
   /// the top level); an element may never extend past it, otherwise a nested element could overrun its parent
   /// while still fitting the payload and silently swallow its following siblings.
   private static Object readElement(Cursor cursor, int parentEnd) {
-    int header = cursor.readUInt8();
+    int header = cursor.peekUInt8();
     int type = header & 0x0F;
     int sizeDescriptor = header >>> 4;
-    long payloadSize;
-    switch (sizeDescriptor) {
-      case 12:
-        payloadSize = cursor.readUInt8();
-        break;
-      case 13:
-        payloadSize = cursor.readUInt16BE();
-        break;
-      case 14:
-        payloadSize = cursor.readUInt32BE();
-        break;
-      case 15:
-        payloadSize = cursor.readUInt64BE();
-        break;
-      default:
-        payloadSize = sizeDescriptor;
-        break;
-    }
+    int headerStart = cursor._pos;
+    // Decode the header through the same helpers matches() uses, so detection and parsing cannot drift apart.
+    cursor.skip(headerLength(sizeDescriptor));
+    long payloadSize = declaredSize(cursor._buf, headerStart, sizeDescriptor);
     int start = cursor._pos;
     int end = cursor.boundedEnd(start, payloadSize, parentEnd);
     Object result;
@@ -401,23 +393,21 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
       _limit = limit;
     }
 
-    private int readUInt8() {
+    /// The next byte, without advancing.
+    private int peekUInt8() {
       if (_pos >= _limit) {
         throw new IllegalArgumentException("Truncated SQLite JSONB payload");
       }
-      return _buf[_pos++] & 0xFF;
+      return _buf[_pos] & 0xFF;
     }
 
-    private int readUInt16BE() {
-      return (readUInt8() << 8) | readUInt8();
-    }
-
-    private long readUInt32BE() {
-      return ((long) readUInt16BE() << 16) | readUInt16BE();
-    }
-
-    private long readUInt64BE() {
-      return (readUInt32BE() << 32) | (readUInt32BE() & 0xFFFFFFFFL);
+    /// Advances past {@code count} bytes, verifying they are present. Compares without adding to {@code _pos}
+    /// so the check cannot overflow.
+    private void skip(int count) {
+      if (count > _limit - _pos) {
+        throw new IllegalArgumentException("Truncated SQLite JSONB payload");
+      }
+      _pos += count;
     }
 
     /// Validates that a payload of {@code size} bytes starting at {@code start} fits inside the enclosing

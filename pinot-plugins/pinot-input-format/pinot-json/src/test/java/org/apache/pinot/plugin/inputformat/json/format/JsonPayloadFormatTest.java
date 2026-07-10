@@ -461,7 +461,8 @@ public class JsonPayloadFormatTest {
   }
 
   @Test
-  public void testSqliteDetectionRequiresAnExactlyFillingObject() {
+  public void testSqliteDetectionRequiresAnExactlyFillingObject()
+      throws Exception {
     JsonPayloadParser sqlite = JsonPayloadFormat.SQLITE_JSONB.getParser();
     // The OBJECT low nibble alone would claim one arbitrary binary byte in sixteen, so detection additionally
     // requires the declared top-level size to exactly fill the payload.
@@ -478,14 +479,37 @@ public class JsonPayloadFormatTest {
     // ... but the degenerate empty object, which does exactly fill its payload, still is.
     assertTrue(sqlite.matches(bytes(0x0C), 0, 1));
 
-    // Wide size descriptors participate in the same check.
+    // Every size descriptor participates in the same check. Each positive case is the object {"a": 1} whose
+    // 4-byte payload is declared through a different-width size field, and each negative case is the same
+    // payload with the declared size off by one.
+    // Descriptor 12: 1-byte size.
+    assertTrue(sqlite.matches(bytes(0xCC, 0x04, 0x17, 0x61, 0x13, 0x31), 0, 6));
+    assertFalse(sqlite.matches(bytes(0xCC, 0x05, 0x17, 0x61, 0x13, 0x31), 0, 6));
+    // Descriptor 13: 2-byte big-endian size.
+    assertTrue(sqlite.matches(bytes(0xDC, 0x00, 0x04, 0x17, 0x61, 0x13, 0x31), 0, 7));
+    assertFalse(sqlite.matches(bytes(0xDC, 0x00, 0x05, 0x17, 0x61, 0x13, 0x31), 0, 7));
+    // A byte-order slip here would read 0x0400 rather than 0x0004.
+    assertFalse(sqlite.matches(bytes(0xDC, 0x04, 0x00, 0x17, 0x61, 0x13, 0x31), 0, 7));
+    // Descriptor 14: 4-byte big-endian size.
     assertTrue(sqlite.matches(bytes(0xEC, 0x00, 0x00, 0x00, 0x04, 0x17, 0x61, 0x13, 0x31), 0, 9));
     assertFalse(sqlite.matches(bytes(0xEC, 0x00, 0x00, 0x00, 0x05, 0x17, 0x61, 0x13, 0x31), 0, 9));
+    // Descriptor 15: 8-byte big-endian size.
+    assertTrue(sqlite.matches(
+        bytes(0xFC, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x17, 0x61, 0x13, 0x31), 0, 13));
+    assertFalse(sqlite.matches(
+        bytes(0xFC, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x17, 0x61, 0x13, 0x31), 0, 13));
     // An 8-byte size with the sign bit set decodes negative and can never equal a length.
     assertFalse(sqlite.matches(bytes(0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x17), 0, 10));
+
     // Truncated headers must not read past the payload.
     assertFalse(sqlite.matches(bytes(0xCC), 0, 1));
+    assertFalse(sqlite.matches(bytes(0xDC, 0x00), 0, 2));
     assertFalse(sqlite.matches(bytes(0xEC, 0x00), 0, 2));
+    assertFalse(sqlite.matches(bytes(0xFC, 0x00, 0x00, 0x00), 0, 4));
+
+    // Detection and parsing must agree: anything matches() claims here, parse() accepts.
+    assertEquals(parse(sqlite, bytes(0xCC, 0x04, 0x17, 0x61, 0x13, 0x31)), Map.of("a", 1));
+    assertEquals(parse(sqlite, bytes(0xDC, 0x00, 0x04, 0x17, 0x61, 0x13, 0x31)), Map.of("a", 1));
   }
 
   @Test
