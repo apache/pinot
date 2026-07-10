@@ -32,10 +32,12 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class JsonPayloadFormatTest {
@@ -93,7 +95,17 @@ public class JsonPayloadFormatTest {
     assertEquals(JsonPayloadFormat.fromConfig("POSTGRES_JSONB"), JsonPayloadFormat.POSTGRES_JSONB);
     // AUTO resolves the concrete format per message, so every format has a non-null parser.
     assertSame(JsonPayloadFormat.AUTO.getParser().getClass(), AutoDetectPayloadParser.class);
-    assertThrows(IllegalArgumentException.class, () -> JsonPayloadFormat.fromConfig("bson"));
+  }
+
+  @Test
+  public void testFromConfigRejectsUnknownFormatAndKeepsTheCause() {
+    IllegalArgumentException e =
+        expectThrows(IllegalArgumentException.class, () -> JsonPayloadFormat.fromConfig("bson"));
+    // The message names the offending value and the supported set ...
+    assertTrue(e.getMessage().contains("bson"), e.getMessage());
+    assertTrue(e.getMessage().contains("SQLITE_JSONB"), e.getMessage());
+    // ... and the underlying valueOf failure is preserved so the stack trace still points at the parse.
+    assertNotNull(e.getCause());
   }
 
   // ------------------------------------------------------------------------------------------------------

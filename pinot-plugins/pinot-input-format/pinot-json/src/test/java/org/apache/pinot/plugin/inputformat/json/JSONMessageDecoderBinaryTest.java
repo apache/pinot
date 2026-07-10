@@ -197,6 +197,10 @@ public class JSONMessageDecoderBinaryTest {
     String message = decodeFailureMessage(Map.of(), "{\"name\":".getBytes(StandardCharsets.UTF_8));
     assertTrue(message.contains("8 bytes: {\"name\":"), message);
 
+    // ... including non-ASCII UTF-8, since bytes >= 0x80 are not control characters ...
+    message = decodeFailureMessage(Map.of(), "{\"n\":\"café\"".getBytes(StandardCharsets.UTF_8));
+    assertTrue(message.contains("{\"n\":\"café\""), message);
+
     // ... while a malformed *binary* payload is hex-encoded rather than dumped as mojibake.
     byte[] badSmile = bytes(0x3A, 0x29, 0x0A, 0x04, 0xFF, 0xFF, 0xFF);
     message = decodeFailureMessage(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "SMILE"), badSmile);
