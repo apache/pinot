@@ -635,6 +635,12 @@ public class TableConfigUtilsTest {
     }
 
     schema.addField(new MetricFieldSpec("m1", FieldSpec.DataType.DOUBLE));
+    // Mark the metric as no-dictionary up front (a requirement validated by validateMetricsAggregation, covered in
+    // metricsAggregationValidationTest) so the steps below exercise the per-aggregation-config function validation.
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setNoDictionaryColumns(List.of("m1"));
+    tableConfig.setIndexingConfig(indexingConfig);
+
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig(null, null)));
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
@@ -669,33 +675,13 @@ public class TableConfigUtilsTest {
     }
 
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("m1", "SUM(m1)")));
-    try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
-      fail("Should fail due to noDictionaryColumns being null");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    IndexingConfig indexingConfig = new IndexingConfig();
-    indexingConfig.setNoDictionaryColumns(List.of());
-    tableConfig.setIndexingConfig(indexingConfig);
-
-    try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
-      fail("Should fail due to noDictionaryColumns not containing m1");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    indexingConfig.setNoDictionaryColumns(List.of("m1"));
-
-    ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("m1", "SUM(m1)")));
     TableConfigUtils.validateIngestionConfig(tableConfig, schema);
 
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("m1", "SUM(s1)")));
     TableConfigUtils.validateIngestionConfig(tableConfig, schema);
 
     schema.addField(new MetricFieldSpec("m2", FieldSpec.DataType.DOUBLE));
+    indexingConfig.setNoDictionaryColumns(List.of("m1", "m2"));
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
       fail("Should fail due to one metric column not being aggregated");
@@ -839,6 +825,104 @@ public class TableConfigUtilsTest {
       fail("Should have failed with too many arguments but didn't");
     } catch (IllegalStateException e) {
       // Expected
+    }
+  }
+
+  @Test
+  public void metricsAggregationValidationTest() {
+    // A COMPLEX column is neither a valid aggregation key nor an aggregatable metric, so metrics aggregation (via
+    // either the aggregateMetrics flag or ingestion aggregationConfigs) cannot be enabled when the schema contains one.
+    Schema schemaWithComplex = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime("timeColumn", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addMetric("m1", FieldSpec.DataType.LONG)
+        .addComplex("complexCol", FieldSpec.DataType.MAP, Map.of())
+        .build();
+
+    TableConfig aggregateMetricsConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setAggregateMetrics(true)
+        .setNoDictionaryColumns(List.of("m1"))
+        .build();
+    assertMetricsAggregationValidationFails(aggregateMetricsConfig, schemaWithComplex, "COMPLEX columns");
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("m1", "SUM(s1)")));
+    TableConfig aggregationConfigsConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfig)
+        .setNoDictionaryColumns(List.of("m1"))
+        .build();
+    assertMetricsAggregationValidationFails(aggregationConfigsConfig, schemaWithComplex, "COMPLEX columns");
+
+    // A multi-value dimension cannot be used as an aggregation key.
+    Schema schemaWithMvDimension = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime("timeColumn", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addMultiValueDimension("mvDim", FieldSpec.DataType.INT)
+        .addMetric("m1", FieldSpec.DataType.LONG)
+        .build();
+    assertMetricsAggregationValidationFails(aggregationConfigsConfig, schemaWithMvDimension,
+        "multi-value dimension column");
+
+    // Metric columns must be no-dictionary, for both mechanisms.
+    Schema schemaWithSvColumns = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime("timeColumn", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addSingleValueDimension("d1", FieldSpec.DataType.INT)
+        .addMetric("m1", FieldSpec.DataType.LONG)
+        .build();
+    TableConfig dictMetricAggregateMetricsConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setAggregateMetrics(true)
+        .build();
+    assertMetricsAggregationValidationFails(dictMetricAggregateMetricsConfig, schemaWithSvColumns,
+        "must be a no-dictionary column when metrics aggregation is enabled");
+
+    IngestionConfig dictMetricIngestionConfig = new IngestionConfig();
+    dictMetricIngestionConfig.setAggregationConfigs(List.of(new AggregationConfig("m1", "SUM(s1)")));
+    TableConfig dictMetricAggregationConfigsConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(dictMetricIngestionConfig)
+        .build();
+    assertMetricsAggregationValidationFails(dictMetricAggregationConfigsConfig, schemaWithSvColumns,
+        "must be a no-dictionary column when metrics aggregation is enabled");
+
+    // Metrics aggregation is incompatible with dedup, for both mechanisms.
+    TableConfig dedupAggregateMetricsConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setAggregateMetrics(true)
+        .setNoDictionaryColumns(List.of("m1"))
+        .setDedupConfig(new DedupConfig())
+        .build();
+    assertMetricsAggregationValidationFails(dedupAggregateMetricsConfig, schemaWithSvColumns,
+        "Metrics aggregation and dedup cannot be enabled together");
+
+    IngestionConfig dedupIngestionConfig = new IngestionConfig();
+    dedupIngestionConfig.setAggregationConfigs(List.of(new AggregationConfig("m1", "SUM(s1)")));
+    TableConfig dedupAggregationConfigsConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(dedupIngestionConfig)
+        .setNoDictionaryColumns(List.of("m1"))
+        .setDedupConfig(new DedupConfig())
+        .build();
+    assertMetricsAggregationValidationFails(dedupAggregationConfigsConfig, schemaWithSvColumns,
+        "Metrics aggregation and dedup cannot be enabled together");
+
+    // Valid: single-value dimensions, a no-dictionary metric, and no COMPLEX column.
+    TableConfig validConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setAggregateMetrics(true)
+        .setNoDictionaryColumns(List.of("m1"))
+        .build();
+    TableConfigUtils.validateIngestionConfig(validConfig, schemaWithSvColumns);
+  }
+
+  private void assertMetricsAggregationValidationFails(TableConfig tableConfig, Schema schema,
+      String expectedMessageSubstring) {
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      fail("Should fail with message containing: " + expectedMessageSubstring);
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains(expectedMessageSubstring),
+          "Expected message containing '" + expectedMessageSubstring + "' but got: " + e.getMessage());
     }
   }
 
