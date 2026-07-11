@@ -76,10 +76,21 @@ public class AvroSchemaUtil {
     }
   }
 
+  /// Builds the Avro schema JSON for a single Pinot field. Used to generate sample Avro data from a Pinot schema
+  /// (see `AvroWriter`). Each field is emitted as a nullable union `["null", <type>]`.
+  ///
+  /// The switch is driven by the original (logical) [DataType] rather than the stored type, so logical types are
+  /// represented faithfully instead of collapsing to their physical storage type: BOOLEAN maps to Avro `boolean`
+  /// and TIMESTAMP to a `timestamp-millis` long, not a plain `int`/`long`.
+  ///
+  /// This intentionally differs from the segment-processing converters `AvroUtils.getAvroSchemaFromPinotSchema` and
+  /// `SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema`, which switch on the stored type because they
+  /// serialize Pinot's physically-stored values (e.g. an int for BOOLEAN) directly.
   public static ObjectNode toAvroSchemaJsonObject(FieldSpec fieldSpec) {
     ObjectNode jsonSchema = JsonUtils.newObjectNode();
     jsonSchema.put("name", fieldSpec.getName());
-    switch (fieldSpec.getDataType().getStoredType()) {
+    DataType dataType = fieldSpec.getDataType();
+    switch (dataType) {
       case INT:
         jsonSchema.set("type", convertStringsToJsonArray("null", "int"));
         return jsonSchema;
@@ -92,15 +103,31 @@ public class AvroSchemaUtil {
       case DOUBLE:
         jsonSchema.set("type", convertStringsToJsonArray("null", "double"));
         return jsonSchema;
+      case BOOLEAN:
+        jsonSchema.set("type", convertStringsToJsonArray("null", "boolean"));
+        return jsonSchema;
+      case TIMESTAMP:
+        // TIMESTAMP is stored as LONG millis-since-epoch; annotate the long branch with the timestamp-millis
+        // logical type so the value stays a long but is self-describing as a timestamp.
+        ObjectNode timestampType = JsonUtils.newObjectNode();
+        timestampType.put("type", "long");
+        timestampType.put("logicalType", "timestamp-millis");
+        ArrayNode timestampUnion = JsonUtils.newArrayNode();
+        timestampUnion.add("null");
+        timestampUnion.add(timestampType);
+        jsonSchema.set("type", timestampUnion);
+        return jsonSchema;
       case STRING:
       case JSON:
         jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
         return jsonSchema;
       case BYTES:
+      case UUID:
+        // UUID is a logical type stored as fixed-width 16-byte BYTES.
         jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
         return jsonSchema;
       default:
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
   }
 
