@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -93,6 +94,8 @@ public class JsonIndexHandlerTest {
     // Column is in config but has no existing JSON index — metadata present.
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(COLUMN)));
     when(segmentMetadata.getColumnMetadataFor(COLUMN)).thenReturn(mock(ColumnMetadata.class));
 
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
@@ -112,6 +115,8 @@ public class JsonIndexHandlerTest {
     // Column is in config but getColumnMetadataFor returns null — not yet in segment.
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(COLUMN)));
     when(segmentMetadata.getColumnMetadataFor(COLUMN)).thenReturn(null);
 
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
@@ -154,6 +159,8 @@ public class JsonIndexHandlerTest {
   private static SegmentDirectory mockSegmentDirectory(String column) {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(column)));
 
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
     when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
