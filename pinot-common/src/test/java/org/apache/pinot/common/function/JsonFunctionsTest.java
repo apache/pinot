@@ -21,6 +21,7 @@ package org.apache.pinot.common.function;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.jayway.jsonpath.InvalidJsonException;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -36,6 +37,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class JsonFunctionsTest {
@@ -793,5 +795,120 @@ public class JsonFunctionsTest {
     Assert.assertTrue(jsonPathResult.contains("$['field.with.dots']"));
     Assert.assertTrue(jsonPathResult.contains("$['field_with_underscores']"));
     Assert.assertTrue(jsonPathResult.contains("$['field with spaces']"));
+  }
+
+  private static String scalarSampleJson() {
+    return "{"
+        + "\"i\":42,\"l\":9999999999,\"f\":1.5,\"d\":2.5,\"s\":\"hi\",\"b\":true,"
+        + "\"num5\":5,\"zero\":0,\"bstr1\":\"1\","
+        + "\"tnum\":1514805173000,\"tiso\":\"2018-01-01T11:12:53Z\","
+        + "\"hp\":0.1234567890123456789,\"obj\":{\"k\":\"v\"},"
+        + "\"arr\":[1,2,3],\"arrnull\":[1,null,3],\"lstr\":\"1.234\",\"lexp\":\"1E1\"}";
+  }
+
+  @Test
+  public void testJsonExtractScalarSingleValueCoercions() {
+    String json = scalarSampleJson();
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.i", "INT"), 42);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.l", "LONG"), 9999999999L);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.f", "FLOAT"), 1.5f);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.d", "DOUBLE"), 2.5d);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.s", "STRING"), "hi");
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.obj", "STRING"), "{\"k\":\"v\"}");
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.obj", "JSON"), "{\"k\":\"v\"}");
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.i", "BIG_DECIMAL"), new BigDecimal("42"));
+    // BOOLEAN follows Pinot's numeric convention (non-zero number is true) and is returned as stored INT (0/1).
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.b", "BOOLEAN"), 1);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.num5", "BOOLEAN"), 1);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.zero", "BOOLEAN"), 0);
+    // The string "1" must go through BooleanUtils.toInt; Boolean.parseBoolean("1") would wrongly yield 0.
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.bstr1", "BOOLEAN"), 1);
+    // TIMESTAMP: numeric epoch as-is; ISO-8601 string via TimestampUtils (Long.parseLong would throw).
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.tnum", "TIMESTAMP"), 1514805173000L);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.tiso", "TIMESTAMP"), 1514805173000L);
+    // LONG from numeric strings uses BigDecimal truncation/exponent handling; Long.parseLong would throw.
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.lstr", "LONG"), 1L);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.lexp", "LONG"), 10L);
+  }
+
+  @Test
+  public void testJsonExtractScalarBigDecimalPreservesPrecision() {
+    // Default float parsing collapses to a double (0.12345678901234568); the BigDecimal parser must not.
+    Object result = JsonFunctions.jsonExtractScalar(scalarSampleJson(), "$.hp", "BIG_DECIMAL");
+    assertEquals(((BigDecimal) result).compareTo(new BigDecimal("0.1234567890123456789")), 0);
+  }
+
+  @Test
+  public void testJsonExtractScalarBytes() {
+    assertEquals((byte[]) JsonFunctions.jsonExtractScalar("{\"h\":\"0a0b\"}", "$.h", "BYTES"),
+        new byte[]{0x0a, 0x0b});
+  }
+
+  @Test
+  public void testJsonExtractScalarReturnsDefaultWhenUnresolved() {
+    String json = scalarSampleJson();
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "INT", -1), -1);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "LONG", -1L), -1L);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "DOUBLE", -1d), -1d);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "STRING", "def"), "def");
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "BOOLEAN", 1), 1);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "BIG_DECIMAL", BigDecimal.ONE), BigDecimal.ONE);
+  }
+
+  @DataProvider(name = "unresolvedThrowTypes")
+  public Object[][] unresolvedThrowTypes() {
+    return new Object[][]{{"INT"}, {"LONG"}, {"DOUBLE"}, {"STRING"}, {"BIG_DECIMAL"}};
+  }
+
+  @Test(dataProvider = "unresolvedThrowTypes")
+  public void testJsonExtractScalarThrowsWhenUnresolvedWithoutDefault(String type) {
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
+        () -> JsonFunctions.jsonExtractScalar(scalarSampleJson(), "$.missing", type));
+    assertEquals(e.getMessage(), "Cannot resolve JSON path on some records. Consider setting a default value.");
+  }
+
+  @Test
+  public void testJsonExtractScalarTreatsMalformedJsonAsUnresolved() {
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
+        () -> JsonFunctions.jsonExtractScalar("not json", "$.x", "STRING"));
+    assertEquals(e.getMessage(), "Cannot resolve JSON path on some records. Consider setting a default value.");
+    assertEquals(JsonFunctions.jsonExtractScalar("not json", "$.x", "STRING", "def"), "def");
+  }
+
+  @Test
+  public void testJsonExtractScalarArrays() {
+    String json = scalarSampleJson();
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar(json, "$.arr", "INT_ARRAY"), new int[]{1, 2, 3});
+    // An unresolved multi-value path yields an empty array and never throws.
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar(json, "$.missing", "INT_ARRAY"), new int[0]);
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar("not json", "$.x", "INT_ARRAY"), new int[0]);
+    // A null element is filled from the default when present, otherwise it throws.
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar(json, "$.arrnull", "INT_ARRAY", 0), new int[]{1, 0, 3});
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
+        () -> JsonFunctions.jsonExtractScalar(json, "$.arrnull", "INT_ARRAY"));
+    assertEquals(e.getMessage(),
+        "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+            + "Consider setting a default value as the fourth argument of json_extract_scalar.");
+    assertEquals((String[]) JsonFunctions.jsonExtractScalar("{\"a\":[\"x\",\"y\"]}", "$.a", "STRING_ARRAY"),
+        new String[]{"x", "y"});
+  }
+
+  @Test
+  public void testJsonExtractScalarUnsupportedType() {
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
+        () -> JsonFunctions.jsonExtractScalar(scalarSampleJson(), "$.i", "FOO"));
+    assertTrue(e.getMessage().startsWith("Unsupported results type: FOO for jsonExtractScalar function."));
+  }
+
+  @Test
+  public void testJsonExtractScalarLeafParseFailures() {
+    expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":\"abc\"}", "$.x", "INT"));
+    NumberFormatException nfe = expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":\"abc\"}", "$.x", "LONG"));
+    assertEquals(nfe.getMessage(), "For input string: \"abc\"");
+    IllegalArgumentException iae = expectThrows(IllegalArgumentException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":\"nope\"}", "$.x", "TIMESTAMP"));
+    assertTrue(iae.getMessage().startsWith("Invalid timestamp: 'nope'"));
   }
 }

@@ -19,7 +19,9 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.jayway.jsonpath.Configuration;
@@ -31,6 +33,7 @@ import com.jayway.jsonpath.spi.cache.CacheProvider;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -39,7 +42,11 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /**
@@ -63,6 +70,13 @@ public class JsonFunctions {
       new Configuration.ConfigurationBuilder().jsonProvider(new ArrayAwareJacksonJsonProvider())
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS)
           .build());
+
+  // Mirrors JsonExtractScalarTransformFunction's BigDecimal-preserving parser: BIG_DECIMAL / STRING / JSON
+  // extraction reads JSON floats as BigDecimal to avoid precision loss.
+  private static final ParseContext PARSE_CONTEXT_WITH_BIG_DECIMAL = JsonPath.using(
+      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider(
+              new ObjectMapper().configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)))
+          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
 
   // JsonPath context for extracting keys (paths)
   private static final ParseContext KEY_PARSE_CONTEXT = JsonPath.using(
@@ -392,6 +406,306 @@ public class JsonFunctions {
       return object;
     }
     return null;
+  }
+
+  /**
+   * Extract a scalar (or scalar-array) value from a JSON document and coerce it to {@code resultsType}.
+   * <p>Scalar-function counterpart of the {@code jsonExtractScalar} transform (see
+   * {@link org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction}), so that
+   * {@code json_extract_scalar(...)} resolves in the multi-stage engine and in ad-hoc scalar contexts.
+   * {@code resultsType} is a Pinot {@link DataType} name, optionally suffixed with {@code _ARRAY} for a
+   * multi-value result. Supported types are
+   * {@code INT/LONG/FLOAT/DOUBLE/BIG_DECIMAL/BOOLEAN/TIMESTAMP/STRING/JSON/BYTES} and the
+   * {@code INT/LONG/FLOAT/DOUBLE/BIG_DECIMAL/STRING} array variants.
+   * <p>Coercion mirrors the transform exactly: {@code BOOLEAN} is returned as its stored {@code INT} (0/1),
+   * {@code TIMESTAMP} as epoch millis (numeric values as-is, strings via ISO-8601), {@code BIG_DECIMAL} /
+   * {@code STRING} / {@code JSON} use a BigDecimal-preserving parser. Without a default value an unresolved
+   * single-value path throws; a multi-value path yields an empty array, but a {@code null} element inside a
+   * resolved array still throws. A malformed JSON document is treated as unresolved.
+   */
+  @ScalarFunction
+  public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String resultsType) {
+    return jsonExtractScalar(jsonInput, jsonPath, resultsType, null);
+  }
+
+  /**
+   * See {@link #jsonExtractScalar(Object, String, String)}. {@code defaultValue} is returned (coerced to
+   * {@code resultsType}) when the path resolves to {@code null} or the document is malformed.
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static Object jsonExtractScalar(@Nullable Object jsonInput, String jsonPath, String resultsType,
+      @Nullable Object defaultValue) {
+    String type = resultsType.toUpperCase();
+    boolean isSingleValue = !type.endsWith("_ARRAY");
+    DataType dataType;
+    try {
+      dataType = DataType.valueOf(isSingleValue ? type : type.substring(0, type.length() - 6));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(unsupportedResultsTypeMessage(resultsType));
+    }
+    // BIG_DECIMAL / STRING / JSON must read floats as BigDecimal to preserve precision, matching the transform.
+    boolean useBigDecimal =
+        dataType == DataType.BIG_DECIMAL || dataType == DataType.STRING || dataType == DataType.JSON;
+    if (isSingleValue) {
+      Object value = readJsonPathValue(jsonInput, jsonPath, useBigDecimal);
+      if (value == null) {
+        if (defaultValue != null) {
+          return coerceScalar(defaultValue, dataType);
+        }
+        throw new IllegalArgumentException(
+            "Cannot resolve JSON path on some records. Consider setting a default value.");
+      }
+      return coerceScalar(value, dataType);
+    }
+    return coerceScalarArray(readJsonPathArray(jsonInput, jsonPath, useBigDecimal), dataType, defaultValue);
+  }
+
+  @Nullable
+  private static Object readJsonPathValue(@Nullable Object jsonInput, String jsonPath, boolean useBigDecimal) {
+    if (jsonInput == null) {
+      return null;
+    }
+    try {
+      ParseContext parseContext = useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT;
+      if (jsonInput instanceof String) {
+        return parseContext.parse((String) jsonInput).read(jsonPath, NO_PREDICATES);
+      }
+      return parseContext.parse(jsonInput).read(jsonPath, NO_PREDICATES);
+    } catch (Exception e) {
+      // Malformed JSON (e.g. a plain-text row) is treated as unresolved, mirroring the transform which swallows
+      // per-row extraction errors; the caller then applies the default or throws.
+      return null;
+    }
+  }
+
+  @Nullable
+  private static Object[] readJsonPathArray(@Nullable Object jsonInput, String jsonPath, boolean useBigDecimal) {
+    if (jsonInput == null) {
+      return null;
+    }
+    try {
+      ParseContext parseContext = useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT;
+      Object read = jsonInput instanceof String ? parseContext.parse((String) jsonInput).read(jsonPath, NO_PREDICATES)
+          : parseContext.parse(jsonInput).read(jsonPath, NO_PREDICATES);
+      return convertObjectToArray(read);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private static Object coerceScalar(Object value, DataType dataType) {
+    switch (dataType) {
+      case INT:
+        return toInt(value, false);
+      case BOOLEAN:
+        return toInt(value, true);
+      case LONG:
+        return toLong(value, false);
+      case TIMESTAMP:
+        return toLong(value, true);
+      case FLOAT:
+        return toFloat(value);
+      case DOUBLE:
+        return toDouble(value);
+      case BIG_DECIMAL:
+        return toBigDecimal(value);
+      case STRING:
+      case JSON:
+        return toStringValue(value);
+      case BYTES:
+        return BytesUtils.toBytes(value.toString());
+      default:
+        throw new IllegalArgumentException(unsupportedResultsTypeMessage(dataType.name()));
+    }
+  }
+
+  private static Object coerceScalarArray(@Nullable Object[] array, DataType dataType, @Nullable Object defaultValue) {
+    switch (dataType) {
+      case INT:
+        return toIntArray(array, defaultValue);
+      case LONG:
+        return toLongArray(array, defaultValue);
+      case FLOAT:
+        return toFloatArray(array, defaultValue);
+      case DOUBLE:
+        return toDoubleArray(array, defaultValue);
+      case BIG_DECIMAL:
+        return toBigDecimalArray(array, defaultValue);
+      case STRING:
+        return toStringArray(array, defaultValue);
+      default:
+        throw new IllegalArgumentException(unsupportedResultsTypeMessage(dataType.name() + "_ARRAY"));
+    }
+  }
+
+  /**
+   * Resolve a single array element: pass through a non-null element, substitute the default when the element is
+   * {@code null}, or throw when a null element has no default - matching the transform's MV semantics.
+   */
+  private static Object resolveArrayElement(@Nullable Object element, @Nullable Object defaultValue) {
+    if (element != null) {
+      return element;
+    }
+    if (defaultValue != null) {
+      return defaultValue;
+    }
+    throw new IllegalArgumentException(
+        "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+            + "Consider setting a default value as the fourth argument of json_extract_scalar.");
+  }
+
+  private static int[] toIntArray(@Nullable Object[] array, @Nullable Object defaultValue) {
+    if (array == null) {
+      return new int[0];
+    }
+    int[] values = new int[array.length];
+    for (int i = 0; i < array.length; i++) {
+      values[i] = toInt(resolveArrayElement(array[i], defaultValue), false);
+    }
+    return values;
+  }
+
+  private static long[] toLongArray(@Nullable Object[] array, @Nullable Object defaultValue) {
+    if (array == null) {
+      return new long[0];
+    }
+    long[] values = new long[array.length];
+    for (int i = 0; i < array.length; i++) {
+      values[i] = toLong(resolveArrayElement(array[i], defaultValue), false);
+    }
+    return values;
+  }
+
+  private static float[] toFloatArray(@Nullable Object[] array, @Nullable Object defaultValue) {
+    if (array == null) {
+      return new float[0];
+    }
+    float[] values = new float[array.length];
+    for (int i = 0; i < array.length; i++) {
+      values[i] = toFloat(resolveArrayElement(array[i], defaultValue));
+    }
+    return values;
+  }
+
+  private static double[] toDoubleArray(@Nullable Object[] array, @Nullable Object defaultValue) {
+    if (array == null) {
+      return new double[0];
+    }
+    double[] values = new double[array.length];
+    for (int i = 0; i < array.length; i++) {
+      values[i] = toDouble(resolveArrayElement(array[i], defaultValue));
+    }
+    return values;
+  }
+
+  private static BigDecimal[] toBigDecimalArray(@Nullable Object[] array, @Nullable Object defaultValue) {
+    if (array == null) {
+      return new BigDecimal[0];
+    }
+    BigDecimal[] values = new BigDecimal[array.length];
+    for (int i = 0; i < array.length; i++) {
+      values[i] = toBigDecimal(resolveArrayElement(array[i], defaultValue));
+    }
+    return values;
+  }
+
+  private static String[] toStringArray(@Nullable Object[] array, @Nullable Object defaultValue) {
+    if (array == null) {
+      return new String[0];
+    }
+    String[] values = new String[array.length];
+    for (int i = 0; i < array.length; i++) {
+      values[i] = toStringValue(resolveArrayElement(array[i], defaultValue));
+    }
+    return values;
+  }
+
+  private static int toInt(Object value, boolean isBoolean) {
+    if (isBoolean) {
+      if (value instanceof Boolean) {
+        return (Boolean) value ? 1 : 0;
+      }
+      // For BOOLEAN result, follow Pinot's numeric convention: any non-zero number is true.
+      if (value instanceof Number) {
+        return ((Number) value).doubleValue() != 0 ? 1 : 0;
+      }
+      // String fallback: BooleanUtils.toInt accepts "true" / "TRUE" / "1".
+      return BooleanUtils.toInt(value.toString());
+    }
+    if (value instanceof Number) {
+      return ((Number) value).intValue();
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value ? 1 : 0;
+    }
+    return Integer.parseInt(value.toString());
+  }
+
+  private static long toLong(Object value, boolean isTimestamp) {
+    if (value instanceof Number) {
+      return ((Number) value).longValue();
+    }
+    if (isTimestamp) {
+      return TimestampUtils.toMillisSinceEpoch(value.toString());
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value ? 1L : 0L;
+    }
+    try {
+      // pinot-common cannot depend on pinot-core's NumberUtils#parseJsonLong; BigDecimal reproduces its
+      // truncate-toward-zero and exponent handling for JSON numeric strings ("1.9" -> 1, "1E1" -> 10).
+      return new BigDecimal(value.toString().trim()).longValue();
+    } catch (NumberFormatException e) {
+      throw new NumberFormatException("For input string: \"" + value + "\"");
+    }
+  }
+
+  private static float toFloat(Object value) {
+    if (value instanceof Number) {
+      return ((Number) value).floatValue();
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value ? 1f : 0f;
+    }
+    return Float.parseFloat(value.toString());
+  }
+
+  private static double toDouble(Object value) {
+    if (value instanceof Number) {
+      return ((Number) value).doubleValue();
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value ? 1d : 0d;
+    }
+    return Double.parseDouble(value.toString());
+  }
+
+  private static BigDecimal toBigDecimal(Object value) {
+    if (value instanceof BigDecimal) {
+      return (BigDecimal) value;
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value ? BigDecimal.ONE : BigDecimal.ZERO;
+    }
+    return new BigDecimal(value.toString());
+  }
+
+  private static String toStringValue(Object value) {
+    if (value instanceof String) {
+      return (String) value;
+    }
+    try {
+      return JsonUtils.objectToString(value);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Caught exception while serializing JSON value: " + value, e);
+    }
+  }
+
+  private static String unsupportedResultsTypeMessage(String resultsType) {
+    return String.format(
+        "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
+            + "INT/LONG/FLOAT/DOUBLE/BIG_DECIMAL/BOOLEAN/TIMESTAMP/STRING/JSON/BYTES/"
+            + "INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY/BIG_DECIMAL_ARRAY/STRING_ARRAY", resultsType);
   }
 
   private static void setValuesToMap(String keyColumnName, String valueColumnName, Object obj,
