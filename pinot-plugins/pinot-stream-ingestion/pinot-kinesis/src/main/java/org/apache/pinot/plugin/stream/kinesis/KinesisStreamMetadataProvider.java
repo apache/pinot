@@ -262,10 +262,14 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     Map<String, PartitionLagState> perPartitionLag = new HashMap<>();
     for (Map.Entry<String, ConsumerPartitionState> entry : currentPartitionStateMap.entrySet()) {
       ConsumerPartitionState partitionState = entry.getValue();
-      // Compute record-availability
-      String recordAvailabilityLag = "UNKNOWN";
+      // Compute record-availability. Only when both the last-processed wall-clock time and the record's upstream
+      // ingestion time are valid; otherwise a missing/invalid ingestion time (e.g. records without a valid
+      // timestamp) would turn the subtraction into an epoch-sized value that leaks to the metric and UI. Keep the
+      // NOT_CALCULATED sentinel in that case so the lag is reported as not-calculated rather than a bogus number.
+      String recordAvailabilityLag = PartitionLagState.NOT_CALCULATED;
       StreamMessageMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
-      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
+      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0
+          && lastProcessedMessageMetadata.getRecordIngestionTimeMs() > 0) {
         long availabilityLag =
             partitionState.getLastProcessedTimeMs() - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
         recordAvailabilityLag = String.valueOf(availabilityLag);
