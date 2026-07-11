@@ -57,6 +57,12 @@ public class BasicAuthAccessControlFactoryTest {
   private static final String FULL_PASSWORD = "fullPassword";
   private static final String WILDCARD_USER = "wildcard";
   private static final String WILDCARD_PASSWORD = "wildcardPassword";
+  private static final String SCOPED_ADMIN_USER = "scopedAdmin";
+  private static final String SCOPED_ADMIN_PASSWORD = "scopedAdminPassword";
+  private static final String EXCLUDED_USER = "excluded";
+  private static final String EXCLUDED_PASSWORD = "excludedPassword";
+  private static final String CLUSTER_READER_USER = "clusterReader";
+  private static final String CLUSTER_READER_PASSWORD = "clusterReaderPassword";
   private static final String CORRUPT_USER = "corrupt";
   private static final String ENDPOINT_URL = "/cluster/configs";
 
@@ -68,11 +74,23 @@ public class BasicAuthAccessControlFactoryTest {
 
   @Test(dataProvider = "accessControls")
   public void testClusterPermissions(AccessControl accessControl) {
-    HttpHeaders restrictedHeaders = headers(RESTRICTED_USER, RESTRICTED_PASSWORD);
-    assertTrue(accessControl.hasAccess(AccessType.READ, restrictedHeaders, ENDPOINT_URL));
-    assertFalse(accessControl.hasAccess(AccessType.CREATE, restrictedHeaders, ENDPOINT_URL));
-    assertFalse(accessControl.hasAccess(AccessType.UPDATE, restrictedHeaders, ENDPOINT_URL));
-    assertFalse(accessControl.hasAccess(AccessType.DELETE, restrictedHeaders, ENDPOINT_URL));
+    // A principal confined to a subset of tables holds no cluster-wide access, whichever permissions it was granted.
+    for (Map.Entry<String, String> tableScopedUser : Map.of(RESTRICTED_USER, RESTRICTED_PASSWORD, SCOPED_ADMIN_USER,
+        SCOPED_ADMIN_PASSWORD, EXCLUDED_USER, EXCLUDED_PASSWORD).entrySet()) {
+      HttpHeaders tableScopedHeaders = headers(tableScopedUser.getKey(), tableScopedUser.getValue());
+      for (AccessType accessType : AccessType.values()) {
+        assertFalse(accessControl.hasAccess(accessType, tableScopedHeaders, ENDPOINT_URL),
+            tableScopedUser.getKey() + " must not hold cluster " + accessType);
+      }
+    }
+
+    // Table scope is necessary but not sufficient: an unrestricted principal is still held to its permissions.
+    HttpHeaders clusterReaderHeaders = headers(CLUSTER_READER_USER, CLUSTER_READER_PASSWORD);
+    assertTrue(accessControl.hasAccess(AccessType.READ, clusterReaderHeaders, ENDPOINT_URL));
+    for (AccessType accessType : List.of(AccessType.CREATE, AccessType.UPDATE, AccessType.DELETE)) {
+      assertFalse(accessControl.hasAccess(accessType, clusterReaderHeaders, ENDPOINT_URL),
+          CLUSTER_READER_USER + " holds only READ, so it must not hold cluster " + accessType);
+    }
 
     HttpHeaders fullHeaders = headers(FULL_USER, FULL_PASSWORD);
     for (AccessType accessType : AccessType.values()) {
@@ -117,7 +135,12 @@ public class BasicAuthAccessControlFactoryTest {
   @Test(dataProvider = "accessControls")
   public void testAuthenticationProbeRemainsNonThrowing(AccessControl accessControl) {
     assertFalse(accessControl.hasAccess(headers("unknown", "wrong"), TargetType.CLUSTER));
+    assertTrue(accessControl.hasAccess(headers(FULL_USER, FULL_PASSWORD), TargetType.CLUSTER));
+
+    // This probe backs the UI login gate, so it stays an authentication check: a table-scoped principal must still be
+    // able to sign in and work with the tables it is scoped to. Cluster requests are denied by the checks above.
     assertTrue(accessControl.hasAccess(headers(RESTRICTED_USER, RESTRICTED_PASSWORD), TargetType.CLUSTER));
+    assertTrue(accessControl.hasAccess(headers(SCOPED_ADMIN_USER, SCOPED_ADMIN_PASSWORD), TargetType.CLUSTER));
   }
 
   @Test(dataProvider = "accessControls")
@@ -140,6 +163,11 @@ public class BasicAuthAccessControlFactoryTest {
     for (AccessType accessType : AccessType.values()) {
       assertTrue(accessControl.hasAccess(ALLOWED_TABLE, accessType, fullHeaders, ENDPOINT_URL));
     }
+
+    // An exclude-list principal loses cluster access but keeps every table it was not excluded from.
+    HttpHeaders excludedHeaders = headers(EXCLUDED_USER, EXCLUDED_PASSWORD);
+    assertTrue(accessControl.hasAccess(ALLOWED_TABLE, AccessType.READ, excludedHeaders, ENDPOINT_URL));
+    assertFalse(accessControl.hasAccess("otherTable", AccessType.READ, excludedHeaders, ENDPOINT_URL));
   }
 
   @Test(dataProvider = "accessControls")
@@ -160,6 +188,37 @@ public class BasicAuthAccessControlFactoryTest {
         BasicAuthTokenUtils.toBasicAuthToken(RESTRICTED_USER, RESTRICTED_PASSWORD)));
   }
 
+  /// Regression test for [issue 14595](https://github.com/apache/pinot/issues/14595): a principal scoped to a single
+  /// table held every permission on cluster-level endpoints, letting it delete resources such as other users. Table
+  /// scope must be honored on endpoints that name no table, while the principal keeps access to its own table.
+  @Test(dataProvider = "accessControls")
+  public void testTableScopedPrincipalCannotReachClusterEndpoints(AccessControl accessControl) {
+    HttpHeaders scopedAdminHeaders = headers(SCOPED_ADMIN_USER, SCOPED_ADMIN_PASSWORD);
+
+    ControllerApplicationException exception = expectThrows(ControllerApplicationException.class,
+        () -> AccessControlUtils.validatePermission(null, AccessType.DELETE, scopedAdminHeaders, "/users/admin",
+            accessControl));
+    assertEquals(exception.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+
+    // The same principal still holds every permission on the table it is scoped to.
+    for (AccessType accessType : AccessType.values()) {
+      assertTrue(accessControl.hasAccess(ALLOWED_TABLE, accessType, scopedAdminHeaders, ENDPOINT_URL));
+    }
+    assertFalse(accessControl.hasAccess("otherTable", AccessType.DELETE, scopedAdminHeaders, ENDPOINT_URL));
+
+    // An unrestricted principal with the same permission is still authorized cluster-wide.
+    AccessControlUtils.validatePermission(null, AccessType.DELETE, headers(FULL_USER, FULL_PASSWORD), "/users/admin",
+        accessControl);
+
+    // Omitting the table name must not sidestep the scope rule via the table overload. An exclude-list principal is
+    // the case that slips through a plain hasTable(null) check, since it has no allow-list to fail against.
+    for (String tableScopedUser : List.of(SCOPED_ADMIN_USER, EXCLUDED_USER)) {
+      HttpHeaders tableScopedHeaders = headers(tableScopedUser, tableScopedUser + "Password");
+      assertFalse(accessControl.hasAccess(null, AccessType.DELETE, tableScopedHeaders, "/users/admin"),
+          tableScopedUser + " must not be authorized for a request that names no table");
+    }
+  }
+
   @Test
   public void testMalformedCachedZkPrincipalFailsClosed()
       throws Exception {
@@ -175,13 +234,21 @@ public class BasicAuthAccessControlFactoryTest {
 
   private static AccessControl createStaticAccessControl() {
     Map<String, Object> properties = Map.ofEntries(
-        Map.entry("controller.admin.access.control.principals", "restricted,full,wildcard"),
+        Map.entry("controller.admin.access.control.principals",
+            "restricted,full,wildcard,scopedAdmin,excluded,clusterReader"),
         Map.entry("controller.admin.access.control.principals.restricted.password", RESTRICTED_PASSWORD),
         Map.entry("controller.admin.access.control.principals.restricted.tables", ALLOWED_TABLE),
         Map.entry("controller.admin.access.control.principals.restricted.permissions", "read"),
         Map.entry("controller.admin.access.control.principals.full.password", FULL_PASSWORD),
         Map.entry("controller.admin.access.control.principals.full.permissions", "create,read,update,delete"),
-        Map.entry("controller.admin.access.control.principals.wildcard.password", WILDCARD_PASSWORD));
+        Map.entry("controller.admin.access.control.principals.wildcard.password", WILDCARD_PASSWORD),
+        Map.entry("controller.admin.access.control.principals.scopedAdmin.password", SCOPED_ADMIN_PASSWORD),
+        Map.entry("controller.admin.access.control.principals.scopedAdmin.tables", ALLOWED_TABLE),
+        Map.entry("controller.admin.access.control.principals.scopedAdmin.permissions", "create,read,update,delete"),
+        Map.entry("controller.admin.access.control.principals.excluded.password", EXCLUDED_PASSWORD),
+        Map.entry("controller.admin.access.control.principals.excluded.excludeTables", "otherTable"),
+        Map.entry("controller.admin.access.control.principals.clusterReader.password", CLUSTER_READER_PASSWORD),
+        Map.entry("controller.admin.access.control.principals.clusterReader.permissions", "read"));
     BasicAuthAccessControlFactory factory = new BasicAuthAccessControlFactory();
     factory.init(new PinotConfiguration(properties));
     return factory.create();
@@ -195,6 +262,11 @@ public class BasicAuthAccessControlFactoryTest {
         user(FULL_USER, FULL_PASSWORD, null,
             List.of(org.apache.pinot.spi.config.user.AccessType.values())),
         user(WILDCARD_USER, WILDCARD_PASSWORD, null, null),
+        user(SCOPED_ADMIN_USER, SCOPED_ADMIN_PASSWORD, List.of(ALLOWED_TABLE),
+            List.of(org.apache.pinot.spi.config.user.AccessType.values())),
+        user(EXCLUDED_USER, EXCLUDED_PASSWORD, null, List.of("otherTable"), null),
+        user(CLUSTER_READER_USER, CLUSTER_READER_PASSWORD, null,
+            List.of(org.apache.pinot.spi.config.user.AccessType.READ)),
         new UserConfig(CORRUPT_USER, " ", ComponentType.CONTROLLER.name(), RoleType.USER.name(), null, null, null));
     List<String> userNames = users.stream().map(UserConfig::getUsernameWithComponent).toList();
     List<String> userPaths = userNames.stream().map(name -> "/CONFIGS/USER/" + name).toList();
@@ -222,8 +294,13 @@ public class BasicAuthAccessControlFactoryTest {
 
   private static UserConfig user(String username, String password, List<String> tables,
       List<org.apache.pinot.spi.config.user.AccessType> permissions) {
+    return user(username, password, tables, null, permissions);
+  }
+
+  private static UserConfig user(String username, String password, List<String> tables, List<String> excludeTables,
+      List<org.apache.pinot.spi.config.user.AccessType> permissions) {
     return new UserConfig(username, BcryptUtils.encrypt(password), ComponentType.CONTROLLER.name(),
-        RoleType.USER.name(), tables, null, permissions);
+        RoleType.USER.name(), tables, excludeTables, permissions);
   }
 
   private static HttpHeaders headers(String username, String password) {

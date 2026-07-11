@@ -82,6 +82,10 @@ pinotAuth:
   #  - access.control.principals.user.password=secret
   #  - access.control.principals.user.tables=baseballStats,otherstuff
   #  - access.control.principals.user.permissions=READ
+  # Setting `tables` (or `excludeTables`) scopes a principal to those tables and, on the controller, withholds every
+  # endpoint that names no table — cluster configs, instances, users, and cluster-wide listings such as GET /tables.
+  # `admin` above is unscoped and keeps that access. Give an operator both: a scoped principal for table work and an
+  # unscoped one for cluster work. Widening `tables` to restore cluster access would also widen table access.
 
 # ------------------------------------------------------------------------------
 # Pinot Controller:
