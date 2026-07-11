@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
@@ -97,6 +98,8 @@ public class IFSTIndexHandlerTest {
     // Column is in config but has no existing IFST index — metadata present.
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(COLUMN)));
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     when(columnMetadata.getColumnName()).thenReturn(COLUMN);
     when(columnMetadata.getDataType()).thenReturn(FieldSpec.DataType.STRING);
@@ -121,6 +124,8 @@ public class IFSTIndexHandlerTest {
     // Column is in config but getColumnMetadataFor returns null — not yet in segment.
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(COLUMN)));
     when(segmentMetadata.getColumnMetadataFor(COLUMN)).thenReturn(null);
 
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
@@ -163,6 +168,8 @@ public class IFSTIndexHandlerTest {
   private static SegmentDirectory mockSegmentDirectory(String column) {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(column)));
 
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
     when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
