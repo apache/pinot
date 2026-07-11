@@ -277,14 +277,29 @@ public class JsonUtils {
     return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonString);
   }
 
+  public static Map<String, Object> stringToMapWithBigDecimal(String jsonString)
+      throws JsonProcessingException {
+    return READER_WITH_BIG_DECIMAL.forType(MAP_TYPE_REFERENCE).readValue(jsonString);
+  }
+
   public static Map<String, Object> bytesToMap(byte[] jsonBytes)
       throws IOException {
     return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonBytes);
   }
 
+  public static Map<String, Object> bytesToMapWithBigDecimal(byte[] jsonBytes)
+      throws IOException {
+    return READER_WITH_BIG_DECIMAL.forType(MAP_TYPE_REFERENCE).readValue(jsonBytes);
+  }
+
   public static Map<String, Object> bytesToMap(byte[] jsonBytes, int offset, int length)
       throws IOException {
     return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonBytes, offset, length);
+  }
+
+  public static Map<String, Object> bytesToMapWithBigDecimal(byte[] jsonBytes, int offset, int length)
+      throws IOException {
+    return READER_WITH_BIG_DECIMAL.forType(MAP_TYPE_REFERENCE).readValue(jsonBytes, offset, length);
   }
 
   public static String objectToString(Object object)
