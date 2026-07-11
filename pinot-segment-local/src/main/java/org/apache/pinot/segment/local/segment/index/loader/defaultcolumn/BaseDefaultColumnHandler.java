@@ -30,6 +30,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.function.FunctionUtils;
@@ -110,13 +112,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     UPDATE_DIMENSION_DATA_TYPE,
     UPDATE_DIMENSION_DEFAULT_VALUE,
     UPDATE_DIMENSION_NUMBER_OF_VALUES,
+    UPDATE_DIMENSION_TRANSFORM_FUNCTION,
     UPDATE_METRIC_DATA_TYPE,
     UPDATE_METRIC_DEFAULT_VALUE,
     UPDATE_METRIC_NUMBER_OF_VALUES,
+    UPDATE_METRIC_TRANSFORM_FUNCTION,
     UPDATE_DATE_TIME_DATA_TYPE,
     UPDATE_DATE_TIME_DEFAULT_VALUE,
+    UPDATE_DATE_TIME_TRANSFORM_FUNCTION,
     UPDATE_COMPLEX_DATA_TYPE,
-    UPDATE_COMPLEX_DEFAULT_VALUE;
+    UPDATE_COMPLEX_DEFAULT_VALUE,
+    UPDATE_COMPLEX_TRANSFORM_FUNCTION;
 
     boolean isAddAction() {
       return this == ADD_DIMENSION || this == ADD_METRIC || this == ADD_DATE_TIME || this == ADD_COMPLEX;
@@ -293,6 +299,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DIMENSION_DEFAULT_VALUE);
           } else if (isSingleValueInMetadata != isSingleValueInSchema) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DIMENSION_NUMBER_OF_VALUES);
+          } else if (isTransformFunctionChanged(column, columnMetadata)) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DIMENSION_TRANSFORM_FUNCTION);
           }
         } else if (fieldTypeInMetadata == METRIC) {
           if (dataTypeInMetadata != dataTypeInSchema) {
@@ -301,18 +309,24 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_METRIC_DEFAULT_VALUE);
           } else if (isSingleValueInMetadata != isSingleValueInSchema) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_METRIC_NUMBER_OF_VALUES);
+          } else if (isTransformFunctionChanged(column, columnMetadata)) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_METRIC_TRANSFORM_FUNCTION);
           }
         } else if (fieldTypeInMetadata == DATE_TIME) {
           if (dataTypeInMetadata != dataTypeInSchema) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DATE_TIME_DATA_TYPE);
           } else if (!defaultValueInSchema.equals(defaultValueInMetadata)) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DATE_TIME_DEFAULT_VALUE);
+          } else if (isTransformFunctionChanged(column, columnMetadata)) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DATE_TIME_TRANSFORM_FUNCTION);
           }
         } else if (fieldTypeInMetadata == COMPLEX) {
           if (dataTypeInMetadata != dataTypeInSchema) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_COMPLEX_DATA_TYPE);
           } else if (!defaultValueInSchema.equals(defaultValueInMetadata)) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_COMPLEX_DEFAULT_VALUE);
+          } else if (isTransformFunctionChanged(column, columnMetadata)) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_COMPLEX_TRANSFORM_FUNCTION);
           }
         }
       } else {
@@ -359,6 +373,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     return defaultColumnActionMap;
   }
 
+  private boolean isTransformFunctionChanged(String column, ColumnMetadata columnMetadata) {
+    String transformFunctionInMetadata = columnMetadata.getTransformFunction();
+    return !Objects.equals(transformFunctionInMetadata, getTransformFunctionForColumn(column));
+  }
+
   /**
    * Helper method to update default column indices, returns {@code true} if the update succeeds, {@code false}
    * otherwise.
@@ -390,63 +409,72 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   protected boolean createColumnV1Indices(String column)
       throws Exception {
     boolean errorOnFailure = _indexLoadingConfig.isErrorOnColumnBuildFailure();
-    IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
-    if (ingestionConfig != null && ingestionConfig.getTransformConfigs() != null) {
-      List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
-      for (TransformConfig transformConfig : transformConfigs) {
-        if (transformConfig.getColumnName().equals(column)) {
-          String transformFunction = transformConfig.getTransformFunction();
-          FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+    String transformFunction = getTransformFunctionForColumn(column);
+    if (transformFunction != null) {
+      FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
 
-          // Check if all arguments exist in the segment
-          // TODO: Support chained derived column
-          List<String> arguments = functionEvaluator.getArguments();
-          List<ColumnMetadata> argumentsMetadata = new ArrayList<>(arguments.size());
-          for (String argument : arguments) {
-            ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(argument);
-            if (columnMetadata == null) {
-              LOGGER.warn("Assigning default value to derived column: {} because argument: {} does not exist in the "
-                  + "segment", column, argument);
-              createDefaultValueColumnV1Indices(column);
-              return true;
-            }
-            // TODO: Support creation of derived columns from forward index disabled columns
-            if (!_segmentWriter.hasIndexFor(argument, StandardIndexes.forward())) {
-              throw new UnsupportedOperationException(String.format("Operation not supported! Cannot create a derived "
-                      + "column %s because argument: %s does not have a forward index. Enable forward index and "
-                      + "refresh/backfill the segments to create a derived column from source column", column,
-                  argument));
-            }
-            argumentsMetadata.add(columnMetadata);
-          }
-
-          // TODO: Support forward index disabled derived column
-          if (isForwardIndexDisabled(column)) {
-            LOGGER.warn("Skip creating forward index disabled derived column: {}", column);
-            if (errorOnFailure) {
-              throw new UnsupportedOperationException(
-                  String.format("Failed to create forward index disabled derived column: %s", column));
-            }
-            return false;
-          }
-
-          try {
-            createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata, errorOnFailure);
-            return true;
-          } catch (Exception e) {
-            LOGGER.error("Caught exception while creating derived column: {} with transform function: {}", column,
-                transformFunction, e);
-            if (errorOnFailure) {
-              throw e;
-            }
-            return false;
-          }
+      // Check if all arguments exist in the segment
+      // TODO: Support chained derived column
+      List<String> arguments = functionEvaluator.getArguments();
+      List<ColumnMetadata> argumentsMetadata = new ArrayList<>(arguments.size());
+      for (String argument : arguments) {
+        ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(argument);
+        if (columnMetadata == null) {
+          LOGGER.warn("Assigning default value to derived column: {} because argument: {} does not exist in the "
+              + "segment", column, argument);
+          createDefaultValueColumnV1Indices(column, transformFunction);
+          return true;
         }
+        // TODO: Support creation of derived columns from forward index disabled columns
+        if (!_segmentWriter.hasIndexFor(argument, StandardIndexes.forward())) {
+          throw new UnsupportedOperationException(String.format("Operation not supported! Cannot create a derived "
+                  + "column %s because argument: %s does not have a forward index. Enable forward index and "
+                  + "refresh/backfill the segments to create a derived column from source column", column,
+              argument));
+        }
+        argumentsMetadata.add(columnMetadata);
+      }
+
+      // TODO: Support forward index disabled derived column
+      if (isForwardIndexDisabled(column)) {
+        LOGGER.warn("Skip creating forward index disabled derived column: {}", column);
+        if (errorOnFailure) {
+          throw new UnsupportedOperationException(
+              String.format("Failed to create forward index disabled derived column: %s", column));
+        }
+        return false;
+      }
+
+      try {
+        createDerivedColumnV1Indices(column, transformFunction, functionEvaluator, argumentsMetadata, errorOnFailure);
+        return true;
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while creating derived column: {} with transform function: {}", column,
+            transformFunction, e);
+        if (errorOnFailure) {
+          throw e;
+        }
+        return false;
       }
     }
 
-    createDefaultValueColumnV1Indices(column);
+    createDefaultValueColumnV1Indices(column, null);
     return true;
+  }
+
+  @SuppressWarnings("deprecation")
+  private String getTransformFunctionForColumn(String column) {
+    IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
+    if (ingestionConfig != null && ingestionConfig.getTransformConfigs() != null) {
+      for (TransformConfig transformConfig : ingestionConfig.getTransformConfigs()) {
+        if (column.equals(transformConfig.getColumnName())) {
+          return transformConfig.getTransformFunction();
+        }
+      }
+    }
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+    // Keep the schema-level transform fallback for legacy configs.
+    return fieldSpec != null ? fieldSpec.getTransformFunction() : null;
   }
 
   /**
@@ -460,7 +488,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   /**
    * Helper method to create the V1 indices (dictionary and forward index) for a column with default values.
    */
-  private void createDefaultValueColumnV1Indices(String column)
+  private void createDefaultValueColumnV1Indices(String column, @Nullable String transformFunction)
       throws Exception {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
 
@@ -528,7 +556,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata information to the metadata properties.
     BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, totalDocs, fieldSpec, true,
-        dictionaryElementSize, FieldConfig.EncodingType.DICTIONARY, true);
+        dictionaryElementSize, FieldConfig.EncodingType.DICTIONARY, true, transformFunction);
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
@@ -545,8 +573,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    *   - Support chained derived column
    *   - Support forward index disabled derived column
    */
-  private void createDerivedColumnV1Indices(String column, FunctionEvaluator functionEvaluator,
-      List<ColumnMetadata> argumentsMetadata, boolean errorOnFailure)
+  private void createDerivedColumnV1Indices(String column, String transformFunction,
+      FunctionEvaluator functionEvaluator, List<ColumnMetadata> argumentsMetadata, boolean errorOnFailure)
       throws Exception {
     // Initialize value readers for all arguments
     int numArguments = argumentsMetadata.size();
@@ -766,10 +794,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
 
       if (createDictionary) {
-        createDerivedColumnForwardIndexWithDictionary(column, fieldSpec, outputValues, statsCollector,
-            useVarLengthDictionary);
+        createDerivedColumnForwardIndexWithDictionary(column, transformFunction, fieldSpec, outputValues,
+            statsCollector, useVarLengthDictionary);
       } else {
-        createDerivedColumnForwardIndexWithoutDictionary(column, fieldSpec, outputValues, statsCollector);
+        createDerivedColumnForwardIndexWithoutDictionary(column, transformFunction, fieldSpec, outputValues,
+            statsCollector);
       }
     } finally {
       for (ValueReader valueReader : valueReaders) {
@@ -1083,8 +1112,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   /**
    * Helper method to create the dictionary and forward indices for a column with derived values.
    */
-  private void createDerivedColumnForwardIndexWithDictionary(String column, FieldSpec fieldSpec, Object[] outputValues,
-      ColumnStatistics columnStatistics, boolean useVarLengthDictionary)
+  private void createDerivedColumnForwardIndexWithDictionary(String column, String transformFunction,
+      FieldSpec fieldSpec, Object[] outputValues, ColumnStatistics columnStatistics, boolean useVarLengthDictionary)
       throws Exception {
 
     // Create dictionary
@@ -1111,7 +1140,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         // Add the column metadata
         BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, numDocs, fieldSpec, true,
-            dictionaryCreator.getNumBytesPerEntry(), FieldConfig.EncodingType.DICTIONARY, true);
+            dictionaryCreator.getNumBytesPerEntry(), FieldConfig.EncodingType.DICTIONARY, true, transformFunction);
       }
     }
   }
@@ -1119,8 +1148,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   /**
    * Helper method to create a forward index for a raw encoded column with derived values.
    */
-  private void createDerivedColumnForwardIndexWithoutDictionary(String column, FieldSpec fieldSpec,
-      Object[] outputValues, ColumnStatistics columnStatistics)
+  private void createDerivedColumnForwardIndexWithoutDictionary(String column, String transformFunction,
+      FieldSpec fieldSpec, Object[] outputValues, ColumnStatistics columnStatistics)
       throws Exception {
 
     // Create forward index
@@ -1196,7 +1225,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata
     BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, numDocs, fieldSpec, false,
-        0, FieldConfig.EncodingType.RAW, true);
+        0, FieldConfig.EncodingType.RAW, true, transformFunction);
   }
 
   private ForwardIndexCreator getForwardIndexCreator(ColumnStatistics columnStatistics,

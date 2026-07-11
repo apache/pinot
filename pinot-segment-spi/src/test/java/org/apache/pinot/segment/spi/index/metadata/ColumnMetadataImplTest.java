@@ -24,10 +24,13 @@ import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -130,6 +133,40 @@ public class ColumnMetadataImplTest {
 
     assertEquals(metadata.getParentColumn(), "metrics");
     assertTrue(metadata.isMaterializedChild());
+  }
+
+  @Test
+  public void transformFunctionRoundtrip() {
+    String transformFunction = "Groovy({x + ',' + y}, x, y)";
+    ColumnMetadataImpl meta = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.STRING, true))
+        .setTransformFunction(transformFunction)
+        .build();
+
+    assertEquals(meta.getTransformFunction(), transformFunction);
+  }
+
+  @Test
+  public void transformFunctionReadFromPropertiesConfig() {
+    String transformFunction = "Groovy({x + ',' + y}, x, y)";
+    String escapedTransformFunction =
+        CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    assertNotNull(escapedTransformFunction);
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION), escapedTransformFunction);
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertEquals(metadata.getTransformFunction(), transformFunction);
+  }
+
+  @Test
+  public void missingTransformFunctionIsBackwardCompatible() {
+    PropertiesConfiguration config = baseConfig("col");
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertNull(metadata.getTransformFunction());
   }
 
   private static PropertiesConfiguration baseConfig(String column) {
