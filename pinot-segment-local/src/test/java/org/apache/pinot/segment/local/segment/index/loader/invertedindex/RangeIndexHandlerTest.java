@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
@@ -140,6 +141,8 @@ public class RangeIndexHandlerTest {
     // Column has no range index yet and is not sorted — needs creation.
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(COLUMN)));
 
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     when(columnMetadata.isSorted()).thenReturn(false);
@@ -169,6 +172,8 @@ public class RangeIndexHandlerTest {
     // Sorted columns use a different query path — range index is not created for them.
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(COLUMN)));
 
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     when(columnMetadata.isSorted()).thenReturn(true);
@@ -205,6 +210,8 @@ public class RangeIndexHandlerTest {
   private static SegmentDirectory mockSegmentDirectory(String column) {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(column)));
 
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
     when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
