@@ -28,6 +28,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// An implementation of StreamMessageDecoder to read JSON records from a stream.
@@ -52,12 +53,14 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
+  private static final String PRESERVE_DECIMAL_PRECISION_CONFIG_KEY = "preserveDecimalPrecision";
 
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
   private Set<String> _fieldsToRead;
   private boolean _usesDefaultRecordExtractor;
   // For AUTO this resolves the concrete format per message; otherwise it is the pinned format's parser.
   private JsonPayloadParser _parser;
+  private boolean _preserveDecimalPrecision;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
@@ -71,13 +74,24 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     if (recordExtractorClass == null) {
       recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
     }
+    String preserveDecimalPrecision = null;
+    if (props != null) {
+      preserveDecimalPrecision = props.get(PRESERVE_DECIMAL_PRECISION_CONFIG_KEY);
+    }
+
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _jsonRecordExtractor.init(fieldsToRead, null);
     _fieldsToRead = CollectionUtils.isNotEmpty(fieldsToRead) ? Set.copyOf(fieldsToRead) : null;
     // Direct parsing implements JSONRecordExtractor's conversion contract and bypasses extract(). Require the
     // exact default class so a configured extractor or subclass cannot lose custom extraction behavior.
     _usesDefaultRecordExtractor = _jsonRecordExtractor.getClass() == JSONRecordExtractor.class;
-    _parser = JsonPayloadFormat.fromConfig(jsonFormat).getParser();
+    JsonPayloadFormat format = JsonPayloadFormat.fromConfig(jsonFormat);
+    _parser = format.getParser();
+    // BigDecimal-preserving parsing goes through Pinot's BigDecimal-aware text JSON reader, so it applies only
+    // to the TEXT format (the historical default); the binary formats encode floating point natively.
+    _preserveDecimalPrecision = format == JsonPayloadFormat.TEXT && (preserveDecimalPrecision != null
+        ? Boolean.parseBoolean(preserveDecimalPrecision)
+        : JSON_RECORD_EXTRACTOR_CLASS.equals(recordExtractorClass));
   }
 
   @Override
@@ -88,6 +102,11 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
+      if (_preserveDecimalPrecision) {
+        // Parse text JSON with the BigDecimal-aware reader so high-precision decimals survive ingestion.
+        return _jsonRecordExtractor.extract(JsonUtils.bytesToMapWithBigDecimal(payload, offset, length),
+            destination);
+      }
       if (_usesDefaultRecordExtractor && _parser.parse(payload, offset, length, destination, _fieldsToRead)) {
         return destination;
       }

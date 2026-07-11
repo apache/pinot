@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -97,7 +98,11 @@ public class JSONMessageDecoderBinaryTest {
   @Test
   public void testUnsetFormatIsText()
       throws Exception {
-    assertRich(decode(Map.of(), RICH_FIELDS, TEXT_DOC));
+    GenericRow row = decode(Map.of(), RICH_FIELDS, TEXT_DOC);
+    assertEquals(row.getValue("name"), "pinot");
+    assertEquals(row.getValue("count"), 7);
+    // The default extractor preserves decimal precision on text JSON, so the decimal parses as BigDecimal.
+    assertEquals(row.getValue("ratio"), new BigDecimal("2.5"));
   }
 
   /// The direct streaming path materializes top-level scalars straight off the parser; guard the binary-only
