@@ -62,6 +62,15 @@ public class BasicAuthPrincipal {
     return isTableIncluded(tableName) && isTableNotExcluded(tableName);
   }
 
+  /// Returns whether this principal is scoped to every table, i.e. it carries neither an allow-list nor an
+  /// exclude-list. Access control implementations use this to decide requests that name no table, so the return value
+  /// must satisfy: `true` implies [#hasTable(String)] holds for every table name. A subclass that narrows table scope
+  /// by any other means — in particular by overriding [#hasTable(String)] — must override this method to match, or it
+  /// will report unrestricted scope while denying individual tables.
+  public boolean hasUnrestrictedTableAccess() {
+    return _tables.isEmpty() && _excludeTables.isEmpty();
+  }
+
   private boolean isTableIncluded(String tableName) {
     return _tables.isEmpty() || _tables.contains(tableName);
   }
