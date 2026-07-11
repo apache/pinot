@@ -27,6 +27,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
@@ -96,7 +97,12 @@ public class IFSTIndexHandlerTest {
     // Column is in config but has no existing IFST index — metadata present.
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
-    when(segmentMetadata.getColumnMetadataFor(COLUMN)).thenReturn(mock(ColumnMetadata.class));
+    ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+    when(columnMetadata.getColumnName()).thenReturn(COLUMN);
+    when(columnMetadata.getDataType()).thenReturn(FieldSpec.DataType.STRING);
+    when(columnMetadata.hasDictionary()).thenReturn(true);
+    when(columnMetadata.isSingleValue()).thenReturn(true);
+    when(segmentMetadata.getColumnMetadataFor(COLUMN)).thenReturn(columnMetadata);
 
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
     when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
