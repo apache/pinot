@@ -64,6 +64,13 @@ public class BasicAuthPrincipal {
     return isTableIncluded(tableName) && isTableNotExcluded(tableName);
   }
 
+  /**
+   * Returns whether this principal has access to every table, without allow-list or exclude-list restrictions.
+   */
+  public boolean hasUnrestrictedTableAccess() {
+    return _tables.isEmpty() && _excludeTables.isEmpty();
+  }
+
   private boolean isTableIncluded(String tableName) {
     return _tables.isEmpty() || _tables.contains(tableName);
   }
