@@ -129,22 +129,24 @@ class AvroRecordAppender implements Closeable {
   private static Set<String> booleanColumns(org.apache.avro.Schema avroSchema) {
     Set<String> booleanColumns = new HashSet<>();
     for (Field field : avroSchema.getFields()) {
-      if (unwrapNullableType(field.schema()) == Type.BOOLEAN) {
+      if (nonNullBranch(field.schema()).getType() == Type.BOOLEAN) {
         booleanColumns.add(field.name());
       }
     }
     return booleanColumns;
   }
 
-  private static Type unwrapNullableType(org.apache.avro.Schema schema) {
+  /// Returns the non-null branch of a nullable union `["null", <type>]`, or the schema itself if it is not a union.
+  @VisibleForTesting
+  static org.apache.avro.Schema nonNullBranch(org.apache.avro.Schema schema) {
     if (schema.getType() == Type.UNION) {
       for (org.apache.avro.Schema member : schema.getTypes()) {
         if (member.getType() != Type.NULL) {
-          return member.getType();
+          return member;
         }
       }
     }
-    return schema.getType();
+    return schema;
   }
 
   @Override

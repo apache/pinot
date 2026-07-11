@@ -130,14 +130,6 @@ public class AvroWriterTest {
   }
 
   private static Schema nonNullBranch(Schema recordSchema, String fieldName) {
-    Schema fieldSchema = recordSchema.getField(fieldName).schema();
-    if (fieldSchema.getType() == Schema.Type.UNION) {
-      for (Schema member : fieldSchema.getTypes()) {
-        if (member.getType() != Schema.Type.NULL) {
-          return member;
-        }
-      }
-    }
-    return fieldSchema;
+    return AvroRecordAppender.nonNullBranch(recordSchema.getField(fieldName).schema());
   }
 }
