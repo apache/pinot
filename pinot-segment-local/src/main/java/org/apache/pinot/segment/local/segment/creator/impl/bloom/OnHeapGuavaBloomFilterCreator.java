@@ -44,12 +44,15 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapGuavaBloomFilterCreator.class);
 
   public static final int TYPE_VALUE = 1;
-  /** Legacy v1 format: {@code [TYPE_VALUE=1 (int)][VERSION=1 (int)][Guava bytes...]} — no fpp in header. */
+  /** V1 format (current write format): {@code [TYPE_VALUE=1 (int)][VERSION=1 (int)][Guava bytes...]}. */
   public static final int VERSION = 1;
-  /** V2 format: {@code [TYPE_VALUE=1 (int)][VERSION_V2=2 (int)][effective FPP (double)][Guava bytes...]}.
-   * The effective fpp (after applying any {@code maxSizeInBytes} cap) is stored at byte offset 8 so that
-   * {@link org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler} can compare it
-   * directly without depending on Guava's internal serialisation layout.
+  /**
+   * V2 format: {@code [TYPE_VALUE=1 (int)][VERSION_V2=2 (int)][effective FPP (double)][Guava bytes...]}.
+   * This format was introduced to embed the effective FPP in the header for change detection, but it broke
+   * backward compatibility because release-1.5.0 and older servers throw
+   * {@code IllegalStateException: Unsupported bloom filter type value: 1 and version: 2} on load.
+   * New segments are written in V1 format; this constant is kept so the reader can still handle any
+   * V2 segments that were created during the short window when V2 was the write format.
    */
   public static final int VERSION_V2 = 2;
   /** Byte offset of the fpp field in a v2 bloom filter file (after TYPE_VALUE + VERSION_V2). */
@@ -99,8 +102,7 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
       throws IOException {
     try (DataOutputStream out = new DataOutputStream(new FileOutputStream(_bloomFilterFile))) {
       out.writeInt(TYPE_VALUE);
-      out.writeInt(VERSION_V2);
-      out.writeDouble(_effectiveFpp);
+      out.writeInt(VERSION);
       _bloomFilter.writeTo(out);
     }
   }

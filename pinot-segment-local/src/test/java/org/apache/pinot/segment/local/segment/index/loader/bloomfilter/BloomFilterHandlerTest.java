@@ -52,19 +52,17 @@ import static org.testng.Assert.assertTrue;
 /**
  * Unit tests for {@link BloomFilterHandler} fpp-change detection.
  *
- * <p>The key invariant being tested: fpp-change detection reads the effective fpp stored directly
- * in the v2 bloom filter header, rather than inferring it from Guava-internal fields (numHashFunctions,
- * numLongs).  This avoids a fragile dependency on Guava's internal serialisation layout.
- *
  * <p>Bloom filter file format versions:
  * <ul>
- *   <li><b>v1 (legacy):</b> {@code [TYPE_VALUE=1 (int)][VERSION (int)][Guava bytes...]} — fpp not stored.</li>
- *   <li><b>v2:</b> {@code [TYPE_VALUE=1 (int)][VERSION_V2=2 (int)][FPP (double)][Guava bytes...]} — fpp stored
- *       explicitly at byte offset {@link OnHeapGuavaBloomFilterCreator#FPP_OFFSET}.</li>
+ *   <li><b>v1 (current write format):</b>
+ *       {@code [TYPE_VALUE=1 (int)][VERSION=1 (int)][Guava bytes...]} — fpp not stored explicitly.
+ *       Change detection reads {@code numHashFunctions} and {@code numLongs} from the Guava payload
+ *       at fixed offsets and compares them to the values computed from the configured fpp + cardinality.</li>
+ *   <li><b>v2 (legacy, no longer written):</b>
+ *       {@code [TYPE_VALUE=1 (int)][VERSION_V2=2 (int)][FPP (double)][Guava bytes...]} — fpp stored
+ *       explicitly at byte offset {@link OnHeapGuavaBloomFilterCreator#FPP_OFFSET}.
+ *       V2 reading is retained for segments created during the short window when V2 was the write format.</li>
  * </ul>
- *
- * <p>Legacy v1 segments skip fpp-change detection (return false) because the fpp is absent from the
- * header.  They are upgraded to v2 the next time the bloom filter is rebuilt for any other reason.
  */
 public class BloomFilterHandlerTest {
   private static final String COLUMN = "myBloomCol";
@@ -90,20 +88,34 @@ public class BloomFilterHandlerTest {
   }
 
   /**
-   * Legacy v1 segments do not carry fpp in the header; fpp-change detection must be skipped regardless
-   * of what the current config says.  The segment will be upgraded to v2 on its next rebuild.
+   * V1 file with the same fpp as the current config: numHashFunctions and numLongs match, no rebuild needed.
    */
   @Test
-  public void testV1LegacyFileSkipsFppChangeDetection()
+  public void testNeedUpdateReturnsFalseWhenFppUnchangedV1()
       throws Exception {
     writeV1BloomFilter(CARDINALITY, FPP_STORED);
 
-    // Config uses a clearly different fpp, but because the file is v1 the handler must not trigger a rebuild.
-    BloomFilterHandler handler = createHandler(COLUMN, new BloomFilterConfig(FPP_DIFFERENT, 0, false));
+    BloomFilterHandler handler = createHandler(COLUMN, new BloomFilterConfig(FPP_STORED, 0, false));
     SegmentDirectory.Reader reader = mockReaderWithBloomFilter(COLUMN, _bloomFilterFile);
 
     assertFalse(handler.needUpdateIndices(reader),
-        "No rebuild expected for legacy v1 segments — fpp is not stored in the header");
+        "No rebuild expected when stored v1 numHashFunctions/numLongs match the current config");
+  }
+
+  /**
+   * V1 file with a different fpp from the current config: numHashFunctions or numLongs differ,
+   * rebuild must be triggered.
+   */
+  @Test
+  public void testNeedUpdateReturnsTrueWhenFppChangedV1()
+      throws Exception {
+    writeV1BloomFilter(CARDINALITY, FPP_STORED);
+
+    BloomFilterHandler handler = createHandler(COLUMN, new BloomFilterConfig(FPP_DIFFERENT, 0, false));
+    SegmentDirectory.Reader reader = mockReaderWithBloomFilter(COLUMN, _bloomFilterFile);
+
+    assertTrue(handler.needUpdateIndices(reader),
+        "Rebuild expected when v1 numHashFunctions/numLongs do not match the current config");
   }
 
   /**
@@ -139,7 +151,7 @@ public class BloomFilterHandlerTest {
   // --- helpers ---
 
   /**
-   * Writes a legacy v1 Pinot bloom filter file: {@code [TYPE_VALUE=1 (int)][VERSION (int)][Guava bytes]}.
+   * Writes a v1 Pinot bloom filter file: {@code [TYPE_VALUE=1 (int)][VERSION=1 (int)][Guava bytes]}.
    */
   private void writeV1BloomFilter(int cardinality, double fpp)
       throws Exception {
