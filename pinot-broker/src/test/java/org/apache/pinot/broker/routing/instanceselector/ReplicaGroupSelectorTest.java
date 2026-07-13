@@ -54,6 +54,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.config.table.RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
 import static org.apache.pinot.spi.config.table.RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -70,7 +71,7 @@ import static org.testng.Assert.assertTrue;
 
 /**
  * Tests for {@link ReplicaGroupInstanceSelector} and {@link StrictReplicaGroupInstanceSelector},
- * including adaptive server selection (pool-level routing for strict replica groups).
+ * including adaptive server selection (replica-group-level routing for strict replica groups).
  */
 @SuppressWarnings("unchecked")
 public class ReplicaGroupSelectorTest {
@@ -336,40 +337,40 @@ public class ReplicaGroupSelectorTest {
 
   // --- Adaptive server selection tests ---
 
-  // Shared topology for AR tests: 3 segments across 5 instances in two replica groups.
-  // segment2 intentionally has instance4 (unranked) so AR falls back to round-robin for that segment.
-  private static final String AR_INSTANCE0 = "instance0";
-  private static final String AR_INSTANCE1 = "instance1";
-  private static final String AR_INSTANCE2 = "instance2";
-  private static final String AR_INSTANCE3 = "instance3";
-  private static final String AR_INSTANCE4 = "instance4";
+  // Shared topology for AR tests: 3 segments across 5 instances in two pools / replica groups.
+  // segment2 intentionally has AR_P0_RG0_SERVER_E (unranked) so AR falls back to round-robin for that segment.
+  private static final String AR_P0_RG0_SERVER_A = "ar_p0_rg0_server_a";
+  private static final String AR_P1_RG1_SERVER_B = "ar_p1_rg1_server_b";
+  private static final String AR_P0_RG0_SERVER_C = "ar_p0_rg0_server_c";
+  private static final String AR_P1_RG1_SERVER_D = "ar_p1_rg1_server_d";
+  private static final String AR_P0_RG0_SERVER_E = "ar_p0_rg0_server_e";
   private static final String AR_SEGMENT0 = "segment0";
   private static final String AR_SEGMENT1 = "segment1";
   private static final String AR_SEGMENT2 = "segment2";
   private static final List<String> AR_SEGMENTS =
       Arrays.asList(AR_SEGMENT0, AR_SEGMENT1, AR_SEGMENT2);
-  // Rankings: instance3 best → instance2 → instance1 → instance0 worst; instance4 absent (triggers AR fallback)
+  // Rankings: D best → C → B → A worst; E absent (triggers AR fallback)
   private static final List<Pair<String, Double>> AR_SERVER_RANKS = Arrays.asList(
-      new ImmutablePair<>(AR_INSTANCE3, 1.0),
-      new ImmutablePair<>(AR_INSTANCE2, 2.0),
-      new ImmutablePair<>(AR_INSTANCE1, 3.0),
-      new ImmutablePair<>(AR_INSTANCE0, 4.0)
+      new ImmutablePair<>(AR_P1_RG1_SERVER_D, 1.0),
+      new ImmutablePair<>(AR_P0_RG0_SERVER_C, 2.0),
+      new ImmutablePair<>(AR_P1_RG1_SERVER_B, 3.0),
+      new ImmutablePair<>(AR_P0_RG0_SERVER_A, 4.0)
   );
 
   private SegmentStates buildArSegmentStates() {
     Map<String, List<SegmentInstanceCandidate>> candidatesMap = new HashMap<>();
-    // segment0 → instance0, instance1
+    // segment0 → pool 0 / replica group 0 server A, pool 1 / replica group 1 server B
     candidatesMap.put(AR_SEGMENT0, Arrays.asList(
-        new SegmentInstanceCandidate(AR_INSTANCE0, true),
-        new SegmentInstanceCandidate(AR_INSTANCE1, true)));
-    // segment1 → instance2, instance3
+        new SegmentInstanceCandidate(AR_P0_RG0_SERVER_A, true, 0, 0),
+        new SegmentInstanceCandidate(AR_P1_RG1_SERVER_B, true, 1, 1)));
+    // segment1 → pool 0 / replica group 0 server C, pool 1 / replica group 1 server D
     candidatesMap.put(AR_SEGMENT1, Arrays.asList(
-        new SegmentInstanceCandidate(AR_INSTANCE2, true),
-        new SegmentInstanceCandidate(AR_INSTANCE3, true)));
-    // segment2 → instance4 (unranked), instance3
+        new SegmentInstanceCandidate(AR_P0_RG0_SERVER_C, true, 0, 0),
+        new SegmentInstanceCandidate(AR_P1_RG1_SERVER_D, true, 1, 1)));
+    // segment2 → pool 0 / replica group 0 server E (unranked), pool 1 / replica group 1 server D
     candidatesMap.put(AR_SEGMENT2, Arrays.asList(
-        new SegmentInstanceCandidate(AR_INSTANCE4, true),
-        new SegmentInstanceCandidate(AR_INSTANCE3, true)));
+        new SegmentInstanceCandidate(AR_P0_RG0_SERVER_E, true, 0, 0),
+        new SegmentInstanceCandidate(AR_P1_RG1_SERVER_D, true, 1, 1)));
     return new SegmentStates(candidatesMap, new HashSet<>(AR_SEGMENTS), null);
   }
 
@@ -383,18 +384,34 @@ public class ReplicaGroupSelectorTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setRoutingConfig(routingConfig).build();
     IdealState idealState = createIdealState(Map.of(
-        AR_SEGMENT0, List.of(Pair.of(AR_INSTANCE0, ONLINE), Pair.of(AR_INSTANCE1, ONLINE)),
-        AR_SEGMENT1, List.of(Pair.of(AR_INSTANCE2, ONLINE), Pair.of(AR_INSTANCE3, ONLINE)),
-        AR_SEGMENT2, List.of(Pair.of(AR_INSTANCE3, ONLINE), Pair.of(AR_INSTANCE4, ONLINE))));
+        AR_SEGMENT0, List.of(Pair.of(AR_P0_RG0_SERVER_A, ONLINE), Pair.of(AR_P1_RG1_SERVER_B, ONLINE)),
+        AR_SEGMENT1, List.of(Pair.of(AR_P0_RG0_SERVER_C, ONLINE), Pair.of(AR_P1_RG1_SERVER_D, ONLINE)),
+        AR_SEGMENT2, List.of(Pair.of(AR_P1_RG1_SERVER_D, ONLINE), Pair.of(AR_P0_RG0_SERVER_E, ONLINE))));
     ExternalView externalView = createExternalView(Map.of(
-        AR_SEGMENT0, List.of(Pair.of(AR_INSTANCE0, ONLINE), Pair.of(AR_INSTANCE1, ONLINE)),
-        AR_SEGMENT1, List.of(Pair.of(AR_INSTANCE2, ONLINE), Pair.of(AR_INSTANCE3, ONLINE)),
-        AR_SEGMENT2, List.of(Pair.of(AR_INSTANCE3, ONLINE), Pair.of(AR_INSTANCE4, ONLINE))));
+        AR_SEGMENT0, List.of(Pair.of(AR_P0_RG0_SERVER_A, ONLINE), Pair.of(AR_P1_RG1_SERVER_B, ONLINE)),
+        AR_SEGMENT1, List.of(Pair.of(AR_P0_RG0_SERVER_C, ONLINE), Pair.of(AR_P1_RG1_SERVER_D, ONLINE)),
+        AR_SEGMENT2, List.of(Pair.of(AR_P1_RG1_SERVER_D, ONLINE), Pair.of(AR_P0_RG0_SERVER_E, ONLINE))));
+    ServerInstance serverA = mock(ServerInstance.class);
+    when(serverA.getPool()).thenReturn(0);
+    ServerInstance serverB = mock(ServerInstance.class);
+    when(serverB.getPool()).thenReturn(1);
+    ServerInstance serverC = mock(ServerInstance.class);
+    when(serverC.getPool()).thenReturn(0);
+    ServerInstance serverD = mock(ServerInstance.class);
+    when(serverD.getPool()).thenReturn(1);
+    ServerInstance serverE = mock(ServerInstance.class);
+    when(serverE.getPool()).thenReturn(0);
+    Map<String, ServerInstance> serverMap = Map.of(
+        AR_P0_RG0_SERVER_A, serverA,
+        AR_P1_RG1_SERVER_B, serverB,
+        AR_P0_RG0_SERVER_C, serverC,
+        AR_P1_RG1_SERVER_D, serverD,
+        AR_P0_RG0_SERVER_E, serverE);
     return (ReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
         mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), hybridSelector,
         brokerConfig,
-        Set.of(AR_INSTANCE0, AR_INSTANCE1, AR_INSTANCE2, AR_INSTANCE3, AR_INSTANCE4),
-        Map.of(), idealState, externalView, new HashSet<>(AR_SEGMENTS));
+        Set.of(AR_P0_RG0_SERVER_A, AR_P1_RG1_SERVER_B, AR_P0_RG0_SERVER_C, AR_P1_RG1_SERVER_D, AR_P0_RG0_SERVER_E),
+        serverMap, idealState, externalView, new HashSet<>(AR_SEGMENTS));
   }
 
   @Test
@@ -413,44 +430,47 @@ public class ReplicaGroupSelectorTest {
         instanceSelector.select(AR_SEGMENTS, 0, buildArSegmentStates(), null);
 
     // AR prefers the better-ranked server when all candidates are ranked:
-    // segment0: instance1 (rank 3) over instance0 (rank 4)
-    // segment1: instance3 (rank 1) over instance2 (rank 2)
-    // segment2: instance4 unranked → AR falls back to round-robin → index 0 = instance4
+    // segment0: B (rank 3) over A (rank 4)
+    // segment1: D (rank 1) over C (rank 2)
+    // segment2: E unranked → AR falls back to round-robin → index 0 = E
     assertEquals(result.segmentToInstanceMap(), Map.of(
-        AR_SEGMENT0, AR_INSTANCE1,
-        AR_SEGMENT1, AR_INSTANCE3,
-        AR_SEGMENT2, AR_INSTANCE4));
+        AR_SEGMENT0, AR_P1_RG1_SERVER_B,
+        AR_SEGMENT1, AR_P1_RG1_SERVER_D,
+        AR_SEGMENT2, AR_P0_RG0_SERVER_E));
   }
 
   @Test
   public void testStrictReplicaGroupAdaptiveDisabledByFeatureFlag() {
-    // when the feature flag is disabled, the factory nulls out the adaptive selector so the
-    // selector falls back to round-robin.
+    // When the feature flag is disabled, the factory nulls out the adaptive selector so the selector falls back to the
+    // strict selector's non-adaptive, round-robin-by-replica-index path.
     HybridSelector hybridSelector = mock(HybridSelector.class);
+    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     PinotConfiguration brokerConfig = new PinotConfiguration(Map.of(
         CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STRICT_REPLICA_GROUP, "false"));
-    ReplicaGroupInstanceSelector instanceSelector =
-        buildArSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, hybridSelector, brokerConfig);
+    StrictReplicaGroupInstanceSelector instanceSelector =
+        buildStrictReplicaGroupArSelector(hybridSelector, brokerMetrics, brokerConfig);
 
-    assertTrue(instanceSelector instanceof StrictReplicaGroupInstanceSelector);
     assertNull(instanceSelector._adaptiveServerSelector);
     assertNull(instanceSelector._priorityPoolInstanceSelector);
 
     BaseInstanceSelector.InstanceMapping result =
-        instanceSelector.select(AR_SEGMENTS, 0, buildArSegmentStates(), null);
+        instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
 
-    // hybridSelector never consulted during routing despite being passed to the factory
     verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
-
-    // Round-robin with requestId=0 picks candidate index 0 per segment
     assertEquals(result.segmentToInstanceMap(), Map.of(
-        AR_SEGMENT0, AR_INSTANCE0,
-        AR_SEGMENT1, AR_INSTANCE2,
-        AR_SEGMENT2, AR_INSTANCE4));
+        STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT1, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
+
+    result = instanceSelector.select(STRICT_SEGMENTS, 1, buildStrictReplicaGroupSegmentStates(), null);
+    assertEquals(result.segmentToInstanceMap(), Map.of(
+        STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
   }
 
   @Test
-  public void testStrictReplicaGroupUsesAdaptiveServerSelector() {
+  public void testStrictReplicaGroupFactoryEnablesAdaptiveRouting() {
     HybridSelector hybridSelector = mock(HybridSelector.class);
     ReplicaGroupInstanceSelector instanceSelector =
         buildArSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, hybridSelector);
@@ -460,37 +480,39 @@ public class ReplicaGroupSelectorTest {
     assertNotNull(instanceSelector._priorityPoolInstanceSelector);
   }
 
-  // --- Strict replica group pool-level adaptive routing tests ---
+  // --- Strict replica group adaptive routing tests ---
 
-  // Topology: 2 replica groups (pool 0 and pool 1), 3 segments
-  // Pool 0: server_a (segment0, segment1), server_b (segment2)
-  // Pool 1: server_c (segment0, segment1), server_d (segment2)
-  private static final String SRG_SERVER_A = "server_a";
-  private static final String SRG_SERVER_B = "server_b";
-  private static final String SRG_SERVER_C = "server_c";
-  private static final String SRG_SERVER_D = "server_d";
-  private static final String SRG_SEGMENT0 = "seg0";
-  private static final String SRG_SEGMENT1 = "seg1";
-  private static final String SRG_SEGMENT2 = "seg2";
-  private static final List<String> SRG_SEGMENTS = Arrays.asList(SRG_SEGMENT0, SRG_SEGMENT1, SRG_SEGMENT2);
+  // Topology: 2 replica groups, 3 segments
+  // Replica group 0: server_a (segment0, segment1), server_b (segment2)
+  // Replica group 1: server_c (segment0, segment1), server_d (segment2)
+  // If a strict-fixture server name omits `P#`, its pool is FALLBACK_POOL_ID.
+  private static final String STRICT_RG0_SERVER_A = "strict_rg0_server_a";
+  private static final String STRICT_RG0_SERVER_B = "strict_rg0_server_b";
+  private static final String STRICT_RG1_SERVER_C = "strict_rg1_server_c";
+  private static final String STRICT_RG1_SERVER_D = "strict_rg1_server_d";
+  private static final String STRICT_SEGMENT0 = "seg0";
+  private static final String STRICT_SEGMENT1 = "seg1";
+  private static final String STRICT_SEGMENT2 = "seg2";
+  private static final List<String> STRICT_SEGMENTS = Arrays.asList(STRICT_SEGMENT0, STRICT_SEGMENT1, STRICT_SEGMENT2);
+
+  private List<SegmentInstanceCandidate> buildStrictReplicaGroupCandidates(String replicaGroup0Instance,
+      String replicaGroup1Instance) {
+    return Arrays.asList(
+        new SegmentInstanceCandidate(replicaGroup0Instance, true, FALLBACK_POOL_ID, 0),
+        new SegmentInstanceCandidate(replicaGroup1Instance, true, FALLBACK_POOL_ID, 1));
+  }
 
   private SegmentStates buildStrictReplicaGroupSegmentStates() {
     Map<String, List<SegmentInstanceCandidate>> candidatesMap = new HashMap<>();
-    // segment0 → server_a (pool 0), server_c (pool 1).
-    // Pool 0 is inserted into the LinkedHashMap before pool 1 because server_a (pool 0) appears
-    // first here. The round-robin fallback test depends on this insertion order.
-    candidatesMap.put(SRG_SEGMENT0, Arrays.asList(
-        new SegmentInstanceCandidate(SRG_SERVER_A, true, 0, 0),
-        new SegmentInstanceCandidate(SRG_SERVER_C, true, 1, 0)));
-    // segment1 → server_a (pool 0), server_c (pool 1)
-    candidatesMap.put(SRG_SEGMENT1, Arrays.asList(
-        new SegmentInstanceCandidate(SRG_SERVER_A, true, 0, 0),
-        new SegmentInstanceCandidate(SRG_SERVER_C, true, 1, 0)));
-    // segment2 → server_b (pool 0), server_d (pool 1)
-    candidatesMap.put(SRG_SEGMENT2, Arrays.asList(
-        new SegmentInstanceCandidate(SRG_SERVER_B, true, 0, 0),
-        new SegmentInstanceCandidate(SRG_SERVER_D, true, 1, 0)));
-    return new SegmentStates(candidatesMap, new HashSet<>(SRG_SEGMENTS), null);
+    // All strict-fixture servers intentionally share FALLBACK_POOL_ID so these tests fail if strict routing regresses
+    // back to grouping or filtering by pool instead of idealStateReplicaId.
+    candidatesMap.put(STRICT_SEGMENT0,
+        buildStrictReplicaGroupCandidates(STRICT_RG0_SERVER_A, STRICT_RG1_SERVER_C));
+    candidatesMap.put(STRICT_SEGMENT1,
+        buildStrictReplicaGroupCandidates(STRICT_RG0_SERVER_A, STRICT_RG1_SERVER_C));
+    candidatesMap.put(STRICT_SEGMENT2,
+        buildStrictReplicaGroupCandidates(STRICT_RG0_SERVER_B, STRICT_RG1_SERVER_D));
+    return new SegmentStates(candidatesMap, new HashSet<>(STRICT_SEGMENTS), null);
   }
 
   private StrictReplicaGroupInstanceSelector buildStrictReplicaGroupArSelector(HybridSelector hybridSelector) {
@@ -510,214 +532,217 @@ public class ReplicaGroupSelectorTest {
         .setRoutingConfig(routingConfig).build();
     // Ideal state: mirrors the topology above
     IdealState idealState = createIdealState(Map.of(
-        SRG_SEGMENT0, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(SRG_SERVER_C, ONLINE)),
-        SRG_SEGMENT1, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(SRG_SERVER_C, ONLINE)),
-        SRG_SEGMENT2, List.of(Pair.of(SRG_SERVER_B, ONLINE), Pair.of(SRG_SERVER_D, ONLINE))));
+        STRICT_SEGMENT0, List.of(
+            Pair.of(STRICT_RG0_SERVER_A, ONLINE),
+            Pair.of(STRICT_RG1_SERVER_C, ONLINE)),
+        STRICT_SEGMENT1, List.of(
+            Pair.of(STRICT_RG0_SERVER_A, ONLINE),
+            Pair.of(STRICT_RG1_SERVER_C, ONLINE)),
+        STRICT_SEGMENT2, List.of(
+            Pair.of(STRICT_RG0_SERVER_B, ONLINE),
+            Pair.of(STRICT_RG1_SERVER_D, ONLINE))));
     ExternalView externalView = createExternalView(Map.of(
-        SRG_SEGMENT0, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(SRG_SERVER_C, ONLINE)),
-        SRG_SEGMENT1, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(SRG_SERVER_C, ONLINE)),
-        SRG_SEGMENT2, List.of(Pair.of(SRG_SERVER_B, ONLINE), Pair.of(SRG_SERVER_D, ONLINE))));
-    // Provide server instances with pool assignments
+        STRICT_SEGMENT0, List.of(
+            Pair.of(STRICT_RG0_SERVER_A, ONLINE),
+            Pair.of(STRICT_RG1_SERVER_C, ONLINE)),
+        STRICT_SEGMENT1, List.of(
+            Pair.of(STRICT_RG0_SERVER_A, ONLINE),
+            Pair.of(STRICT_RG1_SERVER_C, ONLINE)),
+        STRICT_SEGMENT2, List.of(
+            Pair.of(STRICT_RG0_SERVER_B, ONLINE),
+            Pair.of(STRICT_RG1_SERVER_D, ONLINE))));
+    // All servers use the fallback pool to prove strict routing keys off idealStateReplicaId rather than pool.
     ServerInstance serverA = mock(ServerInstance.class);
-    when(serverA.getPool()).thenReturn(0);
+    when(serverA.getPool()).thenReturn(FALLBACK_POOL_ID);
     ServerInstance serverB = mock(ServerInstance.class);
-    when(serverB.getPool()).thenReturn(0);
+    when(serverB.getPool()).thenReturn(FALLBACK_POOL_ID);
     ServerInstance serverC = mock(ServerInstance.class);
-    when(serverC.getPool()).thenReturn(1);
+    when(serverC.getPool()).thenReturn(FALLBACK_POOL_ID);
     ServerInstance serverD = mock(ServerInstance.class);
-    when(serverD.getPool()).thenReturn(1);
+    when(serverD.getPool()).thenReturn(FALLBACK_POOL_ID);
     Map<String, ServerInstance> serverMap = Map.of(
-        SRG_SERVER_A, serverA, SRG_SERVER_B, serverB,
-        SRG_SERVER_C, serverC, SRG_SERVER_D, serverD);
+        STRICT_RG0_SERVER_A, serverA, STRICT_RG0_SERVER_B, serverB,
+        STRICT_RG1_SERVER_C, serverC, STRICT_RG1_SERVER_D, serverD);
     return (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
         mock(ZkHelixPropertyStore.class), brokerMetrics, hybridSelector,
         brokerConfig,
-        Set.of(SRG_SERVER_A, SRG_SERVER_B, SRG_SERVER_C, SRG_SERVER_D),
-        serverMap, idealState, externalView, new HashSet<>(SRG_SEGMENTS));
+        Set.of(STRICT_RG0_SERVER_A, STRICT_RG0_SERVER_B,
+            STRICT_RG1_SERVER_C, STRICT_RG1_SERVER_D),
+        serverMap, idealState, externalView, new HashSet<>(STRICT_SEGMENTS));
   }
 
   @Test
   public void testStrictReplicaGroupAdaptivePicksBestReplicaGroupByWorstCaseServer() {
-    // Pool 0 servers: server_a (rank 2), server_b (rank 3) → worst = 3
-    // Pool 1 servers: server_c (rank 0), server_d (rank 1) → worst = 1
-    // Pool 1 is better (lower worst-case rank), so all segments should route to pool 1
+    // Replica group 0 servers: server_a (rank 2), server_b (rank 3) → worst = 3
+    // Replica group 1 servers: server_c (rank 0), server_d (rank 1) → worst = 1
+    // Replica group 1 is better (lower worst-case rank), so all segments should route there
     HybridSelector hybridSelector = mock(HybridSelector.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector,
         brokerMetrics);
 
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
-        new ImmutablePair<>(SRG_SERVER_C, 1.0),  // rank 0 (best)
-        new ImmutablePair<>(SRG_SERVER_D, 2.0),  // rank 1
-        new ImmutablePair<>(SRG_SERVER_A, 3.0),  // rank 2
-        new ImmutablePair<>(SRG_SERVER_B, 4.0)   // rank 3 (worst)
+        new ImmutablePair<>(STRICT_RG1_SERVER_C, 1.0),  // rank 0 (best)
+        new ImmutablePair<>(STRICT_RG1_SERVER_D, 2.0),  // rank 1
+        new ImmutablePair<>(STRICT_RG0_SERVER_A, 3.0),  // rank 2
+        new ImmutablePair<>(STRICT_RG0_SERVER_B, 4.0)   // rank 3 (worst)
     ));
 
     InstanceSelector.InstanceMapping result =
-        instanceSelector.select(SRG_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
+        instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
 
-    // All segments routed to pool 1
+    // All segments routed to replica group 1
     assertEquals(result.segmentToInstanceMap(), Map.of(
-        SRG_SEGMENT0, SRG_SERVER_C,
-        SRG_SEGMENT1, SRG_SERVER_C,
-        SRG_SEGMENT2, SRG_SERVER_D));
+        STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
+    // Metrics are still reported per actual pool, even though routing is chosen by replica group.
     verify(brokerMetrics).addMeteredValue(eq(BrokerMeter.POOL_SEG_QUERIES), eq(3L),
-        eq(BrokerMetrics.getTagForPreferredPool(null)), eq("1"));
+        eq(BrokerMetrics.getTagForPreferredPool(null)), eq(String.valueOf(FALLBACK_POOL_ID)));
   }
 
   @Test
-  public void testStrictReplicaGroupAdaptivePicksPool0WhenItHasBetterWorstCase() {
-    // Pool 0 servers: server_a (rank 0), server_b (rank 1) → worst = 1
-    // Pool 1 servers: server_c (rank 2), server_d (rank 3) → worst = 3
-    // Pool 0 is better
+  public void testStrictReplicaGroupAdaptivePicksGroup0WhenItHasBetterWorstCase() {
+    // Replica group 0 servers: server_a (rank 0), server_b (rank 1) → worst = 1
+    // Replica group 1 servers: server_c (rank 2), server_d (rank 3) → worst = 3
+    // Replica group 0 is better
     HybridSelector hybridSelector = mock(HybridSelector.class);
     StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
 
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
-        new ImmutablePair<>(SRG_SERVER_A, 1.0),
-        new ImmutablePair<>(SRG_SERVER_B, 2.0),
-        new ImmutablePair<>(SRG_SERVER_C, 3.0),
-        new ImmutablePair<>(SRG_SERVER_D, 4.0)
+        new ImmutablePair<>(STRICT_RG0_SERVER_A, 1.0),
+        new ImmutablePair<>(STRICT_RG0_SERVER_B, 2.0),
+        new ImmutablePair<>(STRICT_RG1_SERVER_C, 3.0),
+        new ImmutablePair<>(STRICT_RG1_SERVER_D, 4.0)
     ));
 
     InstanceSelector.InstanceMapping result =
-        instanceSelector.select(SRG_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
+        instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
 
-    // All segments routed to pool 0
+    // All segments routed to replica group 0
     assertEquals(result.segmentToInstanceMap(), Map.of(
-        SRG_SEGMENT0, SRG_SERVER_A,
-        SRG_SEGMENT1, SRG_SERVER_A,
-        SRG_SEGMENT2, SRG_SERVER_B));
+        STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT1, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
   }
 
   @Test
-  public void testStrictReplicaGroupAdaptiveNoStatsFallsBackToRoundRobin() {
-    // When fetchServerRankingsWithScores returns empty, fall back to round-robin
+  public void testStrictReplicaGroupAdaptiveEmptyRankingsFallBackToRoundRobin() {
+    // When adaptive ranking returns no servers, fall back to round-robin by replica-group index.
     HybridSelector hybridSelector = mock(HybridSelector.class);
     StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
 
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(List.of());
 
-    // requestId=0 → picks group at index 0 (pool 0)
+    // requestId=0 → picks group at index 0 (replica group 0)
     InstanceSelector.InstanceMapping result =
-        instanceSelector.select(SRG_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
+        instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
     assertEquals(result.segmentToInstanceMap(), Map.of(
-        SRG_SEGMENT0, SRG_SERVER_A,
-        SRG_SEGMENT1, SRG_SERVER_A,
-        SRG_SEGMENT2, SRG_SERVER_B));
+        STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT1, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
 
-    // requestId=1 → picks group at index 1 (pool 1)
-    result = instanceSelector.select(SRG_SEGMENTS, 1, buildStrictReplicaGroupSegmentStates(), null);
+    // requestId=1 → picks group at index 1 (replica group 1)
+    result = instanceSelector.select(STRICT_SEGMENTS, 1, buildStrictReplicaGroupSegmentStates(), null);
     assertEquals(result.segmentToInstanceMap(), Map.of(
-        SRG_SEGMENT0, SRG_SERVER_C,
-        SRG_SEGMENT1, SRG_SERVER_C,
-        SRG_SEGMENT2, SRG_SERVER_D));
+        STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
   }
 
   @Test
   public void testStrictReplicaGroupAdaptiveConsistencyAllSegmentsSameReplicaGroup() {
-    // For any set of adaptive scores, all segments must route to the same replica group
+    // When adaptive scores favor replica group 1, all segments must route to that same replica group.
     HybridSelector hybridSelector = mock(HybridSelector.class);
     StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
 
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
-        new ImmutablePair<>(SRG_SERVER_C, 1.0),
-        new ImmutablePair<>(SRG_SERVER_D, 2.0),
-        new ImmutablePair<>(SRG_SERVER_A, 3.0),
-        new ImmutablePair<>(SRG_SERVER_B, 4.0)
+        new ImmutablePair<>(STRICT_RG1_SERVER_C, 1.0),
+        new ImmutablePair<>(STRICT_RG1_SERVER_D, 2.0),
+        new ImmutablePair<>(STRICT_RG0_SERVER_A, 3.0),
+        new ImmutablePair<>(STRICT_RG0_SERVER_B, 4.0)
     ));
 
     InstanceSelector.InstanceMapping result =
-        instanceSelector.select(SRG_SEGMENTS, 42, buildStrictReplicaGroupSegmentStates(), null);
+        instanceSelector.select(STRICT_SEGMENTS, 42, buildStrictReplicaGroupSegmentStates(), null);
 
-    // Collect all pool IDs from selected instances
-    Map<String, String> selections = result.segmentToInstanceMap();
-    Set<Integer> poolsUsed = new HashSet<>();
-    SegmentStates states = buildStrictReplicaGroupSegmentStates();
-    for (Map.Entry<String, String> entry : selections.entrySet()) {
-      String segment = entry.getKey();
-      String selectedInstance = entry.getValue();
-      for (SegmentInstanceCandidate candidate : states.getCandidates(segment)) {
-        if (candidate.getInstance().equals(selectedInstance)) {
-          poolsUsed.add(candidate.getPool());
-          break;
-        }
-      }
-    }
-    // All segments must be from the same pool
-    assertEquals(poolsUsed.size(), 1, "All segments should be routed to the same replica group");
+    assertEquals(result.segmentToInstanceMap(), Map.of(
+        STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
   }
 
   @Test
   public void testStrictReplicaGroupAdaptivePrefersFullCoverageGroup() {
-    // Topology: pool 0 has all 3 segments, pool 1 only has segment0 and segment1 (missing segment2).
-    // Even though pool 1 has better adaptive ranks, pool 0 should be chosen because it has full coverage.
-    // Pool 0: server_a (seg0, seg1), server_b (seg2) — full coverage
-    // Pool 1: server_c (seg0, seg1) — missing seg2, partial coverage
+    // Topology: replica group 0 has all 3 segments, replica group 1 only has segment0 and segment1.
+    // Even though replica group 1 has better adaptive ranks, replica group 0 should be chosen (full coverage).
+    // Replica group 0: server_a (seg0, seg1), server_b (seg2) — full coverage
+    // Replica group 1: server_c (seg0, seg1) — missing seg2, partial coverage
+    // Pools intentionally do not match replica groups: server_a and server_c share pool 0, while server_b is pool 1.
     String serverC = "server_c";
     HybridSelector hybridSelector = mock(HybridSelector.class);
 
     RoutingConfig routingConfig = new RoutingConfig(null, null, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testUpsertTable")
         .setRoutingConfig(routingConfig).build();
-    // Pool 1 only has seg0 and seg1 (no seg2)
+    // Replica group 1 only has seg0 and seg1 (no seg2)
     IdealState idealState = createIdealState(Map.of(
-        SRG_SEGMENT0, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(serverC, ONLINE)),
-        SRG_SEGMENT1, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(serverC, ONLINE)),
-        SRG_SEGMENT2, List.of(Pair.of(SRG_SERVER_B, ONLINE))));
+        STRICT_SEGMENT0, List.of(Pair.of(STRICT_RG0_SERVER_A, ONLINE), Pair.of(serverC, ONLINE)),
+        STRICT_SEGMENT1, List.of(Pair.of(STRICT_RG0_SERVER_A, ONLINE), Pair.of(serverC, ONLINE)),
+        STRICT_SEGMENT2, List.of(Pair.of(STRICT_RG0_SERVER_B, ONLINE))));
     ExternalView externalView = createExternalView(Map.of(
-        SRG_SEGMENT0, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(serverC, ONLINE)),
-        SRG_SEGMENT1, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(serverC, ONLINE)),
-        SRG_SEGMENT2, List.of(Pair.of(SRG_SERVER_B, ONLINE))));
+        STRICT_SEGMENT0, List.of(Pair.of(STRICT_RG0_SERVER_A, ONLINE), Pair.of(serverC, ONLINE)),
+        STRICT_SEGMENT1, List.of(Pair.of(STRICT_RG0_SERVER_A, ONLINE), Pair.of(serverC, ONLINE)),
+        STRICT_SEGMENT2, List.of(Pair.of(STRICT_RG0_SERVER_B, ONLINE))));
     ServerInstance serverA = mock(ServerInstance.class);
     when(serverA.getPool()).thenReturn(0);
     ServerInstance serverB = mock(ServerInstance.class);
-    when(serverB.getPool()).thenReturn(0);
+    when(serverB.getPool()).thenReturn(1);
     ServerInstance serverCInstance = mock(ServerInstance.class);
-    when(serverCInstance.getPool()).thenReturn(1);
+    when(serverCInstance.getPool()).thenReturn(0);
     Map<String, ServerInstance> serverMap = Map.of(
-        SRG_SERVER_A, serverA, SRG_SERVER_B, serverB, serverC, serverCInstance);
+        STRICT_RG0_SERVER_A, serverA, STRICT_RG0_SERVER_B, serverB, serverC, serverCInstance);
     StrictReplicaGroupInstanceSelector instanceSelector =
         (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
             mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), hybridSelector,
             new PinotConfiguration(Map.of()),
-            Set.of(SRG_SERVER_A, SRG_SERVER_B, serverC),
-            serverMap, idealState, externalView, new HashSet<>(SRG_SEGMENTS));
+            Set.of(STRICT_RG0_SERVER_A, STRICT_RG0_SERVER_B, serverC),
+            serverMap, idealState, externalView, new HashSet<>(STRICT_SEGMENTS));
 
-    // Pool 1 (server_c) has rank 0 — best rank, but only covers 2 of 3 segments
-    // Pool 0 (server_a rank 2, server_b rank 3) — worse ranks, but full coverage
+    // Replica group 1 (server_c) has rank 0 — best rank, but only covers 2 of 3 segments
+    // Replica group 0 (server_a rank 1, server_b rank 2) — worse ranks, but full coverage
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
         new ImmutablePair<>(serverC, 1.0),        // rank 0 (best)
-        new ImmutablePair<>(SRG_SERVER_A, 3.0),   // rank 1
-        new ImmutablePair<>(SRG_SERVER_B, 4.0)    // rank 2
+        new ImmutablePair<>(STRICT_RG0_SERVER_A, 3.0),   // rank 1
+        new ImmutablePair<>(STRICT_RG0_SERVER_B, 4.0)    // rank 2
     ));
 
-    // Build segment states where pool 1 is missing seg2
+    // Build segment states where replica group 1 is missing seg2
     Map<String, List<SegmentInstanceCandidate>> candidatesMap = new HashMap<>();
-    candidatesMap.put(SRG_SEGMENT0, Arrays.asList(
-        new SegmentInstanceCandidate(SRG_SERVER_A, true, 0, 0),
-        new SegmentInstanceCandidate(serverC, true, 1, 0)));
-    candidatesMap.put(SRG_SEGMENT1, Arrays.asList(
-        new SegmentInstanceCandidate(SRG_SERVER_A, true, 0, 0),
-        new SegmentInstanceCandidate(serverC, true, 1, 0)));
-    candidatesMap.put(SRG_SEGMENT2, List.of(
-        new SegmentInstanceCandidate(SRG_SERVER_B, true, 0, 0)));
-    SegmentStates segmentStates = new SegmentStates(candidatesMap, new HashSet<>(SRG_SEGMENTS), null);
+    candidatesMap.put(STRICT_SEGMENT0, Arrays.asList(
+        new SegmentInstanceCandidate(STRICT_RG0_SERVER_A, true, 0, 0),
+        new SegmentInstanceCandidate(serverC, true, 0, 1)));
+    candidatesMap.put(STRICT_SEGMENT1, Arrays.asList(
+        new SegmentInstanceCandidate(STRICT_RG0_SERVER_A, true, 0, 0),
+        new SegmentInstanceCandidate(serverC, true, 0, 1)));
+    candidatesMap.put(STRICT_SEGMENT2, List.of(
+        new SegmentInstanceCandidate(STRICT_RG0_SERVER_B, true, 1, 0)));
+    SegmentStates segmentStates = new SegmentStates(candidatesMap, new HashSet<>(STRICT_SEGMENTS), null);
 
     InstanceSelector.InstanceMapping result =
-        instanceSelector.select(SRG_SEGMENTS, 0, segmentStates, null);
+        instanceSelector.select(STRICT_SEGMENTS, 0, segmentStates, null);
 
-    // Pool 0 should be chosen (full coverage) even though pool 1 has better ranks
+    // Replica group 0 should be chosen (full coverage) even though replica group 1 has better ranks
     assertEquals(result.segmentToInstanceMap(), Map.of(
-        SRG_SEGMENT0, SRG_SERVER_A,
-        SRG_SEGMENT1, SRG_SERVER_A,
-        SRG_SEGMENT2, SRG_SERVER_B));
+        STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT1, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
   }
 
   @Test
   public void testStrictReplicaGroupAdaptiveNewSegmentNotFalselyUnavailable() {
-    // Topology: server_a (pool 0) hosts seg0 only. seg1 has no online instance (simulating a
-    // new/unassigned segment with null candidates in segmentStates). Pool 0 is chosen (only pool).
+    // Topology: server_a (replica group 0) hosts seg0 only. seg1 has no online instance (simulating a
+    // new/unassigned segment with null candidates in segmentStates). Replica group 0 is chosen (only group).
     // seg1 should NOT appear in unavailable — it is a new segment, not a dropped one.
     String serverA = "new_server_a";
     String seg0 = "new_seg0";
@@ -734,7 +759,7 @@ public class ReplicaGroupSelectorTest {
     ExternalView externalView = createExternalView(Map.of(
         seg0, List.of(Pair.of(serverA, ONLINE))));
     ServerInstance serverAInstance = mock(ServerInstance.class);
-    when(serverAInstance.getPool()).thenReturn(0);
+    when(serverAInstance.getPool()).thenReturn(FALLBACK_POOL_ID);
     StrictReplicaGroupInstanceSelector instanceSelector =
         (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
             mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), hybridSelector,
@@ -759,134 +784,130 @@ public class ReplicaGroupSelectorTest {
 
   @Test
   public void testStrictReplicaGroupAdaptiveDroppedSegmentReportedAsUnavailable() {
-    // Topology: no replica group has full coverage.
-    // Pool 0: server_a hosts seg0, seg1 (missing seg2)
-    // Pool 1: server_c hosts seg1, seg2 (missing seg0)
-    // Pool 1 has better ranks -> chosen. seg0 has no candidate in pool 1 -> reported unavailable.
-    String serverA = "partial_server_a";
-    String serverC = "partial_server_c";
-    String seg0 = "partial_seg0";
-    String seg1 = "partial_seg1";
-    String seg2 = "partial_seg2";
-    List<String> segments = Arrays.asList(seg0, seg1, seg2);
+    // Topology: no replica group (idealStateReplicaId) has full coverage.
+    // ReplicaId 0 (server_a): covers seg0, seg1 (missing seg2)
+    // ReplicaId 1 (server_c, server_d): covers seg1, seg2 (missing seg0)
+    // ReplicaId 1 has better rank -> chosen. seg0 has no replicaId-1 candidate -> reported unavailable.
     HybridSelector hybridSelector = mock(HybridSelector.class);
+    StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
 
-    RoutingConfig routingConfig = new RoutingConfig(null, null, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testPartialCoverage")
-            .setRoutingConfig(routingConfig).build();
-    IdealState idealState = createIdealState(Map.of(
-            seg0, List.of(Pair.of(serverA, ONLINE)),
-            seg1, List.of(Pair.of(serverA, ONLINE), Pair.of(serverC, ONLINE)),
-            seg2, List.of(Pair.of(serverC, ONLINE))));
-    ExternalView externalView = createExternalView(Map.of(
-            seg0, List.of(Pair.of(serverA, ONLINE)),
-            seg1, List.of(Pair.of(serverA, ONLINE), Pair.of(serverC, ONLINE)),
-            seg2, List.of(Pair.of(serverC, ONLINE))));
-    ServerInstance serverAInstance = mock(ServerInstance.class);
-    when(serverAInstance.getPool()).thenReturn(0);
-    ServerInstance serverCInstance = mock(ServerInstance.class);
-    when(serverCInstance.getPool()).thenReturn(1);
-    Map<String, ServerInstance> serverMap = Map.of(serverA, serverAInstance, serverC, serverCInstance);
-    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
-    StrictReplicaGroupInstanceSelector instanceSelector =
-            (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
-                    mock(ZkHelixPropertyStore.class), brokerMetrics, hybridSelector,
-                    new PinotConfiguration(Map.of()),
-                    Set.of(serverA, serverC),
-                    serverMap, idealState, externalView, new HashSet<>(segments));
-
-    // Pool 1 (server_c) ranked better -> pool 1 chosen
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
-            new ImmutablePair<>(serverC, 1.0),
-            new ImmutablePair<>(serverA, 3.0)
+            new ImmutablePair<>(STRICT_RG1_SERVER_C, 1.0),
+            new ImmutablePair<>(STRICT_RG0_SERVER_A, 3.0)
     ));
 
-    BrokerRequest brokerRequest = mock(BrokerRequest.class);
-    PinotQuery pinotQuery = mock(PinotQuery.class);
-    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
-    when(pinotQuery.getQueryOptions()).thenReturn(null);
+    // Craft segment states with partial coverage per replica group:
+    //   seg0: only in replicaId 0 (server_a)
+    //   seg1: in both replicaId 0 (server_a) and replicaId 1 (server_c)
+    //   seg2: only in replicaId 1 (server_d)
+    Map<String, List<SegmentInstanceCandidate>> candidatesMap = new HashMap<>();
+    candidatesMap.put(STRICT_SEGMENT0, List.of(
+        new SegmentInstanceCandidate(STRICT_RG0_SERVER_A, true, FALLBACK_POOL_ID, 0)));
+    candidatesMap.put(STRICT_SEGMENT1, Arrays.asList(
+        new SegmentInstanceCandidate(STRICT_RG0_SERVER_A, true, FALLBACK_POOL_ID, 0),
+        new SegmentInstanceCandidate(STRICT_RG1_SERVER_C, true, FALLBACK_POOL_ID, 1)));
+    candidatesMap.put(STRICT_SEGMENT2, List.of(
+        new SegmentInstanceCandidate(STRICT_RG1_SERVER_D, true, FALLBACK_POOL_ID, 1)));
+    SegmentStates segmentStates = new SegmentStates(candidatesMap, new HashSet<>(STRICT_SEGMENTS), null);
 
-    InstanceSelector.SelectionResult result = instanceSelector.select(brokerRequest, segments, 0);
+    InstanceSelector.InstanceMapping result =
+        instanceSelector.select(STRICT_SEGMENTS, 0, segmentStates, null);
 
-    // seg1 and seg2 routed to pool 1
-    assertEquals(result.getSegmentToInstanceMap(), Map.of(seg1, serverC, seg2, serverC));
-    // seg0 has candidates (pool 0 only) but no match in chosen pool 1 -> reported unavailable
-    assertEquals(result.getUnavailableSegments(), List.of(seg0));
+    // seg1 and seg2 routed to replicaId 1
+    assertEquals(result.segmentToInstanceMap(), Map.of(
+        STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
+    // seg0 has candidates (replicaId 0 only) but no match in chosen replicaId 1 -> reported unavailable
+    assertEquals(result.unavailableSegments(), List.of(STRICT_SEGMENT0));
   }
 
   @Test
   public void testStrictReplicaGroupAdaptiveOnlyQueryRelevantServersScored() {
-    // Topology: pool 1 has an extra server (server_e) that hosts a segment NOT in the query.
-    // server_e has a very high rank but should not affect pool 1's score since it hosts no query segments.
-    // Pool 0: server_a (rank 2), server_b (rank 3) → worst = 3
-    // Pool 1: server_c (rank 0), server_d (rank 1) → worst = 1
-    //   (server_e at rank 99 hosts segment "seg_extra" which is not in the query)
-    // Pool 1 should win because only query-relevant servers matter (server_e is ignored).
-    String serverE = "server_e";
+    // Replica group 1 has an extra server (server_e) that only hosts seg_extra, which is not in the query.
+    // server_e should never be scored for a query over STRICT_SEGMENTS.
+    // Replica group 0: server_a (rank 2), server_b (rank 3) → worst = 3
+    // Replica group 1: server_c (rank 0), server_d (rank 1) → worst = 1
+    // Replica group 1 should win because only query-relevant servers matter.
+    String rg1ServerE = "server_e";
     String segExtra = "seg_extra";
     HybridSelector hybridSelector = mock(HybridSelector.class);
 
-    // Build selector with server_e in pool 1, hosting seg_extra
+    // Build selector with server_e in replica group 1, hosting seg_extra.
     RoutingConfig routingConfig = new RoutingConfig(null, null, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testUpsertTable")
         .setRoutingConfig(routingConfig).build();
+    // server_e's pool intentionally differs from the queried servers to show pool is irrelevant.
+    // segExtra places server_d at position 0 and server_e at position 1 (idealStateReplicaId=1).
     IdealState idealState = createIdealState(Map.of(
-        SRG_SEGMENT0, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(SRG_SERVER_C, ONLINE)),
-        SRG_SEGMENT1, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(SRG_SERVER_C, ONLINE)),
-        SRG_SEGMENT2, List.of(Pair.of(SRG_SERVER_B, ONLINE), Pair.of(SRG_SERVER_D, ONLINE)),
-        segExtra, List.of(Pair.of(serverE, ONLINE))));
+        STRICT_SEGMENT0, List.of(Pair.of(STRICT_RG0_SERVER_A, ONLINE), Pair.of(STRICT_RG1_SERVER_C, ONLINE)),
+        STRICT_SEGMENT1, List.of(Pair.of(STRICT_RG0_SERVER_A, ONLINE), Pair.of(STRICT_RG1_SERVER_C, ONLINE)),
+        STRICT_SEGMENT2, List.of(Pair.of(STRICT_RG0_SERVER_B, ONLINE), Pair.of(STRICT_RG1_SERVER_D, ONLINE)),
+        segExtra, List.of(Pair.of(STRICT_RG1_SERVER_D, ONLINE), Pair.of(rg1ServerE, ONLINE))));
     ExternalView externalView = createExternalView(Map.of(
-        SRG_SEGMENT0, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(SRG_SERVER_C, ONLINE)),
-        SRG_SEGMENT1, List.of(Pair.of(SRG_SERVER_A, ONLINE), Pair.of(SRG_SERVER_C, ONLINE)),
-        SRG_SEGMENT2, List.of(Pair.of(SRG_SERVER_B, ONLINE), Pair.of(SRG_SERVER_D, ONLINE)),
-        segExtra, List.of(Pair.of(serverE, ONLINE))));
+        STRICT_SEGMENT0, List.of(Pair.of(STRICT_RG0_SERVER_A, ONLINE), Pair.of(STRICT_RG1_SERVER_C, ONLINE)),
+        STRICT_SEGMENT1, List.of(Pair.of(STRICT_RG0_SERVER_A, ONLINE), Pair.of(STRICT_RG1_SERVER_C, ONLINE)),
+        STRICT_SEGMENT2, List.of(Pair.of(STRICT_RG0_SERVER_B, ONLINE), Pair.of(STRICT_RG1_SERVER_D, ONLINE)),
+        segExtra, List.of(Pair.of(STRICT_RG1_SERVER_D, ONLINE), Pair.of(rg1ServerE, ONLINE))));
     ServerInstance serverA = mock(ServerInstance.class);
-    when(serverA.getPool()).thenReturn(0);
+    when(serverA.getPool()).thenReturn(FALLBACK_POOL_ID);
     ServerInstance serverB = mock(ServerInstance.class);
-    when(serverB.getPool()).thenReturn(0);
+    when(serverB.getPool()).thenReturn(FALLBACK_POOL_ID);
     ServerInstance serverC = mock(ServerInstance.class);
-    when(serverC.getPool()).thenReturn(1);
+    when(serverC.getPool()).thenReturn(FALLBACK_POOL_ID);
     ServerInstance serverD = mock(ServerInstance.class);
-    when(serverD.getPool()).thenReturn(1);
+    when(serverD.getPool()).thenReturn(FALLBACK_POOL_ID);
     ServerInstance serverEInstance = mock(ServerInstance.class);
-    when(serverEInstance.getPool()).thenReturn(1);
+    when(serverEInstance.getPool()).thenReturn(99);
     Map<String, ServerInstance> serverMap = Map.of(
-        SRG_SERVER_A, serverA, SRG_SERVER_B, serverB,
-        SRG_SERVER_C, serverC, SRG_SERVER_D, serverD,
-        serverE, serverEInstance);
-    Set<String> allSegments = new HashSet<>(SRG_SEGMENTS);
+        STRICT_RG0_SERVER_A, serverA, STRICT_RG0_SERVER_B, serverB,
+        STRICT_RG1_SERVER_C, serverC, STRICT_RG1_SERVER_D, serverD,
+        rg1ServerE, serverEInstance);
+    Set<String> allSegments = new HashSet<>(STRICT_SEGMENTS);
     allSegments.add(segExtra);
     StrictReplicaGroupInstanceSelector instanceSelector =
         (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
             mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), hybridSelector,
             new PinotConfiguration(Map.of()),
-            Set.of(SRG_SERVER_A, SRG_SERVER_B, SRG_SERVER_C, SRG_SERVER_D, serverE),
+            Set.of(STRICT_RG0_SERVER_A, STRICT_RG0_SERVER_B,
+                STRICT_RG1_SERVER_C, STRICT_RG1_SERVER_D, rg1ServerE),
             serverMap, idealState, externalView, allSegments);
 
-    // server_e has rank 99 but hosts no query segments — should be irrelevant
+    // server_e has a much worse mocked score but hosts no query segments, so it should never be ranked.
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
-        new ImmutablePair<>(SRG_SERVER_C, 1.0),   // rank 0
-        new ImmutablePair<>(SRG_SERVER_D, 2.0),   // rank 1
-        new ImmutablePair<>(SRG_SERVER_A, 3.0),   // rank 2
-        new ImmutablePair<>(SRG_SERVER_B, 4.0),   // rank 3
-        new ImmutablePair<>(serverE, 99.0)        // rank 4 (high score, not query-relevant)
+        new ImmutablePair<>(STRICT_RG1_SERVER_C, 1.0),   // rank 0
+        new ImmutablePair<>(STRICT_RG1_SERVER_D, 2.0),   // rank 1
+        new ImmutablePair<>(STRICT_RG0_SERVER_A, 3.0),   // rank 2
+        new ImmutablePair<>(STRICT_RG0_SERVER_B, 4.0),   // rank 3
+        new ImmutablePair<>(rg1ServerE, 99.0)        // rank 4 (not query-relevant)
     ));
 
-    // Query only SRG_SEGMENTS (not seg_extra), so server_e is not query-relevant
-    InstanceSelector.InstanceMapping result =
-        instanceSelector.select(SRG_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
+    Map<String, List<SegmentInstanceCandidate>> candidatesMap = new HashMap<>();
+    candidatesMap.put(STRICT_SEGMENT0,
+        buildStrictReplicaGroupCandidates(STRICT_RG0_SERVER_A, STRICT_RG1_SERVER_C));
+    candidatesMap.put(STRICT_SEGMENT1,
+        buildStrictReplicaGroupCandidates(STRICT_RG0_SERVER_A, STRICT_RG1_SERVER_C));
+    candidatesMap.put(STRICT_SEGMENT2,
+        buildStrictReplicaGroupCandidates(STRICT_RG0_SERVER_B, STRICT_RG1_SERVER_D));
+    candidatesMap.put(segExtra, Arrays.asList(
+        new SegmentInstanceCandidate(STRICT_RG1_SERVER_D, true, FALLBACK_POOL_ID, 0),
+        new SegmentInstanceCandidate(rg1ServerE, true, 99, 1)));
+    SegmentStates segmentStates = new SegmentStates(candidatesMap, allSegments, null);
 
-    // Pool 1 wins (worst rank among query-relevant servers = 1) over pool 0 (worst = 3)
-    // server_e's rank 4 is not considered because it hosts no query segments
+    InstanceSelector.InstanceMapping result =
+        instanceSelector.select(STRICT_SEGMENTS, 0, segmentStates, null);
+
+    // Replica group 1 wins (worst rank among query-relevant servers = 1) over replica group 0 (worst = 3)
+    // server_e is not considered because it hosts no query segments
     assertEquals(result.segmentToInstanceMap(), Map.of(
-        SRG_SEGMENT0, SRG_SERVER_C,
-        SRG_SEGMENT1, SRG_SERVER_C,
-        SRG_SEGMENT2, SRG_SERVER_D));
+        STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
 
     ArgumentCaptor<List<String>> rankedCandidatesCaptor = ArgumentCaptor.forClass(List.class);
     verify(hybridSelector).fetchServerRankingsWithScores(rankedCandidatesCaptor.capture());
     assertEquals(new HashSet<>(rankedCandidatesCaptor.getValue()),
-        Set.of(SRG_SERVER_A, SRG_SERVER_B, SRG_SERVER_C, SRG_SERVER_D));
+        Set.of(STRICT_RG0_SERVER_A, STRICT_RG0_SERVER_B,
+            STRICT_RG1_SERVER_C, STRICT_RG1_SERVER_D));
     assertEquals(rankedCandidatesCaptor.getValue().size(), 4);
   }
 }
