@@ -388,20 +388,27 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
     // Update metrics
     long numPrimaryKeys = getNumPrimaryKeys();
-    updatePrimaryKeyGauge(numPrimaryKeys);
+    updatePrimaryKeyGauge(numPrimaryKeys, getPrimaryKeyMapSizeInBytes());
     _logger.info("Finished adding segment: {} in {}ms, current primary key count: {}", segmentName,
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
 
   protected abstract long getNumPrimaryKeys();
 
-  protected void updatePrimaryKeyGauge(long numPrimaryKeys) {
+  /**
+   * Returns the estimated size in bytes of the primary-key-to-record-location map.
+   */
+  protected abstract long getPrimaryKeyMapSizeInBytes();
+
+  protected void updatePrimaryKeyGauge(long numPrimaryKeys, long primaryKeySizeInBytes) {
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         numPrimaryKeys);
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
+        ServerGauge.UPSERT_PRIMARY_KEY_MAP_SIZE_IN_BYTES, primaryKeySizeInBytes);
   }
 
   protected void updatePrimaryKeyGauge() {
-    updatePrimaryKeyGauge(getNumPrimaryKeys());
+    updatePrimaryKeyGauge(getNumPrimaryKeys(), getPrimaryKeyMapSizeInBytes());
   }
 
   @Override
@@ -459,7 +466,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
     // Update metrics
     long numPrimaryKeys = getNumPrimaryKeys();
-    updatePrimaryKeyGauge(numPrimaryKeys);
+    updatePrimaryKeyGauge(numPrimaryKeys, getPrimaryKeyMapSizeInBytes());
     _logger.info("Finished preloading segment: {} in {}ms, current primary key count: {}", segmentName,
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
@@ -645,7 +652,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
     // Update metrics
     long numPrimaryKeys = getNumPrimaryKeys();
-    updatePrimaryKeyGauge(numPrimaryKeys);
+    updatePrimaryKeyGauge(numPrimaryKeys, getPrimaryKeyMapSizeInBytes());
     _logger.info("Finished replacing segment: {} in {}ms, current primary key count: {}", segmentName,
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
@@ -812,7 +819,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
     // Update metrics
     long numPrimaryKeys = getNumPrimaryKeys();
-    updatePrimaryKeyGauge(numPrimaryKeys);
+    updatePrimaryKeyGauge(numPrimaryKeys, getPrimaryKeyMapSizeInBytes());
     _logger.info("Finished removing segment: {} in {}ms, current primary key count: {}", segmentName,
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
@@ -1186,7 +1193,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // We don't remove the segment from the metadata manager when
     // it's closed. This was done to make table deletion faster. Since we don't remove the segment, we never decrease
     // the primary key count. So, we set the primary key count to 0 here.
-    updatePrimaryKeyGauge(0);
+    updatePrimaryKeyGauge(0, 0);
     _logger.info("Closed the metadata manager");
   }
 

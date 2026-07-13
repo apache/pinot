@@ -45,6 +45,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
   // Upsert metrics
   UPSERT_PRIMARY_KEYS_COUNT("upsertPrimaryKeysCount", false),
+  UPSERT_PRIMARY_KEY_MAP_SIZE_IN_BYTES("bytes", false),
   // Dedup metrics
   DEDUP_PRIMARY_KEYS_COUNT("dedupPrimaryKeysCount", false),
   CONSUMPTION_QUOTA_UTILIZATION("ratio", false),
