@@ -47,6 +47,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
@@ -254,6 +255,36 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
         int length = reader.getBytesMV(i, values, context);
         assertEquals(Arrays.copyOf(values, length), input);
       }
+    }
+  }
+
+  @Test
+  public void testUncompressedValueSizeTrackingEnabled()
+      throws IOException {
+    String column = "mvVarTrackingEnabled";
+    try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
+        OUTPUT_DIR, ChunkCompressionType.LZ4, column, 100, DataType.STRING, 100, 3)) {
+      creator.enableRawForwardIndexUncompressedValueSizeTracking();
+      for (int i = 0; i < 100; i++) {
+        creator.putStringMV(new String[]{"val" + i, "extra" + i});
+      }
+      assertTrue(creator.getRawForwardIndexUncompressedValueSizeInBytes() > 0,
+          "MV var-byte creator should report > 0 uncompressed size when tracking enabled");
+    }
+  }
+
+  @Test
+  public void testUncompressedValueSizeTrackingDisabled()
+      throws IOException {
+    String column = "mvVarTrackingDisabled";
+    try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
+        OUTPUT_DIR, ChunkCompressionType.LZ4, column, 100, DataType.STRING, 100, 3)) {
+      // tracking off by default
+      for (int i = 0; i < 100; i++) {
+        creator.putStringMV(new String[]{"val" + i});
+      }
+      assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L,
+          "MV var-byte creator should report unavailable when tracking is disabled");
     }
   }
 }

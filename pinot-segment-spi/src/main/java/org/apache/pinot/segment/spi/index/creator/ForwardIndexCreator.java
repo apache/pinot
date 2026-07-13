@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.MapUtils;
@@ -308,6 +309,18 @@ public interface ForwardIndexCreator extends IndexCreator {
    * forward index.
    */
   DataType getValueType();
+
+  /// Returns serialized value bytes presented to the raw forward-index chunk compressor, or `-1` when unavailable.
+  default long getRawForwardIndexUncompressedValueSizeInBytes() {
+    return -1;
+  }
+
+  /// Returns the chunk-compression type actually selected by this raw forward-index creator, or `null` when this
+  /// creator is dictionary encoded or does not expose compression statistics.
+  @Nullable
+  default ChunkCompressionType getRawForwardIndexChunkCompressionType() {
+    return null;
+  }
 
   /**
    * DICTIONARY-ENCODED INDEX APIs

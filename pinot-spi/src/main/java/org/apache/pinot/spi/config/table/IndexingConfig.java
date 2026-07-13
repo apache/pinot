@@ -112,6 +112,13 @@ public class IndexingConfig extends BaseJsonConfig {
 
   private MultiColumnTextIndexConfig _multiColumnTextIndexConfig;
 
+  /// When true, segment creation records uncompressed serialized bytes and the chunk-compression type for raw forward
+  /// indexes, plus raw value bytes for dictionary-encoded columns. The table size and metadata APIs expose ratios using
+  /// raw forward-index files, or dictionary plus forward-index files for dictionary encoding. Columns without a
+  /// forward index and old segments without persisted uncompressed-value-size metadata are excluded. Disabled by
+  /// default.
+  private boolean _compressionStatsEnabled;
+
   @Nullable
   public List<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
@@ -418,6 +425,16 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setMultiColumnTextIndexConfig(MultiColumnTextIndexConfig multiColumnTextIndexConfig) {
     _multiColumnTextIndexConfig = multiColumnTextIndexConfig;
+  }
+
+  /// Returns whether new segments collect compression statistics.
+  public boolean isCompressionStatsEnabled() {
+    return _compressionStatsEnabled;
+  }
+
+  /// Enables or disables compression-statistics collection for newly built or rewritten indexes.
+  public void setCompressionStatsEnabled(boolean compressionStatsEnabled) {
+    _compressionStatsEnabled = compressionStatsEnabled;
   }
 
   /**

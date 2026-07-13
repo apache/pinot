@@ -47,6 +47,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVe
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMetadata;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
@@ -169,13 +170,18 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       Preconditions.checkState(dictEnabledColumn,
           "Cannot create inverted index for raw index column: %s", columnName);
     }
-    IndexCreationContext.Common context = getIndexCreationContext(fieldSpec, dictEnabledColumn);
-
     FieldIndexConfigs config = adaptConfig(columnName, originalConfig, columnStatistics, _config, dictEnabledColumn);
+    IndexCreationContext.Common context =
+        getIndexCreationContext(fieldSpec, dictEnabledColumn, _config.isCompressionStatsEnabled());
 
     SegmentDictionaryCreator dictionaryCreator = null;
     if (dictEnabledColumn) {
-      dictionaryCreator = getDictionaryCreator(columnName, originalConfig, context);
+      ForwardIndexConfig forwardIndexConfig = config.getConfig(StandardIndexes.forward());
+      boolean trackDictionaryValues = _config.isCompressionStatsEnabled() && forwardIndexConfig.isEnabled()
+          && forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY;
+      IndexCreationContext.Common dictionaryContext = trackDictionaryValues == _config.isCompressionStatsEnabled()
+          ? context : getIndexCreationContext(fieldSpec, true, trackDictionaryValues);
+      dictionaryCreator = getDictionaryCreator(columnName, originalConfig, dictionaryContext);
     }
 
     List<IndexCreator> indexCreators = getIndexCreatorsByColumn(fieldSpec, context, config, dictEnabledColumn);
@@ -184,7 +190,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         indexCreators, getNullValueCreator(fieldSpec));
   }
 
-  private IndexCreationContext.Common getIndexCreationContext(FieldSpec fieldSpec, boolean dictEnabledColumn) {
+  private IndexCreationContext.Common getIndexCreationContext(FieldSpec fieldSpec, boolean dictEnabledColumn,
+      boolean compressionStatsEnabled) {
     ColumnStatistics columnStats = _columnStatisticsMap.get(fieldSpec.getName());
     return new IndexCreationContext.Builder(_indexDir, _config.getTableConfig(), columnStats, dictEnabledColumn)
         .withOnHeap(_config.isOnHeap())
@@ -196,6 +203,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         .withMutableSegmentCompacted(_config.isMutableSegmentCompacted())
         .withMutableToImmutableDocIdMap(_config.getMutableToImmutableDocIdMap())
         .withContinueOnError(_config.isContinueOnError())
+        .withCompressionStatsEnabled(compressionStatsEnabled)
         .build();
   }
 
@@ -550,6 +558,36 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
           columnIndexCreators.getIndexConfigs().getConfig(StandardIndexes.forward());
       addColumnMetadataInfo(properties, column, columnStatistics, _totalDocs, _schema.getFieldSpecFor(column),
           hasDictionary, dictionaryElementSize, fwdConfig.getEncodingType(), false);
+    }
+
+    if (_config.isCompressionStatsEnabled()) {
+      for (Map.Entry<String, ColumnIndexCreators> entry : _colIndexes.entrySet()) {
+        String column = entry.getKey();
+        ColumnIndexCreators colCreators = entry.getValue();
+        ForwardIndexCreator fwdCreator = colCreators.getForwardIndexCreator();
+        CompressionStatsMetadata compressionMetadata = CompressionStatsMetadata.unavailable();
+        if (fwdCreator != null && !fwdCreator.isDictionaryEncoded()) {
+          compressionMetadata = CompressionStatsMetadata.forRawForwardIndex(
+              fwdCreator.getRawForwardIndexUncompressedValueSizeInBytes(),
+              fwdCreator.getRawForwardIndexChunkCompressionType());
+        } else if (fwdCreator != null) {
+          SegmentDictionaryCreator dictCreator = colCreators.getDictionaryCreator();
+          if (dictCreator != null) {
+            FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+            DataType storedType = fieldSpec != null ? fieldSpec.getDataType().getStoredType() : null;
+            long uncompressedValueSizeInBytes;
+            if (storedType != null && storedType.isFixedWidth()) {
+              ColumnStatistics columnStatistics = _columnStatisticsMap.get(column);
+              int totalValues = columnStatistics != null ? columnStatistics.getTotalNumberOfEntries() : _totalDocs;
+              uncompressedValueSizeInBytes = (long) totalValues * storedType.size();
+            } else {
+              uncompressedValueSizeInBytes = dictCreator.getTotalVariableLengthUncompressedValueSizeInBytes();
+            }
+            compressionMetadata = CompressionStatsMetadata.forDictionary(uncompressedValueSizeInBytes);
+          }
+        }
+        compressionMetadata.applyTo(properties, column);
+      }
     }
 
     SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();

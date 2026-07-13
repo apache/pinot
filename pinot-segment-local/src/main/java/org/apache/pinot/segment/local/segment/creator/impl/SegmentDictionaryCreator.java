@@ -34,12 +34,14 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +59,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 public class SegmentDictionaryCreator implements IndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDictionaryCreator.class);
+  private static final int MAX_CACHED_SERIALIZED_LENGTHS = 4 * 1024 * 1024 / Integer.BYTES;
 
   private final String _columnName;
   private final DataType _storedType;
@@ -69,20 +72,56 @@ public class SegmentDictionaryCreator implements IndexCreator {
   private Double2IntOpenHashMap _doubleValueToIndexMap;
   private Object2IntOpenHashMap<Object> _objectValueToIndexMap;
   private int _numBytesPerEntry = 0;
+  private final boolean _trackUncompressedValueBytes;
+  // Cache lengths computed while serializing the dictionary, capped at 4 MiB per column to avoid cardinality-sized
+  // allocations for very large dictionaries.
+  @Nullable
+  private int[] _serializedValueLengthByDictId;
+  /// Accumulated uncompressed serialized column-value bytes across all rows indexed. Populated only when compression
+  /// stats are enabled
+  /// and for variable-length types (STRING, BYTES, BIG_DECIMAL); 0 for fixed-width types.
+  private long _totalUncompressedValueSizeInBytes;
+
+  /// Controls whether dictionary creation tracks uncompressed column-value bytes.
+  public enum UncompressedValueSizeTracking {
+    ENABLED,
+    DISABLED;
+
+    public static UncompressedValueSizeTracking fromEnabled(boolean enabled) {
+      return enabled ? ENABLED : DISABLED;
+    }
+  }
 
   public SegmentDictionaryCreator(String columnName, DataType storedType, File indexFile,
       boolean useVarLengthDictionary) {
+    this(columnName, storedType, indexFile, useVarLengthDictionary, UncompressedValueSizeTracking.DISABLED);
+  }
+
+  public SegmentDictionaryCreator(String columnName, DataType storedType, File indexFile,
+      boolean useVarLengthDictionary, UncompressedValueSizeTracking tracking) {
     _columnName = columnName;
     _storedType = storedType;
     _dictionaryFile = indexFile;
     _useVarLengthDictionary = useVarLengthDictionary;
+    _trackUncompressedValueBytes = tracking == UncompressedValueSizeTracking.ENABLED;
   }
 
   public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir, boolean useVarLengthDictionary) {
+    this(fieldSpec, indexDir, useVarLengthDictionary, UncompressedValueSizeTracking.DISABLED);
+  }
+
+  public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir, boolean useVarLengthDictionary,
+      UncompressedValueSizeTracking tracking) {
     _columnName = fieldSpec.getName();
     _storedType = fieldSpec.getDataType().getStoredType();
     _dictionaryFile = new File(indexDir, _columnName + DictionaryIndexType.getFileExtension());
     _useVarLengthDictionary = useVarLengthDictionary;
+    _trackUncompressedValueBytes = tracking == UncompressedValueSizeTracking.ENABLED;
+  }
+
+  public SegmentDictionaryCreator(IndexCreationContext context, boolean useVarLengthDictionary) {
+    this(context.getFieldSpec(), context.getIndexDir(), useVarLengthDictionary,
+        UncompressedValueSizeTracking.fromEnabled(context.isCompressionStatsEnabled()));
   }
 
   @Override
@@ -187,6 +226,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedBigDecimals.length;
         Preconditions.checkState(numValues > 0);
         _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+        initializeSerializedLengthCache(numValues);
 
         // Get the maximum length of all entries
         byte[][] sortedBigDecimalBytes = new byte[numValues][];
@@ -195,6 +235,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
           _objectValueToIndexMap.put(value, i);
           byte[] valueBytes = BigDecimalUtils.serialize(value);
           sortedBigDecimalBytes[i] = valueBytes;
+          cacheSerializedLength(i, valueBytes.length);
           _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
         }
 
@@ -208,6 +249,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedStrings.length;
         Preconditions.checkState(numValues > 0);
         _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+        initializeSerializedLengthCache(numValues);
 
         // Get the maximum length of all entries
         byte[][] sortedStringBytes = new byte[numValues][];
@@ -216,6 +258,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
           _objectValueToIndexMap.put(value, i);
           byte[] valueBytes = value.getBytes(UTF_8);
           sortedStringBytes[i] = valueBytes;
+          cacheSerializedLength(i, valueBytes.length);
           _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
         }
 
@@ -229,6 +272,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedBytes.length;
         Preconditions.checkState(numValues > 0);
         _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+        initializeSerializedLengthCache(numValues);
 
         // Get the maximum length of all entries
         byte[][] sortedByteArrays = new byte[numValues][];
@@ -236,6 +280,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
           ByteArray value = sortedBytes[i];
           sortedByteArrays[i] = value.getBytes();
           _objectValueToIndexMap.put(value, i);
+          cacheSerializedLength(i, value.getBytes().length);
           _numBytesPerEntry = Math.max(_numBytesPerEntry, value.getBytes().length);
         }
 
@@ -304,6 +349,11 @@ public class SegmentDictionaryCreator implements IndexCreator {
     return _numBytesPerEntry;
   }
 
+  /// Returns value bytes observed through variable-length dictionary lookups, or `0` when tracking is disabled.
+  public long getTotalVariableLengthUncompressedValueSizeInBytes() {
+    return _totalUncompressedValueSizeInBytes;
+  }
+
   public int indexOfSV(Object value) {
     switch (_storedType) {
       case INT:
@@ -316,9 +366,9 @@ public class SegmentDictionaryCreator implements IndexCreator {
         return _doubleValueToIndexMap.get((double) value);
       case BIG_DECIMAL:
       case STRING:
-        return _objectValueToIndexMap.getInt(value);
+        return indexOfVariableLengthValue(value);
       case BYTES:
-        return _objectValueToIndexMap.getInt(new ByteArray((byte[]) value));
+        return indexOfVariableLengthValue(new ByteArray((byte[]) value));
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
     }
@@ -356,14 +406,14 @@ public class SegmentDictionaryCreator implements IndexCreator {
    * Get dictionary index for a String value.
    */
   public int indexOfSV(String value) {
-    return _objectValueToIndexMap.getInt(value);
+    return indexOfVariableLengthValue(value);
   }
 
   /**
    * Get dictionary index for a byte array value.
    */
   public int indexOfSV(byte[] value) {
-    return _objectValueToIndexMap.getInt(new ByteArray(value));
+    return indexOfVariableLengthValue(new ByteArray(value));
   }
 
   public int[] indexOfMV(int[] values) {
@@ -400,26 +450,83 @@ public class SegmentDictionaryCreator implements IndexCreator {
 
   public int[] indexOfMV(BigDecimal[] values) {
     int[] indexes = new int[values.length];
+    if (!_trackUncompressedValueBytes) {
+      for (int i = 0; i < values.length; i++) {
+        indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+      }
+      return indexes;
+    }
     for (int i = 0; i < values.length; i++) {
-      indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+      indexes[i] = trackUncompressedValueSize(values[i], _objectValueToIndexMap.getInt(values[i]));
     }
     return indexes;
   }
 
   public int[] indexOfMV(String[] values) {
     int[] indexes = new int[values.length];
+    if (!_trackUncompressedValueBytes) {
+      for (int i = 0; i < values.length; i++) {
+        indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+      }
+      return indexes;
+    }
     for (int i = 0; i < values.length; i++) {
-      indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+      indexes[i] = trackUncompressedValueSize(values[i], _objectValueToIndexMap.getInt(values[i]));
     }
     return indexes;
   }
 
   public int[] indexOfMV(byte[][] values) {
     int[] indexes = new int[values.length];
+    if (!_trackUncompressedValueBytes) {
+      for (int i = 0; i < values.length; i++) {
+        indexes[i] = _objectValueToIndexMap.getInt(new ByteArray(values[i]));
+      }
+      return indexes;
+    }
     for (int i = 0; i < values.length; i++) {
-      indexes[i] = _objectValueToIndexMap.getInt(new ByteArray(values[i]));
+      ByteArray value = new ByteArray(values[i]);
+      indexes[i] = trackUncompressedValueSize(value, _objectValueToIndexMap.getInt(value));
     }
     return indexes;
+  }
+
+  private int indexOfVariableLengthValue(Object value) {
+    int dictId = _objectValueToIndexMap.getInt(value);
+    return _trackUncompressedValueBytes ? trackUncompressedValueSize(value, dictId) : dictId;
+  }
+
+  private int trackUncompressedValueSize(Object value, int dictId) {
+    if (_serializedValueLengthByDictId != null) {
+      _totalUncompressedValueSizeInBytes += _serializedValueLengthByDictId[dictId];
+      return dictId;
+    }
+    switch (_storedType) {
+      case BIG_DECIMAL:
+        _totalUncompressedValueSizeInBytes += BigDecimalUtils.byteSize((BigDecimal) value);
+        break;
+      case STRING:
+        _totalUncompressedValueSizeInBytes += Utf8Utils.encodedLengthWithReplacement((String) value);
+        break;
+      case BYTES:
+        _totalUncompressedValueSizeInBytes += ((ByteArray) value).getBytes().length;
+        break;
+      default:
+        throw new IllegalStateException("Cannot track uncompressed size for data type: " + _storedType);
+    }
+    return dictId;
+  }
+
+  private void initializeSerializedLengthCache(int cardinality) {
+    if (_trackUncompressedValueBytes && cardinality <= MAX_CACHED_SERIALIZED_LENGTHS) {
+      _serializedValueLengthByDictId = new int[cardinality];
+    }
+  }
+
+  private void cacheSerializedLength(int dictId, int length) {
+    if (_serializedValueLengthByDictId != null) {
+      _serializedValueLengthByDictId[dictId] = length;
+    }
   }
 
   public int[] indexOfMV(Object value) {
@@ -448,14 +555,37 @@ public class SegmentDictionaryCreator implements IndexCreator {
         }
         break;
       case BIG_DECIMAL:
-      case STRING:
+        if (!_trackUncompressedValueBytes) {
+          for (int i = 0; i < multiValues.length; i++) {
+            indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);
+          }
+          break;
+        }
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);
+          indexes[i] = trackUncompressedValueSize(multiValues[i], _objectValueToIndexMap.getInt(multiValues[i]));
+        }
+        break;
+      case STRING:
+        if (!_trackUncompressedValueBytes) {
+          for (int i = 0; i < multiValues.length; i++) {
+            indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);
+          }
+          break;
+        }
+        for (int i = 0; i < multiValues.length; i++) {
+          indexes[i] = trackUncompressedValueSize(multiValues[i], _objectValueToIndexMap.getInt(multiValues[i]));
         }
         break;
       case BYTES:
+        if (!_trackUncompressedValueBytes) {
+          for (int i = 0; i < multiValues.length; i++) {
+            indexes[i] = _objectValueToIndexMap.getInt(new ByteArray((byte[]) multiValues[i]));
+          }
+          break;
+        }
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _objectValueToIndexMap.getInt(new ByteArray((byte[]) multiValues[i]));
+          ByteArray bytes = new ByteArray((byte[]) multiValues[i]);
+          indexes[i] = trackUncompressedValueSize(bytes, _objectValueToIndexMap.getInt(bytes));
         }
         break;
       default:
@@ -473,6 +603,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
     _floatValueToIndexMap = null;
     _doubleValueToIndexMap = null;
     _objectValueToIndexMap = null;
+    _serializedValueLengthByDictId = null;
   }
 
   @Override
@@ -482,5 +613,6 @@ public class SegmentDictionaryCreator implements IndexCreator {
 
   @Override
   public void close() {
+    postIndexingCleanup();
   }
 }

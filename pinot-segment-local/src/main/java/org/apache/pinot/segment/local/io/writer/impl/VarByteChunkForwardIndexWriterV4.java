@@ -92,6 +92,8 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   private int _nextDocId = 0;
   private int _metadataSize = 0;
   private long _chunkOffset = 0;
+  private long _uncompressedValueSize = 0;
+  private boolean _trackUncompressedValueSize = false;
 
   public VarByteChunkForwardIndexWriterV4(File file, ChunkCompressionType compressionType, int chunkSize)
       throws IOException {
@@ -202,6 +204,9 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
       buffer = ByteBuffer.wrap(bytes);
     }
     try {
+      if (_trackUncompressedValueSize) {
+        _uncompressedValueSize += bytes.length;
+      }
       _nextDocId++;
       write(buffer, true);
     } finally {
@@ -224,6 +229,10 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     [------16-bytes-----][----a+b+c bytes----------]
      */
     int numDocs = _nextDocId - _docIdOffset;
+    int logicalDataSize = _chunkBuffer.position() - Integer.BYTES - numDocs * Integer.BYTES;
+    if (_trackUncompressedValueSize) {
+      _uncompressedValueSize += logicalDataSize;
+    }
     _chunkBuffer.putInt(0, numDocs);
     // collect offsets
     int[] offsets = new int[numDocs];
@@ -331,5 +340,21 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     CleanerUtil.cleanQuietly(_chunkBuffer);
     FileUtils.deleteQuietly(_dataBuffer);
     _chunkCompressor.close();
+  }
+
+  /// Returns the total uncompressed size of data written so far, or `-1` when tracking is disabled.
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    if (!_trackUncompressedValueSize) {
+      return -1;
+    }
+    int bufferedDocs = _nextDocId - _docIdOffset;
+    return _uncompressedValueSize + _chunkBuffer.position() - Integer.BYTES - bufferedDocs * Integer.BYTES;
+  }
+
+  /// Enables uncompressed-size tracking before the first value is written.
+  public void enableRawForwardIndexUncompressedValueSizeTracking() {
+    Preconditions.checkState(_nextDocId == 0,
+        "Uncompressed-size tracking must be enabled before writing values");
+    _trackUncompressedValueSize = true;
   }
 }
