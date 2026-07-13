@@ -152,7 +152,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
       containerResponseContext.getHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS, DELETE");
       containerResponseContext.getHeaders()
-          .add("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, Origin, X-Requested-With");
+          .add("Access-Control-Allow-Headers",
+              "Authorization, Content-Type, Accept, Origin, X-Requested-With, Database, If-Match");
       if (containerRequestContext.getMethod().equals("OPTIONS")) {
         containerResponseContext.setStatus(HttpServletResponse.SC_OK);
       }

@@ -35,18 +35,19 @@ import org.slf4j.LoggerFactory;
 /**
  * In-memory implementation of {@link SessionManager}.
  *
- * <p>Sessions are stored in a {@link ConcurrentHashMap} with a configurable sliding-window TTL
+ * <p>Sessions are stored in a {@link ConcurrentHashMap} with a configurable fixed TTL
  * and are cleaned up periodically to prevent unbounded growth.
  *
- * <p><strong>Sliding window TTL:</strong> Each time a session is accessed via
- * {@link #getUsername(String)}, the expiry is extended by the configured TTL. This means active
- * users are never logged out due to inactivity — only truly idle sessions (no API calls for the
- * full TTL duration) expire.
+ * <p><strong>Fixed TTL:</strong> Each session expires at {@code loginTime + TTL} regardless of
+ * activity. This keeps the server-side expiry aligned with the browser cookie {@code Max-Age},
+ * both of which are set to the same TTL at login. A sliding-window TTL would let the server
+ * session outlive the browser cookie (which has no renewal mechanism here), creating a
+ * desynchronised state where the server holds a valid session the browser can no longer reach.
  *
  * <p>Design follows the Ambari / Trino FormWebUiAuthenticationFilter pattern:
  * <ul>
  *   <li>Login  → validate credentials → create session token → set HttpOnly cookie</li>
- *   <li>Request → read cookie → look up session → slide expiry → allow or redirect to login</li>
+ *   <li>Request → read cookie → look up session → allow or redirect to login</li>
  *   <li>Logout → read cookie → remove session from store → delete cookie → redirect to login</li>
  * </ul>
  */
@@ -86,7 +87,7 @@ public class InMemorySessionManager implements SessionManager {
         CLEANUP_INTERVAL_SECONDS,
         CLEANUP_INTERVAL_SECONDS,
         TimeUnit.SECONDS);
-    LOGGER.info("InMemorySessionManager initialized with sliding TTL={}s", _sessionTtlSeconds);
+    LOGGER.info("InMemorySessionManager initialized with fixed TTL={}s", _sessionTtlSeconds);
   }
 
   @Override
@@ -103,19 +104,13 @@ public class InMemorySessionManager implements SessionManager {
     if (token == null || token.isEmpty()) {
       return Optional.empty();
     }
-    // Sliding window: single atomic compute() avoids a race condition where a non-atomic
-    // get+check+put sequence could see the session removed between the expiry check and the put.
-    // compute() provides an atomic read-modify-write on the ConcurrentHashMap entry.
-    final String[] resolvedUsername = {null};
-    _sessions.compute(token, (k, v) -> {
-      if (v == null || Instant.now().isAfter(v.expiry())) {
-        // Expired or not found – remove the entry (return null removes key from map)
-        return null;
-      }
-      resolvedUsername[0] = v.username();
-      return new SessionEntry(v.username(), Instant.now().plusSeconds(_sessionTtlSeconds), v.basicAuthToken());
-    });
-    return Optional.ofNullable(resolvedUsername[0]);
+    // Fixed TTL: just check expiry without extending it, keeping server and browser cookie
+    // expiry in sync (both set to the same TTL value at login time).
+    SessionEntry entry = _sessions.get(token);
+    if (entry == null || Instant.now().isAfter(entry.expiry())) {
+      return Optional.empty();
+    }
+    return Optional.of(entry.username());
   }
 
   @Override

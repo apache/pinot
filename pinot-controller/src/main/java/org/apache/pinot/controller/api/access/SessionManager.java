@@ -38,7 +38,7 @@ public interface SessionManager {
   /** Cookie name used to carry the session token. */
   String SESSION_COOKIE_NAME = "Pinot-UI-Session";
 
-  /** Default session TTL: 8 hours (sliding window – resets on each API call). */
+  /** Default session TTL: 8 hours from login. */
   long DEFAULT_SESSION_TTL_SECONDS = 8 * 60 * 60L;
 
   /**
@@ -51,7 +51,7 @@ public interface SessionManager {
   String createSession(String username, String basicAuthToken);
 
   /**
-   * Looks up the username for a session token, extending the sliding TTL on each access.
+   * Looks up the username for a session token.
    *
    * @param token the session token from the cookie
    * @return the username if the session is valid and not expired, empty otherwise
