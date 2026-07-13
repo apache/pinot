@@ -42,7 +42,7 @@ import static org.testng.Assert.*;
  * <ul>
  *   <li>createSession — token generation, storage</li>
  *   <li>getUsername — valid session, expired session, null/empty token</li>
- *   <li>Sliding window TTL — expiry is extended on each getUsername call</li>
+ *   <li>Fixed TTL — session expires at loginTime + TTL regardless of access</li>
  *   <li>invalidateSession — immediate removal, idempotent</li>
  *   <li>getBasicAuthToken — returns stored token, empty after invalidation</li>
  *   <li>Concurrent access — no race condition under parallel getUsername calls</li>
@@ -140,38 +140,42 @@ public class SessionManagerTest {
   }
 
   @Test
-  public void testExpiredSessionRemovedFromStore() throws InterruptedException {
+  public void testExpiredSessionIsNotAccessible() throws InterruptedException {
+    // getUsername returns empty for expired sessions. Expired entries are NOT eagerly removed from
+    // the store on access — they linger until the background sweep (every 30 minutes). This is
+    // intentional: the map is only consulted for expiry checks, not for active garbage collection.
     SessionManager shortTtlManager = new InMemorySessionManager(1L);
     try {
       String token = shortTtlManager.createSession("bob", "Basic xyz");
       Thread.sleep(1500);
-      shortTtlManager.getUsername(token); // triggers removal via compute()
-      assertEquals(shortTtlManager.getActiveSessionCount(), 0,
-          "Expired session should be removed from store on access");
+      Optional<String> result = shortTtlManager.getUsername(token);
+      assertFalse(result.isPresent(), "Expired session should not be returned by getUsername");
     } finally {
       shortTtlManager.shutdown();
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Sliding window TTL
+  // Fixed TTL (no sliding window)
   // ---------------------------------------------------------------------------
 
   @Test
-  public void testSlidingWindowExtendsExpiry() throws InterruptedException {
-    // TTL = 2 seconds. Access at t=1.5s should slide expiry to t=3.5s.
-    SessionManager slidingManager = new InMemorySessionManager(2L);
+  public void testFixedTtlExpiresAtLoginPlusTimeout() throws InterruptedException {
+    // TTL = 3 seconds. Session should be valid at t=1.5s but expired at t=3.5s.
+    // Calling getUsername at t=1.5s must NOT extend the expiry — the fixed TTL
+    // ensures server and browser cookie expiry are aligned from login time.
+    SessionManager fixedManager = new InMemorySessionManager(3L);
     try {
-      String token = slidingManager.createSession("carol", "Basic zzz");
+      String token = fixedManager.createSession("carol", "Basic zzz");
       Thread.sleep(1500); // t=1.5s — still valid
-      Optional<String> midResult = slidingManager.getUsername(token);
+      Optional<String> midResult = fixedManager.getUsername(token);
       assertTrue(midResult.isPresent(), "Session should still be valid at t=1.5s");
-      // Without sliding, session would expire at t=2s. With sliding it expires at t=3.5s.
-      Thread.sleep(1200); // t=2.7s — should still be valid due to slide
-      Optional<String> lateResult = slidingManager.getUsername(token);
-      assertTrue(lateResult.isPresent(), "Session should still be valid after sliding TTL extension");
+      // Without sliding TTL, session expires at t=3s regardless of the access above.
+      Thread.sleep(2000); // t=3.5s — 500ms after expiry, generous margin for CI
+      Optional<String> lateResult = fixedManager.getUsername(token);
+      assertFalse(lateResult.isPresent(), "Session should have expired at loginTime + TTL");
     } finally {
-      slidingManager.shutdown();
+      fixedManager.shutdown();
     }
   }
 

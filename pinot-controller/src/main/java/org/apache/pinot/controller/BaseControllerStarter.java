@@ -749,8 +749,27 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX), _helixResourceManager);
 
     // Create a singleton SessionManager for session-based UI authentication.
-    // Server-side TTL = inactivity timeout + 120s buffer so the server doesn't evict a session
-    // that the UI hasn't timed out yet (e.g. user is active but a background API call races with eviction).
+    //
+    // IMPORTANT: This is a per-process in-memory store. In a multi-controller deployment behind
+    // a load balancer, a session token minted on controller-A is not known to controller-B, and
+    // a logout request routed to controller-B will not invalidate the token held by controller-A.
+    // To preserve the server-side logout guarantee, configure the load balancer with sticky
+    // sessions (e.g., consistent hashing on the session cookie or source IP) so that all requests
+    // from a given browser are always routed to the same controller. Without sticky sessions,
+    // session-based UI authentication degrades to best-effort: login and most API calls will work
+    // (the LB will route them to the controller that knows the session), but logout may silently
+    // fail if it hits a different controller.
+    //
+    // The session TTL is set to the configured session timeout plus a 120s grace period.
+    // The grace period absorbs clock skew and in-flight requests: a request that arrives at
+    // the server just before the browser cookie's Max-Age expires will still see a valid
+    // server-side session. Both the server session and the browser cookie Max-Age are set to
+    // serverSessionTtlSeconds at login, so they expire at the same absolute time.
+    //
+    // Note: CONTROLLER_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS controls the session *ceiling*
+    // (loginTime + timeout + 120s), not a sliding inactivity window. The UI enforces inactivity
+    // detection client-side (JavaScript timer that redirects to login after timeout seconds of
+    // no user interaction). The server does not extend the session on each request.
     long uiInactivityTimeoutSeconds = _config.getProperty(
         ControllerConf.CONTROLLER_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS,
         ControllerConf.DEFAULT_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS);
