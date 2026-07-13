@@ -164,8 +164,12 @@ public class BloomFilterHandler extends BaseIndexHandler {
 
   /**
    * Computes the {@code numHashFunctions} and {@code numLongs} that Guava would allocate for the given
-   * fpp and cardinality. These match Guava's {@code optimalNumOfBits} / {@code optimalNumOfHashFunctions}
-   * formulas and are used to detect fpp changes in V1 bloom filter files.
+   * fpp and cardinality, matching the formulas in Guava's {@code BloomFilter}.
+   *
+   * <p>{@code numLongs} uses {@code optimalNumOfBits(n, p) = (long)(-n * ln(p) / (ln 2)^2)}.
+   * {@code numHashFunctions} uses the direct formula {@code max(1, round(-ln(p) / ln(2)))},
+   * which is what current Guava (33+) writes. The older two-step path via {@code idealNumBits / n * ln(2)}
+   * diverges for small cardinalities due to long-cast truncation and must not be used.
    *
    * @return {@code int[]{numHashFunctions, numLongs}}
    */
@@ -181,10 +185,12 @@ public class BloomFilterHandler extends BaseIndexHandler {
     }
     // Guava: optimalNumOfBits = -n * ln(p) / (ln 2)^2, minimum 1
     long idealNumBits = Math.max(1, (long) (-cardinality * Math.log(fpp) / (Math.log(2) * Math.log(2))));
-    // Guava: numLongs = ceil(idealNumBits / 64). numHashFunctions uses idealNumBits, not the quantized count.
+    // Guava: numLongs = ceil(idealNumBits / 64).
     int numLongs = (int) ((idealNumBits + 63) / 64);
-    // Guava: optimalNumOfHashFunctions(n, idealNumBits) = max(1, round(idealNumBits / n * ln 2))
-    int numHashFunctions = Math.max(1, (int) Math.round((double) idealNumBits / cardinality * Math.log(2)));
+    // Guava (33+): optimalNumOfHashFunctions(p) = max(1, round(-ln(p) / ln(2)))
+    // This is the direct formula Guava now uses; it avoids the long-cast quantization error
+    // in the old two-step path (via idealNumBits / n) that diverges for small cardinalities.
+    int numHashFunctions = Math.max(1, (int) Math.round(-Math.log(fpp) / Math.log(2)));
     return new int[]{numHashFunctions, numLongs};
   }
 
