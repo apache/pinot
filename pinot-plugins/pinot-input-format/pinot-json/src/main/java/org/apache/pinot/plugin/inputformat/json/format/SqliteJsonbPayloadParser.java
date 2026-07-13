@@ -71,6 +71,14 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
   private static final Pattern CANONICAL_NUMBER =
       Pattern.compile("-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?");
 
+  // Bound nesting depth and numeric-token length to Jackson's StreamReadConstraints defaults, so this binary
+  // path rejects the same pathological shapes text JSON already rejects via JsonUtils.bytesToMap. The depth cap
+  // is the important one: each nesting level is only ~1-3 wire bytes, so without it a small message can recurse
+  // deep enough to throw StackOverflowError -- an Error, not an Exception, that escapes the decode-error
+  // handling and fails the whole consuming segment instead of dropping one bad record.
+  private static final int MAX_NESTING_DEPTH = 1000;
+  private static final int MAX_NUMBER_LENGTH = 1000;
+
   @Override
   public boolean matches(byte[] payload, int offset, int length) {
     // The top-level element must be an OBJECT (low nibble == 12) to produce a row. That never collides with
@@ -141,7 +149,7 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
   public Map<String, Object> parse(byte[] payload, int offset, int length) {
     int limit = offset + length;
     Cursor cursor = new Cursor(payload, offset, limit);
-    Object value = readElement(cursor, limit);
+    Object value = readElement(cursor, limit, 0);
     if (!(value instanceof Map)) {
       throw new IllegalArgumentException("Top-level SQLite JSONB element must be an object");
     }
@@ -159,7 +167,7 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
   /// Reads one element. {@code parentEnd} is the exclusive end of the enclosing container (the whole payload at
   /// the top level); an element may never extend past it, otherwise a nested element could overrun its parent
   /// while still fitting the payload and silently swallow its following siblings.
-  private static Object readElement(Cursor cursor, int parentEnd) {
+  private static Object readElement(Cursor cursor, int parentEnd, int depth) {
     int header = cursor.peekUInt8();
     int type = header & 0x0F;
     int sizeDescriptor = header >>> 4;
@@ -203,9 +211,9 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
         result = unescape(cursor.utf8(start, end), true);
         break;
       case TYPE_ARRAY:
-        return readArray(cursor, end);
+        return readArray(cursor, end, depth);
       case TYPE_OBJECT:
-        return readObject(cursor, end);
+        return readObject(cursor, end, depth);
       default:
         throw new IllegalArgumentException("Reserved/invalid SQLite JSONB element type: " + type);
     }
@@ -213,27 +221,39 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
     return result;
   }
 
-  private static List<Object> readArray(Cursor cursor, int end) {
+  private static List<Object> readArray(Cursor cursor, int end, int depth) {
+    int childDepth = nextDepth(depth);
     List<Object> list = new ArrayList<>();
     while (cursor._pos < end) {
-      list.add(readElement(cursor, end));
+      list.add(readElement(cursor, end, childDepth));
     }
     return list;
   }
 
-  private static Map<String, Object> readObject(Cursor cursor, int end) {
+  private static Map<String, Object> readObject(Cursor cursor, int end, int depth) {
+    int childDepth = nextDepth(depth);
     Map<String, Object> map = Maps.newHashMapWithExpectedSize(4);
     while (cursor._pos < end) {
-      Object label = readElement(cursor, end);
+      Object label = readElement(cursor, end, childDepth);
       if (!(label instanceof String)) {
         throw new IllegalArgumentException("SQLite JSONB object label must be text");
       }
       if (cursor._pos >= end) {
         throw new IllegalArgumentException("SQLite JSONB object is missing a value for label: " + label);
       }
-      map.put((String) label, readElement(cursor, end));
+      map.put((String) label, readElement(cursor, end, childDepth));
     }
     return map;
+  }
+
+  /// Returns {@code depth + 1} for the children of a container, throwing once nesting would exceed
+  /// [#MAX_NESTING_DEPTH]. Keeps deep nesting on the `IllegalArgumentException` path (handled as a bad record)
+  /// rather than letting the recursion overflow the stack with a `StackOverflowError`.
+  private static int nextDepth(int depth) {
+    if (depth >= MAX_NESTING_DEPTH) {
+      throw new IllegalArgumentException("SQLite JSONB nesting exceeds the maximum depth of " + MAX_NESTING_DEPTH);
+    }
+    return depth + 1;
   }
 
   /// Parses a canonical (RFC 8259) integer, the SQLite `TYPE_INT` form. Validated as strictly as text JSON:
@@ -459,7 +479,15 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
       return start + (int) size;
     }
 
+    /// Decodes a numeric token as ASCII. Numeric element types are this method's only callers, so it also
+    /// enforces the numeric length cap here: `BigInteger(String)` parsing is ~O(n^2), and without a bound a
+    /// single ~1 MB run of digits would be a per-message CPU sink with no analogue in text JSON, which caps
+    /// number length the same way via Jackson's StreamReadConstraints.
     private String ascii(int start, int end) {
+      if (end - start > MAX_NUMBER_LENGTH) {
+        throw new IllegalArgumentException(
+            "SQLite JSONB numeric token exceeds the maximum length of " + MAX_NUMBER_LENGTH);
+      }
       return new String(_buf, start, end - start, StandardCharsets.US_ASCII);
     }
 

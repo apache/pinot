@@ -458,6 +458,76 @@ public class JsonPayloadFormatTest {
     assertThrows(IllegalArgumentException.class, () -> parse(parser, bytes(0x4C, 0x17, 0x80, 0x13, 0x31)));
   }
 
+  // SQLite JSONB element type codes used by the builders below.
+  private static final int SQLITE_TYPE_INT = 3;
+  private static final int SQLITE_TYPE_TEXT = 7;
+  private static final int SQLITE_TYPE_ARRAY = 11;
+  private static final int SQLITE_TYPE_OBJECT = 12;
+
+  /// Builds a SQLite JSONB element (header + payload) whose declared size exactly matches {@code payload},
+  /// choosing the narrowest size descriptor. Used to hand-build arbitrarily large / deep valid fixtures.
+  private static byte[] sqliteElement(int type, byte[] payload) {
+    int size = payload.length;
+    byte[] header;
+    if (size <= 11) {
+      header = bytes((size << 4) | type);
+    } else if (size <= 0xFF) {
+      header = bytes((12 << 4) | type, size);
+    } else if (size <= 0xFFFF) {
+      header = bytes((13 << 4) | type, (size >>> 8) & 0xFF, size & 0xFF);
+    } else {
+      header = bytes((14 << 4) | type, (size >>> 24) & 0xFF, (size >>> 16) & 0xFF, (size >>> 8) & 0xFF, size & 0xFF);
+    }
+    byte[] out = new byte[header.length + payload.length];
+    System.arraycopy(header, 0, out, 0, header.length);
+    System.arraycopy(payload, 0, out, header.length, payload.length);
+    return out;
+  }
+
+  /// {@code {"<key>": <value element>}} as an exactly-filling SQLite JSONB object.
+  private static byte[] sqliteObject(String key, byte[] valueElement) {
+    byte[] label = sqliteElement(SQLITE_TYPE_TEXT, key.getBytes(StandardCharsets.US_ASCII));
+    byte[] payload = new byte[label.length + valueElement.length];
+    System.arraycopy(label, 0, payload, 0, label.length);
+    System.arraycopy(valueElement, 0, payload, label.length, valueElement.length);
+    return sqliteElement(SQLITE_TYPE_OBJECT, payload);
+  }
+
+  /// {@code {"a": [[[ ... ]]]}} with {@code depth} nested arrays, innermost empty. Each level is a valid,
+  /// exactly-filling element, so the whole payload is well-formed apart from its depth.
+  private static byte[] sqliteNestedArrays(int depth) {
+    byte[] element = sqliteElement(SQLITE_TYPE_ARRAY, new byte[0]);
+    for (int i = 0; i < depth; i++) {
+      element = sqliteElement(SQLITE_TYPE_ARRAY, element);
+    }
+    return sqliteObject("a", element);
+  }
+
+  @Test
+  public void testSqliteRejectsExcessiveNestingDepth()
+      throws Exception {
+    JsonPayloadParser parser = JsonPayloadFormat.SQLITE_JSONB.getParser();
+    // Moderate nesting decodes -- confirms the fixture builder and normal nesting are fine.
+    assertTrue(parse(parser, sqliteNestedArrays(50)).get("a") instanceof List);
+    // Past the depth cap it must fail as a bad record (IllegalArgumentException), NOT recurse into a
+    // StackOverflowError, which is an Error that would escape decode-error handling and fail the segment.
+    assertThrows(IllegalArgumentException.class, () -> parse(parser, sqliteNestedArrays(1200)));
+  }
+
+  @Test
+  public void testSqliteRejectsOversizedNumericToken()
+      throws Exception {
+    JsonPayloadParser parser = JsonPayloadFormat.SQLITE_JSONB.getParser();
+    // A 1000-digit canonical integer is accepted (parity with Jackson's number-length cap).
+    byte[] atLimit =
+        sqliteObject("n", sqliteElement(SQLITE_TYPE_INT, "9".repeat(1000).getBytes(StandardCharsets.US_ASCII)));
+    assertTrue(parse(parser, atLimit).get("n") instanceof BigInteger);
+    // One digit past the cap is rejected before the ~O(n^2) BigInteger parse runs.
+    byte[] overLimit =
+        sqliteObject("n", sqliteElement(SQLITE_TYPE_INT, "9".repeat(1001).getBytes(StandardCharsets.US_ASCII)));
+    assertThrows(IllegalArgumentException.class, () -> parse(parser, overLimit));
+  }
+
   @Test
   public void testSqliteTextEscapeVariants()
       throws Exception {

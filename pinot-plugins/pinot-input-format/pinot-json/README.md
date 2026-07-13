@@ -78,6 +78,11 @@ When `AUTO` is set, each message is classified in this order, falling back to te
 Pin an explicit format instead of `AUTO` when you know the encoding: it skips detection and, for formats
 without a strong magic number (notably tag-less CBOR), is the only way to decode them.
 
+The SQLite signature is intentionally narrow, but not zero-risk: a message consisting of the single byte
+`0x0C` is a valid, exactly-filling empty SQLite object, so under `AUTO` a stray `0x0C` decodes to an empty row
+rather than being rejected. This is the heuristic nature of `AUTO`; pin `TEXT` (or your actual format) to avoid
+it entirely.
+
 ## Examples
 
 All examples use a Kafka real-time table; substitute your stream type (`stream.<type>.…`) as needed.
