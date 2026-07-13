@@ -34,6 +34,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormat.forPattern(DATE_FORMAT).withZoneUTC();
 
   private final String _tableName;
+  private final int _topicId;
   private final int _partitionGroupId;
   private final int _sequenceNumber;
   private final String _creationTime;
@@ -41,22 +42,42 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   public LLCSegmentName(String segmentName) {
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
-    Preconditions.checkArgument(parts.length == 4, "Invalid LLC segment name: %s", segmentName);
+    Preconditions.checkArgument(parts.length == 4 || parts.length == 5, "Invalid LLC segment name: %s", segmentName);
     _tableName = parts[0];
-    _partitionGroupId = Integer.parseInt(parts[1]);
-    _sequenceNumber = Integer.parseInt(parts[2]);
-    _creationTime = parts[3];
+    if (parts.length == 4) {
+      _topicId = 0;
+      _partitionGroupId = Integer.parseInt(parts[1]);
+      _sequenceNumber = Integer.parseInt(parts[2]);
+      _creationTime = parts[3];
+    } else {
+      _topicId = Integer.parseInt(parts[1]);
+      _partitionGroupId = Integer.parseInt(parts[2]);
+      _sequenceNumber = Integer.parseInt(parts[3]);
+      _creationTime = parts[4];
+    }
     _segmentName = segmentName;
   }
 
   public LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
     Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
     _tableName = tableName;
+    _topicId = 0;
     _partitionGroupId = partitionGroupId;
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
     _creationTime = DATE_FORMATTER.print(msSinceEpoch);
     _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
+  }
+
+  public LLCSegmentName(String tableName, int configId, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
+    Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
+    _tableName = tableName;
+    _topicId = configId;
+    _partitionGroupId = partitionGroupId;
+    _sequenceNumber = sequenceNumber;
+    _creationTime = DATE_FORMATTER.print(msSinceEpoch);
+    _segmentName = tableName + SEPARATOR + configId + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber
+        + SEPARATOR + _creationTime;
   }
 
   /**
@@ -82,7 +103,26 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
       numSeparators++;
       index += 2; // SEPARATOR.length()
     }
-    return numSeparators == 3;
+    return numSeparators == 3 || numSeparators == 4;
+  }
+
+  /**
+   * Returns whether the given segment name is a multi-topic LLC segment (5-part format where
+   * parts[1] and parts[3] are integers, distinguishing it from UploadedRealtimeSegmentName).
+   */
+  public static boolean isMultiTopicLLCSegment(String segmentName) {
+    String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
+    if (parts.length != 5) {
+      return false;
+    }
+    try {
+      Integer.parseInt(parts[1]); // topicId
+      Integer.parseInt(parts[2]); // partitionGroupId
+      Integer.parseInt(parts[3]); // sequenceNumber
+      return true;
+    } catch (NumberFormatException e) {
+      return false;
+    }
   }
 
   @Deprecated
@@ -99,6 +139,10 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   public String getTableName() {
     return _tableName;
+  }
+
+  public int getTopicId() {
+    return _topicId;
   }
 
   public int getPartitionGroupId() {
@@ -127,6 +171,8 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   public int compareTo(LLCSegmentName other) {
     Preconditions.checkArgument(_tableName.equals(other._tableName),
         "Cannot compare segment names from different table: %s, %s", _segmentName, other.getSegmentName());
+    Preconditions.checkArgument(_topicId == other._topicId,
+        "Cannot compare segment names from different topic ids: %s, %s", _segmentName, other.getSegmentName());
     if (_partitionGroupId != other._partitionGroupId) {
       return Integer.compare(_partitionGroupId, other._partitionGroupId);
     }
