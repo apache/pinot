@@ -119,6 +119,24 @@ public class BloomFilterHandlerTest {
   }
 
   /**
+   * Regression guard for the small-cardinality formula bug: with n=1 and fpp=0.01, the formula must produce
+   * numHashFunctions=7 to match Guava 33.5+'s {@code optimalNumOfHashFunctions(p) = round(-ln(p)/ln(2))}.
+   * An older two-step formula via {@code idealNumBits/n * ln(2)} gives 6, causing an infinite rebuild loop.
+   */
+  @Test
+  public void testNeedUpdateReturnsFalseWhenFppUnchangedV1SmallCardinality()
+      throws Exception {
+    // n=1, p=0.01 → Guava 33.5+ writes numHashFunctions=7 (round(-ln(0.01)/ln(2)) = round(6.64) = 7)
+    writeV1BloomFilter(1, 0.01);
+
+    BloomFilterHandler handler = createHandlerWithCardinality(COLUMN, new BloomFilterConfig(0.01, 0, false), 1);
+    SegmentDirectory.Reader reader = mockReaderWithBloomFilter(COLUMN, _bloomFilterFile);
+
+    assertFalse(handler.needUpdateIndices(reader),
+        "No rebuild expected for small cardinality (n=1) when fpp is unchanged — formula must match Guava exactly");
+  }
+
+  /**
    * Sanity check: when the v2 header fpp matches the current config, the handler must not trigger a rebuild.
    */
   @Test
@@ -179,16 +197,21 @@ public class BloomFilterHandlerTest {
   }
 
   private BloomFilterHandler createHandler(String columnName, BloomFilterConfig bloomFilterConfig) {
+    return createHandlerWithCardinality(columnName, bloomFilterConfig, CARDINALITY);
+  }
+
+  private BloomFilterHandler createHandlerWithCardinality(String columnName, BloomFilterConfig bloomFilterConfig,
+      int cardinality) {
     FieldIndexConfigs fieldIndexConfigs =
         new FieldIndexConfigs.Builder().add(StandardIndexes.bloomFilter(), bloomFilterConfig).build();
 
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
-    when(columnMetadata.getCardinality()).thenReturn(CARDINALITY);
-    when(columnMetadata.getTotalNumberOfEntries()).thenReturn(CARDINALITY);
+    when(columnMetadata.getCardinality()).thenReturn(cardinality);
+    when(columnMetadata.getTotalNumberOfEntries()).thenReturn(cardinality);
 
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
-    when(segmentMetadata.getTotalDocs()).thenReturn(CARDINALITY);
+    when(segmentMetadata.getTotalDocs()).thenReturn(cardinality);
     when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(columnName)));
     when(segmentMetadata.getColumnMetadataFor(columnName)).thenReturn(columnMetadata);
 
