@@ -160,6 +160,15 @@ public class PartitionGroupMetadataFetcherTest {
           .collect(Collectors.toList());
 
       Assert.assertEquals(partitionIds, Arrays.asList(0, 1, 10000, 10001));
+
+      // Verify the topic ids are correctly assigned: topic1 (index 0) -> 0, 0; topic2 (index 1) -> 1, 1
+      List<Integer> topicIds = streamMetadataList.stream()
+          .flatMap(sm -> sm.getPartitionGroupMetadataList().stream())
+          .map(PartitionGroupMetadata::getTopicId)
+          .sorted()
+          .collect(Collectors.toList());
+
+      Assert.assertEquals(topicIds, Arrays.asList(0, 0, 1, 1));
     }
   }
 

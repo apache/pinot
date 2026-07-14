@@ -26,6 +26,7 @@ package org.apache.pinot.spi.stream;
  * 1. A unique partition group id for this partition group
  * 2. The start offset to begin consumption for this partition group
  * 3. The sequence number for the consuming segment (used when creating segments with designated offsets/sequences)
+ * 4. The id of the topic (stream config) this partition group belongs to, for tables with multiple topics
  */
 public class PartitionGroupMetadata {
 
@@ -34,7 +35,6 @@ public class PartitionGroupMetadata {
   private final int _partitionGroupId;
   private final StreamPartitionMsgOffset _startOffset;
   private final int _sequenceNumber;
-  private final int _streamPartitionGroupId;
   private final int _topicId;
 
   public PartitionGroupMetadata(int partitionGroupId, StreamPartitionMsgOffset startOffset) {
@@ -42,13 +42,23 @@ public class PartitionGroupMetadata {
   }
 
   public PartitionGroupMetadata(int partitionGroupId, StreamPartitionMsgOffset startOffset, int sequenceNumber) {
+    this(partitionGroupId, 0, startOffset, sequenceNumber);
+  }
+
+  public PartitionGroupMetadata(int partitionGroupId, int topicId, StreamPartitionMsgOffset startOffset,
+      int sequenceNumber) {
     _partitionGroupId = partitionGroupId;
+    _topicId = topicId;
     _startOffset = startOffset;
     _sequenceNumber = sequenceNumber;
   }
 
   public int getPartitionGroupId() {
     return _partitionGroupId;
+  }
+
+  public int getTopicId() {
+    return _topicId;
   }
 
   public StreamPartitionMsgOffset getStartOffset() {

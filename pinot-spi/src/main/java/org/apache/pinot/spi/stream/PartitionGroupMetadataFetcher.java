@@ -143,7 +143,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
                 .stream()
                 .map(metadata -> new PartitionGroupMetadata(
                     IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(metadata.getPartitionGroupId(),
-                        index), metadata.getStartOffset(), metadata.getSequenceNumber()))
+                        index), index, metadata.getStartOffset(), metadata.getSequenceNumber()))
                 .collect(Collectors.toList());
         _streamMetadataList.add(
             new StreamMetadata(streamConfig, partitionGroupMetadataList.size(), partitionGroupMetadataList));
