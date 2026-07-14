@@ -306,7 +306,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         LLCSegmentName llcSegmentName = entry.getValue();
         SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, llcSegmentName.getSegmentName());
         PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
-            new PartitionGroupConsumptionStatus(partitionGroupId, llcSegmentName.getSequenceNumber(),
+            new PartitionGroupConsumptionStatus(partitionGroupId, partitionGroupId, 0,
+                llcSegmentName.getSequenceNumber(),
                 offsetFactory.create(segmentZKMetadata.getStartOffset()),
                 segmentZKMetadata.getEndOffset() != null ? offsetFactory.create(segmentZKMetadata.getEndOffset())
                     : null, segmentZKMetadata.getStatus().toString());
@@ -318,16 +319,18 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       for (Map.Entry<Integer, LLCSegmentName> entry : partitionGroupIdToLatestSegment.entrySet()) {
         int partitionGroupId = entry.getKey();
         LLCSegmentName llcSegmentName = entry.getValue();
-        int index = llcSegmentName.getTopicId(true);
+        int topicId = llcSegmentName.getTopicId(true);
         int streamPartitionId = llcSegmentName.getStreamPartitionGroupId(true);
         SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, llcSegmentName.getSegmentName());
-        StreamPartitionMsgOffsetFactory offsetFactory = offsetFactories[index];
+        StreamPartitionMsgOffsetFactory offsetFactory = offsetFactories[topicId];
         if (offsetFactory == null) {
-          offsetFactory = StreamConsumerFactoryProvider.create(streamConfigs.get(index)).createStreamMsgOffsetFactory();
-          offsetFactories[index] = offsetFactory;
+          offsetFactory =
+              StreamConsumerFactoryProvider.create(streamConfigs.get(topicId)).createStreamMsgOffsetFactory();
+          offsetFactories[topicId] = offsetFactory;
         }
         PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
-            new PartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId, llcSegmentName.getSequenceNumber(),
+            new PartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId, topicId,
+                llcSegmentName.getSequenceNumber(),
                 offsetFactory.create(segmentZKMetadata.getStartOffset()),
                 segmentZKMetadata.getEndOffset() != null ? offsetFactory.create(segmentZKMetadata.getEndOffset())
                     : null, segmentZKMetadata.getStatus().toString());
@@ -2065,7 +2068,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         int partitionGroupId = entry.getKey();
         SegmentZKMetadata zkMetadata = entry.getValue();
         LLCSegmentName llcSegmentName = new LLCSegmentName(zkMetadata.getSegmentName());
-        result.add(new PartitionGroupConsumptionStatus(partitionGroupId, llcSegmentName.getSequenceNumber(),
+        result.add(new PartitionGroupConsumptionStatus(partitionGroupId, partitionGroupId, 0,
+            llcSegmentName.getSequenceNumber(),
             offsetFactory.create(zkMetadata.getStartOffset()),
             zkMetadata.getEndOffset() != null ? offsetFactory.create(zkMetadata.getEndOffset()) : null,
             zkMetadata.getStatus().toString()));
@@ -2074,17 +2078,17 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       StreamPartitionMsgOffsetFactory[] offsetFactories = new StreamPartitionMsgOffsetFactory[numStreams];
       for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
         int partitionGroupId = entry.getKey();
-        int index = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionGroupId);
-        int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(partitionGroupId);
         SegmentZKMetadata zkMetadata = entry.getValue();
         LLCSegmentName llcSegmentName = new LLCSegmentName(zkMetadata.getSegmentName());
-        StreamPartitionMsgOffsetFactory offsetFactory = offsetFactories[index];
+        int topicId = llcSegmentName.getTopicId(true);
+        int streamPartitionId = llcSegmentName.getStreamPartitionGroupId(true);
+        StreamPartitionMsgOffsetFactory offsetFactory = offsetFactories[topicId];
         if (offsetFactory == null) {
           offsetFactory =
-              StreamConsumerFactoryProvider.create(streamConfigs.get(index)).createStreamMsgOffsetFactory();
-          offsetFactories[index] = offsetFactory;
+              StreamConsumerFactoryProvider.create(streamConfigs.get(topicId)).createStreamMsgOffsetFactory();
+          offsetFactories[topicId] = offsetFactory;
         }
-        result.add(new PartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId,
+        result.add(new PartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId, topicId,
             llcSegmentName.getSequenceNumber(),
             offsetFactory.create(zkMetadata.getStartOffset()),
             zkMetadata.getEndOffset() != null ? offsetFactory.create(zkMetadata.getEndOffset()) : null,
