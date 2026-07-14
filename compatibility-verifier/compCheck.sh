@@ -212,22 +212,36 @@ function setupKafkaBinary() {
     rm -rf "${workingDir}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}"
     if [ ! -f "${KAFKA_ARCHIVE}" ]; then
       echo "Downloading Kafka from ${KAFKA_DOWNLOAD_URL}"
-      curl -fSL --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 300 "${KAFKA_DOWNLOAD_URL}" -o "${KAFKA_ARCHIVE}" 1>${LOG_DIR}/kafka.download.${logCount}.log 2>&1
+      # downloads.apache.org only hosts current releases (older ones rotate to archive.apache.org), so a
+      # 404 here is expected once ${KAFKA_VERSION} ages out; fall back to the archive mirror on failure
+      httpCode=$(curl -fSL --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 300 -w "%{http_code}" \
+        "${KAFKA_DOWNLOAD_URL}" -o "${KAFKA_ARCHIVE}" 2>>${LOG_DIR}/kafka.download.${logCount}.log)
       if [ $? -ne 0 ]; then
-        echo "Primary download failed, trying archive mirror: ${KAFKA_ARCHIVE_URL}"
+        echo "Primary download failed (HTTP ${httpCode}), trying archive mirror: ${KAFKA_ARCHIVE_URL}"
         rm -f "${KAFKA_ARCHIVE}"
-        curl -fSL --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 300 "${KAFKA_ARCHIVE_URL}" -o "${KAFKA_ARCHIVE}" 1>>${LOG_DIR}/kafka.download.${logCount}.log 2>&1 || exit 1
+        # archive.apache.org is bandwidth-throttled: abort if throughput stays below 100KB/s for 60s (too
+        # slow to ever finish the ~130MB tarball) or after 30 min; a single retry keeps the worst case
+        # around 1h, within the compat job timeout
+        curl -fSL --retry 1 --retry-delay 5 --connect-timeout 30 --speed-limit 102400 --speed-time 60 --max-time 1800 \
+          "${KAFKA_ARCHIVE_URL}" -o "${KAFKA_ARCHIVE}" 1>>${LOG_DIR}/kafka.download.${logCount}.log 2>&1 || { rm -f "${KAFKA_ARCHIVE}"; exit 1; }
       fi
     fi
-    tar -xzf "${KAFKA_ARCHIVE}" -C "${workingDir}" 1>>${LOG_DIR}/kafka.download.${logCount}.log 2>&1 || exit 1
+    tar -xzf "${KAFKA_ARCHIVE}" -C "${workingDir}" 1>>${LOG_DIR}/kafka.download.${logCount}.log 2>&1 || { rm -f "${KAFKA_ARCHIVE}"; exit 1; }
     mv "${workingDir}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}" "${KAFKA_HOME}"
   fi
 
   rm -rf "${KAFKA_DATA_DIR}"
   mkdir -p "${KAFKA_DATA_DIR}"
+  # Kafka 4.x is KRaft-only: run a single node acting as both broker and controller
   cat <<EOF >"${KAFKA_CONFIG_FILE}"
-listeners=${KAFKA_LISTENER}
+process.roles=broker,controller
+node.id=1
+controller.quorum.voters=1@127.0.0.1:${KAFKA_CONTROLLER_PORT}
+listeners=${KAFKA_LISTENER},CONTROLLER://127.0.0.1:${KAFKA_CONTROLLER_PORT}
 advertised.listeners=${KAFKA_LISTENER}
+inter.broker.listener.name=PLAINTEXT
+controller.listener.names=CONTROLLER
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
 num.io.threads=8
 num.network.threads=3
 socket.send.buffer.bytes=102400
@@ -239,9 +253,10 @@ num.recovery.threads.per.data.dir=1
 offsets.topic.replication.factor=1
 transaction.state.log.replication.factor=1
 transaction.state.log.min.isr=1
-zookeeper.connect=localhost:${ZK_PORT}/kafka
-zookeeper.connection.timeout.ms=6000
 EOF
+  # The data dir is wiped above, so the KRaft storage must be re-formatted before every start
+  "${KAFKA_HOME}/bin/kafka-storage.sh" format -t "$("${KAFKA_HOME}/bin/kafka-storage.sh" random-uuid)" \
+    -c "${KAFKA_CONFIG_FILE}" 1>${LOG_DIR}/kafka.format.${logCount}.log 2>&1 || exit 1
 }
 
 function startKafkaService() {
@@ -460,11 +475,12 @@ SERVER_NETTY_PORT=8098
 SERVER_2_NETTY_PORT=9098
 SERVER_GRPC_PORT=8090
 SERVER_2_GRPC_PORT=9090
-KAFKA_VERSION="${KAFKA_VERSION:-3.9.2}"
+KAFKA_VERSION="${KAFKA_VERSION:-4.2.1}"
  KAFKA_SCALA_VERSION="${KAFKA_SCALA_VERSION:-2.13}"
  KAFKA_DOWNLOAD_URL="${KAFKA_DOWNLOAD_URL:-https://downloads.apache.org/kafka/${KAFKA_VERSION}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz}"
  KAFKA_ARCHIVE_URL="https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz"
  KAFKA_PORT="${KAFKA_PORT:-19092}"
+ KAFKA_CONTROLLER_PORT="${KAFKA_CONTROLLER_PORT:-19093}"
  KAFKA_LISTENER="PLAINTEXT://127.0.0.1:${KAFKA_PORT}"
  KAFKA_HOME="${workingDir}/kafka"
  KAFKA_ARCHIVE="${workingDir}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz"
@@ -493,7 +509,7 @@ setupCompatTester
 # check that the default ports are open
 if ! checkPortAvailable ${SERVER_ADMIN_PORT} || ! checkPortAvailable ${SERVER_NETTY_PORT} || ! checkPortAvailable ${SERVER_GRPC_PORT} ||
   ! checkPortAvailable ${BROKER_QUERY_PORT} || ! checkPortAvailable ${CONTROLLER_PORT} || ! checkPortAvailable ${ZK_PORT} ||
-  ! checkPortAvailable ${KAFKA_PORT} ||
+  ! checkPortAvailable ${KAFKA_PORT} || ! checkPortAvailable ${KAFKA_CONTROLLER_PORT} ||
   { [ -f "${SERVER_CONF_2}" ] && { ! checkPortAvailable ${SERVER_2_ADMIN_PORT} || ! checkPortAvailable ${SERVER_2_NETTY_PORT} || ! checkPortAvailable ${SERVER_2_GRPC_PORT}; } ; }; then
   exit 1
 fi
