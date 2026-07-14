@@ -280,6 +280,38 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
     }
   }
 
+  @Test
+  public void testSingleValueVarByteRawIndexCreatorTrackingEnabled()
+      throws IOException {
+    File file = Files.createTempFile(getClass().getSimpleName(), "svVarTrackEnabled").toFile();
+    file.deleteOnExit();
+    try (SingleValueVarByteRawIndexCreator creator = new SingleValueVarByteRawIndexCreator(
+        file.getParentFile(), ChunkCompressionType.LZ4, file.getName(), 100, DataType.STRING, 20)) {
+      creator.enableRawForwardIndexUncompressedValueSizeTracking();
+      for (int i = 0; i < 100; i++) {
+        creator.putString("value_" + i);
+      }
+      Assert.assertTrue(creator.getRawForwardIndexUncompressedValueSizeInBytes() > 0,
+          "SV var-byte creator should track > 0 uncompressed size when enabled");
+    }
+  }
+
+  @Test
+  public void testSingleValueVarByteRawIndexCreatorTrackingDisabled()
+      throws IOException {
+    File file = Files.createTempFile(getClass().getSimpleName(), "svVarTrackDisabled").toFile();
+    file.deleteOnExit();
+    try (SingleValueVarByteRawIndexCreator creator = new SingleValueVarByteRawIndexCreator(
+        file.getParentFile(), ChunkCompressionType.LZ4, file.getName(), 100, DataType.STRING, 20)) {
+      // tracking disabled by default
+      for (int i = 0; i < 100; i++) {
+        creator.putString("value_" + i);
+      }
+      Assert.assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L,
+          "SV var-byte creator should return unavailable when tracking is disabled");
+    }
+  }
+
   @Test(expectedExceptions = IllegalStateException.class)
   public void testV2IntegerOverflow()
       throws IOException {

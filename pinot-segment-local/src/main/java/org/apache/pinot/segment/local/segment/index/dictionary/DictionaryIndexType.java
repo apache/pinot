@@ -255,7 +255,7 @@ public class DictionaryIndexType
   @Override
   public SegmentDictionaryCreator createIndexCreator(IndexCreationContext context, DictionaryIndexConfig indexConfig) {
     boolean useVarLengthDictionary = shouldUseVarLengthDictionary(context, indexConfig);
-    return new SegmentDictionaryCreator(context.getFieldSpec(), context.getIndexDir(), useVarLengthDictionary);
+    return new SegmentDictionaryCreator(context, useVarLengthDictionary);
   }
 
   public boolean shouldUseVarLengthDictionary(IndexCreationContext context, DictionaryIndexConfig indexConfig) {

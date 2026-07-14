@@ -215,6 +215,14 @@ public class V1Constants {
       public static final String TOTAL_DOCS = "totalDocs";
 
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
+      /// Optional uncompressed serialized column-value bytes for a raw forward index.
+      public static final String FORWARD_INDEX_RAW_UNCOMPRESSED_VALUE_SIZE_IN_BYTES =
+          "forwardIndex.rawUncompressedValueSizeInBytes";
+      public static final String FORWARD_INDEX_RAW_CHUNK_COMPRESSION_TYPE =
+          "forwardIndex.rawChunkCompressionType";
+      /// Uncompressed serialized column-value bytes for dictionary encoding, written at seal time.
+      public static final String FORWARD_INDEX_DICTIONARY_ENCODED_UNCOMPRESSED_VALUE_SIZE_IN_BYTES =
+          "forwardIndex.dictionaryEncodedUncompressedValueSizeInBytes";
 
       public static String getKeyFor(String column, String key) {
         return COLUMN_PROPS_KEY_PREFIX + column + "." + key;

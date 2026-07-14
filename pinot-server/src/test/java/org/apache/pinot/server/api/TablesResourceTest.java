@@ -22,14 +22,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsContribution;
+import org.apache.pinot.common.restlet.resources.SegmentCompressionStatsContribution;
+import org.apache.pinot.common.restlet.resources.ServerCompressionStatsResponse;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
@@ -37,26 +42,42 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class TablesResourceTest extends BaseResourceTest {
@@ -186,6 +207,28 @@ public class TablesResourceTest extends BaseResourceTest {
     Response response = _webTarget.path("/tables/noSuchTable/metadata").request().get(Response.class);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+  }
+
+  @Test
+  public void testTableMetadataPreservesSegmentManagerCountWithoutImmutableSegments()
+      throws Exception {
+    TableDataManager original = _tableDataManagerMap.get(REALTIME_TABLE_NAME);
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    SegmentDataManager consumingSegment = mock(SegmentDataManager.class);
+    SegmentDataManager unavailableSegment = mock(SegmentDataManager.class);
+    when(consumingSegment.getReportableSegments()).thenReturn(List.of());
+    when(unavailableSegment.getReportableSegments()).thenReturn(List.of());
+    when(tableDataManager.acquireAllSegments()).thenReturn(List.of(consumingSegment, unavailableSegment));
+    when(tableDataManager.getPartitionToPrimaryKeyCount()).thenReturn(Map.of());
+    when(tableDataManager.getTableName()).thenReturn(REALTIME_TABLE_NAME);
+    _tableDataManagerMap.put(REALTIME_TABLE_NAME, tableDataManager);
+    try {
+      String response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/metadata").request().get(String.class);
+      TableMetadataInfo metadataInfo = JsonUtils.stringToObject(response, TableMetadataInfo.class);
+      Assert.assertEquals(metadataInfo.getNumSegments(), 2L);
+    } finally {
+      _tableDataManagerMap.put(REALTIME_TABLE_NAME, original);
+    }
   }
 
   @Test
@@ -759,6 +802,184 @@ public class TablesResourceTest extends BaseResourceTest {
     response =
         _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/segments/UNKNOWN_SEGMENT").request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+  }
+
+  @Test
+  public void testGetTableMetadataCompressionStatsDisabled()
+      throws Exception {
+    String tableName = "compressionStatsDisabledEndpoint_OFFLINE";
+    List<ImmutableSegment> segments = new ArrayList<>();
+    addTable(tableName);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableName);
+    ImmutableSegment trackedSegment = setUpSegment(tableName, null, "tracked", segments, true);
+    Assert.assertTrue(trackedSegment.getSegmentMetadata().getColumnMetadataMap().values().stream()
+        .anyMatch(column -> column.getRawForwardIndexUncompressedValueSizeInBytes() >= 0
+            || column.getDictionaryEncodedUncompressedValueSizeInBytes() >= 0));
+
+    try {
+      TableSegments request = new TableSegments(List.of(trackedSegment.getSegmentName()));
+      JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget
+          .path("/tables/" + tableName + "/compression-stats")
+          .queryParam("includeColumnCompressionStats", "true")
+          .request()
+          .post(Entity.json(request), String.class));
+      ServerCompressionStatsResponse response =
+          JsonUtils.jsonNodeToObject(jsonResponse, ServerCompressionStatsResponse.class);
+
+      Assert.assertNotNull(response);
+      Assert.assertEquals(response.getSegmentCompressionStats().size(), 1);
+      SegmentCompressionStatsContribution contribution = response.getSegmentCompressionStats().get(0);
+      Assert.assertFalse(contribution.isComplete());
+      Assert.assertEquals(contribution.getUncompressedValueSizeInBytes(), -1);
+      Assert.assertEquals(contribution.getForwardIndexAndDictionaryStorageSizeInBytes(), -1);
+      Assert.assertNull(contribution.getColumnCompressionStats());
+    } finally {
+      tableDataManager.offloadSegment(trackedSegment.getSegmentName());
+      tableDataManager.shutDown();
+      _tableDataManagerMap.remove(tableName);
+    }
+  }
+
+  @Test
+  public void testGetCompressionStatsWithMissingSegmentList()
+      throws Exception {
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget
+        .path("/tables/" + OFFLINE_TABLE_NAME + "/compression-stats")
+        .request()
+        .post(Entity.json("{}"), String.class));
+    ServerCompressionStatsResponse response =
+        JsonUtils.jsonNodeToObject(jsonResponse, ServerCompressionStatsResponse.class);
+
+    Assert.assertNotNull(response);
+    Assert.assertTrue(response.getSegmentCompressionStats().isEmpty());
+  }
+
+  @Test
+  public void testGetTableMetadataMixedDictRawCodec()
+      throws Exception {
+    // Regression test: when tracked segments use dictionary and raw encoding for the same column, both encoding
+    // contributions must be preserved.
+    String mixedTableName = "mixedDictRaw_OFFLINE";
+    List<ImmutableSegment> mixedSegments = new ArrayList<>();
+    List<GenericRow> rows = new ArrayList<>();
+    for (int i = 0; i < 1000; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue("column1", i);
+      row.putValue("column2", "value_" + i);
+      rows.add(row);
+    }
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TableNameBuilder.extractRawTableName(mixedTableName))
+        .addSingleValueDimension("column1", DataType.INT)
+        .addSingleValueDimension("column2", DataType.STRING)
+        .build();
+
+    // Segment 1: dictionary-encoded with tracked uncompressed value bytes.
+    File tableDataDir = new File(TEMP_DIR, mixedTableName);
+    TableConfig dictTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(mixedTableName).build();
+    dictTableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
+    SegmentGeneratorConfig dictConfig = new SegmentGeneratorConfig(dictTableConfig, schema);
+    dictConfig.setOutDir(tableDataDir.getAbsolutePath());
+    dictConfig.setSegmentName("mixedDictRaw_dict");
+    SegmentIndexCreationDriverImpl dictDriver = new SegmentIndexCreationDriverImpl();
+    dictDriver.init(dictConfig, new GenericRowRecordReader(rows));
+    dictDriver.build();
+    ImmutableSegment dictSegment = ImmutableSegmentLoader.load(
+        new File(tableDataDir, dictDriver.getSegmentName()),
+        ReadMode.mmap);
+    mixedSegments.add(dictSegment);
+
+    // Segment 2: raw-encoded for column1 and column2
+    TableConfig rawTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(mixedTableName)
+        .setNoDictionaryColumns(List.of("column1", "column2"))
+        .setFieldConfigList(List.of(
+            new FieldConfig("column1", FieldConfig.EncodingType.RAW, List.of(),
+                FieldConfig.CompressionCodec.LZ4, null),
+            new FieldConfig("column2", FieldConfig.EncodingType.RAW, List.of(),
+                FieldConfig.CompressionCodec.LZ4, null)))
+        .build();
+    rawTableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
+    SegmentGeneratorConfig rawConfig = new SegmentGeneratorConfig(rawTableConfig, schema);
+    rawConfig.setOutDir(tableDataDir.getAbsolutePath());
+    rawConfig.setSegmentName("mixedDictRaw_raw");
+    SegmentIndexCreationDriverImpl rawDriver = new SegmentIndexCreationDriverImpl();
+    rawDriver.init(rawConfig, new GenericRowRecordReader(rows));
+    rawDriver.build();
+    ImmutableSegment rawSegment = ImmutableSegmentLoader.load(
+        new File(tableDataDir, rawDriver.getSegmentName()),
+        ReadMode.mmap);
+    for (String column : List.of("column1", "column2")) {
+      Assert.assertFalse(rawSegment.getSegmentMetadata().getColumnMetadataFor(column).hasDictionary());
+      Assert.assertEquals(
+          rawSegment.getSegmentMetadata().getColumnMetadataFor(column).getRawForwardIndexChunkCompressionType(),
+          ChunkCompressionType.LZ4);
+      Assert.assertTrue(
+          rawSegment.getSegmentMetadata().getColumnMetadataFor(column)
+              .getRawForwardIndexUncompressedValueSizeInBytes() > 0);
+    }
+    mixedSegments.add(rawSegment);
+
+    // Register the table with compressionStatsEnabled=true
+    addTable(mixedTableName);
+    IndexingConfig tableIndexingConfig = new IndexingConfig();
+    tableIndexingConfig.setCompressionStatsEnabled(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(mixedTableName).build();
+    tableConfig.setIndexingConfig(tableIndexingConfig);
+    _tableDataManagerMap.get(mixedTableName).updateCachedTableConfigAndSchema(tableConfig, null);
+    for (ImmutableSegment seg : mixedSegments) {
+      _tableDataManagerMap.get(mixedTableName).addSegment(seg);
+    }
+
+    try {
+      JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget
+          .path("/tables/" + mixedTableName + "/compression-stats")
+          .queryParam("columns", "column1")
+          .queryParam("columns", "column2")
+          .queryParam("includeColumnCompressionStats", "true")
+          .request()
+          .post(Entity.json(new TableSegments(List.of(dictSegment.getSegmentName(), rawSegment.getSegmentName()))),
+              String.class));
+      ServerCompressionStatsResponse compressionResponse =
+          JsonUtils.jsonNodeToObject(jsonResponse, ServerCompressionStatsResponse.class);
+
+      Assert.assertNotNull(compressionResponse);
+      for (String column : List.of("column1", "column2")) {
+        boolean sawDictionary = false;
+        boolean sawRaw = false;
+        for (SegmentCompressionStatsContribution segmentStats : compressionResponse.getSegmentCompressionStats()) {
+          Map<String, ColumnCompressionStatsContribution> columnStats = segmentStats.getColumnCompressionStats();
+          Assert.assertNotNull(columnStats);
+          for (ColumnCompressionStatsContribution.EncodingContribution encoding
+              : columnStats.get(column).getEncodingBreakdown()) {
+            sawDictionary |= encoding.getEncoding() == FieldConfig.EncodingType.DICTIONARY
+                && encoding.getChunkCompressionType() == null;
+            sawRaw |= encoding.getEncoding() == FieldConfig.EncodingType.RAW
+                && encoding.getChunkCompressionType() == ChunkCompressionType.LZ4;
+          }
+        }
+        Assert.assertTrue(sawDictionary);
+        Assert.assertTrue(sawRaw);
+      }
+
+      JsonNode filteredResponse = JsonUtils.stringToJsonNode(_webTarget
+          .path("/tables/" + mixedTableName + "/compression-stats")
+          .queryParam("columns", "column1")
+          .queryParam("includeColumnCompressionStats", "true")
+          .request()
+          .post(Entity.json(new TableSegments(List.of(dictSegment.getSegmentName(), rawSegment.getSegmentName()))),
+              String.class));
+      ServerCompressionStatsResponse filteredInfo =
+          JsonUtils.jsonNodeToObject(filteredResponse, ServerCompressionStatsResponse.class);
+      for (SegmentCompressionStatsContribution segmentStats : filteredInfo.getSegmentCompressionStats()) {
+        Assert.assertNotNull(segmentStats.getColumnCompressionStats());
+        Assert.assertEquals(segmentStats.getColumnCompressionStats().keySet(), Set.of("column1"));
+      }
+    } finally {
+      for (ImmutableSegment seg : mixedSegments) {
+        seg.offload();
+        seg.destroy();
+      }
+      _tableDataManagerMap.remove(mixedTableName);
+    }
   }
 
   // Override to use data with delete records

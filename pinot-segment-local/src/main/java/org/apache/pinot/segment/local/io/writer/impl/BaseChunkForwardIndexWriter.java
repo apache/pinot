@@ -69,8 +69,11 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
 
   protected int _chunkSize;
   protected long _dataOffset;
+  protected long _uncompressedValueSize;
+  protected boolean _trackUncompressedValueSize = false;
 
   private final int _headerEntryChunkOffsetSize;
+  private final long _initialDataOffset;
 
   /**
    * Constructor for the class.
@@ -95,6 +98,7 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
     _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
     _headerEntryChunkOffsetSize = version == 2 ? Integer.BYTES : Long.BYTES;
     _dataOffset = writeHeader(compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, version);
+    _initialDataOffset = _dataOffset;
     _chunkBuffer = ByteBuffer.allocateDirect(_chunkSize);
     int maxCompressedChunkSize = _chunkCompressor.maxCompressedSize(_chunkSize); // may exceed original chunk size
     _compressedBuffer = ByteBuffer.allocateDirect(maxCompressedChunkSize);
@@ -195,5 +199,17 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
 
     _dataOffset += sizeToWrite;
     _chunkBuffer.clear();
+  }
+
+  /// Returns the total uncompressed size of data written so far, or `-1` when tracking is disabled.
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    return _trackUncompressedValueSize ? _uncompressedValueSize : -1;
+  }
+
+  /// Enables uncompressed-size tracking before the first value is written.
+  public void enableRawForwardIndexUncompressedValueSizeTracking() {
+    Preconditions.checkState(_chunkBuffer.position() == 0 && _dataOffset == _initialDataOffset,
+        "Uncompressed-size tracking must be enabled before writing values");
+    _trackUncompressedValueSize = true;
   }
 }

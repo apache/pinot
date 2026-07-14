@@ -91,7 +91,7 @@ import org.slf4j.LoggerFactory;
  * @see VarByteChunkForwardIndexWriterV5
  * @see ForwardIndexCreator
  */
-public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
+public class CLPForwardIndexCreatorV2 implements CompressionStatsTrackingForwardIndexCreator {
   public static final Logger LOGGER = LoggerFactory.getLogger(CLPForwardIndexCreatorV2.class);
   public static final byte[] MAGIC_BYTES = "CLP.v2".getBytes(StandardCharsets.UTF_8);
 
@@ -126,6 +126,8 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
   private final BytesOffHeapMutableDictionary _mutableLogtypeDict;
   private final BytesOffHeapMutableDictionary _mutableDictVarDict;
   private final ChunkCompressionType _chunkCompressionType;
+  private boolean _trackUncompressedValueSize;
+  private long _uncompressedValueSize;
 
   /**
    * Initializes a forward index creator for the given column using the provided base directory, column statistics and
@@ -327,11 +329,17 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
     EncodedMessage encodedMessage = _clpEncodedMessage;
     try {
       _clpMessageEncoder.encodeMessage(value, encodedMessage);
+      if (_trackUncompressedValueSize) {
+        _uncompressedValueSize += encodedMessage.getMessage().length;
+      }
     } catch (IOException e) {
+      if (_trackUncompressedValueSize) {
+        _uncompressedValueSize += value.getBytes(StandardCharsets.UTF_8).length;
+      }
       // Encode a fail-to-encode message if CLP encoding fails
       encodedMessage = _failToEncodeClpEncodedMessage;
     } finally {
-      appendEncodedMessage(encodedMessage);
+      appendEncodedMessageInternal(encodedMessage);
     }
   }
 
@@ -341,6 +349,13 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
    * @param clpEncodedMessage The encoded message to append, must not be null.
    */
   public void appendEncodedMessage(EncodedMessage clpEncodedMessage) {
+    if (_trackUncompressedValueSize) {
+      _uncompressedValueSize += clpEncodedMessage.getMessage().length;
+    }
+    appendEncodedMessageInternal(clpEncodedMessage);
+  }
+
+  private void appendEncodedMessageInternal(EncodedMessage clpEncodedMessage) {
     if (_isClpEncoded) {
       // Logtype
       _logtypeIdFwdIndex.putInt(_mutableLogtypeDict.index(clpEncodedMessage.getLogtype()));
@@ -468,6 +483,22 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
     // Delete all temp files
     FileUtils.deleteDirectory(_intermediateFilesDir);
     _dataFile.close();
+  }
+
+  /// Returns the original UTF-8 message bytes written to this CLP index, or `-1` when tracking is disabled.
+  @Override
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    return _trackUncompressedValueSize ? _uncompressedValueSize : -1;
+  }
+
+  @Override
+  public ChunkCompressionType getRawForwardIndexChunkCompressionType() {
+    return _chunkCompressionType;
+  }
+
+  @Override
+  public void enableRawForwardIndexUncompressedValueSizeTracking() {
+    _trackUncompressedValueSize = true;
   }
 
   @Override

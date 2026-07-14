@@ -20,19 +20,17 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 
-/**
- * Class to represent aggregated segment metadata for a table.
- * - When return by server API, columnLengthMap/columnCardinalityMap is the total columnLength/columnCardinality across
- *   all segments on that server.
- * - When return by controller API, columnLengthMap/columnCardinalityMap is the average columnLength/columnCardinality
- *   across all segments for the given table.
- * - For diskSizeInBytes/numSegments/numRows, both server API and controller API will return the total value across all
- *   segments (if a segment has multiple replicas, only consider one replica).
- */
+/// Aggregated controller response for table segment metadata.
+///
+/// Column length and cardinality values are averages across logical segments. Disk size, segment count, and row count
+/// are table totals with replicas de-duplicated.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableMetadataInfo {
   private final String _tableName;
@@ -46,6 +44,8 @@ public class TableMetadataInfo {
   // JSON property name kept as "upsertPartitionToServerPrimaryKeyCountMap" to avoid silent data loss during rolling
   // upgrades where servers and controllers may temporarily run different versions of this class.
   private final Map<Integer, Map<String, Long>> _partitionToServerPrimaryKeyCountMap;
+  private final List<ColumnCompressionStatsInfo> _columnCompressionStats;
+  private final CompressionStatsSummary _compressionStats;
 
   @JsonCreator
   public TableMetadataInfo(@JsonProperty("tableName") String tableName,
@@ -55,7 +55,10 @@ public class TableMetadataInfo {
       @JsonProperty("maxNumMultiValuesMap") Map<String, Double> maxNumMultiValuesMap,
       @JsonProperty("columnIndexSizeMap") Map<String, Map<String, Double>> columnIndexSizeMap,
       @JsonProperty("upsertPartitionToServerPrimaryKeyCountMap")
-      Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap) {
+      Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap,
+      @JsonProperty("columnCompressionStats") @Nullable
+      List<ColumnCompressionStatsInfo> columnCompressionStats,
+      @JsonProperty("compressionStats") @Nullable CompressionStatsSummary compressionStats) {
     _tableName = tableName;
     _diskSizeInBytes = sizeInBytes;
     _numSegments = numSegments;
@@ -65,6 +68,27 @@ public class TableMetadataInfo {
     _maxNumMultiValuesMap = maxNumMultiValuesMap;
     _columnIndexSizeMap = columnIndexSizeMap;
     _partitionToServerPrimaryKeyCountMap = partitionToServerPrimaryKeyCountMap;
+    _columnCompressionStats = columnCompressionStats != null ? List.copyOf(columnCompressionStats) : null;
+    _compressionStats = compressionStats;
+  }
+
+  /// Constructor for callers that provide column compression statistics but not the aggregate summary.
+  public TableMetadataInfo(String tableName, long sizeInBytes, long numSegments, long numRows,
+      Map<String, Double> columnLengthMap, Map<String, Double> columnCardinalityMap,
+      Map<String, Double> maxNumMultiValuesMap, Map<String, Map<String, Double>> columnIndexSizeMap,
+      Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap,
+      @Nullable List<ColumnCompressionStatsInfo> columnCompressionStats) {
+    this(tableName, sizeInBytes, numSegments, numRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap,
+        columnIndexSizeMap, partitionToServerPrimaryKeyCountMap, columnCompressionStats, null);
+  }
+
+  /// Backwards-compatible constructor for callers that do not provide compression fields.
+  public TableMetadataInfo(String tableName, long sizeInBytes, long numSegments, long numRows,
+      Map<String, Double> columnLengthMap, Map<String, Double> columnCardinalityMap,
+      Map<String, Double> maxNumMultiValuesMap, Map<String, Map<String, Double>> columnIndexSizeMap,
+      Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap) {
+    this(tableName, sizeInBytes, numSegments, numRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap,
+        columnIndexSizeMap, partitionToServerPrimaryKeyCountMap, null, null);
   }
 
   public String getTableName() {
@@ -102,5 +126,17 @@ public class TableMetadataInfo {
   @JsonProperty("upsertPartitionToServerPrimaryKeyCountMap")
   public Map<Integer, Map<String, Long>> getPartitionToServerPrimaryKeyCountMap() {
     return _partitionToServerPrimaryKeyCountMap;
+  }
+
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public List<ColumnCompressionStatsInfo> getColumnCompressionStats() {
+    return _columnCompressionStats;
+  }
+
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public CompressionStatsSummary getCompressionStats() {
+    return _compressionStats;
   }
 }

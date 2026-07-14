@@ -131,6 +131,7 @@ public class ForwardIndexHandlerTest {
   private static final String DIM_MV_PASS_THROUGH_LONG = "DIM_MV_PASS_THROUGH_LONG";
   private static final String DIM_MV_PASS_THROUGH_STRING = "DIM_MV_PASS_THROUGH_STRING";
   private static final String DIM_MV_PASS_THROUGH_BYTES = "DIM_MV_PASS_THROUGH_BYTES";
+  private static final String DIM_MV_PASS_THROUGH_BIG_DECIMAL = "DIM_MV_PASS_THROUGH_BIG_DECIMAL";
 
   // Dictionary columns
   private static final String DIM_DICT_INTEGER = "DIM_DICT_INTEGER";
@@ -191,7 +192,8 @@ public class ForwardIndexHandlerTest {
   private static final List<String> RAW_PASS_THROUGH_COLUMNS =
       List.of(DIM_PASS_THROUGH_STRING, DIM_PASS_THROUGH_LONG, DIM_PASS_THROUGH_INTEGER, DIM_PASS_THROUGH_BYTES,
           METRIC_PASS_THROUGH_BIG_DECIMAL, METRIC_PASS_THROUGH_INTEGER, DIM_MV_PASS_THROUGH_INTEGER,
-          DIM_MV_PASS_THROUGH_LONG, DIM_MV_PASS_THROUGH_STRING, DIM_MV_PASS_THROUGH_BYTES);
+          DIM_MV_PASS_THROUGH_LONG, DIM_MV_PASS_THROUGH_STRING, DIM_MV_PASS_THROUGH_BYTES,
+          DIM_MV_PASS_THROUGH_BIG_DECIMAL);
 
   private static final List<String> RAW_LZ4_COLUMNS =
       List.of(DIM_LZ4_STRING, DIM_LZ4_LONG, DIM_LZ4_INTEGER, DIM_LZ4_BYTES, METRIC_LZ4_BIG_DECIMAL, METRIC_LZ4_INTEGER);
@@ -278,6 +280,7 @@ public class ForwardIndexHandlerTest {
       .addMultiValueDimension(DIM_MV_PASS_THROUGH_LONG, DataType.LONG)
       .addMultiValueDimension(DIM_MV_PASS_THROUGH_STRING, DataType.STRING)
       .addMultiValueDimension(DIM_MV_PASS_THROUGH_BYTES, DataType.BYTES)
+      .addMultiValueDimension(DIM_MV_PASS_THROUGH_BIG_DECIMAL, DataType.BIG_DECIMAL)
       .addMultiValueDimension(DIM_DICT_MV_BYTES, DataType.BYTES)
       .addMultiValueDimension(DIM_DICT_MV_INTEGER, DataType.INT)
       .addMultiValueDimension(DIM_DICT_MV_LONG, DataType.LONG)
@@ -321,6 +324,7 @@ public class ForwardIndexHandlerTest {
     Integer[][] tempMVIntRows = new Integer[numRows][maxNumberOfMVEntries];
     Long[][] tempMVLongRows = new Long[numRows][maxNumberOfMVEntries];
     byte[][][] tempMVByteRows = new byte[numRows][maxNumberOfMVEntries][];
+    BigDecimal[][] tempMVBigDecimalRows = new BigDecimal[numRows][maxNumberOfMVEntries];
 
     // For MV columns today adding duplicate entries within the same row will result in the total number of MV entries
     // reducing for that row since we cannot support rebuilding the forward index without losing duplicates within a
@@ -347,6 +351,7 @@ public class ForwardIndexHandlerTest {
           tempMVLongRows[i][j] = (long) (numRows + 1);
           tempMVStringRows[i][j] = str;
           tempMVByteRows[i][j] = str.getBytes();
+          tempMVBigDecimalRows[i][j] = BigDecimal.valueOf(numRows + 1);
         }
       } else {
         String str = "n" + i;
@@ -364,6 +369,7 @@ public class ForwardIndexHandlerTest {
           tempMVLongRows[i][j] = (long) j;
           tempMVStringRows[i][j] = str;
           tempMVByteRows[i][j] = str.getBytes();
+          tempMVBigDecimalRows[i][j] = BigDecimal.valueOf(j);
         }
       }
 
@@ -440,6 +446,7 @@ public class ForwardIndexHandlerTest {
       row.putValue(DIM_MV_PASS_THROUGH_LONG, tempMVLongRows[i]);
       row.putValue(DIM_MV_PASS_THROUGH_STRING, tempMVStringRows[i]);
       row.putValue(DIM_MV_PASS_THROUGH_BYTES, tempMVByteRows[i]);
+      row.putValue(DIM_MV_PASS_THROUGH_BIG_DECIMAL, tempMVBigDecimalRows[i]);
 
       // Forward index disabled columns
       row.putValue(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER, tempIntRows[i]);
@@ -2362,8 +2369,14 @@ public class ForwardIndexHandlerTest {
               break;
             }
             case BIG_DECIMAL: {
-              assertTrue(isSingleValue);
-              assertEquals(val, BigDecimal.valueOf(1001));
+              if (isSingleValue) {
+                assertEquals(val, BigDecimal.valueOf(1001));
+              } else {
+                Object[] values = (Object[]) val;
+                for (Object value : values) {
+                  assertEquals(value, BigDecimal.valueOf(1001));
+                }
+              }
               break;
             }
             default:
@@ -2555,7 +2568,8 @@ public class ForwardIndexHandlerTest {
     // For each var-length column, strip the 1.6.0-era stats from metadata to simulate a pre-1.6.0 segment, then
     // trigger a compression change. The pre-pass in `ForwardIndexHandler.updateIndices` should backfill the
     // missing stats from a column scan before any per-op handler runs.
-    for (String column : List.of(DIM_SNAPPY_STRING, DIM_MV_PASS_THROUGH_STRING)) {
+    for (String column : List.of(DIM_SNAPPY_STRING, DIM_MV_PASS_THROUGH_STRING, DIM_SNAPPY_BYTES,
+        DIM_MV_PASS_THROUGH_BYTES, METRIC_SNAPPY_BIG_DECIMAL, DIM_MV_PASS_THROUGH_BIG_DECIMAL)) {
       ColumnMetadata expected;
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
@@ -2596,6 +2610,41 @@ public class ForwardIndexHandlerTest {
       assertEquals(actual.isAscii(), expected.isAscii());
       assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
     }
+  }
+
+  @Test
+  public void testBackfillMissingStatsForDictionaryMvBytes()
+      throws Exception {
+    String column = DIM_DICT_MV_BYTES;
+    ColumnMetadata expected;
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      expected = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+
+      Map<String, String> stripped = new HashMap<>();
+      stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+          V1Constants.MetadataKeys.Column.LENGTH_OF_SHORTEST_ELEMENT), null);
+      stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+          V1Constants.MetadataKeys.Column.LENGTH_OF_LONGEST_ELEMENT), null);
+      stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+          V1Constants.MetadataKeys.Column.MAX_ROW_LENGTH_IN_BYTES), null);
+      SegmentMetadataUtils.updateMetadataProperties(segmentDirectory, stripped);
+      ColumnMetadata afterStrip = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertTrue(afterStrip.getLengthOfShortestElement() < 0);
+      assertTrue(afterStrip.getMaxRowLengthInBytes() < 0);
+
+      _fieldConfigMap.put(column,
+          new FieldConfig(column, FieldConfig.EncodingType.DICTIONARY, List.of(), CompressionCodec.MV_ENTRY_DICT,
+              null));
+      updateIndices();
+    }
+
+    ColumnMetadata actual = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column);
+    assertEquals(actual.getLengthOfShortestElement(), expected.getLengthOfShortestElement());
+    assertEquals(actual.getLengthOfLongestElement(), expected.getLengthOfLongestElement());
+    assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
   }
 
   @Test

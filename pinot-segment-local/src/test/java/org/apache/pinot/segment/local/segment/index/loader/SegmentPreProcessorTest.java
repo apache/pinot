@@ -176,6 +176,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
+  private boolean _compressionStatsEnabled;
 
   public SegmentPreProcessorTest()
       throws IOException {
@@ -245,6 +246,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _jsonIndexConfigs = null;
     _starTreeIndexConfigs = null;
     _enableDefaultStarTree = false;
+    _compressionStatsEnabled = false;
   }
 
   @AfterMethod
@@ -304,6 +306,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
     indexingConfig.setBloomFilterConfigs(_bloomFilterConfigs);
     indexingConfig.setJsonIndexConfigs(_jsonIndexConfigs);
+    indexingConfig.setCompressionStatsEnabled(_compressionStatsEnabled);
     if (_starTreeIndexConfigs != null || _enableDefaultStarTree) {
       indexingConfig.setEnableDynamicStarTreeCreation(true);
       indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
@@ -664,7 +667,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     // (1) Auto-enable dictionary by adding an inverted index. ForwardIndexHandler now queues
     // ENABLE_DICTIONARY because the inverted index requires a dictionary. The range index must be rebuilt
-    // against dict ids — its on-disk size therefore changes.
+    // against dict ids — its forward-index storage size therefore changes.
     _invertedIndexColumns.add(EXISTING_INT_COL_RAW);
     runPreProcessor(_schema);
     SegmentMetadataImpl afterAutoEnable = new SegmentMetadataImpl(INDEX_DIR);
@@ -1157,6 +1160,44 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     expectedDefaultValue = new ByteArray((byte[]) tDigestMetricFieldSpec.getDefaultNullValue());
     assertEquals(tDigestMetricMetadata.getMinValue(), expectedDefaultValue);
     assertEquals(tDigestMetricMetadata.getMaxValue(), expectedDefaultValue);
+  }
+
+  @Test(dataProvider = "bothV1AndV3")
+  public void testCompressionStatsForDefaultAndDerivedColumns(SegmentVersion segmentVersion)
+      throws Exception {
+    _compressionStatsEnabled = true;
+    buildSegment(segmentVersion);
+
+    _noDictionaryColumns.add(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"),
+            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata defaultInt = segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME);
+    assertTrue(defaultInt.hasDictionary());
+    assertEquals(defaultInt.getDictionaryEncodedUncompressedValueSizeInBytes(), 100000L * Integer.BYTES,
+        "Default fixed-width columns should report one raw value per row");
+    assertEquals(defaultInt.getRawForwardIndexUncompressedValueSizeInBytes(), ColumnMetadata.UNAVAILABLE);
+
+    ColumnMetadata defaultStringMv = segmentMetadata.getColumnMetadataFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME);
+    assertTrue(defaultStringMv.hasDictionary());
+    assertEquals(defaultStringMv.getDictionaryEncodedUncompressedValueSizeInBytes(), 100000L * "null".length(),
+        "Default MV columns should report the raw bytes for their single default entry per row");
+
+    ColumnMetadata derivedInt = segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    assertTrue(derivedInt.hasDictionary());
+    assertEquals(derivedInt.getDictionaryEncodedUncompressedValueSizeInBytes(), 100000L * Integer.BYTES,
+        "Dictionary-encoded derived columns should persist uncompressed value bytes");
+
+    ColumnMetadata derivedRawString =
+        segmentMetadata.getColumnMetadataFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    assertFalse(derivedRawString.hasDictionary());
+    assertEquals(derivedRawString.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.LZ4);
+    assertTrue(derivedRawString.getRawForwardIndexUncompressedValueSizeInBytes() > 0,
+        "Raw derived columns should persist their exact writer input size");
+    assertEquals(derivedRawString.getDictionaryEncodedUncompressedValueSizeInBytes(), ColumnMetadata.UNAVAILABLE);
   }
 
   private void checkUpdateDefaultColumns()

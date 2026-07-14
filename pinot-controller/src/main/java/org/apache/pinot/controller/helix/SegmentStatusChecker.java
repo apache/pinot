@@ -122,8 +122,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     try {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       updateTableConfigMetrics(tableNameWithType, tableConfig, context);
-      updateSegmentMetrics(tableNameWithType, tableConfig, context);
-      updateTableSizeMetrics(tableNameWithType);
+      if (updateSegmentMetrics(tableNameWithType, tableConfig, context)) {
+        updateTableSizeMetrics(tableNameWithType, tableConfig);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
       // Remove the metric for this table
@@ -256,16 +257,31 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
   }
 
-  private void updateTableSizeMetrics(String tableNameWithType)
+  void updateTableSizeMetrics(String tableNameWithType, TableConfig tableConfig)
       throws InvalidConfigException {
-    _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS, true);
+    TableSizeReader.TableSizeDetails tableSizeDetails =
+        _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS, true,
+            TableSizeReader.CompressionStatsMode.AGGREGATE_SUMMARY);
+    boolean compressionStatsEnabled = tableConfig != null && tableConfig.getIndexingConfig() != null
+        && tableConfig.getIndexingConfig().isCompressionStatsEnabled();
+    if (!compressionStatsEnabled || tableSizeDetails == null) {
+      _tableSizeReader.clearCompressionMetrics(tableNameWithType);
+      return;
+    }
+    TableSizeReader.TableSubTypeSizeDetails subTypeSizeDetails = tableConfig.getTableType() == TableType.OFFLINE
+        ? tableSizeDetails._offlineSegments : tableSizeDetails._realtimeSegments;
+    if (subTypeSizeDetails != null) {
+      _tableSizeReader.updateCompressionMetrics(tableNameWithType, subTypeSizeDetails);
+    } else {
+      _tableSizeReader.clearCompressionMetrics(tableNameWithType);
+    }
   }
 
   /**
    * Runs a segment status pass over the given table.
    * TODO: revisit the logic and reduce the ZK access
    */
-  private void updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
+  private boolean updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
 
     ServerQueryInfoFetcher serverQueryInfoFetcher = new ServerQueryInfoFetcher(_pinotHelixResourceManager);
@@ -275,7 +291,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     if (idealState == null) {
       LOGGER.warn("Table {} has null ideal state. Skipping segment status checks", tableNameWithType);
       removeMetricsForTable(tableNameWithType);
-      return;
+      return false;
     }
 
     if (!idealState.isEnabled()) {
@@ -284,7 +300,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       removeMetricsForTable(tableNameWithType);
       context._disabledTables.add(tableNameWithType);
-      return;
+      return false;
     }
 
     if (PinotLLCRealtimeSegmentManager.isTablePaused(idealState)) {
@@ -340,7 +356,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS, 0);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_SIZE, 0);
-      return;
+      return true;
     }
 
     long evSnapshotTimestamp = System.currentTimeMillis();
@@ -537,6 +553,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
           streamConfigs, idealState).findAndEmitMetrics(idealState);
     }
+    return true;
   }
 
   private boolean isServerQueryable(ServerQueryInfo serverInfo) {
@@ -566,6 +583,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         _controllerMetrics.removeTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO);
       }
     }
+    _tableSizeReader.clearCompressionMetrics(tableNameWithType);
     for (ControllerGauge metric : ControllerGauge.values()) {
       if (!metric.isGlobal()) {
         _controllerMetrics.removeTableGauge(tableNameWithType, metric);
