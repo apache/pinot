@@ -141,6 +141,15 @@ public class PinotControllerAuthResource {
           ControllerConf.DEFAULT_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS);
       return new AccessControl.AuthWorkflowInfo(AccessControl.WORKFLOW_SESSION, inactivityTimeout);
     }
-    return _accessControlFactory.create().getAuthWorkflowInfo();
+    AccessControl.AuthWorkflowInfo factoryInfo = _accessControlFactory.create().getAuthWorkflowInfo();
+    // When the factory itself advertises SESSION (e.g. SessionBasicAuthAccessControlFactory),
+    // enrich the response with the inactivity timeout from config so the UI can set up its timer.
+    if (AccessControl.WORKFLOW_SESSION.equals(factoryInfo.getWorkflow()) && _controllerConf != null) {
+      long inactivityTimeout = _controllerConf.getProperty(
+          ControllerConf.CONTROLLER_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS,
+          ControllerConf.DEFAULT_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS);
+      return new AccessControl.AuthWorkflowInfo(AccessControl.WORKFLOW_SESSION, inactivityTimeout);
+    }
+    return factoryInfo;
   }
 }

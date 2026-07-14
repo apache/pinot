@@ -84,6 +84,10 @@ export const App = () => {
 
   const performSessionLogout = async () => {
     setShowTimeoutWarning(false);
+    // Clear all timers so no further callbacks fire after logout
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     try {
       await fetch('/auth/logout', { method: 'GET', credentials: 'include' });
     } catch (e) {
@@ -269,15 +273,20 @@ export const App = () => {
         <DialogTitle>Session Expiring Soon</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Your session will expire in {warningCountdown} second{warningCountdown !== 1 ? 's' : ''} due to inactivity.
+            Your session will expire in {warningCountdown} second{warningCountdown !== 1 ? 's' : ''}.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button
             onClick={async () => {
-              // Slide the server-side TTL without logging out
-              await fetch('/auth/session', { credentials: 'include' });
-              resetInactivityTimer();
+              // Renew the server-side session (rotates token, resets TTL on both server and cookie)
+              const res = await fetch('/auth/session/renew', { method: 'POST', credentials: 'include' });
+              if (res.ok) {
+                resetInactivityTimer();
+              } else {
+                // Session expired before the user responded — redirect to login
+                performSessionLogout();
+              }
             }}
             color="primary"
           >

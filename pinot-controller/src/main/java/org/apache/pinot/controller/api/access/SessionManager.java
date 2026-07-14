@@ -73,6 +73,26 @@ public interface SessionManager {
    */
   void invalidateSession(String token);
 
+  /**
+   * Atomically rotates the session: invalidates the old token and issues a fresh one with a new TTL.
+   * Returns the new token, or empty if the session is absent, expired, or was already rotated
+   * by a concurrent call (check-and-remove prevents double-rotation).
+   *
+   * @param oldToken the current session token from the browser cookie
+   * @return the new session token, or empty if rotation could not be performed
+   */
+  default Optional<String> rotateSession(String oldToken) {
+    // Default non-atomic implementation for custom SessionManager implementations.
+    // InMemorySessionManager overrides this with a CAS-based atomic version.
+    Optional<String> username = getUsername(oldToken);
+    if (!username.isPresent()) {
+      return Optional.empty();
+    }
+    Optional<String> authToken = getBasicAuthToken(oldToken);
+    invalidateSession(oldToken);
+    return Optional.of(createSession(username.get(), authToken.orElse(null)));
+  }
+
   /** Returns the configured session TTL in seconds. */
   long getSessionTtlSeconds();
 

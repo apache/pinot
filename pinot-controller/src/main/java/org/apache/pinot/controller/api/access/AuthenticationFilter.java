@@ -54,7 +54,7 @@ import org.glassfish.grizzly.http.server.Request;
 public class AuthenticationFilter implements ContainerRequestFilter {
   private static final Set<String> UNPROTECTED_PATHS =
       new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "auth/verify/v2", "auth/login",
-          "auth/logout", "auth/session", "health"));
+          "auth/logout", "auth/session", "auth/session/renew", "health"));
   private static final String KEY_TABLE_NAME = "tableName";
   private static final String KEY_TABLE_NAME_WITH_TYPE = "tableNameWithType";
   private static final String KEY_SCHEMA_NAME = "schemaName";
@@ -76,6 +76,10 @@ public class AuthenticationFilter implements ContainerRequestFilter {
 
   @Context
   HttpHeaders _httpHeaders;
+
+  // Cached result of isSessionEnabled() — computed lazily on first request and never changes.
+  // volatile ensures all threads see the result once it is written.
+  private volatile Boolean _sessionEnabled;
 
   @Override
   public void filter(ContainerRequestContext requestContext)
@@ -173,9 +177,20 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   }
 
   private boolean isSessionEnabled() {
-    return _controllerConf != null
-        && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)
-        && _sessionManager != null;
+    if (_sessionEnabled == null) {
+      // Compute once and cache. Double-checked locking is safe here because the result
+      // is idempotent: all threads compute the same value from the same injected beans.
+      boolean enabled = _sessionManager != null && (
+          (_controllerConf != null
+              && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false))
+          // Also enable when the factory itself advertises SESSION workflow (e.g.
+          // SessionBasicAuthAccessControlFactory configured without the explicit flag).
+          || (_accessControlFactory != null
+              && AccessControl.WORKFLOW_SESSION.equals(
+                  _accessControlFactory.create().getAuthWorkflowInfo().getWorkflow())));
+      _sessionEnabled = enabled;
+    }
+    return _sessionEnabled;
   }
 
   private static boolean isBaseFile(String path) {
