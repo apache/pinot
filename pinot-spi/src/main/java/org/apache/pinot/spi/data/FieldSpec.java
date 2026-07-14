@@ -38,6 +38,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -172,6 +174,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   @Nullable
   protected List<String> _aliases;
 
+  // Optional, free-form per-column metadata. It is additive, excluded from backward-compatibility
+  // checks, and omitted from serialization when unset/empty. The keys and their interpretation are
+  // defined by whoever populates it; the core schema attaches no semantics to it.
+  @JsonProperty("metadata")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  protected Map<String, String> _metadata;
+
   protected String _name;
   protected DataType _dataType;
   protected boolean _singleValueField = true;
@@ -249,7 +259,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public void setTags(@Nullable List<String> tags) {
-    _tags = tags;
+    _tags = CollectionUtils.isEmpty(tags) ? null : tags;
   }
 
   @Nullable
@@ -267,7 +277,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public void setAliases(@Nullable List<String> aliases) {
-    _aliases = aliases == null || aliases.isEmpty() ? null : aliases;
+    _aliases = CollectionUtils.isEmpty(aliases) ? null : aliases;
+  }
+
+  @Nullable
+  public Map<String, String> getMetadata() {
+    return _metadata;
+  }
+
+  public void setMetadata(@Nullable Map<String, String> metadata) {
+    _metadata = MapUtils.isEmpty(metadata) ? null : metadata;
   }
 
   public DataType getDataType() {
@@ -624,7 +643,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return jsonObject;
   }
 
-  /// Appends `fieldId` and `aliases` (when set) to the given JSON object.
+  /// Appends `fieldId`, `aliases`, and `metadata` (when set) to the given JSON object.
   ///
   /// Subclasses that build JSON without calling [FieldSpec#toJsonObject()], such as [TimeFieldSpec], use this helper
   /// to preserve these fields during schema round-trip serialization.
@@ -638,6 +657,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         aliasesArray.add(alias);
       }
       jsonObject.set("aliases", aliasesArray);
+    }
+    if (MapUtils.isNotEmpty(_metadata)) {
+      ObjectNode metadataNode = jsonObject.putObject("metadata");
+      for (Map.Entry<String, String> entry : _metadata.entrySet()) {
+        metadataNode.put(entry.getKey(), entry.getValue());
+      }
     }
   }
 
@@ -716,14 +741,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && Objects.equals(_description, that._description)
         && Objects.equals(_tags, that._tags)
         && Objects.equals(_fieldId, that._fieldId)
-        && Objects.equals(_aliases, that._aliases);
+        && Objects.equals(_aliases, that._aliases)
+        && Objects.equals(_metadata, that._metadata);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
         _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider,
-        _description, _tags, _fieldId, _aliases);
+        _description, _tags, _fieldId, _aliases, _metadata);
   }
 
   /**
