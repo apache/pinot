@@ -416,6 +416,32 @@ public class SchemaSerializationTest {
   }
 
   @Test
+  public void testDeserializeSimpleSchemaWithoutFieldType()
+      throws Exception {
+    final String simpleSchemaJson = "{"
+        + "\"schemaName\":\"mytable\","
+        + "\"metricFieldSpecs\":[{\"name\":\"ActualElapsedTime\",\"dataType\":\"INT\"}],"
+        + "\"timeFieldSpec\":{\"incomingGranularitySpec\":{"
+        + "\"name\":\"DaysSinceEpoch\",\"dataType\":\"INT\",\"timeType\":\"DAYS\"}},"
+        + "\"dimensionFieldSpecs\":["
+        + "{\"name\":\"AirlineID\",\"dataType\":\"LONG\"},"
+        + "{\"name\":\"DivAirportIDs\",\"dataType\":\"INT\",\"singleValueField\":false}"
+        + "]"
+        + "}";
+
+    final Schema deserializedSchema = Schema.fromString(simpleSchemaJson);
+
+    assertEquals(deserializedSchema.getSchemaName(), "mytable");
+    assertNotNull(deserializedSchema.getMetricSpec("ActualElapsedTime"));
+    assertEquals(deserializedSchema.getMetricSpec("ActualElapsedTime").getDataType(), DataType.INT);
+    assertNotNull(deserializedSchema.getDimensionSpec("AirlineID"));
+    assertEquals(deserializedSchema.getDimensionSpec("AirlineID").getDataType(), DataType.LONG);
+    assertFalse(deserializedSchema.getDimensionSpec("DivAirportIDs").isSingleValueField());
+    assertNotNull(deserializedSchema.getTimeFieldSpec());
+    assertEquals(deserializedSchema.getTimeFieldSpec().getIncomingGranularitySpec().getName(), "DaysSinceEpoch");
+  }
+
+  @Test
   public void testComplexFieldDefaultNullValue()
       throws Exception {
     // Test LIST
