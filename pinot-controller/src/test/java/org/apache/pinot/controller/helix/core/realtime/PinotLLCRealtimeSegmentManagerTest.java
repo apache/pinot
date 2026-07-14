@@ -2010,20 +2010,17 @@ public class PinotLLCRealtimeSegmentManagerTest {
     doThrow(new RuntimeException()).when(segmentManagerSpy).getPartitionIds(any(StreamConfig.class));
     doReturn(List.of()).when(segmentManagerSpy).getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
 
-    // Topic 0, raw partitions 0 and 3 -> padded pinot partition ids 0 and 3 (two groups for the same topic, to
-    // verify they accumulate into one Set instead of the second overwriting the first)
-    // Topic 1, raw partition 5 -> padded pinot partition id 10005
+    // Topic 0, raw partitions 0 and 3 (two groups for the same topic, to verify they accumulate into one Set
+    // instead of the second overwriting the first)
+    // Topic 1, raw partition 5
     // topicId and streamPartitionId are chosen to differ per entry so a transposed topicId/streamPartitionId
     // formula would produce a visibly wrong result rather than accidentally matching.
     List<StreamMetadata> streamMetadataList = List.of(
         new StreamMetadata(streamConfigs.get(0), 2,
-            List.of(new PartitionGroupMetadata(
-                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(0, 0), new LongMsgOffset(1)),
-                new PartitionGroupMetadata(
-                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(3, 0), new LongMsgOffset(1)))),
+            List.of(new PartitionGroupMetadata(0, 0, new LongMsgOffset(1), 0),
+                new PartitionGroupMetadata(3, 0, new LongMsgOffset(1), 0))),
         new StreamMetadata(streamConfigs.get(1), 2,
-            List.of(new PartitionGroupMetadata(
-                IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(5, 1), new LongMsgOffset(1)))));
+            List.of(new PartitionGroupMetadata(5, 1, new LongMsgOffset(1), 0))));
     doReturn(streamMetadataList).when(segmentManagerSpy)
         .getNewStreamMetadataList(eq(streamConfigs), any(), eq(idealState));
 
