@@ -35,6 +35,18 @@
     <shade.phase.prop>package</shade.phase.prop>
   </properties>
 
+  <dependencies>
+    <!-- Binary JSON encodings supported by the stream decoder. Versions managed by jackson-bom. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-smile</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-cbor</artifactId>
+    </dependency>
+  </dependencies>
+
   <profiles>
     <profile>
       <id>pinot-fastdev</id>
