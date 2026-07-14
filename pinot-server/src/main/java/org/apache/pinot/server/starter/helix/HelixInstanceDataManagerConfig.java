@@ -126,7 +126,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Lazy segment loading. Keys resolve under the "pinot.server.instance." prefix, e.g.
   // pinot.server.instance.lazy.load.enabled
   private static final String LAZY_LOAD_ENABLED = "lazy.load.enabled";
-  private static final boolean DEFAULT_LAZY_LOAD_ENABLED = true;
+  private static final boolean DEFAULT_LAZY_LOAD_ENABLED = false;
   private static final String LAZY_SWEEP_INTERVAL_SECONDS = "lazy.sweep.interval.seconds";
   private static final int DEFAULT_LAZY_SWEEP_INTERVAL_SECONDS = 60;
   private static final String LAZY_MATERIALIZE_PARALLELISM = "lazy.materialize.parallelism";

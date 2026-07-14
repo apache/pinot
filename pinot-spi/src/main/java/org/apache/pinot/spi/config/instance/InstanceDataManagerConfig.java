@@ -98,7 +98,7 @@ public interface InstanceDataManagerConfig {
    * to the regular eager loading path on this instance. Default methods keep other implementors compiling.
    */
   default boolean isLazyLoadEnabled() {
-    return true;
+    return false;
   }
 
   /**
