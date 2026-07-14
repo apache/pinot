@@ -1244,12 +1244,13 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   @VisibleForTesting
   Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs, IdealState idealState) {
     Set<Integer> partitionIds = new HashSet<>();
-    getPartitionIdsWithIdealState(streamConfigs, () -> idealState)._partitionIdsByTopic.values()
+    getPartitionIdsWithIdealState(streamConfigs, () -> idealState).getPartitionIdsByTopic().values()
         .forEach(partitionIds::addAll);
     return partitionIds;
   }
 
-  private static class PartitionIdsWithIdealState {
+  @VisibleForTesting
+  static class PartitionIdsWithIdealState {
     private final Map<Integer, Set<Integer>> _partitionIdsByTopic;
     @Nullable
     private final IdealState _idealState;
@@ -1258,13 +1259,19 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       _partitionIdsByTopic = partitionIds;
       _idealState = idealState;
     }
+
+    @VisibleForTesting
+    Map<Integer, Set<Integer>> getPartitionIdsByTopic() {
+      return _partitionIdsByTopic;
+    }
   }
 
   /**
    * Fetches, per stream config index (topic id), the set of raw (unpadded) stream partition ids currently known
    * to that stream. Values are always raw stream partition ids, never padded/encoded pinot partition ids.
    */
-  private PartitionIdsWithIdealState getPartitionIdsWithIdealState(List<StreamConfig> streamConfigs,
+  @VisibleForTesting
+  PartitionIdsWithIdealState getPartitionIdsWithIdealState(List<StreamConfig> streamConfigs,
       Supplier<IdealState> idealStateSupplier) {
     Map<Integer, Set<Integer>> partitionIds = new HashMap<>();
     boolean allPartitionIdsFetched = true;
@@ -1295,9 +1302,15 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
           getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
       List<StreamMetadata> streamMetadataList =
           getNewStreamMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
+      boolean isMultiTopic = numStreams > 1;
       for (StreamMetadata streamMetadata : streamMetadataList) {
         for (PartitionGroupMetadata partitionGroupMetadata : streamMetadata.getPartitionGroupMetadataList()) {
-          partitionIds.add(partitionGroupMetadata.getPartitionGroupId());
+          int pinotPartitionId = partitionGroupMetadata.getPartitionGroupId();
+          int topicId = isMultiTopic
+              ? IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(pinotPartitionId) : 0;
+          int streamPartitionId = isMultiTopic
+              ? IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(pinotPartitionId) : pinotPartitionId;
+          partitionIds.computeIfAbsent(topicId, k -> new HashSet<>()).add(streamPartitionId);
         }
       }
       return new PartitionIdsWithIdealState(partitionIds, idealState);
