@@ -39,6 +39,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   private final int _sequenceNumber;
   private final String _creationTime;
   private final String _segmentName;
+  private final boolean _isMultiTopicFormat;
 
   public LLCSegmentName(String segmentName) {
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
@@ -49,11 +50,13 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
       _partitionGroupId = Integer.parseInt(parts[1]);
       _sequenceNumber = Integer.parseInt(parts[2]);
       _creationTime = parts[3];
+      _isMultiTopicFormat = false;
     } else {
       _topicId = Integer.parseInt(parts[1]);
       _partitionGroupId = Integer.parseInt(parts[2]);
       _sequenceNumber = Integer.parseInt(parts[3]);
       _creationTime = parts[4];
+      _isMultiTopicFormat = true;
     }
     _segmentName = segmentName;
   }
@@ -66,6 +69,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
     _creationTime = DATE_FORMATTER.print(msSinceEpoch);
+    _isMultiTopicFormat = false;
     _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
@@ -76,6 +80,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     _partitionGroupId = partitionGroupId;
     _sequenceNumber = sequenceNumber;
     _creationTime = DATE_FORMATTER.print(msSinceEpoch);
+    _isMultiTopicFormat = false;
     _segmentName = tableName + SEPARATOR + configId + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber
         + SEPARATOR + _creationTime;
   }
@@ -160,6 +165,10 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   public long getCreationTimeMs() {
     DateTime dateTime = DATE_FORMATTER.parseDateTime(_creationTime);
     return dateTime.getMillis();
+  }
+
+  public boolean isMultiTopicFormat() {
+    return _isMultiTopicFormat;
   }
 
   @JsonValue
