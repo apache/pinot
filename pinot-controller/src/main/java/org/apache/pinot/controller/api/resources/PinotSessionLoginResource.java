@@ -99,6 +99,9 @@ public class PinotSessionLoginResource {
   /** Path for the session-check endpoint. */
   public static final String AUTH_SESSION_PATH = "auth/session";
 
+  /** Path for the session-renew endpoint. */
+  public static final String AUTH_SESSION_RENEW_PATH = "auth/session/renew";
+
   @Inject
   private AccessControlFactory _accessControlFactory;
 
@@ -180,7 +183,7 @@ public class PinotSessionLoginResource {
     String sessionCookieHeader = buildSessionCookieHeader(
         sessionToken, (int) _sessionManager.getSessionTtlSeconds(), secureCookie);
 
-    return Response.ok("{\"status\":\"ok\",\"username\":\"" + username.trim() + "\"}")
+    return Response.ok("{\"status\":\"ok\",\"username\":\"" + escapeJson(username.trim()) + "\"}")
         .header("Set-Cookie", sessionCookieHeader)
         .build();
   }
@@ -210,8 +213,11 @@ public class PinotSessionLoginResource {
       LOGGER.info("Session invalidated on logout");
     }
 
-    // Return a delete-cookie (Max-Age=0) to clear it from the browser
-    String deleteCookieHeader = buildDeleteCookieHeader();
+    // Return a delete-cookie (Max-Age=0) to clear it from the browser.
+    // Carry the Secure flag so the deletion header matches the original set-cookie.
+    boolean secureCookie = _controllerConf == null
+        || _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_COOKIE_SECURE, true);
+    String deleteCookieHeader = buildDeleteCookieHeader(secureCookie);
 
     return Response.ok("{\"status\":\"logged_out\"}")
         .header("Set-Cookie", deleteCookieHeader)
@@ -257,7 +263,62 @@ public class PinotSessionLoginResource {
           .build();
     }
 
-    return Response.ok("{\"status\":\"ok\",\"username\":\"" + username.get() + "\"}")
+    return Response.ok("{\"status\":\"ok\",\"username\":\"" + escapeJson(username.get()) + "\"}")
+        .build();
+  }
+
+  // ---------------------------------------------------------------------------
+  // POST /auth/session/renew
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Renews the current session by issuing a fresh token with a new fixed TTL.
+   *
+   * <p>This is the server-side counterpart of the UI's "Stay Logged In" action. The old token is
+   * invalidated and a new one with a full TTL is returned via {@code Set-Cookie}, keeping both
+   * the server entry and the browser cookie in sync.
+   *
+   * <p>Returns 401 when the current session cookie is absent or has already expired.
+   */
+  @POST
+  @Path(AUTH_SESSION_RENEW_PATH)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Renew the current session, issuing a fresh token and resetting the TTL")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Session renewed – new cookie set"),
+      @ApiResponse(code = 401, message = "No valid session to renew")
+  })
+  public Response renewSession(@Context HttpHeaders httpHeaders) {
+    Cookie sessionCookie = httpHeaders.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
+    if (sessionCookie == null || sessionCookie.getValue() == null) {
+      return Response.status(Response.Status.UNAUTHORIZED)
+          .entity("{\"error\":\"No session\"}")
+          .build();
+    }
+
+    // rotateSession() atomically invalidates the old token and creates a fresh one,
+    // preventing orphaned tokens from concurrent "Stay Logged In" clicks.
+    String oldToken = sessionCookie.getValue();
+    Optional<String> usernameOpt = _sessionManager.getUsername(oldToken);
+    Optional<String> newTokenOpt = _sessionManager.rotateSession(oldToken);
+    if (!newTokenOpt.isPresent()) {
+      // Session was absent, expired, or already rotated by a concurrent request.
+      return Response.status(Response.Status.UNAUTHORIZED)
+          .entity("{\"error\":\"Session expired\"}")
+          .build();
+    }
+
+    String username = usernameOpt.orElse("unknown");
+    String newToken = newTokenOpt.get();
+    LOGGER.info("Session renewed for user '{}'", username);
+
+    boolean secureCookie = _controllerConf == null
+        || _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_COOKIE_SECURE, true);
+    String sessionCookieHeader = buildSessionCookieHeader(
+        newToken, (int) _sessionManager.getSessionTtlSeconds(), secureCookie);
+
+    return Response.ok("{\"status\":\"renewed\",\"username\":\"" + escapeJson(username) + "\"}")
+        .header("Set-Cookie", sessionCookieHeader)
         .build();
   }
 
@@ -287,13 +348,23 @@ public class PinotSessionLoginResource {
     return sb.toString();
   }
 
+  /** Escapes {@code "} and {@code \} so the value can be safely embedded in a JSON string literal. */
+  private static String escapeJson(String value) {
+    return value.replace("\\", "\\\\").replace("\"", "\\\"");
+  }
+
   /** Builds a {@code Set-Cookie} header that instructs the browser to delete the session cookie. */
-  private static String buildDeleteCookieHeader() {
-    return SessionManager.SESSION_COOKIE_NAME + "=deleted"
-        + "; Path=/"
-        + "; Max-Age=0"
-        + "; HttpOnly"
-        + "; SameSite=Strict";
+  private static String buildDeleteCookieHeader(boolean secure) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(SessionManager.SESSION_COOKIE_NAME).append("=deleted");
+    sb.append("; Path=/");
+    sb.append("; Max-Age=0");
+    sb.append("; HttpOnly");
+    sb.append("; SameSite=Strict");
+    if (secure) {
+      sb.append("; Secure");
+    }
+    return sb.toString();
   }
 
   // ---------------------------------------------------------------------------

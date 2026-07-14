@@ -125,6 +125,28 @@ public class InMemorySessionManager implements SessionManager {
     return Optional.ofNullable(entry.basicAuthToken());
   }
 
+  /**
+   * Atomically rotates the session using {@link ConcurrentHashMap#remove(Object, Object)}.
+   * Only one of concurrent renew requests will win the CAS; the rest see empty and get 401.
+   * This prevents orphaned tokens from double-clicks on "Stay Logged In".
+   */
+  @Override
+  public Optional<String> rotateSession(String oldToken) {
+    if (oldToken == null || oldToken.isEmpty()) {
+      return Optional.empty();
+    }
+    SessionEntry entry = _sessions.get(oldToken);
+    if (entry == null || Instant.now().isAfter(entry.expiry())) {
+      return Optional.empty();
+    }
+    // CAS: only one concurrent caller can remove this exact entry reference.
+    if (!_sessions.remove(oldToken, entry)) {
+      return Optional.empty();
+    }
+    String newToken = createSession(entry.username(), entry.basicAuthToken());
+    return Optional.of(newToken);
+  }
+
   @Override
   public void invalidateSession(String token) {
     if (token != null && !token.isEmpty()) {
