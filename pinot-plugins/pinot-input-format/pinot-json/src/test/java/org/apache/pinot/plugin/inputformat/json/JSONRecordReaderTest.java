@@ -21,8 +21,10 @@ package org.apache.pinot.plugin.inputformat.json;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.FileWriter;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -30,9 +32,12 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class JSONRecordReaderTest extends AbstractRecordReaderTest {
+  private static final String PRECISE_DECIMAL = "12345678901234567890.12345678901234567890";
+  private static final double EPSILON = 1e-6d;
 
   @Override
   protected RecordReader createRecordReader(File file)
@@ -61,6 +66,24 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
     return "data.json";
   }
 
+  @Test
+  public void testRecordReaderPreservesBigDecimalPrecision()
+      throws Exception {
+    File dataFile = new File(_tempDir, "big_decimal_data.json");
+    try (FileWriter fileWriter = new FileWriter(dataFile)) {
+      fileWriter.write("{\"decimalMetric\":" + PRECISE_DECIMAL + ",\"doubleMetric\":1.25}");
+    }
+
+    try (JSONRecordReader recordReader = new JSONRecordReader()) {
+      recordReader.init(dataFile, Set.of("decimalMetric", "doubleMetric"), null);
+      GenericRow actualRecord = recordReader.next();
+
+      Assert.assertEquals(actualRecord.getValue("decimalMetric"), new BigDecimal(PRECISE_DECIMAL));
+      Assert.assertEquals(((BigDecimal) actualRecord.getValue("doubleMetric")).doubleValue(), 1.25d);
+      Assert.assertFalse(recordReader.hasNext());
+    }
+  }
+
   @Override
   protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap,
       List<Object[]> expectedPrimaryKeys)
@@ -71,14 +94,13 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(),
-              expectedRecord.get(fieldSpecName).toString());
+          assertRecordValueEquals(actualRecord.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
         } else {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           Assert.assertEquals(actualRecords.length, expectedRecords.size());
           for (int j = 0; j < actualRecords.length; j++) {
-            Assert.assertEquals(actualRecords[j].toString(), expectedRecords.get(j).toString());
+            assertRecordValueEquals(actualRecords[j], expectedRecords.get(j));
           }
         }
       }
@@ -86,5 +108,16 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
       Assert.assertEquals(primaryKey.getValues(), expectedPrimaryKeys.get(i));
     }
     Assert.assertFalse(recordReader.hasNext());
+  }
+
+  private static void assertRecordValueEquals(Object actualValue, Object expectedValue) {
+    boolean isFloating = expectedValue instanceof Float || expectedValue instanceof Double
+        || actualValue instanceof Float || actualValue instanceof Double
+        || (actualValue instanceof BigDecimal && (expectedValue instanceof Float || expectedValue instanceof Double));
+    if (isFloating) {
+      Assert.assertEquals(((Number) actualValue).doubleValue(), ((Number) expectedValue).doubleValue(), EPSILON);
+    } else {
+      Assert.assertEquals(actualValue.toString(), expectedValue.toString());
+    }
   }
 }

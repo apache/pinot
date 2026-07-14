@@ -33,8 +33,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
+  private static final String PRESERVE_DECIMAL_PRECISION_CONFIG_KEY = "preserveDecimalPrecision";
 
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
+  private boolean _preserveDecimalPrecision;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
@@ -46,6 +48,14 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     if (recordExtractorClass == null) {
       recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
     }
+    String preserveDecimalPrecision = null;
+    if (props != null) {
+      preserveDecimalPrecision = props.get(PRESERVE_DECIMAL_PRECISION_CONFIG_KEY);
+    }
+    _preserveDecimalPrecision = preserveDecimalPrecision != null
+        ? Boolean.parseBoolean(preserveDecimalPrecision)
+        : JSON_RECORD_EXTRACTOR_CLASS.equals(recordExtractorClass);
+
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _jsonRecordExtractor.init(fieldsToRead, null);
   }
@@ -59,7 +69,9 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
       // Parse directly to Map, avoiding intermediate JsonNode representation for better performance
-      Map<String, Object> jsonMap = JsonUtils.bytesToMap(payload, offset, length);
+      Map<String, Object> jsonMap = _preserveDecimalPrecision
+          ? JsonUtils.bytesToMapWithBigDecimal(payload, offset, length)
+          : JsonUtils.bytesToMap(payload, offset, length);
       return _jsonRecordExtractor.extract(jsonMap, destination);
     } catch (Exception e) {
       throw new RuntimeException(

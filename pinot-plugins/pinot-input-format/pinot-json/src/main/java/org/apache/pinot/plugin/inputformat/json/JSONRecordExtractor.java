@@ -28,14 +28,15 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /// Extracts Pinot [GenericRow] from a parsed JSON `Map<String, Object>` (Jackson representation). JSON has
-/// no native bytes / float / big-decimal type.
+/// no native bytes / float type.
 ///
 /// **JSON source type → Java input → Java output type:**
 /// - `true` / `false` → `Boolean` → `Boolean`
 /// - int that fits in 32 bits → `Integer` → `Integer`
 /// - int that overflows 32 bits but fits in 64 → `Long` → `Long`
 /// - int that overflows 64 bits → `BigInteger` → `BigDecimal` (Pinot has no `BigInteger` data type)
-/// - decimal → `Double` → `Double` (never `Float` or `BigDecimal` with default Jackson config)
+/// - decimal → `BigDecimal` → `BigDecimal` when parsed with Pinot's BigDecimal-aware JSON readers
+/// - decimal → `Double` → `Double` for callers that still provide default Jackson-decoded maps
 /// - string → `String` → `String`
 /// - `null` → `null` → `null`
 /// - array → `List` → `Object[]` (each element recursively converted)
@@ -60,7 +61,7 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
 
   /// Walks a non-null Jackson-parsed value and produces the contract shape: `BigDecimal` for `BigInteger`
   /// (oversized ints), `Object[]` for JSON arrays, `Map<String, Object>` for JSON objects, pass-through for
-  /// the other Jackson scalar types (`Boolean`, `Integer`, `Long`, `Double`, `String`).
+  /// the other Jackson scalar types (`Boolean`, `Integer`, `Long`, `Double`, `BigDecimal`, `String`).
   private static Object convert(Object value) {
     // BigInteger widens (Pinot has no BigInteger type)
     if (value instanceof BigInteger) {
@@ -76,7 +77,7 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
       //noinspection unchecked
       return convertMap((Map<String, Object>) value);
     }
-    // Single value pass-through (Boolean / Integer / Long / Double / String)
+    // Single value pass-through (Boolean / Integer / Long / Double / BigDecimal / String)
     return value;
   }
 
