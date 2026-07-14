@@ -38,23 +38,19 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for {@link JsonIndexHandler}.
- *
- * <p>Covers:
- * <ul>
- *   <li>Index removal when a column is dropped from the JSON index config</li>
- *   <li>New index creation when a column is added to the config</li>
- *   <li>No update required when the index is already present and matches config</li>
- *   <li>No update when column metadata is absent (column not in segment)</li>
- * </ul>
- */
+/// Unit tests for [JsonIndexHandler].
+///
+/// Covers:
+/// - needUpdateIndices returns true when a column is dropped from the JSON index config
+/// - updateIndices removes the on-disk index when a column is dropped from config
+/// - needUpdateIndices returns true when a new column is added to the config
+/// - needUpdateIndices returns false when the index is already present and matches config
+/// - needUpdateIndices returns false when column metadata is absent (column not in segment)
 public class JsonIndexHandlerTest {
   private static final String COLUMN = "details";
 
-  // ---------------------------------------------------------------------------
-  // Column removed from config
-  // ---------------------------------------------------------------------------
+  /** FieldIndexConfigs that explicitly has no JSON index — used for the "column removed" tests. */
+  private static final FieldIndexConfigs NO_JSON = new FieldIndexConfigs.Builder().build();
 
   @Test
   public void testNeedUpdateReturnsTrueWhenColumnRemovedFromConfig()
@@ -63,7 +59,7 @@ public class JsonIndexHandlerTest {
     SegmentDirectory segmentDirectory = mockSegmentDirectory(COLUMN);
     SegmentDirectory.Reader reader = mockReader(segmentDirectory);
 
-    JsonIndexHandler handler = new JsonIndexHandler(segmentDirectory, Map.of(),
+    JsonIndexHandler handler = new JsonIndexHandler(segmentDirectory, Map.of(COLUMN, NO_JSON),
         mock(TableConfig.class), mock(Schema.class));
 
     assertTrue(handler.needUpdateIndices(reader),
@@ -77,16 +73,12 @@ public class JsonIndexHandlerTest {
     SegmentDirectory.Writer writer = mock(SegmentDirectory.Writer.class);
     when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
 
-    JsonIndexHandler handler = new JsonIndexHandler(segmentDirectory, Map.of(),
+    JsonIndexHandler handler = new JsonIndexHandler(segmentDirectory, Map.of(COLUMN, NO_JSON),
         mock(TableConfig.class), mock(Schema.class));
     handler.updateIndices(writer);
 
     verify(writer).removeIndex(COLUMN, StandardIndexes.json());
   }
-
-  // ---------------------------------------------------------------------------
-  // New column added to config
-  // ---------------------------------------------------------------------------
 
   @Test
   public void testNeedUpdateReturnsTrueWhenNewColumnAdded()
@@ -130,10 +122,6 @@ public class JsonIndexHandlerTest {
         "No update expected when column metadata is absent");
   }
 
-  // ---------------------------------------------------------------------------
-  // No update when index is already up-to-date
-  // ---------------------------------------------------------------------------
-
   @Test
   public void testNeedUpdateReturnsFalseWhenIndexUpToDate()
       throws Exception {
@@ -144,10 +132,6 @@ public class JsonIndexHandlerTest {
     assertFalse(createHandler(segmentDirectory).needUpdateIndices(reader),
         "No update expected when JSON index is present and matches config");
   }
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
 
   private static JsonIndexHandler createHandler(SegmentDirectory segmentDirectory) {
     FieldIndexConfigs fieldIndexConfigs =
