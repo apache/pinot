@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.segment.index.map.SimpleColumnMetadata;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -158,8 +160,10 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       PinotDataType destType = ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
       return destType.convert(rawValue, sourceType);
     } catch (Exception e) {
-      LOGGER.warn("OPEN_STRUCT '{}': coercion failed for key '{}' to {}. Skipping.",
-          _openStructColumn, key, storedType, e);
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      if (serverMetrics != null) {
+        serverMetrics.addMeteredGlobalValue(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1);
+      }
       return null;
     }
   }

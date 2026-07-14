@@ -65,6 +65,10 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   /// Convenience constructor for segment-load time. Synthesizes a minimal {@link DataSourceMetadata}
   /// for the parent OPEN_STRUCT column (which has no on-disk presence of its own) and uses an empty
   /// {@link ColumnIndexContainer} — all real readers live on the per-key data sources.
+  ///
+  /// The parent's {@code getForwardIndex()} / {@code getDictionary()} will return {@code null}.
+  /// Callers must use {@link #getDataSource(String)} for per-key access; whole-struct projection
+  /// ({@code SELECT open_struct_col}) is handled by the query layer, not the storage layer.
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
       @Nullable DataSource sparseDataSource, int numDocs) {
     this(fieldSpec, perKeyDataSources, sparseDataSource,

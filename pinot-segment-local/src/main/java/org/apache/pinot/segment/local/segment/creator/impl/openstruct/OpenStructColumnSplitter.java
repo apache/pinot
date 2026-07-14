@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.segment.creator.impl.BaseSegmentCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
@@ -91,6 +93,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   private final Map<String, List<Object>> _values = new HashMap<>();
   private final Map<String, DataType> _inferredTypes = new HashMap<>();
   private int _numDocs;
+  private int _coercionFailures;
 
   // Resolved at seal time
   @Nullable
@@ -208,8 +211,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           PinotDataType destType = ColumnDataType.fromDataTypeSV(valueType.getStoredType()).toPinotDataType();
           coerced = destType.convert(rawValue, sourceType);
         } catch (Exception e) {
-          LOGGER.warn("OPEN_STRUCT '{}': coercion failed for key '{}' value '{}' to {}. Skipping.",
-              _columnName, key, rawValue, valueType, e);
+          _coercionFailures++;
           _presenceBitmaps.get(key).remove(_numDocs);
           continue;
         }
@@ -239,6 +241,14 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     }
     if (!sparseKeys.isEmpty()) {
       writeSparseJsonColumn(sparseKeys);
+    }
+
+    if (_coercionFailures > 0) {
+      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures", _columnName, _coercionFailures);
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      if (serverMetrics != null) {
+        serverMetrics.addMeteredGlobalValue(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, _coercionFailures);
+      }
     }
 
     emitParentColumnMetadata(!sparseKeys.isEmpty());
