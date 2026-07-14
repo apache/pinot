@@ -34,6 +34,8 @@ public class PartitionGroupMetadata {
   private final int _partitionGroupId;
   private final StreamPartitionMsgOffset _startOffset;
   private final int _sequenceNumber;
+  private final int _streamPartitionGroupId;
+  private final int _topicId;
 
   public PartitionGroupMetadata(int partitionGroupId, StreamPartitionMsgOffset startOffset) {
     this(partitionGroupId, startOffset, DEFAULT_SEQUENCE_NUMBER);
