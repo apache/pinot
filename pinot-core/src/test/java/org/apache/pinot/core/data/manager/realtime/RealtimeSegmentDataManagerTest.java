@@ -48,6 +48,8 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -55,6 +57,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -789,6 +792,44 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  @Test
+  public void testSegmentBuildSizeUsesLatestIndexConfiguration()
+      throws Exception {
+    TableConfig buildConfig = createTableConfig();
+    buildConfig.getIndexingConfig().setSegmentFormatVersion("v3");
+    buildConfig.getIndexingConfig().setInvertedIndexColumns(List.of("d"));
+
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, buildConfig)) {
+      Schema schema = Fixtures.createSchema();
+      TableConfig latestConfig = createTableConfig();
+      latestConfig.getIndexingConfig().setSegmentFormatVersion("v3");
+      IndexLoadingConfig latestIndexLoadingConfig =
+          new IndexLoadingConfig(FakeRealtimeSegmentDataManager.makeInstanceDataManagerConfig(), latestConfig, schema);
+      when(segmentDataManager._tableDataManager.fetchIndexLoadingConfig()).thenReturn(latestIndexLoadingConfig);
+
+      for (int i = 0; i < 1_000; i++) {
+        GenericRow row = Fixtures.createSingleRow(i);
+        row.putValue("m", (long) i);
+        row.putValue("d", "value_" + i % 10);
+        row.putValue("minutesSinceEpoch", (long) i);
+        segmentDataManager.index(row);
+      }
+
+      RealtimeSegmentDataManager.SegmentBuildDescriptor descriptor =
+          segmentDataManager.invokeRealBuildSegment(false);
+      File indexDir = new File(new File(TEMP_DIR, REALTIME_TABLE_NAME), SEGMENT_NAME_STR);
+      Assert.assertFalse(ImmutableSegmentLoader.needPreprocess(indexDir, latestIndexLoadingConfig, null));
+      ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, latestIndexLoadingConfig, false);
+      try {
+        Assert.assertEquals(descriptor.getSegmentSizeBytes(), immutableSegment.getSegmentSizeBytes());
+        Assert.assertNull(immutableSegment.getInvertedIndex("d"));
+      } finally {
+        immutableSegment.destroy();
+      }
+    }
+  }
+
   private long buildRealSegmentAndGetCrc(File resourceDir, String segmentName)
       throws Exception {
     Schema schema = Fixtures.createSchema();
@@ -1452,6 +1493,18 @@ public class RealtimeSegmentDataManagerTest {
         throws SegmentBuildFailureException {
       super.buildSegmentForCommit(leaseTime);
       return getSegmentBuildDescriptor();
+    }
+
+    public SegmentBuildDescriptor invokeRealBuildSegment(boolean forCommit)
+        throws SegmentBuildFailureException {
+      return super.buildSegmentInternal(forCommit);
+    }
+
+    public void index(GenericRow row)
+        throws Exception {
+      Field field = RealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
+      field.setAccessible(true);
+      ((MutableSegmentImpl) field.get(this)).index(row, null);
     }
 
     public boolean invokeCommit()

@@ -2354,11 +2354,19 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     if (currentMetadata.getStatus() == Status.COMMITTING) {
       LOGGER.info("Updating ZK metadata for committing segment: {}", segmentName);
       currentMetadata.setSimpleFields(uploadedMetadata.getSimpleFields());
-    } else if (currentMetadata.getCrc() != uploadedMetadata.getCrc()) {
-      LOGGER.info("Updating CRC in ZK metadata for segment: {} from: {} to: {}", segmentName, currentMetadata.getCrc(),
-          uploadedMetadata.getCrc());
-      currentMetadata.setCrc(uploadedMetadata.getCrc());
-      currentMetadata.setDataCrc(uploadedMetadata.getDataCrc());
+    } else {
+      if (currentMetadata.getCrc() != uploadedMetadata.getCrc()) {
+        LOGGER.info("Updating CRC in ZK metadata for segment: {} from: {} to: {}", segmentName,
+            currentMetadata.getCrc(), uploadedMetadata.getCrc());
+        currentMetadata.setCrc(uploadedMetadata.getCrc());
+        currentMetadata.setDataCrc(uploadedMetadata.getDataCrc());
+      }
+      long uploadedSizeInBytes = uploadedMetadata.getSizeInBytes();
+      if (uploadedSizeInBytes >= 0 && currentMetadata.getSizeInBytes() != uploadedSizeInBytes) {
+        LOGGER.info("Updating size in ZK metadata for segment: {} from: {} to: {}", segmentName,
+            currentMetadata.getSizeInBytes(), uploadedSizeInBytes);
+        currentMetadata.setSizeInBytes(uploadedSizeInBytes);
+      }
     }
     // Merge the custom map from the server into the current metadata. The server merges segment-file customMap entries
     // into the existing ZK customMap; without this merge those entries would be dropped when we persist
