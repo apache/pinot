@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -38,7 +39,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -112,6 +115,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.LazyLoadConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -136,6 +140,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
   protected final ServerMetrics _serverMetrics = ServerMetrics.get();
   protected TableUpsertMetadataManager _tableUpsertMetadataManager;
+
+  // Lazy segment loading: registry of segments that are assigned ONLINE but not materialized locally. This is a
+  // parallel map, not a fake SegmentDataManager — all lazy logic is confined to the assignment and acquire touch
+  // points plus the eviction sweeper. Broker routing is unchanged: the segment looks ONLINE to the cluster.
+  protected final ConcurrentHashMap<String, SegmentZKMetadata> _stubbedSegments = new ConcurrentHashMap<>();
+  protected boolean _instanceLazyLoadEnabled;
+  @Nullable
+  protected ExecutorService _lazyMaterializeExecutor;
 
   protected InstanceDataManagerConfig _instanceDataManagerConfig;
   protected String _instanceId;
@@ -275,6 +287,20 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     _logger.info("Async segment refresh is {}!", _enableAsyncSegmentRefresh ? "enabled" : "disabled");
 
+    _instanceLazyLoadEnabled = instanceDataManagerConfig.isLazyLoadEnabled();
+    if (_instanceLazyLoadEnabled) {
+      int materializeParallelism = Math.max(1, instanceDataManagerConfig.getLazyLoadMaterializeParallelism());
+      ThreadPoolExecutor lazyMaterializeExecutor =
+          new ThreadPoolExecutor(materializeParallelism, materializeParallelism, 60, TimeUnit.SECONDS,
+              new LinkedBlockingQueue<>(),
+              new ThreadFactoryBuilder().setNameFormat("lazy-materialize-" + _tableNameWithType + "-%d")
+                  .setDaemon(true).build());
+      // Threads idle-timeout so the pool costs nothing between cold loads.
+      lazyMaterializeExecutor.allowCoreThreadTimeOut(true);
+      _lazyMaterializeExecutor = lazyMaterializeExecutor;
+      _logger.info("Lazy loading enabled at instance level, materialize parallelism: {}", materializeParallelism);
+    }
+
     doInit();
 
     _logger.info("Initialized table data manager with data directory: {}", _tableDataDir);
@@ -310,6 +336,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Shutting down table data manager");
     _shutDown = true;
     doShutdown();
+    if (_lazyMaterializeExecutor != null) {
+      _lazyMaterializeExecutor.shutdownNow();
+    }
     _logger.info("Shut down table data manager");
   }
 
@@ -319,6 +348,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * Releases and removes all segments tracked by the table data manager.
    */
   protected void releaseAndRemoveAllSegments() {
+    _stubbedSegments.clear();
+    _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.LAZY_STUBBED_SEGMENT_COUNT, 0);
     List<SegmentDataManager> segmentDataManagers;
     synchronized (_segmentDataManagerMap) {
       segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
@@ -358,7 +389,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public boolean hasSegment(String segmentName) {
-    return _segmentDataManagerMap.containsKey(segmentName);
+    // Stubbed segments count as present: they are assigned ONLINE and routable, just not materialized yet.
+    return _segmentDataManagerMap.containsKey(segmentName) || _stubbedSegments.containsKey(segmentName);
   }
 
   /**
@@ -564,6 +596,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
       } finally {
         _segmentReloadSemaphore.release();
       }
+    } else if (_stubbedSegments.containsKey(segmentName)) {
+      // Segment refreshed while stubbed: update the stub metadata; the next query loads the NEW version (the
+      // materialize path re-fetches ZK metadata, so this is belt-and-braces consistency).
+      SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
+      _stubbedSegments.put(segmentName, zkMetadata);
+      _logger.info("Segment: {} is stubbed, updated stub metadata on refresh; new version loads on next query",
+          segmentName);
     } else {
       _logger.warn("Failed to find segment: {}, skipping replacing it", segmentName);
     }
@@ -607,11 +646,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   protected void doOffloadSegment(String segmentName) {
+    // Helix OFFLINE/DROP transitions must also clear lazy stubs.
+    boolean wasStubbed = _stubbedSegments.remove(segmentName) != null;
+    if (wasStubbed) {
+      _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.LAZY_STUBBED_SEGMENT_COUNT,
+          _stubbedSegments.size());
+    }
     SegmentDataManager segmentDataManager = unregisterSegment(segmentName);
     if (segmentDataManager != null) {
       segmentDataManager.offload();
       releaseSegment(segmentDataManager);
       _logger.info("Offloaded segment: {}", segmentName);
+    } else if (wasStubbed) {
+      _logger.info("Offloaded stubbed segment: {} (stub removed, nothing to release)", segmentName);
     } else {
       _logger.warn("Failed to find segment: {}, skipping offloading it", segmentName);
     }
@@ -752,9 +799,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public List<SegmentDataManager> acquireSegments(List<String> segmentNames,
       @Nullable List<String> optionalSegmentNames, List<String> missingSegments) {
+    materializeStubbedSegmentsInParallel(segmentNames);
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
     for (String segmentName : segmentNames) {
-      SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+      SegmentDataManager segmentDataManager = getOrMaterializeSegmentDataManager(segmentName);
       if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
         segmentDataManagers.add(segmentDataManager);
       } else {
@@ -776,11 +824,209 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Nullable
   @Override
   public SegmentDataManager acquireSegment(String segmentName) {
-    SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+    SegmentDataManager segmentDataManager = getOrMaterializeSegmentDataManager(segmentName);
     if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
       return segmentDataManager;
     } else {
       return null;
+    }
+  }
+
+  /**
+   * Returns the SegmentDataManager for the given segment, materializing it first if it is currently a lazy stub.
+   * Returns null if the segment is neither loaded nor stubbed, or if materialization failed (in which case the stub
+   * stays registered so the next query retries — self-healing).
+   */
+  @Nullable
+  protected SegmentDataManager getOrMaterializeSegmentDataManager(String segmentName) {
+    SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+    if (segmentDataManager != null) {
+      return segmentDataManager;
+    }
+    if (_stubbedSegments.containsKey(segmentName)) {
+      return materializeStubbedSegment(segmentName);
+    }
+    return null;
+  }
+
+  /**
+   * Materializes a stubbed segment: downloads it from the deep store, loads it and removes the stub. Runs under the
+   * per-segment lock so concurrent cold queries for the same segment dedupe into a single download. On failure the
+   * stub is kept and null is returned — the segment is reported missing for this query (upstream behavior) and the
+   * next query retries.
+   */
+  @Nullable
+  protected SegmentDataManager materializeStubbedSegment(String segmentName) {
+    Lock segmentLock = getSegmentLock(segmentName);
+    segmentLock.lock();
+    try {
+      // Re-check under the lock: a concurrent query may have materialized it already.
+      SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+      if (segmentDataManager != null) {
+        return segmentDataManager;
+      }
+      if (!_stubbedSegments.containsKey(segmentName)) {
+        return null;
+      }
+      long startTimeMs = System.currentTimeMillis();
+      _logger.info("Materializing stubbed segment: {} on first query access", segmentName);
+      try {
+        // Re-fetch ZK metadata so a segment refreshed while stubbed loads its NEW version (CRC check downstream).
+        SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
+        IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+        indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+        addNewOnlineSegment(zkMetadata, indexLoadingConfig);
+        _stubbedSegments.remove(segmentName);
+        long loadTimeMs = System.currentTimeMillis() - startTimeMs;
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.LAZY_SEGMENT_COLD_LOADS, 1);
+        _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.LAZY_SEGMENT_LOAD_TIME_MS, loadTimeMs,
+            TimeUnit.MILLISECONDS);
+        _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.LAZY_STUBBED_SEGMENT_COUNT,
+            _stubbedSegments.size());
+        _logger.info("Materialized stubbed segment: {} in {}ms", segmentName, loadTimeMs);
+        return _segmentDataManagerMap.get(segmentName);
+      } catch (Exception e) {
+        _logger.error("Failed to materialize stubbed segment: {}, keeping stub so the next query retries",
+            segmentName, e);
+        addSegmentError(segmentName, new SegmentErrorInfo(System.currentTimeMillis(),
+            "Caught exception while materializing stubbed segment", e));
+        return null;
+      }
+    } finally {
+      segmentLock.unlock();
+    }
+  }
+
+  /**
+   * Materializes all stubbed segments needed by a query in parallel on a bounded pool. Failures are swallowed here —
+   * the per-segment acquire that follows reports them as missing while the stubs stay registered for retry.
+   */
+  protected void materializeStubbedSegmentsInParallel(List<String> segmentNames) {
+    if (_lazyMaterializeExecutor == null || _stubbedSegments.isEmpty()) {
+      return;
+    }
+    List<String> stubbedSegmentNames = new ArrayList<>();
+    for (String segmentName : segmentNames) {
+      if (_stubbedSegments.containsKey(segmentName) && !_segmentDataManagerMap.containsKey(segmentName)) {
+        stubbedSegmentNames.add(segmentName);
+      }
+    }
+    if (stubbedSegmentNames.isEmpty()) {
+      return;
+    }
+    if (stubbedSegmentNames.size() == 1) {
+      materializeStubbedSegment(stubbedSegmentNames.get(0));
+      return;
+    }
+    _logger.info("Materializing {} stubbed segments in parallel", stubbedSegmentNames.size());
+    CompletableFuture.allOf(stubbedSegmentNames.stream()
+        .map(segmentName -> CompletableFuture.runAsync(() -> materializeStubbedSegment(segmentName),
+            _lazyMaterializeExecutor))
+        .toArray(CompletableFuture[]::new)).join();
+  }
+
+  /**
+   * Registers a metadata-only stub for a segment assigned ONLINE. Zero disk, zero memory — the first query that
+   * touches the segment materializes it.
+   */
+  protected void registerStubbedSegment(String segmentName, SegmentZKMetadata zkMetadata) {
+    _stubbedSegments.put(segmentName, zkMetadata);
+    _recentlyDeletedSegments.invalidate(segmentName);
+    _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.LAZY_STUBBED_SEGMENT_COUNT,
+        _stubbedSegments.size());
+    _logger.info("Lazy loading: registering stub for segment: {} (skipping download)", segmentName);
+  }
+
+  /**
+   * Returns the LazyLoadConfig if lazy loading is effectively enabled for this table (table config enabled AND
+   * instance kill switch on), otherwise null.
+   */
+  @Nullable
+  protected LazyLoadConfig getEffectiveLazyLoadConfig() {
+    if (!_instanceLazyLoadEnabled) {
+      return null;
+    }
+    TableConfig tableConfig = _cachedTableConfigAndSchema.getLeft();
+    LazyLoadConfig lazyLoadConfig = tableConfig.getLazyLoadConfig();
+    return lazyLoadConfig != null && lazyLoadConfig.isEnabled() ? lazyLoadConfig : null;
+  }
+
+  /**
+   * Returns true if lazy loading is effectively enabled for this table.
+   */
+  public boolean isLazyLoadEnabled() {
+    return getEffectiveLazyLoadConfig() != null;
+  }
+
+  /**
+   * Evicts segments that have been idle for longer than the table's idleEvictionSeconds back to stubs. Called
+   * periodically by the instance-level eviction sweeper. Every query acquire resets the idle clock; a segment with a
+   * query in flight is never evicted.
+   */
+  public void evictIdleLazySegments() {
+    if (_shutDown) {
+      return;
+    }
+    LazyLoadConfig lazyLoadConfig = getEffectiveLazyLoadConfig();
+    if (lazyLoadConfig == null) {
+      return;
+    }
+    long idleEvictionMs = lazyLoadConfig.getIdleEvictionSeconds() * 1000L;
+    long nowMs = System.currentTimeMillis();
+    for (Map.Entry<String, SegmentDataManager> entry : _segmentDataManagerMap.entrySet()) {
+      SegmentDataManager segmentDataManager = entry.getValue();
+      if (!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
+        continue;
+      }
+      if (nowMs - segmentDataManager.getLastAccessTimeMs() < idleEvictionMs) {
+        continue;
+      }
+      evictSegmentToStub(entry.getKey(), lazyLoadConfig);
+    }
+  }
+
+  /**
+   * Evicts a single idle segment back to a stub: offload, release (frees memory when the last reader is done),
+   * optionally delete the local index dir, re-register the stub. Data is never lost — the deep-store copy remains
+   * and the segment stays routable. Idle time and in-flight queries are re-checked under the segment lock.
+   */
+  protected void evictSegmentToStub(String segmentName, LazyLoadConfig lazyLoadConfig) {
+    Lock segmentLock = getSegmentLock(segmentName);
+    segmentLock.lock();
+    try {
+      SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+      if (segmentDataManager == null) {
+        return;
+      }
+      // Re-check under the lock: reference count > 1 means a query is in flight; a fresh access resets the clock.
+      long idleEvictionMs = lazyLoadConfig.getIdleEvictionSeconds() * 1000L;
+      if (segmentDataManager.getReferenceCount() > 1
+          || System.currentTimeMillis() - segmentDataManager.getLastAccessTimeMs() < idleEvictionMs) {
+        return;
+      }
+      SegmentZKMetadata zkMetadata = fetchZKMetadataNullable(segmentName);
+      if (zkMetadata == null || zkMetadata.getDownloadUrl() == null
+          || CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(zkMetadata.getDownloadUrl())) {
+        // No authoritative deep-store copy to refetch from — never evict such a segment.
+        return;
+      }
+      _logger.info("Evicting idle lazy segment: {} back to stub (deleteLocalOnEvict: {})", segmentName,
+          lazyLoadConfig.isDeleteLocalOnEvict());
+      TableConfig tableConfig = _cachedTableConfigAndSchema.getLeft();
+      File indexDir = getSegmentDataDir(segmentName, zkMetadata.getTier(), tableConfig);
+      // Register the stub before unregistering the loaded segment so the segment never looks missing.
+      registerStubbedSegment(segmentName, zkMetadata);
+      unregisterSegment(segmentName);
+      _recentlyDeletedSegments.invalidate(segmentName);
+      segmentDataManager.offload();
+      releaseSegment(segmentDataManager);
+      if (lazyLoadConfig.isDeleteLocalOnEvict()) {
+        FileUtils.deleteQuietly(indexDir);
+      }
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.LAZY_SEGMENT_EVICTIONS, 1);
+      _logger.info("Evicted idle segment: {} back to stub", segmentName);
+    } finally {
+      segmentLock.unlock();
     }
   }
 

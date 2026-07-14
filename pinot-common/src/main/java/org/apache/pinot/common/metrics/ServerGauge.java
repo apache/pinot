@@ -73,6 +73,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   // Segment operation metrics - count is the current number of segments undergoing the given operation.
   // Incremented when the semaphore is acquired and decremented when the semaphore is released
   SEGMENT_TABLE_DOWNLOAD_COUNT("segmentTableDownloadCount", false),
+  // Number of lazily stubbed (assigned but not materialized) segments per table
+  LAZY_STUBBED_SEGMENT_COUNT("segments", false),
   SEGMENT_DOWNLOAD_COUNT("segmentDownloadCount", true),
   SEGMENT_ALL_PREPROCESS_COUNT("segmentAllPreprocessCount", true),
   SEGMENT_STARTREE_PREPROCESS_COUNT("segmentStartreePreprocessCount", true),

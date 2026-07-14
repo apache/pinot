@@ -123,6 +123,15 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String UPLOAD_SEGMENT_TO_DEEP_STORE = "segment.upload.to.deep.store";
   public static final boolean DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE = false;
 
+  // Lazy segment loading. Keys resolve under the "pinot.server.instance." prefix, e.g.
+  // pinot.server.instance.lazy.load.enabled
+  private static final String LAZY_LOAD_ENABLED = "lazy.load.enabled";
+  private static final boolean DEFAULT_LAZY_LOAD_ENABLED = true;
+  private static final String LAZY_SWEEP_INTERVAL_SECONDS = "lazy.sweep.interval.seconds";
+  private static final int DEFAULT_LAZY_SWEEP_INTERVAL_SECONDS = 60;
+  private static final String LAZY_MATERIALIZE_PARALLELISM = "lazy.materialize.parallelism";
+  private static final int DEFAULT_LAZY_MATERIALIZE_PARALLELISM = 4;
+
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private static final int DEFAULT_DELETED_TABLES_CACHE_TTL_MINUTES = 60;
@@ -358,5 +367,20 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public boolean isDimensionTablePreloadDisabled() {
     return _serverConfig.getProperty(DISABLE_DIMENSION_TABLE_PRELOAD,
         DEFAULT_DISABLE_DIMENSION_TABLE_PRELOAD);
+  }
+
+  @Override
+  public boolean isLazyLoadEnabled() {
+    return _serverConfig.getProperty(LAZY_LOAD_ENABLED, DEFAULT_LAZY_LOAD_ENABLED);
+  }
+
+  @Override
+  public int getLazyLoadSweepIntervalSeconds() {
+    return _serverConfig.getProperty(LAZY_SWEEP_INTERVAL_SECONDS, DEFAULT_LAZY_SWEEP_INTERVAL_SECONDS);
+  }
+
+  @Override
+  public int getLazyLoadMaterializeParallelism() {
+    return _serverConfig.getProperty(LAZY_MATERIALIZE_PARALLELISM, DEFAULT_LAZY_MATERIALIZE_PARALLELISM);
   }
 }

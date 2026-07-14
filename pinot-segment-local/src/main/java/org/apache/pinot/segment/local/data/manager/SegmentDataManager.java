@@ -33,9 +33,15 @@ public abstract class SegmentDataManager {
   private final AtomicBoolean _offloaded = new AtomicBoolean();
   private final AtomicBoolean _destroyed = new AtomicBoolean();
   private int _referenceCount = 1;
+  // Idle clock for lazy-loading TTL eviction. Stamped on every successful query acquire.
+  private volatile long _lastAccessTimeMs = _loadTimeMs;
 
   public long getLoadTimeMs() {
     return _loadTimeMs;
+  }
+
+  public long getLastAccessTimeMs() {
+    return _lastAccessTimeMs;
   }
 
   public synchronized int getReferenceCount() {
@@ -52,6 +58,7 @@ public abstract class SegmentDataManager {
       return false;
     } else {
       _referenceCount++;
+      _lastAccessTimeMs = System.currentTimeMillis();
       return true;
     }
   }

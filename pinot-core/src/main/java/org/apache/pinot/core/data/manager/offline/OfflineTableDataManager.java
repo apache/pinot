@@ -77,6 +77,12 @@ public class OfflineTableDataManager extends BaseTableDataManager {
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager == null) {
+      if (isLazyLoadEnabled()) {
+        // Lazy loading: register a metadata-only stub instead of downloading. The first query that touches the
+        // segment materializes it from the deep store.
+        registerStubbedSegment(segmentName, zkMetadata);
+        return;
+      }
       addNewOnlineSegment(zkMetadata, indexLoadingConfig);
     } else {
       replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
