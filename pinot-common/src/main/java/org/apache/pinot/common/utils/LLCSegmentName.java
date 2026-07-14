@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -150,6 +151,15 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return _topicId;
   }
 
+  public int getTopicId(boolean hasMultiTopic) {
+    if (hasMultiTopic) {
+      return _isMultiTopicFormat ? _topicId :
+          IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId);
+    } else {
+      return _topicId;
+    }
+  }
+
   public int getPartitionGroupId() {
     return _partitionGroupId;
   }
@@ -174,6 +184,15 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   @JsonValue
   public String getSegmentName() {
     return _segmentName;
+  }
+
+  public int getStreamPartitionGroupId(boolean hasMultiTopics) {
+    if (hasMultiTopics) {
+      return _isMultiTopicFormat ? _partitionGroupId :
+          IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
+    } else {
+      return _partitionGroupId;
+    }
   }
 
   @Override

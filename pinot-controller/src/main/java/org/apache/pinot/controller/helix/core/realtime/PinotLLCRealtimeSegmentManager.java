@@ -317,9 +317,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       StreamPartitionMsgOffsetFactory[] offsetFactories = new StreamPartitionMsgOffsetFactory[numStreams];
       for (Map.Entry<Integer, LLCSegmentName> entry : partitionGroupIdToLatestSegment.entrySet()) {
         int partitionGroupId = entry.getKey();
-        int index = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionGroupId);
-        int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(partitionGroupId);
         LLCSegmentName llcSegmentName = entry.getValue();
+        int index = llcSegmentName.getTopicId(true);
+        int streamPartitionId = llcSegmentName.getStreamPartitionGroupId(true);
         SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, llcSegmentName.getSegmentName());
         StreamPartitionMsgOffsetFactory offsetFactory = offsetFactories[index];
         if (offsetFactory == null) {
@@ -842,13 +842,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
 
     // Normalize the committing segment's partition into (topicId, streamPartitionId), regardless of whether the
     // committing segment name uses the old (index * 10000 + partitionId) or new (explicit topicId) format.
-    int committingTopicId = isMultiTopic
-        ? (committingLLCSegment.isMultiTopicFormat() ? committingLLCSegment.getTopicId()
-            : IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(committingSegmentPartitionGroupId))
-        : 0;
-    int committingStreamPartitionId = isMultiTopic && !committingLLCSegment.isMultiTopicFormat()
-        ? IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(committingSegmentPartitionGroupId)
-        : committingSegmentPartitionGroupId;
+    int committingTopicId = committingLLCSegment.getTopicId(isMultiTopic);
+    int committingStreamPartitionId = committingLLCSegment.getStreamPartitionGroupId(isMultiTopic);
 
     Set<Integer> streamPartitionIds = partitionIdsByTopic.get(committingTopicId);
     if (streamPartitionIds != null && streamPartitionIds.contains(committingStreamPartitionId)) {
@@ -1018,10 +1013,11 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     String segmentName = newLLCSegmentName.getSegmentName();
-
+    boolean isMultiTopic = IngestionConfigUtils.hasMultipleStreams(tableConfig);
     // Handle offset auto reset
     String nextOffset = committingSegmentDescriptor.getNextOffset();
-    String startOffset = computeStartOffset(nextOffset, streamConfig, newLLCSegmentName.getPartitionGroupId());
+    String startOffset = computeStartOffset(nextOffset, streamConfig,
+        newLLCSegmentName.getStreamPartitionGroupId(isMultiTopic));
     if (!startOffset.equals(nextOffset)) {
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.OFFSET_AUTO_RESET_SKIPPED_OFFSETS,
           Long.parseLong(startOffset) - Long.parseLong(nextOffset));
@@ -1086,7 +1082,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         ControllerGauge.NUM_ROWS_THRESHOLD_WITH_TOPIC, flushThreshold);
   }
 
-  private String computeStartOffset(String nextOffset, StreamConfig streamConfig, int partitionId) {
+  private String computeStartOffset(String nextOffset, StreamConfig streamConfig, int streamPartitionId) {
     if (!streamConfig.isEnableOffsetAutoReset() || streamConfig.isBackfillTopic()) {
       return nextOffset;
     }
@@ -1099,7 +1095,6 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
           timeThreshold, offsetThreshold);
       return nextOffset;
     }
-    int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(partitionId);
     String clientId = getTableTopicUniqueClientId(streamConfig);
     StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     StreamPartitionMsgOffsetFactory offsetFactory = consumerFactory.createStreamMsgOffsetFactory();
@@ -1300,18 +1295,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
           getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
       List<StreamMetadata> streamMetadataList =
           getNewStreamMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
-      // NOTE: streamMetadataList may be shorter than streamConfigs (a permanently-failed topic is skipped rather
-      // than represented by a placeholder), so its list position is NOT the topic id. Each PartitionGroupMetadata's
-      // partitionGroupId already encodes the true topic id via padding (see PartitionGroupMetadataFetcher), so
-      // decode from that instead of trusting list position.
       for (StreamMetadata streamMetadata : streamMetadataList) {
         for (PartitionGroupMetadata partitionGroupMetadata : streamMetadata.getPartitionGroupMetadataList()) {
-          int pinotPartitionId = partitionGroupMetadata.getPartitionGroupId();
-          int topicId = numStreams > 1
-              ? IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(pinotPartitionId) : 0;
-          int streamPartitionId = numStreams > 1
-              ? IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(pinotPartitionId) : pinotPartitionId;
-          partitionIds.computeIfAbsent(topicId, k -> new HashSet<>()).add(streamPartitionId);
+          partitionIds.add(partitionGroupMetadata.getPartitionGroupId());
         }
       }
       return new PartitionIdsWithIdealState(partitionIds, idealState);
