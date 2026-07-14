@@ -90,9 +90,18 @@ public class PinotAccessControlUserRestletResource {
    * {@inheritDoc}
    */
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotAccessControlUserRestletResource.class);
+  private static final String COMPONENT_TYPE_REQUIRED_ERROR = "Component type is required as query parameter";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  private static ComponentType validateRequiredComponentType(String componentTypeStr) {
+    ComponentType componentType = Constants.validateComponentType(componentTypeStr);
+    if (componentType == null) {
+      throw new ControllerApplicationException(LOGGER, COMPONENT_TYPE_REQUIRED_ERROR, Response.Status.BAD_REQUEST);
+    }
+    return componentType;
+  }
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -115,10 +124,11 @@ public class PinotAccessControlUserRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_USER)
   @ApiOperation(value = "Get an user in cluster", notes = "Get an user in cluster")
   public String getUser(@PathParam("username") String username,
-      @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr) {
+      @ApiParam(value = "CONTROLLER|SERVER|BROKER", required = true) @QueryParam("component")
+      String componentTypeStr) {
+    ComponentType componentType = validateRequiredComponentType(componentTypeStr);
     try {
       ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-      ComponentType componentType = Constants.validateComponentType(componentTypeStr);
       String usernameWithType = username + "_" + componentType.name();
 
       UserConfig userConfig = ZKMetadataProvider.getUserConfig(propertyStore, usernameWithType);
@@ -168,15 +178,18 @@ public class PinotAccessControlUserRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete a user", notes = "Delete a user")
   public SuccessResponse deleteUser(@PathParam("username") String username,
-      @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr) {
+      @ApiParam(value = "CONTROLLER|SERVER|BROKER", required = true) @QueryParam("component")
+      String componentTypeStr) {
 
     List<String> usersDeleted = new LinkedList<>();
-    String usernameWithComponentType = username + "_" + componentTypeStr;
+    ComponentType componentType = validateRequiredComponentType(componentTypeStr);
+    String componentTypeName = componentType.name();
+    String usernameWithComponentType = username + "_" + componentTypeName;
 
     try {
 
       boolean userExist = false;
-      userExist = _pinotHelixResourceManager.hasUser(username, componentTypeStr);
+      userExist = _pinotHelixResourceManager.hasUser(username, componentTypeName);
 
       _pinotHelixResourceManager.deleteUser(usernameWithComponentType);
       if (userExist) {
@@ -200,11 +213,14 @@ public class PinotAccessControlUserRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update user config for a user", notes = "Update user config for user")
   public SuccessResponse updateUserConfig(@PathParam("username") String username,
-      @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr,
+      @ApiParam(value = "CONTROLLER|SERVER|BROKER", required = true) @QueryParam("component")
+      String componentTypeStr,
       @QueryParam("passwordChanged") boolean passwordChanged, String userConfigString) {
 
     UserConfig userConfig;
-    String usernameWithComponentType = username + "_" + componentTypeStr;
+    ComponentType componentType = validateRequiredComponentType(componentTypeStr);
+    String componentTypeName = componentType.name();
+    String usernameWithComponentType = username + "_" + componentTypeName;
     try {
       userConfig = JsonUtils.stringToObject(userConfigString, UserConfig.class);
       if (passwordChanged) {
@@ -216,7 +232,7 @@ public class PinotAccessControlUserRestletResource {
             "Request user " + usernameWithComponentType + " does not match " + usernameWithComponentTypeFromUserConfig
                 + " in the Request body", Response.Status.BAD_REQUEST);
       }
-      if (!_pinotHelixResourceManager.hasUser(username, componentTypeStr)) {
+      if (!_pinotHelixResourceManager.hasUser(username, componentTypeName)) {
         throw new ControllerApplicationException(LOGGER,
             "Request user " + usernameWithComponentType + " does not exist", Response.Status.NOT_FOUND);
       }
