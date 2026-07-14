@@ -35,6 +35,36 @@ resolved chunk-compression type. Dictionary-encoded columns record uncompressed 
 `forwardIndexAndDictionaryStorageSizeInBytes` includes both the dictionary and forward-index files. Columns without a
 forward index and old segments without value-size metadata are excluded from compression ratios.
 
+## Inspect realtime segment size metadata
+
+For a completed realtime segment, `segment.size.in.bytes` is the logical size of the finalized, uncompressed immutable
+segment. Before publishing this value, the committing server applies the latest table index configuration. For example,
+if an inverted index was removed while the segment was consuming, the removed index is not included in the published
+size. Deep-store recovery also refreshes the value from the immutable segment loaded by the selected server.
+
+This field is not the compressed archive size and does not represent filesystem-allocated blocks reported by tools
+such as `du`. A later segment reload can also make replica sizes differ from the shared metadata snapshot.
+
+To compare the metadata snapshot with the currently loaded copies of one realtime segment:
+
+```bash
+CONTROLLER='http://localhost:9000'
+TABLE='events'
+SEGMENT='events__0__0__20260714T0000Z'
+
+curl -sS "$CONTROLLER/segments/${TABLE}_REALTIME/$SEGMENT/metadata" \
+  | jq '{segmentSizeInBytes: (."segment.size.in.bytes" | tonumber)}'
+
+curl -sS "$CONTROLLER/tables/$TABLE/size?verbose=true" \
+  | jq --arg segment "$SEGMENT" \
+    '.realtimeSegments.segments[$segment].serverInfo
+     | to_entries[]
+     | {server: .key, diskSizeInBytes: .value.diskSizeInBytes}'
+```
+
+The first value is one shared segment metadata snapshot and does not include replication. The second request reports
+each loaded replica separately.
+
 ## Query statistics
 
 Request the table-size summary and per-segment details:

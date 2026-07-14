@@ -59,6 +59,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManage
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.DedupContext;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
@@ -1286,7 +1287,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         FileUtils.deleteQuietly(tempSegmentFolder);
       }
 
-      long segmentSizeBytes = FileUtils.sizeOfDirectory(indexDir);
+      try {
+        IndexLoadingConfig latestIndexLoadingConfig = _realtimeTableDataManager.fetchIndexLoadingConfig();
+        ImmutableSegmentLoader.preprocess(indexDir, latestIndexLoadingConfig,
+            _realtimeTableDataManager.getSegmentOperationsThrottlerSet(), _segmentZKMetadata);
+      } catch (Exception e) {
+        String errorMessage = "Could not finalize segment with the latest index configuration";
+        reportSegmentBuildFailure(errorMessage, e);
+        throw new SegmentBuildFailureException(errorMessage, e);
+      }
+
+      long segmentSizeBytes =
+          FileUtils.sizeOfDirectory(SegmentDirectoryPaths.findSegmentDirectory(indexDir));
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
           TimeUnit.MILLISECONDS.toSeconds(buildTimeMillis));
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,

@@ -131,6 +131,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
   private static final String SEGMENT_LOCATION_PREFIX = "http://control_vip/segments/";
   private static final int SEGMENT_SIZE_IN_BYTES = 100000000;
+  private static final int FINALIZED_SEGMENT_SIZE_IN_BYTES = 25000000;
 
   private static final long CURRENT_TIME_MS = System.currentTimeMillis();
   private static final Random RANDOM = new Random(CURRENT_TIME_MS);
@@ -1823,11 +1824,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Map<String, String> existingCustomMap = new HashMap<>();
     existingCustomMap.put("controllerKey", "controllerValue");
     segmentsZKMetadata.get(0).setCustomMap(existingCustomMap);
+    segmentsZKMetadata.get(0).setSizeInBytes(SEGMENT_SIZE_IN_BYTES);
 
     SegmentZKMetadata segmentZKMetadataCopy =
         new SegmentZKMetadata(new ZNRecord(segmentsZKMetadata.get(0).toZNRecord()));
 
     segmentZKMetadataCopy.setDownloadUrl(tempSegmentFileLocation.getPath());
+    segmentZKMetadataCopy.setSizeInBytes(FINALIZED_SEGMENT_SIZE_IN_BYTES);
     // Simulate the server-side merge of segment-file customMap entries into the uploaded ZK metadata. The controller
     // must propagate these entries to the persisted ZK metadata.
     Map<String, String> uploadedCustomMap = new HashMap<>();
@@ -1891,6 +1894,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertNotNull(persistedCustomMap);
     assertEquals(persistedCustomMap.get("segmentFileKey"), "segmentFileValue");
     assertEquals(persistedCustomMap.get("controllerKey"), "controllerValue");
+    assertEquals(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getSizeInBytes(),
+        FINALIZED_SEGMENT_SIZE_IN_BYTES);
 
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(1), null).getDownloadUrl(),
         METADATA_URI_FOR_PEER_DOWNLOAD);

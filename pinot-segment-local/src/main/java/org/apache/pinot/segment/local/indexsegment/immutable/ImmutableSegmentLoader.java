@@ -301,6 +301,28 @@ public class ImmutableSegmentLoader {
     return new SegmentPreProcessor(segmentDirectory, indexLoadingConfig).needProcess();
   }
 
+  /// Checks whether a local segment directory needs preprocessing for the supplied index loading configuration.
+  ///
+  /// @param indexDir local segment index directory
+  /// @param indexLoadingConfig index loading configuration to check against
+  /// @param zkMetadata segment metadata used to resolve segment custom configuration, or `null`
+  /// @return `true` when loading the segment requires preprocessing
+  public static boolean needPreprocess(File indexDir, IndexLoadingConfig indexLoadingConfig,
+      @Nullable SegmentZKMetadata zkMetadata)
+      throws Exception {
+    Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory",
+        indexDir);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    if (segmentMetadata.getTotalDocs() == 0) {
+      return false;
+    }
+    try (SegmentDirectory segmentDirectory = loadSegmentDirectoryForPreprocess(indexDir, segmentMetadata.getName(),
+        segmentMetadata.getCrc(), indexLoadingConfig, zkMetadata)) {
+      return needPreprocess(segmentDirectory, indexLoadingConfig);
+    }
+  }
+
   private static boolean needConvertSegmentFormat(IndexLoadingConfig indexLoadingConfig,
       SegmentMetadataImpl segmentMetadata) {
     SegmentVersion segmentVersionToLoad = indexLoadingConfig.getSegmentVersion();
@@ -334,6 +356,16 @@ public class ImmutableSegmentLoader {
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
       SegmentZKMetadata zkMetadata)
       throws Exception {
+    SegmentDirectory segmentDirectory =
+        loadSegmentDirectoryForPreprocess(indexDir, segmentName, segmentCrc, indexLoadingConfig, zkMetadata);
+    try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      preProcessor.process(segmentOperationsThrottlerSet);
+    }
+  }
+
+  private static SegmentDirectory loadSegmentDirectoryForPreprocess(File indexDir, String segmentName,
+      String segmentCrc, IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata)
+      throws Exception {
     SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
         .setReadMode(indexLoadingConfig.getReadMode())
         .setTableConfig(indexLoadingConfig.getTableConfig())
@@ -343,10 +375,7 @@ public class ImmutableSegmentLoader {
         .setSegmentCrc(segmentCrc)
         .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
         .build();
-    SegmentDirectory segmentDirectory =
-        SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
-    try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
-      preProcessor.process(segmentOperationsThrottlerSet);
-    }
+    return SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(),
+        segmentLoaderContext);
   }
 }

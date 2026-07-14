@@ -163,6 +163,9 @@ public class LoaderTest {
 
     // The newly generated segment is consistent with table config and schema, thus
     // in follow checks, whether it needs reprocess or not depends on segment format.
+    assertFalse(ImmutableSegmentLoader.needPreprocess(_indexDir, new IndexLoadingConfig(), null));
+    assertFalse(ImmutableSegmentLoader.needPreprocess(_indexDir, _v1IndexLoadingConfig, null));
+    assertTrue(ImmutableSegmentLoader.needPreprocess(_indexDir, _v3IndexLoadingConfig, null));
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(_indexDir, ReadMode.mmap)) {
       // The segmentVersionToLoad is null, not leading to reprocess.
       assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, new IndexLoadingConfig()));
@@ -177,6 +180,7 @@ public class LoaderTest {
 
     // Need to reset `segmentDirectory` to point to the correct index directory after the above load since the path
     // changes
+    assertFalse(ImmutableSegmentLoader.needPreprocess(_indexDir, _v3IndexLoadingConfig, null));
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(_indexDir, ReadMode.mmap)) {
       assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, _v3IndexLoadingConfig));
     }
