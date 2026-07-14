@@ -554,7 +554,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
           }
         });
 
-    updatePrimaryKeyGauge();
+    // Per-record hot path: keep the update count-only. The byte-size gauge is refreshed at segment-lifecycle
+    // cadence instead (see BasePartitionUpsertMetadataManager#updatePrimaryKeyGauge()).
+    updatePrimaryKeyGauge(getNumPrimaryKeys());
     return !isOutOfOrderRecord.get();
   }
 

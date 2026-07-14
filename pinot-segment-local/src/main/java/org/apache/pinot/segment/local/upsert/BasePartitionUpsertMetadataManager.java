@@ -401,10 +401,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected abstract long getPrimaryKeyMapSizeInBytes();
 
   protected void updatePrimaryKeyGauge(long numPrimaryKeys, long primaryKeySizeInBytes) {
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
-        numPrimaryKeys);
+    updatePrimaryKeyGauge(numPrimaryKeys);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEY_MAP_SIZE_IN_BYTES, primaryKeySizeInBytes);
+  }
+
+  protected void updatePrimaryKeyGauge(long numPrimaryKeys) {
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        numPrimaryKeys);
   }
 
   protected void updatePrimaryKeyGauge() {
