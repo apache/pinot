@@ -39,26 +39,19 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for {@link IFSTIndexHandler}.
- *
- * <p>IFST (case-Insensitive FST) indexes share the same index lifecycle as FST indexes but
- * use a separate index type ({@link StandardIndexes#ifst()}) and file extension.
- *
- * <p>Covers:
- * <ul>
- *   <li>Index removal when a column is dropped from the IFST index config</li>
- *   <li>New index creation when a column is added to the config</li>
- *   <li>No update required when the index is already present and matches config</li>
- *   <li>No update when column metadata is absent (column not in segment)</li>
- * </ul>
- */
+/// Unit tests for [IFSTIndexHandler].
+///
+/// IFST (case-insensitive FST) indexes share the same index lifecycle as FST indexes but
+/// use a separate index type ([StandardIndexes#ifst()]) and file extension.
+///
+/// Covers:
+/// - needUpdateIndices returns true when a column is dropped from the IFST index config
+/// - updateIndices removes the on-disk index when a column is dropped from config
+/// - needUpdateIndices returns true when a new column is added to the config
+/// - needUpdateIndices returns false when the index is already present and matches config
+/// - needUpdateIndices returns false when column metadata is absent (column not in segment)
 public class IFSTIndexHandlerTest {
   private static final String COLUMN = "category";
-
-  // ---------------------------------------------------------------------------
-  // Column removed from config
-  // ---------------------------------------------------------------------------
 
   @Test
   public void testNeedUpdateReturnsTrueWhenColumnRemovedFromConfig()
@@ -87,10 +80,6 @@ public class IFSTIndexHandlerTest {
 
     verify(writer).removeIndex(COLUMN, StandardIndexes.ifst());
   }
-
-  // ---------------------------------------------------------------------------
-  // New column added to config
-  // ---------------------------------------------------------------------------
 
   @Test
   public void testNeedUpdateReturnsTrueWhenNewColumnAdded()
@@ -139,10 +128,6 @@ public class IFSTIndexHandlerTest {
         "No update expected when column metadata is absent");
   }
 
-  // ---------------------------------------------------------------------------
-  // No update when index is already up-to-date
-  // ---------------------------------------------------------------------------
-
   @Test
   public void testNeedUpdateReturnsFalseWhenIndexUpToDate()
       throws Exception {
@@ -153,10 +138,6 @@ public class IFSTIndexHandlerTest {
     assertFalse(createHandler(segmentDirectory).needUpdateIndices(reader),
         "No update expected when IFST index is present and matches config");
   }
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
 
   private static IFSTIndexHandler createHandler(SegmentDirectory segmentDirectory) {
     FieldIndexConfigs fieldIndexConfigs =
