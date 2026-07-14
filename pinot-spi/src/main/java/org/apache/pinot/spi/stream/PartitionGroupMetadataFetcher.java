@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,8 +129,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
       int index = i;
       List<PartitionGroupConsumptionStatus> topicPartitionGroupConsumptionStatusList =
           _partitionGroupConsumptionStatusList.stream()
-              .filter(partitionGroupConsumptionStatus -> IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(
-                  partitionGroupConsumptionStatus.getPartitionGroupId()) == index)
+              .filter(partitionGroupConsumptionStatus -> partitionGroupConsumptionStatus.getTopicId() == index)
               .collect(Collectors.toList());
       try (StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(
           StreamConsumerFactory.getUniqueClientId(clientId))) {
@@ -141,9 +139,8 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
                     /*maxWaitTimeMs=*/METADATA_FETCH_TIMEOUT_MS,
                     _forceGetOffsetFromStream)
                 .stream()
-                .map(metadata -> new PartitionGroupMetadata(
-                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(metadata.getPartitionGroupId(),
-                        index), index, metadata.getStartOffset(), metadata.getSequenceNumber()))
+                .map(metadata -> new PartitionGroupMetadata(metadata.getPartitionGroupId(), index,
+                    metadata.getStartOffset(), metadata.getSequenceNumber()))
                 .collect(Collectors.toList());
         _streamMetadataList.add(
             new StreamMetadata(streamConfig, partitionGroupMetadataList.size(), partitionGroupMetadataList));

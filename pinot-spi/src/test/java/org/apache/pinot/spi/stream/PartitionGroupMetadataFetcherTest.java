@@ -116,8 +116,10 @@ public class PartitionGroupMetadataFetcherTest {
     StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
     List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
 
-    PartitionGroupConsumptionStatus status1 = new PartitionGroupConsumptionStatus(0, 0, null, null, "IN_PROGRESS");
-    PartitionGroupConsumptionStatus status2 = new PartitionGroupConsumptionStatus(1, 1, null, null, "IN_PROGRESS");
+    PartitionGroupConsumptionStatus status1 =
+        new PartitionGroupConsumptionStatus(0, 0, 0, 0, null, null, "IN_PROGRESS");
+    PartitionGroupConsumptionStatus status2 =
+        new PartitionGroupConsumptionStatus(1, 1, 1, 0, null, null, "IN_PROGRESS");
     List<PartitionGroupConsumptionStatus> statusList = Arrays.asList(status1, status2);
 
     PartitionGroupMetadata mockedMetadata1 = new PartitionGroupMetadata(0, mock(StreamPartitionMsgOffset.class));
@@ -152,14 +154,14 @@ public class PartitionGroupMetadataFetcherTest {
       Assert.assertEquals(streamMetadataList.get(1).getNumPartitions(), 2);
       Assert.assertEquals(streamMetadataList.get(1).getPartitionGroupMetadataList().size(), 2);
 
-      // Verify the correct partition group IDs: 0, 1, 10000, 10001
+      // Verify the partition group IDs are the raw, unpadded per-topic stream partition ids: 0, 0, 1, 1
       List<Integer> partitionIds = streamMetadataList.stream()
           .flatMap(sm -> sm.getPartitionGroupMetadataList().stream())
           .map(PartitionGroupMetadata::getPartitionGroupId)
           .sorted()
           .collect(Collectors.toList());
 
-      Assert.assertEquals(partitionIds, Arrays.asList(0, 1, 10000, 10001));
+      Assert.assertEquals(partitionIds, Arrays.asList(0, 0, 1, 1));
 
       // Verify the topic ids are correctly assigned: topic1 (index 0) -> 0, 0; topic2 (index 1) -> 1, 1
       List<Integer> topicIds = streamMetadataList.stream()
@@ -213,14 +215,14 @@ public class PartitionGroupMetadataFetcherTest {
       Assert.assertEquals(streamMetadataList.size(), 2);
       Assert.assertNull(fetcher.getException());
 
-      // Verify the correct partition group IDs
+      // Verify the partition group IDs are the raw, unpadded per-topic stream partition ids
       List<Integer> partitionIds = streamMetadataList.stream()
           .flatMap(sm -> sm.getPartitionGroupMetadataList().stream())
           .map(PartitionGroupMetadata::getPartitionGroupId)
           .sorted()
           .collect(Collectors.toList());
 
-      Assert.assertEquals(partitionIds, Arrays.asList(0, 1, 20000, 20001));
+      Assert.assertEquals(partitionIds, Arrays.asList(0, 0, 1, 1));
     }
   }
 
@@ -332,11 +334,14 @@ public class PartitionGroupMetadataFetcherTest {
       List<StreamMetadata> streamMetadataList = fetcher.getStreamMetadataList();
       Assert.assertEquals(streamMetadataList.size(), 2);
 
-      // Second stream's partitions should have remapped IDs but preserved sequence numbers
+      // Second stream's partitions should preserve raw (unpadded) partition ids and sequence numbers,
+      // with topicId set to the stream's index
       List<PartitionGroupMetadata> stream1Partitions = streamMetadataList.get(1).getPartitionGroupMetadataList();
-      Assert.assertEquals(stream1Partitions.get(0).getPartitionGroupId(), 10000);
+      Assert.assertEquals(stream1Partitions.get(0).getPartitionGroupId(), 0);
+      Assert.assertEquals(stream1Partitions.get(0).getTopicId(), 1);
       Assert.assertEquals(stream1Partitions.get(0).getSequenceNumber(), 7);
-      Assert.assertEquals(stream1Partitions.get(1).getPartitionGroupId(), 10001);
+      Assert.assertEquals(stream1Partitions.get(1).getPartitionGroupId(), 1);
+      Assert.assertEquals(stream1Partitions.get(1).getTopicId(), 1);
       Assert.assertEquals(stream1Partitions.get(1).getSequenceNumber(), 3);
     }
   }
