@@ -393,14 +393,13 @@ public class PinotTableRestletResource {
         _pinotHelixResourceManager.getRealtimeSegmentManager().getPartitionCountMap(streamConfigs);
     Map<Integer, List<PartitionGroupMetadata>> partitionGroupMetadataByStreamConfigIndex = new HashMap<>();
     for (WatermarkInductionResult.Watermark watermark : watermarkInductionResult.getWatermarks()) {
-      int streamConfigIndex =
-          IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(watermark.getPartitionGroupId());
+      int streamConfigIndex = watermark.getTopicId();
       Preconditions.checkArgument(streamConfigIndex >= 0 && streamConfigIndex < streamConfigs.size(),
-          "Invalid stream config index %s from watermark partition ID %s. Expected index in range [0, %s)",
+          "Invalid stream config index %s from watermark (partitionGroupId=%s). Expected index in range [0, %s)",
           streamConfigIndex, watermark.getPartitionGroupId(), streamConfigs.size());
       partitionGroupMetadataByStreamConfigIndex.computeIfAbsent(streamConfigIndex, ignored -> new ArrayList<>()).add(
-          new PartitionGroupMetadata(watermark.getPartitionGroupId(), new LongMsgOffset(watermark.getOffset()),
-              watermark.getSequenceNumber()));
+          new PartitionGroupMetadata(watermark.getPartitionGroupId(), streamConfigIndex,
+              new LongMsgOffset(watermark.getOffset()), watermark.getSequenceNumber()));
     }
 
     // Iterate in order by streamConfigIndex to ensure deterministic ordering

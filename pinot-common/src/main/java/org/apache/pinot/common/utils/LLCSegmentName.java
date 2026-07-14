@@ -153,8 +153,8 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   public int getTopicId(boolean hasMultiTopic) {
     if (hasMultiTopic) {
-      return _isMultiTopicFormat ? _topicId :
-          IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId);
+      return _isMultiTopicFormat
+          ? _topicId : IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId);
     } else {
       return _topicId;
     }
@@ -188,8 +188,8 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   public int getStreamPartitionGroupId(boolean hasMultiTopics) {
     if (hasMultiTopics) {
-      return _isMultiTopicFormat ? _partitionGroupId :
-          IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
+      return _isMultiTopicFormat
+          ? _partitionGroupId : IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
     } else {
       return _partitionGroupId;
     }
