@@ -134,18 +134,51 @@ public class JsonIndexHandlerTest {
   }
 
   @Test
-  public void testNeedUpdateReturnsTrueWhenNoStoredConfig()
+  public void testNeedUpdateReturnsTrueWhenNoStoredConfigAndForwardIndexAvailable()
       throws Exception {
     // No stored config — index was built before config persistence was added (legacy segment).
-    // Must trigger a one-time rebuild to backfill the stored config and detect any config drift.
+    // Forward index is present, so a one-time backfill rebuild is safe and expected.
     createEmptyMetadataFile();
 
     JsonIndexConfig currentConfig = new JsonIndexConfig();
     JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
-    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN);
+    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN, /* hasForwardIndex= */ true);
 
     assertTrue(handler.needUpdateIndices(reader),
-        "Rebuild expected for legacy segments with no stored config (one-time backfill)");
+        "Rebuild expected for legacy segments with no stored config when forward index is available");
+  }
+
+  @Test
+  public void testNeedUpdateReturnsFalseWhenNoStoredConfigButForwardIndexAbsent()
+      throws Exception {
+    // No stored config (legacy segment) AND no forward index (forwardIndexDisabled=true with no
+    // dictionary/inverted pair). createForwardIndexIfNeeded() would fail in this case, so the
+    // existing JSON index must be preserved without triggering a rebuild.
+    createEmptyMetadataFile();
+
+    JsonIndexConfig currentConfig = new JsonIndexConfig();
+    JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
+    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN, /* hasForwardIndex= */ false,
+        /* hasDictionary= */ false, /* hasInverted= */ false);
+
+    assertFalse(handler.needUpdateIndices(reader),
+        "No rebuild expected for legacy segments when forward index is absent (forwardIndexDisabled)");
+  }
+
+  @Test
+  public void testNeedUpdateReturnsTrueWhenNoStoredConfigAndForwardIndexReconstructable()
+      throws Exception {
+    // No stored config (legacy segment) AND forward index is absent but can be reconstructed from
+    // dictionary + inverted index. The rebuild is safe and should be triggered for backfill.
+    createEmptyMetadataFile();
+
+    JsonIndexConfig currentConfig = new JsonIndexConfig();
+    JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
+    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN, /* hasForwardIndex= */ false,
+        /* hasDictionary= */ true, /* hasInverted= */ true);
+
+    assertTrue(handler.needUpdateIndices(reader),
+        "Rebuild expected when forward index is reconstructable via dictionary + inverted index");
   }
 
   // --- helpers ---
@@ -184,10 +217,24 @@ public class JsonIndexHandlerTest {
   }
 
   private SegmentDirectory.Reader mockReaderWithIndexOn(String columnName) {
+    return mockReaderWithIndexOn(columnName, /* hasForwardIndex= */ true, /* hasDictionary= */ false,
+        /* hasInverted= */ false);
+  }
+
+  private SegmentDirectory.Reader mockReaderWithIndexOn(String columnName, boolean hasForwardIndex) {
+    return mockReaderWithIndexOn(columnName, hasForwardIndex, /* hasDictionary= */ false,
+        /* hasInverted= */ false);
+  }
+
+  private SegmentDirectory.Reader mockReaderWithIndexOn(String columnName, boolean hasForwardIndex,
+      boolean hasDictionary, boolean hasInverted) {
     SegmentDirectory segDir = mock(SegmentDirectory.class);
     when(segDir.getColumnsWithIndex(StandardIndexes.json())).thenReturn(Set.of(columnName));
     SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
     when(reader.toSegmentDirectory()).thenReturn(segDir);
+    when(reader.hasIndexFor(columnName, StandardIndexes.forward())).thenReturn(hasForwardIndex);
+    when(reader.hasIndexFor(columnName, StandardIndexes.dictionary())).thenReturn(hasDictionary);
+    when(reader.hasIndexFor(columnName, StandardIndexes.inverted())).thenReturn(hasInverted);
     return reader;
   }
 }
