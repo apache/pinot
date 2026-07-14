@@ -81,12 +81,32 @@ public class JsonIndexHandler extends BaseIndexHandler {
       }
       // Column exists in both existing indexes and config; check if config changed.
       // When properties != null but storedConfig is null the index predates config persistence (legacy segment):
-      // treat as a one-time rebuild to backfill the stored config and catch any config drift.
+      // only backfill (rebuild) when the forward index is present or reconstructable. If the forward index is
+      // absent (e.g. forwardIndexDisabled=true with no dictionary/inverted pair), preserve the existing JSON
+      // index untouched — createForwardIndexIfNeeded() would fail with no dictionary/inverted index available.
       JsonIndexConfig currentConfig = _jsonIndexConfigs.get(column);
       JsonIndexConfig storedConfig = readStoredJsonIndexConfig(column, properties);
-      if (properties != null && (storedConfig == null || !storedConfig.equals(currentConfig))) {
-        LOGGER.info("Need to rebuild json index for segment: {}, column: {} due to config change", segmentName, column);
-        return true;
+      if (properties != null) {
+        // configChanged: stored config exists and differs from current — rebuild regardless of forward
+        // index presence (same pre-existing behaviour; createForwardIndexIfNeeded will fail if the
+        // forward index is truly unrecoverable, which requires an explicit segment refresh).
+        boolean configChanged = storedConfig != null && !storedConfig.equals(currentConfig);
+        // legacyBackfill: stored config is absent (either the index predates config persistence, or
+        // the stored value failed to deserialize and readStoredJsonIndexConfig returned null). Only
+        // backfill when the forward index is present or reconstructable; if it is absent
+        // (forwardIndexDisabled=true with no dictionary/inverted pair) createForwardIndexIfNeeded()
+        // would throw, so preserve the existing JSON index instead.
+        boolean legacyBackfill = storedConfig == null && isForwardIndexAvailable(segmentReader, column);
+        if (configChanged) {
+          LOGGER.info("Need to rebuild json index for segment: {}, column: {} due to config change", segmentName,
+              column);
+          return true;
+        }
+        if (legacyBackfill) {
+          LOGGER.info("Need to rebuild json index for segment: {}, column: {} to backfill stored config "
+              + "(legacy segment or unreadable stored config)", segmentName, column);
+          return true;
+        }
       }
     }
     // Check if any new index need to be added.
@@ -118,13 +138,26 @@ public class JsonIndexHandler extends BaseIndexHandler {
       } else {
         // Column exists in both existing indexes and config; check if config changed and rebuild if needed.
         // When properties != null but storedConfig is null the index predates config persistence (legacy segment):
-        // treat as a one-time rebuild to backfill the stored config and catch any config drift.
+        // only backfill (rebuild) when the forward index is present or reconstructable. If the forward index is
+        // absent (e.g. forwardIndexDisabled=true with no dictionary/inverted pair), preserve the existing JSON
+        // index untouched — createForwardIndexIfNeeded() would fail with no dictionary/inverted index available.
         JsonIndexConfig currentConfig = _jsonIndexConfigs.get(column);
         JsonIndexConfig storedConfig = readStoredJsonIndexConfig(column, properties);
-        if (properties != null && (storedConfig == null || !storedConfig.equals(currentConfig))) {
-          LOGGER.info("Rebuilding json index for segment: {}, column: {} due to config change", segmentName, column);
-          segmentWriter.removeIndex(column, StandardIndexes.json());
-          columnsToAddIdx.add(column);
+        if (properties != null) {
+          // configChanged: stored config exists and differs — rebuild (see needUpdateIndices for rationale).
+          boolean configChanged = storedConfig != null && !storedConfig.equals(currentConfig);
+          // legacyBackfill: absent/unreadable stored config; only rebuild when forward index is recoverable.
+          boolean legacyBackfill = storedConfig == null && isForwardIndexAvailable(segmentWriter, column);
+          if (configChanged) {
+            LOGGER.info("Rebuilding json index for segment: {}, column: {} due to config change", segmentName, column);
+            segmentWriter.removeIndex(column, StandardIndexes.json());
+            columnsToAddIdx.add(column);
+          } else if (legacyBackfill) {
+            LOGGER.info("Rebuilding json index for segment: {}, column: {} to backfill stored config "
+                + "(legacy segment or unreadable stored config)", segmentName, column);
+            segmentWriter.removeIndex(column, StandardIndexes.json());
+            columnsToAddIdx.add(column);
+          }
         }
       }
     }
@@ -173,7 +206,7 @@ public class JsonIndexHandler extends BaseIndexHandler {
       String serialized = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(escaped);
       return JsonUtils.stringToObject(serialized, JsonIndexConfig.class);
     } catch (Exception e) {
-      LOGGER.warn("Failed to read stored json index config for column: {}, will not trigger rebuild on config change",
+      LOGGER.warn("Failed to read stored json index config for column: {}, treating as legacy (no stored config)",
           columnName, e);
       return null;
     }
@@ -195,6 +228,15 @@ public class JsonIndexHandler extends BaseIndexHandler {
       LOGGER.warn("Failed to serialize json index config for column: {}, config changes will not trigger rebuild",
           columnName, e);
     }
+  }
+
+  /// Returns {@code true} if the forward index for {@code column} is already present in the segment or can be
+  /// reconstructed from the dictionary and inverted index (the path used by
+  /// {@link BaseIndexHandler#createForwardIndexIfNeeded}).
+  private static boolean isForwardIndexAvailable(SegmentDirectory.Reader segmentReader, String column) {
+    return segmentReader.hasIndexFor(column, StandardIndexes.forward())
+        || (segmentReader.hasIndexFor(column, StandardIndexes.dictionary())
+            && segmentReader.hasIndexFor(column, StandardIndexes.inverted()));
   }
 
   private boolean shouldCreateJsonIndex(ColumnMetadata columnMetadata) {
