@@ -114,4 +114,13 @@ public interface InstanceDataManagerConfig {
   default int getLazyLoadMaterializeParallelism() {
     return 4;
   }
+
+  /**
+   * Maximum time in seconds a multi-segment query waits for its stubbed segments to materialize before reporting
+   * the still-stubbed ones as missing (their downloads continue in the background for subsequent queries). Brokers
+   * typically give up well before long downloads finish, so waiting longer mostly pins server query workers.
+   */
+  default long getLazyLoadMaterializeTimeoutSeconds() {
+    return 60;
+  }
 }

@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,12 +38,15 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -145,7 +149,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // parallel map, not a fake SegmentDataManager — all lazy logic is confined to the assignment and acquire touch
   // points plus the eviction sweeper. Broker routing is unchanged: the segment looks ONLINE to the cluster.
   protected final ConcurrentHashMap<String, SegmentZKMetadata> _stubbedSegments = new ConcurrentHashMap<>();
+  // In-flight materializations, keyed by segment name: dedups task submission across concurrent cold queries.
+  private final ConcurrentHashMap<String, CompletableFuture<Void>> _materializeFutures = new ConcurrentHashMap<>();
   protected boolean _instanceLazyLoadEnabled;
+  protected long _lazyMaterializeTimeoutSeconds;
   @Nullable
   protected ExecutorService _lazyMaterializeExecutor;
 
@@ -289,6 +296,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     _instanceLazyLoadEnabled = instanceDataManagerConfig.isLazyLoadEnabled();
     if (_instanceLazyLoadEnabled) {
+      _lazyMaterializeTimeoutSeconds = Math.max(1, instanceDataManagerConfig.getLazyLoadMaterializeTimeoutSeconds());
       int materializeParallelism = Math.max(1, instanceDataManagerConfig.getLazyLoadMaterializeParallelism());
       ThreadPoolExecutor lazyMaterializeExecutor =
           new ThreadPoolExecutor(materializeParallelism, materializeParallelism, 60, TimeUnit.SECONDS,
@@ -799,11 +807,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public List<SegmentDataManager> acquireSegments(List<String> segmentNames,
       @Nullable List<String> optionalSegmentNames, List<String> missingSegments) {
-    materializeStubbedSegmentsInParallel(segmentNames);
+    // Materialize required stubs in parallel, bounded by the materialize timeout, and trigger fire-and-forget
+    // downloads for stubbed optional segments (best-effort for this query, warm for the next). Segments returned
+    // must not be materialized inline below — they either already had their inline attempt or may still be
+    // downloading in the background after a timeout.
+    Set<String> noInlineMaterializeSegments = materializeStubbedSegments(segmentNames, optionalSegmentNames);
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
     for (String segmentName : segmentNames) {
-      SegmentDataManager segmentDataManager = getOrMaterializeSegmentDataManager(segmentName);
-      if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
+      // Inline materialization here covers the sweeper-eviction race (a segment loaded when this query started but
+      // stubbed now) and a single bounded retry for a pool materialization that failed fast — never a blocking
+      // wait behind a timed-out download.
+      SegmentDataManager segmentDataManager =
+          acquireLoadedSegment(segmentName, !noInlineMaterializeSegments.contains(segmentName));
+      if (segmentDataManager != null) {
         segmentDataManagers.add(segmentDataManager);
       } else {
         missingSegments.add(segmentName);
@@ -811,9 +827,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
     if (optionalSegmentNames != null) {
       for (String segmentName : optionalSegmentNames) {
-        SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+        SegmentDataManager segmentDataManager = acquireLoadedSegment(segmentName, false);
         // Optional segments are not counted to missing segments that are reported back in query exception.
-        if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
+        if (segmentDataManager != null) {
           segmentDataManagers.add(segmentDataManager);
         }
       }
@@ -824,11 +840,56 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Nullable
   @Override
   public SegmentDataManager acquireSegment(String segmentName) {
-    SegmentDataManager segmentDataManager = getOrMaterializeSegmentDataManager(segmentName);
-    if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
-      return segmentDataManager;
-    } else {
-      return null;
+    while (true) {
+      SegmentDataManager segmentDataManager = getOrMaterializeSegmentDataManager(segmentName);
+      if (segmentDataManager == null) {
+        return null;
+      }
+      if (segmentDataManager.increaseReferenceCount()) {
+        return segmentDataManager;
+      }
+      if (!_stubbedSegments.containsKey(segmentName)) {
+        // Genuinely destroyed (dropped/replaced) — matches upstream behavior for a failed acquire.
+        return null;
+      }
+      // Raced with evictSegmentToStub: the sweeper destroyed the manager but the segment is stubbed and fully
+      // servable. Loop to re-materialize. Terminates because a freshly materialized segment is not idle and thus
+      // cannot be immediately re-evicted.
+    }
+  }
+
+  /**
+   * Acquires a segment for a multi-segment query. When {@code materializeInline} is true, a stubbed segment is
+   * materialized on the calling thread; this covers the rare race where the eviction sweeper evicts the segment
+   * around the lookup / reference-count increment (the segment is stubbed and fully servable, so returning null
+   * would surface a false missing-segment error — the re-load is served from the kept local copy when
+   * {@code deleteLocalOnEvict=false}, and is a cold re-download otherwise, the accepted price for never returning
+   * a false miss) and a single bounded retry after a pool materialization failed fast. When false (optional
+   * segments, or required segments whose download may still be running after a timed-out wait), a stub is reported
+   * as null without blocking. Returns null if the segment is stubbed and not materialized here, or genuinely gone.
+   * The loop terminates because a freshly materialized segment is not idle and thus cannot be immediately
+   * re-evicted.
+   */
+  @Nullable
+  private SegmentDataManager acquireLoadedSegment(String segmentName, boolean materializeInline) {
+    while (true) {
+      SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+      if (segmentDataManager == null) {
+        if (!materializeInline || !_stubbedSegments.containsKey(segmentName)) {
+          return null;
+        }
+        segmentDataManager = materializeStubbedSegment(segmentName);
+        if (segmentDataManager == null) {
+          return null;
+        }
+      }
+      if (segmentDataManager.increaseReferenceCount()) {
+        return segmentDataManager;
+      }
+      if (!materializeInline || !_stubbedSegments.containsKey(segmentName)) {
+        return null;
+      }
+      // Eviction race: loop to re-materialize the stub.
     }
   }
 
@@ -898,31 +959,146 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   /**
-   * Materializes all stubbed segments needed by a query in parallel on a bounded pool. Failures are swallowed here —
-   * the per-segment acquire that follows reports them as missing while the stubs stay registered for retry.
+   * Materializes the stubbed segments among the required names in parallel on the bounded pool, waiting at most the
+   * configured materialize timeout, and triggers fire-and-forget materialization of stubbed optional segments —
+   * strictly after the required submissions, so best-effort prefetch never queues ahead of the segments this query
+   * needs. Failures and timeouts are swallowed here: still-stubbed segments are reported missing for this query
+   * while their stubs stay registered (and any in-flight downloads keep running) so subsequent queries succeed.
+   *
+   * @return the segment names the caller must NOT materialize inline: segments whose single inline attempt already
+   *         ran (lone-stub fast path) or whose downloads may still be running (timed-out / interrupted / rejected
+   *         wait). An empty result means every required stub either materialized or failed fast, so one bounded
+   *         inline retry is safe.
    */
-  protected void materializeStubbedSegmentsInParallel(List<String> segmentNames) {
-    if (_lazyMaterializeExecutor == null || _stubbedSegments.isEmpty()) {
-      return;
+  protected Set<String> materializeStubbedSegments(List<String> segmentNames,
+      @Nullable List<String> optionalSegmentNames) {
+    ExecutorService lazyMaterializeExecutor = _lazyMaterializeExecutor;
+    if (lazyMaterializeExecutor == null || _stubbedSegments.isEmpty()) {
+      return Set.of();
     }
-    List<String> stubbedSegmentNames = new ArrayList<>();
+    Set<String> stubbedSegmentNames = new HashSet<>();
     for (String segmentName : segmentNames) {
       if (_stubbedSegments.containsKey(segmentName) && !_segmentDataManagerMap.containsKey(segmentName)) {
         stubbedSegmentNames.add(segmentName);
       }
     }
     if (stubbedSegmentNames.isEmpty()) {
-      return;
+      materializeStubbedSegmentsAsync(optionalSegmentNames);
+      return stubbedSegmentNames;
     }
     if (stubbedSegmentNames.size() == 1) {
-      materializeStubbedSegment(stubbedSegmentNames.get(0));
-      return;
+      // Fast path: a lone cold segment downloads on the query thread (first-query-pays), immune to pool backlog.
+      // The inline attempt already happened, so the caller must not retry.
+      materializeStubbedSegment(stubbedSegmentNames.iterator().next());
+      materializeStubbedSegmentsAsync(optionalSegmentNames);
+      return stubbedSegmentNames;
     }
     _logger.info("Materializing {} stubbed segments in parallel", stubbedSegmentNames.size());
-    CompletableFuture.allOf(stubbedSegmentNames.stream()
-        .map(segmentName -> CompletableFuture.runAsync(() -> materializeStubbedSegment(segmentName),
-            _lazyMaterializeExecutor))
-        .toArray(CompletableFuture[]::new)).join();
+    try {
+      List<CompletableFuture<Void>> futures = new ArrayList<>(stubbedSegmentNames.size());
+      for (String segmentName : stubbedSegmentNames) {
+        futures.add(submitMaterialization(segmentName, lazyMaterializeExecutor));
+      }
+      // Optional prefetch is submitted only after every required download is enqueued.
+      materializeStubbedSegmentsAsync(optionalSegmentNames);
+      CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+          .get(_lazyMaterializeTimeoutSeconds, TimeUnit.SECONDS);
+      // The wait completed: anything still stubbed failed fast, and one bounded inline retry is allowed.
+      return Set.of();
+    } catch (TimeoutException e) {
+      _logger.warn("Timed out after {}s waiting for {} stubbed segments to materialize; segments still stubbed are"
+              + " reported missing for this query while materialization continues in the background",
+          _lazyMaterializeTimeoutSeconds, stubbedSegmentNames.size());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      _logger.warn("Interrupted while waiting for {} stubbed segments to materialize", stubbedSegmentNames.size());
+    } catch (ExecutionException e) {
+      // materializeStubbedSegment handles its own failures (keeps the stub); this guards unexpected errors.
+      _logger.error("Caught exception while materializing stubbed segments", e);
+    } catch (RejectedExecutionException e) {
+      // Executor concurrently shut down (table shutdown): remaining stubs count as missing for this query.
+      _logger.warn("Lazy materialize executor is shut down, skipping materialization of {} stubbed segments",
+          stubbedSegmentNames.size());
+    }
+    return stubbedSegmentNames;
+  }
+
+  /**
+   * Triggers materialization of the stubbed segments among the given names without waiting. Used for optional
+   * segments: best-effort for the current query, warm for the next one.
+   */
+  protected void materializeStubbedSegmentsAsync(@Nullable List<String> segmentNames) {
+    ExecutorService lazyMaterializeExecutor = _lazyMaterializeExecutor;
+    if (segmentNames == null || segmentNames.isEmpty() || lazyMaterializeExecutor == null
+        || _stubbedSegments.isEmpty()) {
+      return;
+    }
+    for (String segmentName : segmentNames) {
+      if (_stubbedSegments.containsKey(segmentName) && !_segmentDataManagerMap.containsKey(segmentName)) {
+        try {
+          submitMaterialization(segmentName, lazyMaterializeExecutor);
+        } catch (RejectedExecutionException e) {
+          // Executor concurrently shut down (table shutdown): nothing to trigger.
+          return;
+        }
+      }
+    }
+  }
+
+  /**
+   * Submits a materialization task for the segment, deduplicating against in-flight submissions: concurrent queries
+   * cold-touching the same segment share one future instead of stacking duplicate tasks that would each pin a pool
+   * worker on the segment lock. The cleanup callback is attached OUTSIDE computeIfAbsent (whose mapping function
+   * must not modify the map) and removes by (key, value) so a completed future can never shadow a newer one.
+   */
+  private CompletableFuture<Void> submitMaterialization(String segmentName, ExecutorService lazyMaterializeExecutor) {
+    CompletableFuture<Void> future = _materializeFutures.computeIfAbsent(segmentName,
+        name -> CompletableFuture.runAsync(() -> materializeStubbedSegment(name), lazyMaterializeExecutor));
+    future.whenComplete((v, t) -> _materializeFutures.remove(segmentName, future));
+    return future;
+  }
+
+  /**
+   * Returns true if the segment may be registered as a lazy stub instead of eagerly loaded. Two conditions guard
+   * this: (1) the deep store must hold an authoritative copy to materialize from later — otherwise the
+   * OFFLINE->ONLINE transition must attempt the load now so a permanent failure surfaces as a Helix ERROR state
+   * instead of being silently deferred to query time; (2) no local index directory may exist — a restarted server
+   * warms up from its valid local copy instead of resetting hot segments to stubs.
+   */
+  protected boolean canRegisterStub(String segmentName, SegmentZKMetadata zkMetadata) {
+    if (!hasAuthoritativeDeepStoreCopy(zkMetadata)) {
+      return false;
+    }
+    TableConfig tableConfig = _cachedTableConfigAndSchema.getLeft();
+    File tierDataDir = getSegmentDataDir(segmentName, zkMetadata.getTier(), tableConfig);
+    if (tierDataDir.exists()) {
+      return false;
+    }
+    // A copy may also sit in the default-tier directory when the segment's target tier changed while the server
+    // was down; the eager path relocates/reuses it, a stub would orphan it and re-download from the deep store.
+    File defaultDataDir = getSegmentDataDir(segmentName);
+    return defaultDataDir.equals(tierDataDir) || !defaultDataDir.exists();
+  }
+
+  /**
+   * Returns true if the segment's ZK metadata points at an authoritative deep-store copy that a stub can later be
+   * materialized from (peer-download segments have no such copy). Shared by stub registration and eviction so the
+   * two predicates can never diverge.
+   */
+  protected static boolean hasAuthoritativeDeepStoreCopy(SegmentZKMetadata zkMetadata) {
+    String downloadUrl = zkMetadata.getDownloadUrl();
+    return downloadUrl != null && !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(downloadUrl);
+  }
+
+  /**
+   * Removes a stale stub entry, if present, when a segment takes the eager loading path (e.g. re-sent ONLINE after
+   * an eviction that kept the local copy), so the stub registry and its gauge never over-report.
+   */
+  protected void unregisterStubbedSegment(String segmentName) {
+    if (_stubbedSegments.remove(segmentName) != null) {
+      _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.LAZY_STUBBED_SEGMENT_COUNT,
+          _stubbedSegments.size());
+    }
   }
 
   /**
@@ -1005,8 +1181,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         return;
       }
       SegmentZKMetadata zkMetadata = fetchZKMetadataNullable(segmentName);
-      if (zkMetadata == null || zkMetadata.getDownloadUrl() == null
-          || CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(zkMetadata.getDownloadUrl())) {
+      if (zkMetadata == null || !hasAuthoritativeDeepStoreCopy(zkMetadata)) {
         // No authoritative deep-store copy to refetch from — never evict such a segment.
         return;
       }

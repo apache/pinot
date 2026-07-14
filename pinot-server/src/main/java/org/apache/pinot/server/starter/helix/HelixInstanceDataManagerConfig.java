@@ -131,6 +131,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final int DEFAULT_LAZY_SWEEP_INTERVAL_SECONDS = 60;
   private static final String LAZY_MATERIALIZE_PARALLELISM = "lazy.materialize.parallelism";
   private static final int DEFAULT_LAZY_MATERIALIZE_PARALLELISM = 4;
+  private static final String LAZY_MATERIALIZE_TIMEOUT_SECONDS = "lazy.materialize.timeout.seconds";
+  private static final long DEFAULT_LAZY_MATERIALIZE_TIMEOUT_SECONDS = 60;
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
@@ -382,5 +384,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public int getLazyLoadMaterializeParallelism() {
     return _serverConfig.getProperty(LAZY_MATERIALIZE_PARALLELISM, DEFAULT_LAZY_MATERIALIZE_PARALLELISM);
+  }
+
+  @Override
+  public long getLazyLoadMaterializeTimeoutSeconds() {
+    return _serverConfig.getProperty(LAZY_MATERIALIZE_TIMEOUT_SECONDS, DEFAULT_LAZY_MATERIALIZE_TIMEOUT_SECONDS);
   }
 }

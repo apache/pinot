@@ -79,7 +79,8 @@ import static org.testng.Assert.assertTrue;
 
 /**
  * Tests for lazy segment loading: stub-on-assignment, materialize-on-first-query, concurrent dedupe, TTL eviction
- * back to stub, in-flight query protection, instance kill switch and non-lazy regression.
+ * back to stub, in-flight query protection, eager load when a local copy exists (restart warm-up), instance kill
+ * switch and non-lazy regression.
  */
 public class OfflineTableDataManagerLazyLoadTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "OfflineTableDataManagerLazyLoadTest");
@@ -275,6 +276,27 @@ public class OfflineTableDataManagerLazyLoadTest {
   }
 
   @Test
+  public void testLocalCopySkipsStubOnAssignment()
+      throws Exception {
+    TableConfig tableConfig = createLazyTableConfig(IDLE_EVICTION_SECONDS, true);
+    SegmentZKMetadata zkMetadata = createRawSegment(SEGMENT_NAME);
+    OfflineTableDataManager tableDataManager =
+        createLazyTableDataManager(tableConfig, createLazyInstanceConfig(true), zkMetadata);
+
+    // Recreate the local index dir to simulate a server restart with a valid local copy: the assignment must load
+    // eagerly from disk instead of resetting the segment to a stub (which would force a deep-store re-download).
+    createSegment(SEGMENT_NAME);
+    tableDataManager.addOnlineSegment(SEGMENT_NAME);
+    assertEquals(tableDataManager.getNumSegments(), 1);
+    verify(tableDataManager, times(1)).addNewOnlineSegment(any(), any());
+
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(SEGMENT_NAME);
+    assertNotNull(segmentDataManager);
+    assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(), NUM_ROWS);
+    tableDataManager.releaseSegment(segmentDataManager);
+  }
+
+  @Test
   public void testInstanceKillSwitchDisablesLazyLoading()
       throws Exception {
     TableConfig tableConfig = createLazyTableConfig(IDLE_EVICTION_SECONDS, true);
@@ -333,6 +355,7 @@ public class OfflineTableDataManagerLazyLoadTest {
     when(config.shouldCheckCRCOnSegmentLoad()).thenReturn(true);
     when(config.isLazyLoadEnabled()).thenReturn(lazyLoadEnabled);
     when(config.getLazyLoadMaterializeParallelism()).thenReturn(4);
+    when(config.getLazyLoadMaterializeTimeoutSeconds()).thenReturn(300L);
     return config;
   }
 
