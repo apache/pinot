@@ -449,6 +449,43 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(pinotResponse.get("exceptions").size(), 0);
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testUnsatisfiablePredicatesOnSameMapKey(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Mutually exclusive predicates on the same map key reduce the filter to false, and the planner collapses the
+    // scan to empty Values while the ITEM (map subscript) projections remain on top. With Calcite 1.40 the
+    // projection over the empty Values leaked into the runtime plan and failed with "Unsupported function: ITEM";
+    // the query should instead return an empty result.
+    String query = "SELECT stringMap['k2'], stringMap['k1'] FROM " + getTableName()
+        + " WHERE (stringMap['k1'] = 'v1' OR stringMap['k1'] = 'v2') AND stringMap['k1'] = 'v3'";
+    JsonNode pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    assertEquals(pinotResponse.get("resultTable").get("rows").size(), 0);
+
+    // Same shape with IN + EQ (as reported originally)
+    query = "SELECT stringMap['k2'], stringMap['k1'] FROM " + getTableName()
+        + " WHERE stringMap['k1'] IN ('v1', 'v2') AND stringMap['k1'] = 'v3'";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    assertEquals(pinotResponse.get("resultTable").get("rows").size(), 0);
+
+    // Same shape with an int map
+    query = "SELECT intMap['k2'], intMap['k1'] FROM " + getTableName()
+        + " WHERE intMap['k1'] IN (1, 2) AND intMap['k1'] = 3";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    assertEquals(pinotResponse.get("resultTable").get("rows").size(), 0);
+
+    // Unsatisfiable filter under a group-by over map subscripts
+    query = "SELECT stringMap['k1'], COUNT(*) FROM " + getTableName()
+        + " WHERE stringMap['k1'] IN ('v1', 'v2') AND stringMap['k1'] = 'v3' GROUP BY stringMap['k1']";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    assertEquals(pinotResponse.get("resultTable").get("rows").size(), 0);
+  }
+
   @Override
   protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
     super.setUseMultiStageQueryEngine(useMultiStageQueryEngine);
