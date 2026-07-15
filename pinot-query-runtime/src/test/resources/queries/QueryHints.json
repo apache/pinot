@@ -183,6 +183,14 @@
       {
         "description": "INTERSECT with is_colocated_by_set_op_keys='false' disables auto-detected pre-partitioning and falls back to a shuffle; results stay correct",
         "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ INTERSECT SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
+      },
+      {
+        "description": "Chained colocated operations stay correct: a colocated JOIN on num feeding a window partitioned by num (the no-shuffle plan shape is asserted in QueryCompilationTest)",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), windowOptions(is_partitioned_by_window_keys='true') */ {tbl1}.num, COUNT(*) OVER (PARTITION BY {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Chained colocated operations stay correct: a UNION ALL of two colocated JOINs on num, set-op hint on the outer wrap and join hint per branch (the no-shuffle plan shape is asserted in QueryCompilationTest)",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ * FROM (SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num UNION ALL SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num)"
       }
     ]
   },

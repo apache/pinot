@@ -1167,6 +1167,84 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return sendNodes;
   }
 
+  /// When colocation hints are applied to a chain of operations that are all keyed on the same (partition) column, the
+  /// whole chain executes without a data shuffle: every hash-distributed exchange in the plan is pre-partitioned. This
+  /// covers combinations of colocated joins, window functions and set operations (see {@link #colocatedChains}). The
+  /// join key is {@code a.col2}/{@code b.col1} (each table's partition column), so the join is colocated, and the
+  /// window and set op keep that same key.
+  @Test(dataProvider = "colocatedChains")
+  public void testColocatedOperationsChainWithoutShuffle(String description, String query) {
+    List<MailboxSendNode> hashSends = findHashSendNodes(_queryEnvironment.planQuery(query));
+    assertFalse(hashSends.isEmpty(), "Expected at least one hash exchange in the chain: " + description);
+    for (MailboxSendNode sendNode : hashSends) {
+      assertTrue(sendNode.isPrePartitioned(),
+          "Colocated chain '" + description + "' should have no shuffle, but a hash exchange was not pre-partitioned");
+    }
+  }
+
+  @DataProvider(name = "colocatedChains")
+  private Object[][] colocatedChains() {
+    // joinOptions + windowOptions together (attach to the join and window in a single SELECT).
+    String joinAndWindowHint = "/*+ joinOptions(is_colocated_by_join_keys='true'), "
+        + "windowOptions(is_partitioned_by_window_keys='true') */";
+    String joinHint = "/*+ joinOptions(is_colocated_by_join_keys='true') */";
+    String windowHint = "/*+ windowOptions(is_partitioned_by_window_keys='true') */";
+    String setOpHint = "/*+ setOpOptions(is_colocated_by_set_op_keys='true') */";
+    String join = "a JOIN b ON a.col2 = b.col1";
+    return new Object[][]{
+        {"join -> window",
+            "SELECT " + joinAndWindowHint + " a.col2, SUM(a.col3) OVER (PARTITION BY a.col2) FROM " + join},
+        {"set op of colocated joins", "SELECT " + setOpHint + " * FROM (SELECT " + joinHint + " a.col2 FROM " + join
+            + " UNION ALL SELECT " + joinHint + " a.col2 FROM " + join + ")"},
+        {"set op of colocated windows", "SELECT " + setOpHint + " * FROM (SELECT " + windowHint
+            + " col2, SUM(col3) OVER (PARTITION BY col2) FROM a UNION ALL SELECT " + windowHint
+            + " col2, SUM(col3) OVER (PARTITION BY col2) FROM a)"},
+        {"join -> window -> set op", "SELECT " + setOpHint + " * FROM (SELECT " + joinAndWindowHint
+            + " a.col2, SUM(a.col3) OVER (PARTITION BY a.col2) FROM " + join + " UNION ALL SELECT " + joinAndWindowHint
+            + " a.col2, SUM(a.col3) OVER (PARTITION BY a.col2) FROM " + join + ")"},
+    };
+  }
+
+  /// Baseline for {@link #testColocatedOperationsChainWithoutShuffle}: without the colocation hints the same
+  /// join -> window chain still shuffles (at least one hash exchange is not pre-partitioned), proving the hints are
+  /// what eliminate the shuffles.
+  @Test
+  public void testChainWithoutColocationHintsStillShuffles() {
+    String query = "SELECT a.col2, SUM(a.col3) OVER (PARTITION BY a.col2) FROM a JOIN b ON a.col2 = b.col1";
+    List<MailboxSendNode> hashSends = findHashSendNodes(_queryEnvironment.planQuery(query));
+    assertTrue(hashSends.stream().anyMatch(sendNode -> !sendNode.isPrePartitioned()),
+        "Without the colocation hints, the join -> window chain should contain at least one shuffled hash exchange");
+  }
+
+  /// Set-op-specific baseline for the "set op of colocated joins" chain: with
+  /// {@code is_colocated_by_set_op_keys='false'} the set-op exchange is forced back to a shuffle (while the per-branch
+  /// joins stay colocated), proving the set-op hint is what keeps the set-op level of the chain colocated.
+  @Test
+  public void testSetOpChainWithoutSetOpHintShuffles() {
+    String join = "a JOIN b ON a.col2 = b.col1";
+    String joinHint = "/*+ joinOptions(is_colocated_by_join_keys='true') */";
+    String query = "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ * FROM (SELECT " + joinHint
+        + " a.col2 FROM " + join + " UNION ALL SELECT " + joinHint + " a.col2 FROM " + join + ")";
+    List<MailboxSendNode> hashSends = findHashSendNodes(_queryEnvironment.planQuery(query));
+    assertTrue(hashSends.stream().anyMatch(sendNode -> !sendNode.isPrePartitioned()),
+        "With is_colocated_by_set_op_keys='false', the set-op level of the chain should shuffle");
+  }
+
+  /// Collects the {@link MailboxSendNode} at the root of every hash-distributed stage in the plan (i.e. every
+  /// inter-stage hash exchange). A pre-partitioned send is a direct, no-shuffle exchange; a non-pre-partitioned one is
+  /// a full shuffle.
+  private List<MailboxSendNode> findHashSendNodes(DispatchableSubPlan dispatchableSubPlan) {
+    List<MailboxSendNode> sendNodes = new ArrayList<>();
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      PlanNode root = fragment.getPlanFragment().getFragmentRoot();
+      if (root instanceof MailboxSendNode
+          && ((MailboxSendNode) root).getDistributionType() == RelDistribution.Type.HASH_DISTRIBUTED) {
+        sendNodes.add((MailboxSendNode) root);
+      }
+    }
+    return sendNodes;
+  }
+
   /**
    * Finds the DispatchablePlanFragment containing a JoinNode (non-leaf, non-root stage).
    */
