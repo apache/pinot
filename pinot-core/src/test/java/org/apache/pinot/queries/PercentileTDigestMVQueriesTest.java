@@ -26,6 +26,7 @@ import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggrega
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -54,15 +55,18 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
  */
 public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest {
   private static final int MAX_NUM_MULTI_VALUES = 10;
+  private long _numValues;
 
   @Override
   protected void buildSegment()
       throws Exception {
+    _numValues = 0L;
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
 
       int numMultiValues = RANDOM.nextInt(MAX_NUM_MULTI_VALUES) + 1;
+      _numValues += numMultiValues;
       Double[] values = new Double[numMultiValues];
       TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       TDigest tDigestCustom = TDigest.createMergingDigest(CUSTOM_COMPRESSION);
@@ -93,8 +97,11 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
     schema.addField(new MetricFieldSpec(TDIGEST_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new MetricFieldSpec(TDIGEST_CUSTOM_COMPRESSION_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new DimensionFieldSpec(GROUP_BY_COLUMN, FieldSpec.DataType.STRING, true));
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of(GROUP_BY_COLUMN), null,
+        List.of(STAR_TREE_TDIGEST_COLUMN), null, 1);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(List.of(TDIGEST_COLUMN, TDIGEST_CUSTOM_COMPRESSION_COLUMN)).build();
+        .setNoDictionaryColumns(List.of(TDIGEST_COLUMN, TDIGEST_CUSTOM_COMPRESSION_COLUMN))
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
@@ -106,6 +113,11 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
       driver.init(config, recordReader);
       driver.build();
     }
+  }
+
+  @Override
+  protected long getExpectedTotalDigestSize() {
+    return _numValues;
   }
 
   @Override
