@@ -1,0 +1,12 @@
+{
+  "schemaName": "userFactEvents",
+  "dimensionFieldSpecs": [
+    {"dataType": "STRING", "name": "userUUID"},
+    {"dataType": "STRING", "name": "deviceOS"},
+    {"dataType": "STRING", "name": "cityName"}
+  ],
+  "metricFieldSpecs": [
+    {"dataType": "DOUBLE", "name": "tripAmount"},
+    {"dataType": "DOUBLE", "name": "distanceMeters"}
+  ]
+}
