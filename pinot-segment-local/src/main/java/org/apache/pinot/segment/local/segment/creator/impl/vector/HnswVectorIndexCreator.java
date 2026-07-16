@@ -65,20 +65,33 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
     _vectorSimilarityFunction = VectorIndexUtils.toSimilarityFunction(vectorIndexConfig.getVectorDistanceFunction());
     _storeInSegmentFile = vectorIndexConfig.isStoreInSegmentFile();
     _segmentIndexDir = segmentIndexDir;
+    // Use local variables so that, if IndexWriter construction fails after FSDirectory is already
+    // open, we can close the directory before rethrowing — preventing a file-descriptor leak.
+    Directory indexDirectory = null;
+    IndexWriter indexWriter;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       File indexFile = new File(segmentIndexDir, _vectorColumn
           + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
       _hnswIndexDir = indexFile;
-      _indexDirectory = FSDirectory.open(indexFile.toPath());
+      indexDirectory = FSDirectory.open(indexFile.toPath());
       LOGGER.info("Creating HNSW index for column: {} at path: {} with {} for segment: {}", column,
           indexFile.getAbsolutePath(), vectorIndexConfig.getProperties(), segmentIndexDir.getAbsolutePath());
-      _indexWriter = new IndexWriter(_indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
+      indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
     } catch (Exception e) {
+      if (indexDirectory != null) {
+        try {
+          indexDirectory.close();
+        } catch (IOException closeEx) {
+          e.addSuppressed(closeEx);
+        }
+      }
       throw new RuntimeException(
           "Caught exception while instantiating the HnswVectorIndexCreator for column: " + column, e);
     }
+    _indexDirectory = indexDirectory;
+    _indexWriter = indexWriter;
   }
 
   @Override
