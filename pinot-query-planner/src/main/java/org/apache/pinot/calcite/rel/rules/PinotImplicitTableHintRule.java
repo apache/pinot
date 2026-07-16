@@ -19,6 +19,7 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -75,7 +76,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     @Nullable
     RelHint explicitHint = getTableOptionHint(tableScan);
     TableOptions tableOptions = calculateTableOptions(explicitHint, implicitTableOptions, tableScan);
-    RelNode newRel = withNewTableOptions(tableScan, tableOptions);
+    RelNode newRel = withNewTableOptions(tableScan, tableOptions, explicitHint);
     call.transformTo(newRel);
   }
 
@@ -102,23 +103,31 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   }
 
   /**
-   * Returns a new node which is a copy of the given table scan with the new table options hint.
+   * Returns a new node which is a copy of the given table scan with a rebuilt table options hint: options from the
+   * explicit hint that are not modeled by {@link TableOptions} (e.g. is_replicated) are carried over, and the merged
+   * (inferred + explicitly overridden) partition options overwrite the explicitly supplied ones.
    */
-  private static RelNode withNewTableOptions(TableScan tableScan, TableOptions tableOptions) {
+  private static RelNode withNewTableOptions(TableScan tableScan, TableOptions tableOptions,
+      @Nullable RelHint explicitHint) {
     ArrayList<RelHint> newHints = new ArrayList<>(tableScan.getHints());
 
     newHints.removeIf(relHint -> relHint.hintName.equals(PinotHintOptions.TABLE_HINT_OPTIONS));
 
-    RelHint.Builder builder = RelHint.builder(PinotHintOptions.TABLE_HINT_OPTIONS)
-        .hintOption(PinotHintOptions.TableHintOptions.PARTITION_KEY, tableOptions.getPartitionKey())
-        .hintOption(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION, tableOptions.getPartitionFunction())
-        .hintOption(PinotHintOptions.TableHintOptions.PARTITION_SIZE, String.valueOf(tableOptions.getPartitionSize()));
-
+    // Seed with the explicitly supplied options so that the ones not rebuilt from the given table options (e.g.
+    // is_replicated) are carried over, then overwrite with the merged (inferred + explicitly overridden) partition
+    // options.
+    Map<String, String> kvOptions =
+        explicitHint != null ? new LinkedHashMap<>(explicitHint.kvOptions) : new LinkedHashMap<>();
+    kvOptions.put(PinotHintOptions.TableHintOptions.PARTITION_KEY, tableOptions.getPartitionKey());
+    kvOptions.put(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION, tableOptions.getPartitionFunction());
+    kvOptions.put(PinotHintOptions.TableHintOptions.PARTITION_SIZE, String.valueOf(tableOptions.getPartitionSize()));
     if (tableOptions.getPartitionParallelism() != null) {
-      builder.hintOption(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM,
+      kvOptions.put(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM,
           String.valueOf(tableOptions.getPartitionParallelism()));
     }
 
+    RelHint.Builder builder = RelHint.builder(PinotHintOptions.TABLE_HINT_OPTIONS);
+    kvOptions.forEach(builder::hintOption);
     newHints.add(builder.build());
 
     return tableScan.withHints(newHints);
@@ -152,7 +161,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    */
   private static ImmutableTableOptions overridePartitionKey(ImmutableTableOptions base, TableScan tableScan,
       Map<String, String> kvOptions) {
-    String partitionKey = kvOptions.get(kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY));
+    String partitionKey = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY);
     if (partitionKey == null || partitionKey.equals(base.getPartitionKey())) {
       return base;
     }
@@ -165,7 +174,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    */
   private static ImmutableTableOptions overridePartitionFunction(ImmutableTableOptions base,
       TableScan tableScan, Map<String, String> kvOptions) {
-    String partitionFunction = kvOptions.get(kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION));
+    String partitionFunction = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION);
     if (partitionFunction == null || partitionFunction.equals(base.getPartitionFunction())) {
       return base;
     }

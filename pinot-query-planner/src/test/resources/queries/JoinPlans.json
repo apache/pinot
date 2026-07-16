@@ -835,6 +835,38 @@
         ]
       },
       {
+        "description": "Simple local replicated join with partition hint inference enabled (is_replicated should be preserved when the table options hint is rebuilt with the inferred partition options)",
+        "sql": "SET inferPartitionHint=true; EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ a.col1, b.col2 FROM a JOIN b /*+ tableOptions(is_replicated = 'true') */ ON a.col1 = b.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Local replicated join with partition hint inference enabled (is_replicated should be preserved even when the hint also carries an explicit partition parallelism, and planning should succeed)",
+        "sql": "SET inferPartitionHint=true; EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ a.col1, b.col2 FROM a JOIN b /*+ tableOptions(is_replicated = 'true', partition_parallelism = '2') */ ON a.col1 = b.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Broadcast join with filter on both left and right table",
         "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ a.col1, b.col2 FROM a JOIN b /*+ tableOptions(is_replicated = 'true') */ ON a.col1 = b.col1 WHERE a.col2 = 'foo' AND b.col2 = 'bar'",
         "output": [
