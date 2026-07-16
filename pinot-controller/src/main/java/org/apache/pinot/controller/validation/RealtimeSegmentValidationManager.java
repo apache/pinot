@@ -77,7 +77,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker,
       ResourceUtilizationManager resourceUtilizationManager) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
-            config.getRealtimeSegmentValidationManagerInitialDelaySeconds(),
+        config.getRealtimeSegmentValidationManagerInitialDelaySeconds(),
         config.getRealtimeSegmentValidationCronExpression(),
         pinotHelixResourceManager, leadControllerManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
@@ -174,7 +174,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       if (!isTablePaused || !pauseStatus.getReasonCode()
           .equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
         _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType,
-            PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization limit exceeded.");
+            PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+            "Resource utilization limit exceeded. Check ResourceUtilizationManager log on controllers for detail "
+                + "reasons");
       }
       return false; // if resource utilization check failed, then skip subsequent checks
     } else if ((isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.PASS) && isTablePaused
