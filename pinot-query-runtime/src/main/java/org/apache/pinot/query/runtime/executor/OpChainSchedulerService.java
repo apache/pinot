@@ -207,8 +207,11 @@ public class OpChainSchedulerService {
         statsRef.set(stats);
         if (result.isError()) {
           ErrorMseBlock errorBlock = (ErrorMseBlock) result;
+          String serverId = errorBlock.getServerId() != null ? errorBlock.getServerId() : "unknown";
           throw errorBlock.getMainErrorCode().asException("Error block "
-              + "from " + errorBlock.getServerId()
+              + "from stage " + errorBlock.getStageId()
+              + " worker " + errorBlock.getWorkerId()
+              + " on " + serverId
               + ". Msg: " + errorBlock.getErrorMessages()
               + ". Stats: " + stats);
         } else {

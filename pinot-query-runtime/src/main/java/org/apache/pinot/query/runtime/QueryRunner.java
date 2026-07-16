@@ -368,8 +368,8 @@ public class QueryRunner {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     QueryExecutionContext queryContext = QueryThreadContext.get().getExecutionContext();
     long requestId = queryContext.getRequestId();
-    LOGGER.error("Error executing stage for request: {}, stage: {}, sending error block: {}", requestId,
-        stageMetadata.getStageId(), errorBlock);
+    // The stage/worker/server are already rendered by errorBlock.toString(); only requestId is added here.
+    LOGGER.error("Error executing stage for request: {}, sending error block: {}", requestId, errorBlock);
     try {
       OpChainExecutionContext executionContext =
           OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
