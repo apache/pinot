@@ -1853,7 +1853,7 @@ public class ForwardIndexHandlerTest {
       // the original values without corruption.
       ColumnMetadata afterMetadata = new SegmentMetadataImpl(segmentDir).getColumnMetadataFor(column);
       assertTrue(afterMetadata.hasDictionary());
-      assertFalse(afterMetadata.isSorted());
+      assertTrue(afterMetadata.isSorted());
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
           SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
         assertTrue(reader.hasIndexFor(column, StandardIndexes.forward()));

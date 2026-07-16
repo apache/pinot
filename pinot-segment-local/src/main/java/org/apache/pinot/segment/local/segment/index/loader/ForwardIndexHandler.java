@@ -900,28 +900,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     ColumnMetadata existingColMetadata = segmentMetadata.getColumnMetadataFor(column);
     FieldSpec fieldSpec = existingColMetadata.getFieldSpec();
-    String fwdIndexFileExtension;
-    if (fieldSpec.isSingleValueField()) {
-      if (existingColMetadata.isSorted()) {
-        fwdIndexFileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
-      } else {
-        fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
-      }
-    } else {
-      fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
-    }
-    File fwdIndexFile = new File(indexDir, column + fwdIndexFileExtension);
-
-    if (!inProgress.exists()) {
-      // Marker file does not exist, which means last run ended normally.
-      // Create a marker file.
-      FileUtils.touch(inProgress);
-    } else {
-      // Marker file exists, which means last run was interrupted.
-      // Remove forward index and dictionary files if they exist.
-      FileUtils.deleteQuietly(fwdIndexFile);
-      FileUtils.deleteQuietly(dictionaryFile);
-    }
+    File fwdIndexFile;
 
     AbstractColumnStatisticsCollector statsCollector;
     SegmentDictionaryCreator dictionaryCreator;
@@ -944,6 +923,29 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         statsCollector.seal();
       }
+
+      String fwdIndexFileExtension;
+      if (fieldSpec.isSingleValueField()) {
+        if (statsCollector.isSorted()) {
+          fwdIndexFileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+        } else {
+          fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+        }
+      } else {
+        fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
+      }
+      fwdIndexFile = new File(indexDir, column + fwdIndexFileExtension);
+
+      if (!inProgress.exists()) {
+        // Marker file does not exist, which means last run ended normally.
+        // Create a marker file.
+        FileUtils.touch(inProgress);
+      } else {
+        // Marker file exists, which means last run was interrupted.
+        // Remove forward index and dictionary files if they exist.
+        FileUtils.deleteQuietly(fwdIndexFile);
+        FileUtils.deleteQuietly(dictionaryFile);
+      }
       DictionaryIndexConfig dictConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.dictionary());
       boolean optimizeDictionaryType = _tableConfig.getIndexingConfig().isOptimizeDictionaryType();
       boolean useVarLength = dictConf.isUseVarLengthDictionary() || DictionaryIndexType.shouldUseVarLengthDictionary(
@@ -955,19 +957,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
           segmentName, column);
       ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-      // When it's false negative on a column's sortedness in metadata, `fwdIndexFileExtension` would be determined
-      // unsorted (.sv.unsorted.fwd), but the creator would write to .sv.sorted.fwd, because the creator factory
-      // constructs the forward index creator by statsCollector. This false negative could happen before
-      // apache/pinot#17965
-      //
-      // It should never be the other way round, fail loudly here
-      Preconditions.checkState(!existingColMetadata.isSorted() || statsCollector.isSorted(),
-          "Column %s metadata reports isSorted=true but its data is not sorted; refusing to build a sorted forward "
-              + "index for segment %s", column, segmentName);
       IndexCreationContext context =
-          new IndexCreationContext.Builder(indexDir, _tableConfig, statsCollector, true)
-              .withSorted(existingColMetadata.isSorted())
-              .build();
+          new IndexCreationContext.Builder(indexDir, _tableConfig, statsCollector, true).build();
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         forwardIndexRewriteHelper(column, existingColMetadata, reader, creator, numDocs, dictionaryCreator, null);
       }
@@ -984,6 +975,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     LOGGER.info("Created forwardIndex. Updating metadata properties for segment={} and column={}", segmentName, column);
     Map<String, String> metadataProperties = new HashMap<>();
+    metadataProperties.put(getKeyFor(column, IS_SORTED), String.valueOf(statsCollector.isSorted()));
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(true));
     metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), EncodingType.DICTIONARY.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
