@@ -19,9 +19,11 @@
 package org.apache.pinot.query.runtime.operator.window;
 
 import java.util.List;
+import java.util.Objects;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 
@@ -65,5 +67,134 @@ public abstract class WindowFunction extends AggregationUtils.Accumulator {
 
   protected Object extractValueFromRow(Object[] row) {
     return _inputRef == -1 ? _literal : (row == null ? null : row[_inputRef]);
+  }
+
+  /**
+   * Returns whether peer-group information is required to apply the given EXCLUDE clause. {@code CURRENT_ROW} only
+   * touches the current row, so callers can skip the O(n) peer-boundary computation when the frame doesn't otherwise
+   * depend on peer bounds (i.e. ROWS frames).
+   */
+  protected static boolean needsPeerBoundaries(WindowNode.WindowExclusion exclude) {
+    return exclude == WindowNode.WindowExclusion.GROUP || exclude == WindowNode.WindowExclusion.TIES;
+  }
+
+  /**
+   * Fills {@code peerStart} and {@code peerEnd} with the inclusive bounds of each row's peer group based on the
+   * ORDER BY keys. Rows are peers iff they share the same ORDER BY values. With no ORDER BY clause every row is a peer
+   * of every other row in the partition.
+   */
+  protected void computePeerBoundaries(List<Object[]> rows, int[] peerStart, int[] peerEnd) {
+    int numRows = rows.size();
+    if (_orderKeys.length == 0) {
+      for (int i = 0; i < numRows; i++) {
+        peerStart[i] = 0;
+        peerEnd[i] = numRows - 1;
+      }
+      return;
+    }
+    int groupStart = 0;
+    for (int i = 1; i <= numRows; i++) {
+      if (i == numRows || !samePeerKey(rows.get(i - 1), rows.get(i))) {
+        int peerLast = i - 1;
+        for (int j = groupStart; j < i; j++) {
+          peerStart[j] = groupStart;
+          peerEnd[j] = peerLast;
+        }
+        groupStart = i;
+      }
+    }
+  }
+
+  private boolean samePeerKey(Object[] a, Object[] b) {
+    for (int k : _orderKeys) {
+      if (!Objects.equals(a[k], b[k])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Returns the first index in {@code [fs, fe]} that is not excluded by the SQL EXCLUDE clause for the current row
+   * {@code i} whose peer group is {@code [pStart, pEnd]}. Returns {@code -1} if no such index exists.
+   */
+  protected static int firstNonExcluded(int fs, int fe, int i, int pStart, int pEnd,
+      WindowNode.WindowExclusion exclude) {
+    if (fs > fe) {
+      return -1;
+    }
+    switch (exclude) {
+      case CURRENT_ROW:
+        return fs == i ? (fs + 1 > fe ? -1 : fs + 1) : fs;
+      case GROUP:
+        if (fs < pStart || fs > pEnd) {
+          return fs;
+        }
+        return pEnd + 1 > fe ? -1 : pEnd + 1;
+      case TIES:
+        if (fs == i || fs < pStart || fs > pEnd) {
+          return fs;
+        }
+        if (i >= fs && i <= fe) {
+          return i;
+        }
+        return pEnd + 1 > fe ? -1 : pEnd + 1;
+      default:
+        return fs;
+    }
+  }
+
+  /**
+   * Returns the inclusive lower index of the base frame for the row at index {@code i} given its peer group
+   * {@code [pStart, pEnd]} and the total {@code numRows} in the partition.
+   */
+  protected int frameStartForRow(int i, int pStart, int numRows) {
+    if (_windowFrame.isRowType()) {
+      int lb = _windowFrame.getLowerBound();
+      return lb == Integer.MIN_VALUE ? 0 : Math.max(0, lb + i);
+    }
+    return _windowFrame.isUnboundedPreceding() ? 0 : pStart;
+  }
+
+  /**
+   * Returns the inclusive upper index of the base frame for the row at index {@code i} given its peer group
+   * {@code [pStart, pEnd]} and the total {@code numRows} in the partition.
+   */
+  protected int frameEndForRow(int i, int pEnd, int numRows) {
+    if (_windowFrame.isRowType()) {
+      int ub = _windowFrame.getUpperBound();
+      return ub == Integer.MAX_VALUE ? numRows - 1 : Math.min(numRows - 1, ub + i);
+    }
+    return _windowFrame.isUnboundedFollowing() ? numRows - 1 : pEnd;
+  }
+
+  /**
+   * Returns the last index in {@code [fs, fe]} that is not excluded by the SQL EXCLUDE clause for the current row
+   * {@code i} whose peer group is {@code [pStart, pEnd]}. Returns {@code -1} if no such index exists.
+   */
+  protected static int lastNonExcluded(int fs, int fe, int i, int pStart, int pEnd,
+      WindowNode.WindowExclusion exclude) {
+    if (fs > fe) {
+      return -1;
+    }
+    switch (exclude) {
+      case CURRENT_ROW:
+        return fe == i ? (fe - 1 < fs ? -1 : fe - 1) : fe;
+      case GROUP:
+        if (fe < pStart || fe > pEnd) {
+          return fe;
+        }
+        return pStart - 1 < fs ? -1 : pStart - 1;
+      case TIES:
+        if (fe == i || fe < pStart || fe > pEnd) {
+          return fe;
+        }
+        if (i >= fs && i <= fe) {
+          return i;
+        }
+        return pStart - 1 < fs ? -1 : pStart - 1;
+      default:
+        return fe;
+    }
   }
 }

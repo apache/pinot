@@ -261,6 +261,7 @@ public class PlanNodeSerializer {
           .setWindowFrameType(convertWindowFrameType(node.getWindowFrameType()))
           .setLowerBound(node.getLowerBound())
           .setUpperBound(node.getUpperBound())
+          .setExclude(convertWindowExclusion(node.getExclude()))
           .addAllConstants(convertLiterals(node.getConstants()))
           .build();
       builder.setWindowNode(windowNode);
@@ -477,6 +478,21 @@ public class PlanNodeSerializer {
           return Plan.WindowFrameType.RANGE;
         default:
           throw new IllegalStateException("Unsupported WindowFrameType: " + windowFrameType);
+      }
+    }
+
+    private static Plan.WindowExclusion convertWindowExclusion(WindowNode.WindowExclusion exclude) {
+      switch (exclude) {
+        case NO_OTHERS:
+          return Plan.WindowExclusion.EXCLUDE_NO_OTHERS;
+        case CURRENT_ROW:
+          return Plan.WindowExclusion.EXCLUDE_CURRENT_ROW;
+        case GROUP:
+          return Plan.WindowExclusion.EXCLUDE_GROUP;
+        case TIES:
+          return Plan.WindowExclusion.EXCLUDE_TIES;
+        default:
+          throw new IllegalStateException("Unsupported WindowExclusion: " + exclude);
       }
     }
   }

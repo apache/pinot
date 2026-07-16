@@ -753,4 +753,55 @@ public class WindowValueAggregatorTest {
     assertTrue(result instanceof Long);
     assertEquals(result, largeVal);
   }
+
+  // ========================
+  // SortedMultisetMinMaxWindowValueAggregator (used for MIN/MAX under EXCLUDE)
+  // ========================
+
+  @Test
+  public void testSortedMultisetMin() {
+    WindowValueAggregator<Object> agg = new SortedMultisetMinMaxWindowValueAggregator(true);
+    assertNull(agg.getCurrentAggregatedValue());
+    agg.addValue(5);
+    agg.addValue(2);
+    agg.addValue(2);
+    agg.addValue(8);
+    assertEquals(agg.getCurrentAggregatedValue(), 2);
+    // Removing one occurrence of the duplicate min leaves the other
+    agg.removeValue(2);
+    assertEquals(agg.getCurrentAggregatedValue(), 2);
+    agg.removeValue(2);
+    assertEquals(agg.getCurrentAggregatedValue(), 5);
+    // Out-of-order removal still works (we remove the max next)
+    agg.removeValue(8);
+    assertEquals(agg.getCurrentAggregatedValue(), 5);
+    agg.removeValue(5);
+    assertNull(agg.getCurrentAggregatedValue());
+  }
+
+  @Test
+  public void testSortedMultisetMaxIgnoresNullsAndUnknownRemovals() {
+    WindowValueAggregator<Object> agg = new SortedMultisetMinMaxWindowValueAggregator(false);
+    agg.addValue(null);
+    agg.addValue(7);
+    agg.addValue(3);
+    assertEquals(agg.getCurrentAggregatedValue(), 7);
+    // Removing a value never added is a no-op
+    agg.removeValue(99);
+    agg.removeValue(null);
+    assertEquals(agg.getCurrentAggregatedValue(), 7);
+    agg.clear();
+    assertNull(agg.getCurrentAggregatedValue());
+  }
+
+  @Test
+  public void testSortedMultisetWithBigDecimal() {
+    WindowValueAggregator<Object> agg = new SortedMultisetMinMaxWindowValueAggregator(true);
+    agg.addValue(new BigDecimal("3.14"));
+    agg.addValue(new BigDecimal("2.71"));
+    agg.addValue(new BigDecimal("1.41"));
+    assertEquals(agg.getCurrentAggregatedValue(), new BigDecimal("1.41"));
+    agg.removeValue(new BigDecimal("1.41"));
+    assertEquals(agg.getCurrentAggregatedValue(), new BigDecimal("2.71"));
+  }
 }
