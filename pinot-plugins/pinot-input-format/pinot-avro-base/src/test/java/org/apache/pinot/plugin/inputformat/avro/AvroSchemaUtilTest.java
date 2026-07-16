@@ -41,8 +41,6 @@ public class AvroSchemaUtilTest {
     assertPrimitiveType(DataType.STRING, "string");
     assertPrimitiveType(DataType.JSON, "string");
     assertPrimitiveType(DataType.BYTES, "bytes");
-    // UUID is a logical type stored as BYTES; it must keep mapping to Avro bytes (not fall through to default).
-    assertPrimitiveType(DataType.UUID, "bytes");
     // Logical types must not collapse to their stored INT/LONG type.
     assertPrimitiveType(DataType.BOOLEAN, "boolean");
 
@@ -58,6 +56,18 @@ public class AvroSchemaUtilTest {
   public void testToAvroSchemaJsonObjectRejectsUnsupportedType() {
     assertThrows(UnsupportedOperationException.class,
         () -> AvroSchemaUtil.toAvroSchemaJsonObject(new DimensionFieldSpec("col", DataType.BIG_DECIMAL, true)));
+  }
+
+  /// A UUID column is represented faithfully as an Avro string annotated with logicalType "uuid".
+  /// `DataGenerator#buildSpec` always marks the recommender schema FieldSpec single-value, so this emits a scalar
+  /// union like every sibling type.
+  @Test
+  public void testToAvroSchemaJsonObjectForUuid() {
+    JsonNode type = typeOf(DataType.UUID);
+    assertEquals(type.get(0).asText(), "null");
+    JsonNode uuidBranch = type.get(1);
+    assertEquals(uuidBranch.get("type").asText(), "string");
+    assertEquals(uuidBranch.get("logicalType").asText(), "uuid");
   }
 
   private static void assertPrimitiveType(DataType dataType, String expectedAvroType) {

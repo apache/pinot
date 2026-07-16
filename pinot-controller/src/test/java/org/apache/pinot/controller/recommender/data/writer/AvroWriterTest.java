@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
@@ -111,6 +112,55 @@ public class AvroWriterTest {
         assertTrue(record.get("boolCol") instanceof Boolean, "boolCol should be a Boolean");
         assertTrue(record.get("tsCol") instanceof Long, "tsCol should be a Long");
         assertTrue(record.get("intCol") instanceof Integer, "intCol should be an Integer");
+        count++;
+      }
+    }
+    assertEquals(count, totalDocs);
+  }
+
+  /// The recommender must support UUID columns end to end: the generated schema declares a logicalType "uuid" string
+  /// and the values round-trip as canonical UUID strings. Before UUID generation was wired up, writing a UUID column
+  /// threw because the number generator rejected the type.
+  @Test
+  public void testUuidRoundTrip()
+      throws Exception {
+    List<String> columns = List.of("uuidCol");
+    Map<String, DataType> dataTypes = new HashMap<>();
+    dataTypes.put("uuidCol", DataType.UUID);
+    Map<String, FieldType> fieldTypes = new HashMap<>();
+    Map<String, Integer> cardinality = new HashMap<>();
+    for (String column : columns) {
+      fieldTypes.put(column, FieldType.DIMENSION);
+      cardinality.put(column, 5);
+    }
+
+    DataGeneratorSpec spec =
+        new DataGeneratorSpec(columns, cardinality, new HashMap<String, IntegerRange>(), new HashMap<>(),
+            new HashMap<>(), new HashMap<>(), dataTypes, fieldTypes, new HashMap<String, TimeUnit>(), new HashMap<>(),
+            new HashMap<>());
+    DataGenerator generator = new DataGenerator();
+    generator.init(spec);
+
+    int totalDocs = 10;
+    AvroWriterSpec writerSpec = new AvroWriterSpec(generator, _baseDir, totalDocs, 1, 0);
+    AvroWriter writer = new AvroWriter();
+    writer.init(writerSpec);
+    writer.write();
+
+    Schema avroSchema = AvroWriter.getAvroSchema(writerSpec.getSchema());
+    Schema uuidBranch = nonNullBranch(avroSchema, "uuidCol");
+    assertEquals(uuidBranch.getType(), Schema.Type.STRING);
+    assertEquals(uuidBranch.getProp("logicalType"), "uuid");
+
+    File avroFile = new File(_baseDir, "part-0.avro");
+    assertTrue(avroFile.exists());
+    int count = 0;
+    try (DataFileReader<GenericRecord> reader = new DataFileReader<>(avroFile, new GenericDatumReader<>())) {
+      for (GenericRecord record : reader) {
+        Object value = record.get("uuidCol");
+        assertTrue(value instanceof CharSequence, "uuidCol should read back as a string");
+        String uuid = value.toString();
+        assertEquals(UUID.fromString(uuid).toString(), uuid, "value must be a canonical UUID string");
         count++;
       }
     }

@@ -80,8 +80,9 @@ public class AvroSchemaUtil {
   /// (see `AvroWriter`). Each field is emitted as a nullable union `["null", <type>]`.
   ///
   /// The switch is driven by the original (logical) [DataType] rather than the stored type, so logical types are
-  /// represented faithfully instead of collapsing to their physical storage type: BOOLEAN maps to Avro `boolean`
-  /// and TIMESTAMP to a `timestamp-millis` long, not a plain `int`/`long`.
+  /// represented faithfully instead of collapsing to their physical storage type: BOOLEAN maps to Avro `boolean`,
+  /// TIMESTAMP to a `timestamp-millis` long (not a plain `int`/`long`), and UUID to a `uuid`-logical-type string
+  /// (not raw `bytes`).
   ///
   /// This intentionally differs from the segment-processing converters `AvroUtils.getAvroSchemaFromPinotSchema` and
   /// `SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema`, which switch on the stored type because they
@@ -121,9 +122,18 @@ public class AvroSchemaUtil {
       case JSON:
         jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
         return jsonSchema;
-      case BYTES:
       case UUID:
-        // UUID is a logical type stored as fixed-width 16-byte BYTES.
+        // UUID is a logical type; represent it faithfully as an Avro string annotated with logicalType "uuid" rather
+        // than collapsing to raw bytes, so generated sample data round-trips as canonical UUID strings.
+        ObjectNode uuidType = JsonUtils.newObjectNode();
+        uuidType.put("type", "string");
+        uuidType.put("logicalType", "uuid");
+        ArrayNode uuidUnion = JsonUtils.newArrayNode();
+        uuidUnion.add("null");
+        uuidUnion.add(uuidType);
+        jsonSchema.set("type", uuidUnion);
+        return jsonSchema;
+      case BYTES:
         jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
         return jsonSchema;
       default:
