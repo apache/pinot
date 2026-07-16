@@ -121,6 +121,7 @@ public interface IndexCreationContext extends ColumnShape {
     private int _maxNumberOfMultiValues;
     private int _maxRowLengthInBytes;
     private boolean _hasDictionary;
+    private boolean _sorted;
 
     // Build-time toggles.
     private boolean _onHeap;
@@ -167,6 +168,7 @@ public interface IndexCreationContext extends ColumnShape {
       _maxNumberOfMultiValues = columnShape.getMaxNumberOfMultiValues();
       _maxRowLengthInBytes = columnShape.getMaxRowLengthInBytes();
       _hasDictionary = hasDictionary;
+      _sorted = columnShape.isSorted();
       _continueOnError = continueOnError;
     }
 
@@ -209,6 +211,11 @@ public interface IndexCreationContext extends ColumnShape {
 
     public Builder withDictionary(boolean hasDictionary) {
       _hasDictionary = hasDictionary;
+      return this;
+    }
+
+    public Builder withSorted(boolean sorted) {
+      _sorted = sorted;
       return this;
     }
 
@@ -279,6 +286,7 @@ public interface IndexCreationContext extends ColumnShape {
     private final int _maxNumberOfMultiValues;
     private final int _maxRowLengthInBytes;
     private final boolean _hasDictionary;
+    private final boolean _sorted;
 
     // Build-time toggles.
     private final boolean _onHeap;
@@ -307,6 +315,7 @@ public interface IndexCreationContext extends ColumnShape {
       _maxNumberOfMultiValues = builder._maxNumberOfMultiValues;
       _maxRowLengthInBytes = builder._maxRowLengthInBytes;
       _hasDictionary = builder._hasDictionary;
+      _sorted = builder._sorted;
       _onHeap = builder._onHeap;
       _optimizeDictionary = builder._optimizedDictionary;
       _textCommitOnClose = builder._textCommitOnClose;
@@ -358,9 +367,11 @@ public interface IndexCreationContext extends ColumnShape {
       return _columnShape.getCardinality();
     }
 
+    // When the segment metadata reports false negative on sortedness, we want to override to create index with
+    // unsorted even though _columnShape say sorted
     @Override
     public boolean isSorted() {
-      return _columnShape.isSorted();
+      return _sorted;
     }
 
     @Override

@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -75,8 +76,11 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.IS_SORTED;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
 import static org.testng.Assert.*;
 
 
@@ -1762,6 +1766,119 @@ public class ForwardIndexHandlerTest {
     validateForwardIndex(DIM_RAW_SORTED_INTEGER, CompressionCodec.SNAPPY, true);
     validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(DIM_RAW_SORTED_INTEGER),
         metadata, false);
+  }
+
+  @DataProvider(name = "coincidentallySortedRawTypes")
+  public Object[][] coincidentallySortedRawTypes() {
+    // Cover a fixed-width type and both variable-length types (STRING/BYTES take a different raw writer path).
+    return new Object[][]{
+        {DataType.LONG, 0L},
+        {DataType.STRING, "sameValue"},
+        {DataType.BYTES, new byte[]{0x1, 0x2, 0x3}},
+    };
+  }
+
+  /// Regression test for enabling a dictionary on a raw column whose persisted metadata says {@code isSorted=false}
+  /// but whose values happen to be monotonic (here, all identical). This is the shape produced by a realtime segment
+  /// committed while the column was raw: raw columns are persisted with {@code isSorted=false} regardless of the data.
+  /// On reload the fresh stats collector reads the identical values and reports the column as sorted, so before the
+  /// fix the forward-index creator emitted a `.sv.sorted.fwd` index while {@link ForwardIndexHandler} derived the temp
+  /// file name from the metadata ({@code .sv.unsorted.fwd}) and never updated {@code isSorted}, throwing
+  /// {@link java.io.FileNotFoundException} and leaving a format/metadata mismatch for the next read. The fix forces
+  /// the creator to honor the persisted {@code isSorted} flag, keeping the written format, the file name, and the
+  /// metadata consistent.
+  @Test(dataProvider = "coincidentallySortedRawTypes")
+  public void testEnableDictionaryForRawColumnWithCoincidentallySortedValues(DataType dataType, Object value)
+      throws Exception {
+    File tempDir = new File(FileUtils.getTempDirectory(), "ForwardIndexHandlerCoincidentalSortTest");
+    FileUtils.deleteQuietly(tempDir);
+    try {
+      String tableName = "coincidentalSortTable";
+      String column = "coincidentallySortedColumn";
+      String segmentName = "coincidentalSortSegment";
+      int numDocs = 48;
+
+      Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
+          .addSingleValueDimension(column, dataType)
+          .build();
+
+      // Build the segment with the column as raw (no dictionary).
+      TableConfig rawTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
+          .setNoDictionaryColumns(List.of(column))
+          .setFieldConfigList(
+              List.of(new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.PASS_THROUGH,
+                  null)))
+          .build();
+
+      // All-identical values -> trivially monotonic -> the stats collector treats the column as sorted.
+      List<GenericRow> rows = new ArrayList<>();
+      for (int i = 0; i < numDocs; i++) {
+        GenericRow row = new GenericRow();
+        row.putValue(column, value);
+        rows.add(row);
+      }
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(rawTableConfig, schema);
+      config.setOutDir(tempDir.getPath());
+      config.setSegmentName(segmentName);
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, new GenericRowRecordReader(rows));
+      driver.build();
+      File segmentDir = new File(tempDir, segmentName);
+
+      // Offline generation records isSorted from the data, so it would set isSorted=true for these all-equal values.
+      // Overwrite it to false to reproduce the realtime raw-segment condition.
+      PropertiesConfiguration metadataConfig = SegmentMetadataUtils.getPropertiesConfiguration(segmentDir);
+      metadataConfig.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(false));
+      SegmentMetadataUtils.savePropertiesConfiguration(metadataConfig, segmentDir);
+
+      ColumnMetadata beforeMetadata = new SegmentMetadataImpl(segmentDir).getColumnMetadataFor(column);
+      assertFalse(beforeMetadata.isSorted());
+      assertFalse(beforeMetadata.hasDictionary());
+
+      // Enable a dictionary on the column and run the forward-index handler (the reload path).
+      TableConfig dictTableConfig =
+          new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setNoDictionaryColumns(List.of()).build();
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(dictTableConfig, schema);
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
+          SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+        ForwardIndexHandler handler = new ForwardIndexHandler(segmentDirectory, indexLoadingConfig);
+        assertEquals(handler.computeOperations(writer),
+            Map.of(column, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY)));
+        // Before the fix this threw FileNotFoundException for the missing .sv.unsorted.fwd file.
+        handler.updateIndices(writer);
+        handler.postUpdateIndicesCleanup(writer);
+      }
+
+      // The column now has a dictionary; isSorted must stay false and the unsorted dict forward index must read back
+      // the original values without corruption.
+      ColumnMetadata afterMetadata = new SegmentMetadataImpl(segmentDir).getColumnMetadataFor(column);
+      assertTrue(afterMetadata.hasDictionary());
+      assertFalse(afterMetadata.isSorted());
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
+          SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+        assertTrue(reader.hasIndexFor(column, StandardIndexes.forward()));
+        assertTrue(reader.hasIndexFor(column, StandardIndexes.dictionary()));
+        IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+        FieldIndexConfigs fieldIndexConfigs = createFieldIndexConfigsFromMetadata(afterMetadata);
+        try (ForwardIndexReader<?> fwdReader =
+                readerFactory.createIndexReader(reader, fieldIndexConfigs, afterMetadata);
+            Dictionary dictionary = DictionaryIndexType.read(reader, afterMetadata)) {
+          PinotSegmentColumnReader columnReader =
+              new PinotSegmentColumnReader(column, fwdReader, dictionary, null,
+                  afterMetadata.getMaxNumberOfMultiValues());
+          for (int i = 0; i < numDocs; i++) {
+            Object actual = columnReader.getValue(i);
+            if (dataType == DataType.BYTES) {
+              assertEquals((byte[]) actual, (byte[]) value);
+            } else {
+              assertEquals(actual, value);
+            }
+          }
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
   }
 
   @Test

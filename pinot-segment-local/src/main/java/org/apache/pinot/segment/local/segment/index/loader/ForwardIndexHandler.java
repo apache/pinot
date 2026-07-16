@@ -955,8 +955,19 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
           segmentName, column);
       ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      // When it's false negative on a column's sortedness in metadata, `fwdIndexFileExtension` would be determined
+      // unsorted (.sv.unsorted.fwd), but the creator would write to .sv.sorted.fwd, because the creator factory
+      // constructs the forward index creator by statsCollector. This false negative could happen before
+      // apache/pinot#17965
+      //
+      // It should never be the other way round, fail loudly here
+      Preconditions.checkState(!existingColMetadata.isSorted() || statsCollector.isSorted(),
+          "Column %s metadata reports isSorted=true but its data is not sorted; refusing to build a sorted forward "
+              + "index for segment %s", column, segmentName);
       IndexCreationContext context =
-          new IndexCreationContext.Builder(indexDir, _tableConfig, statsCollector, true).build();
+          new IndexCreationContext.Builder(indexDir, _tableConfig, statsCollector, true)
+              .withSorted(existingColMetadata.isSorted())
+              .build();
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         forwardIndexRewriteHelper(column, existingColMetadata, reader, creator, numDocs, dictionaryCreator, null);
       }
