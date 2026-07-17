@@ -301,6 +301,28 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
   }
 
   @Test
+  public void testGetPrimaryKeyMapSizeInBytes() {
+    ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.build());
+    assertEquals(upsertMetadataManager.getPrimaryKeyMapSizeInBytes(), 0);
+
+    Map<Object, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation> recordLocationMap =
+        upsertMetadataManager._primaryKeyToRecordLocationMap;
+    IndexSegment mockSegment = mock(IndexSegment.class);
+    recordLocationMap.put(new PrimaryKey(new Object[]{"short"}),
+        new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation(mockSegment, 0, 0, 1));
+    long shortKeyBytes = upsertMetadataManager.getPrimaryKeyMapSizeInBytes();
+    assertTrue(shortKeyBytes > 0);
+
+    recordLocationMap.clear();
+    recordLocationMap.put(new PrimaryKey(new Object[]{"a".repeat(1000)}),
+        new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation(mockSegment, 0, 0, 1));
+    long longKeyBytes = upsertMetadataManager.getPrimaryKeyMapSizeInBytes();
+    assertTrue(longKeyBytes > shortKeyBytes);
+  }
+
+  @Test
   public void testAddReplaceRemoveSegment()
       throws IOException {
     verifyAddReplaceRemoveSegment(HashFunction.NONE);

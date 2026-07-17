@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
@@ -84,6 +85,15 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   @Override
   protected long getNumPrimaryKeys() {
     return _primaryKeyToRecordLocationMap.size();
+  }
+
+  // Approximates ConcurrentHashMap.Node + RecordLocation object overhead per map entry.
+  private static final long PER_ENTRY_OVERHEAD_BYTES =
+      RamUsageEstimator.HASHTABLE_RAM_BYTES_PER_ENTRY + RamUsageEstimator.shallowSizeOfInstance(RecordLocation.class);
+
+  @Override
+  protected long getPrimaryKeyMapSizeInBytes() {
+    return UpsertUtils.estimatePrimaryKeyMapSizeInBytes(_primaryKeyToRecordLocationMap, PER_ENTRY_OVERHEAD_BYTES);
   }
 
   @Override
@@ -261,7 +271,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     }
     // Update metrics
     long numPrimaryKeys = getNumPrimaryKeys();
-    updatePrimaryKeyGauge(numPrimaryKeys);
+    updatePrimaryKeyGauge(numPrimaryKeys, getPrimaryKeyMapSizeInBytes());
     _logger.info("Finished removing segment: {} in {}ms, current primary key count: {}", segmentName,
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
@@ -544,7 +554,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
           }
         });
 
-    updatePrimaryKeyGauge();
+    // Per-record hot path: keep the update count-only. The byte-size gauge is refreshed at segment-lifecycle
+    // cadence instead (see BasePartitionUpsertMetadataManager#updatePrimaryKeyGauge()).
+    updatePrimaryKeyGauge(getNumPrimaryKeys());
     return !isOutOfOrderRecord.get();
   }
 

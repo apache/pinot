@@ -19,16 +19,21 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -133,6 +138,62 @@ public class UpsertUtilsTest {
     when(liveQueryable.isEmpty()).thenReturn(true);
     segment.enableUpsert(manager, mock(ThreadSafeMutableRoaringBitmap.class), liveQueryable);
     assertFalse(segment.hasNoQueryableDocs());
+  }
+
+  // -------- estimatePrimaryKeyMapSizeInBytes --------
+
+  @Test
+  public void testEstimatePrimaryKeyMapSizeInBytesEmptyMap() {
+    assertEquals(UpsertUtils.estimatePrimaryKeyMapSizeInBytes(new ConcurrentHashMap<>(), 100), 0);
+  }
+
+  @Test
+  public void testEstimatePrimaryKeyMapSizeInBytesScalesWithPrimaryKeyContentSize() {
+    Map<Object, Object> shortKeyMap = new ConcurrentHashMap<>();
+    Map<Object, Object> longKeyMap = new ConcurrentHashMap<>();
+    String longValuePrefix = "x".repeat(500);
+    for (int i = 0; i < 100; i++) {
+      shortKeyMap.put(new PrimaryKey(new Object[]{"k" + i}), new Object());
+      longKeyMap.put(new PrimaryKey(new Object[]{longValuePrefix + i}), new Object());
+    }
+    long shortKeyMapBytes = UpsertUtils.estimatePrimaryKeyMapSizeInBytes(shortKeyMap, 0);
+    long longKeyMapBytes = UpsertUtils.estimatePrimaryKeyMapSizeInBytes(longKeyMap, 0);
+    assertTrue(longKeyMapBytes > shortKeyMapBytes);
+  }
+
+  @Test
+  public void testEstimatePrimaryKeyMapSizeInBytesWithHashedByteArrayKeys() {
+    // Hashed primary keys (e.g. MD5) are always the same fixed length regardless of PK content.
+    Map<Object, Object> map = new ConcurrentHashMap<>();
+    for (int i = 0; i < 50; i++) {
+      byte[] bytes = new byte[16];
+      bytes[0] = (byte) i;
+      map.put(new ByteArray(bytes), new Object());
+    }
+    assertEquals(UpsertUtils.estimatePrimaryKeyMapSizeInBytes(map, 0), 50L * 16);
+  }
+
+  @Test
+  public void testEstimatePrimaryKeyMapSizeInBytesIncludesPerEntryOverhead() {
+    Map<Object, Object> map = new ConcurrentHashMap<>();
+    map.put(new ByteArray(new byte[16]), new Object());
+    assertEquals(UpsertUtils.estimatePrimaryKeyMapSizeInBytes(map, 32), 16 + 32);
+  }
+
+  @Test
+  public void testEstimatePrimaryKeyMapSizeInBytesExtrapolatesBeyondSampleSize() {
+    // With more keys than the sampling cap, only a bounded sample is scanned and the result is
+    // extrapolated over all keys. Uniform-length ByteArray keys make the result exact regardless
+    // of which keys happen to be sampled.
+    int numKeys = 2500;
+    Map<Object, Object> map = new ConcurrentHashMap<>();
+    for (int i = 0; i < numKeys; i++) {
+      byte[] bytes = new byte[16];
+      bytes[0] = (byte) i;
+      bytes[1] = (byte) (i >> 8);
+      map.put(new ByteArray(bytes), new Object());
+    }
+    assertEquals(UpsertUtils.estimatePrimaryKeyMapSizeInBytes(map, 8), (long) numKeys * (16 + 8));
   }
 
   /// Returns a minimal {@link ImmutableSegmentImpl} usable for testing the upsert-aware methods.

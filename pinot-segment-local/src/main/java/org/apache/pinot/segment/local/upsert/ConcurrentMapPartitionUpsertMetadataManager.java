@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
@@ -65,6 +66,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @Override
   protected long getNumPrimaryKeys() {
     return _primaryKeyToRecordLocationMap.size();
+  }
+
+  // Approximates ConcurrentHashMap.Node + RecordLocation object overhead per map entry.
+  private static final long PER_ENTRY_OVERHEAD_BYTES =
+      RamUsageEstimator.HASHTABLE_RAM_BYTES_PER_ENTRY + RamUsageEstimator.shallowSizeOfInstance(RecordLocation.class);
+
+  @Override
+  protected long getPrimaryKeyMapSizeInBytes() {
+    return UpsertUtils.estimatePrimaryKeyMapSizeInBytes(_primaryKeyToRecordLocationMap, PER_ENTRY_OVERHEAD_BYTES);
   }
 
   @Override
@@ -412,7 +422,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           }
         });
 
-    updatePrimaryKeyGauge();
+    // Per-record hot path: keep the update count-only. The byte-size gauge is refreshed at segment-lifecycle
+    // cadence instead (see BasePartitionUpsertMetadataManager#updatePrimaryKeyGauge()).
+    updatePrimaryKeyGauge(getNumPrimaryKeys());
     return !isOutOfOrderRecord.get();
   }
 

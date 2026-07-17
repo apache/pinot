@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
@@ -80,11 +81,14 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
@@ -192,6 +196,41 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     // Metadata manager should be closed now
     TestUtils.waitForCondition(aVoid -> closed.get(), 10_000L, "Failed to close the metadata manager");
+  }
+
+  @Test
+  public void testGetPrimaryKeyMapSizeInBytes() {
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+    assertEquals(upsertMetadataManager.getPrimaryKeyMapSizeInBytes(), 0);
+
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    IndexSegment mockSegment = mock(IndexSegment.class);
+    recordLocationMap.put(new PrimaryKey(new Object[]{"short"}), new RecordLocation(mockSegment, 0, 0));
+    long shortKeyBytes = upsertMetadataManager.getPrimaryKeyMapSizeInBytes();
+    assertTrue(shortKeyBytes > 0);
+
+    recordLocationMap.clear();
+    recordLocationMap.put(new PrimaryKey(new Object[]{"a".repeat(1000)}), new RecordLocation(mockSegment, 0, 0));
+    long longKeyBytes = upsertMetadataManager.getPrimaryKeyMapSizeInBytes();
+    assertTrue(longKeyBytes > shortKeyBytes);
+  }
+
+  @Test
+  public void testAddRecordUpdatesCountGaugeOnly() {
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    reset(serverMetrics);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+
+    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment segment = mockMutableSegment(1, validDocIds, null);
+    upsertMetadataManager.addRecord(segment, new RecordInfo(makePrimaryKey(1), 0, 10, false));
+
+    // Per-record hot path only refreshes the count gauge, not the byte-size gauge
+    verify(serverMetrics).setValueOfPartitionGauge(REALTIME_TABLE_NAME, 0, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT, 1);
+    verify(serverMetrics, never()).setValueOfPartitionGauge(eq(REALTIME_TABLE_NAME), eq(0),
+        eq(ServerGauge.UPSERT_PRIMARY_KEY_MAP_SIZE_IN_BYTES), anyLong());
   }
 
   @Test

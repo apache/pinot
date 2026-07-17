@@ -38,6 +38,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 @SuppressWarnings("rawtypes")
 public class UpsertUtils {
+  // ponytail: bounded sample instead of a full map walk, so size estimation stays O(1) regardless of table size.
+  private static final int PRIMARY_KEY_SAMPLE_SIZE = 1000;
+
   private UpsertUtils() {
   }
 
@@ -84,6 +87,46 @@ public class UpsertUtils {
     if (currentQueryableDocIds != null) {
       currentQueryableDocIds.remove(docId);
     }
+  }
+
+  /**
+   * Estimates the total size in bytes of a primary-key-to-record-location map. Samples up to
+   * {@link #PRIMARY_KEY_SAMPLE_SIZE} keys to compute the average key content size, then extrapolates over all keys,
+   * so the cost stays bounded regardless of map size. Handles both unhashed ({@link PrimaryKey}) and hashed
+   * ({@link ByteArray}) keys.
+   *
+   * @param perEntryOverheadBytes estimated fixed per-entry overhead (e.g. map node + record location object)
+   */
+  public static long estimatePrimaryKeyMapSizeInBytes(Map<Object, ?> primaryKeyToRecordLocationMap,
+      long perEntryOverheadBytes) {
+    int numKeys = primaryKeyToRecordLocationMap.size();
+    if (numKeys == 0) {
+      return 0;
+    }
+    long sampledKeyBytes = 0;
+    int numSampled = 0;
+    for (Object key : primaryKeyToRecordLocationMap.keySet()) {
+      sampledKeyBytes += getPrimaryKeyContentSizeInBytes(key);
+      if (++numSampled >= PRIMARY_KEY_SAMPLE_SIZE) {
+        break;
+      }
+    }
+    if (numSampled == 0) {
+      // ponytail: map drained concurrently between size() and keySet() iteration; nothing sampled.
+      return 0;
+    }
+    double avgKeyBytes = (double) sampledKeyBytes / numSampled;
+    return (long) (numKeys * (avgKeyBytes + perEntryOverheadBytes));
+  }
+
+  private static int getPrimaryKeyContentSizeInBytes(Object key) {
+    if (key instanceof PrimaryKey) {
+      return ((PrimaryKey) key).asBytes().length;
+    }
+    if (key instanceof ByteArray) {
+      return ((ByteArray) key).length();
+    }
+    return 0;
   }
 
   /**
