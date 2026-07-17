@@ -835,7 +835,7 @@
         ]
       },
       {
-        "description": "Simple local replicated join with partition hint inference enabled (is_replicated should be preserved when the table options hint is rebuilt with the inferred partition options)",
+        "description": "Simple local replicated join with partition hint inference enabled (inference is skipped for tables hinted as replicated, leaving the explicit tableOptions hint untouched)",
         "sql": "SET inferPartitionHint=true; EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ a.col1, b.col2 FROM a JOIN b /*+ tableOptions(is_replicated = 'true') */ ON a.col1 = b.col1",
         "output": [
           "Execution Plan",
@@ -851,7 +851,7 @@
         ]
       },
       {
-        "description": "Local replicated join with partition hint inference enabled (is_replicated should be preserved even when the hint also carries an explicit partition parallelism, and planning should succeed)",
+        "description": "Local replicated join with partition hint inference enabled (inference is skipped for tables hinted as replicated even when the hint also carries an explicit partition parallelism, and planning should succeed)",
         "sql": "SET inferPartitionHint=true; EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ a.col1, b.col2 FROM a JOIN b /*+ tableOptions(is_replicated = 'true', partition_parallelism = '2') */ ON a.col1 = b.col1",
         "output": [
           "Execution Plan",

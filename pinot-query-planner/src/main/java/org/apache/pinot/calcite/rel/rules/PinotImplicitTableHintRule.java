@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -58,8 +57,11 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   public boolean matches(RelOptRuleCall call) {
     TableScan tableScan = call.rel(0);
 
-    // we don't want to apply this rule if the explicit hint is complete
-    return !isHintComplete(getTableOptionHint(tableScan));
+    // we don't want to apply this rule if the explicit hint is complete, or if the table is hinted as replicated
+    // across all workers (each worker scans all the segments, so partition options are irrelevant)
+    @Nullable
+    RelHint explicitHint = getTableOptionHint(tableScan);
+    return !isHintComplete(explicitHint) && !isReplicated(explicitHint);
   }
 
   @Override
@@ -76,7 +78,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     @Nullable
     RelHint explicitHint = getTableOptionHint(tableScan);
     TableOptions tableOptions = calculateTableOptions(explicitHint, implicitTableOptions, tableScan);
-    RelNode newRel = withNewTableOptions(tableScan, tableOptions, explicitHint);
+    RelNode newRel = withNewTableOptions(tableScan, tableOptions);
     call.transformTo(newRel);
   }
 
@@ -95,6 +97,16 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   }
 
   /**
+   * Determines whether the provided hint declares the table as replicated across all workers.
+   */
+  private static boolean isReplicated(@Nullable RelHint hint) {
+    if (hint == null || hint.kvOptions == null) {
+      return false;
+    }
+    return Boolean.parseBoolean(hint.kvOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED));
+  }
+
+  /**
    * Get the table option hint from the table scan, if any.
    */
   @Nullable
@@ -103,31 +115,28 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   }
 
   /**
-   * Returns a new node which is a copy of the given table scan with a rebuilt table options hint: options from the
-   * explicit hint that are not modeled by {@link TableOptions} (e.g. is_replicated) are carried over, and the merged
-   * (inferred + explicitly overridden) partition options overwrite the explicitly supplied ones.
+   * Returns a new node which is a copy of the given table scan with the new table options hint.
    */
-  private static RelNode withNewTableOptions(TableScan tableScan, TableOptions tableOptions,
-      @Nullable RelHint explicitHint) {
+  private static RelNode withNewTableOptions(TableScan tableScan, TableOptions tableOptions) {
     ArrayList<RelHint> newHints = new ArrayList<>(tableScan.getHints());
 
     newHints.removeIf(relHint -> relHint.hintName.equals(PinotHintOptions.TABLE_HINT_OPTIONS));
 
-    // Seed with the explicitly supplied options so that the ones not rebuilt from the given table options (e.g.
-    // is_replicated) are carried over, then overwrite with the merged (inferred + explicitly overridden) partition
-    // options.
-    Map<String, String> kvOptions =
-        explicitHint != null ? new LinkedHashMap<>(explicitHint.kvOptions) : new LinkedHashMap<>();
-    kvOptions.put(PinotHintOptions.TableHintOptions.PARTITION_KEY, tableOptions.getPartitionKey());
-    kvOptions.put(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION, tableOptions.getPartitionFunction());
-    kvOptions.put(PinotHintOptions.TableHintOptions.PARTITION_SIZE, String.valueOf(tableOptions.getPartitionSize()));
+    RelHint.Builder builder = RelHint.builder(PinotHintOptions.TABLE_HINT_OPTIONS)
+        .hintOption(PinotHintOptions.TableHintOptions.PARTITION_KEY, tableOptions.getPartitionKey())
+        .hintOption(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION, tableOptions.getPartitionFunction())
+        .hintOption(PinotHintOptions.TableHintOptions.PARTITION_SIZE, String.valueOf(tableOptions.getPartitionSize()));
+
     if (tableOptions.getPartitionParallelism() != null) {
-      kvOptions.put(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM,
+      builder.hintOption(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM,
           String.valueOf(tableOptions.getPartitionParallelism()));
     }
 
-    RelHint.Builder builder = RelHint.builder(PinotHintOptions.TABLE_HINT_OPTIONS);
-    kvOptions.forEach(builder::hintOption);
+    if (tableOptions.isReplicated() != null) {
+      builder.hintOption(PinotHintOptions.TableHintOptions.IS_REPLICATED,
+          String.valueOf(tableOptions.isReplicated()));
+    }
+
     newHints.add(builder.build());
 
     return tableScan.withHints(newHints);
@@ -152,8 +161,23 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     newTableOptions = overridePartitionFunction(newTableOptions, tableScan, kvOptions);
     newTableOptions = overridePartitionSize(newTableOptions, tableScan, kvOptions);
     newTableOptions = overridePartitionParallelism(newTableOptions, tableScan, kvOptions);
+    newTableOptions = carryOverIsReplicated(newTableOptions, kvOptions);
 
     return newTableOptions;
+  }
+
+  /**
+   * Returns a table options hint with the replicated flag carried over from the explicit hint, if any. Note that this
+   * rule does not match when the table is hinted as replicated across all workers, so this only ever carries over an
+   * explicit {@code is_replicated='false'}.
+   */
+  private static ImmutableTableOptions carryOverIsReplicated(ImmutableTableOptions base,
+      Map<String, String> kvOptions) {
+    String isReplicated = kvOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED);
+    if (isReplicated == null) {
+      return base;
+    }
+    return base.withIsReplicated(Boolean.parseBoolean(isReplicated));
   }
 
   /**
