@@ -31,6 +31,14 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
   protected final AggregationResultHolder[] _aggregationResultHolders;
   protected final Object[] _preAggregatedResults;
 
+  /**
+   * Creates an executor that skips functions with a pre-aggregated result. For each index {@code i} where
+   * {@code preAggregatedResults[i]} is non-null, the function is not aggregated over the scanned blocks and the
+   * pre-aggregated value is emitted directly in the results. A {@code null} array disables this behavior and all
+   * functions are computed by scanning.
+   *
+   * @param preAggregatedResults per-function pre-aggregated results, or {@code null} if none are pre-aggregated
+   */
   public DefaultAggregationExecutor(AggregationFunction[] aggregationFunctions, Object[] preAggregatedResults) {
     _preAggregatedResults = preAggregatedResults;
     _aggregationFunctions = aggregationFunctions;

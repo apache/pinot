@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
@@ -44,7 +45,9 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -61,8 +64,13 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -168,6 +176,42 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(_upsertIndexSegment));
     Operator<?> upsertOperator = PLAN_MAKER.makeSegmentPlanNode(segmentContext, queryContext).run();
     assertTrue(upsertOperatorClass.isInstance(upsertOperator));
+  }
+
+  /**
+   * Verifies the partial metadata-based aggregation path. When a query mixes a metadata-eligible function (MAX) with a
+   * non-eligible one (SUM), the plan uses an {@link AggregationOperator} that pre-aggregates the eligible function from
+   * metadata while scanning the rest. Before this feature, a non-scan based operator was used only when <em>all</em>
+   * functions were metadata eligible; a mixed query would have scanned every function.
+   * <p>
+   * To prove the eligible function is actually served from metadata (and not scanned), the column dictionary is
+   * overridden to report a bogus max value that does not exist in the data. The query result equals the bogus value
+   * only if the metadata path is taken; a scan would return the true max.
+   */
+  @Test
+  public void testPartialMetadataBasedAggregationServesEligibleFromMetadata() {
+    int bogusMax = 999_999_999;
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("select max(daysSinceEpoch), sum(column1) from testTable");
+
+    // Override only daysSinceEpoch's dictionary max value; everything else delegates to the real segment.
+    DataSource realDataSource = _indexSegment.getDataSource("daysSinceEpoch", queryContext.getSchema());
+    Dictionary dictionaryWithBogusMax = mock(Dictionary.class, delegatesTo(realDataSource.getDictionary()));
+    doReturn(bogusMax).when(dictionaryWithBogusMax).getMaxVal();
+    DataSource dataSourceWithBogusMax = mock(DataSource.class, delegatesTo(realDataSource));
+    doReturn(dictionaryWithBogusMax).when(dataSourceWithBogusMax).getDictionary();
+    IndexSegment segment = mock(IndexSegment.class, delegatesTo(_indexSegment));
+    doReturn(dataSourceWithBogusMax).when(segment).getDataSource(eq("daysSinceEpoch"), any());
+
+    Operator<?> operator = PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(segment), queryContext).run();
+    // A mixed query must use the (partial) AggregationOperator, not the fully non-scan based operator.
+    assertTrue(operator instanceof AggregationOperator);
+
+    AggregationResultsBlock resultsBlock = (AggregationResultsBlock) operator.nextBlock();
+    List<Object> results = resultsBlock.getResults();
+    assertNotNull(results);
+    // MAX is served from the (overridden) dictionary metadata, so the bogus value proves the metadata path was used.
+    assertEquals(((Number) results.get(0)).doubleValue(), (double) bogusMax);
   }
 
   @DataProvider(name = "testPlanMakerDataProvider")

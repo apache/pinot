@@ -521,20 +521,35 @@ public class AggregationFunctionUtils {
   }
 
   /**
-   * Gets the aggregation result without scanning the segment.
-   * This is used for non-scan based aggregation operator.
-   * @param aggregationFunction
-   * @param dataSource
-   * @param numTotalDocs
-   * @return
+   * Resolves the result of the given aggregation function from the column dictionary or metadata, without scanning the
+   * segment. This is used by the non-scan based aggregation operator and by the partial metadata-based path in
+   * {@link org.apache.pinot.core.plan.AggregationPlanNode} to pre-aggregate metadata-eligible functions.
+   * <p>
+   * {@code COUNT} is resolved directly from {@code numTotalDocs}. Every other supported function reads its result from
+   * the column dictionary or metadata and therefore requires a non-null {@code dataSource}. Callers must only invoke
+   * this method for functions that are metadata/dictionary eligible (as determined by the fitness check in
+   * {@link org.apache.pinot.core.plan.AggregationPlanNode}); unsupported function types cause an
+   * {@link IllegalStateException}.
+   *
+   * @param aggregationFunction aggregation function to resolve
+   * @param dataSource data source of the function argument; may be {@code null} only for {@code COUNT}
+   * @param numTotalDocs total number of documents in the segment, used to resolve {@code COUNT}
+   * @param explainPlanName explain-plan name used for periodic query termination checks
+   * @return the pre-aggregated result for the function
+   * @throws IllegalStateException if the function type cannot be resolved from dictionary or metadata
    */
-  public static Object getAggregationResult(AggregationFunction aggregationFunction, DataSource dataSource,
-      int numTotalDocs, String explainName) {
+  public static Object getAggregationResult(AggregationFunction aggregationFunction, @Nullable DataSource dataSource,
+      int numTotalDocs, String explainPlanName) {
+    AggregationFunctionType functionType = aggregationFunction.getType();
+    if (functionType == AggregationFunctionType.COUNT) {
+      return (long) numTotalDocs;
+    }
+    // Every other supported function resolves its result from the column dictionary or metadata, all of which require
+    // a non-null data source.
+    Objects.requireNonNull(dataSource, "DataSource is null for aggregation function: " + functionType);
+
     Object result;
-    switch (aggregationFunction.getType()) {
-      case COUNT:
-        result = (long) numTotalDocs;
-        break;
+    switch (functionType) {
       case MIN:
       case MINMV:
         result = getMinValueNumeric(dataSource);
@@ -567,7 +582,7 @@ public class AggregationFunctionUtils {
       case DISTINCTCOUNTMV:
       case DISTINCTSUMMV:
       case DISTINCTAVGMV:
-        result = getDistinctValueSet(Objects.requireNonNull(dataSource.getDictionary()), explainName);
+        result = getDistinctValueSet(Objects.requireNonNull(dataSource.getDictionary()), explainPlanName);
         break;
       case DISTINCTCOUNTOFFHEAP:
         result = ((DistinctCountOffHeapAggregationFunction) aggregationFunction).extractAggregationResult(
@@ -576,51 +591,51 @@ public class AggregationFunctionUtils {
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTHLLMV:
         result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
-            (DistinctCountHLLAggregationFunction) aggregationFunction, explainName);
+            (DistinctCountHLLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTRAWHLL:
       case DISTINCTCOUNTRAWHLLMV:
         result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
             ((DistinctCountRawHLLAggregationFunction) aggregationFunction).getDistinctCountHLLAggregationFunction(),
-            explainName);
+            explainPlanName);
         break;
       case DISTINCTCOUNTHLLPLUS:
       case DISTINCTCOUNTHLLPLUSMV:
         result = getDistinctCountHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
-            (DistinctCountHLLPlusAggregationFunction) aggregationFunction, explainName);
+            (DistinctCountHLLPlusAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTRAWHLLPLUS:
       case DISTINCTCOUNTRAWHLLPLUSMV:
         result = getDistinctCountHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
             ((DistinctCountRawHLLPlusAggregationFunction) aggregationFunction)
-                .getDistinctCountHLLPlusAggregationFunction(), explainName);
+                .getDistinctCountHLLPlusAggregationFunction(), explainPlanName);
         break;
       case SEGMENTPARTITIONEDDISTINCTCOUNT:
         result = (long) Objects.requireNonNull(dataSource.getDictionary()).length();
         break;
       case DISTINCTCOUNTSMARTHLL:
         result = getDistinctCountSmartHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
-            (DistinctCountSmartHLLAggregationFunction) aggregationFunction, explainName);
+            (DistinctCountSmartHLLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTSMARTHLLPLUS:
         result = getDistinctCountSmartHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
-            (DistinctCountSmartHLLPlusAggregationFunction) aggregationFunction, explainName);
+            (DistinctCountSmartHLLPlusAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTULL:
         result = getDistinctCountULLResult(Objects.requireNonNull(dataSource.getDictionary()),
-            (DistinctCountULLAggregationFunction) aggregationFunction, explainName);
+            (DistinctCountULLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTSMARTULL:
         result = getDistinctCountSmartULLResult(Objects.requireNonNull(dataSource.getDictionary()),
-            (DistinctCountSmartULLAggregationFunction) aggregationFunction, explainName);
+            (DistinctCountSmartULLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTRAWULL:
         result = getDistinctCountULLResult(Objects.requireNonNull(dataSource.getDictionary()),
-            (DistinctCountULLAggregationFunction) aggregationFunction, explainName);
+            (DistinctCountULLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       default:
         throw new IllegalStateException(
-            "Non-scan based aggregation operator does not support function type: " + aggregationFunction.getType());
+            "Non-scan based aggregation operator does not support function type: " + functionType);
     }
 
     return result;
@@ -676,55 +691,55 @@ public class AggregationFunctionUtils {
     }
   }
 
-  private static Set getDistinctValueSet(Dictionary dictionary, String explainName) {
+  private static Set getDistinctValueSet(Dictionary dictionary, String explainPlanName) {
     int dictionarySize = dictionary.length();
     switch (dictionary.getValueType()) {
       case INT:
         IntOpenHashSet intSet = new IntOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainName);
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainPlanName);
           intSet.add(dictionary.getIntValue(dictId));
         }
         return intSet;
       case LONG:
         LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainName);
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainPlanName);
           longSet.add(dictionary.getLongValue(dictId));
         }
         return longSet;
       case FLOAT:
         FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainName);
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainPlanName);
           floatSet.add(dictionary.getFloatValue(dictId));
         }
         return floatSet;
       case DOUBLE:
         DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainName);
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainPlanName);
           doubleSet.add(dictionary.getDoubleValue(dictId));
         }
         return doubleSet;
       case BIG_DECIMAL:
         ObjectOpenHashSet<BigDecimal> bigDecimalSet = new ObjectOpenHashSet<>(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainName);
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainPlanName);
           bigDecimalSet.add(dictionary.getBigDecimalValue(dictId));
         }
         return bigDecimalSet;
       case STRING:
         ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainName);
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainPlanName);
           stringSet.add(dictionary.getStringValue(dictId));
         }
         return stringSet;
       case BYTES:
         ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainName);
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, explainPlanName);
           bytesSet.add(new ByteArray(dictionary.getBytesValue(dictId)));
         }
         return bytesSet;
@@ -733,47 +748,47 @@ public class AggregationFunctionUtils {
     }
   }
 
-  private static HyperLogLog getDistinctValueHLL(Dictionary dictionary, int log2m, String explainName) {
+  private static HyperLogLog getDistinctValueHLL(Dictionary dictionary, int log2m, String explainPlanName) {
     HyperLogLog hll = new HyperLogLog(log2m);
     int length = dictionary.length();
     for (int i = 0; i < length; i++) {
-      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainName);
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
       hll.offer(dictionary.get(i));
     }
     return hll;
   }
 
-  private static UltraLogLog getDistinctValueULL(Dictionary dictionary, int p, String explainName) {
+  private static UltraLogLog getDistinctValueULL(Dictionary dictionary, int p, String explainPlanName) {
     UltraLogLog ull = UltraLogLog.create(p);
     int length = dictionary.length();
     for (int i = 0; i < length; i++) {
-      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainName);
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
       Object value = dictionary.get(i);
       UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
     }
     return ull;
   }
 
-  private static HyperLogLogPlus getDistinctValueHLLPlus(Dictionary dictionary, int p, int sp, String explainName) {
+  private static HyperLogLogPlus getDistinctValueHLLPlus(Dictionary dictionary, int p, int sp, String explainPlanName) {
     HyperLogLogPlus hllPlus = new HyperLogLogPlus(p, sp);
     int length = dictionary.length();
     for (int i = 0; i < length; i++) {
-      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainName);
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
       hllPlus.offer(dictionary.get(i));
     }
     return hllPlus;
   }
 
   private static HyperLogLog getDistinctCountHLLResult(Dictionary dictionary,
-      DistinctCountHLLAggregationFunction function, String explainName) {
+      DistinctCountHLLAggregationFunction function, String explainPlanName) {
     if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLog
       try {
-        QueryThreadContext.checkTerminationAndSampleUsage(explainName);
+        QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         HyperLogLog hll = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainName);
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
           hll.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return hll;
@@ -781,20 +796,20 @@ public class AggregationFunctionUtils {
         throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
       }
     } else {
-      return getDistinctValueHLL(dictionary, function.getLog2m(), explainName);
+      return getDistinctValueHLL(dictionary, function.getLog2m(), explainPlanName);
     }
   }
 
   private static HyperLogLogPlus getDistinctCountHLLPlusResult(Dictionary dictionary,
-      DistinctCountHLLPlusAggregationFunction function, String explainName) {
+      DistinctCountHLLPlusAggregationFunction function, String explainPlanName) {
     if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLogPlus
       try {
-        QueryThreadContext.checkTerminationAndSampleUsage(explainName);
+        QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         HyperLogLogPlus hllplus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainName);
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
           hllplus.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return hllplus;
@@ -802,7 +817,7 @@ public class AggregationFunctionUtils {
         throw new RuntimeException("Caught exception while merging HyperLogLogPluses", e);
       }
     } else {
-      return getDistinctValueHLLPlus(dictionary, function.getP(), function.getSp(), explainName);
+      return getDistinctValueHLLPlus(dictionary, function.getP(), function.getSp(), explainPlanName);
     }
   }
 
@@ -817,25 +832,25 @@ public class AggregationFunctionUtils {
   }
 
   private static Object getDistinctCountSmartHLLPlusResult(Dictionary dictionary,
-      DistinctCountSmartHLLPlusAggregationFunction function, String explainName) {
+      DistinctCountSmartHLLPlusAggregationFunction function, String explainPlanName) {
     if (dictionary.length() > function.getThreshold()) {
       // Store values into a HLLPlus when the dictionary size exceeds the conversion threshold
-      return getDistinctValueHLLPlus(dictionary, function.getP(), function.getSp(), explainName);
+      return getDistinctValueHLLPlus(dictionary, function.getP(), function.getSp(), explainPlanName);
     } else {
-      return getDistinctValueSet(dictionary, explainName);
+      return getDistinctValueSet(dictionary, explainPlanName);
     }
   }
 
   private static UltraLogLog getDistinctCountULLResult(Dictionary dictionary,
-      DistinctCountULLAggregationFunction function, String explainName) {
+      DistinctCountULLAggregationFunction function, String explainPlanName) {
     if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
       // Treat BYTES value as serialized UltraLogLog and merge
       try {
-        QueryThreadContext.checkTerminationAndSampleUsage(explainName);
+        QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainName);
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
           ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return ull;
@@ -843,16 +858,17 @@ public class AggregationFunctionUtils {
         throw new RuntimeException("Caught exception while merging UltraLogLogs", e);
       }
     } else {
-      return getDistinctValueULL(dictionary, function.getP(), explainName);
+      return getDistinctValueULL(dictionary, function.getP(), explainPlanName);
     }
   }
 
+  @Nullable
   private static Object getDistinctCountSmartULLResult(Dictionary dictionary,
-      DistinctCountSmartULLAggregationFunction function, String explainName) {
+      DistinctCountSmartULLAggregationFunction function, String explainPlanName) {
     if (dictionary.length() > function.getThreshold()) {
-      return getDistinctValueULL(dictionary, function.getP(), explainName);
+      return getDistinctValueULL(dictionary, function.getP(), explainPlanName);
     } else {
-      return getDistinctValueSet(dictionary, explainName);
+      return getDistinctValueSet(dictionary, explainPlanName);
     }
   }
 }
