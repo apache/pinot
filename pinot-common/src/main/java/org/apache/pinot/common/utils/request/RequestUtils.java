@@ -487,9 +487,16 @@ public class RequestUtils {
     return getLiteralString(literal);
   }
 
+  /// Creates a `Function` with the given operands. The operand list stored in the returned function
+  /// is always a mutable `ArrayList`: if `operands` is not already an `ArrayList` (e.g. an immutable
+  /// `List.of(...)`), it is copied into one. Downstream query rewriters and filter optimizers mutate
+  /// operands in place (via `getOperands().replaceAll(...)`, `set(...)`, or `add(...)`), so an
+  /// immutable list would otherwise throw `UnsupportedOperationException` far from where it was
+  /// created.
   public static Function getFunction(String canonicalName, List<Expression> operands) {
     Function function = new Function(canonicalName);
-    function.setOperands(operands);
+    // Ensure a mutable ArrayList so downstream rewriters can modify operands in place.
+    function.setOperands(operands instanceof ArrayList ? operands : new ArrayList<>(operands));
     return function;
   }
 
