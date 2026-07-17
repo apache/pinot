@@ -45,7 +45,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 /// is no dictionary.
 @SuppressWarnings("rawtypes")
 public class NonScanBasedAggregationOperator extends BaseOperator<AggregationResultsBlock> {
-  public static final String EXPLAIN_NAME = "AGGREGATE_NO_SCAN";
+  private static final String EXPLAIN_NAME = "AGGREGATE_NO_SCAN";
 
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;

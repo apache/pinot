@@ -40,7 +40,7 @@ import org.apache.pinot.spi.query.QueryScanCostContext;
 /// The `AggregationOperator` class implements keyless aggregation query on a single segment in V1/SSQE.
 @SuppressWarnings("rawtypes")
 public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
-  private static final String EXPLAIN_NAME = "AGGREGATE";
+  public static final String EXPLAIN_NAME = "AGGREGATE";
 
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
@@ -55,6 +55,15 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
     this(queryContext, aggregationInfo, numTotalDocs, null);
   }
 
+  /**
+   * Constructs an aggregation operator with optional pre-aggregated results. Each non-null entry in
+   * {@code preAggregatedResults} is a result already resolved from the column dictionary/metadata (see
+   * {@link AggregationFunctionUtils#getAggregationResult}); the corresponding function is skipped during the scan and
+   * its pre-aggregated value is used directly. A {@code null} array (or a {@code null} entry) means the function is
+   * computed by scanning the segment.
+   *
+   * @param preAggregatedResults per-function pre-aggregated results, or {@code null} if none are pre-aggregated
+   */
   public AggregationOperator(QueryContext queryContext, AggregationInfo aggregationInfo, long numTotalDocs,
       Object[] preAggregatedResults) {
     _queryContext = queryContext;
@@ -70,6 +79,7 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
     // Perform aggregation on all the transform blocks
     AggregationExecutor aggregationExecutor;
     if (_useStarTree) {
+      // StarTreeAggregationExecutor doesn't support pre-aggregated results.
       aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
     } else {
       aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions, _preAggregatedResults);
