@@ -21,7 +21,9 @@ package org.apache.pinot.core.operator.query;
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -31,9 +33,11 @@ import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
@@ -42,7 +46,7 @@ import org.apache.pinot.spi.query.QueryScanCostContext;
  */
 @SuppressWarnings("rawtypes")
 public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
-  public static final String EXPLAIN_NAME = "AGGREGATE";
+  private static final String EXPLAIN_NAME = "AGGREGATE";
 
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
@@ -51,29 +55,41 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private final long _numTotalDocs;
 
   private int _numDocsScanned = 0;
-  protected final Object[] _preAggregatedResults;
+
+  // Marks the functions that can be resolved from the column dictionary/metadata without scanning the segment. The
+  // aligned dataSources array holds the argument data source of each such function (a null entry is only valid for
+  // COUNT). Resolution is deferred to execution time (see getNextBlock) to keep query planning cheap. Both are null
+  // when no function is metadata-resolvable, in which case every function is computed by scanning.
+  @Nullable
+  private final boolean[] _metadataResolvable;
+  @Nullable
+  private final DataSource[] _dataSources;
 
   public AggregationOperator(QueryContext queryContext, AggregationInfo aggregationInfo, long numTotalDocs) {
-    this(queryContext, aggregationInfo, numTotalDocs, null);
+    this(queryContext, aggregationInfo, numTotalDocs, null, null);
   }
 
   /**
-   * Constructs an aggregation operator with optional pre-aggregated results. Each non-null entry in
-   * {@code preAggregatedResults} is a result already resolved from the column dictionary/metadata (see
-   * {@link AggregationFunctionUtils#getAggregationResult}); the corresponding function is skipped during the scan and
-   * its pre-aggregated value is used directly. A {@code null} array (or a {@code null} entry) means the function is
-   * computed by scanning the segment.
+   * Constructs an aggregation operator that optionally resolves some functions from the column dictionary/metadata
+   * instead of scanning the segment. For each function flagged in {@code metadataResolvable}, the result is resolved
+   * from the aligned {@code dataSources} entry (via {@link AggregationFunctionUtils#getAggregationResult}) at execution
+   * time and the function is skipped during the scan; all other functions are computed by scanning the segment.
+   * Passing {@code null} for both means every function is computed by scanning.
    *
-   * @param preAggregatedResults per-function pre-aggregated results, or {@code null} if none are pre-aggregated
+   * @param metadataResolvable per-function flags (aligned by function index) marking the functions to resolve from
+   *     dictionary/metadata, or {@code null} if none are resolvable
+   * @param dataSources per-function argument data sources aligned by function index (a {@code null} entry is only
+   *     valid for {@code COUNT}), or {@code null} if none are resolvable
    */
   public AggregationOperator(QueryContext queryContext, AggregationInfo aggregationInfo, long numTotalDocs,
-      Object[] preAggregatedResults) {
+      @Nullable boolean[] metadataResolvable, @Nullable DataSource[] dataSources) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _projectOperator = aggregationInfo.getProjectOperator();
     _useStarTree = aggregationInfo.isUseStarTree();
     _numTotalDocs = numTotalDocs;
-    _preAggregatedResults = preAggregatedResults;
+    _metadataResolvable = metadataResolvable;
+    _dataSources = dataSources;
   }
 
   @Override
@@ -84,7 +100,7 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
       // StarTreeAggregationExecutor doesn't support pre-aggregated results.
       aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
     } else {
-      aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions, _preAggregatedResults);
+      aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions, resolveMetadataBasedResults());
     }
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
@@ -100,6 +116,28 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
 
     // Build intermediate result block based on aggregation result from the executor
     return new AggregationResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(), _queryContext);
+  }
+
+  /**
+   * Returns {@code null} when no function is metadata-resolvable, in which case all functions are computed by scanning.
+   * Each returned non-null entry is consumed by {@link DefaultAggregationExecutor}, which skips the scan for that
+   * function and emits the resolved value directly.
+   */
+  @Nullable
+  private Object[] resolveMetadataBasedResults() {
+    if (_metadataResolvable == null) {
+      return null;
+    }
+
+    Objects.requireNonNull(_dataSources);
+    Object[] preAggregatedResults = new Object[_aggregationFunctions.length];
+    for (int i = 0; i < _aggregationFunctions.length; i++) {
+      if (_metadataResolvable[i]) {
+        preAggregatedResults[i] = AggregationFunctionUtils.getAggregationResult(_aggregationFunctions[i],
+            _dataSources[i], (int) _numTotalDocs, EXPLAIN_NAME);
+      }
+    }
+    return preAggregatedResults;
   }
 
   @Override

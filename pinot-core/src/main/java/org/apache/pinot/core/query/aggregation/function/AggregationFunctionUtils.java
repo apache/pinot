@@ -523,7 +523,7 @@ public class AggregationFunctionUtils {
   /**
    * Resolves the result of the given aggregation function from the column dictionary or metadata, without scanning the
    * segment. This is used by the non-scan based aggregation operator and by the partial metadata-based path in
-   * {@link org.apache.pinot.core.plan.AggregationPlanNode} to pre-aggregate metadata-eligible functions.
+   * {@link org.apache.pinot.core.operator.query.AggregationOperator} to resolve metadata-eligible functions.
    * <p>
    * {@code COUNT} is resolved directly from {@code numTotalDocs}. Every other supported function reads its result from
    * the column dictionary or metadata and therefore requires a non-null {@code dataSource}. Callers must only invoke

@@ -122,42 +122,33 @@ public class AggregationPlanNode implements PlanNode {
 
     boolean hasNullValues = _queryContext.isNullHandlingEnabled() && hasNullValues(aggregationFunctions);
     if (!hasNullValues) {
-      // Priority 2: Check if non-scan based aggregation is feasible
-      if (filterOperator.isResultMatchingAll() && isFitForNonScanBasedPlan()) {
-        DataSource[] dataSources = new DataSource[aggregationFunctions.length];
-        for (int i = 0; i < aggregationFunctions.length; i++) {
-          dataSources[i] = getDataSourceForAggregationFunction(aggregationFunctions[i]);
-          List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
-          if (!inputExpressions.isEmpty()) {
-            String column = ((ExpressionContext) inputExpressions.get(0)).getIdentifier();
-            dataSources[i] = _indexSegment.getDataSource(column, _queryContext.getSchema());
-          }
-        }
-        return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
-      }
-
+      // when the filter matches all documents, resolve as many functions as possible from the column
+      // dictionary/metadata without scanning the segment. Eligibility is evaluated once per function here
+      // and reused for both the fully non-scan path (all functions resolvable) and
+      // the partial path (some functions resolvable).
       if (filterOperator.isResultMatchingAll()) {
-        boolean anyResolved = false;
-        Object[] preAggregatedResults = new Object[aggregationFunctions.length];
+        boolean[] metadataResolvable = new boolean[aggregationFunctions.length];
+        DataSource[] dataSources = new DataSource[aggregationFunctions.length];
+        int numResolved = 0;
         for (int i = 0; i < aggregationFunctions.length; i++) {
-          // Only resolve functions that can be answered from dictionary/metadata; the rest fall back to scan-based
-          // execution in the AggregationOperator below. getAggregationResult() throws for unsupported function types,
-          // so it must not be called for functions that are not metadata compatible (e.g. MODE, SUM, AVG).
-          if (!isFitForNonScanBasedPlan(aggregationFunctions[i])) {
-            continue;
-          }
-
           DataSource dataSource = getDataSourceForAggregationFunction(aggregationFunctions[i]);
-          preAggregatedResults[i] = AggregationFunctionUtils.getAggregationResult(aggregationFunctions[i],
-              dataSource, numTotalDocs, AggregationOperator.EXPLAIN_NAME);
-          anyResolved = true;
+          if (isFitForNonScanBasedPlan(aggregationFunctions[i], dataSource)) {
+            metadataResolvable[i] = true;
+            dataSources[i] = dataSource;
+            numResolved++;
+          }
         }
 
-        if (anyResolved) {
-          // build aggregation info for all functions (including those that cannot be resolved from metadata)
+        if (numResolved == aggregationFunctions.length) {
+          // Priority 2: all functions can be resolved from dictionary/metadata -> fully non-scan based execution
+          return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
+        }
+        if (numResolved > 0) {
+          // some functions can be resolved from dictionary/metadata; the rest fall back to scan-based
+          // execution in the AggregationOperator.
           aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithoutStarTree(_segmentContext, _queryContext,
               aggregationFunctions, filterOperator);
-          return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs, preAggregatedResults);
+          return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs, metadataResolvable, dataSources);
         }
       }
 
@@ -206,33 +197,21 @@ public class AggregationPlanNode implements PlanNode {
   }
 
   /**
-   * Returns {@code true} if the given aggregations can be solved with dictionary or column metadata, {@code false}
-   * otherwise.
-   */
-  private boolean isFitForNonScanBasedPlan() {
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null;
-    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
-      if (!isFitForNonScanBasedPlan(aggregationFunction)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
    * Returns {@code true} if the given aggregation function can be resolved from the column dictionary or metadata
    * (without scanning the segment), {@code false} otherwise. {@code COUNT} is always eligible. Functions whose result
    * is derived numerically from the column min/max (e.g. MIN, MAX, MINMAXRANGE) are only eligible for numeric columns,
    * since non-numeric columns (e.g. BYTES) store min/max as raw values that cannot be parsed as numbers.
+   *
+   * @param aggregationFunction aggregation function to test
+   * @param dataSource the function argument's data source (see {@link #getDataSourceForAggregationFunction})
    */
-  private boolean isFitForNonScanBasedPlan(AggregationFunction<?, ?> aggregationFunction) {
+  private boolean isFitForNonScanBasedPlan(AggregationFunction<?, ?> aggregationFunction,
+      @Nullable DataSource dataSource) {
     AggregationFunctionType functionType = aggregationFunction.getType();
     if (functionType == COUNT) {
       return true;
     }
 
-    DataSource dataSource = getDataSourceForAggregationFunction(aggregationFunction);
     if (dataSource == null) {
       // Aggregation function does not have a single identifier argument (e.g. COUNT(*) or COUNT(1)),
       // so it cannot be resolved from metadata
