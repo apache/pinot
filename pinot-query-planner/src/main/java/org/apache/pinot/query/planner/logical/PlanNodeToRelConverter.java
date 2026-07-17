@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
@@ -375,7 +376,8 @@ public final class PlanNodeToRelConverter {
         }
 
         Window.Group group =
-            new Window.Group(keys, isRow, getWindowBound(node.getLowerBound()), getWindowBound(node.getUpperBound()),
+            new Window.Group(keys, isRow, getWindowBound(node.getLowerBound(), node.getLowerBoundOffset()),
+                getWindowBound(node.getUpperBound(), node.getUpperBoundOffset()),
                 toRexWindowExclusion(node.getExclude()), orderKeys, aggCalls);
 
         List<RexLiteral> constants =
@@ -409,13 +411,18 @@ public final class PlanNodeToRelConverter {
       }
     }
 
-    private RexWindowBound getWindowBound(int bound) {
+    private RexWindowBound getWindowBound(int bound, @Nullable RexExpression.Literal rangeOffset) {
       if (bound == Integer.MIN_VALUE) {
         return RexWindowBounds.UNBOUNDED_PRECEDING;
       } else if (bound == Integer.MAX_VALUE) {
         return RexWindowBounds.UNBOUNDED_FOLLOWING;
       } else if (bound == 0) {
         return RexWindowBounds.CURRENT_ROW;
+      } else if (rangeOffset != null) {
+        // RANGE offset bound: the int is only a sign discriminator (-1 preceding, +1 following); the actual value
+        // distance is carried by the offset literal.
+        RexNode offset = RexExpressionUtils.toRexLiteral(_builder, rangeOffset);
+        return bound < 0 ? RexWindowBounds.preceding(offset) : RexWindowBounds.following(offset);
       } else if (bound < 0) {
         return RexWindowBounds.preceding(_builder.literal(-bound));
       } else {

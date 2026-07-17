@@ -25,6 +25,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.hep.HepRelVertex;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Exchange;
@@ -34,6 +35,7 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
@@ -42,6 +44,7 @@ import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.rex.RexWindowBounds;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
@@ -154,7 +157,7 @@ public class PinotRuleUtils {
       validateWindowAggCallsSupported(windowGroup);
 
       // Validate the frame
-      validateWindowFrames(windowGroup);
+      validateWindowFrames(window, windowGroup);
     }
 
     /**
@@ -228,16 +231,35 @@ public class PinotRuleUtils {
       }
     }
 
-    private static void validateWindowFrames(Window.Group windowGroup) {
+    private static void validateWindowFrames(Window window, Window.Group windowGroup) {
+      if (windowGroup.isRows) {
+        // ROWS frames support any (physical row count) offset bounds.
+        return;
+      }
+
       RexWindowBound lowerBound = windowGroup.lowerBound;
       RexWindowBound upperBound = windowGroup.upperBound;
-
-      boolean hasOffset = (lowerBound.isPreceding() && !lowerBound.isUnbounded()) || (upperBound.isFollowing()
-          && !upperBound.isUnbounded());
-
-      if (!windowGroup.isRows) {
-        Preconditions.checkState(!hasOffset, "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+      boolean lowerIsOffset = !lowerBound.isUnbounded() && !lowerBound.isCurrentRow();
+      boolean upperIsOffset = !upperBound.isUnbounded() && !upperBound.isCurrentRow();
+      if (!lowerIsOffset && !upperIsOffset) {
+        // RANGE frame with only UNBOUNDED / CURRENT ROW bounds is always supported.
+        return;
       }
+
+      // Value-based RANGE offset frame (e.g. RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING). Calcite already guarantees a
+      // single ORDER BY key and an offset type compatible with the key's type family for RANGE offset frames, but we
+      // re-assert the single-key requirement and additionally restrict support to numeric ORDER BY keys (temporal /
+      // INTERVAL offsets are not yet supported by the runtime).
+      List<RelFieldCollation> orderKeys = windowGroup.orderKeys.getFieldCollations();
+      Preconditions.checkState(orderKeys.size() == 1,
+          "RANGE window frame with offset PRECEDING / FOLLOWING requires exactly one ORDER BY key, got %s order keys",
+          orderKeys.size());
+      int orderKeyIndex = orderKeys.get(0).getFieldIndex();
+      RelDataType orderKeyType = window.getInput().getRowType().getFieldList().get(orderKeyIndex).getType();
+      SqlTypeName orderKeyTypeName = orderKeyType.getSqlTypeName();
+      Preconditions.checkState(SqlTypeName.NUMERIC_TYPES.contains(orderKeyTypeName),
+          "RANGE window frame with offset PRECEDING / FOLLOWING is only supported for numeric ORDER BY keys, got: %s",
+          orderKeyTypeName);
     }
 
     @Nullable

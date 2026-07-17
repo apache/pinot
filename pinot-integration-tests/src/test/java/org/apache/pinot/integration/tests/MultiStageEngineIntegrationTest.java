@@ -1572,6 +1572,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
             + "ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) AS SumAirlineDelayInWindow FROM mytable;";
     jsonNode = postQuery(query);
     assertNoError(jsonNode);
+
+    // Value-based RANGE offset frame (RANGE BETWEEN n PRECEDING AND n FOLLOWING).
+    query =
+        "SELECT AirlineID, ArrDelay, DaysSinceEpoch, SUM(ArrDelay) OVER(PARTITION BY AirlineID ORDER BY DaysSinceEpoch "
+            + "RANGE BETWEEN 3 PRECEDING AND 3 FOLLOWING) AS SumAirlineDelayInRange FROM mytable;";
+    jsonNode = postQuery(query);
+    assertNoError(jsonNode);
   }
 
   @Test

@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -30,17 +31,35 @@ public class WindowNode extends BasePlanNode {
   private final List<RelFieldCollation> _collations;
   private final List<RexExpression.FunctionCall> _aggCalls;
   private final WindowFrameType _windowFrameType;
-  // Both these bounds are relative to current row; 0 means current row, -1 means previous row, 1 means next row, etc.
-  // Integer.MIN_VALUE represents UNBOUNDED PRECEDING which is only allowed for the lower bound (ensured by Calcite).
-  // Integer.MAX_VALUE represents UNBOUNDED FOLLOWING which is only allowed for the upper bound (ensured by Calcite).
+  // For ROWS frames, both bounds are physical row offsets relative to current row: 0 means current row, -1 means
+  // previous row, 1 means next row, etc. Integer.MIN_VALUE represents UNBOUNDED PRECEDING (only allowed for the lower
+  // bound) and Integer.MAX_VALUE represents UNBOUNDED FOLLOWING (only allowed for the upper bound).
+  // For RANGE frames, the offset (if any) is a value distance on the single ORDER BY key, not a row count, and is
+  // carried by _lowerBoundOffset / _upperBoundOffset below. In that case the int bound is only a discriminator:
+  // Integer.MIN_VALUE / Integer.MAX_VALUE for UNBOUNDED, 0 for CURRENT ROW, -1 for an offset PRECEDING bound and +1 for
+  // an offset FOLLOWING bound (the magnitude is meaningless; read the value from the offset literal instead).
   private final int _lowerBound;
   private final int _upperBound;
   private final WindowExclusion _exclude;
+  // Value-based RANGE frame offsets. Non-null only for a RANGE frame bound that is an offset PRECEDING / FOLLOWING
+  // bound; null for ROWS frames and for RANGE bounds that are UNBOUNDED / CURRENT ROW.
+  @Nullable
+  private final RexExpression.Literal _lowerBoundOffset;
+  @Nullable
+  private final RexExpression.Literal _upperBoundOffset;
   private final List<RexExpression.Literal> _constants;
 
   public WindowNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, List<Integer> keys,
       List<RelFieldCollation> collations, List<RexExpression.FunctionCall> aggCalls, WindowFrameType windowFrameType,
       int lowerBound, int upperBound, WindowExclusion exclude, List<RexExpression.Literal> constants) {
+    this(stageId, dataSchema, nodeHint, inputs, keys, collations, aggCalls, windowFrameType, lowerBound, upperBound,
+        exclude, null, null, constants);
+  }
+
+  public WindowNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, List<Integer> keys,
+      List<RelFieldCollation> collations, List<RexExpression.FunctionCall> aggCalls, WindowFrameType windowFrameType,
+      int lowerBound, int upperBound, WindowExclusion exclude, @Nullable RexExpression.Literal lowerBoundOffset,
+      @Nullable RexExpression.Literal upperBoundOffset, List<RexExpression.Literal> constants) {
     super(stageId, dataSchema, nodeHint, inputs);
     _keys = keys;
     _collations = collations;
@@ -49,6 +68,8 @@ public class WindowNode extends BasePlanNode {
     _lowerBound = lowerBound;
     _upperBound = upperBound;
     _exclude = exclude;
+    _lowerBoundOffset = lowerBoundOffset;
+    _upperBoundOffset = upperBoundOffset;
     _constants = constants;
   }
 
@@ -80,6 +101,16 @@ public class WindowNode extends BasePlanNode {
     return _exclude;
   }
 
+  @Nullable
+  public RexExpression.Literal getLowerBoundOffset() {
+    return _lowerBoundOffset;
+  }
+
+  @Nullable
+  public RexExpression.Literal getUpperBoundOffset() {
+    return _upperBoundOffset;
+  }
+
   public List<RexExpression.Literal> getConstants() {
     return _constants;
   }
@@ -97,7 +128,7 @@ public class WindowNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new WindowNode(_stageId, _dataSchema, _nodeHint, inputs, _keys, _collations, _aggCalls, _windowFrameType,
-        _lowerBound, _upperBound, _exclude, _constants);
+        _lowerBound, _upperBound, _exclude, _lowerBoundOffset, _upperBoundOffset, _constants);
   }
 
   @Override
@@ -115,13 +146,14 @@ public class WindowNode extends BasePlanNode {
     return _lowerBound == that._lowerBound && _upperBound == that._upperBound && Objects.equals(_aggCalls,
         that._aggCalls) && Objects.equals(_keys, that._keys) && Objects.equals(_collations, that._collations)
         && _windowFrameType == that._windowFrameType && _exclude == that._exclude
-        && Objects.equals(_constants, that._constants);
+        && Objects.equals(_lowerBoundOffset, that._lowerBoundOffset)
+        && Objects.equals(_upperBoundOffset, that._upperBoundOffset) && Objects.equals(_constants, that._constants);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _aggCalls, _keys, _collations, _windowFrameType, _lowerBound, _upperBound,
-        _exclude, _constants);
+        _exclude, _lowerBoundOffset, _upperBoundOffset, _constants);
   }
 
   /**

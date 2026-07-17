@@ -757,13 +757,25 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "FROM a";
     _queryEnvironment.planQuery(queryWithValidBounds);
 
-    // Custom RANGE window frame is not currently supported by Pinot
-    String sumQueryWithCustomRangeWindow =
+    // Value-based RANGE window frames with a numeric ORDER BY key are supported.
+    String sumQueryWithRangeOffsetUnboundedPrecedingAndFollowing =
         "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3 RANGE BETWEEN UNBOUNDED PRECEDING AND 1 "
             + "FOLLOWING) FROM a";
-    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(sumQueryWithCustomRangeWindow));
+    _queryEnvironment.planQuery(sumQueryWithRangeOffsetUnboundedPrecedingAndFollowing);
+
+    String sumQueryWithRangeOffsetPrecedingAndFollowing =
+        "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3 RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING) "
+            + "FROM a";
+    _queryEnvironment.planQuery(sumQueryWithRangeOffsetPrecedingAndFollowing);
+
+    // Value-based RANGE offset frames are only supported for numeric ORDER BY keys. A temporal ORDER BY key with an
+    // INTERVAL offset is accepted by Calcite but rejected by Pinot for now.
+    String rangeOffsetWithTimestampOrderKey =
+        "SELECT col1, SUM(col3) OVER (ORDER BY ts_timestamp RANGE BETWEEN INTERVAL '1' DAY PRECEDING AND CURRENT ROW) "
+            + "FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(rangeOffsetWithTimestampOrderKey));
     assertTrue(e.getCause().getMessage()
-        .contains("RANGE window frame with offset PRECEDING / FOLLOWING is not supported"));
+        .contains("RANGE window frame with offset PRECEDING / FOLLOWING is only supported for numeric ORDER BY keys"));
 
     // RANK, DENSE_RANK, ROW_NUMBER, NTILE, LAG, LEAD with custom window frame are invalid
     String rankQuery =

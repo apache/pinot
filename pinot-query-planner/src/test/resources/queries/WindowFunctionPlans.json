@@ -3541,6 +3541,20 @@
         ]
       },
       {
+        "description": "Custom RANGE based window frame with offset PRECEDING / FOLLOWING",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3 RANGE BETWEEN 5 PRECEDING AND 10 FOLLOWING) FROM a WHERE a.col3 >= 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] range between 5 PRECEDING and 10 FOLLOWING aggs [AVG($1)])], constants=[[5, 10]])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col3=[$2])",
+          "\n        LogicalFilter(condition=[>=($2, 0)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Custom RANGE based window frame with ORDER BY",
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
         "output": [

@@ -209,12 +209,18 @@ public class PlanNodeDeserializer {
 
   private static WindowNode deserializeWindowNode(Plan.PlanNode protoNode) {
     Plan.WindowNode protoWindowNode = protoNode.getWindowNode();
+    // Value-based offsets for RANGE offset frames. Absent (hasXxx() == false) for ROWS frames, UNBOUNDED / CURRENT ROW
+    // bounds, and plans serialized by older brokers that predate RANGE offset support.
+    RexExpression.Literal lowerBoundOffset = protoWindowNode.hasLowerBoundOffset()
+        ? ProtoExpressionToRexExpression.convertLiteral(protoWindowNode.getLowerBoundOffset()) : null;
+    RexExpression.Literal upperBoundOffset = protoWindowNode.hasUpperBoundOffset()
+        ? ProtoExpressionToRexExpression.convertLiteral(protoWindowNode.getUpperBoundOffset()) : null;
     return new WindowNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), protoWindowNode.getKeysList(), convertCollations(protoWindowNode.getCollationsList()),
         convertFunctionCalls(protoWindowNode.getAggCallsList()),
         convertWindowFrameType(protoWindowNode.getWindowFrameType()), protoWindowNode.getLowerBound(),
-        protoWindowNode.getUpperBound(), convertWindowExclusion(protoWindowNode.getExclude()),
-        convertLiterals(protoWindowNode.getConstantsList()));
+        protoWindowNode.getUpperBound(), convertWindowExclusion(protoWindowNode.getExclude()), lowerBoundOffset,
+        upperBoundOffset, convertLiterals(protoWindowNode.getConstantsList()));
   }
 
   private static ExplainedNode deserializeExplainedNode(Plan.PlanNode protoNode) {

@@ -5742,5 +5742,155 @@
         ]
       }
     ]
+  },
+  "range_offset_window_function_aggregations": {
+    "comment": "Value-based RANGE offset window frames (RANGE BETWEEN n PRECEDING AND n FOLLOWING). These queries omit 'outputs' so they are validated against H2 as the oracle. Order keys are non-null numeric columns (single ORDER BY key required for RANGE offset frames).",
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"},
+          {"name": "nullable_int_col", "type": "INT"}
+        ],
+        "inputs": [
+          [2, 300, "a", true, 1],
+          [2, 400, "a", true, null],
+          [3, 100, "b", false, null],
+          [3, 100, "c", true, 3],
+          [100, 1, "b", false, 1],
+          [42, 50.5, "e", true, 2],
+          [42, 42, "d", false, null],
+          [42, 75, "a", true, 5],
+          [42, 42, "a", false, 4],
+          [42, 50.5, "a", true, null],
+          [42, 42, "e", false, null],
+          [-101, 1.01, "c", false, 7],
+          [150, 1.5, "c", false, 6],
+          [50, 1.6, "c", false, 8],
+          [150, -1.53, "h", false, null],
+          [3, 100, "g", true, 10],
+          [2, 400, "c", false, null]
+        ]
+      }
+    },
+    "extraProps": {
+      "enableColumnBasedNullHandling": true
+    },
+    "queries": [
+      {
+        "description": "SUM with RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "AVG with RANGE BETWEEN 10 PRECEDING AND 10 FOLLOWING",
+        "sql": "SELECT string_col, int_col, AVG(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 10 PRECEDING AND 10 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "COUNT(*) with RANGE BETWEEN 20 PRECEDING AND CURRENT ROW",
+        "sql": "SELECT string_col, int_col, COUNT(*) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 20 PRECEDING AND CURRENT ROW) FROM {tbl}"
+      },
+      {
+        "description": "MIN with RANGE BETWEEN 50 PRECEDING AND 50 FOLLOWING",
+        "sql": "SELECT string_col, int_col, MIN(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 50 PRECEDING AND 50 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "MAX with RANGE BETWEEN 50 PRECEDING AND 50 FOLLOWING",
+        "sql": "SELECT string_col, int_col, MAX(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 50 PRECEDING AND 50 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "SUM with RANGE offset and DESC ordering",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col DESC RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "SUM with RANGE offset producing empty frames",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 100 PRECEDING AND 60 PRECEDING) FROM {tbl}"
+      },
+      {
+        "description": "SUM with RANGE BETWEEN UNBOUNDED PRECEDING AND offset FOLLOWING",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN UNBOUNDED PRECEDING AND 5 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "SUM with RANGE BETWEEN offset PRECEDING AND UNBOUNDED FOLLOWING",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 5 PRECEDING AND UNBOUNDED FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "SUM with RANGE BETWEEN CURRENT ROW AND offset FOLLOWING",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN CURRENT ROW AND 5 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "SUM over DOUBLE order key with RANGE offset",
+        "sql": "SELECT string_col, double_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY double_col RANGE BETWEEN 50.0 PRECEDING AND 50.0 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "SUM of nullable values over RANGE offset frame",
+        "sql": "SELECT string_col, int_col, SUM(nullable_int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "FIRST_VALUE with RANGE offset frame over unique order keys",
+        "sql": "SELECT int_col, FIRST_VALUE(nullable_int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 100 PRECEDING AND 100 FOLLOWING) FROM {tbl} WHERE string_col = 'c'"
+      },
+      {
+        "description": "LAST_VALUE with RANGE offset frame over unique order keys",
+        "sql": "SELECT int_col, LAST_VALUE(nullable_int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 100 PRECEDING AND 100 FOLLOWING) FROM {tbl} WHERE string_col = 'c'"
+      },
+      {
+        "description": "SUM with RANGE offset over a nullable order key (NULLS LAST) - NULL rows form their own peer group",
+        "sql": "SELECT nullable_int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY nullable_int_col NULLS LAST RANGE BETWEEN 2 PRECEDING AND 2 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "SUM with RANGE offset over a nullable order key (NULLS FIRST)",
+        "sql": "SELECT nullable_int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY nullable_int_col NULLS FIRST RANGE BETWEEN 2 PRECEDING AND 2 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "SUM with RANGE offset over a nullable order key, UNBOUNDED PRECEDING (NULLS LAST) - includes preceding NULLs",
+        "sql": "SELECT nullable_int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY nullable_int_col NULLS FIRST RANGE BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "SUM with RANGE offset over a nullable order key with DESC ordering (NULLS LAST)",
+        "sql": "SELECT nullable_int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY nullable_int_col DESC NULLS LAST RANGE BETWEEN 2 PRECEDING AND 2 FOLLOWING) FROM {tbl}"
+      },
+      {
+        "description": "FIRST_VALUE IGNORE NULLS with RANGE offset frame over unique order keys",
+        "sql": "SELECT int_col, FIRST_VALUE(nullable_int_col) IGNORE NULLS OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 100 PRECEDING AND 100 FOLLOWING) FROM {tbl} WHERE string_col = 'c'"
+      },
+      {
+        "description": "LAST_VALUE IGNORE NULLS with RANGE offset frame over unique order keys",
+        "sql": "SELECT int_col, LAST_VALUE(nullable_int_col) IGNORE NULLS OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 100 PRECEDING AND 100 FOLLOWING) FROM {tbl} WHERE string_col = 'c'"
+      },
+      {
+        "description": "SUM with RANGE offset frame and EXCLUDE CURRENT ROW",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING EXCLUDE CURRENT ROW) FROM {tbl}"
+      },
+      {
+        "description": "SUM with RANGE offset frame and EXCLUDE GROUP",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING EXCLUDE GROUP) FROM {tbl}"
+      },
+      {
+        "description": "SUM with RANGE offset frame and EXCLUDE TIES",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING EXCLUDE TIES) FROM {tbl}"
+      },
+      {
+        "description": "AVG with RANGE offset frame and EXCLUDE GROUP",
+        "sql": "SELECT string_col, int_col, AVG(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 10 PRECEDING AND 10 FOLLOWING EXCLUDE GROUP) FROM {tbl}"
+      },
+      {
+        "description": "MAX with RANGE offset frame and EXCLUDE CURRENT ROW (exercises arbitrary-removal aggregator)",
+        "sql": "SELECT string_col, int_col, MAX(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 50 PRECEDING AND 50 FOLLOWING EXCLUDE CURRENT ROW) FROM {tbl}"
+      },
+      {
+        "description": "MIN with RANGE offset frame and EXCLUDE TIES (exercises arbitrary-removal aggregator)",
+        "sql": "SELECT string_col, int_col, MIN(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 50 PRECEDING AND 50 FOLLOWING EXCLUDE TIES) FROM {tbl}"
+      },
+      {
+        "description": "FIRST_VALUE with RANGE offset frame and EXCLUDE CURRENT ROW over unique order keys",
+        "sql": "SELECT int_col, FIRST_VALUE(nullable_int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 100 PRECEDING AND 100 FOLLOWING EXCLUDE CURRENT ROW) FROM {tbl} WHERE string_col = 'c'"
+      },
+      {
+        "description": "LAST_VALUE with RANGE offset frame and EXCLUDE GROUP over unique order keys",
+        "sql": "SELECT int_col, LAST_VALUE(nullable_int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN 100 PRECEDING AND 100 FOLLOWING EXCLUDE GROUP) FROM {tbl} WHERE string_col = 'c'"
+      }
+    ]
   }
 }
