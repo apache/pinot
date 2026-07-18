@@ -226,16 +226,16 @@ public class UpsertViewManager {
     _upsertViewLock.writeLock().lock();
     try {
       // Check again with lock, and always refresh if the current view is still empty.
-      Map<IndexSegment, MutableRoaringBitmap> current = _segmentQueryableDocIdsMap;
-      Map<IndexSegment, MutableRoaringBitmap> currentValid = _segmentValidDocIdsMap;
-      if (!forceRefresh && skipUpsertViewRefresh(upsertViewFreshnessMs) && current != null) {
+      Map<IndexSegment, MutableRoaringBitmap> queryableDocIds = _segmentQueryableDocIdsMap;
+      Map<IndexSegment, MutableRoaringBitmap> validDocs = _segmentValidDocIdsMap;
+      if (!forceRefresh && skipUpsertViewRefresh(upsertViewFreshnessMs) && queryableDocIds != null) {
         return;
       }
       if (LOGGER.isDebugEnabled()) {
-        if (current == null) {
+        if (queryableDocIds == null) {
           LOGGER.debug("Current upsert view is still null");
         } else {
-          current.forEach(
+          queryableDocIds.forEach(
               (segment, bitmap) -> LOGGER.debug("Current upsert view of segment: {}, type: {}, total: {}, valid: {}",
                   segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"),
                   segment.getSegmentMetadata().getTotalDocs(), bitmap.getCardinality()));
@@ -247,7 +247,8 @@ public class UpsertViewManager {
         // Update bitmap for segment updated since last refresh or not in the view yet. This also handles segments
         // that are tracked by _trackedSegments but not by _updatedSegmentsSinceLastRefresh, like those didn't update
         // any bitmaps as their docs simply lost all the upsert comparisons with the existing docs.
-        if (current == null || current.get(segment) == null || _updatedSegmentsSinceLastRefresh.contains(segment)) {
+        if (queryableDocIds == null || queryableDocIds.get(segment) == null
+            || _updatedSegmentsSinceLastRefresh.contains(segment)) {
           MutableRoaringBitmap validSnapshot = UpsertUtils.getValidDocIdsSnapshotFromSegment(segment, true);
           updatedValid.put(segment, validSnapshot);
           // Without delete enabled, queryable docs equal valid docs; reuse the clone instead of cloning twice.
@@ -257,11 +258,11 @@ public class UpsertViewManager {
             LOGGER.debug("Update upsert view of segment: {}, type: {}, total: {}, valid: {}, reason: {}",
                 segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"),
                 segment.getSegmentMetadata().getTotalDocs(), updated.get(segment).getCardinality(),
-                current == null || current.get(segment) == null ? "no view yet" : "bitmap updated");
+                queryableDocIds == null || queryableDocIds.get(segment) == null ? "no view yet" : "bitmap updated");
           }
         } else {
-          updated.put(segment, current.get(segment));
-          updatedValid.put(segment, currentValid.get(segment));
+          updated.put(segment, queryableDocIds.get(segment));
+          updatedValid.put(segment, validDocs.get(segment));
         }
       }
       // Swap in the new consistent set of bitmaps.
