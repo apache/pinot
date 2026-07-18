@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,8 +55,11 @@ import org.apache.pinot.materializedview.rewrite.MatchType;
 import org.apache.pinot.materializedview.rewrite.MaterializedViewQueryRewriteEngine;
 import org.apache.pinot.materializedview.rewrite.MaterializedViewRewritePlan;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -856,6 +860,146 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   /// The split-mode time-boundary filter attach helpers moved to
   /// org.apache.pinot.materializedview.handler.DefaultMaterializedViewHandler#attachFilter; their
   /// regression coverage lives in DefaultMaterializedViewHandlerTest in pinot-materialized-view.
+
+  /// Bug: `RlsFiltersRewriter` combines the RLS predicate with an existing WHERE clause via
+  /// `RequestUtils.getFunctionExpression(AND, List.of(...))`. The `List<Expression>` overload used
+  /// to store the list as-is, so the AND function's operand list was the immutable list returned by
+  /// `List.of(...)`.
+  ///
+  /// When the table also carries an expression-override map, `handleExpressionOverride` recurses
+  /// into the filter tree and calls `function.getOperands().replaceAll(...)` on that AND function,
+  /// throwing `UnsupportedOperationException` on the immutable operand list.
+  ///
+  /// This test reproduces the crash by enabling RLS (which yields a combined AND filter) on a query
+  /// that already has a WHERE clause, for a table whose expression-override map is non-null. Before
+  /// the fix, `handleRequest` throws `UnsupportedOperationException`; after the fix it completes and
+  /// reports that RLS filters were applied.
+  @Test
+  public void testRlsFilterCombinedWithExpressionOverrideDoesNotThrow()
+      throws Exception {
+    String rawTable = "faroEvents";
+    String offlineTable = "faroEvents_OFFLINE";
+
+    // Query with an existing WHERE clause so the RLS rewriter builds a combined AND filter.
+    String userSql = "SELECT COUNT(*) FROM faroEvents WHERE ts = 'x'";
+
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(rawTable)
+        .addSingleValueDimension("ts", DataType.STRING)
+        .addMetric("revenue", DataType.DOUBLE)
+        .build();
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(rawTable)).thenReturn(rawTable);
+    when(tableCache.getSchema(rawTable)).thenReturn(schema);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("ts", "ts", "revenue", "revenue"));
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("t_BROKER", "t_SERVER", null));
+    when(tableCache.getTableConfig(offlineTable)).thenReturn(tableCfg);
+
+    // Non-null expression-override map for the table. A non-null map is enough to make
+    // handleExpressionOverride recurse into the filter tree and call replaceAll on the AND operands.
+    Expression overrideKey = CalciteSqlParser.compileToExpression("ts");
+    Expression overrideValue = CalciteSqlParser.compileToExpression("ts");
+    when(tableCache.getExpressionOverrideMap(offlineTable)).thenReturn(Map.of(overrideKey, overrideValue));
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(offlineTable)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+            new SegmentsToQuery(List.of("seg01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
+
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+    when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    // AccessControl that allows everything and returns a non-empty RLS filter for the table.
+    AccessControl accessControl = new AccessControl() {
+      @Override
+      public AuthorizationResult authorize(RequesterIdentity identity, BrokerRequest request) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableAuthorizationResult authorize(RequesterIdentity identity, Set<String> tables) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableRowColAccessResult getRowColFilters(RequesterIdentity identity, String tableWithType) {
+        return new TableRowColAccessResultImpl(List.of("ts = 'allowed'"));
+      }
+    };
+    AccessControlFactory accessControlFactory = mock(AccessControlFactory.class);
+    when(accessControlFactory.create()).thenReturn(accessControl);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration(
+        Map.of(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH, "true"));
+    BrokerQueryEventListenerFactory.init(config);
+
+    AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
+            routingManager, accessControlFactory, quotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId,
+              BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+              TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            capturedServerRequest.set(serverBrokerRequest);
+            return BrokerResponseNative.empty();
+          }
+        };
+
+    // Before the fix this throws UnsupportedOperationException from replaceAll on the immutable
+    // AND operand list produced by the RLS rewriter.
+    BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(userSql);
+
+    Assert.assertNotNull(response, "handleRequest must return a response, not throw");
+    Assert.assertTrue(response.getRLSFiltersApplied(), "response should report that RLS filters were applied");
+
+    // The server query must carry BOTH the RLS predicate and the original WHERE clause, combined
+    // under a single AND. This guards against a future regression that silently drops an operand.
+    BrokerRequest serverRequest = capturedServerRequest.get();
+    Assert.assertNotNull(serverRequest, "server query should have been captured");
+    Expression filter = serverRequest.getPinotQuery().getFilterExpression();
+    Assert.assertNotNull(filter, "server query must have a filter expression");
+    Function filterFunction = filter.getFunctionCall();
+    Assert.assertNotNull(filterFunction, "combined filter must be a function");
+    Assert.assertEquals(filterFunction.getOperator(), FilterKind.AND.name(),
+        "RLS predicate and existing WHERE clause must be combined under AND");
+    Assert.assertEquals(filterFunction.getOperands().size(), 2, "combined AND must retain both operands");
+    // Collect the RHS string literals of both EQUALS operands: one must be the RLS predicate value
+    // ('allowed') and the other the original WHERE-clause value ('x').
+    Set<String> literalValues = new HashSet<>();
+    for (Expression operand : filterFunction.getOperands()) {
+      Function eq = operand.getFunctionCall();
+      Assert.assertNotNull(eq, "each AND operand must be a comparison function");
+      for (Expression eqOperand : eq.getOperands()) {
+        if (eqOperand.getLiteral() != null) {
+          literalValues.add(eqOperand.getLiteral().getStringValue());
+        }
+      }
+    }
+    Assert.assertTrue(literalValues.contains("allowed"),
+        "combined filter must include the RLS predicate, got literals: " + literalValues);
+    Assert.assertTrue(literalValues.contains("x"),
+        "combined filter must retain the original WHERE clause, got literals: " + literalValues);
+  }
 
   /**
    * Pins the security-style defense that a user-supplied `materializedViewRewrite=true` query
