@@ -247,7 +247,7 @@ public class UpsertViewManager {
                   segment.getSegmentMetadata().getTotalDocs(), bitmap.getCardinality()));
         }
       }
-      Map<IndexSegment, MutableRoaringBitmap> updated = new HashMap<>();
+      Map<IndexSegment, MutableRoaringBitmap> updatedQueryable = new HashMap<>();
       Map<IndexSegment, MutableRoaringBitmap> updatedValid = new HashMap<>();
       for (IndexSegment segment : _trackedSegments) {
         // Update bitmap for segment updated since last refresh or not in the view yet. This also handles segments
@@ -258,27 +258,27 @@ public class UpsertViewManager {
           MutableRoaringBitmap validSnapshot = UpsertUtils.getValidDocIdsSnapshotFromSegment(segment, true);
           updatedValid.put(segment, validSnapshot);
           // Without delete enabled, queryable docs equal valid docs; reuse the clone instead of cloning twice.
-          updated.put(segment, segment.getQueryableDocIds() != null
+          updatedQueryable.put(segment, segment.getQueryableDocIds() != null
               ? UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment, true) : validSnapshot);
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Update upsert view of segment: {}, type: {}, total: {}, valid: {}, reason: {}",
                 segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"),
-                segment.getSegmentMetadata().getTotalDocs(), updated.get(segment).getCardinality(),
+                segment.getSegmentMetadata().getTotalDocs(), updatedQueryable.get(segment).getCardinality(),
                 queryableDocIds == null || queryableDocIds.get(segment) == null ? "no view yet" : "bitmap updated");
           }
         } else {
-          updated.put(segment, queryableDocIds.get(segment));
+          updatedQueryable.put(segment, queryableDocIds.get(segment));
           updatedValid.put(segment, validDocs.get(segment));
         }
       }
       // Swap in the new consistent set of bitmaps.
       if (LOGGER.isDebugEnabled()) {
-        updated.forEach(
+        updatedQueryable.forEach(
             (segment, bitmap) -> LOGGER.debug("Updated upsert view of segment: {}, type: {}, total: {}, valid: {}",
                 segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"),
                 segment.getSegmentMetadata().getTotalDocs(), bitmap.getCardinality()));
       }
-      _segmentQueryableDocIdsMap = updated;
+      _segmentQueryableDocIdsMap = updatedQueryable;
       _segmentValidDocIdsMap = updatedValid;
       _updatedSegmentsSinceLastRefresh.clear();
       _lastUpsertViewRefreshTimeMs = System.currentTimeMillis();
