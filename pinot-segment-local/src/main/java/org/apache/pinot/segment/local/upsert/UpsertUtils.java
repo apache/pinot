@@ -57,6 +57,36 @@ public class UpsertUtils {
         : (useEmptyForNull ? new MutableRoaringBitmap() : null);
   }
 
+  /// Unlike [#getQueryableDocIdsSnapshotFromSegment], never falls back to preferring queryable docs.
+  @Nullable
+  public static MutableRoaringBitmap getValidDocIdsSnapshotFromSegment(IndexSegment segment) {
+    return getValidDocIdsSnapshotFromSegment(segment, false);
+  }
+
+  /// Shared by {@code ImmutableSegmentImpl}/{@code MutableSegmentImpl}'s `hasNoValidDocs()`. Mirrors
+  /// `hasNoQueryableDocs()`'s consistency-mode-aware/live-fallback split, against the valid-docs cache instead.
+  public static boolean hasNoValidDocs(@Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      IndexSegment segment) {
+    if (partitionUpsertMetadataManager == null) {
+      return false;
+    }
+    UpsertViewManager viewManager = partitionUpsertMetadataManager.getUpsertViewManager();
+    if (viewManager != null) {
+      MutableRoaringBitmap validDocIdsSnapshot = viewManager.getValidDocIdsSnapshot(segment);
+      return validDocIdsSnapshot != null && validDocIdsSnapshot.isEmpty();
+    }
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null && validDocIds.isEmpty();
+  }
+
+  @Nullable
+  public static MutableRoaringBitmap getValidDocIdsSnapshotFromSegment(IndexSegment segment,
+      boolean useEmptyForNull) {
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null ? validDocIds.getMutableRoaringBitmap()
+        : (useEmptyForNull ? new MutableRoaringBitmap() : null);
+  }
+
   public static void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
     validDocIds.replace(oldDocId, newDocId);

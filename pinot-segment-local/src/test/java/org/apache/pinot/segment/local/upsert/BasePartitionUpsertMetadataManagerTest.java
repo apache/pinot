@@ -703,15 +703,15 @@ public class BasePartitionUpsertMetadataManagerTest {
       ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(sc.getIndexSegment());
       assertNotNull(validDocIds);
       // SegmentContext holds a clone of the original queryableDocIds held by the segment object.
-      assertNotSame(sc.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
-      assertEquals(sc.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertNotSame(sc.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(sc.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
       // docId=0 in seg01 got invalidated.
       if (sc.getIndexSegment() == seg01) {
-        assertFalse(sc.getQueryableDocIdsSnapshot().contains(0));
+        assertFalse(sc.getDocIdsSnapshot().contains(0));
       }
       // docId=12 in seg03 was newly added.
       if (sc.getIndexSegment() == seg03) {
-        assertTrue(sc.getQueryableDocIdsSnapshot().contains(12));
+        assertTrue(sc.getDocIdsSnapshot().contains(12));
       }
     }
   }
@@ -796,21 +796,21 @@ public class BasePartitionUpsertMetadataManagerTest {
     for (SegmentContext reuseSC : reuseSegmentContexts) {
       for (SegmentContext sc : segmentContexts) {
         if (reuseSC.getIndexSegment() == sc.getIndexSegment()) {
-          assertSame(reuseSC.getQueryableDocIdsSnapshot(), sc.getQueryableDocIdsSnapshot());
+          assertSame(reuseSC.getDocIdsSnapshot(), sc.getDocIdsSnapshot());
         }
       }
       ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(reuseSC.getIndexSegment());
       assertNotNull(validDocIds);
       // The upsert view holds a clone of the original queryableDocIds held by the segment object.
-      assertNotSame(reuseSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
-      assertEquals(reuseSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertNotSame(reuseSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(reuseSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
       // docId=0 in seg01 got invalidated.
       if (reuseSC.getIndexSegment() == seg01) {
-        assertFalse(reuseSC.getQueryableDocIdsSnapshot().contains(0));
+        assertFalse(reuseSC.getDocIdsSnapshot().contains(0));
       }
       // docId=12 in seg03 was newly added.
       if (reuseSC.getIndexSegment() == seg03) {
-        assertTrue(reuseSC.getQueryableDocIdsSnapshot().contains(12));
+        assertTrue(reuseSC.getDocIdsSnapshot().contains(12));
       }
     }
 
@@ -825,21 +825,21 @@ public class BasePartitionUpsertMetadataManagerTest {
     for (SegmentContext refreshSC : refreshSegmentContexts) {
       for (SegmentContext sc : segmentContexts) {
         if (refreshSC.getIndexSegment() == sc.getIndexSegment()) {
-          assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), sc.getQueryableDocIdsSnapshot());
+          assertNotSame(refreshSC.getDocIdsSnapshot(), sc.getDocIdsSnapshot());
         }
       }
       ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(refreshSC.getIndexSegment());
       assertNotNull(validDocIds);
       // The upsert view holds a clone of the original queryableDocIds held by the segment object.
-      assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
-      assertEquals(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertNotSame(refreshSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(refreshSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
       // docId=0 in seg01 got invalidated.
       if (refreshSC.getIndexSegment() == seg01) {
-        assertFalse(refreshSC.getQueryableDocIdsSnapshot().contains(0));
+        assertFalse(refreshSC.getDocIdsSnapshot().contains(0));
       }
       // docId=12 in seg03 was newly added.
       if (refreshSC.getIndexSegment() == seg03) {
-        assertTrue(refreshSC.getQueryableDocIdsSnapshot().contains(12));
+        assertTrue(refreshSC.getDocIdsSnapshot().contains(12));
       }
     }
   }
@@ -896,22 +896,22 @@ public class BasePartitionUpsertMetadataManagerTest {
     for (SegmentContext refreshSC : refreshSegmentContexts) {
       for (SegmentContext sc : segmentContexts) {
         if (refreshSC.getIndexSegment() == sc.getIndexSegment()) {
-          assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), sc.getQueryableDocIdsSnapshot());
+          assertNotSame(refreshSC.getDocIdsSnapshot(), sc.getDocIdsSnapshot());
         }
       }
       ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(refreshSC.getIndexSegment());
       assertNotNull(validDocIds);
       // The upsert view holds a clone of the original queryableDocIds held by the segment object.
-      assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
-      assertEquals(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
-      assertNotNull(refreshSC.getQueryableDocIdsSnapshot());
+      assertNotSame(refreshSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(refreshSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertNotNull(refreshSC.getDocIdsSnapshot());
       // docId=0 in seg01 got invalidated.
       if (refreshSC.getIndexSegment() == seg01) {
-        assertFalse(refreshSC.getQueryableDocIdsSnapshot().contains(0));
+        assertFalse(refreshSC.getDocIdsSnapshot().contains(0));
       }
       // docId=12 in seg03 was newly added.
       if (refreshSC.getIndexSegment() == seg03) {
-        assertTrue(refreshSC.getQueryableDocIdsSnapshot().contains(12));
+        assertTrue(refreshSC.getDocIdsSnapshot().contains(12));
       }
     }
   }

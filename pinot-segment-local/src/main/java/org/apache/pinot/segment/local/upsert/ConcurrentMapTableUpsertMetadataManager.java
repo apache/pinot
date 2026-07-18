@@ -95,24 +95,28 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
     // Otherwise, get queryableDocIds bitmaps as kept by the segment objects directly as before.
     if (_context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE || QueryOptionsUtils.isSkipUpsertView(
         queryOptions)) {
+      // No shared upsert-view lock exists in this branch, so a direct read is already safe here.
+      boolean skipUpsertDelete = QueryOptionsUtils.isSkipUpsertDelete(queryOptions);
       for (SegmentContext segmentContext : segmentContexts) {
         IndexSegment segment = segmentContext.getIndexSegment();
-        segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
+        segmentContext.setDocIdsSnapshot(skipUpsertDelete
+            ? UpsertUtils.getValidDocIdsSnapshotFromSegment(segment)
+            : UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
       }
       return;
     }
-    // All segments should have been tracked by partitionMetadataManagers to provide queries consistent upsert view.
+    // A consistency mode is active: UpsertViewManager knows the locking each mode requires for skipUpsertDelete too.
     _partitionMetadataManagerMap.forEach(
         (partitionID, upsertMetadataManager) -> upsertMetadataManager.getUpsertViewManager()
             .setSegmentContexts(segmentContexts, queryOptions));
     if (LOGGER.isDebugEnabled()) {
       for (SegmentContext segmentContext : segmentContexts) {
         IndexSegment segment = segmentContext.getIndexSegment();
-        if (segmentContext.getQueryableDocIdsSnapshot() == null) {
+        if (segmentContext.getDocIdsSnapshot() == null) {
           LOGGER.debug("No upsert view for segment: {}, type: {}, total: {}", segment.getSegmentName(),
               (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.getSegmentMetadata().getTotalDocs());
         } else {
-          int cardCnt = segmentContext.getQueryableDocIdsSnapshot().getCardinality();
+          int cardCnt = segmentContext.getDocIdsSnapshot().getCardinality();
           LOGGER.debug("Got upsert view of segment: {}, type: {}, total: {}, valid: {}", segment.getSegmentName(),
               (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.getSegmentMetadata().getTotalDocs(),
               cardCnt);

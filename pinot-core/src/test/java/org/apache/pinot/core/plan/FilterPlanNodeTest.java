@@ -94,7 +94,7 @@ public class FilterPlanNodeTest {
     // Result should be invariant - always exactly 3 docs
     for (int i = 0; i < 10_000; i++) {
       SegmentContext segmentContext = new SegmentContext(segment);
-      segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
+      segmentContext.setDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
       assertEquals(getNumberOfFilteredDocs(segmentContext, queryContext), 3);
     }
 
