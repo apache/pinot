@@ -105,29 +105,21 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     assertSame(segmentContext.getDocIdsSnapshot(), segment.getValidDocIds().getMutableRoaringBitmap());
   }
 
+  /// ConcurrentMapTableUpsertMetadataManager's dispatch only special-cases NONE (see the other tests above);
+  /// SYNC and SNAPSHOT both fall into this same delegate branch, so testing one mode here is sufficient — their
+  /// differing internal behavior is UpsertViewManager's concern, covered by UpsertViewManagerTest instead.
   @Test
-  public void testSyncModeDelegatesToUpsertViewManagerAndRespectsTracking() {
+  public void testDelegatesToUpsertViewManagerAndRespectsTracking() {
     ConcurrentMapTableUpsertMetadataManager manager = createManager(UpsertConfig.ConsistencyMode.SYNC);
     IndexSegment segment = mockSegmentWithDistinctBitmaps();
     SegmentContext segmentContext = new SegmentContext(segment);
 
-    // Deliberately not tracked: a correct delegation to UpsertViewManager leaves the snapshot unset, since
-    // UpsertViewManager only serves tracked segments. A regression back to a direct-read bypass would populate it
-    // regardless of tracking, as testNoneModeTakesDirectReadEvenWhenUntracked demonstrates.
-    manager.setSegmentContexts(List.of(segmentContext), Map.of(QueryOptionKey.USE_VALID_DOC_IDS, "true"));
-    assertNull(segmentContext.getDocIdsSnapshot());
-
-    manager.getOrCreatePartitionManager(0).getUpsertViewManager().trackSegment(segment);
-    manager.setSegmentContexts(List.of(segmentContext), Map.of(QueryOptionKey.USE_VALID_DOC_IDS, "true"));
-    assertSame(segmentContext.getDocIdsSnapshot(), segment.getValidDocIds().getMutableRoaringBitmap());
-  }
-
-  @Test
-  public void testSnapshotModeDelegatesToUpsertViewManagerAndRespectsTracking() {
-    ConcurrentMapTableUpsertMetadataManager manager = createManager(UpsertConfig.ConsistencyMode.SNAPSHOT);
-    IndexSegment segment = mockSegmentWithDistinctBitmaps();
-    SegmentContext segmentContext = new SegmentContext(segment);
-
+    // Force the partition manager (and its UpsertViewManager) to exist, but deliberately don't track the segment:
+    // a correct delegation to UpsertViewManager leaves the snapshot unset, since UpsertViewManager only serves
+    // tracked segments. A regression back to a direct-read bypass would populate it regardless of tracking, as
+    // testNoneModeTakesDirectReadEvenWhenUntracked demonstrates. (Without forcing the partition manager to exist
+    // first, this assertion would pass vacuously: setSegmentContexts would iterate zero partition managers.)
+    manager.getOrCreatePartitionManager(0);
     manager.setSegmentContexts(List.of(segmentContext), Map.of(QueryOptionKey.USE_VALID_DOC_IDS, "true"));
     assertNull(segmentContext.getDocIdsSnapshot());
 

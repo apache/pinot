@@ -97,6 +97,22 @@ public class UpsertViewManagerTest {
     assertSame(defaultCtx.getDocIdsSnapshot(), QUERYABLE_RESULT);
   }
 
+  /// Without a delete column, queryable docs == valid docs; the refresh reuses one clone for both caches instead
+  /// of cloning twice (see doBatchRefreshUpsertView), so both maps must resolve to the same bitmap instance.
+  @Test
+  public void testNoDeleteColumnReusesSameBitmapInBothCaches() {
+    UpsertViewManager mgr = new UpsertViewManager(UpsertConfig.ConsistencyMode.SNAPSHOT, mock(UpsertContext.class));
+    IndexSegment seg1 = mock(MutableSegment.class);
+    ThreadSafeMutableRoaringBitmap validBitmap = mock(ThreadSafeMutableRoaringBitmap.class);
+    when(validBitmap.getMutableRoaringBitmap()).thenReturn(new MutableRoaringBitmap());
+    when(seg1.getValidDocIds()).thenReturn(validBitmap);
+    when(seg1.getQueryableDocIds()).thenReturn(null);
+    when(seg1.getSegmentName()).thenReturn("seg1");
+
+    mgr.trackSegment(seg1);
+    assertSame(mgr.getQueryableDocIdsSnapshot(seg1), mgr.getValidDocIdsSnapshot(seg1));
+  }
+
   private static final MutableRoaringBitmap VALID_RESULT = new MutableRoaringBitmap();
   private static final MutableRoaringBitmap QUERYABLE_RESULT = new MutableRoaringBitmap();
 

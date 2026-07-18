@@ -24,6 +24,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 public class SegmentContext {
   private final IndexSegment _indexSegment;
+  /// Queryable-docs bitmap by default, or valid-docs (tombstones included) when the query set `useValidDocIds`.
   @Nullable
   private MutableRoaringBitmap _docIdsSnapshot = null;
 
@@ -35,12 +36,13 @@ public class SegmentContext {
     return _indexSegment;
   }
 
-  /// Queryable-docs bitmap by default, or valid-docs (tombstones included) when the query set `useValidDocIds`.
+  /// See {@link #_docIdsSnapshot}.
   @Nullable
   public MutableRoaringBitmap getDocIdsSnapshot() {
     return _docIdsSnapshot;
   }
 
+  /// See {@link #_docIdsSnapshot}.
   public void setDocIdsSnapshot(@Nullable MutableRoaringBitmap docIdsSnapshot) {
     _docIdsSnapshot = docIdsSnapshot;
   }

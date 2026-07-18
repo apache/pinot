@@ -110,6 +110,7 @@ public interface IndexSegment {
     return false;
   }
 
+  /// Same as {@link #hasNoQueryableDocs}, against {@link #getValidDocIds} instead.
   default boolean hasNoValidDocs() {
     return false;
   }

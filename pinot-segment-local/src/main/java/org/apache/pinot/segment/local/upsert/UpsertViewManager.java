@@ -65,6 +65,8 @@ public class UpsertViewManager {
   // The query threads always get _upsertViewTrackedSegmentsLock then _upsertViewSegmentDocIdsLock to avoid deadlock.
   // And the upsert threads never nest the two locks.
   private final ReadWriteLock _upsertViewLock = new ReentrantReadWriteLock();
+  // When a segment has no delete column, the same MutableRoaringBitmap instance is stored in both maps below
+  // (see doBatchRefreshUpsertView) to avoid cloning it twice; never mutate a bitmap read from either map in place.
   private volatile Map<IndexSegment, MutableRoaringBitmap> _segmentQueryableDocIdsMap;
   // Refreshed alongside _segmentQueryableDocIdsMap in the same locked pass, so useValidDocIds queries and pruning
   // can read a consistent cut lock-free instead of taking the write lock per call.
@@ -219,16 +221,20 @@ public class UpsertViewManager {
 
   @VisibleForTesting
   void doBatchRefreshUpsertView(long upsertViewFreshnessMs, boolean forceRefresh) {
-    // Always refresh if the current view is still empty.
-    if (!forceRefresh && skipUpsertViewRefresh(upsertViewFreshnessMs) && _segmentQueryableDocIdsMap != null) {
+    // Always refresh if either view is still empty. The two maps are swapped in via two separate volatile writes,
+    // not one atomic publish, so a concurrent reader can observe _segmentValidDocIdsMap up to one refresh behind
+    // _segmentQueryableDocIdsMap; this is self-correcting next cycle and no caller combines both maps at once.
+    if (!forceRefresh && skipUpsertViewRefresh(upsertViewFreshnessMs) && _segmentQueryableDocIdsMap != null
+        && _segmentValidDocIdsMap != null) {
       return;
     }
     _upsertViewLock.writeLock().lock();
     try {
-      // Check again with lock, and always refresh if the current view is still empty.
+      // Check again with lock, and always refresh if either view is still empty.
       Map<IndexSegment, MutableRoaringBitmap> queryableDocIds = _segmentQueryableDocIdsMap;
       Map<IndexSegment, MutableRoaringBitmap> validDocs = _segmentValidDocIdsMap;
-      if (!forceRefresh && skipUpsertViewRefresh(upsertViewFreshnessMs) && queryableDocIds != null) {
+      if (!forceRefresh && skipUpsertViewRefresh(upsertViewFreshnessMs) && queryableDocIds != null
+          && validDocs != null) {
         return;
       }
       if (LOGGER.isDebugEnabled()) {
