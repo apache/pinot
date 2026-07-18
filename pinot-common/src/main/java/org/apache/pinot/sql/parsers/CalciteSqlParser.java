@@ -174,6 +174,7 @@ public class CalciteSqlParser {
         }
       } else if (sqlNode instanceof SqlSetOption) {
         // extract options, these are non-execution statements
+        //this is how SET options are parsed.
         List<SqlNode> operandList = ((SqlSetOption) sqlNode).getOperandList();
         SqlIdentifier key = (SqlIdentifier) operandList.get(1);
         SqlLiteral value = (SqlLiteral) operandList.get(2);

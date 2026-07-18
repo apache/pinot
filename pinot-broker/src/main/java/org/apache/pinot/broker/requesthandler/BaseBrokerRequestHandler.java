@@ -36,6 +36,8 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlSelect;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
@@ -58,6 +60,8 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -67,8 +71,11 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -189,6 +196,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
     }
 
+    //check if we need to add extra time based pruning.
+    applySkipOutOfRetentionValuesIfNeeded(sqlNodeAndOptions);
     // check app qps before doing anything
     String application = sqlNodeAndOptions.getOptions().get(QueryOptionKey.APPLICATION_NAME);
     if (application != null && !_queryQuotaManager.acquireApplication(application)) {
@@ -479,5 +488,58 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   protected boolean isQueryCancellationEnabled() {
     return _enableQueryCancellation;
+  }
+
+  /**
+   * Appends a where clause to the query to filter out of retention data if SKIP_OUT_OF_RETENTION_VALUES is
+   * set to True in query Options.
+   * @param sqlNodeAndOptions
+   */
+  private void applySkipOutOfRetentionValuesIfNeeded(SqlNodeAndOptions sqlNodeAndOptions) {
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
+    if (!Boolean.parseBoolean(options.get(QueryOptionKey.SKIP_OUT_OF_RETENTION_VALUES))) {
+      return;
+    }
+
+    //then check if the table has a time column, get its format, calculate the last valid timestamp in ms and append
+    //that to the query.
+    SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
+    if (sqlNode == null) {
+      return;
+    }
+
+    //we only inject this extra where clause for select statements
+    if (!(sqlNode instanceof SqlSelect)) {
+      return;
+    }
+    SqlSelect sqlSelect = (SqlSelect) sqlNode;
+    //get list of table names used in the query.
+    TableNameExtractor tableNameExtractor = new TableNameExtractor();
+    tableNameExtractor.extractTableNames(sqlSelect);
+    Set<String> tableNames = tableNameExtractor.getTableNames();
+
+    //extracting the first table.
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNames.iterator().next());
+
+    TableConfig tableConfig = _tableCache.getTableConfig(rawTableName);
+    Schema schema = _tableCache.getSchema(rawTableName);
+    if (tableConfig == null || schema == null || tableConfig.getValidationConfig() == null) {
+      return;
+    }
+
+    //get timestamp column and retention details
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    String retentionTimeUnit = tableConfig.getValidationConfig().getRetentionTimeUnit();
+    String retentionTimeValue = tableConfig.getValidationConfig().getRetentionTimeValue();
+
+    if (StringUtils.isEmpty(timeColumnName) || StringUtils.isEmpty(retentionTimeUnit) || StringUtils.isEmpty(retentionTimeValue)) {
+      return;
+    }
+
+
+
+
+
+
   }
 }
