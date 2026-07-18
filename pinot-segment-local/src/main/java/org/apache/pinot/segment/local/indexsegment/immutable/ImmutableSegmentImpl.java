@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.local.upsert.UpsertViewManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
@@ -380,6 +381,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     }
     ThreadSafeMutableRoaringBitmap validDocIds = getValidDocIds();
     return validDocIds != null && validDocIds.isEmpty();
+  }
+
+  @Override
+  public boolean hasNoValidDocs() {
+    return UpsertUtils.hasNoValidDocs(_partitionUpsertMetadataManager, this);
   }
 
   @Override

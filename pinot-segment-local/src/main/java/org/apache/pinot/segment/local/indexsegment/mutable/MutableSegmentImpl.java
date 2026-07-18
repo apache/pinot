@@ -74,6 +74,7 @@ import org.apache.pinot.segment.local.upsert.ComparisonColumns;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
+import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.local.upsert.UpsertViewManager;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.IdMap;
@@ -1270,6 +1271,11 @@ public class MutableSegmentImpl implements MutableSegment {
     }
     ThreadSafeMutableRoaringBitmap validDocIds = getValidDocIds();
     return validDocIds != null && validDocIds.isEmpty();
+  }
+
+  @Override
+  public boolean hasNoValidDocs() {
+    return UpsertUtils.hasNoValidDocs(_partitionUpsertMetadataManager, this);
   }
 
   @Override

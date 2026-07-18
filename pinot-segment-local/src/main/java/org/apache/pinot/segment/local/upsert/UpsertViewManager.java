@@ -66,6 +66,9 @@ public class UpsertViewManager {
   // And the upsert threads never nest the two locks.
   private final ReadWriteLock _upsertViewLock = new ReentrantReadWriteLock();
   private volatile Map<IndexSegment, MutableRoaringBitmap> _segmentQueryableDocIdsMap;
+  // Refreshed alongside _segmentQueryableDocIdsMap in the same locked pass, so useValidDocIds queries and pruning
+  // can read a consistent cut lock-free instead of taking the write lock per call.
+  private volatile Map<IndexSegment, MutableRoaringBitmap> _segmentValidDocIdsMap;
 
   // For SNAPSHOT mode, track segments that get new updates since last refresh to reduce the overhead of refreshing.
   private final Set<IndexSegment> _updatedSegmentsSinceLastRefresh = ConcurrentHashMap.newKeySet();
@@ -164,10 +167,11 @@ public class UpsertViewManager {
    * present, to avoid overwriting the contexts specified at the others places.
    */
   public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
+    boolean useValidDocIds = QueryOptionsUtils.isUseValidDocIds(queryOptions);
     if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {
       _upsertViewLock.readLock().lock();
       try {
-        setSegmentContexts(segmentContexts);
+        setSegmentContexts(segmentContexts, useValidDocIds);
         return;
       } finally {
         _upsertViewLock.readLock().unlock();
@@ -184,21 +188,24 @@ public class UpsertViewManager {
       upsertViewFreshnessMs = _upsertViewRefreshIntervalMs;
     }
     doBatchRefreshUpsertView(upsertViewFreshnessMs, false);
-    Map<IndexSegment, MutableRoaringBitmap> currentUpsertView = _segmentQueryableDocIdsMap;
+    Map<IndexSegment, MutableRoaringBitmap> currentUpsertView =
+        useValidDocIds ? _segmentValidDocIdsMap : _segmentQueryableDocIdsMap;
     for (SegmentContext segmentContext : segmentContexts) {
       IndexSegment segment = segmentContext.getIndexSegment();
       MutableRoaringBitmap segmentView = currentUpsertView.get(segment);
       if (segmentView != null) {
-        segmentContext.setQueryableDocIdsSnapshot(segmentView);
+        segmentContext.setDocIdsSnapshot(segmentView);
       }
     }
   }
 
-  private void setSegmentContexts(List<SegmentContext> segmentContexts) {
+  private void setSegmentContexts(List<SegmentContext> segmentContexts, boolean useValidDocIds) {
     for (SegmentContext segmentContext : segmentContexts) {
       IndexSegment segment = segmentContext.getIndexSegment();
       if (_trackedSegments.contains(segment)) {
-        segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment, true));
+        segmentContext.setDocIdsSnapshot(useValidDocIds
+            ? UpsertUtils.getValidDocIdsSnapshotFromSegment(segment, true)
+            : UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment, true));
       }
     }
   }
@@ -220,6 +227,7 @@ public class UpsertViewManager {
     try {
       // Check again with lock, and always refresh if the current view is still empty.
       Map<IndexSegment, MutableRoaringBitmap> current = _segmentQueryableDocIdsMap;
+      Map<IndexSegment, MutableRoaringBitmap> currentValid = _segmentValidDocIdsMap;
       if (!forceRefresh && skipUpsertViewRefresh(upsertViewFreshnessMs) && current != null) {
         return;
       }
@@ -234,12 +242,17 @@ public class UpsertViewManager {
         }
       }
       Map<IndexSegment, MutableRoaringBitmap> updated = new HashMap<>();
+      Map<IndexSegment, MutableRoaringBitmap> updatedValid = new HashMap<>();
       for (IndexSegment segment : _trackedSegments) {
         // Update bitmap for segment updated since last refresh or not in the view yet. This also handles segments
         // that are tracked by _trackedSegments but not by _updatedSegmentsSinceLastRefresh, like those didn't update
         // any bitmaps as their docs simply lost all the upsert comparisons with the existing docs.
         if (current == null || current.get(segment) == null || _updatedSegmentsSinceLastRefresh.contains(segment)) {
-          updated.put(segment, UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment, true));
+          MutableRoaringBitmap validSnapshot = UpsertUtils.getValidDocIdsSnapshotFromSegment(segment, true);
+          updatedValid.put(segment, validSnapshot);
+          // Without delete enabled, queryable docs equal valid docs; reuse the clone instead of cloning twice.
+          updated.put(segment, segment.getQueryableDocIds() != null
+              ? UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment, true) : validSnapshot);
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Update upsert view of segment: {}, type: {}, total: {}, valid: {}, reason: {}",
                 segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"),
@@ -248,6 +261,7 @@ public class UpsertViewManager {
           }
         } else {
           updated.put(segment, current.get(segment));
+          updatedValid.put(segment, currentValid.get(segment));
         }
       }
       // Swap in the new consistent set of bitmaps.
@@ -258,6 +272,7 @@ public class UpsertViewManager {
                 segment.getSegmentMetadata().getTotalDocs(), bitmap.getCardinality()));
       }
       _segmentQueryableDocIdsMap = updated;
+      _segmentValidDocIdsMap = updatedValid;
       _updatedSegmentsSinceLastRefresh.clear();
       _lastUpsertViewRefreshTimeMs = System.currentTimeMillis();
     } finally {
@@ -307,11 +322,23 @@ public class UpsertViewManager {
     return _segmentQueryableDocIdsMap;
   }
 
+  @VisibleForTesting
+  Map<IndexSegment, MutableRoaringBitmap> getSegmentValidDocIdsMap() {
+    return _segmentValidDocIdsMap;
+  }
+
   // Returns the queryable doc-id snapshot for the given segment from the most recent refresh, or
   // null if no refresh has happened yet or the segment is not in the current view.
   @Nullable
   public MutableRoaringBitmap getQueryableDocIdsSnapshot(IndexSegment segment) {
     Map<IndexSegment, MutableRoaringBitmap> view = _segmentQueryableDocIdsMap;
+    return view == null ? null : view.get(segment);
+  }
+
+  // Same as getQueryableDocIdsSnapshot, but from the valid-docs (tombstones included) cache.
+  @Nullable
+  public MutableRoaringBitmap getValidDocIdsSnapshot(IndexSegment segment) {
+    Map<IndexSegment, MutableRoaringBitmap> view = _segmentValidDocIdsMap;
     return view == null ? null : view.get(segment);
   }
 

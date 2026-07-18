@@ -97,6 +97,17 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void shouldReadUseValidDocIdsOption() {
+    Map<String, String> optsTrue = Map.of(USE_VALID_DOC_IDS, "true");
+    Map<String, String> optsFalse = Map.of(USE_VALID_DOC_IDS, "false");
+    Map<String, String> optsMissing = Map.of();
+
+    assertTrue(QueryOptionsUtils.isUseValidDocIds(optsTrue));
+    assertFalse(QueryOptionsUtils.isUseValidDocIds(optsFalse));
+    assertFalse(QueryOptionsUtils.isUseValidDocIds(optsMissing));
+  }
+
+  @Test
   public void shouldReadIgnoreMissingSegmentsOption() {
     // Given:
     Map<String, String> optsTrue = Map.of(IGNORE_MISSING_SEGMENTS, "true");

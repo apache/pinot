@@ -20,12 +20,14 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -52,12 +54,63 @@ public class UpsertViewManagerTest {
     mgr.trackSegment(seg1);
     assertEquals(mgr.getTrackedSegments(), Set.of(seg1));
     mgr.setSegmentContexts(List.of(segCtx1), new HashMap<>());
-    assertSame(segCtx1.getQueryableDocIdsSnapshot(), mutableRoaringBitmap);
+    assertSame(segCtx1.getDocIdsSnapshot(), mutableRoaringBitmap);
 
     mgr.untrackSegment(seg1);
     assertTrue(mgr.getTrackedSegments().isEmpty());
     segCtx1 = new SegmentContext(seg1);
     mgr.setSegmentContexts(List.of(segCtx1), new HashMap<>());
-    assertNull(segCtx1.getQueryableDocIdsSnapshot());
+    assertNull(segCtx1.getDocIdsSnapshot());
+  }
+
+  @Test
+  public void testUseValidDocIdsReadsValidBitmapUnderSyncMode() {
+    UpsertViewManager mgr = new UpsertViewManager(UpsertConfig.ConsistencyMode.SYNC, mock(UpsertContext.class));
+    IndexSegment seg1 = mockSegmentWithDistinctBitmaps();
+    mgr.trackSegment(seg1);
+
+    SegmentContext segCtx = new SegmentContext(seg1);
+    mgr.setSegmentContexts(List.of(segCtx), Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_VALID_DOC_IDS,
+        "true"));
+    assertSame(segCtx.getDocIdsSnapshot(), VALID_RESULT);
+
+    SegmentContext defaultCtx = new SegmentContext(seg1);
+    mgr.setSegmentContexts(List.of(defaultCtx), new HashMap<>());
+    assertSame(defaultCtx.getDocIdsSnapshot(), QUERYABLE_RESULT);
+  }
+
+  @Test
+  public void testUseValidDocIdsReadsValidBitmapUnderSnapshotMode() {
+    UpsertViewManager mgr = new UpsertViewManager(UpsertConfig.ConsistencyMode.SNAPSHOT, mock(UpsertContext.class));
+    IndexSegment seg1 = mockSegmentWithDistinctBitmaps();
+    mgr.trackSegment(seg1);
+
+    // useValidDocIds reads the cached valid-docs map, refreshed alongside the queryable-docs one on track.
+    SegmentContext segCtx = new SegmentContext(seg1);
+    mgr.setSegmentContexts(List.of(segCtx), Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_VALID_DOC_IDS,
+        "true"));
+    assertSame(segCtx.getDocIdsSnapshot(), VALID_RESULT);
+
+    // Without the option, the cached queryable-docs map is used instead.
+    SegmentContext defaultCtx = new SegmentContext(seg1);
+    mgr.setSegmentContexts(List.of(defaultCtx), new HashMap<>());
+    assertSame(defaultCtx.getDocIdsSnapshot(), QUERYABLE_RESULT);
+  }
+
+  private static final MutableRoaringBitmap VALID_RESULT = new MutableRoaringBitmap();
+  private static final MutableRoaringBitmap QUERYABLE_RESULT = new MutableRoaringBitmap();
+
+  /// Mocks a segment whose valid-docs and queryable-docs bitmaps resolve to two different, identity-comparable
+  /// {@link MutableRoaringBitmap} instances, so tests can assert exactly which one a code path picked.
+  private static IndexSegment mockSegmentWithDistinctBitmaps() {
+    IndexSegment segment = mock(MutableSegment.class);
+    ThreadSafeMutableRoaringBitmap validBitmap = mock(ThreadSafeMutableRoaringBitmap.class);
+    ThreadSafeMutableRoaringBitmap queryableBitmap = mock(ThreadSafeMutableRoaringBitmap.class);
+    when(validBitmap.getMutableRoaringBitmap()).thenReturn(VALID_RESULT);
+    when(queryableBitmap.getMutableRoaringBitmap()).thenReturn(QUERYABLE_RESULT);
+    when(segment.getValidDocIds()).thenReturn(validBitmap);
+    when(segment.getQueryableDocIds()).thenReturn(queryableBitmap);
+    when(segment.getSegmentName()).thenReturn("seg1");
+    return segment;
   }
 }

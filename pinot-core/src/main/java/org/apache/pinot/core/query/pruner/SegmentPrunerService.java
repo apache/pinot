@@ -136,26 +136,31 @@ public class SegmentPrunerService {
    * @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
    *                 undefined way. Therefore, this list should not be used after calling this method.
    * @param query    query context; when non-null and skipUpsert=true, segments with 0 queryable/valid docs are not
-   *                 treated as empty (they contribute replaced rows to the result). When queryable doc ids exist,
-   *                 emptiness is determined from them; otherwise {@link IndexSegment#getValidDocIds()} is used.
+   *                 treated as empty (they contribute replaced rows to the result). When useValidDocIds=true,
+   *                 emptiness is determined from valid docs (tombstones count as non-empty); otherwise from
+   *                 queryable docs.
    * @return the new list with filtered elements. This is the list that have to be used.
    */
   private static List<IndexSegment> removeEmptySegments(List<IndexSegment> segments, QueryContext query) {
     int selected = 0;
-    boolean skipUpsert = QueryOptionsUtils.isSkipUpsert(query.getQueryOptions());
+    Map<String, String> queryOptions = query.getQueryOptions();
+    boolean skipUpsert = QueryOptionsUtils.isSkipUpsert(queryOptions);
+    boolean useValidDocIds = QueryOptionsUtils.isUseValidDocIds(queryOptions);
     for (IndexSegment segment : segments) {
-      if (!isEmptySegment(segment, skipUpsert)) {
+      if (!isEmptySegment(segment, skipUpsert, useValidDocIds)) {
         segments.set(selected++, segment);
       }
     }
     return segments.subList(0, selected);
   }
 
-  private static boolean isEmptySegment(IndexSegment segment, boolean skipUpsert) {
+  private static boolean isEmptySegment(IndexSegment segment, boolean skipUpsert, boolean useValidDocIds) {
     if (segment.getSegmentMetadata().getTotalDocs() == 0) {
       return true;
     }
-    // Check if the segment has 0 queryable docIds while skipUpsert=false
-    return !skipUpsert && segment.hasNoQueryableDocs();
+    if (skipUpsert) {
+      return false;
+    }
+    return useValidDocIds ? segment.hasNoValidDocs() : segment.hasNoQueryableDocs();
   }
 }

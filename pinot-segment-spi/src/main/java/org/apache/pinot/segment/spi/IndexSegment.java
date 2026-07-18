@@ -110,6 +110,10 @@ public interface IndexSegment {
     return false;
   }
 
+  default boolean hasNoValidDocs() {
+    return false;
+  }
+
   /**
    * Returns the record for the given document id. Virtual column values are not returned.
    * <p>NOTE: don't use this method for high performance code. Use PinotSegmentRecordReader when reading multiple

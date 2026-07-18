@@ -187,6 +187,42 @@ public class SegmentPrunerServiceTest {
   }
 
   @Test
+  public void emptyQueryableRetainedWithUseValidDocIds() {
+    SegmentPrunerService service = new SegmentPrunerService(_emptyPrunerConf);
+    ThreadSafeMutableRoaringBitmap valid = new ThreadSafeMutableRoaringBitmap(0);
+    ThreadSafeMutableRoaringBitmap queryable = new ThreadSafeMutableRoaringBitmap();
+    IndexSegment segment = mockUpsertIndexSegment(10, valid, queryable);
+
+    List<IndexSegment> segments = new ArrayList<>();
+    segments.add(segment);
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("select col1 from t1 option(useValidDocIds=true)");
+
+    List<IndexSegment> actual = service.prune(segments, queryContext, new SegmentPrunerStatistics());
+
+    Assert.assertEquals(actual, segments);
+  }
+
+  /**
+   * useValidDocIds checks valid-docs emptiness specifically, not skipUpsert's blanket bypass: a segment fully
+   * superseded elsewhere (0 valid docs) is still pruned.
+   */
+  @Test
+  public void emptyValidPrunedWithUseValidDocIds() {
+    SegmentPrunerService service = new SegmentPrunerService(_emptyPrunerConf);
+    IndexSegment segment = mockUpsertIndexSegment(10, new ThreadSafeMutableRoaringBitmap(), null);
+
+    List<IndexSegment> segments = new ArrayList<>();
+    segments.add(segment);
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("select col1 from t1 option(useValidDocIds=true)");
+
+    List<IndexSegment> actual = service.prune(segments, queryContext, new SegmentPrunerStatistics());
+
+    Assert.assertEquals(actual, List.of());
+  }
+
+  @Test
   public void nonEmptyQueryableNotPruned() {
     SegmentPrunerService service = new SegmentPrunerService(_emptyPrunerConf);
     ThreadSafeMutableRoaringBitmap valid = new ThreadSafeMutableRoaringBitmap(0);
