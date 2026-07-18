@@ -741,6 +741,9 @@ public class CommonConstants {
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
+        /// Default `false` (queryable docs, tombstones excluded). When `true`, skips the delete/tombstone
+        /// exclusion so rows deleted via `deleteRecordColumn` are included.
+        public static final String SKIP_UPSERT_DELETE = "skipUpsertDelete";
         public static final String USE_STAR_TREE = "useStarTree";
         /**
          * When true, use index-based distinct operators when applicable. This enables both
