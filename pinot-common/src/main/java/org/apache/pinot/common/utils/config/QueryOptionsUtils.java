@@ -165,8 +165,8 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT_VIEW));
   }
 
-  public static boolean isUseValidDocIds(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_VALID_DOC_IDS));
+  public static boolean isSkipUpsertDelete(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT_DELETE));
   }
 
   public static boolean isTraceRuleProductions(Map<String, String> queryOptions) {

@@ -68,7 +68,7 @@ public class UpsertViewManager {
   // When a segment has no delete column, the same MutableRoaringBitmap instance is stored in both maps below
   // (see doBatchRefreshUpsertView) to avoid cloning it twice; never mutate a bitmap read from either map in place.
   private volatile Map<IndexSegment, MutableRoaringBitmap> _segmentQueryableDocIdsMap;
-  // Refreshed alongside _segmentQueryableDocIdsMap in the same locked pass, so useValidDocIds queries and pruning
+  // Refreshed alongside _segmentQueryableDocIdsMap in the same locked pass, so skipUpsertDelete queries and pruning
   // can read a consistent cut lock-free instead of taking the write lock per call.
   private volatile Map<IndexSegment, MutableRoaringBitmap> _segmentValidDocIdsMap;
 
@@ -169,11 +169,11 @@ public class UpsertViewManager {
    * present, to avoid overwriting the contexts specified at the others places.
    */
   public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
-    boolean useValidDocIds = QueryOptionsUtils.isUseValidDocIds(queryOptions);
+    boolean skipUpsertDelete = QueryOptionsUtils.isSkipUpsertDelete(queryOptions);
     if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {
       _upsertViewLock.readLock().lock();
       try {
-        setSegmentContexts(segmentContexts, useValidDocIds);
+        setSegmentContexts(segmentContexts, skipUpsertDelete);
         return;
       } finally {
         _upsertViewLock.readLock().unlock();
@@ -191,7 +191,7 @@ public class UpsertViewManager {
     }
     doBatchRefreshUpsertView(upsertViewFreshnessMs, false);
     Map<IndexSegment, MutableRoaringBitmap> currentUpsertView =
-        useValidDocIds ? _segmentValidDocIdsMap : _segmentQueryableDocIdsMap;
+        skipUpsertDelete ? _segmentValidDocIdsMap : _segmentQueryableDocIdsMap;
     for (SegmentContext segmentContext : segmentContexts) {
       IndexSegment segment = segmentContext.getIndexSegment();
       MutableRoaringBitmap segmentView = currentUpsertView.get(segment);
@@ -201,11 +201,11 @@ public class UpsertViewManager {
     }
   }
 
-  private void setSegmentContexts(List<SegmentContext> segmentContexts, boolean useValidDocIds) {
+  private void setSegmentContexts(List<SegmentContext> segmentContexts, boolean skipUpsertDelete) {
     for (SegmentContext segmentContext : segmentContexts) {
       IndexSegment segment = segmentContext.getIndexSegment();
       if (_trackedSegments.contains(segment)) {
-        segmentContext.setDocIdsSnapshot(useValidDocIds
+        segmentContext.setDocIdsSnapshot(skipUpsertDelete
             ? UpsertUtils.getValidDocIdsSnapshotFromSegment(segment, true)
             : UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment, true));
       }

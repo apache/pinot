@@ -24,7 +24,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 public class SegmentContext {
   private final IndexSegment _indexSegment;
-  /// Queryable-docs bitmap by default, or valid-docs (tombstones included) when the query set `useValidDocIds`.
+  /// Queryable-docs bitmap by default, or valid-docs (tombstones included) when the query set `skipUpsertDelete`.
   @Nullable
   private MutableRoaringBitmap _docIdsSnapshot = null;
 

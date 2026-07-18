@@ -136,7 +136,7 @@ public class SegmentPrunerService {
    * @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
    *                 undefined way. Therefore, this list should not be used after calling this method.
    * @param query    query context; when non-null and skipUpsert=true, segments with 0 queryable/valid docs are not
-   *                 treated as empty (they contribute replaced rows to the result). When useValidDocIds=true,
+   *                 treated as empty (they contribute replaced rows to the result). When skipUpsertDelete=true,
    *                 emptiness is determined from valid docs (tombstones count as non-empty); otherwise from
    *                 queryable docs.
    * @return the new list with filtered elements. This is the list that have to be used.
@@ -145,22 +145,22 @@ public class SegmentPrunerService {
     int selected = 0;
     Map<String, String> queryOptions = query.getQueryOptions();
     boolean skipUpsert = QueryOptionsUtils.isSkipUpsert(queryOptions);
-    boolean useValidDocIds = QueryOptionsUtils.isUseValidDocIds(queryOptions);
+    boolean skipUpsertDelete = QueryOptionsUtils.isSkipUpsertDelete(queryOptions);
     for (IndexSegment segment : segments) {
-      if (!isEmptySegment(segment, skipUpsert, useValidDocIds)) {
+      if (!isEmptySegment(segment, skipUpsert, skipUpsertDelete)) {
         segments.set(selected++, segment);
       }
     }
     return segments.subList(0, selected);
   }
 
-  private static boolean isEmptySegment(IndexSegment segment, boolean skipUpsert, boolean useValidDocIds) {
+  private static boolean isEmptySegment(IndexSegment segment, boolean skipUpsert, boolean skipUpsertDelete) {
     if (segment.getSegmentMetadata().getTotalDocs() == 0) {
       return true;
     }
     if (skipUpsert) {
       return false;
     }
-    return useValidDocIds ? segment.hasNoValidDocs() : segment.hasNoQueryableDocs();
+    return skipUpsertDelete ? segment.hasNoValidDocs() : segment.hasNoQueryableDocs();
   }
 }

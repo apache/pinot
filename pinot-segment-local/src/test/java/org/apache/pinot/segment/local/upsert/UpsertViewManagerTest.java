@@ -64,13 +64,13 @@ public class UpsertViewManagerTest {
   }
 
   @Test
-  public void testUseValidDocIdsReadsValidBitmapUnderSyncMode() {
+  public void testSkipUpsertDeleteReadsValidBitmapUnderSyncMode() {
     UpsertViewManager mgr = new UpsertViewManager(UpsertConfig.ConsistencyMode.SYNC, mock(UpsertContext.class));
     IndexSegment seg1 = mockSegmentWithDistinctBitmaps();
     mgr.trackSegment(seg1);
 
     SegmentContext segCtx = new SegmentContext(seg1);
-    mgr.setSegmentContexts(List.of(segCtx), Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_VALID_DOC_IDS,
+    mgr.setSegmentContexts(List.of(segCtx), Map.of(CommonConstants.Broker.Request.QueryOptionKey.SKIP_UPSERT_DELETE,
         "true"));
     assertSame(segCtx.getDocIdsSnapshot(), VALID_RESULT);
 
@@ -80,14 +80,14 @@ public class UpsertViewManagerTest {
   }
 
   @Test
-  public void testUseValidDocIdsReadsValidBitmapUnderSnapshotMode() {
+  public void testSkipUpsertDeleteReadsValidBitmapUnderSnapshotMode() {
     UpsertViewManager mgr = new UpsertViewManager(UpsertConfig.ConsistencyMode.SNAPSHOT, mock(UpsertContext.class));
     IndexSegment seg1 = mockSegmentWithDistinctBitmaps();
     mgr.trackSegment(seg1);
 
-    // useValidDocIds reads the cached valid-docs map, refreshed alongside the queryable-docs one on track.
+    // skipUpsertDelete reads the cached valid-docs map, refreshed alongside the queryable-docs one on track.
     SegmentContext segCtx = new SegmentContext(seg1);
-    mgr.setSegmentContexts(List.of(segCtx), Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_VALID_DOC_IDS,
+    mgr.setSegmentContexts(List.of(segCtx), Map.of(CommonConstants.Broker.Request.QueryOptionKey.SKIP_UPSERT_DELETE,
         "true"));
     assertSame(segCtx.getDocIdsSnapshot(), VALID_RESULT);
 

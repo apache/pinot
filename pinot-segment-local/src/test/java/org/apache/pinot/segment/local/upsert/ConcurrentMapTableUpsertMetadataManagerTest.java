@@ -90,7 +90,7 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     SegmentContext segmentContext = new SegmentContext(segment);
 
     // Never tracked via any UpsertViewManager, yet a direct read still populates the snapshot.
-    manager.setSegmentContexts(List.of(segmentContext), Map.of(QueryOptionKey.USE_VALID_DOC_IDS, "true"));
+    manager.setSegmentContexts(List.of(segmentContext), Map.of(QueryOptionKey.SKIP_UPSERT_DELETE, "true"));
     assertSame(segmentContext.getDocIdsSnapshot(), segment.getValidDocIds().getMutableRoaringBitmap());
   }
 
@@ -101,7 +101,7 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     SegmentContext segmentContext = new SegmentContext(segment);
 
     manager.setSegmentContexts(List.of(segmentContext),
-        Map.of(QueryOptionKey.SKIP_UPSERT_VIEW, "true", QueryOptionKey.USE_VALID_DOC_IDS, "true"));
+        Map.of(QueryOptionKey.SKIP_UPSERT_VIEW, "true", QueryOptionKey.SKIP_UPSERT_DELETE, "true"));
     assertSame(segmentContext.getDocIdsSnapshot(), segment.getValidDocIds().getMutableRoaringBitmap());
   }
 
@@ -120,11 +120,11 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     // testNoneModeTakesDirectReadEvenWhenUntracked demonstrates. (Without forcing the partition manager to exist
     // first, this assertion would pass vacuously: setSegmentContexts would iterate zero partition managers.)
     manager.getOrCreatePartitionManager(0);
-    manager.setSegmentContexts(List.of(segmentContext), Map.of(QueryOptionKey.USE_VALID_DOC_IDS, "true"));
+    manager.setSegmentContexts(List.of(segmentContext), Map.of(QueryOptionKey.SKIP_UPSERT_DELETE, "true"));
     assertNull(segmentContext.getDocIdsSnapshot());
 
     manager.getOrCreatePartitionManager(0).getUpsertViewManager().trackSegment(segment);
-    manager.setSegmentContexts(List.of(segmentContext), Map.of(QueryOptionKey.USE_VALID_DOC_IDS, "true"));
+    manager.setSegmentContexts(List.of(segmentContext), Map.of(QueryOptionKey.SKIP_UPSERT_DELETE, "true"));
     assertSame(segmentContext.getDocIdsSnapshot(), segment.getValidDocIds().getMutableRoaringBitmap());
   }
 }

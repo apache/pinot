@@ -96,16 +96,16 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
     if (_context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE || QueryOptionsUtils.isSkipUpsertView(
         queryOptions)) {
       // No shared upsert-view lock exists in this branch, so a direct read is already safe here.
-      boolean useValidDocIds = QueryOptionsUtils.isUseValidDocIds(queryOptions);
+      boolean skipUpsertDelete = QueryOptionsUtils.isSkipUpsertDelete(queryOptions);
       for (SegmentContext segmentContext : segmentContexts) {
         IndexSegment segment = segmentContext.getIndexSegment();
-        segmentContext.setDocIdsSnapshot(useValidDocIds
+        segmentContext.setDocIdsSnapshot(skipUpsertDelete
             ? UpsertUtils.getValidDocIdsSnapshotFromSegment(segment)
             : UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
       }
       return;
     }
-    // A consistency mode is active: UpsertViewManager knows the locking each mode requires for useValidDocIds too.
+    // A consistency mode is active: UpsertViewManager knows the locking each mode requires for skipUpsertDelete too.
     _partitionMetadataManagerMap.forEach(
         (partitionID, upsertMetadataManager) -> upsertMetadataManager.getUpsertViewManager()
             .setSegmentContexts(segmentContexts, queryOptions));
