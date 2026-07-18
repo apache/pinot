@@ -29,6 +29,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -40,6 +41,7 @@ import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParserPos;
@@ -78,10 +80,7 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
-import org.apache.pinot.spi.utils.TimeUtils;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.slf4j.Logger;
@@ -509,19 +508,26 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return;
     }
 
-    //then check if the table has a time column, get its format, calculate the last valid timestamp in ms and append
-    //that to the query.
     SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
     if (sqlNode == null) {
       return;
     }
 
-    //we only inject this extra where clause for select statements
-    if (!(sqlNode instanceof SqlSelect)) {
+    // Resolve the inner SqlSelect, unwrapping SqlOrderBy if needed.
+    // SqlWith (CTEs) and other statement types are not supported.
+    SqlSelect sqlSelect;
+    if (sqlNode instanceof SqlSelect) {
+      sqlSelect = (SqlSelect) sqlNode;
+    } else if (sqlNode instanceof SqlOrderBy) {
+      SqlNode query = ((SqlOrderBy) sqlNode).query;
+      if (!(query instanceof SqlSelect)) {
+        return;
+      }
+      sqlSelect = (SqlSelect) query;
+    } else {
       return;
     }
-    SqlSelect sqlSelect = (SqlSelect) sqlNode;
-    //get list of table names used in the query.
+
     TableNameExtractor tableNameExtractor = new TableNameExtractor();
     tableNameExtractor.extractTableNames(sqlSelect);
     Set<String> tableNames = tableNameExtractor.getTableNames();
@@ -529,7 +535,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return;
     }
 
-    //extracting the first table.
+    // Multi-table queries (JOINs) are not supported: it is ambiguous which table's retention
+    // applies, and injecting a filter with the wrong table's time column would produce
+    // incorrect results. Callers must issue separate single-table queries.
+    if (tableNames.size() > 1) {
+      LOGGER.debug("skipOutOfRetentionValues is not supported for multi-table queries; skipping filter injection");
+      return;
+    }
+
     String rawTableName = TableNameBuilder.extractRawTableName(tableNames.iterator().next());
 
     TableConfig tableConfig = _tableCache.getTableConfig(rawTableName);
@@ -542,12 +555,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     String retentionTimeUnit = tableConfig.getValidationConfig().getRetentionTimeUnit();
     String retentionTimeValue = tableConfig.getValidationConfig().getRetentionTimeValue();
-    if (StringUtils.isEmpty(timeColumnName) || StringUtils.isEmpty(retentionTimeUnit) || StringUtils.isEmpty(retentionTimeValue)) {
+    if (StringUtils.isEmpty(timeColumnName) || StringUtils.isEmpty(retentionTimeUnit)
+        || StringUtils.isEmpty(retentionTimeValue)) {
       return;
     }
-    String retentionTime = retentionTimeValue + retentionTimeUnit;
     try {
-      long retentionTimeMs = TimeUtils.convertPeriodToMillis(retentionTime);
+      long retentionTimeMs =
+          TimeUnit.valueOf(retentionTimeUnit.toUpperCase()).toMillis(Long.parseLong(retentionTimeValue));
       long cutoffMs = System.currentTimeMillis() - retentionTimeMs;
       DateTimeFieldSpec timeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
       if (timeFieldSpec == null) {
@@ -561,9 +575,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       SqlIdentifier timeColNode = new SqlIdentifier(timeColumnName, SqlParserPos.ZERO);
       SqlLiteral cutoffNode;
       if (timeFieldSpec.getDataType().isNumeric()) {
-        cutoffNode = SqlLiteral.createExactNumeric(formattedCutoffTime,SqlParserPos.ZERO);
+        cutoffNode = SqlLiteral.createExactNumeric(formattedCutoffTime, SqlParserPos.ZERO);
       } else {
-        cutoffNode = SqlLiteral.createCharString(formattedCutoffTime,SqlParserPos.ZERO);
+        cutoffNode = SqlLiteral.createCharString(formattedCutoffTime, SqlParserPos.ZERO);
       }
 
       SqlBasicCall rangeFilter = new SqlBasicCall(
@@ -582,13 +596,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       } else {
         sqlSelect.setWhere(rangeFilter);
       }
-      LOGGER.debug("Injected Calcite AST filter for skipOutOfRetentionValues on table: {}. Cutoff: {}", rawTableName, formattedCutoffTime);
+      LOGGER.debug("Injected Calcite AST filter for skipOutOfRetentionValues on table: {}. Cutoff: {}", rawTableName,
+          formattedCutoffTime);
     } catch (Exception e) {
       LOGGER.warn("Failed to apply skipOutOfRetentionValues filter for table: {}", rawTableName, e);
     }
-
-
-
-
   }
 }
