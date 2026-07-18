@@ -36,8 +36,13 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
@@ -61,6 +66,8 @@ import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
@@ -71,6 +78,7 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -531,12 +539,50 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     String retentionTimeUnit = tableConfig.getValidationConfig().getRetentionTimeUnit();
     String retentionTimeValue = tableConfig.getValidationConfig().getRetentionTimeValue();
-
     if (StringUtils.isEmpty(timeColumnName) || StringUtils.isEmpty(retentionTimeUnit) || StringUtils.isEmpty(retentionTimeValue)) {
       return;
     }
+    String retentionTime = retentionTimeValue + retentionTimeUnit;
+    try {
+      long retentionTimeMs = TimeUtils.convertPeriodToMillis(retentionTime);
+      long cutoffMs = System.currentTimeMillis() - retentionTimeMs;
+      DateTimeFieldSpec timeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+      if (timeFieldSpec == null) {
+        return;
+      }
 
+      DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(timeFieldSpec.getFormat());
+      String formattedCutoffTime = formatSpec.fromMillisToFormat(cutoffMs);
 
+      //add where clause to the AST
+      SqlIdentifier timeColNode = new SqlIdentifier(timeColumnName, SqlParserPos.ZERO);
+      SqlLiteral cutoffNode;
+      if (timeFieldSpec.getDataType().isNumeric()) {
+        cutoffNode = SqlLiteral.createExactNumeric(formattedCutoffTime,SqlParserPos.ZERO);
+      } else {
+        cutoffNode = SqlLiteral.createCharString(formattedCutoffTime,SqlParserPos.ZERO);
+      }
+
+      SqlBasicCall rangeFilter = new SqlBasicCall(
+          SqlStdOperatorTable.GREATER_THAN_OR_EQUAL, new SqlNode[]{timeColNode, cutoffNode},
+          SqlParserPos.ZERO);
+
+      SqlNode existingWhere = sqlSelect.getWhere();
+      if (existingWhere != null) {
+        //add an AND if the where exists
+        SqlBasicCall andExpr = new SqlBasicCall(
+            SqlStdOperatorTable.AND,
+            new SqlNode[]{existingWhere, rangeFilter},
+            SqlParserPos.ZERO
+        );
+        sqlSelect.setWhere(andExpr);
+      } else {
+        sqlSelect.setWhere(rangeFilter);
+      }
+      LOGGER.debug("Injected Calcite AST filter for skipOutOfRetentionValues on table: {}. Cutoff: {}", rawTableName, formattedCutoffTime);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to apply skipOutOfRetentionValues filter for table: {}", rawTableName, e);
+    }
 
 
 
