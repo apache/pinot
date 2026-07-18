@@ -564,7 +564,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       SqlBasicCall rangeFilter = new SqlBasicCall(
-          SqlStdOperatorTable.GREATER_THAN_OR_EQUAL, new SqlNode[]{timeColNode, cutoffNode},
+          SqlStdOperatorTable.GREATER_THAN_OR_EQUAL, List.of(timeColNode, cutoffNode),
           SqlParserPos.ZERO);
 
       SqlNode existingWhere = sqlSelect.getWhere();
@@ -572,7 +572,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         //add an AND if the where exists
         SqlBasicCall andExpr = new SqlBasicCall(
             SqlStdOperatorTable.AND,
-            new SqlNode[]{existingWhere, rangeFilter},
+            List.of(existingWhere, rangeFilter),
             SqlParserPos.ZERO
         );
         sqlSelect.setWhere(andExpr);
