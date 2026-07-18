@@ -525,6 +525,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     TableNameExtractor tableNameExtractor = new TableNameExtractor();
     tableNameExtractor.extractTableNames(sqlSelect);
     Set<String> tableNames = tableNameExtractor.getTableNames();
+    if (tableNames.isEmpty()) {
+      return;
+    }
 
     //extracting the first table.
     String rawTableName = TableNameBuilder.extractRawTableName(tableNames.iterator().next());
