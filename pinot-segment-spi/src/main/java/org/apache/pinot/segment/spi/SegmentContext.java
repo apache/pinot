@@ -36,13 +36,11 @@ public class SegmentContext {
     return _indexSegment;
   }
 
-  /// See {@link #_docIdsSnapshot}.
   @Nullable
   public MutableRoaringBitmap getDocIdsSnapshot() {
     return _docIdsSnapshot;
   }
 
-  /// See {@link #_docIdsSnapshot}.
   public void setDocIdsSnapshot(@Nullable MutableRoaringBitmap docIdsSnapshot) {
     _docIdsSnapshot = docIdsSnapshot;
   }
