@@ -28,7 +28,7 @@ image:
   #   - `latest` tag is always available and points to the nightly pinot master branch build
   #   - `release-x.y.z` or `x.y.z` tags are available for each release, e.g. release-1.0.0, release-0.12.1, 1.0.0, 0.12.1, etc.
   #
-  # Default JDK comes with Amazon Corretto 21, here are also images with supported JDK 21 variants:
+  # Default JDK comes with Amazon Corretto 25, here are also images with supported JDK 25 variants:
   #   - Amazon Corretto 25, e.g. `latest`, `latest-25`, `1.0.0-25`, `latest-25-amazoncorretto`,
   #     `1.0.0-25-amazoncorretto`
   #   - MS OpenJDK 25, e.g. `latest-25-ms-openjdk`, `1.0.0-25-ms-openjdk`

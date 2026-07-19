@@ -33,7 +33,7 @@ This task can be triggered manually to build the cross platform(amd64 and arm64v
 
 The build shell is:
 
-For Amazon Corretto 21:
+For Amazon Corretto 25:
 
 ```SHELL
 docker buildx build --no-cache --platform=linux/arm64,linux/amd64 --file pinot-base-build/amazoncorretto.dockerfile --tag apachepinot/pinot-base-build:25-amazoncorretto --push .

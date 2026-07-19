@@ -62,7 +62,8 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
 
   @Override
   public Object getInitialAggregatedValue(@Nullable byte[] rawValue) {
-    TupleUnion tupleUnion = new TupleUnion<>(_nominalEntries, new IntegerSummarySetOperations(_mode, _mode));
+    TupleUnion<IntegerSummary> tupleUnion =
+        new TupleUnion<>(_nominalEntries, new IntegerSummarySetOperations(_mode, _mode));
     if (rawValue == null) {
       return tupleUnion;
     }
@@ -101,15 +102,15 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
 
   @Override
   public Object applyRawValue(Object aggregatedValue, byte[] rawValue) {
-    TupleUnion tupleUnion = extractUnion(aggregatedValue);
+    TupleUnion<IntegerSummary> tupleUnion = extractUnion(aggregatedValue);
     tupleUnion.union(deserializeAggregatedValue(rawValue));
     return tupleUnion;
   }
 
   @Override
   public Object applyAggregatedValue(Object value, Object aggregatedValue) {
-    TupleUnion tupleUnion = extractUnion(aggregatedValue);
-    TupleSketch sketch = extractSketch(value);
+    TupleUnion<IntegerSummary> tupleUnion = extractUnion(aggregatedValue);
+    TupleSketch<IntegerSummary> sketch = extractSketch(value);
     tupleUnion.union(sketch);
     return tupleUnion;
   }
@@ -146,7 +147,7 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
 
   @Override
   public byte[] serializeAggregatedValue(Object value) {
-    TupleSketch sketch = extractSketch(value);
+    TupleSketch<IntegerSummary> sketch = extractSketch(value);
     return sketch.compact().toByteArray();
   }
 
