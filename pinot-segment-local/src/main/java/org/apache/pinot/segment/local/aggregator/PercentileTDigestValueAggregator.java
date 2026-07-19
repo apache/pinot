@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.aggregator;
 
 import com.tdunning.math.stats.TDigest;
+import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
@@ -31,6 +32,9 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   // TODO: This is copied from PercentileTDigestAggregationFunction.
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
+  private static final int CENTROID_CAPACITY_PADDING = 10;
+  private static final int VERBOSE_HEADER_SIZE = Integer.BYTES + 3 * Double.BYTES + Integer.BYTES;
+  private static final int VERBOSE_CENTROID_SIZE = 2 * Double.BYTES;
   private final int _compressionFactor;
   private int _maxByteSize;
 
@@ -60,12 +64,11 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
       initialValue = deserializeAggregatedValue(bytes);
-      _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
       initialValue = TDigest.createMergingDigest(_compressionFactor);
       addToDigest(initialValue, rawValue);
-      _maxByteSize = Math.max(_maxByteSize, initialValue.byteSize());
     }
+    updateMaxByteSize(initialValue);
     return initialValue;
   }
 
@@ -76,7 +79,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     } else {
       addToDigest(value, rawValue);
     }
-    _maxByteSize = Math.max(_maxByteSize, value.byteSize());
+    updateMaxByteSize(value);
     return value;
   }
 
@@ -97,7 +100,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
   @Override
   public TDigest applyAggregatedValue(TDigest value, TDigest aggregatedValue) {
     value.add(aggregatedValue);
-    _maxByteSize = Math.max(_maxByteSize, value.byteSize());
+    updateMaxByteSize(value);
     return value;
   }
 
@@ -118,11 +121,38 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   @Override
   public byte[] serializeAggregatedValue(TDigest value) {
-    return CustomSerDeUtils.TDIGEST_SER_DE.serialize(value);
+    value.compress();
+    byte[] bytes;
+    if (value.centroidCount() > getDefaultCentroidCapacity(value.compression())) {
+      // Verbose decoding recreates the default centroid capacity, while compact decoding preserves the stored one.
+      ByteBuffer buffer = ByteBuffer.allocate(value.smallByteSize());
+      value.asSmallBytes(buffer);
+      bytes = buffer.array();
+    } else {
+      bytes = CustomSerDeUtils.TDIGEST_SER_DE.serialize(value);
+    }
+    _maxByteSize = Math.max(_maxByteSize, bytes.length);
+    return bytes;
   }
 
   @Override
   public TDigest deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.TDIGEST_SER_DE.deserialize(bytes);
+  }
+
+  private void updateMaxByteSize(TDigest value) {
+    long defaultCapacity = getDefaultCentroidCapacity(value.compression());
+    long maxCentroids = Math.max(value.centroidCount(), Math.min(value.size(), defaultCapacity));
+    _maxByteSize = Math.max(_maxByteSize, getMaxVerboseByteSize(maxCentroids));
+  }
+
+  private static int getMaxVerboseByteSize(long centroidCount) {
+    long maxCentroids = Math.max(centroidCount, 0L);
+    return Math.toIntExact(Math.addExact(VERBOSE_HEADER_SIZE,
+        Math.multiplyExact(VERBOSE_CENTROID_SIZE, maxCentroids)));
+  }
+
+  private static long getDefaultCentroidCapacity(double compression) {
+    return Math.addExact(Math.multiplyExact(2L, (long) Math.ceil(compression)), CENTROID_CAPACITY_PADDING);
   }
 }

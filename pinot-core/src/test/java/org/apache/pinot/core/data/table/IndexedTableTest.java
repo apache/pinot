@@ -18,19 +18,30 @@
  */
 package org.apache.pinot.core.data.table;
 
+import com.tdunning.math.stats.Centroid;
+import com.tdunning.math.stats.TDigest;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.SyntheticBlockValSets;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
+import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -117,6 +128,98 @@ public class IndexedTableTest {
       checkEvicted(indexedTable, "c", "f");
     } finally {
       executorService.shutdown();
+    }
+  }
+
+  @DataProvider(name = "serializedPercentileTDigestResults")
+  public static Object[][] serializedPercentileTDigestResults() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "serializedPercentileTDigestResults", timeOut = 30_000)
+  public void testConcurrentPercentileTDigestUpdatesForSameKey(boolean serialized)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    int numThreads = 8;
+    int segmentsPerThread = 32;
+    int valuesPerSegment = 64;
+    long expectedSize = (long) numThreads * segmentsPerThread * valuesPerSegment;
+    ExpressionContext metricExpression = ExpressionContext.forIdentifier("m1");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT PERCENTILETDIGEST(m1, 75) FROM testTable GROUP BY d1");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "percentileTDigest(m1, 75)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT});
+    ExecutorService tableExecutor = Executors.newCachedThreadPool();
+    ExecutorService writers = Executors.newFixedThreadPool(numThreads);
+    CountDownLatch ready = new CountDownLatch(numThreads);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, false, queryContext, 1,
+          Integer.MAX_VALUE, Integer.MAX_VALUE, INITIAL_CAPACITY, tableExecutor);
+      List<Future<Void>> futures = new ArrayList<>(numThreads);
+      for (int threadIndex = 0; threadIndex < numThreads; threadIndex++) {
+        int currentThread = threadIndex;
+        futures.add(writers.submit(() -> {
+          PercentileTDigestAggregationFunction function =
+              new PercentileTDigestAggregationFunction(metricExpression, 75.0, false);
+          ready.countDown();
+          start.await();
+          for (int segmentIndex = 0; segmentIndex < segmentsPerThread; segmentIndex++) {
+            double[] values = new double[valuesPerSegment];
+            long firstValue = ((long) currentThread * segmentsPerThread + segmentIndex) * valuesPerSegment;
+            for (int valueIndex = 0; valueIndex < valuesPerSegment; valueIndex++) {
+              values[valueIndex] = firstValue + valueIndex;
+            }
+            AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+            function.aggregate(valuesPerSegment, resultHolder,
+                Map.of(metricExpression, SyntheticBlockValSets.Double.create(null, values)));
+            TDigest digest = function.extractAggregationResult(resultHolder);
+            if (serialized) {
+              SerializedIntermediateResult serializedResult = function.serializeIntermediateResult(digest);
+              digest = function.deserializeIntermediateResult(new CustomObject(serializedResult.getType(),
+                  ByteBuffer.wrap(serializedResult.getBytes())));
+            }
+            indexedTable.upsert(new Key(new Object[]{"same-key"}),
+                new Record(new Object[]{"same-key", digest}));
+          }
+          return null;
+        }));
+      }
+      Assert.assertTrue(ready.await(10, TimeUnit.SECONDS), "Writer threads did not become ready");
+      start.countDown();
+      for (Future<Void> future : futures) {
+        future.get(10, TimeUnit.SECONDS);
+      }
+
+      indexedTable.finish(false);
+      Assert.assertEquals(indexedTable.size(), 1);
+      TDigest result = (TDigest) indexedTable.iterator().next().getValues()[1];
+      Assert.assertEquals(result.size(), expectedSize);
+      Assert.assertEquals(result.getMin(), 0.0);
+      Assert.assertEquals(result.getMax(), expectedSize - 1.0);
+
+      long centroidWeight = 0L;
+      double previousMean = Double.NEGATIVE_INFINITY;
+      for (Centroid centroid : result.centroids()) {
+        Assert.assertTrue(Double.isFinite(centroid.mean()));
+        Assert.assertTrue(centroid.count() > 0);
+        Assert.assertTrue(centroid.mean() + 1e-12 >= previousMean);
+        centroidWeight += centroid.count();
+        previousMean = centroid.mean();
+      }
+      Assert.assertEquals(centroidWeight, expectedSize);
+
+      double previousQuantile = Double.NEGATIVE_INFINITY;
+      for (double quantile : new double[]{0.0, 0.5, 0.75, 0.95, 0.99, 1.0}) {
+        double value = result.quantile(quantile);
+        Assert.assertTrue(Double.isFinite(value));
+        Assert.assertTrue(value >= previousQuantile);
+        Assert.assertEquals(value, quantile * (expectedSize - 1), expectedSize * 0.02);
+        previousQuantile = value;
+      }
+    } finally {
+      start.countDown();
+      writers.shutdownNow();
+      tableExecutor.shutdownNow();
     }
   }
 

@@ -60,6 +60,9 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
   private static final String MY_MAP_STR_FIELD_NAME = "myMapStr";
   private static final String MY_MAP_STR_K1_FIELD_NAME = "myMapStr_k1";
   private static final String MY_MAP_STR_K2_FIELD_NAME = "myMapStr_k2";
+  /// Derived columns that exercise the opt-in fast scalar functions through the ingestion transform path.
+  private static final String MY_MAP_STR_K1_FAST_FIELD_NAME = "myMapStr_k1_fast";
+  private static final String MY_MAP_STR_K1_FIRST_FIELD_NAME = "myMapStr_k1_first";
   private static final String COMPLEX_MAP_STR_FIELD_NAME = "complexMapStr";
   private static final String COMPLEX_MAP_STR_K3_FIELD_NAME = "complexMapStr_k3";
 
@@ -88,6 +91,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
         .addSingleValueDimension(MY_MAP_STR_FIELD_NAME, DataType.STRING)
         .addSingleValueDimension(MY_MAP_STR_K1_FIELD_NAME, DataType.STRING)
         .addSingleValueDimension(MY_MAP_STR_K2_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(MY_MAP_STR_K1_FAST_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(MY_MAP_STR_K1_FIRST_FIELD_NAME, DataType.STRING)
         .addSingleValueDimension(COMPLEX_MAP_STR_FIELD_NAME, DataType.STRING)
         .addMultiValueDimension(COMPLEX_MAP_STR_K3_FIELD_NAME, DataType.STRING)
         .build();
@@ -98,6 +103,10 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     List<TransformConfig> transformConfigs = List.of(
         new TransformConfig(MY_MAP_STR_K1_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k1')"),
         new TransformConfig(MY_MAP_STR_K2_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k2')"),
+        new TransformConfig(MY_MAP_STR_K1_FAST_FIELD_NAME,
+            "jsonPathStringFast(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'DEFAULT')"),
+        new TransformConfig(MY_MAP_STR_K1_FIRST_FIELD_NAME,
+            "jsonPathStringFirstMatch(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'DEFAULT')"),
         new TransformConfig(COMPLEX_MAP_STR_K3_FIELD_NAME, "jsonPathArray(" + COMPLEX_MAP_STR_FIELD_NAME + ", '$.k3')")
     );
     IngestionConfig ingestionConfig = new IngestionConfig();
@@ -379,6 +388,26 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
     assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);
     assertEquals(pinotResponse.get("totalDocs").asInt(), 0);
+  }
+
+  /// End-to-end coverage for the opt-in fast functions. They take an `Object` argument, so - like the
+  /// existing `jsonPathString` - they are used through the ingestion transform path, not as query-time scalars.
+  /// `myMapStr_k1_fast` / `myMapStr_k1_first` are derived at ingestion via `jsonPathStringFast` /
+  /// `jsonPathStringFirstMatch`; this asserts, over real rows on both query engines, that they equal the
+  /// Jayway-derived `myMapStr_k1`. The rows have no duplicate keys and no malformed content, so `FirstMatch`
+  /// must also agree.
+  @Test(dataProvider = "useBothQueryEngines")
+  void testFastScalarFunctions(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT myMapStr_k1, myMapStr_k1_fast, myMapStr_k1_first FROM " + getTableName() + " LIMIT 1000";
+    JsonNode rows = postQuery(query).get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "expected non-empty result set");
+    for (JsonNode row : rows) {
+      String jayway = row.get(0).asText();
+      assertEquals(row.get(1).asText(), jayway, "jsonPathStringFast must equal Jayway jsonPathString");
+      assertEquals(row.get(2).asText(), jayway, "jsonPathStringFirstMatch must equal Jayway on clean data");
+    }
   }
 
   @Test
