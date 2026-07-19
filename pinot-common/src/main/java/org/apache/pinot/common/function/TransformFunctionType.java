@@ -30,6 +30,7 @@ import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlSingleOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
@@ -103,10 +104,11 @@ public enum TransformFunctionType {
 
   // JSON extract functions
   JSON_EXTRACT_SCALAR("jsonExtractScalar",
-      opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR),
-      OperandTypes.family(
-          List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
-          i -> i == 3)),
+      TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
+  JSON_EXTRACT_SCALAR_FAST("jsonExtractScalarFast",
+      TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
+  JSON_EXTRACT_SCALAR_FIRST_MATCH("jsonExtractScalarFirstMatch",
+      TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
   JSON_EXTRACT_INDEX("jsonExtractIndex",
       opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR),
       OperandTypes.family(
@@ -317,6 +319,41 @@ public enum TransformFunctionType {
     return opBinding.getTypeFactory().createSqlType(defaultSqlType);
   }
 
+  private static RelDataType jsonExtractScalarReturnTypeInference(SqlOperatorBinding opBinding) {
+    if (opBinding.getOperandCount() > 2 && opBinding.isOperandLiteral(2, false)) {
+      String resultsType = opBinding.getOperandLiteralValue(2, String.class).toUpperCase();
+      RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
+      switch (resultsType) {
+        case "JSON":
+          return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+        case "BOOLEAN_ARRAY":
+          return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BOOLEAN), -1);
+        case "TIMESTAMP_ARRAY":
+          return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.TIMESTAMP), -1);
+        default:
+          break;
+      }
+    }
+    return positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR);
+  }
+
+  private static SqlOperandTypeChecker jsonExtractScalarOperandTypeChecker() {
+    SqlSingleOperandTypeChecker jsonInputTypeChecker =
+        OperandTypes.or(OperandTypes.CHARACTER, OperandTypes.BINARY);
+    SqlSingleOperandTypeChecker characterLiteralTypeChecker =
+        OperandTypes.and(OperandTypes.CHARACTER, OperandTypes.LITERAL);
+    return OperandTypes.or(
+        OperandTypes.sequence(
+            (operator, ignored) -> "'" + operator.getName()
+                + "(<CHARACTER_OR_BINARY>, <CHARACTER_LITERAL>, <CHARACTER_LITERAL>)'",
+            jsonInputTypeChecker, characterLiteralTypeChecker, characterLiteralTypeChecker),
+        OperandTypes.sequence(
+            (operator, ignored) -> "'" + operator.getName()
+                + "(<CHARACTER_OR_BINARY>, <CHARACTER_LITERAL>, <CHARACTER_LITERAL>, <LITERAL>)'",
+            jsonInputTypeChecker, characterLiteralTypeChecker, characterLiteralTypeChecker,
+            OperandTypes.NULLABLE_LITERAL));
+  }
+
   private static RelDataType componentType(SqlOperatorBinding opBinding) {
     return opBinding.getOperandType(0).getComponentType();
   }
@@ -362,6 +399,8 @@ public enum TransformFunctionType {
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
       case "BIG_DECIMAL":
         return typeFactory.createSqlType(SqlTypeName.DECIMAL);
+      case "BIG_DECIMAL_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DECIMAL), -1);
       default:
         SqlTypeName sqlTypeName = SqlTypeName.get(operandTypeStr);
         if (sqlTypeName == null) {
