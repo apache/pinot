@@ -220,7 +220,8 @@
     <snakeyaml.version>2.6</snakeyaml.version>
     <hadoop-shaded-protobuf_3_25.version>1.5.0</hadoop-shaded-protobuf_3_25.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
-    <datasketches-java.version>6.2.0</datasketches-java.version>
+    <datasketches-java.version>8.0.0</datasketches-java.version>
+    <datasketches-memory.version>7.0.0</datasketches-memory.version>
     <t-digest.version>3.2</t-digest.version>
     <picocli.version>4.7.7</picocli.version>
     <tyrus-standalone-client.version>2.2.2</tyrus-standalone-client.version>
@@ -1379,6 +1380,11 @@
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
         <version>${datasketches-java.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.datasketches</groupId>
+        <artifactId>datasketches-memory</artifactId>
+        <version>${datasketches-memory.version}</version>
       </dependency>
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
