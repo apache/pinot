@@ -20,10 +20,10 @@ package org.apache.pinot.core.segment.processing.aggregator;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.datasketches.tuple.CompactSketch;
-import org.apache.datasketches.tuple.Sketch;
-import org.apache.datasketches.tuple.aninteger.IntegerSketch;
+import org.apache.datasketches.tuple.CompactTupleSketch;
+import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.testng.annotations.BeforeMethod;
@@ -44,23 +44,23 @@ public class IntegerTupleSketchAggregatorTest {
 
   @Test
   public void testAggregateWithDefaultBehaviour() {
-    Sketch<IntegerSummary> firstSketch = createTupleSketch(64);
-    Sketch<IntegerSummary> secondSketch = createTupleSketch(32);
+    TupleSketch<IntegerSummary> firstSketch = createTupleSketch(64);
+    TupleSketch<IntegerSummary> secondSketch = createTupleSketch(32);
     byte[] value1 = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(firstSketch);
     byte[] value2 = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(secondSketch);
     Map<String, String> functionParameters = new HashMap<>();
 
     byte[] result = (byte[]) _tupleSketchAggregator.aggregate(value1, value2, functionParameters);
 
-    Sketch<IntegerSummary> resultSketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(result);
+    TupleSketch<IntegerSummary> resultSketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(result);
     assertNotNull(resultSketch);
     assertEquals(resultSketch.getRetainedEntries(), 64);
   }
 
   @Test
   public void testAggregateWithNominalEntries() {
-    Sketch<IntegerSummary> firstSketch = createTupleSketch(64);
-    Sketch<IntegerSummary> secondSketch = createTupleSketch(32);
+    TupleSketch<IntegerSummary> firstSketch = createTupleSketch(64);
+    TupleSketch<IntegerSummary> secondSketch = createTupleSketch(32);
     byte[] value1 = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(firstSketch);
     byte[] value2 = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(secondSketch);
 
@@ -69,14 +69,14 @@ public class IntegerTupleSketchAggregatorTest {
 
     byte[] result = (byte[]) _tupleSketchAggregator.aggregate(value1, value2, functionParameters);
 
-    Sketch<IntegerSummary> resultSketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(result);
+    TupleSketch<IntegerSummary> resultSketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(result);
     assertNotNull(resultSketch);
     assertEquals(resultSketch.getRetainedEntries(), 32);
   }
 
-  private CompactSketch<IntegerSummary> createTupleSketch(int nominalEntries) {
+  private CompactTupleSketch<IntegerSummary> createTupleSketch(int nominalEntries) {
     int lgK = (int) (Math.log(nominalEntries) / Math.log(2));
-    IntegerSketch integerSketch = new IntegerSketch(lgK, IntegerSummary.Mode.Max);
+    IntegerTupleSketch integerSketch = new IntegerTupleSketch(lgK, IntegerSummary.Mode.Max);
     for (int i = 0; i < nominalEntries; i++) {
       integerSketch.update(i, 1);
     }

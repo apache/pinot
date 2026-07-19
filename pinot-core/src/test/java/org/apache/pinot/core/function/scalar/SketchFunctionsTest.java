@@ -19,11 +19,10 @@
 package org.apache.pinot.core.function.scalar;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
+import java.lang.foreign.MemorySegment;
 import java.math.BigDecimal;
 import org.apache.datasketches.cpc.CpcSketch;
-import org.apache.datasketches.memory.Memory;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.Sketches;
+import org.apache.datasketches.theta.ThetaSketch;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.Assert;
@@ -57,7 +56,7 @@ public class SketchFunctionsTest {
   @Test
   public void thetaThetaSketchSummary() {
     for (Object i : _inputs) {
-      Sketch sketch = Sketches.wrapSketch(Memory.wrap(SketchFunctions.toThetaSketch(i)));
+      ThetaSketch sketch = ThetaSketch.wrap(MemorySegment.ofArray(SketchFunctions.toThetaSketch(i)).asReadOnly());
       Assert.assertEquals(SketchFunctions.thetaSketchToString(sketch), sketch.toString());
     }
     Assert.assertThrows(RuntimeException.class, () -> SketchFunctions.thetaSketchToString(new Object()));
@@ -113,7 +112,7 @@ public class SketchFunctionsTest {
   @Test
   public void thetaCpcSketchToString() {
     for (Object i : _inputs) {
-      CpcSketch sketch = CpcSketch.heapify(Memory.wrap(SketchFunctions.toCpcSketch(i)));
+      CpcSketch sketch = CpcSketch.heapify(MemorySegment.ofArray(SketchFunctions.toCpcSketch(i)));
       Assert.assertEquals(SketchFunctions.cpcSketchToString(sketch), sketch.toString());
     }
     Assert.assertThrows(RuntimeException.class, () -> SketchFunctions.cpcSketchToString(new Object()));

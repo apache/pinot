@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import org.apache.datasketches.tuple.Sketch;
+import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleSketchIterator;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -51,7 +51,7 @@ public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTuple
     accumulator.setNominalEntries(_nominalEntries);
     accumulator.setSetOperations(_setOps);
     accumulator.setThreshold(_accumulatorThreshold);
-    Sketch<IntegerSummary> result = accumulator.getResult();
+    TupleSketch<IntegerSummary> result = accumulator.getResult();
     TupleSketchIterator<IntegerSummary> summaries = result.iterator();
     while (summaries.next()) {
       retainedTotal += summaries.getSummary().getValue();

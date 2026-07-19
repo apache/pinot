@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.util.Comparator;
-import org.apache.datasketches.tuple.Sketch;
-import org.apache.datasketches.tuple.Union;
+import org.apache.datasketches.tuple.TupleSketch;
+import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 
@@ -35,10 +35,10 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
  * that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
  * set to the minimum immediately, further gains can be realised.
  */
-public class TupleIntSketchAccumulator extends CustomObjectAccumulator<Sketch<IntegerSummary>> {
+public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSketch<IntegerSummary>> {
   private IntegerSummarySetOperations _setOperations;
   private int _nominalEntries;
-  private Union<IntegerSummary> _union;
+  private TupleUnion<IntegerSummary> _union;
 
   public TupleIntSketchAccumulator() {
   }
@@ -62,13 +62,13 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<Sketch<In
   }
 
   @Override
-  public Sketch<IntegerSummary> getResult() {
+  public TupleSketch<IntegerSummary> getResult() {
     return unionAll();
   }
 
-  private Sketch<IntegerSummary> unionAll() {
+  private TupleSketch<IntegerSummary> unionAll() {
     if (_union == null) {
-      _union = new Union<>(_nominalEntries, _setOperations);
+      _union = new TupleUnion<>(_nominalEntries, _setOperations);
     }
     // Return the default update "gadget" sketch as a compact sketch
     if (isEmpty()) {
@@ -83,7 +83,7 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<Sketch<In
     }
 
     // Performance optimization: ensure that the minimum Theta is used for "early stop".
-    // The "early stop" optimization is implemented in the Apache Datasketches Union operation for
+    // The "early stop" optimization is implemented in the Apache Datasketches TupleUnion operation for
     // ordered and compact Theta sketches. Internally, a compact and ordered Theta sketch can be
     // compared to a sorted array of K items.  When performing a union, only those items from
     // the input sketch less than Theta need to be processed.  The loop terminates as soon as a hash
@@ -91,8 +91,8 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<Sketch<In
     // The following "sort" improves on this further by selecting the minimal Theta value up-front,
     // which results in fewer redundant entries being retained and subsequently discarded during the
     // union operation.
-    _accumulator.sort(Comparator.comparingDouble(Sketch::getTheta));
-    for (Sketch<IntegerSummary> accumulatedSketch : _accumulator) {
+    _accumulator.sort(Comparator.comparingDouble(TupleSketch::getTheta));
+    for (TupleSketch<IntegerSummary> accumulatedSketch : _accumulator) {
       _union.union(accumulatedSketch);
     }
     _accumulator.clear();
