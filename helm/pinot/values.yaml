@@ -29,9 +29,9 @@ image:
   #   - `release-x.y.z` or `x.y.z` tags are available for each release, e.g. release-1.0.0, release-0.12.1, 1.0.0, 0.12.1, etc.
   #
   # Default JDK comes with Amazon Corretto 21, here are also images with supported JDK 21 variants:
-  #   - Amazon Corretto 21, e.g. `latest`, `latest-21`, `1.0.0-21`, `latest-21-amazoncorretto`,
-  #     `1.0.0-21-amazoncorretto`
-  #   - MS OpenJDK 21, e.g. `latest-21-ms-openjdk`, `1.0.0-21-ms-openjdk`
+  #   - Amazon Corretto 25, e.g. `latest`, `latest-25`, `1.0.0-25`, `latest-25-amazoncorretto`,
+  #     `1.0.0-25-amazoncorretto`
+  #   - MS OpenJDK 25, e.g. `latest-25-ms-openjdk`, `1.0.0-25-ms-openjdk`
   tag: latest # 1.0.0, 0.12.1, latest
   pullPolicy: Always # Use IfNotPresent when you pinged a version of image tag
 

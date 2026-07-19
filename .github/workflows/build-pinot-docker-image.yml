@@ -35,7 +35,7 @@ on:
         required: true
       jdkVersion:
         description: "The JDK version to use for the Pinot build and runtime image."
-        default: "21"
+        default: "25"
         required: true
       tags:
         description: "Tags to push of the image, comma separated, e.g. tag1,tag2,tag3"

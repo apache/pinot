@@ -62,9 +62,9 @@ for runtimeImage in "${runtimeImages[@]}"; do
   for tag in "${tags[@]}"; do
     DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-${runtimeImage}-linux-${BUILD_ARCH} "
 
-    # 21-ms-openjdk is the canonical default runtime; promote it as the bare
+    # 25-ms-openjdk is the canonical default runtime; promote it as the bare
     # latest-linux-<arch> tag so multi-arch manifests can reference it.
-    if [ "${runtimeImage}" == "21-ms-openjdk" ]; then
+    if [ "${runtimeImage}" == "25-ms-openjdk" ]; then
       if [ "${tag}" == "latest" ]; then
         DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:latest-linux-${BUILD_ARCH} "
       fi
@@ -84,7 +84,7 @@ for runtimeImage in "${runtimeImages[@]}"; do
   for tag in "${tags[@]}"; do
     docker push "${DOCKER_IMAGE_NAME}:${tag}-${runtimeImage}-linux-${BUILD_ARCH}"
 
-    if [ "${runtimeImage}" == "21-ms-openjdk" ]; then
+    if [ "${runtimeImage}" == "25-ms-openjdk" ]; then
       if [ "${tag}" == "latest" ]; then
         docker push "${DOCKER_IMAGE_NAME}:latest-linux-${BUILD_ARCH}"
       fi
