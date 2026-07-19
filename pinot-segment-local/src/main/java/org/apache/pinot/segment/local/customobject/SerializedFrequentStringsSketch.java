@@ -22,7 +22,7 @@ import java.util.Base64;
 import org.apache.datasketches.common.ArrayOfStringsSerDe;
 import org.apache.datasketches.frequencies.FrequentItemsSketch;
 
-public class SerializedFrequentStringsSketch implements Comparable<FrequentItemsSketch<String>> {
+public class SerializedFrequentStringsSketch implements Comparable<SerializedFrequentStringsSketch> {
   private final FrequentItemsSketch<String> _sketch;
 
   public SerializedFrequentStringsSketch(FrequentItemsSketch<String> sketch) {
@@ -30,10 +30,10 @@ public class SerializedFrequentStringsSketch implements Comparable<FrequentItems
   }
 
   @Override
-  public int compareTo(FrequentItemsSketch<String> other) {
+  public int compareTo(SerializedFrequentStringsSketch other) {
     // There is no well-defined ordering for these sketches
     // numActiveItems is just a placeholder, which can be changed later
-    return _sketch.getNumActiveItems() - other.getNumActiveItems();
+    return Integer.compare(_sketch.getNumActiveItems(), other._sketch.getNumActiveItems());
   }
 
   @Override

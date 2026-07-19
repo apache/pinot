@@ -22,7 +22,7 @@ import java.util.Base64;
 import org.apache.datasketches.frequencies.FrequentLongsSketch;
 
 
-public class SerializedFrequentLongsSketch implements Comparable<FrequentLongsSketch> {
+public class SerializedFrequentLongsSketch implements Comparable<SerializedFrequentLongsSketch> {
   private final FrequentLongsSketch _sketch;
 
   public SerializedFrequentLongsSketch(FrequentLongsSketch sketch) {
@@ -30,10 +30,10 @@ public class SerializedFrequentLongsSketch implements Comparable<FrequentLongsSk
   }
 
   @Override
-  public int compareTo(FrequentLongsSketch other) {
+  public int compareTo(SerializedFrequentLongsSketch other) {
     // There is no well-defined ordering for these sketches
     // numActiveItems is just a placeholder, which can be changed later
-    return _sketch.getNumActiveItems() - other.getNumActiveItems();
+    return Integer.compare(_sketch.getNumActiveItems(), other._sketch.getNumActiveItems());
   }
 
   @Override
