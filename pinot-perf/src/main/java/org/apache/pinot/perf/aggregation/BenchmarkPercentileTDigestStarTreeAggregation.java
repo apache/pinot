@@ -154,8 +154,8 @@ public class BenchmarkPercentileTDigestStarTreeAggregation {
     SplittableRandom random = new SplittableRandom(42);
     byte[][] serializedDigests = new byte[NUM_STAR_TREE_ROWS][];
     for (int rowId = 0; rowId < NUM_STAR_TREE_ROWS; rowId++) {
-      TDigest digest =
-          TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest digest = TDigestBenchmarkUtils.usePinotScaleFunction(
+          TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION));
       for (int i = 0; i < SOURCE_ROWS_PER_DIGEST; i++) {
         digest.add(random.nextDouble());
       }

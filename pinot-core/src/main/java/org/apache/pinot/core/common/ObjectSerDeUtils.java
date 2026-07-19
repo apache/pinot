@@ -25,7 +25,6 @@ import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
-import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongMap;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
@@ -97,6 +96,7 @@ import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.locationtech.jts.geom.Geometry;
@@ -1124,19 +1124,17 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(TDigest tDigest) {
-      byte[] bytes = new byte[tDigest.byteSize()];
-      tDigest.asBytes(ByteBuffer.wrap(bytes));
-      return bytes;
+      return TDigestUtils.serialize(tDigest);
     }
 
     @Override
     public TDigest deserialize(byte[] bytes) {
-      return MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
+      return TDigestUtils.deserialize(bytes);
     }
 
     @Override
     public TDigest deserialize(ByteBuffer byteBuffer) {
-      return MergingDigest.fromBytes(byteBuffer);
+      return TDigestUtils.deserialize(byteBuffer);
     }
   };
 

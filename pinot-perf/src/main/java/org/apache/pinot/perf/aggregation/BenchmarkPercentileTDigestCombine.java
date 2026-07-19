@@ -276,10 +276,10 @@ public class BenchmarkPercentileTDigestCombine {
     double[] rawValues = new double[_fanIn * VALUES_PER_DIGEST];
     int totalInputCentroids = 0;
     for (int sourceId = 0; sourceId < _fanIn; sourceId++) {
-      MergingDigest nativeDigest = null;
+      ImmutableMergingDigest nativeDigest = null;
       if (_sourceLayout == SourceLayout.NATIVE) {
-        nativeDigest = _implementation == Implementation.PAIRWISE ? new MergingDigest(_compression)
-            : new ImmutableMergingDigest(_compression);
+        nativeDigest = new ImmutableMergingDigest(_compression);
+        TDigestBenchmarkUtils.usePinotScaleFunction(nativeDigest);
       }
       double[] sourceValues = new double[VALUES_PER_DIGEST];
       SplittableRandom random = new SplittableRandom(0x6A09E667F3BCC909L + sourceId);
@@ -295,11 +295,7 @@ public class BenchmarkPercentileTDigestCombine {
       TDigest digest;
       byte[] fixedBytes = null;
       if (nativeDigest != null) {
-        if (nativeDigest instanceof ImmutableMergingDigest immutableDigest) {
-          immutableDigest.freeze();
-        } else {
-          nativeDigest.compress();
-        }
+        nativeDigest.freeze();
         digest = nativeDigest;
       } else {
         Arrays.sort(sourceValues);
@@ -374,8 +370,20 @@ public class BenchmarkPercentileTDigestCombine {
     buffer.putDouble(compression);
     buffer.putInt(numCentroids);
     for (int centroidId = 0; centroidId < numCentroids; centroidId++) {
-      int start = centroidId * sortedValues.length / numCentroids;
-      int end = (centroidId + 1) * sortedValues.length / numCentroids;
+      int start;
+      int end;
+      if (centroidId == 0) {
+        start = 0;
+        end = 1;
+      } else if (centroidId == numCentroids - 1) {
+        start = sortedValues.length - 1;
+        end = sortedValues.length;
+      } else {
+        int numInteriorCentroids = numCentroids - 2;
+        int numInteriorValues = sortedValues.length - 2;
+        start = 1 + (centroidId - 1) * numInteriorValues / numInteriorCentroids;
+        end = 1 + centroidId * numInteriorValues / numInteriorCentroids;
+      }
       double sum = 0.0;
       for (int valueId = start; valueId < end; valueId++) {
         sum += sortedValues[valueId];
@@ -969,7 +977,7 @@ public class BenchmarkPercentileTDigestCombine {
       if (pending.isEmpty()) {
         return;
       }
-      TDigest batch = TDigest.createMergingDigest(_compressionFactor);
+      TDigest batch = TDigestBenchmarkUtils.usePinotScaleFunction(TDigest.createMergingDigest(_compressionFactor));
       batch.add(pending);
       pending.clear();
       target.add(batch);
