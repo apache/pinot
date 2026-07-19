@@ -25,10 +25,13 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
@@ -37,12 +40,16 @@ import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -53,12 +60,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -89,6 +98,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   protected static final String TDIGEST_COLUMN = "tDigestColumn";
   protected static final String TDIGEST_CUSTOM_COMPRESSION_COLUMN = "tDigestColumnCustom";
   protected static final String GROUP_BY_COLUMN = "groupByColumn";
+  protected static final String STAR_TREE_TDIGEST_COLUMN = "percentileTDigest__" + DOUBLE_COLUMN;
   protected static final String[] GROUPS = new String[]{"G1", "G2", "G3"};
   protected static final long RANDOM_SEED = System.nanoTime();
   protected static final Random RANDOM = new Random(RANDOM_SEED);
@@ -155,8 +165,11 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     schema.addField(new MetricFieldSpec(TDIGEST_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new MetricFieldSpec(TDIGEST_CUSTOM_COMPRESSION_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new DimensionFieldSpec(GROUP_BY_COLUMN, FieldSpec.DataType.STRING, true));
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of(GROUP_BY_COLUMN), null,
+        List.of(STAR_TREE_TDIGEST_COLUMN), null, 1);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(List.of(TDIGEST_COLUMN, TDIGEST_CUSTOM_COMPRESSION_COLUMN)).build();
+        .setNoDictionaryColumns(List.of(TDIGEST_COLUMN, TDIGEST_CUSTOM_COMPRESSION_COLUMN))
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
@@ -246,6 +259,38 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     }
   }
 
+  @Test
+  public void testStarTreeGroupBy() {
+    String query = String.format("SELECT PERCENTILETDIGEST(%s, 75) FROM %s GROUP BY %s", DOUBLE_COLUMN, TABLE_NAME,
+        GROUP_BY_COLUMN);
+
+    GroupByOperator starTreeOperator = getOperator(query);
+    Map<String, TDigest> starTreeResults = getGroupByResults(starTreeOperator.nextBlock());
+    long starTreeDocsScanned = starTreeOperator.getExecutionStatistics().getNumDocsScanned();
+
+    GroupByOperator nonStarTreeOperator = getGroupByOperator(query, false);
+    Map<String, TDigest> nonStarTreeResults = getGroupByResults(nonStarTreeOperator.nextBlock());
+    long nonStarTreeDocsScanned = nonStarTreeOperator.getExecutionStatistics().getNumDocsScanned();
+
+    assertEquals(nonStarTreeDocsScanned, NUM_ROWS);
+    assertTrue(starTreeDocsScanned < nonStarTreeDocsScanned);
+    assertEquals(starTreeResults.keySet(), nonStarTreeResults.keySet());
+
+    long totalDigestSize = 0;
+    for (Map.Entry<String, TDigest> entry : starTreeResults.entrySet()) {
+      TDigest starTreeDigest = entry.getValue();
+      TDigest nonStarTreeDigest = nonStarTreeResults.get(entry.getKey());
+      assertEquals(starTreeDigest.size(), nonStarTreeDigest.size());
+      assertEquals(starTreeDigest.quantile(0.75), nonStarTreeDigest.quantile(0.75), DELTA, ERROR_MESSAGE);
+      totalDigestSize += starTreeDigest.size();
+    }
+    assertEquals(totalDigestSize, getExpectedTotalDigestSize());
+  }
+
+  protected long getExpectedTotalDigestSize() {
+    return NUM_ROWS;
+  }
+
   protected String getAggregationQuery(int percentile) {
     return String.format("SELECT PERCENTILE%1$d(%2$s), PERCENTILETDIGEST%1$d(%2$s), PERCENTILETDIGEST%1$d(%3$s), "
             + "PERCENTILE(%2$s, %1$d), PERCENTILETDIGEST(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d), "
@@ -256,6 +301,25 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
 
   private String getGroupByQuery(int percentile) {
     return String.format("%s GROUP BY %s", getAggregationQuery(percentile), GROUP_BY_COLUMN);
+  }
+
+  private GroupByOperator getGroupByOperator(String query, boolean useStarTree) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    queryContext.setSkipStarTree(!useStarTree);
+    return (GroupByOperator) PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(getIndexSegment()), queryContext).run();
+  }
+
+  private Map<String, TDigest> getGroupByResults(GroupByResultsBlock resultsBlock) {
+    AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
+    assertNotNull(groupByResult);
+    Map<String, TDigest> results = new HashMap<>();
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
+    while (groupKeyIterator.hasNext()) {
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      results.put((String) groupKey._keys[0], (TDigest) groupByResult.getResultForGroupId(0, groupKey._groupId));
+    }
+    return results;
   }
 
   private void assertTDigest(TDigest tDigest, DoubleList doubleList) {
