@@ -333,7 +333,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
     //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
     testCases.add(new Object[]{
-        "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
+        "SELECT CAST(json_extract_scalar(CONCAT(a.col1, b.col2), 'path', 'INT') AS INT) FROM a JOIN b "
+            + "ON a.col1 = b.col1",
         "Unsupported function: JSONEXTRACTSCALAR"
     });
 
