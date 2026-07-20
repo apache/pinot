@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -44,6 +45,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -64,7 +67,17 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Fork(1)
+// Mirror the --add-opens that the production launcher (appAssemblerScriptTemplate) and surefire pass on JDK 11+. These
+// are required by the Unsafe/Chronicle mmap path (sun.nio.ch) and Netty's zero-copy path; without them the "unsafe"
+// _bufferLibrary and other reflective JDK access fail in the forked JVM.
+@Fork(value = 1, jvmArgsPrepend = {
+    "--add-opens=java.base/java.nio=ALL-UNNAMED",
+    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+    "--add-opens=java.base/java.util=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED"
+})
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 5, time = 1)
 @State(Scope.Benchmark)
@@ -230,18 +243,53 @@ public class BenchmarkQueriesSSQE extends BaseQueriesTest {
       FILTERING_ON_TIMESTAMP_QUERY, REGEXP_REPLACE_QUERY, JSON_MATCH_QUERY
   })
   String _query;
+  // Off-heap buffer backend used for mmap'd segment reads. Defaults to "default" (the JVM default factory, Unsafe
+  // wrapped in SmallWithFallback) so the standard matrix is unaffected. Override on the CLI to compare backends, e.g.
+  // -p _bufferLibrary=foreign,bytebuffer,unsafe . The non-default values force a single factory for ALL buffer sizes
+  // (prioritize.bytebuffer=false) so the query read path is exercised entirely through that implementation.
+  @Param({"default"})
+  String _bufferLibrary;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
   private Distribution.DataSupplier _supplier;
 
+  /// Sets the process-wide default {@link PinotDataBuffer} factory according to {@link #_bufferLibrary}. Uses
+  /// {@code prioritize.bytebuffer=false} so a single factory backs ALL buffer sizes (otherwise buffers below 2GB fall
+  /// back to ByteBuffer and the chosen implementation is never exercised).
+  private void configureBufferFactory() {
+    String className;
+    switch (_bufferLibrary) {
+      case "default":
+        return; // keep the JVM default factory (Unsafe wrapped in SmallWithFallback)
+      case "unsafe":
+        className = "org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory";
+        break;
+      case "foreign":
+        className = "org.apache.pinot.segment.spi.memory.foreign.ForeignPinotBufferFactory";
+        break;
+      case "bytebuffer":
+        className = "org.apache.pinot.segment.spi.memory.ByteBufferPinotBufferFactory";
+        break;
+      default:
+        throw new IllegalArgumentException("Unknown buffer library: " + _bufferLibrary);
+    }
+    Map<String, String> props = new HashMap<>();
+    props.put("pinot.offheap.buffer.factory", className);
+    props.put("pinot.offheap.prioritize.bytebuffer", "false");
+    PinotDataBuffer.loadDefaultFactory(new PinotConfiguration(props));
+  }
+
   @Setup
   public void setUp()
       throws Exception {
+    configureBufferFactory();
     _supplier = Distribution.createSupplier(42, _scenario);
     FileUtils.deleteQuietly(INDEX_DIR);
 
     _indexSegments = new ArrayList<>();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
+    // Force mmap so segment reads go through PinotDataBuffer (the configured off-heap factory), not on-heap.
+    indexLoadingConfig.setReadMode(ReadMode.mmap);
     for (int i = 0; i < _numSegments; i++) {
       buildSegment(String.format(SEGMENT_NAME_TEMPLATE, i));
       _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, String.format(SEGMENT_NAME_TEMPLATE, i)),
