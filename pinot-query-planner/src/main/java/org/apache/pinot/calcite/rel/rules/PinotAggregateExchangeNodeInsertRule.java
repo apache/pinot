@@ -160,7 +160,7 @@ public class PinotAggregateExchangeNodeInsertRule {
         return;
       }
 
-      PinotLogicalAggregate newAggRel = createPlan(call, aggRel, true, hintOptions, newCollations, limit);
+      RelNode newAggRel = createPlan(call, aggRel, true, hintOptions, newCollations, limit);
       RelNode newProjectRel = projectRel.copy(projectRel.getTraitSet(), List.of(newAggRel));
       call.transformTo(sortRel.copy(sortRel.getTraitSet(), List.of(newProjectRel)));
     }
@@ -202,7 +202,7 @@ public class PinotAggregateExchangeNodeInsertRule {
         return;
       }
 
-      PinotLogicalAggregate newAggRel = createPlan(call, aggRel, true, hintOptions, collations, limit);
+      RelNode newAggRel = createPlan(call, aggRel, true, hintOptions, collations, limit);
       call.transformTo(sortRel.copy(sortRel.getTraitSet(), List.of(newAggRel)));
     }
   }
@@ -227,7 +227,7 @@ public class PinotAggregateExchangeNodeInsertRule {
     }
   }
 
-  private static PinotLogicalAggregate createPlan(RelOptRuleCall call, Aggregate aggRel, boolean hasGroupBy,
+  private static RelNode createPlan(RelOptRuleCall call, Aggregate aggRel, boolean hasGroupBy,
       Map<String, String> hintOptions, @Nullable List<RelFieldCollation> collations, int limit) {
     // WITHIN GROUP collation is not supported in leaf stage aggregation.
     RelCollation withinGroupCollation = extractWithinGroupCollation(aggRel);
@@ -261,12 +261,28 @@ public class PinotAggregateExchangeNodeInsertRule {
    * Use this group by optimization to skip leaf stage aggregation when aggregating at leaf level is not desired. Many
    * situation could be wasted effort to do group-by on leaf, eg: when cardinality of group by column is very high.
    */
-  private static PinotLogicalAggregate createPlanWithExchangeDirectAggregation(RelOptRuleCall call, Aggregate aggRel,
+  private static RelNode createPlanWithExchangeDirectAggregation(RelOptRuleCall call, Aggregate aggRel,
       @Nullable RelCollation withinGroupCollation, @Nullable List<RelFieldCollation> collations, int limit) {
     RelNode input = aggRel.getInput();
+    // A layout-restoring Project that RelBuilder may add over the rebuilt aggregate (see below); when
+    // present it is re-applied over the direct aggregate so the aggregate's output columns are
+    // unchanged for the parent.
+    Project topProject = null;
     // Create Project when there's none below the aggregate.
     if (!(PinotRuleUtils.unboxRel(input) instanceof Project)) {
-      aggRel = (Aggregate) generateProjectUnderAggregate(call, aggRel);
+      RelNode rewritten = PinotRuleUtils.unboxRel(generateProjectUnderAggregate(call, aggRel));
+      if (rewritten instanceof Project) {
+        // generateProjectUnderAggregate rebuilds the aggregate with RelBuilder, which deduplicates
+        // identical aggregate calls and, when it does, adds a top Project to restore the original
+        // output layout (a column referenced more than once — e.g. a SUM reused by an AVG reduction —
+        // is projected twice). Keep that Project; the aggregate is its input, and we re-apply it over
+        // the direct aggregate below. Without this, casting the Project to Aggregate threw
+        // "LogicalProject cannot be cast to Aggregate".
+        topProject = (Project) rewritten;
+        aggRel = (Aggregate) PinotRuleUtils.unboxRel(topProject.getInput());
+      } else {
+        aggRel = (Aggregate) rewritten;
+      }
       input = aggRel.getInput();
     }
 
@@ -280,8 +296,16 @@ public class PinotAggregateExchangeNodeInsertRule {
       exchange = PinotLogicalExchange.create(input, distribution);
     }
 
-    return new PinotLogicalAggregate(aggRel, exchange, buildAggCalls(aggRel, AggType.DIRECT, false), AggType.DIRECT,
-        false, collations, limit);
+    PinotLogicalAggregate directAggregate = new PinotLogicalAggregate(aggRel, exchange,
+        buildAggCalls(aggRel, AggType.DIRECT, false), AggType.DIRECT, false, collations, limit);
+    if (topProject == null) {
+      return directAggregate;
+    }
+    // Re-apply the layout-restoring Project over the direct aggregate (same projects and row type,
+    // new input). The direct aggregate keeps the rebuilt aggregate's output columns, so the Project's
+    // references remain valid.
+    return topProject.copy(topProject.getTraitSet(), directAggregate, topProject.getProjects(),
+        topProject.getRowType());
   }
 
   /**
