@@ -23,6 +23,9 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.sql.Types;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -62,6 +65,52 @@ public class PinotResultSetTest {
       Assert.assertEquals(pinotResultSet.getString(5), resultSet.getString(currentRow, 4));
       currentRow++;
     }
+  }
+
+  @Test
+  public void testGetArraysAsTypedLists()
+      throws Exception {
+    PinotResultSet resultSet = PinotResultSet.fromJson("{\"resultTable\":{"
+        + "\"dataSchema\":{\"columnNames\":[\"booleans\",\"ints\",\"longs\",\"floats\",\"doubles\","
+        + "\"decimals\",\"timestamps\",\"strings\",\"bytes\"],"
+        + "\"columnDataTypes\":[\"BOOLEAN_ARRAY\",\"INT_ARRAY\",\"LONG_ARRAY\",\"FLOAT_ARRAY\","
+        + "\"DOUBLE_ARRAY\",\"BIG_DECIMAL_ARRAY\",\"TIMESTAMP_ARRAY\",\"STRING_ARRAY\",\"BYTES_ARRAY\"]},"
+        + "\"rows\":[[[true,false],[1,null,2],[2147483648,3],[1.25,2.5],[1.5,2.75],"
+        + "[\"1.20\",\"3.4\"],[\"2020-01-01 12:00:00\",\"2021-02-03 04:05:06\"],"
+        + "[\"first\",\"second\"],[\"00ff\",\"1020\"]]]}}");
+
+    Assert.assertTrue(resultSet.next());
+    Assert.assertEquals(resultSet.getObject(1), List.of(true, false));
+    Assert.assertEquals(resultSet.getObject(2), Arrays.asList(1, null, 2));
+    Assert.assertEquals(resultSet.getObject(3), List.of(2147483648L, 3L));
+    Assert.assertEquals(resultSet.getObject(4), List.of(1.25f, 2.5f));
+    Assert.assertEquals(resultSet.getObject(5), List.of(1.5, 2.75));
+    Assert.assertEquals(resultSet.getObject(6), List.of(new BigDecimal("1.20"), new BigDecimal("3.4")));
+    Assert.assertEquals(resultSet.getObject(7),
+        List.of(Timestamp.valueOf("2020-01-01 12:00:00"), Timestamp.valueOf("2021-02-03 04:05:06")));
+    Assert.assertEquals(resultSet.getObject(8), List.of("first", "second"));
+    List<?> bytes = (List<?>) resultSet.getObject(9);
+    Assert.assertEquals(bytes.get(0), new byte[]{0, (byte) 0xff});
+    Assert.assertEquals(bytes.get(1), new byte[]{0x10, 0x20});
+
+    ResultSetMetaData metadata = resultSet.getMetaData();
+    for (int columnIndex = 1; columnIndex <= metadata.getColumnCount(); columnIndex++) {
+      Assert.assertEquals(metadata.getColumnType(columnIndex), Types.JAVA_OBJECT);
+      Assert.assertEquals(metadata.getColumnClassName(columnIndex), List.class.getTypeName());
+    }
+  }
+
+  @Test
+  public void testNullAndEmptyArrays()
+      throws Exception {
+    PinotResultSet resultSet = PinotResultSet.fromJson("{\"resultTable\":{"
+        + "\"dataSchema\":{\"columnNames\":[\"nulls\",\"empty\"],"
+        + "\"columnDataTypes\":[\"INT_ARRAY\",\"STRING_ARRAY\"]},\"rows\":[[null,[]]]}}");
+
+    Assert.assertTrue(resultSet.next());
+    Assert.assertNull(resultSet.getObject(1));
+    Assert.assertTrue(resultSet.wasNull());
+    Assert.assertEquals(resultSet.getObject(2), List.of());
   }
 
   @Test
