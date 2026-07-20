@@ -37,8 +37,9 @@ import java.util.List;
 /// its explicit capacity is required to decode an oversized compact digest.
 ///
 /// The accumulator implements [TDigest] so process-local combine and reduction can retain the primitive state.
-/// Quantile queries and CDFs read the primitive state directly. Centroid iteration and serialization use the
-/// canonical library implementation returned from [#toTDigest()].
+/// Quantile queries and CDFs read the primitive state directly. Centroid iteration uses the canonical library
+/// implementation returned from [#toTDigest()], while [#byteSize()] and [#asBytes(ByteBuffer)] emit [#serialize()]
+/// bytes directly so generic `TDigest` serializers preserve capacity-preserving state.
 ///
 /// Serialized group state keeps its first digest pending, and allocates primitive centroid buffers only when another
 /// input must be merged. The raw-value buffer remains unallocated for serialized state until a raw value is added.
@@ -476,9 +477,24 @@ final class PercentileTDigestAccumulator extends TDigest {
     return _compression;
   }
 
+  /// Returns the length of the [#serialize()] bytes rather than the materialized [MergingDigest] byte size, so
+  /// generic `TDigest` serializers ([#byteSize()] followed by [#asBytes(ByteBuffer)]) emit the capacity-preserving
+  /// encoding. Re-encoding through a materialized [MergingDigest] can produce a verbose digest with more centroids
+  /// than a freshly allocated [MergingDigest] of the same compression can hold, which readers reject with
+  /// [ArrayIndexOutOfBoundsException]. The length is computed without materializing the bytes by mirroring the
+  /// [#serialize()] branches; the mutations here (flush, capacity normalization) are idempotent, so the following
+  /// [#asBytes(ByteBuffer)] call writes exactly this many bytes.
   @Override
   public int byteSize() {
-    return toTDigest().byteSize();
+    if (_pendingSerializedTDigest != null) {
+      return _pendingSerializedTDigest.length;
+    }
+    flush();
+    if (requiresCapacityPreservingEncoding()) {
+      return SMALL_HEADER_SIZE + SMALL_CENTROID_SIZE * _numCentroids;
+    }
+    normalizeCentroidCapacity();
+    return VERBOSE_HEADER_SIZE + VERBOSE_CENTROID_SIZE * _numCentroids;
   }
 
   @Override
@@ -486,9 +502,11 @@ final class PercentileTDigestAccumulator extends TDigest {
     return toTDigest().smallByteSize();
   }
 
+  /// Writes the [#serialize()] bytes; see [#byteSize()]. Bytes are always written in big-endian order (the t-digest
+  /// wire order) regardless of the destination buffer's byte order, unlike [MergingDigest#asBytes(ByteBuffer)].
   @Override
   public void asBytes(ByteBuffer buffer) {
-    toTDigest().asBytes(buffer);
+    buffer.put(serialize());
   }
 
   @Override

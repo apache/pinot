@@ -184,7 +184,7 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
   }
 
   private TDigest convertValueListToTDigest(DoubleArrayList valueList) {
-    TDigest tDigest = TDigest.createMergingDigest(_compression);
+    TDigest tDigest = new PercentileTDigestAccumulator(_compression);
     DoubleListIterator iterator = valueList.iterator();
     while (iterator.hasNext()) {
       tDigest.add(iterator.nextDouble());
@@ -267,10 +267,10 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
   @Override
   public Object merge(Object intermediateResult1, Object intermediateResult2) {
     if (intermediateResult1 instanceof TDigest) {
-      return mergeIntoTDigest((TDigest) intermediateResult1, intermediateResult2);
+      return mergeIntoAccumulator((TDigest) intermediateResult1, intermediateResult2);
     }
     if (intermediateResult2 instanceof TDigest) {
-      return mergeIntoTDigest((TDigest) intermediateResult2, intermediateResult1);
+      return mergeIntoAccumulator((TDigest) intermediateResult2, intermediateResult1);
     }
     DoubleArrayList valueList1 = (DoubleArrayList) intermediateResult1;
     DoubleArrayList valueList2 = (DoubleArrayList) intermediateResult2;
@@ -278,17 +278,24 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
     return valueList1.size() > _threshold ? convertValueListToTDigest(valueList1) : valueList1;
   }
 
-  private static TDigest mergeIntoTDigest(TDigest tDigest, Object intermediateResult) {
+  private static TDigest mergeIntoAccumulator(TDigest tDigest, Object intermediateResult) {
+    PercentileTDigestAccumulator accumulator;
+    if (tDigest instanceof PercentileTDigestAccumulator) {
+      accumulator = (PercentileTDigestAccumulator) tDigest;
+    } else {
+      accumulator = PercentileTDigestAccumulator.forReduction(tDigest.compression());
+      accumulator.add(tDigest);
+    }
     if (intermediateResult instanceof TDigest) {
-      tDigest.add((TDigest) intermediateResult);
+      accumulator.add((TDigest) intermediateResult);
     } else {
       DoubleArrayList valueList = (DoubleArrayList) intermediateResult;
       DoubleListIterator iterator = valueList.iterator();
       while (iterator.hasNext()) {
-        tDigest.add(iterator.nextDouble());
+        accumulator.add(iterator.nextDouble());
       }
     }
-    return tDigest;
+    return accumulator;
   }
 
   @Override
@@ -309,6 +316,9 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
 
   @Override
   public Object deserializeIntermediateResult(CustomObject customObject) {
+    if (customObject.getType() == ObjectSerDeUtils.ObjectType.TDigest.getValue()) {
+      return PercentileTDigestAccumulator.forSerializedTDigest(customObject.getBuffer());
+    }
     return ObjectSerDeUtils.deserialize(customObject);
   }
 
