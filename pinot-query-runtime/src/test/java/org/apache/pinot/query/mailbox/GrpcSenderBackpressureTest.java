@@ -178,8 +178,8 @@ public class GrpcSenderBackpressureTest {
       watchdog.shutdownNow();
     }
 
-    // RAW_MESSAGES at this point may already include the error EOS the watchdog's cancel pushed through, so we use
-    // `<=` rather than `==` in the assertion below.
+    // RAW_MESSAGES at this point may already include the error EOS the watchdog's cancel pushed through; see the
+    // bounds asserted below.
     int rawMessages = stats.getInt(MailboxSendOperator.StatKey.RAW_MESSAGES);
 
     stop.set(true);
@@ -202,10 +202,17 @@ public class GrpcSenderBackpressureTest {
         _receiverService.getMailboxServerUsedHeapMemoryBytes(),
         serverGrowth);
 
-    // RAW_MESSAGES counts every block we pushed through processAndSend, including the error EOS the watchdog's
-    // cancel may have emitted. So `rawMessages` is `sendCount` or `sendCount + 1`.
-    assertTrue(rawMessages == sendCount || rawMessages == sendCount + 1,
-        "RAW_MESSAGES (" + rawMessages + ") should equal sendCount (" + sendCount + ") or sendCount+1");
+    // Sanity-check that RAW_MESSAGES tracks the send loop, using two bounds that hold regardless of how the tail of
+    // the run interleaves with the watchdog's cancel. `sendCount` counts every send() call the loop made; each such
+    // call pushes at most one block through processAndSend (RAW_MESSAGES++), and the cancel adds at most one more
+    // error EOS, so RAW_MESSAGES can never exceed sendCount + 1. It also cannot be less than the number of blocks
+    // the receiver actually polled, since the receiver cannot poll a block the sender never pushed. Note we do NOT
+    // assert exact equality: a send() that races the cancel / early-termination is counted by the loop but skipped
+    // before RAW_MESSAGES is incremented, so RAW_MESSAGES legitimately trails sendCount by a few at the tail.
+    assertTrue(rawMessages <= sendCount + 1,
+        "RAW_MESSAGES (" + rawMessages + ") cannot exceed sendCount + 1 (" + (sendCount + 1) + ")");
+    assertTrue(rawMessages >= polledCount,
+        "RAW_MESSAGES (" + rawMessages + ") cannot be less than the polled count (" + polledCount + ")");
 
     // (1) Bounded in-flight pipeline.
     //
