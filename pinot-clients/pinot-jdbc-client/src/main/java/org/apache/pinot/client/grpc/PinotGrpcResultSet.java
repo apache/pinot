@@ -33,10 +33,15 @@ import java.sql.SQLDataException;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.PinotResultMetadata;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
@@ -44,6 +49,7 @@ import org.apache.pinot.client.utils.DateTimeUtils;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -271,8 +277,8 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   @Override
   public String getString(int columnIndex)
       throws SQLException {
-    validateColumn(columnIndex);
-    String val = _currentRowBatch.getRows().get(_currentBatchIndex)[columnIndex - 1].toString();
+    Object value = getValue(columnIndex);
+    String val = value == null ? null : value.toString();
     if (checkIsNull(val)) {
       return null;
     }
@@ -283,27 +289,34 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   public Object getObject(int columnIndex)
       throws SQLException {
 
-    String dataType = _columnDataTypes.getOrDefault(columnIndex, "");
-
-    if (dataType.isEmpty()) {
-      throw new SQLDataException("Data type not supported for " + dataType);
+    String dataTypeName = _columnDataTypes.getOrDefault(columnIndex, "");
+    ColumnDataType dataType;
+    try {
+      dataType = ColumnDataType.valueOf(dataTypeName);
+    } catch (IllegalArgumentException e) {
+      throw new SQLDataException("Data type not supported for " + dataTypeName, e);
     }
 
+    if (dataType.isArray()) {
+      return getList(columnIndex, dataType);
+    }
     switch (dataType) {
-      case "STRING":
+      case STRING:
         return getString(columnIndex);
-      case "INT":
+      case INT:
         return getInt(columnIndex);
-      case "LONG":
+      case LONG:
         return getLong(columnIndex);
-      case "FLOAT":
+      case FLOAT:
         return getFloat(columnIndex);
-      case "DOUBLE":
+      case DOUBLE:
         return getDouble(columnIndex);
-      case "BOOLEAN":
+      case BOOLEAN:
         return getBoolean(columnIndex);
-      case "BYTES":
+      case BYTES:
         return getBytes(columnIndex);
+      case MAP:
+        return getMap(columnIndex);
       default:
         throw new SQLDataException("Data type not supported for " + dataType);
     }
@@ -325,6 +338,142 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   public <T> T getObject(String columnLabel, Class<T> type)
       throws SQLException {
     return super.getObject(columnLabel, type);
+  }
+
+  private Object getValue(int columnIndex)
+      throws SQLException {
+    validateColumn(columnIndex);
+    Object value = _currentRowBatch.getRows().get(_currentBatchIndex)[columnIndex - 1];
+    if (value == null) {
+      _wasNull = true;
+    }
+    return value;
+  }
+
+  private Map<?, ?> getMap(int columnIndex)
+      throws SQLException {
+    Object value = getValue(columnIndex);
+    if (value == null) {
+      return null;
+    }
+    if (!(value instanceof Map)) {
+      throw new SQLDataException("Expected map value, found: " + value.getClass());
+    }
+    return new HashMap<>((Map<?, ?>) value);
+  }
+
+  private List<?> getList(int columnIndex, ColumnDataType dataType)
+      throws SQLException {
+    Object value = getValue(columnIndex);
+    if (value == null) {
+      return null;
+    }
+    try {
+      switch (dataType) {
+        case BOOLEAN_ARRAY:
+          return toList((boolean[]) value);
+        case INT_ARRAY:
+          return toList((int[]) value);
+        case LONG_ARRAY:
+          return toList((long[]) value);
+        case FLOAT_ARRAY:
+          return toList((float[]) value);
+        case DOUBLE_ARRAY:
+          return toList((double[]) value);
+        case BIG_DECIMAL_ARRAY:
+          return toBigDecimalList((String[]) value);
+        case TIMESTAMP_ARRAY:
+          return toTimestampList((String[]) value);
+        case STRING_ARRAY:
+          return new ArrayList<>(Arrays.asList((String[]) value));
+        case BYTES_ARRAY:
+          return toBytesList((String[]) value);
+        default:
+          throw new SQLDataException("Data type is not an array: " + dataType);
+      }
+    } catch (ClassCastException e) {
+      throw new SQLDataException("Unexpected value type for " + dataType + ": " + value.getClass(), e);
+    }
+  }
+
+  private static List<Boolean> toList(boolean[] values) {
+    List<Boolean> list = new ArrayList<>(values.length);
+    for (boolean value : values) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  private static List<Integer> toList(int[] values) {
+    List<Integer> list = new ArrayList<>(values.length);
+    for (int value : values) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  private static List<Long> toList(long[] values) {
+    List<Long> list = new ArrayList<>(values.length);
+    for (long value : values) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  private static List<Float> toList(float[] values) {
+    List<Float> list = new ArrayList<>(values.length);
+    for (float value : values) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  private static List<Double> toList(double[] values) {
+    List<Double> list = new ArrayList<>(values.length);
+    for (double value : values) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  private static List<BigDecimal> toBigDecimalList(String[] values)
+      throws SQLException {
+    List<BigDecimal> list = new ArrayList<>(values.length);
+    try {
+      for (String value : values) {
+        list.add(value == null ? null : new BigDecimal(value));
+      }
+      return list;
+    } catch (NumberFormatException e) {
+      throw new SQLDataException("Error parsing big decimal array", e);
+    }
+  }
+
+  private static List<Timestamp> toTimestampList(String[] values)
+      throws SQLException {
+    List<Timestamp> list = new ArrayList<>(values.length);
+    Calendar calendar = Calendar.getInstance();
+    try {
+      for (String value : values) {
+        list.add(value == null ? null : DateTimeUtils.getTimestampFromString(value, calendar));
+      }
+      return list;
+    } catch (ParseException e) {
+      throw new SQLDataException("Error parsing timestamp array", e);
+    }
+  }
+
+  private static List<byte[]> toBytesList(String[] values)
+      throws SQLException {
+    List<byte[]> list = new ArrayList<>(values.length);
+    try {
+      for (String value : values) {
+        list.add(value == null ? null : Hex.decodeHex(value));
+      }
+      return list;
+    } catch (DecoderException e) {
+      throw new SQLDataException("Error parsing bytes array", e);
+    }
   }
 
   private boolean checkIsNull(String val) {
