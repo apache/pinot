@@ -19,7 +19,9 @@
 package org.apache.pinot.common.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
@@ -455,5 +457,31 @@ public interface BrokerResponse {
   @Nullable
   default String getMaterializedViewQueried() {
     return null;
+  }
+
+  /// Returns generic, product-agnostic response metadata: a free-form string-to-[JsonNode] map that
+  /// any component can populate to surface non-fatal, informational notes about how the query was
+  /// handled (for example that it was executed with an alternate or degraded strategy). Values are
+  /// arbitrary JSON, so a note can be a scalar, an object, or an array. This is intentionally a
+  /// generic extension point: the core engine attaches no semantics to the keys or values, so
+  /// extensions can add their own entries without a dedicated typed field on this interface.
+  ///
+  /// This is distinct from [#getTraceInfo()] (per-server trace strings, only populated when tracing
+  /// is enabled) and from [#getExceptions()] (the error/warning list). The default is an empty,
+  /// unmodifiable map for implementations that do not support response metadata.
+  default Map<String, JsonNode> getResponseMetadata() {
+    return Map.of();
+  }
+
+  /// Records a generic response-metadata entry (arbitrary JSON value; see [#getResponseMetadata()]).
+  /// The default is a no-op, so implementations that do not support response metadata silently
+  /// ignore it.
+  default void putResponseMetadata(String key, JsonNode value) {
+  }
+
+  /// String convenience for [#putResponseMetadata(String, JsonNode)] — the common case — wrapping the
+  /// value in a JSON string node.
+  default void putResponseMetadata(String key, String value) {
+    putResponseMetadata(key, TextNode.valueOf(value));
   }
 }

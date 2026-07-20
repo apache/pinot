@@ -21,9 +21,11 @@ package org.apache.pinot.common.response.broker;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,7 +55,8 @@ import org.apache.pinot.common.response.ProcessingException;
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
     "pools", "rlsFiltersApplied", "groupsTrimmed",
-    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied"
+    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied",
+    "responseMetadata"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -99,6 +102,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private Integer _mseLiteLeafStageEffectiveLimit;
   @Nullable
   private Boolean _mseLiteFanOutAdjustedLimitApplied;
+  private final Map<String, JsonNode> _responseMetadata = new HashMap<>();
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
@@ -489,6 +493,18 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public Map<String, String> getTraceInfo() {
     return Map.of();
+  }
+
+  @JsonProperty("responseMetadata")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Override
+  public Map<String, JsonNode> getResponseMetadata() {
+    return _responseMetadata;
+  }
+
+  @Override
+  public void putResponseMetadata(String key, JsonNode value) {
+    _responseMetadata.put(key, value);
   }
 
   @Override
