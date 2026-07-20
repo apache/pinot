@@ -156,6 +156,9 @@ public class DriverUtils {
     if (isArrayDataType(columnDataType)) {
       return Types.JAVA_OBJECT;
     }
+    if (ColumnDataType.MAP.name().equals(columnDataType)) {
+      return Types.JAVA_OBJECT;
+    }
     Integer columnsSQLDataType;
     switch (columnDataType) {
       case "STRING":
@@ -198,6 +201,9 @@ public class DriverUtils {
     }
     if (isArrayDataType(columnDataType)) {
       return List.class.getTypeName();
+    }
+    if (ColumnDataType.MAP.name().equals(columnDataType)) {
+      return Map.class.getTypeName();
     }
     String columnsJavaClassName;
     switch (columnDataType) {
