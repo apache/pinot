@@ -458,6 +458,24 @@ public class PercentileTDigestAggregationFunctionTest {
   }
 
   @Test
+  public void testCapacityPreservingByteSizeRejectsUnencodableCentroidCount()
+      throws ReflectiveOperationException {
+    PercentileTDigestAccumulator accumulator = PercentileTDigestAccumulator.forReduction(20.0);
+    int unencodableCentroidCount = Short.MAX_VALUE + 1;
+    Field numCentroidsField = PercentileTDigestAccumulator.class.getDeclaredField("_numCentroids");
+    numCentroidsField.setAccessible(true);
+    numCentroidsField.setInt(accumulator, unencodableCentroidCount);
+    Field serializedMainCapacityField =
+        PercentileTDigestAccumulator.class.getDeclaredField("_serializedMainCapacity");
+    serializedMainCapacityField.setAccessible(true);
+    serializedMainCapacityField.setInt(accumulator, unencodableCentroidCount);
+
+    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class, accumulator::byteSize);
+    Assert.assertEquals(exception.getMessage(),
+        "TDigest has too many centroids for capacity-preserving encoding: " + unencodableCentroidCount);
+  }
+
+  @Test
   public void testSerializedGroupByMVSharedInputUsesCentroidCountForInitialCapacity()
       throws ReflectiveOperationException {
     ByteBuffer oneCentroid = ByteBuffer.allocate(30 + 2 * Float.BYTES);

@@ -491,6 +491,7 @@ final class PercentileTDigestAccumulator extends TDigest {
     }
     flush();
     if (requiresCapacityPreservingEncoding()) {
+      checkCapacityPreservingCentroidCount();
       return SMALL_HEADER_SIZE + SMALL_CENTROID_SIZE * _numCentroids;
     }
     normalizeCentroidCapacity();
@@ -506,6 +507,12 @@ final class PercentileTDigestAccumulator extends TDigest {
   /// wire order) regardless of the destination buffer's byte order, unlike [MergingDigest#asBytes(ByteBuffer)].
   @Override
   public void asBytes(ByteBuffer buffer) {
+    if (_pendingSerializedTDigest != null) {
+      // Same validation as serialize(), but write through without the defensive clone.
+      getSerializedTotalWeight(_pendingSerializedTDigest);
+      buffer.put(_pendingSerializedTDigest);
+      return;
+    }
     buffer.put(serialize());
   }
 
@@ -628,10 +635,7 @@ final class PercentileTDigestAccumulator extends TDigest {
   }
 
   private byte[] toCapacityPreservingBytes() {
-    if (_numCentroids > Short.MAX_VALUE) {
-      throw new IllegalStateException("TDigest has too many centroids for capacity-preserving encoding: "
-          + _numCentroids);
-    }
+    checkCapacityPreservingCentroidCount();
     int mainCapacity = Math.min(Short.MAX_VALUE, Math.max(_numCentroids, _serializedMainCapacity));
     long defaultBufferCapacity = Math.multiplyExact(DEFAULT_MERGE_BUFFER_MULTIPLIER, (long) Math.ceil(_compression));
     int bufferCapacity = Math.toIntExact(Math.min(Short.MAX_VALUE,
@@ -649,6 +653,13 @@ final class PercentileTDigestAccumulator extends TDigest {
       buffer.putFloat((float) _centroidMeans[i]);
     }
     return buffer.array();
+  }
+
+  private void checkCapacityPreservingCentroidCount() {
+    if (_numCentroids > Short.MAX_VALUE) {
+      throw new IllegalStateException("TDigest has too many centroids for capacity-preserving encoding: "
+          + _numCentroids);
+    }
   }
 
   private void flush() {
