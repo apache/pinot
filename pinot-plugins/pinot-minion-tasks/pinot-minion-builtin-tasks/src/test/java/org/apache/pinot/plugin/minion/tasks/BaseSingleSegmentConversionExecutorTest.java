@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.minion.tasks;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -238,8 +237,7 @@ public class BaseSingleSegmentConversionExecutorTest {
     @Override
     protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
         SegmentConversionResult segmentConversionResult) {
-      return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-          Collections.emptyMap());
+      return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of());
     }
   }
 }
