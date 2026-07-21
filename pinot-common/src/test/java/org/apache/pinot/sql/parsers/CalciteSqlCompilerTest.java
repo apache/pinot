@@ -3430,6 +3430,24 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testDmlLegacyOptionKeepsFreeFormTaskProps() {
+    // DML free-form OPTION keys (taskName, FS props) must not be rejected — same contract as DML SET.
+    String sql = "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1' OPTION(taskName=myTask-1)";
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+    Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("taskName"), "myTask-1");
+
+    // DQL still rejects unknown legacy OPTION keys.
+    try {
+      CalciteSqlParser.compileToSqlNodeAndOptions("SELECT * FROM db.tbl OPTION(taskName=myTask-1)");
+      Assert.fail("Unknown OPTION key on DQL should fail");
+    } catch (SqlCompilationException e) {
+      Assert.assertTrue(e.getMessage().contains("Unsupported query option 'taskName'")
+          || (e.getCause() != null && e.getCause().getMessage().contains("Unsupported query option 'taskName'")));
+    }
+  }
+
+  @Test
   public void shouldParseBasicAtTimeZoneExtension() {
     // Given:
     String sql = "SELECT ts AT TIME ZONE 'pst' FROM myTable;";

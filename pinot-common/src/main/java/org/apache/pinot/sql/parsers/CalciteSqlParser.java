@@ -131,10 +131,14 @@ public class CalciteSqlParser {
       SqlNodeList sqlNodeList = sqlParser.parseSqlStmtList();
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
-      // add legacy OPTIONS keyword-based options (validate: SQL-supplied only)
+      // Legacy OPTION(...) keys: validate for DQL only. DML (e.g. INSERT INTO FILE OPTION(taskName=...))
+      // intentionally carries free-form task/FS properties, same as DML SET.
       if (!options.isEmpty()) {
-        sqlNodeAndOptions.setExtraOptions(
-            QueryOptionsUtils.resolveAndValidateSqlQueryOptions(extractOptionsMap(options)));
+        Map<String, String> optionMap = extractOptionsMap(options);
+        Map<String, String> resolvedLegacyOptions = sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL
+            ? QueryOptionsUtils.resolveAndValidateSqlQueryOptions(optionMap)
+            : QueryOptionsUtils.resolveCaseInsensitiveOptions(optionMap);
+        sqlNodeAndOptions.setExtraOptions(resolvedLegacyOptions);
       }
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
