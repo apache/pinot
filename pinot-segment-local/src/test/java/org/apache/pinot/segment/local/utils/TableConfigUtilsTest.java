@@ -4390,11 +4390,48 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void testAddingPartitionRejected() {
+  public void testAddingPartitionAllowed() {
+    // Upsert/dedup routing correctness is enforced by stream-side partitioning; adding segmentPartitionConfig is a
+    // broker query-pruning optimization and is allowed on an existing upsert table.
     TableConfig existing = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN).setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
     List<String> violations =
         TableConfigUtils.validateBackwardCompatibility(partitionedTable(partition(4), true, false), existing);
+    assertTrue(violations.isEmpty(), "Adding segmentPartitionConfig should be allowed, but got: " + violations);
+  }
+
+  @Test
+  public void testRemovingPartitionAllowed() {
+    // Removing segmentPartitionConfig only stops broker pruning; no correctness impact on upsert/dedup routing.
+    TableConfig noPartition = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
+    List<String> violations =
+        TableConfigUtils.validateBackwardCompatibility(noPartition, partitionedTable(partition(4), true, false));
+    assertTrue(violations.isEmpty(), "Removing segmentPartitionConfig should be allowed, but got: " + violations);
+  }
+
+  @Test
+  public void testFunctionConfigChangeAllowed() {
+    // functionConfig is a tuning parameter; it does not change the partition mapping and must be allowed to change.
+    Map<String, String> emptyCfg = Map.of();
+    Map<String, String> nonEmptyCfg = Map.of("seed", "42");
+    SegmentPartitionConfig existingPartition =
+        new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("Murmur", 4, emptyCfg)));
+    SegmentPartitionConfig newPartition =
+        new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("Murmur", 4, nonEmptyCfg)));
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(
+        partitionedTable(newPartition, true, false), partitionedTable(existingPartition, true, false));
+    assertTrue(violations.isEmpty(), "functionConfig-only changes should be allowed, but got: " + violations);
+  }
+
+  @Test
+  public void testFunctionNameChangeRejected() {
+    SegmentPartitionConfig existingPartition =
+        new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("Murmur", 4)));
+    SegmentPartitionConfig newPartition =
+        new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("Modulo", 4)));
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(
+        partitionedTable(newPartition, true, false), partitionedTable(existingPartition, true, false));
     assertEquals(violations.size(), 1);
     assertTrue(violations.get(0).contains("segmentPartitionConfig"));
   }
