@@ -1742,6 +1742,13 @@ public class CommonConstants {
         "pinot.server.environmentProvider.factory";
     public static final String ENVIRONMENT_PROVIDER_CLASS_NAME = "pinot.server.environmentProvider.className";
 
+    // Upsert snapshot: bounded wait when doTakeSnapshot() tries to acquire a segment's per-segment lock.
+    // Read from cluster config; live-updated via PinotClusterConfigChangeListener. Set to 0 to preserve the legacy
+    // non-blocking behavior (skip immediately on contention).
+    public static final String CONFIG_OF_UPSERT_SNAPSHOT_SEGMENT_LOCK_TIMEOUT_MS =
+        "pinot.server.upsert.snapshot.segment.lock.timeout.ms";
+    public static final long DEFAULT_UPSERT_SNAPSHOT_SEGMENT_LOCK_TIMEOUT_MS = 2000L;
+
     /// All the keys should be prefixed with {@link #INSTANCE_DATA_MANAGER_CONFIG_PREFIX}
     public static class Upsert {
       public static final String CONFIG_PREFIX = "upsert";

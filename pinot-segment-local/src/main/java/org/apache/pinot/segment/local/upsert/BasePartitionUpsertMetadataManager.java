@@ -924,6 +924,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     int numTrackedSegments = _trackedSegments.size();
     long numPrimaryKeysInSnapshot = 0L;
     long numQueryableDocIdsInSnapshot = 0L;
+    // Snapshot the segmentLock timeout once so every segment in this cycle uses the same value even if the cluster
+    // config is PATCHed mid-snapshot.
+    long segmentLockTimeoutMs = UpsertSnapshotConfig.getSegmentLockTimeoutMs();
     _logger.info("Taking snapshot for {} segments", numTrackedSegments);
     long startTimeMs = System.currentTimeMillis();
 
@@ -958,16 +961,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       // major cleanup steps in the cleanDirectory() method.
       String segmentName = segment.getSegmentName();
       Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
-      boolean locked = segmentLock.tryLock();
+      boolean locked;
+      try {
+        // Wait a bounded time for the segmentLock instead of returning immediately, so a briefly-held segmentLock
+        // (e.g. a Helix task thread mid-swap) does not force us to skip an otherwise-snapshottable segment. The
+        // timeout is server-scoped and live-updatable via cluster config; setting it to 0 preserves the legacy
+        // non-blocking behavior.
+        locked = segmentLock.tryLock(segmentLockTimeoutMs, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        locked = false;
+      }
       if (!locked) {
-        // Try to get the segmentLock in a non-blocking manner to avoid deadlock. The Helix task thread takes
-        // segmentLock first and then the snapshot RLock when replacing a segment. However, the consuming thread has
-        // already acquired the snapshot WLock when reaching here, and if it has to wait for segmentLock, it may
-        // enter deadlock with the Helix task threads waiting for snapshot RLock.
-        // If we can't get the segmentLock, we'd better skip taking snapshot for this tracked segment, because its
-        // validDocIds/queryableDocIds might become stale or wrong when the segment is being processed by another
-        // thread right now.
-        _logger.warn("Could not get segmentLock to take snapshot for segment: {}, skipping", segmentName);
+        // Skip this segment when its lock can't be acquired within the timeout: another thread (typically a Helix
+        // task mid-replacement) is actively mutating the segment, so any validDocIds/queryableDocIds snapshot we
+        // wrote right now could be stale or wrong. Skipping also causes the second loop below to be gated
+        // (via isSegmentSkipped) so we do not write new snapshot files for segments-without-snapshot in this cycle,
+        // preserving the on-disk disjoint-snapshots invariant.
+        _logger.warn("Could not get segmentLock to take snapshot for segment: {} within {}ms, skipping", segmentName,
+            segmentLockTimeoutMs);
         isSegmentSkipped = true;
         continue;
       }
@@ -1013,10 +1025,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
         String segmentName = segment.getSegmentName();
         Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
-        boolean locked = segmentLock.tryLock();
+        boolean locked;
+        try {
+          locked = segmentLock.tryLock(segmentLockTimeoutMs, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          locked = false;
+        }
         if (!locked) {
-          _logger.warn("Could not get segmentLock to take snapshot for segment: {} w/o snapshot, skipping",
-              segmentName);
+          _logger.warn("Could not get segmentLock to take snapshot for segment: {} w/o snapshot within {}ms, skipping",
+              segmentName, segmentLockTimeoutMs);
           continue;
         }
         try {

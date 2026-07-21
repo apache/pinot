@@ -102,6 +102,7 @@ import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvi
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
+import org.apache.pinot.segment.local.upsert.UpsertSnapshotConfig;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -838,6 +839,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottlerSet);
+    UpsertSnapshotConfig.init(_serverConf);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(UpsertSnapshotConfig.getInstance());
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
     ResourceManager resourceManager = _serverInstance.getQueryScheduler().getResourceManager();
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
