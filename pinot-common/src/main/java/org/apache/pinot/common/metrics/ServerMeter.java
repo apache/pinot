@@ -261,6 +261,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   TRANSFORMATION_ERROR_COUNT("rows", false),
   DROPPED_RECORD_COUNT("rows", false),
   CORRUPTED_RECORD_COUNT("rows", false),
+  OPEN_STRUCT_TYPE_COERCION_FAILURES("values", false,
+      "Number of OPEN_STRUCT values dropped because the value could not be coerced to the key's inferred type"),
   // Workload related metrics
   WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", true, "Number of times workload budget exceeded"),
   WORKLOAD_QUERIES("queries", false),

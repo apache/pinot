@@ -68,6 +68,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -588,6 +589,31 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         }
         compressionMetadata.applyTo(properties, column);
       }
+    }
+
+    // OPEN_STRUCT splitters produce per-key materialized child columns (col$key, col$__sparse__) that
+    // are not in _columnStatisticsMap. Merge their pre-built metadata into the segment properties so
+    // each child appears as its own column at load time, and register them as dimensions so the V3
+    // converter and SegmentMetadataImpl discover their index files.
+    List<String> openStructChildColumns = new ArrayList<>();
+    for (ColumnIndexCreators columnIndexCreators : _colIndexes.values()) {
+      for (IndexCreator indexCreator : columnIndexCreators.getIndexCreators()) {
+        if (indexCreator instanceof ColumnarOpenStructIndexCreator) {
+          ColumnarOpenStructIndexCreator splitter = (ColumnarOpenStructIndexCreator) indexCreator;
+          for (Map.Entry<String, PropertiesConfiguration> childEntry
+              : splitter.getMaterializedColumnMetadata().entrySet()) {
+            String childCol = childEntry.getKey();
+            PropertiesConfiguration childProps = childEntry.getValue();
+            childProps.getKeys().forEachRemaining(key -> properties.setProperty(key, childProps.getProperty(key)));
+            openStructChildColumns.add(childCol);
+          }
+        }
+      }
+    }
+    if (!openStructChildColumns.isEmpty()) {
+      List<String> dimensions = new ArrayList<>(_config.getDimensions());
+      dimensions.addAll(openStructChildColumns);
+      properties.setProperty(DIMENSIONS, dimensions);
     }
 
     SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();

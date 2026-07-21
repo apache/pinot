@@ -66,6 +66,8 @@ import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVe
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
+import org.apache.pinot.segment.local.segment.index.openstruct.MutableOpenStructDataSource;
+import org.apache.pinot.segment.local.segment.index.openstruct.MutableOpenStructIndex;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
@@ -107,6 +109,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
@@ -300,7 +303,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     Set<IndexType> specialIndexes =
         Sets.newHashSet(StandardIndexes.dictionary(), // dictionary implements other contract
-            StandardIndexes.nullValueVector()); // null value vector implements other contract
+            StandardIndexes.nullValueVector(), // null value vector implements other contract
+            StandardIndexes.openStruct()); // open-struct is constructed out-of-band below
 
     // Initialize for each column
     boolean hasColumnWithReuseMutableTextIndex = false;
@@ -423,6 +427,15 @@ public class MutableSegmentImpl implements MutableSegment {
           } else {
             dictionary = new SameValueMutableDictionary(rawValueForTextIndex, dictionary);
           }
+        }
+      }
+
+      if (dataType == DataType.OPEN_STRUCT && fieldSpec instanceof ComplexFieldSpec) {
+        IndexConfig openStructConfig = indexConfigs.getConfig(StandardIndexes.openStruct());
+        if (openStructConfig instanceof OpenStructIndexConfig && openStructConfig.isEnabled()) {
+          MutableOpenStructIndex openStructIndex = new MutableOpenStructIndex(column, (ComplexFieldSpec) fieldSpec,
+              (OpenStructIndexConfig) openStructConfig, _memoryManager, _capacity);
+          mutableIndexes.put(StandardIndexes.openStruct(), openStructIndex);
         }
       }
 
@@ -567,7 +580,7 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   private boolean isNoDictionaryColumn(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, String column) {
     DataType dataType = fieldSpec.getDataType();
-    if (dataType == DataType.MAP) {
+    if (dataType == DataType.MAP || dataType == DataType.OPEN_STRUCT) {
       return true;
     }
     if (indexConfigs == null) {
@@ -911,6 +924,17 @@ public class MutableSegmentImpl implements MutableSegment {
       if (fieldSpec.isSingleValueField()) {
         // Update numValues info
         indexContainer._valuesInfo.updateSVNumValues();
+
+        // Route OPEN_STRUCT values to the dedicated mutable index. OPEN_STRUCT has no forward
+        // index / dictionary / min-max, so the standard per-IndexType loop and the comparable
+        // tracking below would be no-ops at best and crash at worst (Map is not Comparable).
+        if (dataType == DataType.OPEN_STRUCT) {
+          MutableIndex openStructIndex = indexContainer._mutableIndexes.get(StandardIndexes.openStruct());
+          if (openStructIndex != null) {
+            openStructIndex.add(value, -1, docId);
+          }
+          continue;
+        }
 
         // Update indexes
         int dictId = indexContainer._dictId;
@@ -1286,6 +1310,20 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
+  /**
+   * Returns the per-column mutable OPEN_STRUCT index, or {@code null} if the column is not OPEN_STRUCT
+   * or the index has not been initialized.
+   */
+  @Nullable
+  public MutableOpenStructIndex getOpenStructIndex(String column) {
+    IndexContainer container = _indexContainerMap.get(column);
+    if (container == null) {
+      return null;
+    }
+    MutableIndex index = container._mutableIndexes.get(StandardIndexes.openStruct());
+    return index instanceof MutableOpenStructIndex ? (MutableOpenStructIndex) index : null;
+  }
+
   @Override
   public void offload() {
     if (_partitionUpsertMetadataManager != null) {
@@ -1656,7 +1694,10 @@ public class MutableSegmentImpl implements MutableSegment {
         @Nullable Set<Integer> partitions, ValuesInfo valuesInfo, Map<IndexType, MutableIndex> mutableIndexes,
         @Nullable MutableDictionary dictionary, @Nullable MutableNullValueVector nullValueVector,
         @Nullable String sourceColumn, @Nullable ValueAggregator valueAggregator) {
-      Preconditions.checkArgument(mutableIndexes.containsKey(StandardIndexes.forward()), "Forward index is required");
+      Preconditions.checkArgument(
+          mutableIndexes.containsKey(StandardIndexes.forward())
+              || mutableIndexes.containsKey(StandardIndexes.openStruct()),
+          "Forward index or OPEN_STRUCT index is required");
       _fieldSpec = fieldSpec;
       _mutableIndexes = mutableIndexes;
       _dictionary = dictionary;
@@ -1669,6 +1710,11 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     DataSource toDataSource() {
+      if (_fieldSpec.getDataType() == DataType.OPEN_STRUCT) {
+        MutableIndex idx = _mutableIndexes.get(StandardIndexes.openStruct());
+        return new MutableOpenStructDataSource((ComplexFieldSpec) _fieldSpec, (MutableOpenStructIndex) idx,
+            _numDocsIndexed);
+      }
       if (_fieldSpec.getDataType() == MAP) {
         return new MutableMapDataSource(_fieldSpec, _numDocsIndexed, _valuesInfo._numValues,
             _valuesInfo._maxNumValuesPerMVEntry, _dictionary == null ? -1 : _dictionary.length(), _partitionFunction,

@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.openstruct.OpenStructColumnSplitter;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
@@ -124,16 +125,16 @@ public class OpenStructIndexType
 
   @Override
   public boolean shouldCreateIndex(IndexCreationContext context, OpenStructIndexConfig indexConfig) {
-    // Creator is wired in the storage-layer PR (PR 2b); returning true here with a null creator
-    // would NPE in SegmentColumnarIndexCreator.add(). Keep false until the real creator lands.
-    return false;
+    // The default OpenStructIndexConfig is auto-applied to every column; only build a creator for
+    // OPEN_STRUCT columns. Non-OPEN_STRUCT columns cannot meaningfully host this index.
+    return context.getFieldSpec().getDataType() == FieldSpec.DataType.OPEN_STRUCT;
   }
 
   @Override
   public ColumnarOpenStructIndexCreator createIndexCreator(IndexCreationContext context,
       OpenStructIndexConfig indexConfig) {
-    throw new UnsupportedOperationException(
-        "OPEN_STRUCT index creator is not yet available; shouldCreateIndex() must return false");
+    FieldSpec fieldSpec = context.getFieldSpec();
+    return new OpenStructColumnSplitter(context.getIndexDir(), fieldSpec.getName(), fieldSpec, indexConfig);
   }
 
   @Override
@@ -155,8 +156,8 @@ public class OpenStructIndexType
   @Nullable
   @Override
   public MutableIndex createMutableIndex(MutableIndexContext context, OpenStructIndexConfig config) {
-    // Mutable OPEN_STRUCT index is constructed by MutableSegmentImpl, not via this SPI path.
-    return null;
+    throw new UnsupportedOperationException("Mutable OPEN_STRUCT index is constructed by MutableSegmentImpl, "
+        + "not via this SPI path");
   }
 
   @Override

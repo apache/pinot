@@ -48,6 +48,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
@@ -213,6 +214,17 @@ public class ImmutableSegmentLoader {
     if (schema != null) {
       Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
       columnsInMetadata.removeIf(schema::hasColumn);
+      // Materialized OPEN_STRUCT child columns (col$key, col$__sparse__) live in segment metadata
+      // but not in the user-facing schema. Keep them when the parent OPEN_STRUCT column is in the
+      // schema; they will be grouped under their parent at segment-impl post-load (Task 16).
+      columnsInMetadata.removeIf(col -> {
+        if (!OpenStructNaming.isMaterializedOpenStructColumn(col)) {
+          return false;
+        }
+        String parent = OpenStructNaming.parseParentColumn(col);
+        return schema.hasColumn(parent)
+            && schema.getFieldSpecFor(parent).getDataType() == FieldSpec.DataType.OPEN_STRUCT;
+      });
       if (!columnsInMetadata.isEmpty()) {
         LOGGER.info("Skip loading columns only exist in metadata but not in schema: {}", columnsInMetadata);
         for (String column : columnsInMetadata) {
