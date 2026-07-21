@@ -961,17 +961,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       // major cleanup steps in the cleanDirectory() method.
       String segmentName = segment.getSegmentName();
       Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
-      boolean locked;
-      try {
-        // Wait a bounded time for the segmentLock instead of returning immediately, so a briefly-held segmentLock
-        // (e.g. a Helix task thread mid-swap) does not force us to skip an otherwise-snapshottable segment. The
-        // timeout is server-scoped and live-updatable via cluster config; setting it to 0 preserves the legacy
-        // non-blocking behavior.
-        locked = segmentLock.tryLock(segmentLockTimeoutMs, TimeUnit.MILLISECONDS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        locked = false;
-      }
+      // Wait a bounded time for the segmentLock instead of returning immediately, so a briefly-held segmentLock
+      // (e.g. a Helix task thread mid-swap) does not force us to skip an otherwise-snapshottable segment. The
+      // timeout is server-scoped and live-updatable via cluster config; setting it to 0 preserves the legacy
+      // non-blocking behavior.
+      boolean locked = tryAcquireSegmentLock(segmentLock, segmentLockTimeoutMs);
       if (!locked) {
         // Skip this segment when its lock can't be acquired within the timeout: another thread (typically a Helix
         // task mid-replacement) is actively mutating the segment, so any validDocIds/queryableDocIds snapshot we
@@ -1025,13 +1019,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
         String segmentName = segment.getSegmentName();
         Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
-        boolean locked;
-        try {
-          locked = segmentLock.tryLock(segmentLockTimeoutMs, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          locked = false;
-        }
+        boolean locked = tryAcquireSegmentLock(segmentLock, segmentLockTimeoutMs);
         if (!locked) {
           _logger.warn("Could not get segmentLock to take snapshot for segment: {} w/o snapshot within {}ms, skipping",
               segmentName, segmentLockTimeoutMs);
@@ -1153,6 +1141,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    * Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL).
    */
   protected abstract void doRemoveExpiredPrimaryKeys();
+
+  /// Attempts to acquire {@code lock} with a bounded wait. Returns true iff the lock was acquired within
+  /// {@code timeoutMs}. On interruption, restores the interrupt flag and returns false so the caller treats
+  /// the segment as skipped, matching the timeout branch.
+  private static boolean tryAcquireSegmentLock(Lock lock, long timeoutMs) {
+    try {
+      return lock.tryLock(timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
+  }
 
   protected synchronized boolean startOperation() {
     if (_stopped || _numPendingOperations == 0) {
