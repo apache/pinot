@@ -1524,8 +1524,19 @@ public final class TableConfigUtils {
   }
 
   /**
-   * Disallows changing segmentPartitionConfig on upsert/dedup tables, since they partition by primary key and
-   * re-partitioning would break key routing. Can be bypassed with a force update.
+   * On upsert/dedup tables, rejects only the segmentPartitionConfig changes that would silently break broker query
+   * pruning against already-written segments — i.e., changing {@code functionName} or {@code numPartitions} on a
+   * column that was already partitioned. All other changes are allowed:
+   * <ul>
+   *   <li>Adding segmentPartitionConfig to a table that had none (or a new column) — existing segments simply
+   *       carry no partition metadata for that column, so broker pruning falls back to a full scan for them.</li>
+   *   <li>Removing segmentPartitionConfig (or dropping a partitioned column) — broker stops pruning by that column;
+   *       no correctness impact.</li>
+   *   <li>Changing {@code functionConfig} (a tuning parameter that does not alter the partition mapping).</li>
+   * </ul>
+   * Upsert/dedup routing correctness itself is enforced by stream-side partitioning on the primary key, not by
+   * segmentPartitionConfig — this check is narrowed to only the fields that actually affect query results on
+   * existing segments. Can be bypassed with a force update.
    */
   private static void validatePartitionConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
       List<String> violations) {
@@ -1534,18 +1545,38 @@ public final class TableConfigUtils {
     if (!existingIsUpsertOrDedup || !newIsUpsertOrDedup) {
       return;
     }
-    SegmentPartitionConfig existingPartitionConfig =
-        existingConfig.getIndexingConfig() != null ? existingConfig.getIndexingConfig().getSegmentPartitionConfig()
-            : null;
-    SegmentPartitionConfig newPartitionConfig =
-        newConfig.getIndexingConfig() != null ? newConfig.getIndexingConfig().getSegmentPartitionConfig() : null;
-    if (!Objects.equals(existingPartitionConfig, newPartitionConfig)) {
-      violations.add(String.format(
-          "segmentPartitionConfig (%s -> %s) - changing partitioning is not allowed for upsert/dedup tables as it "
-              + "breaks primary key routing",
-          existingPartitionConfig != null ? existingPartitionConfig.getColumnPartitionMap() : null,
-          newPartitionConfig != null ? newPartitionConfig.getColumnPartitionMap() : null));
+    Map<String, ColumnPartitionConfig> existingMap = getColumnPartitionMap(existingConfig);
+    Map<String, ColumnPartitionConfig> newMap = getColumnPartitionMap(newConfig);
+    // Only compare columns that were partitioned in the existing config AND remain partitioned in the new config.
+    // Additions and removals are allowed (see method Javadoc).
+    for (Map.Entry<String, ColumnPartitionConfig> entry : existingMap.entrySet()) {
+      String column = entry.getKey();
+      ColumnPartitionConfig existingCol = entry.getValue();
+      ColumnPartitionConfig newCol = newMap.get(column);
+      if (newCol == null) {
+        continue;
+      }
+      if (!Objects.equals(existingCol.getFunctionName(), newCol.getFunctionName())
+          || existingCol.getNumPartitions() != newCol.getNumPartitions()) {
+        violations.add(String.format(
+            "segmentPartitionConfig for column '%s' (functionName=%s/numPartitions=%d -> functionName=%s/"
+                + "numPartitions=%d) - changing partition function or numPartitions is not allowed for upsert/dedup "
+                + "tables as it silently breaks broker query pruning against already-written segments",
+            column, existingCol.getFunctionName(), existingCol.getNumPartitions(),
+            newCol.getFunctionName(), newCol.getNumPartitions()));
+      }
     }
+  }
+
+  private static Map<String, ColumnPartitionConfig> getColumnPartitionMap(TableConfig tableConfig) {
+    if (tableConfig.getIndexingConfig() == null) {
+      return Map.of();
+    }
+    SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (partitionConfig == null || partitionConfig.getColumnPartitionMap() == null) {
+      return Map.of();
+    }
+    return partitionConfig.getColumnPartitionMap();
   }
 
   private static void validateMaterializedViewConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
