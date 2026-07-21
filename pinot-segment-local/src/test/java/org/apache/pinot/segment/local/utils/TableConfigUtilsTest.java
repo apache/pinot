@@ -4425,15 +4425,15 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void testFunctionNameChangeRejected() {
+  public void testFunctionNameChangeAllowed() {
+    // Users may need to migrate between hash functions; allowed so long as numPartitions stays the same.
     SegmentPartitionConfig existingPartition =
         new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("Murmur", 4)));
     SegmentPartitionConfig newPartition =
         new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("Modulo", 4)));
     List<String> violations = TableConfigUtils.validateBackwardCompatibility(
         partitionedTable(newPartition, true, false), partitionedTable(existingPartition, true, false));
-    assertEquals(violations.size(), 1);
-    assertTrue(violations.get(0).contains("segmentPartitionConfig"));
+    assertTrue(violations.isEmpty(), "functionName changes should be allowed, but got: " + violations);
   }
 
   @Test
