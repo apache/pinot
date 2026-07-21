@@ -289,15 +289,16 @@ public class MemoryEstimator {
           long mappedMemoryPerHost = totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition
               * totalConsumingPartitionsPerHost * completedSegmentSizeBytes);
 
-          if (activeMemoryPerHostBytes <= _maxUsableHostMemory) {
-            _activeMemoryPerHost[i][j] =
-                DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
-            _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
-            _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
-            _numRowsInSegment[i][j] = String.valueOf(totalDocs);
-            _numSegmentsQueriedPerHost[i][j] =
-                String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
-          }
+          // Always surface computed values (including when over max usable host memory) so callers can
+          // display them with warnings instead of opaque "NA" cells. Combinations where
+          // numHoursToConsume > retentionHours remain NA (skipped above).
+          _activeMemoryPerHost[i][j] =
+              DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
+          _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
+          _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
+          _numRowsInSegment[i][j] = String.valueOf(totalDocs);
+          _numSegmentsQueriedPerHost[i][j] =
+              String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
         }
       }
     } finally {
@@ -448,6 +449,14 @@ public class MemoryEstimator {
 
   public String[][] getNumSegmentsQueriedPerHost() {
     return _numSegmentsQueriedPerHost;
+  }
+
+  /**
+   * Max usable host memory (bytes) supplied when this estimator was constructed.
+   * Estimates may exceed this value; callers should surface warnings rather than hiding them.
+   */
+  public long getMaxUsableHostMemory() {
+    return _maxUsableHostMemory;
   }
 
   private static File generateCompletedSegment(SchemaWithMetaData schemaWithMetadata, Schema schema,
