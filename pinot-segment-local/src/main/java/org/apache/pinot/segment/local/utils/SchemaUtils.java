@@ -209,6 +209,8 @@ public class SchemaUtils {
   private static void validateTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
     TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+    validateEpochTimeUnitSize(incomingGranularitySpec);
+    validateEpochTimeUnitSize(outgoingGranularitySpec);
 
     if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
       Preconditions.checkState(!incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName()),
@@ -220,6 +222,15 @@ public class SchemaUtils {
               && outgoingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()),
           "Cannot perform time conversion for time format other than EPOCH. TimeFieldSpec: %s", timeFieldSpec);
     }
+  }
+
+  private static void validateEpochTimeUnitSize(TimeGranularitySpec timeGranularitySpec) {
+    Preconditions.checkState(
+        !timeGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
+            || timeGranularitySpec.getTimeUnitSize() == 1,
+        "TimeFieldSpec with EPOCH time format only supports timeUnitSize 1. Use DateTimeFieldSpec for bucketed epoch "
+            + "values. TimeGranularitySpec: %s",
+        timeGranularitySpec);
   }
 
   /**
