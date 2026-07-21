@@ -27,12 +27,14 @@ jobType: SegmentCreationAndTarPush
 
 inputDirURI: 'file:///path/to/input/${ year }/${ month }/${ day }'
 searchRecursively: false
-# includeFileNamePattern: include file name pattern, supported glob pattern.
+# includeFileNamePattern and excludeFileNamePattern: Java NIO PathMatcher (glob: or regex: prefix).
+# regex: is Java regex via FileSystems.getDefault().getPathMatcher (not PCRE/JS).
+# Patterns match the whole normalized path (s3://bucket/... becomes s3:/bucket/...).
+# Job-spec templating treats $ specially; prefer [.] over \. and avoid unescaped $.
 # Sample usage:
-#   'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
-#   'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
+#   'glob:**/*.avro' or 'regex:.*[.]avro' matches Avro file paths.
 includeFileNamePattern: 'glob:**/*.parquet'
-excludeFileNamePattern: 'glob:**/*.avro' # 'glob:**\/*.avro' will exclude all the avro files.
+excludeFileNamePattern: 'glob:**/*.avro'
 outputDirURI: 'file:///path/to/output/${year}/${month}/${day}'
 overwriteOutput: true
 segmentCreationJobParallelism: 100

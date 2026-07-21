@@ -62,6 +62,8 @@ import org.slf4j.LoggerFactory;
  *   input.fs.className - Optional, the class name of filesystem to read input data. Default to be inferred from
  *   inputDirURI if not specified.
  *   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
+ *   includeFileNamePattern - Optional, Java NIO PathMatcher glob or regex pattern for files to include.
+ *   excludeFileNamePattern - Optional, Java NIO PathMatcher glob or regex pattern for files to exclude.
  *
  *   outputDirURI - Optional, the location of output segments. Use local temp dir with push mode TAR, If not specified.
  *   output.fs.className - Optional, the class name of filesystem to write output segments. Default to be inferred

@@ -52,18 +52,17 @@ public class SegmentGenerationJobSpec implements Serializable {
   private boolean _searchRecursively = true;
 
   /**
-   * include file name pattern, supported glob pattern.
-   * Sample usage:
-   *    'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
-   *    'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
+   * Full path pattern for files to include. Passed to {@code FileSystems.getDefault().getPathMatcher}.
+   * Requires a {@code glob:} or {@code regex:} prefix (Java regex, not PCRE/JS). Matches the whole
+   * normalized path (URI schemes such as {@code s3://} normalize to a single slash, e.g. {@code s3:/...}).
+   * Prefer {@code regex:.*[.]avro} over patterns with {@code $} or backslashes when job-spec templating
+   * (Groovy SimpleTemplateEngine) is used.
    */
   private String _includeFileNamePattern;
 
   /**
-   * exclude file name pattern, supported glob pattern.
-   * Sample usage:
-   *    'glob:*.avro' will exclude all avro files just under the inputDirURI, not sub directories;
-   *    'glob:**\/*.avro' will exclude all the avro files under inputDirURI recursively.
+   * Full path pattern for files to exclude. Same PathMatcher rules as the include pattern:
+   * {@code glob:} or {@code regex:} prefix, Java regex, whole normalized path.
    */
   private String _excludeFileNamePattern;
 
@@ -185,12 +184,9 @@ public class SegmentGenerationJobSpec implements Serializable {
   }
 
   /**
-   * include file name pattern, supported glob pattern.
-   * Sample usage:
-   *    'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
-   *    'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
+   * Sets the full path pattern for files to include (Java NIO PathMatcher {@code glob:} or {@code regex:}).
    *
-   * @param includeFileNamePattern
+   * @param includeFileNamePattern pattern with a {@code glob:} or {@code regex:} prefix
    */
   public void setIncludeFileNamePattern(String includeFileNamePattern) {
     _includeFileNamePattern = includeFileNamePattern;
@@ -201,12 +197,9 @@ public class SegmentGenerationJobSpec implements Serializable {
   }
 
   /**
-   * exclude file name pattern, supported glob pattern.
-   * Sample usage:
-   *    'glob:*.avro' will exclude all avro files just under the inputDirURI, not sub directories;
-   *    'glob:**\/*.avro' will exclude all the avro files under inputDirURI recursively.
+   * Sets the full path pattern for files to exclude (Java NIO PathMatcher {@code glob:} or {@code regex:}).
    *
-   * @param excludeFileNamePattern
+   * @param excludeFileNamePattern pattern with a {@code glob:} or {@code regex:} prefix
    */
   public void setExcludeFileNamePattern(String excludeFileNamePattern) {
     _excludeFileNamePattern = excludeFileNamePattern;
