@@ -31,6 +31,7 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -87,15 +88,58 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
 
     @Override
     public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      if (getPrincipal(httpHeaders).isEmpty()) {
+      Optional<BasicAuthPrincipal> principal = getPrincipal(httpHeaders);
+      if (principal.isEmpty()) {
         throw new NotAuthorizedException("Basic");
       }
-      return true;
+      return hasClusterAccess(principal.get(), Objects.toString(accessType));
     }
 
     @Override
     public boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType) {
-      return getPrincipal(httpHeaders).isPresent();
+      return getPrincipal(httpHeaders)
+          .filter(p -> targetType == TargetType.TABLE || p.hasUnrestrictedTableAccess())
+          .isPresent();
+    }
+
+    @Override
+    public boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
+      Optional<BasicAuthPrincipal> principal = getPrincipal(httpHeaders);
+      if (targetType == TargetType.TABLE) {
+        return principal
+            .filter(p -> p.hasTable(TableNameBuilder.extractRawTableName(targetId)) && hasActionPermission(p, action))
+            .isPresent();
+      }
+      if (targetType == TargetType.CLUSTER) {
+        return principal.filter(p -> hasClusterAccess(p, action)).isPresent();
+      }
+      return false;
+    }
+
+    private static boolean hasClusterAccess(BasicAuthPrincipal principal, String action) {
+      return principal.hasUnrestrictedTableAccess() && hasActionPermission(principal, action);
+    }
+
+    private static boolean hasActionPermission(BasicAuthPrincipal principal, String action) {
+      if (action != null && principal.hasPermission(action)) {
+        return true;
+      }
+      return principal.hasPermission(Objects.toString(getAccessTypeForAction(action)));
+    }
+
+    private static AccessType getAccessTypeForAction(String action) {
+      if (action == null || action.startsWith("Get") || action.startsWith("List") || action.startsWith("Query")
+          || action.startsWith("Debug") || action.startsWith("Estimate") || action.startsWith("Recommend")) {
+        return AccessType.READ;
+      }
+      if (action.startsWith("Create") || action.startsWith("Ingest") || action.startsWith("Commit")
+          || action.startsWith("Upload")) {
+        return AccessType.CREATE;
+      }
+      if (action.startsWith("Delete") || action.startsWith("Cancel")) {
+        return AccessType.DELETE;
+      }
+      return AccessType.UPDATE;
     }
 
     private Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
