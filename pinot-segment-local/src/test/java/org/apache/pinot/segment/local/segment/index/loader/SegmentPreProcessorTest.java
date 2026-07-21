@@ -136,6 +136,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private static final String NEW_COLUMNS_SCHEMA_WITH_FST = "data/newColumnsSchemaWithFST.json";
   private static final String NEW_COLUMNS_SCHEMA_WITH_TEXT = "data/newColumnsSchemaWithText.json";
   private static final String NEW_COLUMNS_SCHEMA_WITH_H3_JSON = "data/newColumnsSchemaWithH3Json.json";
+  private static final String NEW_COLUMNS_SCHEMA_WITH_H3_EMPTY_DEFAULT =
+      "data/newColumnsSchemaWithH3EmptyDefault.json";
   private static final String NEW_COLUMNS_SCHEMA_WITH_NO_FORWARD_INDEX =
       "data/newColumnsSchemaWithForwardIndexDisabled.json";
   private static final String NEW_INT_METRIC_COLUMN_NAME = "newIntMetric";
@@ -164,6 +166,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private final Schema _newColumnsSchemaWithFST;
   private final Schema _newColumnsSchemaWithText;
   private final Schema _newColumnsSchemaWithH3Json;
+  private final Schema _newColumnsSchemaWithH3EmptyDefault;
   private final Schema _newColumnsSchemaWithForwardIndexDisabled;
 
   private Set<String> _noDictionaryColumns;
@@ -208,6 +211,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA_WITH_H3_JSON);
     assertNotNull(resourceUrl);
     _newColumnsSchemaWithH3Json = Schema.fromFile(new File(resourceUrl.getFile()));
+    resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA_WITH_H3_EMPTY_DEFAULT);
+    assertNotNull(resourceUrl);
+    _newColumnsSchemaWithH3EmptyDefault = Schema.fromFile(new File(resourceUrl.getFile()));
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA_WITH_NO_FORWARD_INDEX);
     assertNotNull(resourceUrl);
     _newColumnsSchemaWithForwardIndexDisabled = Schema.fromFile(new File(resourceUrl.getFile()));
@@ -1663,6 +1669,39 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     resetIndexConfigs();
     runPreProcessor(_newColumnsSchemaWithH3Json);
     assertEquals(singleFileIndex.length(), initFileSize);
+  }
+
+  /// Regression test for the H3 index builder crashing a segment on empty/default geometry values.
+  ///
+  /// When a geo column is added to the schema after a segment was built, old segments have no source
+  /// data to derive it from, so the derived BYTES column is filled with its default null value -- the
+  /// empty byte array. Building an H3 index over those rows used to call
+  /// [org.apache.pinot.segment.local.utils.GeometrySerializer#deserialize(byte\[\])] directly on the
+  /// empty bytes, throwing a `BufferUnderflowException` that propagated out of the reload and parked
+  /// the segment in an ERROR state. The handler now routes through the creator's tolerant add path,
+  /// which skips undeserializable/default values when `continueOnError` is enabled (set by
+  /// [#resetIndexConfigs()]), exactly like the segment-creation path.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testH3IndexCreationOnEmptyDefaultValue(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    // Add newH3Col as a derived column whose default null value is the empty byte array (no explicit
+    // defaultNullValue in the schema), mirroring old segments reloaded after a geo column was added.
+    runPreProcessor(_newColumnsSchemaWithH3EmptyDefault);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertNotNull(segmentMetadata.getColumnMetadataFor("newH3Col"));
+
+    // Build the H3 index over the empty/default values. This must not throw and must produce the index.
+    _fieldConfigMap.put("newH3Col",
+        new FieldConfig("newH3Col", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+            Map.of("resolutions", "5")));
+    runPreProcessor(_newColumnsSchemaWithH3EmptyDefault);
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      assertTrue(reader.hasIndexFor("newH3Col", StandardIndexes.h3()));
+    }
   }
 
   @Test(dataProvider = "bothV1AndV3")
