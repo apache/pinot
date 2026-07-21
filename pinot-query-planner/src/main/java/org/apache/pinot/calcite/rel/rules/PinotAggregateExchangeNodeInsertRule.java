@@ -60,7 +60,6 @@ import org.apache.calcite.util.mapping.Mappings;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
-import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
@@ -496,8 +495,6 @@ public class PinotAggregateExchangeNodeInsertRule {
       return ((Project) relNode).getProjects();
     } else if (relNode instanceof Union) {
       return findImmediateProjects(relNode.getInput(0));
-    } else if (relNode instanceof PinotLogicalEnrichedJoin) {
-      return ((PinotLogicalEnrichedJoin) relNode).getProjects();
     }
     return null;
   }

@@ -182,6 +182,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     return null;
   }
 
+  @Deprecated
   @Override
   public Void visitEnrichedJoin(EnrichedJoinNode node, ServerPlanRequestContext context) {
     // We can reach here for dynamic broadcast SEMI join and lookup join.

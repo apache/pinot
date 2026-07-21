@@ -1383,4 +1383,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     };
     //@formatter:on
   }
+
+  @Test
+  public void testEnrichedJoinRuleIsNoOp() {
+    // Enriched joins were removed. A query still requesting the JoinToEnrichedJoin rule via usePlannerRules must
+    // plan successfully (no failure for the unknown/disabled rule) and must NOT produce an enriched join — the
+    // project stays above an ordinary join. See QueryEnvironment where the rule is intentionally not registered.
+    String query = "SET usePlannerRules='JoinToEnrichedJoin'; "
+        + "EXPLAIN PLAN FOR SELECT a.col1 + b.col1 FROM a JOIN b ON a.col1 = b.col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(explain.contains("EnrichedJoin"),
+        "usePlannerRules=JoinToEnrichedJoin must be a no-op, got:\n" + explain);
+    assertTrue(explain.contains("LogicalJoin"), "expected an ordinary LogicalJoin, got:\n" + explain);
+  }
 }

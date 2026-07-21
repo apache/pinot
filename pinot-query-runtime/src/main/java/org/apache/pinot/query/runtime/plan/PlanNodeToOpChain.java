@@ -308,6 +308,7 @@ public class PlanNodeToOpChain {
       }
     }
 
+    @Deprecated
     @Override
     public MultiStageOperator visitEnrichedJoin(EnrichedJoinNode node, OpChainExecutionContext context) {
       MultiStageOperator leftOperator = null;

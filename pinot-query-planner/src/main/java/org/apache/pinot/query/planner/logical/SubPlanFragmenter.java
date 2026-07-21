@@ -81,6 +81,7 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
     return process(node, context);
   }
 
+  @Deprecated
   @Override
   public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
     return visitJoin(node, context);

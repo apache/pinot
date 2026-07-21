@@ -44,6 +44,10 @@ public interface PlanNodeVisitor<T, C> {
 
   T visitJoin(JoinNode node, C context);
 
+  /// @deprecated Enriched joins have been removed. This method is retained for backward compatibility because
+  /// [EnrichedJoinNode] can still be produced by deserializing a plan from an older-version broker. No current
+  /// broker produces this node.
+  @Deprecated
   T visitEnrichedJoin(EnrichedJoinNode node, C context);
 
   T visitMailboxReceive(MailboxReceiveNode node, C context);
@@ -164,6 +168,7 @@ public interface PlanNodeVisitor<T, C> {
       return postChildren(node, context);
     }
 
+    @Deprecated
     @Override
     public T visitEnrichedJoin(EnrichedJoinNode node, C context) {
       preChildren(node, context);

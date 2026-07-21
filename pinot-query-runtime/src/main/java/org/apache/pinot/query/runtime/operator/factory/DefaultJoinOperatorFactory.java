@@ -23,7 +23,6 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
-import org.apache.pinot.query.runtime.operator.EnrichedHashJoinOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LookupJoinOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
@@ -57,25 +56,16 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
     }
   }
 
+  /// Enriched joins have been removed. This method is retained only for backward compatibility of the
+  /// {@link JoinOperatorFactory} interface and always throws. A current broker never produces an
+  /// {@link EnrichedJoinNode}, so this is only reachable if a plan from an older-version broker is executed.
+  ///
+  /// @deprecated enriched joins are no longer supported; this method always throws.
+  @Deprecated
   @Override
   public MultiStageOperator createEnrichedJoinOperator(OpChainExecutionContext context,
       MultiStageOperator leftOperator, PlanNode leftPlanNode, MultiStageOperator rightOperator, PlanNode rightPlanNode,
       EnrichedJoinNode joinNode) {
-    JoinNode.JoinStrategy joinStrategy = joinNode.getJoinStrategy();
-    DataSchema leftSchema = leftPlanNode.getDataSchema();
-    switch (joinStrategy) {
-      case HASH:
-        if (joinNode.getLeftKeys().isEmpty()) {
-          throw new UnsupportedOperationException("NonEquiJoin yet to be supported for EnrichedJoin");
-        } else {
-          return new EnrichedHashJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
-        }
-      case LOOKUP:
-        throw new UnsupportedOperationException("LookupJoin yet to be supported for EnrichedJoin");
-      case ASOF:
-        throw new UnsupportedOperationException("AsOfJoin yet to be supported for EnrichedJoin");
-      default:
-        throw new IllegalStateException("Unsupported JoinStrategy for EnrichedJoin: " + joinStrategy);
-    }
+    throw new UnsupportedOperationException("Enriched joins are no longer supported");
   }
 }

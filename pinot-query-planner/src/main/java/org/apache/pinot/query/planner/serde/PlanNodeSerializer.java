@@ -132,6 +132,7 @@ public class PlanNodeSerializer {
       return null;
     }
 
+    @Deprecated
     @Override
     public Void visitEnrichedJoin(EnrichedJoinNode node, Plan.PlanNode.Builder builder) {
       Plan.EnrichedJoinNode.Builder enrichedJoinNode = Plan.EnrichedJoinNode.newBuilder()

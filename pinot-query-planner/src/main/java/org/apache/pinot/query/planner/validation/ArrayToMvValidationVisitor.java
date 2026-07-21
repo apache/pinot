@@ -68,6 +68,7 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
     return null;
   }
 
+  @Deprecated
   @Override
   public Void visitEnrichedJoin(EnrichedJoinNode node, Boolean isIntermediateStage) {
     visitJoin(node, isIntermediateStage);

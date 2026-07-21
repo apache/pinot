@@ -231,6 +231,7 @@ class PlanNodeMerger {
       return node.withInputs(children);
     }
 
+    @Deprecated
     @Nullable
     @Override
     public PlanNode visitEnrichedJoin(EnrichedJoinNode node, PlanNode context) {

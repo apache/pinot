@@ -175,6 +175,7 @@ public final class PlanNodeToRelConverter {
       return null;
     }
 
+    @Deprecated
     @Override
     public Void visitEnrichedJoin(EnrichedJoinNode node, Void context) {
       visitChildren(node);

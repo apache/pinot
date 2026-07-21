@@ -57,7 +57,6 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
-import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
@@ -677,10 +676,9 @@ public class QueryEnvironment {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }
       }
-      if (!isRuleSkipped(CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN, Set.of(), useRuleSet,
-          config.defaultDisabledPlannerRules())) {
-        hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
-      }
+      // Enriched joins have been removed. The JoinToEnrichedJoin planner rule is intentionally not registered here
+      // so that queries requesting it (via usePlannerRules) are silently ignored rather than failing. See
+      // CommonConstants.Broker.PlannerRuleNames#JOIN_TO_ENRICHED_JOIN.
     } else {
       for (RelOptRule relOptRule : ruleSet.rulesFor(Phase.POST_LOGICAL_PHYSICAL_OPT)) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
