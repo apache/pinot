@@ -31,10 +31,13 @@ import com.jayway.jsonpath.spi.cache.CacheProvider;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FastJsonPathExtractor;
@@ -223,10 +226,7 @@ public class JsonFunctions {
   public static String jsonPathString(Object object, String jsonPath)
       throws JsonProcessingException {
     Object jsonValue = jsonPath(object, jsonPath);
-    if (jsonValue instanceof String) {
-      return (String) jsonValue;
-    }
-    return jsonValue == null ? null : JsonUtils.objectToString(jsonValue);
+    return jsonValue != null ? jsonValueToString(jsonValue) : null;
   }
 
   /**
@@ -239,13 +239,27 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = jsonPath(object, jsonPath);
-      if (jsonValue instanceof String) {
-        return (String) jsonValue;
-      }
-      return jsonValue == null ? defaultValue : JsonUtils.objectToString(jsonValue);
+      return jsonValue != null ? jsonValueToString(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
+  }
+
+  /// Renders a value resolved by a JSON path to its string form for the `jsonPathString*` family. A `String`
+  /// leaf is returned verbatim (unquoted). [UUID] / [LocalDate] / [LocalTime] are non-JSON-native scalars a
+  /// record extractor can materialize; [JsonUtils#objectToString] would wrap them in JSON string quotes, so
+  /// they are rendered via their natural (canonical UUID / ISO-8601) `toString` instead. Every other value -
+  /// `Number`, `Boolean`, `Timestamp` (epoch millis), `byte[]`, and `Map` / `Collection` / array containers -
+  /// goes through [JsonUtils#objectToString], matching the json-path-to-string behavior of `jsonExtractScalar`.
+  private static String jsonValueToString(Object jsonValue)
+      throws JsonProcessingException {
+    if (jsonValue instanceof String) {
+      return (String) jsonValue;
+    }
+    if (jsonValue instanceof UUID || jsonValue instanceof LocalDate || jsonValue instanceof LocalTime) {
+      return jsonValue.toString();
+    }
+    return JsonUtils.objectToString(jsonValue);
   }
 
   /// Opt-in fast variant of [#jsonPathString(Object, String, String)] with identical results: a simple
@@ -274,10 +288,7 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = fastJsonPath(object, jsonPath, false, earlyExit);
-      if (jsonValue instanceof String) {
-        return (String) jsonValue;
-      }
-      return jsonValue == null ? defaultValue : JsonUtils.objectToString(jsonValue);
+      return jsonValue != null ? jsonValueToString(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
