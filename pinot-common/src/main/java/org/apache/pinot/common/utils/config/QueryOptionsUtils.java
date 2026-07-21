@@ -46,6 +46,18 @@ public class QueryOptionsUtils {
   private static final Map<String, String> CONFIG_RESOLVER;
   private static final RuntimeException CLASS_LOAD_ERROR;
 
+  /**
+   * Keys accepted in SQL {@code SET}/{@code OPTION(...)} that are not declared on
+   * {@link QueryOptionKey}. Map is lower-case alias → canonical key as consumed by the broker
+   * ({@link CommonConstants#DATABASE}, {@link CommonConstants.Broker.Request#TRACE}).
+   * <p>
+   * Broker-injected keys such as {@link CommonConstants#RLS_FILTERS}* are intentionally <b>not</b>
+   * allowlisted: they are added after parse and must not be settable via user SQL.
+   */
+  private static final Map<String, String> ADDITIONAL_SQL_OPTION_KEYS = Map.of(
+      CommonConstants.Broker.Request.TRACE.toLowerCase(), CommonConstants.Broker.Request.TRACE,
+      CommonConstants.DATABASE.toLowerCase(), CommonConstants.DATABASE);
+
   static {
     // this is a bit hacky, but lots of the code depends directly on usage of
     // Map<String, String> (JSON serialization/GRPC code) so we cannot just
@@ -77,6 +89,11 @@ public class QueryOptionsUtils {
         : new RuntimeException("Failure to build case insensitive mapping.", classLoadError);
   }
 
+  /**
+   * Resolves known option keys case-insensitively to their canonical names. Unknown keys are
+   * preserved unchanged. Used for REST/JSON {@code queryOptions} and internal option maps where
+   * free-form keys must remain allowed.
+   */
   public static Map<String, String> resolveCaseInsensitiveOptions(Map<String, String> queryOptions) {
     if (CLASS_LOAD_ERROR != null) {
       throw CLASS_LOAD_ERROR;
@@ -93,6 +110,100 @@ public class QueryOptionsUtils {
     }
 
     return resolved;
+  }
+
+  /**
+   * Resolves known option keys case-insensitively and rejects unsupported keys.
+   * <p>
+   * Intended for SQL-supplied {@code SET} / {@code OPTION(...)} options only. Do not use for
+   * REST/JSON {@code queryOptions} (kept free-form for backward compatibility — unknown keys are
+   * still silently preserved there) or broker-injected options. DML statements that intentionally
+   * carry free-form task properties should continue to use
+   * {@link #resolveCaseInsensitiveOptions(Map)}.
+   * <p>
+   * Additional SQL keys ({@code trace}, {@code database}) are accepted case-insensitively and
+   * stored under their canonical lowercase names so broker lookups succeed.
+   *
+   * @throws IllegalArgumentException if an unsupported option key is present
+   */
+  public static Map<String, String> resolveAndValidateSqlQueryOptions(Map<String, String> queryOptions) {
+    if (CLASS_LOAD_ERROR != null) {
+      throw CLASS_LOAD_ERROR;
+    }
+
+    Map<String, String> resolved = new HashMap<>();
+    for (Map.Entry<String, String> configEntry : queryOptions.entrySet()) {
+      String key = configEntry.getKey();
+      String lower = key.toLowerCase();
+      String canonical = CONFIG_RESOLVER.get(lower);
+      if (canonical != null) {
+        resolved.put(canonical, configEntry.getValue());
+        continue;
+      }
+      String additionalCanonical = ADDITIONAL_SQL_OPTION_KEYS.get(lower);
+      if (additionalCanonical != null) {
+        resolved.put(additionalCanonical, configEntry.getValue());
+        continue;
+      }
+      throw new IllegalArgumentException(buildUnsupportedOptionMessage(key));
+    }
+    return resolved;
+  }
+
+  private static String buildUnsupportedOptionMessage(String key) {
+    String suggestion = findClosestCanonicalOption(key);
+    if (suggestion != null) {
+      return "Unsupported query option '" + key + "'. Did you mean '" + suggestion + "'?";
+    }
+    return "Unsupported query option '" + key + "'";
+  }
+
+  @Nullable
+  private static String findClosestCanonicalOption(String key) {
+    String lower = key.toLowerCase();
+    String best = null;
+    int bestDist = Integer.MAX_VALUE;
+    for (String canonical : CONFIG_RESOLVER.values()) {
+      int dist = levenshteinDistance(lower, canonical.toLowerCase());
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = canonical;
+      }
+    }
+    if (best == null) {
+      return null;
+    }
+    // Suggest only when reasonably close (pure case variants are already canonicalized above).
+    int threshold = Math.max(2, best.length() / 4);
+    return bestDist <= threshold ? best : null;
+  }
+
+  private static int levenshteinDistance(String a, String b) {
+    int n = a.length();
+    int m = b.length();
+    if (n == 0) {
+      return m;
+    }
+    if (m == 0) {
+      return n;
+    }
+    int[] prev = new int[m + 1];
+    int[] curr = new int[m + 1];
+    for (int j = 0; j <= m; j++) {
+      prev[j] = j;
+    }
+    for (int i = 1; i <= n; i++) {
+      curr[0] = i;
+      char ca = a.charAt(i - 1);
+      for (int j = 1; j <= m; j++) {
+        int cost = ca == b.charAt(j - 1) ? 0 : 1;
+        curr[j] = Math.min(Math.min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+      }
+      int[] tmp = prev;
+      prev = curr;
+      curr = tmp;
+    }
+    return prev[m];
   }
 
   @Nullable

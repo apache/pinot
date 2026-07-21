@@ -72,13 +72,13 @@ public class BrokerRequestOptionsTest {
     assertEquals(sqlNodeAndOptions.getOptions().size(), 1);
     assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
 
-    // Has queryOptions in query
-    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SET queryOption1='foo'; select * from testTable");
+    // Has queryOptions in query (SQL SET must use a known option key)
+    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SET timeoutMs='100'; select * from testTable");
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
     assertEquals(sqlNodeAndOptions.getOptions().size(), 1);
-    assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
+    assertEquals(sqlNodeAndOptions.getOptions().get("timeoutMs"), "100");
 
-    // Has query options in json payload
+    // Has query options in json payload (free-form keys still allowed on REST/JSON path)
     jsonRequest.put(Request.QUERY_OPTIONS, "queryOption1=foo");
     sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
@@ -86,11 +86,11 @@ public class BrokerRequestOptionsTest {
     assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
 
     // Has query options in both json payload and sqlNodeAndOptions, sqlNodeAndOptions takes priority
-    jsonRequest.put(Request.QUERY_OPTIONS, "queryOption1=bar;queryOption2=moo");
-    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SET queryOption1='foo'; select * from testTable;");
+    jsonRequest.put(Request.QUERY_OPTIONS, "timeoutMs=bar;queryOption2=moo");
+    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SET timeoutMs='foo'; select * from testTable;");
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
     assertEquals(sqlNodeAndOptions.getOptions().size(), 2);
-    assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
+    assertEquals(sqlNodeAndOptions.getOptions().get("timeoutMs"), "foo");
     assertEquals(sqlNodeAndOptions.getOptions().get("queryOption2"), "moo");
   }
 }

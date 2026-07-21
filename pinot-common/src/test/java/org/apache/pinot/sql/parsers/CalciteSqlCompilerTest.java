@@ -852,30 +852,46 @@ public class CalciteSqlCompilerTest {
     Assert.assertTrue(pinotQuery.getQueryOptions().isEmpty());
 
     pinotQuery =
-        compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes)");
+        compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts' OPTION (timeoutMs=100)");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
-    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
+    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("timeoutMs"));
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("timeoutMs"), "100");
+
+    // Case-insensitive known option is canonicalized (issue #7207 original example).
+    pinotQuery =
+        compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts' OPTION (timeoutMS=100)");
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("timeoutMs"), "100");
 
     pinotQuery = compileToPinotQuery(
-        "select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes, foo=1234, bar='potato')");
+        "select * from vegetables where name <> 'Brussels sprouts' "
+            + "OPTION (timeoutMs=100, skipUpsert=true, enableNullHandling=true)");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
-    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("timeoutMs"), "100");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("skipUpsert"), "true");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("enableNullHandling"), "true");
+
+    // Unknown OPTION keys are rejected.
+    try {
+      compileToPinotQuery(
+          "select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes)");
+      Assert.fail("Unknown OPTION key should fail");
+    } catch (SqlCompilationException e) {
+      Assert.assertTrue(e.getMessage().contains("Unsupported query option 'delicious'")
+          || (e.getCause() != null && e.getCause().getMessage().contains("Unsupported query option 'delicious'")));
+    }
 
     // Assert that wrongly inserted query option will not be parsed.
     try {
       compileToPinotQuery(
-          "select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes) option(foo=1234) option"
-              + "(bar='potato')");
+          "select * from vegetables where name <> 'Brussels sprouts' OPTION (timeoutMs=100) option(skipUpsert=true) "
+              + "option(enableNullHandling=true)");
     } catch (SqlCompilationException e) {
       Assert.assertTrue(e.getCause() instanceof ParseException);
       Assert.assertTrue(e.getCause().getMessage().contains("OPTION"));
     }
     try {
-      compileToPinotQuery("select * from vegetables where name <> 'Brussels OPTION (delicious=yes)");
+      compileToPinotQuery("select * from vegetables where name <> 'Brussels OPTION (timeoutMs=100)");
     } catch (SqlCompilationException e) {
       Assert.assertTrue(e.getCause() instanceof ParseException);
     }
@@ -914,45 +930,76 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
     Assert.assertTrue(pinotQuery.getQueryOptions().isEmpty());
 
-    pinotQuery = compileToPinotQuery("SET delicious='yes'; select * from vegetables where name <> 'Brussels sprouts'");
+    pinotQuery = compileToPinotQuery("SET timeoutMs='100'; select * from vegetables where name <> 'Brussels sprouts'");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
-    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
+    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("timeoutMs"));
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("timeoutMs"), "100");
 
-    pinotQuery = compileToPinotQuery("SET delicious='yes'; SET foo='1234'; SET bar='''potato''';"
+    // Case-insensitive SET key is canonicalized.
+    pinotQuery = compileToPinotQuery("SET timeoutMS='100'; select * from vegetables where name <> 'Brussels sprouts'");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("timeoutMs"), "100");
+
+    pinotQuery = compileToPinotQuery("SET skipUpsert='true'; SET timeoutMs='1234'; SET enableNullHandling='true';"
         + "select * from vegetables where name <> 'Brussels sprouts' ");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
-    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("skipUpsert"), "true");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("timeoutMs"), "1234");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("enableNullHandling"), "true");
 
-    pinotQuery = compileToPinotQuery("SET delicious='yes'; SET foo='1234'; "
-        + "SET bar='''potato'''; select * from vegetables where name <> 'Brussels sprouts' ");
+    pinotQuery = compileToPinotQuery("SET skipUpsert='true'; SET timeoutMs='1234'; "
+        + "SET enableNullHandling='true'; select * from vegetables where name <> 'Brussels sprouts' ");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
-    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("skipUpsert"), "true");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("timeoutMs"), "1234");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("enableNullHandling"), "true");
 
-    pinotQuery = compileToPinotQuery("SET delicious='yes'; SET foo='1234'; "
-        + "select * from vegetables where name <> 'Brussels sprouts'; SET bar='''potato'''; ");
+    pinotQuery = compileToPinotQuery("SET skipUpsert='true'; SET timeoutMs='1234'; "
+        + "select * from vegetables where name <> 'Brussels sprouts'; SET enableNullHandling='true'; ");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
-    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("skipUpsert"), "true");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("timeoutMs"), "1234");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("enableNullHandling"), "true");
+
+    // Unknown SET option is rejected with a clear message.
+    try {
+      compileToPinotQuery("SET delicious='yes'; select * from vegetables where name <> 'Brussels sprouts'");
+      Assert.fail("Unknown SET option should fail");
+    } catch (SqlCompilationException e) {
+      Assert.assertTrue(e.getMessage().contains("Unsupported query option 'delicious'")
+          || (e.getCause() != null && e.getCause().getMessage().contains("Unsupported query option 'delicious'")));
+    }
+
+    // Near-miss unknown option suggests the closest canonical name.
+    try {
+      compileToPinotQuery("SET timoutMs='100'; select * from vegetables");
+      Assert.fail("Typo SET option should fail");
+    } catch (SqlCompilationException e) {
+      String msg = e.getMessage() + (e.getCause() != null ? e.getCause().getMessage() : "");
+      Assert.assertTrue(msg.contains("Unsupported query option 'timoutMs'"));
+      Assert.assertTrue(msg.contains("Did you mean 'timeoutMs'"));
+    }
+
+    // ADDITIONAL keys (trace, database) are accepted case-insensitively and stored canonically.
+    pinotQuery = compileToPinotQuery("SET TRACE='true'; SET Database='tenantDb'; select * from vegetables");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("trace"), "true");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("database"), "tenantDb");
+    Assert.assertFalse(pinotQuery.getQueryOptions().containsKey("TRACE"));
+    Assert.assertFalse(pinotQuery.getQueryOptions().containsKey("Database"));
+
+    // Broker-internal RLS keys must not be settable via SQL (hyphenated keys may not parse as
+    // SqlSetOption identifiers; use a simple identifier that still matches the rlsFilters prefix).
+    try {
+      compileToPinotQuery("SET rlsFiltersMyTable='col=1'; select * from vegetables");
+      Assert.fail("User-supplied rlsFilters should fail");
+    } catch (SqlCompilationException e) {
+      String msg = e.getMessage() + (e.getCause() != null ? e.getCause().getMessage() : "");
+      Assert.assertTrue(msg.contains("Unsupported query option 'rlsFiltersMyTable'"), msg);
+    }
 
     // test invalid options
     try {
-      compileToPinotQuery("select * from vegetables SET delicious='yes', foo='1234' where name <> 'Brussels sprouts'");
-      Assert.fail("SQL should not be compiled");
-    } catch (SqlCompilationException sce) {
-      // expected.
-    }
-
-    try {
-      compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts'; SET (delicious='yes', foo=1234)");
+      compileToPinotQuery(
+          "select * from vegetables SET timeoutMs='100', skipUpsert='true' where name <> 'Brussels sprouts'");
       Assert.fail("SQL should not be compiled");
     } catch (SqlCompilationException sce) {
       // expected.
@@ -960,8 +1007,16 @@ public class CalciteSqlCompilerTest {
 
     try {
       compileToPinotQuery(
-          "select * from vegetables where name <> 'Brussels sprouts'; SET (delicious='yes', foo=1234); select * from "
-              + "meat");
+          "select * from vegetables where name <> 'Brussels sprouts'; SET (timeoutMs='100', skipUpsert=true)");
+      Assert.fail("SQL should not be compiled");
+    } catch (SqlCompilationException sce) {
+      // expected.
+    }
+
+    try {
+      compileToPinotQuery(
+          "select * from vegetables where name <> 'Brussels sprouts'; SET (timeoutMs='100', skipUpsert=true); "
+              + "select * from meat");
       Assert.fail("SQL should not be compiled");
     } catch (SqlCompilationException sce) {
       // expected.
