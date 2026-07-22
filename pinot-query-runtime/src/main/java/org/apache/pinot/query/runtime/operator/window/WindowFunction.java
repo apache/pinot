@@ -20,8 +20,10 @@ package org.apache.pinot.query.runtime.operator.window;
 
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
@@ -37,6 +39,11 @@ public abstract class WindowFunction extends AggregationUtils.Accumulator {
   protected final int[] _orderKeys;
   protected final int[] _inputRefs;
   protected final WindowFrame _windowFrame;
+  // Metadata for the single ORDER BY key, needed to evaluate value-based RANGE offset frames. For RANGE offset frames
+  // Calcite guarantees exactly one ORDER BY key, so these describe that key. Null / default when there is no ORDER BY.
+  @Nullable
+  protected final ColumnDataType _orderKeyStoredType;
+  protected final boolean _orderKeyAscending;
 
   public WindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema, List<RelFieldCollation> collations,
       WindowFrame windowFrame) {
@@ -47,11 +54,28 @@ public abstract class WindowFunction extends AggregationUtils.Accumulator {
       _orderKeys[i] = collations.get(i).getFieldIndex();
     }
     _windowFrame = windowFrame;
+    if (numOrderKeys > 0) {
+      RelFieldCollation firstCollation = collations.get(0);
+      _orderKeyStoredType = inputSchema.getColumnDataType(firstCollation.getFieldIndex()).getStoredType();
+      _orderKeyAscending = !firstCollation.getDirection().isDescending();
+    } else {
+      _orderKeyStoredType = null;
+      _orderKeyAscending = true;
+    }
     if (WindowAggregateOperator.RANKING_FUNCTION_NAMES.contains(aggCall.getFunctionName())) {
       _inputRefs = _orderKeys;
     } else {
       _inputRefs = new int[]{_inputRef};
     }
+  }
+
+  /**
+   * Computes the inclusive base frame bounds {@code {starts, ends}} for a value-based RANGE offset frame over the given
+   * partition rows, via an O(n) two-pointer sweep. Only valid for RANGE offset frames with a single numeric ORDER BY
+   * key. See {@link RangeWindowFrameBounds}. Any EXCLUDE clause is applied on top of these base bounds by the caller.
+   */
+  protected int[][] computeRangeFrameBounds(List<Object[]> rows) {
+    return RangeWindowFrameBounds.compute(rows, _orderKeys[0], _orderKeyStoredType, _orderKeyAscending, _windowFrame);
   }
 
   /**

@@ -655,32 +655,12 @@ public final class RelToPlanNodeConverter {
     WindowNode.WindowFrameType windowFrameType =
         windowGroup.isRows ? WindowNode.WindowFrameType.ROWS : WindowNode.WindowFrameType.RANGE;
 
-    int lowerBound;
-    if (windowGroup.lowerBound.isUnbounded()) {
-      // Lower bound can't be unbounded following
-      lowerBound = Integer.MIN_VALUE;
-    } else if (windowGroup.lowerBound.isCurrentRow()) {
-      lowerBound = 0;
-    } else {
-      // The literal value is extracted from the constants in the PinotWindowExchangeNodeInsertRule
-      RexLiteral offset = (RexLiteral) windowGroup.lowerBound.getOffset();
-      lowerBound = offset == null ? Integer.MIN_VALUE
-          : (windowGroup.lowerBound.isPreceding() ? -1 * RexExpressionUtils.getValueAsInt(offset)
-              : RexExpressionUtils.getValueAsInt(offset));
-    }
-    int upperBound;
-    if (windowGroup.upperBound.isUnbounded()) {
-      // Upper bound can't be unbounded preceding
-      upperBound = Integer.MAX_VALUE;
-    } else if (windowGroup.upperBound.isCurrentRow()) {
-      upperBound = 0;
-    } else {
-      // The literal value is extracted from the constants in the PinotWindowExchangeNodeInsertRule
-      RexLiteral offset = (RexLiteral) windowGroup.upperBound.getOffset();
-      upperBound = offset == null ? Integer.MAX_VALUE
-          : (windowGroup.upperBound.isFollowing() ? RexExpressionUtils.getValueAsInt(offset)
-              : -1 * RexExpressionUtils.getValueAsInt(offset));
-    }
+    // The offset literal values are extracted from the constants in the PinotWindowExchangeNodeInsertRule. For RANGE
+    // offset bounds the offset is a value distance on the ORDER BY key (carried separately), not a row count.
+    RexExpressionUtils.WindowFrameBound lower =
+        RexExpressionUtils.convertWindowFrameBound(windowGroup.lowerBound, windowGroup.isRows, true);
+    RexExpressionUtils.WindowFrameBound upper =
+        RexExpressionUtils.convertWindowFrameBound(windowGroup.upperBound, windowGroup.isRows, false);
 
     // TODO: The constants are already extracted in the PinotWindowExchangeNodeInsertRule, we can remove them from
     // the WindowNode and plan serde.
@@ -690,7 +670,8 @@ public final class RelToPlanNodeConverter {
     }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
-        aggCalls, windowFrameType, lowerBound, upperBound, fromRexWindowExclusion(windowGroup.exclude), constants);
+        aggCalls, windowFrameType, lower.getBound(), upper.getBound(), fromRexWindowExclusion(windowGroup.exclude),
+        lower.getRangeOffset(), upper.getRangeOffset(), constants);
   }
 
   public static WindowNode.WindowExclusion fromRexWindowExclusion(RexWindowExclusion exclude) {

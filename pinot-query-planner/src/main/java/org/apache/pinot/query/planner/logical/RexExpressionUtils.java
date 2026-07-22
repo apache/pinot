@@ -37,6 +37,7 @@ import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUnknownAs;
+import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
@@ -537,5 +538,65 @@ public class RexExpressionUtils {
     Preconditions.checkArgument(in instanceof RexLiteral, "expected literal, got " + in);
     RexLiteral literal = (RexLiteral) in;
     return literal.getValueAs(Integer.class);
+  }
+
+  /**
+   * Converts a Calcite window frame {@link RexWindowBound} into Pinot's {@link WindowFrameBound} representation.
+   * <p>For ROWS frames and for RANGE bounds that are UNBOUNDED / CURRENT ROW, the offset is a physical row count and
+   * only the int bound is meaningful ({@link WindowFrameBound#getRangeOffset()} is null). For a RANGE offset
+   * PRECEDING / FOLLOWING bound the offset is a value distance on the single ORDER BY key rather than a row count, so
+   * the int bound is only a sign discriminator ({@code -1} for PRECEDING, {@code +1} for FOLLOWING) and the actual
+   * value distance is returned as a {@link RexExpression.Literal}.
+   * <p>The offset {@link RexLiteral} is expected to already be inlined by
+   * {@code PinotRuleUtils.WindowUtils.updateLiteralArgumentsInWindowGroup} (it is originally a reference into the
+   * window's constants pool).
+   *
+   * @param bound the Calcite window frame bound
+   * @param isRows whether the frame is a ROWS frame (vs a RANGE frame)
+   * @param isLowerBound whether this is the lower (start) bound; controls the UNBOUNDED sentinel
+   */
+  public static WindowFrameBound convertWindowFrameBound(RexWindowBound bound, boolean isRows, boolean isLowerBound) {
+    if (bound.isUnbounded()) {
+      // Lower bound can only be UNBOUNDED PRECEDING and upper bound only UNBOUNDED FOLLOWING (ensured by Calcite)
+      return new WindowFrameBound(isLowerBound ? Integer.MIN_VALUE : Integer.MAX_VALUE, null);
+    }
+    if (bound.isCurrentRow()) {
+      return new WindowFrameBound(0, null);
+    }
+    RexLiteral offset = (RexLiteral) bound.getOffset();
+    boolean preceding = bound.isPreceding();
+    if (isRows) {
+      // ROWS offset: the value is a physical row count. Preserve the historical signed-int representation.
+      int rowOffset = offset == null ? (isLowerBound ? Integer.MIN_VALUE : Integer.MAX_VALUE)
+          : (preceding ? -1 * getValueAsInt(offset) : getValueAsInt(offset));
+      return new WindowFrameBound(rowOffset, null);
+    }
+    // RANGE offset: carry the typed value distance; the int bound is only a sign discriminator.
+    Preconditions.checkState(offset != null, "RANGE window frame offset bound must have a literal offset value");
+    return new WindowFrameBound(preceding ? -1 : 1, fromRexLiteral(offset));
+  }
+
+  /**
+   * Pinot representation of a single window frame bound: an int bound (physical row offset for ROWS, or a sentinel /
+   * sign discriminator for RANGE) plus, for RANGE offset bounds, the typed value distance.
+   */
+  public static class WindowFrameBound {
+    private final int _bound;
+    @Nullable
+    private final RexExpression.Literal _rangeOffset;
+
+    public WindowFrameBound(int bound, @Nullable RexExpression.Literal rangeOffset) {
+      _bound = bound;
+      _rangeOffset = rangeOffset;
+    }
+
+    public int getBound() {
+      return _bound;
+    }
+
+    @Nullable
+    public RexExpression.Literal getRangeOffset() {
+      return _rangeOffset;
+    }
   }
 }

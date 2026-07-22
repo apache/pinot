@@ -438,6 +438,12 @@ class PlanNodeMerger {
       if (node.getExclude() != otherNode.getExclude()) {
         return null;
       }
+      if (!Objects.equals(node.getLowerBoundOffset(), otherNode.getLowerBoundOffset())) {
+        return null;
+      }
+      if (!Objects.equals(node.getUpperBoundOffset(), otherNode.getUpperBoundOffset())) {
+        return null;
+      }
       if (!node.getConstants().equals(otherNode.getConstants())) {
         return null;
       }

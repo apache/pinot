@@ -43,7 +43,8 @@ public class AggregateWindowFunction extends WindowFunction {
     _functionName = aggCall.getFunctionName();
     // Removal support is required for sliding ROWS frames and whenever an EXCLUDE clause forces per-row corrections.
     boolean nonDefaultExclude = !windowFrame.isExcludeNoOthers();
-    boolean supportRemoval = nonDefaultExclude || (windowFrame.isRowType() && !(
+    // Removal is also required for value-based RANGE offset frames, which slide over the ORDER BY value.
+    boolean supportRemoval = nonDefaultExclude || windowFrame.isRangeOffsetFrame() || (windowFrame.isRowType() && !(
         windowFrame.isUnboundedPreceding() && windowFrame.isUnboundedFollowing()));
     _windowValueAggregator = WindowValueAggregatorFactory.getWindowValueAggregator(_functionName, _dataType,
         supportRemoval, nonDefaultExclude);
@@ -173,8 +174,45 @@ public class AggregateWindowFunction extends WindowFunction {
       }
       return results;
     } else {
-      throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+      // Value-based RANGE offset frame (e.g. RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING) without an EXCLUDE clause.
+      return processRangeOffsetWindow(rows);
     }
+  }
+
+  /**
+   * Processes a value-based RANGE offset frame by sliding an incremental aggregator over the base frame bounds computed
+   * from the ORDER BY value. Both frame endpoints advance monotonically, so this is O(n) per partition (with O(1) /
+   * amortized-O(1) incremental aggregator updates).
+   */
+  private List<Object> processRangeOffsetWindow(List<Object[]> rows) {
+    int numRows = rows.size();
+    int[][] frameBounds = computeRangeFrameBounds(rows);
+    int[] starts = frameBounds[0];
+    int[] ends = frameBounds[1];
+
+    List<Object> result = new ArrayList<>(numRows);
+    // The aggregator currently holds the rows in [curLeft, curRight - 1]. Both pointers only move forward.
+    int curLeft = 0;
+    int curRight = 0;
+    for (int i = 0; i < numRows; i++) {
+      int start = starts[i];
+      int end = ends[i];
+      while (curRight <= end) {
+        _windowValueAggregator.addValue(extractValueFromRow(rows.get(curRight)));
+        curRight++;
+      }
+      // Advance past rows before 'start'. Only remove rows that were actually added (guards against empty-frame gaps).
+      while (curLeft < start) {
+        if (curLeft < curRight) {
+          _windowValueAggregator.removeValue(extractValueFromRow(rows.get(curLeft)));
+        }
+        curLeft++;
+      }
+      // When the frame is empty (start > end) the aggregator holds no values and returns the identity (NULL for
+      // SUM/AVG/MIN/MAX, 0 for COUNT), matching standard SQL semantics.
+      result.add(_windowValueAggregator.getCurrentAggregatedValue());
+    }
+    return result;
   }
 
   /**
@@ -321,7 +359,55 @@ public class AggregateWindowFunction extends WindowFunction {
       return result;
     }
 
-    throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+    // Value-based RANGE offset frame (e.g. RANGE BETWEEN 5 PRECEDING AND 5 FOLLOWING) with a non-default EXCLUDE.
+    return processRangeOffsetWindowWithExclude(rows);
+  }
+
+  /**
+   * Value-based RANGE offset frame with a non-default EXCLUDE clause. Slides the aggregator over the base frame bounds
+   * computed from the ORDER BY value (like {@link #processRangeOffsetWindow}) and applies the per-row EXCLUDE
+   * corrections on top of that base frame. The aggregator supports arbitrary removal (MIN / MAX use a sorted multiset)
+   * since EXCLUDE re-adds previously removed values.
+   */
+  private List<Object> processRangeOffsetWindowWithExclude(List<Object[]> rows) {
+    int numRows = rows.size();
+    int[][] frameBounds = computeRangeFrameBounds(rows);
+    int[] starts = frameBounds[0];
+    int[] ends = frameBounds[1];
+    WindowNode.WindowExclusion exclude = _windowFrame.getExclude();
+    int[] peerStart = null;
+    int[] peerEnd = null;
+    if (needsPeerBoundaries(exclude)) {
+      peerStart = new int[numRows];
+      peerEnd = new int[numRows];
+      computePeerBoundaries(rows, peerStart, peerEnd);
+    }
+
+    List<Object> result = new ArrayList<>(numRows);
+    // The aggregator holds the base frame [curLeft, curRight - 1]; both pointers only move forward.
+    int curLeft = 0;
+    int curRight = 0;
+    for (int i = 0; i < numRows; i++) {
+      int start = starts[i];
+      int end = ends[i];
+      while (curRight <= end) {
+        _windowValueAggregator.addValue(extractValueFromRow(rows.get(curRight)));
+        curRight++;
+      }
+      while (curLeft < start) {
+        if (curLeft < curRight) {
+          _windowValueAggregator.removeValue(extractValueFromRow(rows.get(curLeft)));
+        }
+        curLeft++;
+      }
+      int pStart = peerStart != null ? peerStart[i] : i;
+      int pEnd = peerEnd != null ? peerEnd[i] : i;
+      // Remove the EXCLUDE set from the base frame [start, end], read the result, then re-add it for the next row.
+      applyExclude(rows, i, start, end, pStart, pEnd, exclude, true);
+      result.add(_windowValueAggregator.getCurrentAggregatedValue());
+      applyExclude(rows, i, start, end, pStart, pEnd, exclude, false);
+    }
+    return result;
   }
 
   /**

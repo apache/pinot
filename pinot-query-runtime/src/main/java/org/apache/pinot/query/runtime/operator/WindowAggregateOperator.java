@@ -123,13 +123,15 @@ public class WindowAggregateOperator extends MultiStageOperator {
     for (int i = 0; i < numKeys; i++) {
       _keys[i] = keys.get(i);
     }
-    WindowFrame windowFrame =
-        new WindowFrame(node.getWindowFrameType(), node.getLowerBound(), node.getUpperBound(), node.getExclude());
-    Preconditions.checkState(
-        windowFrame.isRowType() || ((windowFrame.isUnboundedPreceding() || windowFrame.isLowerBoundCurrentRow()) && (
-            windowFrame.isUnboundedFollowing() || windowFrame.isUpperBoundCurrentRow())),
-        "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
-    Preconditions.checkState(windowFrame.getLowerBound() <= windowFrame.getUpperBound(),
+    RexExpression.Literal lowerBoundOffset = node.getLowerBoundOffset();
+    RexExpression.Literal upperBoundOffset = node.getUpperBoundOffset();
+    WindowFrame windowFrame = new WindowFrame(node.getWindowFrameType(), node.getLowerBound(), node.getUpperBound(),
+        node.getExclude(), lowerBoundOffset != null ? (Number) lowerBoundOffset.getValue() : null,
+        upperBoundOffset != null ? (Number) upperBoundOffset.getValue() : null);
+    // The lower <= upper check only applies to ROWS frames where the int bounds are physical row offsets. For RANGE
+    // frames the int bounds are sentinels / sign discriminators; the validity of value-based offsets and the single
+    // numeric ORDER BY key requirement are enforced during planning (see PinotRuleUtils.WindowUtils).
+    Preconditions.checkState(!windowFrame.isRowType() || windowFrame.getLowerBound() <= windowFrame.getUpperBound(),
         "Window frame lower bound can't be greater than upper bound");
     List<RelFieldCollation> collations = node.getCollations();
     List<RexExpression.FunctionCall> aggCalls = node.getAggCalls();

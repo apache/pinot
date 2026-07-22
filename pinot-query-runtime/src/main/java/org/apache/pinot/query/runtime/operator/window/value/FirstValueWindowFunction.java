@@ -76,13 +76,21 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
       peerEnd = new int[numRows];
       computePeerBoundaries(rows, peerStart, peerEnd);
     }
+    // For a value-based RANGE offset frame the base frame is the ORDER BY value range, not the peer group.
+    int[] rangeStarts = null;
+    int[] rangeEnds = null;
+    if (_windowFrame.isRangeOffsetFrame()) {
+      int[][] frameBounds = computeRangeFrameBounds(rows);
+      rangeStarts = frameBounds[0];
+      rangeEnds = frameBounds[1];
+    }
 
     List<Object> result = new ArrayList<>(numRows);
     for (int i = 0; i < numRows; i++) {
       int pStart = peerStart != null ? peerStart[i] : i;
       int pEnd = peerEnd != null ? peerEnd[i] : i;
-      int fs = frameStartForRow(i, pStart, numRows);
-      int fe = frameEndForRow(i, pEnd, numRows);
+      int fs = rangeStarts != null ? rangeStarts[i] : frameStartForRow(i, pStart, numRows);
+      int fe = rangeEnds != null ? rangeEnds[i] : frameEndForRow(i, pEnd, numRows);
       int idx = firstNonExcluded(fs, fe, i, pStart, pEnd, exclude);
       if (_ignoreNulls) {
         while (idx != -1 && extractValueFromRow(rows.get(idx)) == null) {
@@ -187,13 +195,17 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
   private List<Object> processRangeWindow(List<Object[]> rows) {
     int numRows = rows.size();
 
+    if (_windowFrame.isRangeOffsetFrame()) {
+      return processRangeOffsetWindow(rows);
+    }
+
     if (_windowFrame.isUnboundedPreceding()) {
       return Collections.nCopies(numRows, extractValueFromRow(rows.get(0)));
     }
 
-    // The lower bound has to be CURRENT ROW since we don't support RANGE windows with offset value
+    // The lower bound has to be CURRENT ROW since the RANGE offset case is handled above
     Preconditions.checkState(_windowFrame.isLowerBoundCurrentRow(),
-        "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+        "Unexpected RANGE window frame lower bound: " + _windowFrame);
 
     List<Object> result = new ArrayList<>(numRows);
 
@@ -219,6 +231,10 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
 
   private List<Object> processRangeWindowIgnoreNulls(List<Object[]> rows) {
     int numRows = rows.size();
+
+    if (_windowFrame.isRangeOffsetFrame()) {
+      return processRangeOffsetWindowIgnoreNulls(rows);
+    }
 
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()) {
       return processUnboundedWindowIgnoreNulls(rows);
@@ -303,7 +319,52 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
       return result;
     }
 
-    throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+    // Unreachable: value-based RANGE offset frames are handled by processRangeOffsetWindowIgnoreNulls above.
+    throw new IllegalStateException("Unexpected RANGE window frame: " + _windowFrame);
+  }
+
+  /**
+   * FIRST_VALUE over a value-based RANGE offset frame: the first row of each frame (as computed from the ORDER BY
+   * value), computed in O(n) using {@link #computeRangeFrameBounds(List)}.
+   */
+  private List<Object> processRangeOffsetWindow(List<Object[]> rows) {
+    int numRows = rows.size();
+    int[][] frameBounds = computeRangeFrameBounds(rows);
+    int[] starts = frameBounds[0];
+    int[] ends = frameBounds[1];
+    List<Object> result = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      // Empty frame (start > end) yields null.
+      result.add(starts[i] <= ends[i] ? extractValueFromRow(rows.get(starts[i])) : null);
+    }
+    return result;
+  }
+
+  /**
+   * FIRST_VALUE IGNORE NULLS over a value-based RANGE offset frame: the first non-null value within each frame. Uses a
+   * precomputed "next non-null index" array so the whole partition is processed in O(n).
+   */
+  private List<Object> processRangeOffsetWindowIgnoreNulls(List<Object[]> rows) {
+    int numRows = rows.size();
+    int[][] frameBounds = computeRangeFrameBounds(rows);
+    int[] starts = frameBounds[0];
+    int[] ends = frameBounds[1];
+    // nextNonNull[i] = smallest index >= i whose (target column) value is non-null, or numRows if none.
+    int[] nextNonNull = new int[numRows + 1];
+    nextNonNull[numRows] = numRows;
+    for (int i = numRows - 1; i >= 0; i--) {
+      nextNonNull[i] = extractValueFromRow(rows.get(i)) != null ? i : nextNonNull[i + 1];
+    }
+    List<Object> result = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      if (starts[i] > ends[i]) {
+        result.add(null);
+        continue;
+      }
+      int idx = nextNonNull[starts[i]];
+      result.add(idx <= ends[i] ? extractValueFromRow(rows.get(idx)) : null);
+    }
+    return result;
   }
 
   private List<Object> processUnboundedWindowIgnoreNulls(List<Object[]> rows) {

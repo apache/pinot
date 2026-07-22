@@ -254,7 +254,7 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitWindow(WindowNode node, Plan.PlanNode.Builder builder) {
-      Plan.WindowNode windowNode = Plan.WindowNode.newBuilder()
+      Plan.WindowNode.Builder windowNodeBuilder = Plan.WindowNode.newBuilder()
           .addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
           .addAllKeys(node.getKeys())
           .addAllCollations(convertCollations(node.getCollations()))
@@ -262,9 +262,17 @@ public class PlanNodeSerializer {
           .setLowerBound(node.getLowerBound())
           .setUpperBound(node.getUpperBound())
           .setExclude(convertWindowExclusion(node.getExclude()))
-          .addAllConstants(convertLiterals(node.getConstants()))
-          .build();
-      builder.setWindowNode(windowNode);
+          .addAllConstants(convertLiterals(node.getConstants()));
+      // Value-based offsets for RANGE offset frames (absent for ROWS / UNBOUNDED / CURRENT ROW bounds).
+      RexExpression.Literal lowerBoundOffset = node.getLowerBoundOffset();
+      if (lowerBoundOffset != null) {
+        windowNodeBuilder.setLowerBoundOffset(RexExpressionToProtoExpression.convertLiteral(lowerBoundOffset));
+      }
+      RexExpression.Literal upperBoundOffset = node.getUpperBoundOffset();
+      if (upperBoundOffset != null) {
+        windowNodeBuilder.setUpperBoundOffset(RexExpressionToProtoExpression.convertLiteral(upperBoundOffset));
+      }
+      builder.setWindowNode(windowNodeBuilder.build());
       return null;
     }
 

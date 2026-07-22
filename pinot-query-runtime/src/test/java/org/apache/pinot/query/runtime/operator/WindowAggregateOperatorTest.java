@@ -2952,6 +2952,42 @@ public class WindowAggregateOperatorTest {
         windowFrameUpperBound, input);
   }
 
+  /**
+   * Prepares an operator for a value-based RANGE offset frame. {@code lowerBoundSign} / {@code upperBoundSign} are the
+   * int-bound discriminators (-1 PRECEDING, +1 FOLLOWING, 0 CURRENT ROW, MIN_VALUE / MAX_VALUE for UNBOUNDED), and
+   * {@code lowerOffset} / {@code upperOffset} carry the value distances (null when the corresponding bound is not an
+   * offset bound). Input rows must already be sorted per the collation.
+   */
+  private WindowAggregateOperator prepareRangeOffsetData(String[] inputSchemaCols,
+      ColumnDataType[] inputSchemaColTypes, ColumnDataType outputType, List<Integer> partitionKeys,
+      int collationFieldIndex, boolean ascending, int lowerBoundSign, int upperBoundSign,
+      RexExpression.Literal lowerOffset, RexExpression.Literal upperOffset, RexExpression.FunctionCall functionCall,
+      Object[][] rows) {
+    DataSchema inputSchema = new DataSchema(inputSchemaCols, inputSchemaColTypes);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(OperatorTestUtil.block(inputSchema, rows))
+        .buildWithEos();
+
+    String[] outputSchemaCols = new String[inputSchemaCols.length + 1];
+    System.arraycopy(inputSchemaCols, 0, outputSchemaCols, 0, inputSchemaCols.length);
+    outputSchemaCols[inputSchemaCols.length] = functionCall.getFunctionName().toLowerCase();
+
+    ColumnDataType[] outputSchemaColTypes = new ColumnDataType[inputSchemaColTypes.length + 1];
+    System.arraycopy(inputSchemaColTypes, 0, outputSchemaColTypes, 0, inputSchemaColTypes.length);
+    outputSchemaColTypes[inputSchemaCols.length] = outputType;
+
+    DataSchema resultSchema = new DataSchema(outputSchemaCols, outputSchemaColTypes);
+    List<RexExpression.FunctionCall> aggCalls = List.of(functionCall);
+    RelFieldCollation.Direction direction =
+        ascending ? RelFieldCollation.Direction.ASCENDING : RelFieldCollation.Direction.DESCENDING;
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(collationFieldIndex, direction));
+    WindowNode node = new WindowNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), partitionKeys, collations,
+        aggCalls, WindowNode.WindowFrameType.RANGE, lowerBoundSign, upperBoundSign,
+        WindowNode.WindowExclusion.NO_OTHERS, lowerOffset, upperOffset, List.of());
+    return new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), input, inputSchema, node);
+  }
+
+
   @Test
   public void testShouldThrowOnWindowFrameWithInvalidOffsetBounds() {
     // Given:
@@ -2975,28 +3011,218 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testShouldThrowOnWindowFrameWithOffsetBoundsForRange() {
-    // TODO: Remove this test when support for RANGE window frames with offset PRECEDING / FOLLOWING is added
-    // Given:
-    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
-    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
-        .addBlock(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .buildWithEos();
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
-    List<Integer> keys = List.of(0);
-    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+  public void testSumWithRangeOffsetPrecedingAndFollowing() {
+    // SUM(value) OVER (PARTITION BY name ORDER BY year RANGE BETWEEN 2 PRECEDING AND 2 FOLLOWING)
+    // Note the RANGE (value-based) semantics differ from ROWS: rows within +/- 2 of the current YEAR value are summed.
+    WindowAggregateOperator operator = prepareRangeOffsetData(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, true, -1, 1,
+        new RexExpression.Literal(INT, 2), new RexExpression.Literal(INT, 2), getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
 
-    // Then:
-    IllegalStateException e = Assert.expectThrows(IllegalStateException.class,
-        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE, 5,
-            Integer.MAX_VALUE, input));
-    assertEquals(e.getMessage(), "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
-    e = Assert.expectThrows(IllegalStateException.class,
-        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MAX_VALUE, 5, input));
-    assertEquals(e.getMessage(), "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 24.0},   // years within [1998, 2002]: 2000, 2002 -> 14 + 10
+            new Object[]{"A", 10, 2002, 24.0},   // years within [2000, 2004]: 2000, 2002 -> 14 + 10
+            new Object[]{"A", 20, 2008, 35.0},   // years within [2006, 2010]: 2008, 2008 -> 20 + 15
+            new Object[]{"A", 15, 2008, 35.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10.0},   // years within [1998, 2002]: 2000
+            new Object[]{"B", 20, 2005, 20.0}    // years within [2003, 2007]: 2005
+        )));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithRangeOffsetProducingEmptyFrames() {
+    // SUM(value) OVER (ORDER BY key RANGE BETWEEN 3 PRECEDING AND 2 PRECEDING) - an empty frame yields NULL.
+    WindowAggregateOperator operator = prepareRangeOffsetData(new String[]{"name", "value", "key"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, true, -1, -1,
+        new RexExpression.Literal(INT, 3), new RexExpression.Literal(INT, 2), getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 10, 1},
+            new Object[]{"A", 20, 2},
+            new Object[]{"A", 30, 3},
+            new Object[]{"A", 50, 5}
+        });
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 10, 1, null},      // keys within [-2, -1]: none -> NULL
+            new Object[]{"A", 20, 2, null},      // keys within [-1, 0]: none -> NULL
+            new Object[]{"A", 30, 3, 10.0},      // keys within [0, 1]: key 1 -> 10
+            new Object[]{"A", 50, 5, 50.0}       // keys within [2, 3]: keys 2, 3 -> 20 + 30
+        )));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testMaxWithRangeOffsetDescending() {
+    // MAX(value) OVER (ORDER BY key DESC RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING). Exercises the DESC path and the
+    // monotonic-deque sliding MAX aggregator. Rows must be provided already sorted per the DESC collation.
+    WindowAggregateOperator operator = prepareRangeOffsetData(new String[]{"name", "value", "key"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, false, -1, 1,
+        new RexExpression.Literal(INT, 1), new RexExpression.Literal(INT, 1), getMax(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 5, 7},
+            new Object[]{"A", 9, 5},
+            new Object[]{"A", 2, 2},
+            new Object[]{"A", 8, 2},
+            new Object[]{"A", 1, 1}
+        });
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 5, 7, 5},          // keys within [6, 8]: key 7 -> max(5)
+            new Object[]{"A", 9, 5, 9},          // keys within [4, 6]: key 5 -> max(9)
+            new Object[]{"A", 2, 2, 8},          // keys within [1, 3]: keys 2, 2, 1 -> max(2, 8, 1)
+            new Object[]{"A", 8, 2, 8},          // keys within [1, 3]: keys 2, 2, 1 -> max(2, 8, 1)
+            new Object[]{"A", 1, 1, 8}           // keys within [0, 2]: keys 2, 2, 1 -> max(2, 8, 1)
+        )));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testBoolAndWithRangeOffset() {
+    // BOOL_AND(value) OVER (ORDER BY key RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING). Exercises the incremental
+    // add/remove of the BOOL_AND aggregator over a value-based sliding frame.
+    WindowAggregateOperator operator = prepareRangeOffsetData(new String[]{"name", "value", "key"},
+        new ColumnDataType[]{STRING, BOOLEAN, INT}, BOOLEAN, List.of(0), 2, true, -1, 1,
+        new RexExpression.Literal(INT, 1), new RexExpression.Literal(INT, 1), getBoolAnd(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 1, 1},
+            new Object[]{"A", 1, 2},
+            new Object[]{"A", 0, 3},
+            new Object[]{"A", 1, 5}
+        });
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 1, 1, 1},          // keys within [0, 2]: keys 1, 2 -> AND(true, true) = true
+            new Object[]{"A", 1, 2, 0},          // keys within [1, 3]: keys 1, 2, 3 -> AND(true, true, false) = false
+            new Object[]{"A", 0, 3, 0},          // keys within [2, 4]: keys 2, 3 -> AND(true, false) = false
+            new Object[]{"A", 1, 5, 1}           // keys within [4, 6]: key 5 -> AND(true) = true
+        )));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueWithRangeOffset() {
+    // FIRST_VALUE(value) OVER (ORDER BY key RANGE BETWEEN 3 PRECEDING AND 3 FOLLOWING) - value at the frame start.
+    WindowAggregateOperator operator = prepareRangeOffsetData(new String[]{"name", "value", "key"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, true, -1, 1,
+        new RexExpression.Literal(INT, 3), new RexExpression.Literal(INT, 3),
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 10, 1},
+            new Object[]{"A", null, 3},
+            new Object[]{"A", 30, 5},
+            new Object[]{"A", null, 7}
+        });
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 10, 1, 10},        // keys within [-2, 4]: keys 1, 3 -> first value at key 1 = 10
+            new Object[]{"A", null, 3, 10},      // keys within [0, 6]: keys 1, 3, 5 -> first value at key 1 = 10
+            new Object[]{"A", 30, 5, null},      // keys within [2, 8]: keys 3, 5, 7 -> first value at key 3 = null
+            new Object[]{"A", null, 7, 30}       // keys within [4, 10]: keys 5, 7 -> first value at key 5 = 30
+        )));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueWithRangeOffset() {
+    // LAST_VALUE(value) OVER (ORDER BY key RANGE BETWEEN 3 PRECEDING AND 3 FOLLOWING) - value at the frame end.
+    WindowAggregateOperator operator = prepareRangeOffsetData(new String[]{"name", "value", "key"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, true, -1, 1,
+        new RexExpression.Literal(INT, 3), new RexExpression.Literal(INT, 3),
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 10, 1},
+            new Object[]{"A", null, 3},
+            new Object[]{"A", 30, 5},
+            new Object[]{"A", null, 7}
+        });
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 10, 1, null},      // keys within [-2, 4]: keys 1, 3 -> last value at key 3 = null
+            new Object[]{"A", null, 3, 30},      // keys within [0, 6]: keys 1, 3, 5 -> last value at key 5 = 30
+            new Object[]{"A", 30, 5, null},      // keys within [2, 8]: keys 3, 5, 7 -> last value at key 7 = null
+            new Object[]{"A", null, 7, null}     // keys within [4, 10]: keys 5, 7 -> last value at key 7 = null
+        )));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueIgnoreNullsWithRangeOffset() {
+    // FIRST_VALUE(value) IGNORE NULLS OVER (ORDER BY key RANGE BETWEEN 3 PRECEDING AND 3 FOLLOWING).
+    WindowAggregateOperator operator = prepareRangeOffsetData(new String[]{"name", "value", "key"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, true, -1, 1,
+        new RexExpression.Literal(INT, 3), new RexExpression.Literal(INT, 3),
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 10, 1},
+            new Object[]{"A", null, 3},
+            new Object[]{"A", 30, 5},
+            new Object[]{"A", null, 7}
+        });
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 10, 1, 10},        // keys 1, 3 -> first non-null = 10
+            new Object[]{"A", null, 3, 10},      // keys 1, 3, 5 -> first non-null = 10
+            new Object[]{"A", 30, 5, 30},        // keys 3, 5, 7 -> first non-null (skip key 3 null) = 30
+            new Object[]{"A", null, 7, 30}       // keys 5, 7 -> first non-null = 30
+        )));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueIgnoreNullsWithRangeOffset() {
+    // LAST_VALUE(value) IGNORE NULLS OVER (ORDER BY key RANGE BETWEEN 3 PRECEDING AND 3 FOLLOWING).
+    WindowAggregateOperator operator = prepareRangeOffsetData(new String[]{"name", "value", "key"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, true, -1, 1,
+        new RexExpression.Literal(INT, 3), new RexExpression.Literal(INT, 3),
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 10, 1},
+            new Object[]{"A", null, 3},
+            new Object[]{"A", 30, 5},
+            new Object[]{"A", null, 7}
+        });
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 10, 1, 10},        // keys 1, 3 -> last non-null = 10
+            new Object[]{"A", null, 3, 30},      // keys 1, 3, 5 -> last non-null = 30
+            new Object[]{"A", 30, 5, 30},        // keys 3, 5, 7 -> last non-null (skip key 7 null) = 30
+            new Object[]{"A", null, 7, 30}       // keys 5, 7 -> last non-null = 30
+        )));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test

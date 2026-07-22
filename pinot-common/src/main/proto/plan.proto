@@ -266,6 +266,14 @@ message WindowNode {
   int32 upperBound = 6;
   repeated Literal constants = 7;
   WindowExclusion exclude = 8;
+  // Value-based frame offsets for RANGE frames with an offset PRECEDING / FOLLOWING bound (e.g. RANGE BETWEEN 5
+  // PRECEDING AND 5 FOLLOWING). Only set when the corresponding bound is an offset bound of a RANGE frame; absent for
+  // ROWS frames and for RANGE frames whose bounds are all UNBOUNDED / CURRENT ROW. For such offset bounds, lowerBound /
+  // upperBound above are set to a sign-only discriminator (-1 for PRECEDING, +1 for FOLLOWING) and the actual value
+  // distance is carried here. Message-typed for proto3 field presence (hasLowerBoundOffset/hasUpperBoundOffset), so
+  // absence is distinguishable and old peers keep the legacy int-bound behavior.
+  Literal lowerBoundOffset = 9;
+  Literal upperBoundOffset = 10;
 }
 
 // A node that doesn't carry semantic information.

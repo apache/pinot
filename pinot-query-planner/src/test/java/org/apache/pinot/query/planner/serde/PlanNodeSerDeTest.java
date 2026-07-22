@@ -20,6 +20,8 @@ package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -28,6 +30,7 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -43,6 +46,43 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
       PlanNode deserializedStagePlan = PlanNodeDeserializer.process(PlanNodeSerializer.process(stagePlan));
       assertEquals(stagePlan, deserializedStagePlan);
     }
+  }
+
+  @Test
+  public void testRangeOffsetWindowNodeSerDe() {
+    // Round-trips the value-based RANGE offset frame wire fields (lowerBoundOffset / upperBoundOffset). The int bounds
+    // are sign discriminators (-1 PRECEDING, +1 FOLLOWING) and the value distances are carried by the Literal fields.
+    DataSchema dataSchema = new DataSchema(new String[]{"key", "value", "sum"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    RexExpression.FunctionCall sum =
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.SUM.name(), List.of(new RexExpression.InputRef(1)));
+    WindowNode node = new WindowNode(1, dataSchema, PlanNode.NodeHint.EMPTY, new ArrayList<>(), List.of(),
+        List.of(new RelFieldCollation(0)), List.of(sum), WindowNode.WindowFrameType.RANGE, -1, 1,
+        WindowNode.WindowExclusion.NO_OTHERS, new RexExpression.Literal(ColumnDataType.INT, 5),
+        new RexExpression.Literal(ColumnDataType.INT, 10), List.of());
+
+    WindowNode deserialized = (WindowNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertEquals(deserialized, node);
+    assertEquals(deserialized.getLowerBoundOffset(), new RexExpression.Literal(ColumnDataType.INT, 5));
+    assertEquals(deserialized.getUpperBoundOffset(), new RexExpression.Literal(ColumnDataType.INT, 10));
+  }
+
+  @Test
+  public void testLegacyWindowNodeSerDe() {
+    // A ROWS / non-offset-RANGE WindowNode must round-trip with null offset fields (the wire default an old broker
+    // produces), preserving the historical int-bound behavior.
+    DataSchema dataSchema = new DataSchema(new String[]{"key", "value", "sum"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    RexExpression.FunctionCall sum =
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.SUM.name(), List.of(new RexExpression.InputRef(1)));
+    WindowNode node = new WindowNode(1, dataSchema, PlanNode.NodeHint.EMPTY, new ArrayList<>(), List.of(),
+        List.of(new RelFieldCollation(0)), List.of(sum), WindowNode.WindowFrameType.ROWS, -2, 2,
+        WindowNode.WindowExclusion.NO_OTHERS, List.of());
+
+    WindowNode deserialized = (WindowNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertEquals(deserialized, node);
+    assertEquals(deserialized.getLowerBoundOffset(), null);
+    assertEquals(deserialized.getUpperBoundOffset(), null);
   }
 
   @Test
