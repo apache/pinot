@@ -158,6 +158,19 @@ public class StreamConfigProperties {
   public static final String BACKFILL_TOPIC = "realtime.segment.isBackfillTopic";
 
   /**
+   * When true, skip triggering offset auto-reset backfill for this stream/topic.
+   * Can be set per stream config entry (per topic). Cleared by the operator via normal table config update.
+   */
+  public static final String OFFSET_AUTO_RESET_PAUSE = "realtime.segment.offsetAutoReset.pause";
+
+  /**
+   * If the segment count for the table >= this value, skip triggering a backfill.
+   * -1 or absent means disabled. Prevents znode limit pressure when ingestion is permanently high.
+   */
+  public static final String OFFSET_AUTO_RESET_MAX_SEGMENTS_BEFORE_SKIP =
+      "realtime.segment.offsetAutoReset.maxSegmentsBeforeBackfillSkip";
+
+  /**
    * Helper method to create a stream specific property
    */
   public static String constructStreamProperty(String streamType, String property) {
