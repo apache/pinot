@@ -134,4 +134,21 @@ public class PostAggregationFunctionTest {
     // The function returns null if any argument is null
     assertNull(function.invoke(new Object[]{null, 1}));
   }
+
+  /**
+   * Regression test for the single-stage post-aggregation path: arithmetic on whole-number operands - for example
+   * {@code COUNT(DISTINCT ...) * 60}, which reaches here as {@code times(INT, INT)} because DISTINCTCOUNT is typed
+   * INT and a small integer literal is typed INT - must return LONG rather than silently widening to DOUBLE.
+   */
+  @Test
+  public void testWholeNumberArithmeticReturnsLong() {
+    for (String functionName : new String[]{"plus", "minus", "times"}) {
+      PostAggregationFunction function =
+          new PostAggregationFunction(functionName, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+      assertEquals(function.getResultType(), ColumnDataType.LONG, functionName + "(INT, INT) should return LONG");
+    }
+    // 100000 * 100000 overflows int but fits long; the result must be a Long, not a Double.
+    assertEquals(new PostAggregationFunction("times", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT})
+        .invoke(new Object[]{100000, 100000}), 10_000_000_000L);
+  }
 }
