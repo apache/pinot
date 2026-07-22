@@ -41,6 +41,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidKey;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -52,7 +53,13 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final ExpressionContext _groupByExpression;
-  private final DataType _storedType;
+  /**
+   * Group-key dispatch type: stored type of the column, except UUID is preserved as {@link DataType#UUID} so the
+   * group-key map keys on {@link org.apache.pinot.spi.utils.UuidKey} (two primitive longs) instead of
+   * {@link org.apache.pinot.spi.utils.ByteArray}. For every other logical type this equals
+   * {@code logicalType.getStoredType()}.
+   */
+  private final DataType _dataType;
   private final Map _groupKeyMap;
   private final int _globalGroupIdUpperBound;
   // TODO(nhejazi): Most of the logic between _nullHandlingEnabled=true/false is not sharable, so consider making a
@@ -69,8 +76,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
       @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
     _groupByExpression = groupByExpression;
     ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
-    _storedType = columnContext.getDataType().getStoredType();
-    _groupKeyMap = createGroupKeyMap(_storedType);
+    DataType logicalType = columnContext.getDataType();
+    // Normalize to stored type, but preserve UUID so it uses UuidKey instead of ByteArray
+    _dataType = logicalType == DataType.UUID ? DataType.UUID : logicalType.getStoredType();
+    _groupKeyMap = createGroupKeyMap(_dataType);
     if (groupByExpressionSizesFromPredicates != null) {
       Integer size = groupByExpressionSizesFromPredicates.get(groupByExpression);
       _globalGroupIdUpperBound = size != null ? Math.min(size, numGroupsLimit) : numGroupsLimit;
@@ -98,7 +107,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     }
     int numDocs = valueBlock.getNumDocs();
 
-    switch (_storedType) {
+    switch (_dataType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < numDocs; i++) {
@@ -135,6 +144,12 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
           groupKeys[i] = getKeyForValue(stringValues[i]);
         }
         break;
+      case UUID:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < numDocs; i++) {
+          groupKeys[i] = getKeyForValue(UuidKey.fromBytes(uuidValues[i]));
+        }
+        break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < numDocs; i++) {
@@ -142,7 +157,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         }
         break;
       default:
-        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
+        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataType);
     }
   }
 
@@ -152,7 +167,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpression);
     int numDocs = valueBlock.getNumDocs();
 
-    switch (_storedType) {
+    switch (_dataType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         if (nullBitmap.getCardinality() < numDocs) {
@@ -213,6 +228,16 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
           Arrays.fill(groupKeys, 0, numDocs, getKeyForValue((String) null));
         }
         break;
+      case UUID:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        if (nullBitmap.getCardinality() < numDocs) {
+          for (int i = 0; i < numDocs; i++) {
+            groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : UuidKey.fromBytes(uuidValues[i]));
+          }
+        } else if (numDocs > 0) {
+          Arrays.fill(groupKeys, 0, numDocs, getKeyForValue((UuidKey) null));
+        }
+        break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (nullBitmap.getCardinality() < numDocs) {
@@ -224,7 +249,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         }
         break;
       default:
-        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
+        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataType);
     }
   }
 
@@ -261,6 +286,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         Object2IntOpenHashMap<String> stringMap = new Object2IntOpenHashMap<>();
         stringMap.defaultReturnValue(INVALID_ID);
         return stringMap;
+      case UUID:
+        Object2IntOpenHashMap<UuidKey> uuidMap = new Object2IntOpenHashMap<>();
+        uuidMap.defaultReturnValue(INVALID_ID);
+        return uuidMap;
       case BYTES:
         Object2IntOpenHashMap<ByteArray> bytesMap = new Object2IntOpenHashMap<>();
         bytesMap.defaultReturnValue(INVALID_ID);
@@ -276,7 +305,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpression);
 
     if (_isSingleValueExpression) {
-      switch (_storedType) {
+      switch (_dataType) {
         case INT:
           int[] intValues = blockValSet.getIntValuesSV();
           for (int i = 0; i < numDocs; i++) {
@@ -307,6 +336,12 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = new int[]{getKeyForValue(stringValues[i])};
           }
           break;
+        case UUID:
+          byte[][] uuidValues = blockValSet.getBytesValuesSV();
+          for (int i = 0; i < numDocs; i++) {
+            groupKeys[i] = new int[]{getKeyForValue(UuidKey.fromBytes(uuidValues[i]))};
+          }
+          break;
         case BYTES:
           byte[][] byteValues = blockValSet.getBytesValuesSV();
           for (int i = 0; i < numDocs; i++) {
@@ -314,10 +349,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
           }
           break;
         default:
-          throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
+          throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataType);
       }
     } else {
-      switch (_storedType) {
+      switch (_dataType) {
         case INT:
           int[][] intValues = blockValSet.getIntValuesMV();
           for (int i = 0; i < numDocs; i++) {
@@ -373,8 +408,19 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = mvKeys;
           }
           break;
+        case UUID:
+          byte[][][] uuidValues = blockValSet.getBytesValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            int mvSize = uuidValues[i].length;
+            int[] mvKeys = new int[mvSize];
+            for (int j = 0; j < mvSize; j++) {
+              mvKeys[j] = getKeyForValue(UuidKey.fromBytes(uuidValues[i][j]));
+            }
+            groupKeys[i] = mvKeys;
+          }
+          break;
         default:
-          throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
+          throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataType);
       }
     }
   }
@@ -386,7 +432,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   @Override
   public Iterator<GroupKey> getGroupKeys() {
-    switch (_storedType) {
+    switch (_dataType) {
       case INT:
         return new IntGroupKeyIterator((Int2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
       case LONG:
@@ -398,7 +444,8 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
       case BIG_DECIMAL:
       case STRING:
       case BYTES:
-        return new ObjectGroupKeyIterator((Object2IntOpenHashMap) _groupKeyMap);
+      case UUID:
+        return new ObjectGroupKeyIterator((Object2IntOpenHashMap) _groupKeyMap, _dataType);
       default:
         throw new IllegalStateException();
     }
@@ -482,6 +529,16 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   private int getKeyForValue(ByteArray value) {
     Object2IntMap<ByteArray> map = (Object2IntMap<ByteArray>) _groupKeyMap;
+    int groupId = map.getInt(value);
+    if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
+      groupId = _numGroups++;
+      map.put(value, groupId);
+    }
+    return groupId;
+  }
+
+  private int getKeyForValue(UuidKey value) {
+    Object2IntMap<UuidKey> map = (Object2IntMap<UuidKey>) _groupKeyMap;
     int groupId = map.getInt(value);
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
       groupId = _numGroups++;
@@ -638,10 +695,12 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private static class ObjectGroupKeyIterator implements Iterator<GroupKey> {
     final ObjectIterator<Object2IntMap.Entry> _iterator;
     final GroupKey _groupKey;
+    final DataType _dataType;
 
-    ObjectGroupKeyIterator(Object2IntOpenHashMap objectMap) {
+    ObjectGroupKeyIterator(Object2IntOpenHashMap objectMap, DataType dataType) {
       _iterator = objectMap.object2IntEntrySet().fastIterator();
       _groupKey = new GroupKey();
+      _dataType = dataType;
     }
 
     @Override
@@ -653,7 +712,11 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     public GroupKey next() {
       Object2IntMap.Entry entry = _iterator.next();
       _groupKey._groupId = entry.getIntValue();
-      _groupKey._keys = new Object[]{entry.getKey()};
+      Object key = entry.getKey();
+      if (_dataType == DataType.UUID && key != null) {
+        key = ((UuidKey) key).toByteArray();
+      }
+      _groupKey._keys = new Object[]{key};
       return _groupKey;
     }
 

@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -235,8 +236,12 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
 
       public boolean mightBeContained(BloomFilterReader bloomFilter) {
         if (!_hashed) {
+          // BYTES and UUID convert to ByteArray internally, but DataType.toString expects the raw byte[]. Unwrap so
+          // BYTES renders as hex and UUID as its canonical string, matching how BloomFilterCreator indexed the values.
+          Object value = _comparableValue instanceof ByteArray ? ((ByteArray) _comparableValue).getBytes()
+              : _comparableValue;
           GuavaBloomFilterReaderUtils.Hash128AsLongs hash128AsLongs =
-              GuavaBloomFilterReaderUtils.hashAsLongs(_comparableValue.toString());
+              GuavaBloomFilterReaderUtils.hashAsLongs(_dt.toString(value));
           _hash1 = hash128AsLongs.getHash1();
           _hash2 = hash128AsLongs.getHash2();
           _hashed = true;

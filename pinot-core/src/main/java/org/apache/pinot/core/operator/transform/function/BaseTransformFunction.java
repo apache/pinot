@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -57,6 +58,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, true, false);
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, true, false);
+  protected static final TransformResultMetadata UUID_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.UUID, true, false);
 
   protected static final TransformResultMetadata INT_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.INT, false, false);
@@ -78,6 +81,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, false, false);
   protected static final TransformResultMetadata BYTES_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, false, false);
+  protected static final TransformResultMetadata UUID_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.UUID, false, false);
   protected static final TransformResultMetadata UNKNOWN_METADATA =
       new TransformResultMetadata(DataType.UNKNOWN, true, false);
 
@@ -403,12 +408,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initStringValuesSV(length);
+    DataType resultDataType = getResultMetadata().getDataType();
+    if (resultDataType == DataType.UUID) {
+      byte[][] bytesValues = transformToBytesValuesSV(valueBlock);
+      for (int i = 0; i < length; i++) {
+        _stringValuesSV[i] = UuidUtils.toString(bytesValues[i]);
+      }
+      return _stringValuesSV;
+    }
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(valueBlock);
       dictionary.readStringValues(dictIds, length, _stringValuesSV);
     } else {
-      DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(valueBlock);
@@ -463,6 +475,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
       dictionary.readBytesValues(dictIds, length, _bytesValuesSV);
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
+      if (resultDataType == DataType.UUID) {
+        // UUID transform functions must override transformToBytesValuesSV to return the raw 16-byte representation.
+        // Do NOT fall back to transformToStringValuesSV here — that method calls this one for UUID results, creating
+        // an infinite recursion that ends in StackOverflowError.
+        throw new UnsupportedOperationException(
+            "UUID transform function must override transformToBytesValuesSV: " + getClass().getName());
+      }
       switch (resultDataType.getStoredType()) {
         case BIG_DECIMAL:
           BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(valueBlock);
@@ -775,6 +794,20 @@ public abstract class BaseTransformFunction implements TransformFunction {
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initStringValuesMV(length);
+    DataType resultDataType = getResultMetadata().getDataType();
+    if (resultDataType == DataType.UUID) {
+      byte[][][] bytesValuesMV = transformToBytesValuesMV(valueBlock);
+      for (int i = 0; i < length; i++) {
+        byte[][] bytesValues = bytesValuesMV[i];
+        int numValues = bytesValues.length;
+        String[] stringValues = new String[numValues];
+        for (int j = 0; j < numValues; j++) {
+          stringValues[j] = UuidUtils.toString(bytesValues[j]);
+        }
+        _stringValuesMV[i] = stringValues;
+      }
+      return _stringValuesMV;
+    }
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
@@ -786,7 +819,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _stringValuesMV[i] = stringValues;
       }
     } else {
-      DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(valueBlock);
@@ -843,6 +875,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
+      if (resultDataType == DataType.UUID) {
+        // Symmetric to the SV guard in transformToBytesValuesSV: UUID transform functions must override
+        // transformToBytesValuesMV directly. The default switch below would otherwise fall through to a
+        // confusing "Cannot read MV BYTES as BYTES" error because UUID.getStoredType() == BYTES.
+        throw new UnsupportedOperationException(
+            "UUID MV transform function must override transformToBytesValuesMV: " + getClass().getName());
+      }
       switch (resultDataType.getStoredType()) {
         case BIG_DECIMAL:
           BigDecimal[][] bigDecimalValuesMV = transformToBigDecimalValuesMV(valueBlock);
