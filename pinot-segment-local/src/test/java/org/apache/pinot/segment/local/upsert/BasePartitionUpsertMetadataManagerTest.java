@@ -126,9 +126,9 @@ public class BasePartitionUpsertMetadataManagerTest {
     File segDir02 = new File(TEMP_DIR, "seg02");
     ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
-    upsertMetadataManager.addSegment(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
     FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    upsertMetadataManager.addSegment(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
@@ -187,9 +187,9 @@ public class BasePartitionUpsertMetadataManagerTest {
     File segDir02 = new File(TEMP_DIR, "seg02");
     ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
-    upsertMetadataManager.addSegment(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
     FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    upsertMetadataManager.addSegment(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
@@ -240,6 +240,61 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testTakeSnapshotSkipsSegmentWithoutSnapshotOnLockContention()
+      throws IOException {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    Map<String, Lock> segmentLocks = new HashMap<>();
+    // A contended segmentLock on a segment without existing snapshot file skips only that segment, and the other
+    // segments still take their snapshots.
+    Lock seg01Lock = new ReentrantLock() {
+      @Override
+      public boolean tryLock() {
+        return false;
+      }
+    };
+    segmentLocks.put("seg01", seg01Lock);
+    segmentLocks.put("seg02", new ReentrantLock());
+    segmentLocks.put("seg03", new ReentrantLock());
+    when(tdm.getSegmentLock(anyString())).thenAnswer(invocation -> {
+      String segmentName = invocation.getArgument(0);
+      return segmentLocks.get(segmentName);
+    });
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    List<String> segmentsTakenSnapshot = new ArrayList<>();
+
+    File segDir01 = new File(TEMP_DIR, "seg01");
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, null);
+    seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), null);
+    upsertMetadataManager.addSegment(seg01);
+
+    File segDir02 = new File(TEMP_DIR, "seg02");
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
+    seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
+    // seg02 has snapshot file, so its snapshot is taken first.
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    upsertMetadataManager.addSegment(seg02);
+
+    File segDir03 = new File(TEMP_DIR, "seg03");
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
+    seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), null);
+    upsertMetadataManager.addSegment(seg03);
+
+    upsertMetadataManager.doTakeSnapshot();
+    // seg01 is skipped on lock contention, and the other segments still take their snapshots.
+    assertEquals(segmentsTakenSnapshot.size(), 2);
+    assertEquals(segmentsTakenSnapshot.get(0), "seg02");
+    assertTrue(segmentsTakenSnapshot.contains("seg03"));
+    assertFalse(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).exists());
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 6);
+    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
+  }
+
+  @Test
   public void testTakeSnapshotInOrderBasedOnUpdates()
       throws IOException {
     UpsertContext upsertContext = mock(UpsertContext.class);
@@ -262,9 +317,9 @@ public class BasePartitionUpsertMetadataManagerTest {
     File segDir02 = new File(TEMP_DIR, "seg02");
     ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
-    upsertMetadataManager.addSegment(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
     FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    upsertMetadataManager.addSegment(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
@@ -319,9 +374,9 @@ public class BasePartitionUpsertMetadataManagerTest {
     File segDir02 = new File(TEMP_DIR, "seg02");
     ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
-    upsertMetadataManager.addSegment(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
     FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    upsertMetadataManager.addSegment(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
@@ -385,6 +440,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     // seg02 has snapshot file, so its snapshot is taken first.
     FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+    upsertMetadataManager.markSegmentWithSnapshot(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 =
@@ -459,6 +515,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     // seg02 has snapshot file, so its snapshot is taken first.
     FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+    upsertMetadataManager.markSegmentWithSnapshot(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
@@ -543,6 +600,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     // seg02 has snapshot file, so its snapshot is taken first.
     FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+    upsertMetadataManager.markSegmentWithSnapshot(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
@@ -606,6 +664,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     // seg02 has snapshot file, so its snapshot is taken first.
     FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+    upsertMetadataManager.markSegmentWithSnapshot(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
@@ -1026,8 +1085,12 @@ public class BasePartitionUpsertMetadataManagerTest {
       _trackedSegments.add(seg);
     }
 
-    public void markSegmentAsUpdated(IndexSegment seg) {
+    public void markSegmentAsUpdated(ImmutableSegmentImpl seg) {
       _updatedSegmentsSinceLastSnapshot.add(seg);
+    }
+
+    public void markSegmentWithSnapshot(ImmutableSegmentImpl seg) {
+      _segmentsWithSnapshot.add(seg);
     }
 
     @Override
