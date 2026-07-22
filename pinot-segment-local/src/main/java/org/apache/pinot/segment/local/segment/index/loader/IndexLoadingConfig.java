@@ -72,6 +72,10 @@ public class IndexLoadingConfig {
   private String _tableDataDir;
   private boolean _errorOnColumnBuildFailure;
   private boolean _forwardIndexOnly;
+  // Transient override that lets a specific reload bypass tableIndexConfig.skipSegmentPreprocess. Not persisted —
+  // set per-reload by the reload code path so that secondary indexes get materialized against the latest table
+  // config even when the persisted flag still says skip.
+  private boolean _overrideSkipSegmentPreprocess;
 
   // Initialized by instance data manager config
   private String _instanceId;
@@ -358,7 +362,20 @@ public class IndexLoadingConfig {
   }
 
   public boolean isSkipSegmentPreprocess() {
+    if (_overrideSkipSegmentPreprocess) {
+      return false;
+    }
     return _tableConfig != null && _tableConfig.getIndexingConfig().isSkipSegmentPreprocess();
+  }
+
+  /**
+   * Per-reload override. When set to {@code true}, {@link #isSkipSegmentPreprocess()} returns {@code false} for
+   * this config instance regardless of the underlying table config. Used by {@code AsyncIndexReloader} (and any
+   * other reload-time caller) to force full preprocess — including secondary-index building — on this load
+   * without persisting a config flip.
+   */
+  public void setOverrideSkipSegmentPreprocess(boolean overrideSkipSegmentPreprocess) {
+    _overrideSkipSegmentPreprocess = overrideSkipSegmentPreprocess;
   }
 
   @Nullable
