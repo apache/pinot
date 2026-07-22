@@ -943,6 +943,37 @@ public class BaseTableDataManagerTest {
     }
   }
 
+  /**
+   * registerSegment must fire the post-registration lifecycle hook on the backing segment of a standalone manager.
+   * A standalone ImmutableSegmentDataManager exposes its segment via getReportableSegments() (default), while
+   * getSegments() defaults to empty — so iterating getSegments() here would silently skip the hook for the common
+   * single-segment case. This is a regression guard for that: it fails if registerSegment iterates getSegments().
+   */
+  @Test
+  public void testRegisterSegmentFiresOnSegmentAddedForStandaloneSegment() {
+    BaseTableDataManager tableDataManager = createTableManager();
+    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
+    when(immutableSegment.getSegmentName()).thenReturn(SEGMENT_NAME);
+    tableDataManager.registerSegment(SEGMENT_NAME, new ImmutableSegmentDataManager(immutableSegment));
+    verify(immutableSegment).onSegmentAdded();
+  }
+
+  /**
+   * registerSegment must fire the hook once per reportable segment for a multi-segment manager
+   */
+  @Test
+  public void testRegisterSegmentFiresOnSegmentAddedForEachReportableSegment() {
+    BaseTableDataManager tableDataManager = createTableManager();
+    ImmutableSegment segment1 = mock(ImmutableSegment.class);
+    ImmutableSegment segment2 = mock(ImmutableSegment.class);
+    SegmentDataManager multiSegmentManager = mock(SegmentDataManager.class);
+    when(multiSegmentManager.getSegmentName()).thenReturn(SEGMENT_NAME);
+    when(multiSegmentManager.getReportableSegments()).thenReturn(List.of(segment1, segment2));
+    tableDataManager.registerSegment(SEGMENT_NAME, multiSegmentManager);
+    verify(segment1).onSegmentAdded();
+    verify(segment2).onSegmentAdded();
+  }
+
   protected BaseTableDataManager createTableManager() {
     return createTableManager(createDefaultInstanceDataManagerConfig());
   }

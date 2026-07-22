@@ -286,6 +286,16 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
+  public void onSegmentAdded() {
+    // Best-effort: this fires after the segment is already serving, so a failure cannot roll back the registration.
+    try {
+      _segmentDirectory.onSegmentAdded();
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception in onSegmentAdded for segment: {}. Continuing with error.", getSegmentName(), e);
+    }
+  }
+
+  @Override
   public void offload() {
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.removeSegment(this);

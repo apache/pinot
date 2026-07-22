@@ -35,9 +35,12 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -45,10 +48,22 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * Such an IndexSegment contains only the metadata, and no indexes
  */
 public class EmptyIndexSegment implements ImmutableSegment {
+  private static final Logger LOGGER = LoggerFactory.getLogger(EmptyIndexSegment.class);
+
   private final SegmentMetadataImpl _segmentMetadata;
+  // The directory this empty segment was loaded from, if any. An empty (0-doc) segment holds no index buffers, but the
+  // directory may still own resources and post-registration work that a non-empty segment gets via
+  // ImmutableSegmentImpl. Null when loaded without a directory.
+  @Nullable
+  private final SegmentDirectory _segmentDirectory;
 
   public EmptyIndexSegment(SegmentMetadataImpl segmentMetadata) {
+    this(segmentMetadata, null);
+  }
+
+  public EmptyIndexSegment(SegmentMetadataImpl segmentMetadata, @Nullable SegmentDirectory segmentDirectory) {
     _segmentMetadata = segmentMetadata;
+    _segmentDirectory = segmentDirectory;
   }
 
   @Override
@@ -72,11 +87,33 @@ public class EmptyIndexSegment implements ImmutableSegment {
   }
 
   @Override
+  public void onSegmentAdded() {
+    // Best-effort: this fires after the segment is already serving, so a failure cannot roll back the registration.
+    if (_segmentDirectory == null) {
+      return;
+    }
+    try {
+      _segmentDirectory.onSegmentAdded();
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception in onSegmentAdded for empty segment: {}. Continuing with error.", getSegmentName(),
+          e);
+    }
+  }
+
+  @Override
   public void offload() {
   }
 
   @Override
   public void destroy() {
+    if (_segmentDirectory != null) {
+      try {
+        _segmentDirectory.close();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to close segment directory for empty segment: {}. Continuing with error.",
+            getSegmentName(), e);
+      }
+    }
   }
 
   @Nullable
