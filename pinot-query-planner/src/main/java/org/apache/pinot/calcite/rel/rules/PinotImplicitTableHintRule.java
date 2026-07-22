@@ -56,12 +56,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   @Override
   public boolean matches(RelOptRuleCall call) {
     TableScan tableScan = call.rel(0);
-
-    // we don't want to apply this rule if the explicit hint is complete, or if the table is hinted as replicated
-    // across all workers (each worker scans all the segments, so partition options are irrelevant)
-    @Nullable
-    RelHint explicitHint = getTableOptionHint(tableScan);
-    return !isHintComplete(explicitHint) && !isReplicated(explicitHint);
+    return getHintOptionsToRewrite(tableScan) != null;
   }
 
   @Override
@@ -69,49 +64,40 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     TableScan tableScan = call.rel(0);
 
     String tableName = RelToPlanNodeConverter.getTableNameFromTableScan(tableScan);
-    @Nullable
     TableOptions implicitTableOptions = _workerManager.inferTableOptions(tableName);
     if (implicitTableOptions == null) {
       return;
     }
 
-    @Nullable
-    RelHint explicitHint = getTableOptionHint(tableScan);
-    TableOptions tableOptions = calculateTableOptions(explicitHint, implicitTableOptions, tableScan);
+    Map<String, String> explicitOptions = getHintOptionsToRewrite(tableScan);
+    assert explicitOptions != null;
+    TableOptions tableOptions = calculateTableOptions(explicitOptions, implicitTableOptions, tableScan);
     RelNode newRel = withNewTableOptions(tableScan, tableOptions);
     call.transformTo(newRel);
   }
 
   /**
-   * Determines is the provided hint is complete.
-   * A hint is considered complete if it provides explicit config for key, function and partition size.
-   */
-  private boolean isHintComplete(@Nullable RelHint hint) {
-    if (hint == null || hint.kvOptions == null) {
-      return false;
-    }
-    Map<String, String> kvOptions = hint.kvOptions;
-    return kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_KEY)
-        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION)
-        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
-  }
-
-  /**
-   * Determines whether the provided hint declares the table as replicated across all workers.
-   */
-  private static boolean isReplicated(@Nullable RelHint hint) {
-    if (hint == null || hint.kvOptions == null) {
-      return false;
-    }
-    return Boolean.parseBoolean(hint.kvOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED));
-  }
-
-  /**
-   * Get the table option hint from the table scan, if any.
+   * Returns the kv options of the explicit table options hint to be rewritten with the inferred partition options
+   * (empty if the scan does not have an explicit table options hint), or {@code null} when no rewrite is required —
+   * either the explicit hint already provides the complete partition config (key, function and size), or the table is
+   * hinted as replicated across all workers (each worker scans all the segments, so partition options are irrelevant).
    */
   @Nullable
-  private static RelHint getTableOptionHint(TableScan tableScan) {
-    return PinotHintStrategyTable.getHint(tableScan, PinotHintOptions.TABLE_HINT_OPTIONS);
+  private static Map<String, String> getHintOptionsToRewrite(TableScan tableScan) {
+    RelHint hint = PinotHintStrategyTable.getHint(tableScan, PinotHintOptions.TABLE_HINT_OPTIONS);
+    if (hint == null || hint.kvOptions == null) {
+      return Map.of();
+    }
+    Map<String, String> kvOptions = hint.kvOptions;
+    if (Boolean.parseBoolean(kvOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED))) {
+      return null;
+    }
+    if (kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_KEY)
+        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION)
+        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_SIZE)) {
+      return null;
+    }
+    return kvOptions;
   }
 
   /**
@@ -143,18 +129,16 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   }
 
   /**
-   * Creates a new table options hint based on the given table partition info and the explicit hint, if any.
+   * Creates a new table options hint based on the given table partition info and the explicitly supplied options, if
+   * any.
    *
-   * Any explicit hint will override the implicit hint obtained from the table partition info.
+   * Any explicitly supplied option will override the implicit one obtained from the table partition info.
    */
-  private static TableOptions calculateTableOptions(
-      @Nullable RelHint relHint, TableOptions implicitTableOptions, TableScan tableScan) {
-    if (relHint == null) {
+  private static TableOptions calculateTableOptions(Map<String, String> kvOptions,
+      TableOptions implicitTableOptions, TableScan tableScan) {
+    if (kvOptions.isEmpty()) {
       return implicitTableOptions;
     }
-
-    // there is a hint, check fill default data and obtain the partition parallelism if supplied
-    Map<String, String> kvOptions = relHint.kvOptions;
 
     ImmutableTableOptions newTableOptions = ImmutableTableOptions.copyOf(implicitTableOptions);
     newTableOptions = overridePartitionKey(newTableOptions, tableScan, kvOptions);
