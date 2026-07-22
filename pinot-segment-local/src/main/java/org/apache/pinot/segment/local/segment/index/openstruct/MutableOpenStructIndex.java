@@ -63,7 +63,11 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   private final PinotDataBufferMemoryManager _memoryManager;
   private final int _capacity;
 
-  // Volatile for lock-free reader access; writer always holds the consuming-thread lock.
+  // Volatile copy-on-write: the writer (consuming thread) creates a fresh HashMap copy and publishes
+  // atomically via volatile write (see allocateKeyColumn). Readers see a consistent snapshot of the
+  // entire map. ConcurrentHashMap is NOT appropriate here — it would allow readers to observe
+  // partially-updated state during a put. Single-writer is guaranteed by the Pinot consuming thread
+  // model (one thread per partition).
   private volatile Map<String, MutableKeyColumn> _keyColumns = new HashMap<>();
   // Single-writer (see #index), but close() may run on a different thread, so volatile for
   // visibility; flushed to ServerMetrics on close() to avoid a metered-value call on every
@@ -119,7 +123,8 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         // Resolve stored type and coerce BEFORE allocating a column so a first-row coercion failure
         // does not allocate a column that was never usable.
         DataType resolvedType = resolveStoredType(key, rawValue, null);
-        Object coerced = tryCoerce(key, rawValue, resolvedType);
+        Object coerced = tryCoerce(key, rawValue,
+            ColumnDataType.fromDataTypeSV(resolvedType).toPinotDataType());
         if (coerced == null) {
           continue;
         }
@@ -128,10 +133,10 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         continue;
       }
 
-      // Re-resolve against the established type so a later unmappable value on a STRING key is
-      // metered too; for any other established type this is a no-op returning that type.
-      DataType storedType = resolveStoredType(key, rawValue, keyCol.getStoredType());
-      Object coerced = tryCoerce(key, rawValue, storedType);
+      // Re-resolve for its metering side effect only: on the established path resolveStoredType
+      // always returns keyCol's own stored type, so coercion uses the cached destType.
+      resolveStoredType(key, rawValue, keyCol.getStoredType());
+      Object coerced = tryCoerce(key, rawValue, keyCol.getDestType());
       if (coerced == null) {
         continue;
       }
@@ -176,10 +181,9 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   /// "null"-shaped raw value would also return null — but callers gate on rawValue != null before
   /// reaching here.
   @Nullable
-  private Object tryCoerce(String key, Object rawValue, DataType storedType) {
+  private Object tryCoerce(String key, Object rawValue, PinotDataType destType) {
     try {
       PinotDataType sourceType = PinotDataType.getSingleValueType(rawValue);
-      PinotDataType destType = ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
       return destType.convert(rawValue, sourceType);
     } catch (Exception e) {
       ServerMetrics serverMetrics = ServerMetrics.get();
