@@ -54,8 +54,6 @@ import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
 
 public class TableConfigBuilder {
-  private static final String DEFAULT_SEGMENT_PUSH_TYPE = "APPEND";
-  private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
   private static final String DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD = "7d";
   private static final String DEFAULT_NUM_REPLICAS = "1";
   private static final String MMAP_LOAD_MODE = "MMAP";
@@ -79,9 +77,8 @@ public class TableConfigBuilder {
   @Deprecated
   private String _segmentPushFrequency;
 
-  // TODO: Remove 'DEFAULT_SEGMENT_PUSH_TYPE' in the future major release.
   @Deprecated
-  private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
+  private String _segmentPushType = "APPEND";
   private String _peerSegmentDownloadScheme;
   @Deprecated
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
@@ -227,10 +224,10 @@ public class TableConfigBuilder {
    * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
   public TableConfigBuilder setSegmentPushType(String segmentPushType) {
-    if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
-      _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
+    if ("REFRESH".equalsIgnoreCase(segmentPushType)) {
+      _segmentPushType = "REFRESH";
     } else {
-      _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
+      _segmentPushType = "APPEND";
     }
     return this;
   }
