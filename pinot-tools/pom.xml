@@ -79,6 +79,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-bson</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-orc</artifactId>
     </dependency>
     <dependency>

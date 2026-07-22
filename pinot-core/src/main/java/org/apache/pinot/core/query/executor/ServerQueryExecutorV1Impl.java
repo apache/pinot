@@ -103,6 +103,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private ServerMetrics _serverMetrics;
   private SegmentPrunerService _segmentPrunerService;
   private PlanMaker _planMaker;
+  private PinotConfiguration _config;
   private long _defaultTimeoutMs;
   private boolean _enablePrefetch;
 
@@ -110,6 +111,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public synchronized void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
       ServerMetrics serverMetrics)
       throws ConfigurationException {
+    _config = config;
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
     LOGGER.info("Trying to build SegmentPrunerService");
@@ -131,6 +133,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceDataManager getInstanceDataManager() {
     return _instanceDataManager;
+  }
+
+  @Override
+  public PinotConfiguration getQueryExecutorConfig() {
+    return _config;
   }
 
   @Override

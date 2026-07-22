@@ -115,12 +115,12 @@
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
     <!--
-      Pinot services build against Java 21 by default. SPI/client modules consumed
+      Pinot services build against Java 25 by default. SPI/client modules consumed
       by external JVMs (pinot-spi, pinot-segment-spi, pinot-timeseries-spi,
       pinot-common, pinot-java-client, pinot-jdbc-client) hard-code Java 11
       bytecode in their own maven-compiler-plugin configuration.
     -->
-    <jdk.version>21</jdk.version>
+    <jdk.version>25</jdk.version>
     <!-- OS classifier for platform-specific protoc/grpc binaries, overridden by OS detection profiles -->
     <os.detected.classifier>linux-x86_64</os.detected.classifier>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -156,12 +156,13 @@
 
     <arrow.version>19.0.0</arrow.version>
     <avro.version>1.12.1</avro.version>
+    <bson.version>5.9.0</bson.version>
     <parquet.version>1.17.1</parquet.version>
-    <orc.version>1.9.8</orc.version>
+    <orc.version>1.9.9</orc.version>
     <hive.version>2.8.1</hive.version>
-    <helix.version>2.0.0</helix.version>
+    <helix.version>2.0.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.22.0</jackson.version>
+    <jackson.version>2.22.1</jackson.version>
     <zookeeper.version>3.9.5</zookeeper.version>
     <async-http-client.version>3.0.11</async-http-client.version>
     <jersey.version>2.48</jersey.version>
@@ -183,11 +184,11 @@
     <dropwizard-metrics.version>4.2.39</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
     <zstd-jni.version>1.5.7-11</zstd-jni.version>
-    <lz4-java.version>1.11.0</lz4-java.version>
-    <libthrift.version>0.23.0</libthrift.version>
-    <log4j.version>2.26.0</log4j.version>
+    <lz4-java.version>1.11.1</lz4-java.version>
+    <libthrift.version>0.24.0</libthrift.version>
+    <log4j.version>2.26.1</log4j.version>
     <slf4j.version>2.0.18</slf4j.version>
-    <netty.version>4.1.135.Final</netty.version>
+    <netty.version>4.1.136.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.4.0</h3.version>
@@ -197,9 +198,9 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.0</stax2-api.version>
-    <aws.sdk.version>2.46.17</aws.sdk.version>
+    <aws.sdk.version>2.48.4</aws.sdk.version>
     <azure.sdk.version>1.3.7</azure.sdk.version>
-    <azure.msal4j.version>1.25.0</azure.msal4j.version>
+    <azure.msal4j.version>1.25.1</azure.msal4j.version>
     <joda-time.version>2.14.2</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <ayza.version>10.0.5</ayza.version>
@@ -208,10 +209,10 @@
     <plexus-classworlds.version>2.12.0</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
-    <checker-qual.version>4.2.0</checker-qual.version>
+    <checker-qual.version>4.2.1</checker-qual.version>
     <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
-    <roaring-bitmap.version>1.6.14</roaring-bitmap.version>
+    <roaring-bitmap.version>1.6.15</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.6.0</prometheus.jmx-exporter.version>
     <prometheus.metrics.version>1.8.0</prometheus.metrics.version>
     <fastutil.version>8.5.18</fastutil.version>
@@ -219,17 +220,17 @@
     <snakeyaml.version>2.6</snakeyaml.version>
     <hadoop-shaded-protobuf_3_25.version>1.5.0</hadoop-shaded-protobuf_3_25.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
-    <datasketches-java.version>6.2.0</datasketches-java.version>
+    <datasketches-java.version>9.0.0</datasketches-java.version>
     <t-digest.version>3.2</t-digest.version>
     <picocli.version>4.7.7</picocli.version>
     <tyrus-standalone-client.version>2.2.2</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
 
-    <spark3.version>3.5.8</spark3.version>
+    <spark3.version>3.5.9</spark3.version>
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
-    <pulsar.version>4.0.11</pulsar.version>
+    <pulsar.version>4.0.12</pulsar.version>
     <flink.version>2.3.0</flink.version>
 
     <!-- Apache Commons Libraries -->
@@ -265,13 +266,13 @@
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <httpclient5.version>5.6.1</httpclient5.version>
+    <httpclient5.version>5.6.2</httpclient5.version>
     <httpcore5.version>5.4.3</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>4.35.1</protobuf.version>
-    <grpc.version>1.82.1</grpc.version>
-    <google.cloud.libraries.version>26.84.0</google.cloud.libraries.version>
+    <grpc.version>1.82.2</grpc.version>
+    <google.cloud.libraries.version>26.85.1</google.cloud.libraries.version>
     <opentelemetry.gcp.resources.version>1.58.0-alpha</opentelemetry.gcp.resources.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
@@ -296,8 +297,8 @@
     <fmpp.version>0.9.16</fmpp.version>
 
     <!-- Solve conflicts and vulnerabilities -->
-    <kerby.version>2.1.1</kerby.version>
-    <jline.version>4.2.1</jline.version>
+    <kerby.version>2.1.2</kerby.version>
+    <jline.version>4.3.1</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.6</jettison.version>
     <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
@@ -306,21 +307,21 @@
     <woodstox.version>7.2.1</woodstox.version>
     <curator.version>5.9.0</curator.version>
     <javassist.version>3.32.0-GA</javassist.version>
-    <bouncycastle.version>1.84</bouncycastle.version>
+    <bouncycastle.version>1.85</bouncycastle.version>
     <aircompressor.version>2.0.3</aircompressor.version>
     <jna.version>5.19.1</jna.version>
     <jnr-ffi.version>2.3.0</jnr-ffi.version>
     <jnr-constants.version>0.11.0</jnr-constants.version>
     <asm.version>9.10.1</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
-    <kotlin.stdlib.version>2.4.0</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.4.10</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
     <okio.version>3.17.0</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.5</objenesis.version>
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
-    <ivy.version>2.5.3</ivy.version>
+    <ivy.version>2.6.0</ivy.version>
     <c3p0.version>0.14.1</c3p0.version>
     <mchange-commons-java.version>0.6.1</mchange-commons-java.version>
     <animal-sniffer-annotations.version>1.27</animal-sniffer-annotations.version>
@@ -776,6 +777,11 @@
         <groupId>org.apache.avro</groupId>
         <artifactId>avro</artifactId>
         <version>${avro.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mongodb</groupId>
+        <artifactId>bson</artifactId>
+        <version>${bson.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -2453,8 +2459,8 @@
             <configuration>
               <rules>
                 <requireJavaVersion>
-                  <version>[21,)</version>
-                  <message>Apache Pinot requires JDK 21 or newer to build.</message>
+                  <version>[25,)</version>
+                  <message>Apache Pinot requires JDK 25 or newer to build.</message>
                 </requireJavaVersion>
               </rules>
               <fail>true</fail>

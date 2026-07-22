@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.logging.log4j.util.Strings;
@@ -69,7 +68,7 @@ public class RlsFiltersRewriter implements QueryRewriter {
     Expression existingFilterExpression = pinotQuery.getFilterExpression();
     if (existingFilterExpression != null) {
       Expression combinedFilterExpression =
-          RequestUtils.getFunctionExpression(FilterKind.AND.name(), List.of(expression, existingFilterExpression));
+          RequestUtils.getFunctionExpression(FilterKind.AND.name(), expression, existingFilterExpression);
       pinotQuery.setFilterExpression(combinedFilterExpression);
     } else {
       pinotQuery.setFilterExpression(expression);

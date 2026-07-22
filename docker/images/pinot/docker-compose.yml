@@ -50,6 +50,8 @@ services:
       # Cluster settings
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       CLUSTER_ID: pinot-kafka-cluster-001
+      # Persist Kafka logs to the mounted volume (default is /tmp/kraft-combined-logs, which is ephemeral)
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
       - ./pinot-docker-demo/kafka/data:/var/lib/kafka/data
   pinot-controller:
@@ -59,7 +61,7 @@ services:
       - ./pinot-docker-demo/pinot/controller:/tmp/data/controller
     ports:
       - "9000:9000"
-    command: StartController -zkAddress zookeeper:2181
+    command: StartController -zkAddress zookeeper:2181 -controllerHost pinot-controller -dataDir /tmp/data/controller
     depends_on:
       - zookeeper
       - kafka
@@ -68,7 +70,7 @@ services:
     hostname: pinot-broker
     ports:
       - "8099:8099"
-    command: StartBroker -zkAddress zookeeper:2181
+    command: StartBroker -zkAddress zookeeper:2181 -brokerHost pinot-broker
     depends_on:
       - zookeeper
       - kafka
@@ -80,7 +82,7 @@ services:
       - ./pinot-docker-demo/pinot/server:/tmp/data/server
     ports:
       - "8098:8098"
-    command: StartServer -zkAddress zookeeper:2181
+    command: StartServer -zkAddress zookeeper:2181 -serverHost pinot-server -dataDir /tmp/data/server/data -segmentDir /tmp/data/server/segments
     depends_on:
       - zookeeper
       - kafka
@@ -92,7 +94,7 @@ services:
       - ./pinot-docker-demo/pinot/minion:/tmp/data/minion
     ports:
       - "9514:9514"
-    command: StartMinion -zkAddress zookeeper:2181
+    command: StartMinion -zkAddress zookeeper:2181 -minionHost pinot-minion
     depends_on:
       - zookeeper
       - kafka

@@ -65,6 +65,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -333,9 +334,68 @@ public class MinionTaskUtilsTest {
         () -> MinionTaskUtils.parseValidDocIdsConsensusMode("INVALID_MODE"));
   }
 
-  /**
-   * Builds a RoaringBitmap with {@code numDocs} valid doc ids (0..numDocs-1).
-   */
+  @Test
+  public void testParseValidDocIdsValidationMode() {
+    // Blank/null defaults to STRICT
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode(null),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode(""),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("  "),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+
+    // Case-insensitive parsing
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("STRICT"),
+        MinionConstants.ValidDocIdsValidationMode.STRICT);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("executor_only"),
+        MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY);
+    assertEquals(MinionTaskUtils.parseValidDocIdsValidationMode("  EXECUTOR_ONLY  "),
+        MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY);
+
+    expectThrows(IllegalArgumentException.class,
+        () -> MinionTaskUtils.parseValidDocIdsValidationMode("INVALID_MODE"));
+  }
+
+  @Test
+  public void testResolveGeneratorConsensusMode() {
+    // EXECUTOR_ONLY downgrades the generator to UNSAFE regardless of the configured consensus mode.
+    for (MinionConstants.ValidDocIdsConsensusMode mode : MinionConstants.ValidDocIdsConsensusMode.values()) {
+      assertEquals(
+          MinionTaskUtils.resolveGeneratorConsensusMode(mode, MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY),
+          MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+      // STRICT keeps the configured mode.
+      assertEquals(
+          MinionTaskUtils.resolveGeneratorConsensusMode(mode, MinionConstants.ValidDocIdsValidationMode.STRICT), mode);
+    }
+  }
+
+  @Test
+  public void testCrcMatches() {
+    assertTrue(MinionTaskUtils.crcMatches(1000, 5000, 1000, 9999));
+    assertTrue(MinionTaskUtils.crcMatches(1000, 5000, 2000, 5000));
+    assertFalse(MinionTaskUtils.crcMatches(1000, 5000, 2000, 9999));
+    assertFalse(MinionTaskUtils.crcMatches(1000, 5000, 2000, -1));
+    assertFalse(MinionTaskUtils.crcMatches(1000, -1, 2000, 5000));
+    assertFalse(MinionTaskUtils.crcMatches(1000, -1, 2000, -1));
+  }
+
+  @Test
+  public void testExecutorDataCrcFallbackMatch() {
+    List<Object> responses = List.of(makeResponse("seg1", "2000", "5000", "server1", makeBitmap(4)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000",
+        "5000", "UNSAFE", responses, new String[]{"server1"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 4);
+  }
+
+  @Test
+  public void testExecutorDataCrcMismatchSkips() {
+    List<Object> responses = List.of(makeResponse("seg1", "2000", "9999", "server1", makeBitmap(4)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000",
+        "5000", "UNSAFE", responses, new String[]{"server1"}, this);
+    assertNull(result);
+  }
+
   private static RoaringBitmap makeBitmap(int numDocs) {
     RoaringBitmap b = new RoaringBitmap();
     for (int i = 0; i < numDocs; i++) {
@@ -349,7 +409,13 @@ public class MinionTaskUtilsTest {
    */
   private static ValidDocIdsBitmapResponse makeResponse(String segmentName, String crc, String instanceId,
       RoaringBitmap bitmap) {
-    return new ValidDocIdsBitmapResponse(segmentName, crc, ValidDocIdsType.SNAPSHOT,
+    return new ValidDocIdsBitmapResponse(segmentName, crc, null, ValidDocIdsType.SNAPSHOT,
+        RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD);
+  }
+
+  private static ValidDocIdsBitmapResponse makeResponse(String segmentName, String crc, String dataCrc,
+      String instanceId, RoaringBitmap bitmap) {
+    return new ValidDocIdsBitmapResponse(segmentName, crc, dataCrc, ValidDocIdsType.SNAPSHOT,
         RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD);
   }
 
@@ -395,6 +461,13 @@ public class MinionTaskUtilsTest {
   private static RoaringBitmap getValidDocIdFromServerMatchingCrcWithMockedReader(String tableName,
       String segmentName, String expectedCrc, String consensusMode, List<Object> responseOrThrowByCallOrder,
       String[] servers, MinionTaskUtilsTest testInstance) {
+    return getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc, null, consensusMode,
+        responseOrThrowByCallOrder, servers, testInstance);
+  }
+
+  private static RoaringBitmap getValidDocIdFromServerMatchingCrcWithMockedReader(String tableName,
+      String segmentName, String expectedCrc, String expectedDataCrc, String consensusMode,
+      List<Object> responseOrThrowByCallOrder, String[] servers, MinionTaskUtilsTest testInstance) {
     testInstance.setupMinionContextWithServers(tableName, segmentName, servers);
     // Shared across all mock instances (production creates one reader per server).
     AtomicInteger callIndex = new AtomicInteger(0);
@@ -414,7 +487,7 @@ public class MinionTaskUtilsTest {
               });
         })) {
       return MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableName, segmentName,
-          ValidDocIdsType.SNAPSHOT.name(), MinionContext.getInstance(), expectedCrc, consensusMode);
+          ValidDocIdsType.SNAPSHOT.name(), MinionContext.getInstance(), expectedCrc, expectedDataCrc, consensusMode);
     }
   }
 

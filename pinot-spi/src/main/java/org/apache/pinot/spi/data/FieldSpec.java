@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -37,12 +38,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -170,6 +174,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   @Nullable
   protected List<String> _aliases;
 
+  // Optional, free-form per-column metadata. It is additive, excluded from backward-compatibility
+  // checks, and omitted from serialization when unset/empty. The keys and their interpretation are
+  // defined by whoever populates it; the core schema attaches no semantics to it.
+  @JsonProperty("metadata")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  protected Map<String, String> _metadata;
+
   protected String _name;
   protected DataType _dataType;
   protected boolean _singleValueField = true;
@@ -247,7 +259,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public void setTags(@Nullable List<String> tags) {
-    _tags = tags;
+    _tags = CollectionUtils.isEmpty(tags) ? null : tags;
   }
 
   @Nullable
@@ -265,7 +277,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public void setAliases(@Nullable List<String> aliases) {
-    _aliases = aliases == null || aliases.isEmpty() ? null : aliases;
+    _aliases = CollectionUtils.isEmpty(aliases) ? null : aliases;
+  }
+
+  @Nullable
+  public Map<String, String> getMetadata() {
+    return _metadata;
+  }
+
+  public void setMetadata(@Nullable Map<String, String> metadata) {
+    _metadata = MapUtils.isEmpty(metadata) ? null : metadata;
   }
 
   public DataType getDataType() {
@@ -416,8 +437,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return _defaultNullValue;
   }
 
+  @JsonIgnore
   public String getDefaultNullValueString() {
-    return getStringValue(_defaultNullValue);
+    return _dataType.toString(_defaultNullValue);
   }
 
   /// Returns the [String] representation of the given object.
@@ -513,6 +535,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_JSON;
             case BYTES:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+            case UUID:
+              // The nil UUID is the default null sentinel. Tables that ingest nil UUID as a real value should enable
+              // column-based null handling to distinguish it from null rows.
+              return UuidUtils.nullUuidBytes();
             case BIG_DECIMAL:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL;
             default:
@@ -617,7 +643,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return jsonObject;
   }
 
-  /// Appends `fieldId` and `aliases` (when set) to the given JSON object.
+  /// Appends `fieldId`, `aliases`, and `metadata` (when set) to the given JSON object.
   ///
   /// Subclasses that build JSON without calling [FieldSpec#toJsonObject()], such as [TimeFieldSpec], use this helper
   /// to preserve these fields during schema round-trip serialization.
@@ -631,6 +657,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         aliasesArray.add(alias);
       }
       jsonObject.set("aliases", aliasesArray);
+    }
+    if (MapUtils.isNotEmpty(_metadata)) {
+      ObjectNode metadataNode = jsonObject.putObject("metadata");
+      for (Map.Entry<String, String> entry : _metadata.entrySet()) {
+        metadataNode.put(entry.getKey(), entry.getValue());
+      }
     }
   }
 
@@ -666,6 +698,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           break;
         case BYTES:
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
+          break;
+        case UUID:
+          jsonNode.put(key, UuidUtils.toString((byte[]) _defaultNullValue));
           break;
         case MAP:
         case OPEN_STRUCT:
@@ -706,14 +741,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && Objects.equals(_description, that._description)
         && Objects.equals(_tags, that._tags)
         && Objects.equals(_fieldId, that._fieldId)
-        && Objects.equals(_aliases, that._aliases);
+        && Objects.equals(_aliases, that._aliases)
+        && Objects.equals(_metadata, that._metadata);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
         _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider,
-        _description, _tags, _fieldId, _aliases);
+        _description, _tags, _fieldId, _aliases, _metadata);
   }
 
   /**
@@ -729,52 +765,73 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     DIMENSION, METRIC, TIME, DATE_TIME, COMPLEX
   }
 
-  /**
-   * The <code>DataType</code> enum is used to demonstrate the data type of a field.
-   */
+  /// The `DataType` enum represents the data type of a field.
+  ///
+  /// A value of a given type is held in memory as a fixed Java class, and every value-handling method on this enum
+  /// (`convert`, `equals`, `hashCode`, `compare`, `toString`) expects and produces that representation:
+  /// - `INT` → [Integer]
+  /// - `LONG` → [Long]
+  /// - `FLOAT` → [Float]
+  /// - `DOUBLE` → [Double]
+  /// - `BIG_DECIMAL` → [BigDecimal]
+  /// - `BOOLEAN` → [Integer] (`0` or `1`)
+  /// - `TIMESTAMP` → [Long] (epoch millis)
+  /// - `STRING` / `JSON` → [String]
+  /// - `BYTES` → `byte[]`
+  /// - `UUID` → `byte[]` (fixed 16-byte big-endian form)
+  /// - `MAP` / `OPEN_STRUCT` → [Map]
+  /// - `LIST` → [List]
+  ///
+  /// `convertInternal` is the exception: it returns the internal storage form, which for `BYTES` and `UUID` is
+  /// [ByteArray] rather than `byte[]`.
   @SuppressWarnings("rawtypes")
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT(Integer.BYTES, true, true),
-    LONG(Long.BYTES, true, true),
-    FLOAT(Float.BYTES, true, true),
-    DOUBLE(Double.BYTES, true, true),
-    BIG_DECIMAL(true, true),
-    BOOLEAN(INT, false, true),
-    TIMESTAMP(LONG, false, true),
-    STRING(false, true),
-    JSON(STRING, false, false),
-    BYTES(false, false),
-    STRUCT(false, false),
-    MAP(false, false),
-    OPEN_STRUCT(false, false),
-    LIST(false, false),
-    UNKNOWN(false, true);
+    INT(Integer.BYTES, true),
+    LONG(Long.BYTES, true),
+    FLOAT(Float.BYTES, true),
+    DOUBLE(Double.BYTES, true),
+    BIG_DECIMAL(true),
+    BOOLEAN(INT, false),
+    TIMESTAMP(LONG, false),
+    STRING(false),
+    JSON(STRING, false),
+    BYTES(false),
+    // UUID is a logical type stored as fixed-width 16-byte BYTES, kept right after its stored type BYTES.
+    UUID(BYTES, UuidUtils.UUID_NUM_BYTES, false),
+    STRUCT(false),
+    MAP(false),
+    OPEN_STRUCT(false),
+    LIST(false),
+    UNKNOWN(false);
 
     private final DataType _storedType;
     private final int _size;
-    private final boolean _sortable;
     private final boolean _numeric;
 
-    DataType(boolean numeric, boolean sortable) {
+    DataType(boolean numeric) {
       _storedType = this;
       _size = -1;
-      _sortable = sortable;
       _numeric = numeric;
     }
 
-    DataType(DataType storedType, boolean numeric, boolean sortable) {
-      _storedType = storedType;
-      _size = storedType._size;
-      _sortable = sortable;
-      _numeric = numeric;
-    }
-
-    DataType(int size, boolean numeric, boolean sortable) {
+    DataType(int size, boolean numeric) {
       _storedType = this;
       _size = size;
-      _sortable = sortable;
+      _numeric = numeric;
+    }
+
+    DataType(DataType storedType, boolean numeric) {
+      _storedType = storedType;
+      _size = storedType._size;
+      _numeric = numeric;
+    }
+
+    // Logical type stored as another type with an explicit fixed size (e.g. UUID stored as fixed 16-byte BYTES).
+    DataType(DataType storedType, int size, boolean numeric) {
+      _storedType = storedType;
+      _size = size;
       _numeric = numeric;
     }
 
@@ -822,7 +879,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Converts the given string value to the data type. Returns byte[] for BYTES.
+     * Converts the given string value to the data type. Returns byte[] for BYTES and UUID.
      */
     public Object convert(String value) {
       try {
@@ -846,6 +903,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toBytes(value);
+          case UUID:
+            return UuidUtils.toBytes(value);
           case MAP:
           case OPEN_STRUCT:
             return JsonUtils.stringToObject(value, Map.class);
@@ -860,11 +919,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     public boolean equals(Object value1, Object value2) {
-      return this == BYTES ? Arrays.equals((byte[]) value1, (byte[]) value2) : value1.equals(value2);
+      return this == BYTES || this == UUID ? Arrays.equals((byte[]) value1, (byte[]) value2) : value1.equals(value2);
     }
 
     public int hashCode(Object value) {
-      return this == BYTES ? Arrays.hashCode((byte[]) value) : value.hashCode();
+      return this == BYTES || this == UUID ? Arrays.hashCode((byte[]) value) : value.hashCode();
     }
 
     /**
@@ -877,8 +936,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     public int compare(Object value1, Object value2) {
       switch (this) {
         case INT:
+        case BOOLEAN:
           return Integer.compare((int) value1, (int) value2);
         case LONG:
+        case TIMESTAMP:
           return Long.compare((long) value1, (long) value2);
         case FLOAT:
           return Float.compare((float) value1, (float) value2);
@@ -886,14 +947,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           return Double.compare((double) value1, (double) value2);
         case BIG_DECIMAL:
           return ((BigDecimal) value1).compareTo((BigDecimal) value2);
-        case BOOLEAN:
-          return Boolean.compare((boolean) value1, (boolean) value2);
-        case TIMESTAMP:
-          return Long.compare((long) value1, (long) value2);
         case STRING:
         case JSON:
           return ((String) value1).compareTo((String) value2);
         case BYTES:
+        case UUID:
           return ByteArray.compare((byte[]) value1, (byte[]) value2);
         case MAP:
         case OPEN_STRUCT:
@@ -905,7 +963,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Converts the given value of the data type to string.The input value for BYTES type should be byte[].
+     * Converts the given value of the data type to string. The input value for BYTES/UUID should be byte[].
      */
     public String toString(Object value) {
       if (this == BIG_DECIMAL) {
@@ -913,6 +971,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       }
       if (this == BYTES) {
         return BytesUtils.toHexString((byte[]) value);
+      }
+      if (this == UUID) {
+        return UuidUtils.toString((byte[]) value);
       }
       if (this == MAP || this == OPEN_STRUCT || this == LIST) {
         try {
@@ -925,7 +986,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Converts the given string value to the data type. Returns ByteArray for BYTES.
+     * Converts the given string value to the data type. Returns ByteArray for BYTES and UUID.
      */
     public Comparable convertInternal(String value) {
       try {
@@ -949,6 +1010,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toByteArray(value);
+          case UUID:
+            return new ByteArray(UuidUtils.toBytes(value));
           case MAP:
           case OPEN_STRUCT:
           case LIST:
@@ -959,13 +1022,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       } catch (Exception e) {
         throw new IllegalArgumentException("Cannot convert value: '" + value + "' to type: " + this);
       }
-    }
-
-    /**
-     * Checks whether the data type can be a sorted column.
-     */
-    public boolean canBeASortedColumn() {
-      return _sortable;
     }
   }
 
@@ -1022,19 +1078,17 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class DataTypeProperties {
     @JsonProperty("storedType")
     public final DataType _storedType;
     @JsonProperty("size")
     public final int _size;
-    @JsonProperty("sortable")
-    public final boolean _sortable;
     @JsonProperty("numeric")
     public final boolean _numeric;
 
     public DataTypeProperties(DataType dataType) {
       _storedType = dataType._storedType;
-      _sortable = dataType._sortable;
       _numeric = dataType._numeric;
       _size = dataType._size;
     }

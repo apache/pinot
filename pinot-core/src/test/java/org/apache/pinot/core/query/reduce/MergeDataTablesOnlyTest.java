@@ -118,6 +118,34 @@ public class MergeDataTablesOnlyTest {
     assertRoundTrip(query, serverTables);
   }
 
+  /// Verifies that a GROUP BY query selecting DISTINCTCOUNT keeps OBJECT aggregate state re-mergeable.
+  @Test
+  public void testGroupByDistinctCountObjectRoundTrip()
+      throws IOException {
+    String query = "SELECT col1, DISTINCTCOUNT(col2) FROM testTable GROUP BY col1";
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    BrokerResponseNative baseline = reduce(brokerRequest, toMap(buildDistinctCountServerTables(query)));
+    DataTable merged = merge(brokerRequest, toMap(buildDistinctCountServerTables(query)));
+    assertNotNull(merged, "merge produced null");
+    BrokerResponseNative viaMerge = reduce(brokerRequest, singletonMap(merged));
+    assertResultTablesEquivalent(baseline.getResultTable(), viaMerge.getResultTable());
+  }
+
+  /// Two per-server intermediate DataTables for selecting `DISTINCTCOUNT(col2)` grouped by `col1`.
+  private static List<DataTable> buildDistinctCountServerTables(String query)
+      throws IOException {
+    AggregationFunction aggFunction = aggFunctions(query)[0];
+    DataSchema schema = new DataSchema(new String[]{"col1", "distinctcount(col2)"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.OBJECT});
+    return List.of(
+        buildGroupByWithObject(schema, aggFunction,
+            new Object[]{1, new IntOpenHashSet(new int[]{1, 2, 3})},
+            new Object[]{2, new IntOpenHashSet(new int[]{4, 5})}),
+        buildGroupByWithObject(schema, aggFunction,
+            new Object[]{1, new IntOpenHashSet(new int[]{3, 4, 5})},
+            new Object[]{3, new IntOpenHashSet(new int[]{6, 7})}));
+  }
+
   @Test
   public void testDistinctRoundTrip() {
     String query = "SELECT DISTINCT col1 FROM testTable";
@@ -148,6 +176,18 @@ public class MergeDataTablesOnlyTest {
     DataSchema schema = new DataSchema(new String[]{"col1", "count(*)"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
     Map<ServerRoutingInstance, DataTable> map = singletonMap(buildGroupBy(schema, new Object[][]{{1, 2L}}));
+    assertThrows(UnsupportedOperationException.class, () -> merge(brokerRequest, map));
+  }
+
+  @Test
+  public void testGroupByServerReturnFinalResultKeyUnpartitionedRejected() {
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+        "SELECT col1, DISTINCTCOUNT(col2) FROM testTable GROUP BY col1");
+    brokerRequest.getPinotQuery()
+        .putToQueryOptions(Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED, "true");
+    DataSchema schema = new DataSchema(new String[]{"col1", "distinctcount(col2)"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    Map<ServerRoutingInstance, DataTable> map = singletonMap(buildGroupBy(schema, new Object[][]{{1, 2}}));
     assertThrows(UnsupportedOperationException.class, () -> merge(brokerRequest, map));
   }
 
@@ -487,6 +527,27 @@ public class MergeDataTablesOnlyTest {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Builds a GROUP BY DataTable with one INT key column followed by one OBJECT aggregate column whose
+   * value is the intermediate {@code Set} (or other aggregate state) the server would have emitted.
+   * Mirrors what {@code GroupByResultsBlock.getDataTable()} produces on the server side for the
+   * non-null-handling path: scalar key written directly, OBJECT column written via
+   * {@code serializeIntermediateResult}.
+   */
+  private static DataTable buildGroupByWithObject(DataSchema schema, AggregationFunction aggFunction,
+      Object[]... rows)
+      throws IOException {
+    DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(schema);
+    for (Object[] row : rows) {
+      builder.startRow();
+      // Single INT key column at index 0; OBJECT aggregate intermediate at index 1.
+      builder.setColumn(0, (int) row[0]);
+      builder.setColumn(1, aggFunction.serializeIntermediateResult(row[1]));
+      builder.finishRow();
+    }
+    return builder.build();
   }
 
   private static DataTable buildObjectRow(DataSchema schema, AggregationFunction aggFunction, Object intermediate)

@@ -210,7 +210,6 @@ public final class TableConfigUtils {
 
     if (!skipTypes.contains(ValidationType.UPSERT)) {
       validateUpsertAndDedupConfig(tableConfig, schema);
-      validatePartialUpsertStrategies(tableConfig, schema);
     }
 
     validateTaskConfig(tableConfig);
@@ -443,325 +442,371 @@ public final class TableConfigUtils {
         || CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme);
   }
 
-  /**
-   * Validates the following:
-   * 1. validity of filter function
-   * 2. checks for duplicate transform configs
-   * 3. checks for null column name or transform function in transform config
-   * 4. validity of transform function string
-   * 5. checks for source fields used in destination columns
-   * 6. ingestion type for dimension tables
-   */
+  /// Validates the table's [IngestionConfig] together with the closely related metrics-aggregation config, covering:
+  /// - Metrics aggregation (both the `aggregateMetrics` flag and ingestion `aggregationConfigs`), delegated to
+  ///   [#validateMetricsAggregation].
+  /// - Batch ingestion: each batch config map is well-formed, and a dimension table has batch ingestion configured
+  ///   with `REFRESH` segment ingestion type.
+  /// - Stream ingestion: streams are declared in only one place, at least one stream is present, and pauseless
+  ///   consumption has a valid `peerSegmentDownloadScheme`.
+  /// - Filter config: the filter function is valid and not a disabled Groovy expression.
+  /// - Source field configs: no source field is duplicated within the same complex-type phase.
+  /// - Enrichment configs: each config is valid.
+  /// - Transform configs: non-null column and function, no duplicate destination, and each destination is a schema
+  ///   column, an intermediate consumed by another transform, or an aggregation source column; the function is valid
+  ///   and does not reference its own destination.
+  /// - Complex-type config: no schema field collides with a `prefixesToRename` prefix.
+  /// - Schema-conforming transformer config.
   @VisibleForTesting
   public static void validateIngestionConfig(TableConfig tableConfig, Schema schema) {
+    // All metrics-aggregation validation lives here; it returns the columns referenced as aggregation sources, which
+    // a transform config is allowed to target as its destination (see the transform validation below).
+    Set<String> aggregationSourceColumns = validateMetricsAggregation(tableConfig, schema);
+
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null) {
+      return;
+    }
 
-    if (ingestionConfig != null) {
-      String tableNameWithType = tableConfig.getTableName();
+    String tableNameWithType = tableConfig.getTableName();
 
-      // Batch
-      if (ingestionConfig.getBatchIngestionConfig() != null) {
-        BatchIngestionConfig cfg = ingestionConfig.getBatchIngestionConfig();
-        List<Map<String, String>> batchConfigMaps = cfg.getBatchConfigMaps();
-        try {
-          if (CollectionUtils.isNotEmpty(batchConfigMaps)) {
-            // Validate that BatchConfig can be created
-            batchConfigMaps.forEach(b -> new BatchConfig(tableNameWithType, b));
-          }
-        } catch (Exception e) {
-          throw new IllegalStateException("Could not create BatchConfig using the batchConfig map", e);
+    // Batch
+    if (ingestionConfig.getBatchIngestionConfig() != null) {
+      BatchIngestionConfig cfg = ingestionConfig.getBatchIngestionConfig();
+      List<Map<String, String>> batchConfigMaps = cfg.getBatchConfigMaps();
+      try {
+        if (CollectionUtils.isNotEmpty(batchConfigMaps)) {
+          // Validate that BatchConfig can be created
+          batchConfigMaps.forEach(b -> new BatchConfig(tableNameWithType, b));
         }
-        if (tableConfig.isDimTable()) {
-          Preconditions.checkState(cfg.getSegmentIngestionType().equalsIgnoreCase("REFRESH"),
-              "Dimension tables must have segment ingestion type REFRESH");
-        }
+      } catch (Exception e) {
+        throw new IllegalStateException("Could not create BatchConfig using the batchConfig map", e);
       }
       if (tableConfig.isDimTable()) {
-        Preconditions.checkState(ingestionConfig.getBatchIngestionConfig() != null,
-            "Dimension tables must have batch ingestion configuration");
-      }
-
-      // Stream
-      // stream config map can either be in ingestion config or indexing config. cannot be in both places
-      if (ingestionConfig.getStreamIngestionConfig() != null) {
-        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-        Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
-            "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
-        StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
-        List<Map<String, String>> streamConfigMaps = streamIngestionConfig.getStreamConfigMaps();
-        Preconditions.checkState(!streamConfigMaps.isEmpty(), "Must have at least 1 stream in REALTIME table");
-        // TODO: for multiple stream configs, validate them
-
-        boolean isPauselessEnabled = streamIngestionConfig.isPauselessConsumptionEnabled();
-        if (isPauselessEnabled) {
-          int replication = tableConfig.getReplication();
-          // We are checking for this only when replication is greater than 1 because in test environments
-          // users still prefer to create pauseless tables with replication 1
-          if (replication > 1) {
-            String peerSegmentDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
-            Preconditions.checkState(StringUtils.isNotEmpty(peerSegmentDownloadScheme) && isValidPeerDownloadScheme(
-                    peerSegmentDownloadScheme),
-                "Must have a valid peerSegmentDownloadScheme set in validation config for pauseless consumption");
-          } else {
-            LOGGER.warn("It's not recommended to create pauseless tables with replication 1 for stability reasons.");
-          }
-        }
-      }
-
-      // Filter config
-      FilterConfig filterConfig = ingestionConfig.getFilterConfig();
-      if (filterConfig != null) {
-        String filterFunction = filterConfig.getFilterFunction();
-        if (filterFunction != null) {
-          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
-            throw new IllegalStateException(
-                "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
-          }
-          try {
-            FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Invalid filter function '" + filterFunction + "', exception: " + e.getMessage(), e);
-          }
-        }
-      }
-
-      // Aggregation configs
-      List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
-      Set<String> aggregationSourceColumns = new HashSet<>();
-      if (CollectionUtils.isNotEmpty(aggregationConfigs)) {
-        Preconditions.checkState(!tableConfig.getIndexingConfig().isAggregateMetrics(),
-            "aggregateMetrics cannot be set with AggregationConfig");
-        Set<String> aggregationColumns = new HashSet<>();
-        for (AggregationConfig aggregationConfig : aggregationConfigs) {
-          String columnName = aggregationConfig.getColumnName();
-          String aggregationFunction = aggregationConfig.getAggregationFunction();
-          if (columnName == null || aggregationFunction == null) {
-            throw new IllegalStateException(
-                "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
-          }
-
-          FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-          Preconditions.checkState(fieldSpec != null,
-              "The destination column '" + columnName + "' of the aggregation function must be present in the schema");
-          Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
-              "The destination column '" + columnName + "' of the aggregation function must be a metric column");
-          DataType dataType = fieldSpec.getDataType();
-
-          if (!aggregationColumns.add(columnName)) {
-            throw new IllegalStateException("Duplicate aggregation config found for column '" + columnName + "'");
-          }
-          ExpressionContext expressionContext;
-          try {
-            expressionContext = RequestContextUtils.getExpression(aggregationConfig.getAggregationFunction());
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Invalid aggregation function '" + aggregationFunction + "' for column '" + columnName + "'", e);
-          }
-          Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
-              "aggregation function must be a function for: %s", aggregationConfig);
-
-          FunctionContext functionContext = expressionContext.getFunction();
-          AggregationFunctionType functionType =
-              AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
-          List<ExpressionContext> arguments = functionContext.getArguments();
-          int numArguments = arguments.size();
-          if (functionType == DISTINCTCOUNTHLL) {
-            Preconditions.checkState(numArguments >= 1 && numArguments <= 2,
-                "DISTINCT_COUNT_HLL can have at most two arguments: %s", aggregationConfig);
-            if (numArguments == 2) {
-              ExpressionContext secondArgument = arguments.get(1);
-              Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
-                  "Second argument of DISTINCT_COUNT_HLL must be literal: %s", aggregationConfig);
-              String literal = secondArgument.getLiteral().getStringValue();
-              Preconditions.checkState(StringUtils.isNumeric(literal),
-                  "Second argument of DISTINCT_COUNT_HLL must be a number: %s", aggregationConfig);
-            }
-            Preconditions.checkState(dataType == DataType.BYTES, "Result type for DISTINCT_COUNT_HLL must be BYTES: %s",
-                aggregationConfig);
-          } else if (functionType == DISTINCTCOUNTHLLPLUS) {
-            Preconditions.checkState(numArguments >= 1 && numArguments <= 3,
-                "DISTINCT_COUNT_HLL_PLUS can have at most three arguments: %s", aggregationConfig);
-            if (numArguments == 2) {
-              ExpressionContext secondArgument = arguments.get(1);
-              Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
-                  "Second argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
-              String literal = secondArgument.getLiteral().getStringValue();
-              Preconditions.checkState(StringUtils.isNumeric(literal),
-                  "Second argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
-            }
-            if (numArguments == 3) {
-              ExpressionContext thirdArgument = arguments.get(2);
-              Preconditions.checkState(thirdArgument.getType() == ExpressionContext.Type.LITERAL,
-                  "Third argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
-              String literal = thirdArgument.getLiteral().getStringValue();
-              Preconditions.checkState(StringUtils.isNumeric(literal),
-                  "Third argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
-            }
-            Preconditions.checkState(dataType == DataType.BYTES,
-                "Result type for DISTINCT_COUNT_HLL_PLUS must be BYTES: %s", aggregationConfig);
-          } else if (functionType == SUMPRECISION) {
-            Preconditions.checkState(numArguments >= 2 && numArguments <= 3,
-                "SUM_PRECISION must specify precision (required), scale (optional): %s", aggregationConfig);
-            ExpressionContext secondArgument = arguments.get(1);
-            Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
-                "Second argument of SUM_PRECISION must be literal: %s", aggregationConfig);
-            String literal = secondArgument.getLiteral().getStringValue();
-            Preconditions.checkState(StringUtils.isNumeric(literal),
-                "Second argument of SUM_PRECISION must be a number: %s", aggregationConfig);
-            Preconditions.checkState(dataType == DataType.BIG_DECIMAL || dataType == DataType.BYTES,
-                "Result type for SUM_PRECISION must be BIG_DECIMAL or BYTES: %s", aggregationConfig);
-          } else {
-            Preconditions.checkState(numArguments == 1, "%s can only have one argument: %s", functionType,
-                aggregationConfig);
-          }
-          ExpressionContext firstArgument = arguments.get(0);
-          Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
-              "First argument of aggregation function: %s must be identifier, got: %s", functionType,
-              firstArgument.getType());
-          // Create a ValueAggregator for the aggregation function and check if it is supported for ingestion (fixed
-          // size aggregated value).
-          ValueAggregator<?, ?> valueAggregator;
-          try {
-            valueAggregator =
-                ValueAggregatorFactory.getValueAggregator(functionType, arguments.subList(1, numArguments));
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Caught exception while creating ValueAggregator for aggregation function: " + aggregationFunction, e);
-          }
-          Preconditions.checkState(valueAggregator.isAggregatedValueFixedSize(),
-              "Aggregation function: %s must have fixed size aggregated value", aggregationFunction);
-
-          aggregationSourceColumns.add(firstArgument.getIdentifier());
-        }
-        Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
-            "all metric columns must be aggregated");
-
-        // This is required by MutableSegmentImpl.enableMetricsAggregationIfPossible().
-        // That code will disable ingestion aggregation if all metrics aren't noDictionaryColumns.
-        // But if you do that after the table is already created, all future aggregations will
-        // just be the default value.
-        Map<String, DictionaryIndexConfig> configPerCol = StandardIndexes.dictionary().getConfig(tableConfig, schema);
-        aggregationColumns.forEach(column -> {
-          DictionaryIndexConfig dictConfig = configPerCol.get(column);
-          Preconditions.checkState(dictConfig != null && dictConfig.isDisabled(),
-              "Aggregated column: %s must be a no-dictionary column", column);
-        });
-      }
-
-      // Source field configs
-      List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
-      if (sourceFieldConfigs != null) {
-        // A source field can be configured once per phase (pre- and post-complex-type), but not twice within the same
-        // phase, because that would yield two DataTypeTransformers targeting it in the same phase, which is ambiguous.
-        Set<String> preComplexTypeFieldNames = new HashSet<>();
-        Set<String> postComplexTypeFieldNames = new HashSet<>();
-        for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
-          String name = sourceFieldConfig.getName();
-          boolean preComplexTypeTransform = sourceFieldConfig.isPreComplexTypeTransform();
-          Set<String> fieldNames = preComplexTypeTransform ? preComplexTypeFieldNames : postComplexTypeFieldNames;
-          Preconditions.checkState(fieldNames.add(name),
-              "Duplicate SourceFieldConfig found for source field: %s (preComplexTypeTransform: %s)", name,
-              preComplexTypeTransform);
-        }
-      }
-
-      // Enrichment configs
-      List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
-      if (enrichmentConfigs != null) {
-        for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
-          RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
-              new RecordEnricherValidationConfig(_disableGroovy));
-        }
-      }
-
-      // Transform configs
-      List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
-      if (transformConfigs != null) {
-        // Pre-pass: collect every column referenced as a transform-function argument. A transform whose destination
-        // is not in the schema is still valid when another transform consumes it as an input - i.e. it is an
-        // intermediate ("derived") column. This enables chained / parse-once transforms, e.g.
-        //   message_obj = jsonExtractObject(message)              // intermediate, not in the schema
-        //   level       = JSONPATHSTRING(message_obj, '$.level')  // consumes the intermediate
-        // The intermediate is materialized in the record during transformation and dropped before indexing (only
-        // schema columns are indexed). Unreferenced non-schema destinations still fail below (typo protection).
-        Set<String> transformInputColumns = new HashSet<>();
-        for (TransformConfig transformConfig : transformConfigs) {
-          String transformFunction = transformConfig.getTransformFunction();
-          // Skip Groovy expressions when Groovy is disabled: do not compile them just to collect arguments (the main
-          // loop below rejects Groovy without compiling). Such a config is rejected anyway, so these columns are not
-          // needed as valid intermediate targets.
-          if (transformFunction != null
-              && !(_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction))) {
-            try {
-              transformInputColumns.addAll(
-                  FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction).getArguments());
-            } catch (Exception ignore) {
-              // Invalid functions are reported with a descriptive error in the main loop below.
-            }
-          }
-        }
-        Set<String> transformColumns = new HashSet<>();
-        for (TransformConfig transformConfig : transformConfigs) {
-          String columnName = transformConfig.getColumnName();
-          String transformFunction = transformConfig.getTransformFunction();
-          if (columnName == null || transformFunction == null) {
-            throw new IllegalStateException(
-                "columnName/transformFunction cannot be null in TransformConfig " + transformConfig);
-          }
-          if (!transformColumns.add(columnName)) {
-            throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
-          }
-          Preconditions.checkState(
-              schema.hasColumn(columnName) || aggregationSourceColumns.contains(columnName)
-                  || transformInputColumns.contains(columnName),
-              "The destination column '" + columnName
-                  + "' of the transform function must be present in the schema, be consumed as the input of another "
-                  + "transform function, or be a source column for aggregations");
-          FunctionEvaluator expressionEvaluator;
-          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
-            throw new IllegalStateException(
-                "Groovy transform functions are disabled for table config. Found '" + transformFunction
-                    + "' for column '" + columnName + "'");
-          }
-          try {
-            expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "', exception: "
-                    + e.getMessage(), e);
-          }
-          List<String> arguments = expressionEvaluator.getArguments();
-          if (arguments.contains(columnName)) {
-            throw new IllegalStateException(
-                "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
-                    + columnName + "'");
-          }
-        }
-      }
-
-      // Complex configs
-      ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
-      if (complexTypeConfig != null) {
-        Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
-        if (MapUtils.isNotEmpty(prefixesToRename)) {
-          Set<String> fieldNames = schema.getColumnNames();
-          for (String prefix : prefixesToRename.keySet()) {
-            for (String field : fieldNames) {
-              Preconditions.checkState(!field.startsWith(prefix),
-                  "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
-                      + " config. Name conflict with field: " + field + " and prefix: " + prefix);
-            }
-          }
-        }
-      }
-
-      SchemaConformingTransformerConfig schemaConformingTransformerConfig =
-          ingestionConfig.getSchemaConformingTransformerConfig();
-      if (schemaConformingTransformerConfig != null) {
-        SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
+        Preconditions.checkState(cfg.getSegmentIngestionType().equalsIgnoreCase("REFRESH"),
+            "Dimension tables must have segment ingestion type REFRESH");
       }
     }
+    if (tableConfig.isDimTable()) {
+      Preconditions.checkState(ingestionConfig.getBatchIngestionConfig() != null,
+          "Dimension tables must have batch ingestion configuration");
+    }
+
+    // Stream
+    // stream config map can either be in ingestion config or indexing config. cannot be in both places
+    if (ingestionConfig.getStreamIngestionConfig() != null) {
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
+          "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
+      StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
+      List<Map<String, String>> streamConfigMaps = streamIngestionConfig.getStreamConfigMaps();
+      Preconditions.checkState(!streamConfigMaps.isEmpty(), "Must have at least 1 stream in REALTIME table");
+      // TODO: for multiple stream configs, validate them
+
+      boolean isPauselessEnabled = streamIngestionConfig.isPauselessConsumptionEnabled();
+      if (isPauselessEnabled) {
+        int replication = tableConfig.getReplication();
+        // We are checking for this only when replication is greater than 1 because in test environments
+        // users still prefer to create pauseless tables with replication 1
+        if (replication > 1) {
+          String peerSegmentDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
+          Preconditions.checkState(
+              StringUtils.isNotEmpty(peerSegmentDownloadScheme) && isValidPeerDownloadScheme(peerSegmentDownloadScheme),
+              "Must have a valid peerSegmentDownloadScheme set in validation config for pauseless consumption");
+        } else {
+          LOGGER.warn("It's not recommended to create pauseless tables with replication 1 for stability reasons.");
+        }
+      }
+    }
+
+    // Filter config
+    FilterConfig filterConfig = ingestionConfig.getFilterConfig();
+    if (filterConfig != null) {
+      String filterFunction = filterConfig.getFilterFunction();
+      if (filterFunction != null) {
+        if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
+          throw new IllegalStateException(
+              "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
+        }
+        try {
+          FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
+        } catch (Exception e) {
+          throw new IllegalStateException(
+              "Invalid filter function '" + filterFunction + "', exception: " + e.getMessage(), e);
+        }
+      }
+    }
+
+    // Source field configs
+    List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
+    if (sourceFieldConfigs != null) {
+      // A source field can be configured once per phase (pre- and post-complex-type), but not twice within the same
+      // phase, because that would yield two DataTypeTransformers targeting it in the same phase, which is ambiguous.
+      Set<String> preComplexTypeFieldNames = new HashSet<>();
+      Set<String> postComplexTypeFieldNames = new HashSet<>();
+      for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
+        String name = sourceFieldConfig.getName();
+        boolean preComplexTypeTransform = sourceFieldConfig.isPreComplexTypeTransform();
+        Set<String> fieldNames = preComplexTypeTransform ? preComplexTypeFieldNames : postComplexTypeFieldNames;
+        Preconditions.checkState(fieldNames.add(name),
+            "Duplicate SourceFieldConfig found for source field: %s (preComplexTypeTransform: %s)", name,
+            preComplexTypeTransform);
+      }
+    }
+
+    // Enrichment configs
+    List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
+    if (enrichmentConfigs != null) {
+      for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
+        RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
+            new RecordEnricherValidationConfig(_disableGroovy));
+      }
+    }
+
+    // Transform configs
+    List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
+    if (transformConfigs != null) {
+      // Pre-pass: collect every column referenced as a transform-function argument. A transform whose destination
+      // is not in the schema is still valid when another transform consumes it as an input - i.e. it is an
+      // intermediate ("derived") column. This enables chained / parse-once transforms, e.g.
+      //   message_obj = jsonExtractObject(message)              // intermediate, not in the schema
+      //   level       = JSONPATHSTRING(message_obj, '$.level')  // consumes the intermediate
+      // The intermediate is materialized in the record during transformation and dropped before indexing (only
+      // schema columns are indexed). Unreferenced non-schema destinations still fail below (typo protection).
+      Set<String> transformInputColumns = new HashSet<>();
+      for (TransformConfig transformConfig : transformConfigs) {
+        String transformFunction = transformConfig.getTransformFunction();
+        // Skip Groovy expressions when Groovy is disabled: do not compile them just to collect arguments (the main
+        // loop below rejects Groovy without compiling). Such a config is rejected anyway, so these columns are not
+        // needed as valid intermediate targets.
+        if (transformFunction != null && !(_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(
+            transformFunction))) {
+          try {
+            transformInputColumns.addAll(
+                FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction).getArguments());
+          } catch (Exception ignore) {
+            // Invalid functions are reported with a descriptive error in the main loop below.
+          }
+        }
+      }
+      Set<String> transformColumns = new HashSet<>();
+      for (TransformConfig transformConfig : transformConfigs) {
+        String columnName = transformConfig.getColumnName();
+        String transformFunction = transformConfig.getTransformFunction();
+        if (columnName == null || transformFunction == null) {
+          throw new IllegalStateException(
+              "columnName/transformFunction cannot be null in TransformConfig " + transformConfig);
+        }
+        if (!transformColumns.add(columnName)) {
+          throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
+        }
+        Preconditions.checkState(schema.hasColumn(columnName) || aggregationSourceColumns.contains(columnName)
+            || transformInputColumns.contains(columnName), "The destination column '" + columnName
+            + "' of the transform function must be present in the schema, be consumed as the input of another "
+            + "transform function, or be a source column for aggregations");
+        FunctionEvaluator expressionEvaluator;
+        if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+          throw new IllegalStateException(
+              "Groovy transform functions are disabled for table config. Found '" + transformFunction + "' for column '"
+                  + columnName + "'");
+        }
+        try {
+          expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+        } catch (Exception e) {
+          throw new IllegalStateException(
+              "Invalid transform function '" + transformFunction + "' for column '" + columnName + "', exception: "
+                  + e.getMessage(), e);
+        }
+        List<String> arguments = expressionEvaluator.getArguments();
+        if (arguments.contains(columnName)) {
+          throw new IllegalStateException(
+              "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
+                  + columnName + "'");
+        }
+      }
+    }
+
+    // Complex configs
+    ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
+    if (complexTypeConfig != null) {
+      Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
+      if (MapUtils.isNotEmpty(prefixesToRename)) {
+        Set<String> fieldNames = schema.getColumnNames();
+        for (String prefix : prefixesToRename.keySet()) {
+          for (String field : fieldNames) {
+            Preconditions.checkState(!field.startsWith(prefix),
+                "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
+                    + " config. Name conflict with field: " + field + " and prefix: " + prefix);
+          }
+        }
+      }
+    }
+
+    SchemaConformingTransformerConfig schemaConformingTransformerConfig =
+        ingestionConfig.getSchemaConformingTransformerConfig();
+    if (schemaConformingTransformerConfig != null) {
+      SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
+    }
+  }
+
+  /// Validates all metrics-aggregation configuration for both mechanisms (the `aggregateMetrics` flag and ingestion
+  /// `aggregationConfigs`) in one place, and returns the set of source columns referenced by the aggregation functions
+  /// (empty when aggregation is disabled). Consuming-segment rollup keys each row on the dictionary ids of the
+  /// dimension and time columns and mutates the aggregated value in place in the metric's raw forward index, so:
+  /// - The two mechanisms are mutually exclusive, and aggregation is incompatible with upsert / dedup.
+  /// - The schema must not contain a COMPLEX column (neither a valid key nor an aggregatable metric).
+  /// - Every dimension column must be single-valued; the rollup key holds a single dictionary id per dimension, so it
+  ///   cannot represent a row with multiple values for that column (issue #3867). No-dictionary dimensions are allowed
+  ///   — the consuming segment force-creates a dictionary for them.
+  /// - Every metric column must be single-valued and no-dictionary (aggregated values are mutated in place; a
+  ///   dictionary-encoded metric would silently disable aggregation once the table is created).
+  /// - For `aggregationConfigs`, every metric must be covered by a valid aggregation function whose aggregated value
+  ///   is fixed size.
+  private static Set<String> validateMetricsAggregation(TableConfig tableConfig, Schema schema) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    boolean aggregateMetrics = tableConfig.getIndexingConfig().isAggregateMetrics();
+    List<AggregationConfig> aggregationConfigs =
+        ingestionConfig != null ? ingestionConfig.getAggregationConfigs() : null;
+    boolean hasAggregationConfigs = CollectionUtils.isNotEmpty(aggregationConfigs);
+
+    Preconditions.checkState(!(aggregateMetrics && hasAggregationConfigs),
+        "Metrics aggregation cannot be enabled in the Indexing Config and Ingestion Config at the same time");
+
+    if (!aggregateMetrics && !hasAggregationConfigs) {
+      return Set.of();
+    }
+
+    Preconditions.checkState(!tableConfig.isUpsertEnabled(),
+        "Metrics aggregation and upsert cannot be enabled together");
+    Preconditions.checkState(!tableConfig.isDedupEnabled(), "Metrics aggregation and dedup cannot be enabled together");
+
+    Preconditions.checkState(CollectionUtils.isEmpty(schema.getComplexFieldSpecs()),
+        "Metrics aggregation cannot be enabled when the schema contains COMPLEX columns");
+
+    for (String dimension : schema.getDimensionNames()) {
+      Preconditions.checkState(schema.getFieldSpecFor(dimension).isSingleValueField(),
+          "Metrics aggregation cannot be enabled with multi-value dimension column: %s", dimension);
+    }
+
+    Map<String, DictionaryIndexConfig> dictConfigByCol = StandardIndexes.dictionary().getConfig(tableConfig, schema);
+    for (String metric : schema.getMetricNames()) {
+      Preconditions.checkState(schema.getFieldSpecFor(metric).isSingleValueField(),
+          "Metrics aggregation cannot be enabled with multi-value metric column: %s", metric);
+      DictionaryIndexConfig dictConfig = dictConfigByCol.get(metric);
+      Preconditions.checkState(dictConfig != null && dictConfig.isDisabled(),
+          "Metric column: %s must be a no-dictionary column when metrics aggregation is enabled", metric);
+    }
+
+    // The aggregateMetrics flag implicitly SUMs every metric; there are no per-config functions to validate.
+    if (!hasAggregationConfigs) {
+      return Set.of();
+    }
+
+    Set<String> aggregationSourceColumns = new HashSet<>();
+    Set<String> aggregationColumns = new HashSet<>();
+    for (AggregationConfig aggregationConfig : aggregationConfigs) {
+      String columnName = aggregationConfig.getColumnName();
+      String aggregationFunction = aggregationConfig.getAggregationFunction();
+      if (columnName == null || aggregationFunction == null) {
+        throw new IllegalStateException(
+            "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
+      }
+
+      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+      Preconditions.checkState(fieldSpec != null,
+          "The destination column '" + columnName + "' of the aggregation function must be present in the schema");
+      Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
+          "The destination column '" + columnName + "' of the aggregation function must be a metric column");
+      DataType dataType = fieldSpec.getDataType();
+
+      if (!aggregationColumns.add(columnName)) {
+        throw new IllegalStateException("Duplicate aggregation config found for column '" + columnName + "'");
+      }
+      ExpressionContext expressionContext;
+      try {
+        expressionContext = RequestContextUtils.getExpression(aggregationConfig.getAggregationFunction());
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Invalid aggregation function '" + aggregationFunction + "' for column '" + columnName + "'", e);
+      }
+      Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
+          "aggregation function must be a function for: %s", aggregationConfig);
+
+      FunctionContext functionContext = expressionContext.getFunction();
+      AggregationFunctionType functionType =
+          AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+      List<ExpressionContext> arguments = functionContext.getArguments();
+      int numArguments = arguments.size();
+      if (functionType == DISTINCTCOUNTHLL) {
+        Preconditions.checkState(numArguments >= 1 && numArguments <= 2,
+            "DISTINCT_COUNT_HLL can have at most two arguments: %s", aggregationConfig);
+        if (numArguments == 2) {
+          ExpressionContext secondArgument = arguments.get(1);
+          Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+              "Second argument of DISTINCT_COUNT_HLL must be literal: %s", aggregationConfig);
+          String literal = secondArgument.getLiteral().getStringValue();
+          Preconditions.checkState(StringUtils.isNumeric(literal),
+              "Second argument of DISTINCT_COUNT_HLL must be a number: %s", aggregationConfig);
+        }
+        Preconditions.checkState(dataType == DataType.BYTES, "Result type for DISTINCT_COUNT_HLL must be BYTES: %s",
+            aggregationConfig);
+      } else if (functionType == DISTINCTCOUNTHLLPLUS) {
+        Preconditions.checkState(numArguments >= 1 && numArguments <= 3,
+            "DISTINCT_COUNT_HLL_PLUS can have at most three arguments: %s", aggregationConfig);
+        if (numArguments == 2) {
+          ExpressionContext secondArgument = arguments.get(1);
+          Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+              "Second argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
+          String literal = secondArgument.getLiteral().getStringValue();
+          Preconditions.checkState(StringUtils.isNumeric(literal),
+              "Second argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
+        }
+        if (numArguments == 3) {
+          ExpressionContext thirdArgument = arguments.get(2);
+          Preconditions.checkState(thirdArgument.getType() == ExpressionContext.Type.LITERAL,
+              "Third argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
+          String literal = thirdArgument.getLiteral().getStringValue();
+          Preconditions.checkState(StringUtils.isNumeric(literal),
+              "Third argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
+        }
+        Preconditions.checkState(dataType == DataType.BYTES,
+            "Result type for DISTINCT_COUNT_HLL_PLUS must be BYTES: %s", aggregationConfig);
+      } else if (functionType == SUMPRECISION) {
+        Preconditions.checkState(numArguments >= 2 && numArguments <= 3,
+            "SUM_PRECISION must specify precision (required), scale (optional): %s", aggregationConfig);
+        ExpressionContext secondArgument = arguments.get(1);
+        Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+            "Second argument of SUM_PRECISION must be literal: %s", aggregationConfig);
+        String literal = secondArgument.getLiteral().getStringValue();
+        Preconditions.checkState(StringUtils.isNumeric(literal),
+            "Second argument of SUM_PRECISION must be a number: %s", aggregationConfig);
+        Preconditions.checkState(dataType == DataType.BIG_DECIMAL || dataType == DataType.BYTES,
+            "Result type for SUM_PRECISION must be BIG_DECIMAL or BYTES: %s", aggregationConfig);
+      } else {
+        Preconditions.checkState(numArguments == 1, "%s can only have one argument: %s", functionType,
+            aggregationConfig);
+      }
+      ExpressionContext firstArgument = arguments.get(0);
+      Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
+          "First argument of aggregation function: %s must be identifier, got: %s", functionType,
+          firstArgument.getType());
+      // Create a ValueAggregator for the aggregation function and check if it is supported for ingestion (fixed
+      // size aggregated value).
+      ValueAggregator<?, ?> valueAggregator;
+      try {
+        valueAggregator = ValueAggregatorFactory.getValueAggregator(functionType, arguments.subList(1, numArguments));
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Caught exception while creating ValueAggregator for aggregation function: " + aggregationFunction, e);
+      }
+      Preconditions.checkState(valueAggregator.isAggregatedValueFixedSize(),
+          "Aggregation function: %s must have fixed size aggregated value", aggregationFunction);
+
+      aggregationSourceColumns.add(firstArgument.getIdentifier());
+    }
+    Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
+        "all metric columns must be aggregated");
+    return aggregationSourceColumns;
   }
 
   private static void validateStreamConfigMaps(TableConfig tableConfig) {
@@ -857,43 +902,25 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the upsert-related configurations
-   *  - check table type supports the configured mode
-   *  - the primary key exists on the schema
-   *  - strict replica-group is configured for routing type
-   *  - consumer type must be low-level
-   *  - comparison column exists
-   */
+  /// Validates the upsert- and dedup-related configuration. Returns early when neither is enabled; otherwise checks
+  /// the shared requirements (upsert and dedup are mutually exclusive, primary keys exist and are single-valued,
+  /// strict replica-group routing, no COMPLETED instance partitions, valid tenant tag override for REALTIME, OFFLINE
+  /// restrictions) and then, per the enabled mode:
+  /// - Upsert: no multi-tier / star-tree, comparison / delete-record / out-of-order columns are valid, deleted-keys
+  ///   compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and delegates to
+  ///   [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
+  /// - Dedup: delegates to [#validateTTLForDedupConfig]; rejects MD5 when disabled.
   @VisibleForTesting
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
-    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE && (tableConfig.getDedupConfig() == null
-        || !tableConfig.getDedupConfig().isDedupEnabled())) {
+    boolean upsertEnabled = tableConfig.isUpsertEnabled();
+    boolean dedupEnabled = tableConfig.isDedupEnabled();
+    if (!upsertEnabled && !dedupEnabled) {
       return;
     }
 
-    boolean isUpsertEnabled = tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE;
-    DedupConfig dedupConfig = tableConfig.getDedupConfig();
-    boolean isDedupEnabled = dedupConfig != null && dedupConfig.isDedupEnabled();
-
     // check both upsert and dedup are not enabled simultaneously
-    Preconditions.checkState(!(isUpsertEnabled && isDedupEnabled),
+    Preconditions.checkState(!(upsertEnabled && dedupEnabled),
         "A table can have either Upsert or Dedup enabled, but not both");
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      Preconditions.checkState(isUpsertEnabled && !isDedupEnabled,
-          "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
-      Preconditions.checkState(tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL,
-          "Partial upsert is not supported for OFFLINE table");
-      // Offline upsert tables require segment partition config so that segments are assigned to servers
-      // based on partition, ensuring all segments of a partition land on the same server for correct dedup.
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      SegmentPartitionConfig segmentPartitionConfig =
-          indexingConfig != null ? indexingConfig.getSegmentPartitionConfig() : null;
-      Preconditions.checkState(
-          segmentPartitionConfig != null && MapUtils.isNotEmpty(segmentPartitionConfig.getColumnPartitionMap()),
-          "Offline upsert table must have segment partition config to ensure correct partition-based "
-              + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
-    }
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
@@ -909,26 +936,39 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
+
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
               tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
                   && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
           "Invalid tenant tag override used for Upsert/Dedup table");
+      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+      Preconditions.checkState(instanceAssignmentConfigMap == null || !instanceAssignmentConfigMap.containsKey(
+              InstancePartitionsType.COMPLETED.name()),
+          "COMPLETED instance partitions can't be configured for upsert / dedup tables");
+    } else {
+      Preconditions.checkState(!dedupEnabled,
+          "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
+      assert upsertConfig != null;
+      Preconditions.checkState(upsertConfig.getMode() != UpsertConfig.Mode.PARTIAL,
+          "Partial upsert is not supported for OFFLINE table");
+      // Offline upsert tables require segment partition config so that segments are assigned to servers
+      // based on partition, ensuring all segments of a partition land on the same server for correct dedup.
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      SegmentPartitionConfig segmentPartitionConfig =
+          indexingConfig != null ? indexingConfig.getSegmentPartitionConfig() : null;
+      Preconditions.checkState(
+          segmentPartitionConfig != null && MapUtils.isNotEmpty(segmentPartitionConfig.getColumnPartitionMap()),
+          "Offline upsert table must have segment partition config to ensure correct partition-based "
+              + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
     }
 
-    // specifically for upsert
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    if (PinotMd5Mode.isPinotMd5Disabled()) {
-      if (isUpsertEnabled && upsertConfig != null && upsertConfig.getHashFunction() == HashFunction.MD5) {
-        throw new IllegalStateException(String.format(
-            "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
-      }
-      if (isDedupEnabled && dedupConfig.getHashFunction() == HashFunction.MD5) {
-        throw new IllegalStateException(String.format(
-            "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
-      }
-    }
-    if (upsertConfig != null) {
+    if (upsertEnabled) {
+      // specifically for upsert
+      assert upsertConfig != null;
+
       // Currently, only one tier is allowed for upsert table, as the committed segments can't be moved to other tiers.
       Preconditions.checkState(tableConfig.getTierConfigsList() == null, "The upsert table cannot have multi-tiers");
       // no startree index
@@ -960,7 +1000,7 @@ public final class TableConfigUtils {
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
       if (outOfOrderRecordColumn != null) {
-        Preconditions.checkState(!Boolean.TRUE.equals(upsertConfig.isDropOutOfOrderRecord()),
+        Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
             "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
         FieldSpec fieldSpec = schema.getFieldSpecFor(outOfOrderRecordColumn);
         Preconditions.checkState(
@@ -1067,17 +1107,21 @@ public final class TableConfigUtils {
                 + "Out-of-order record marking is only supported in NONE consistency mode.",
             upsertConfig.getConsistencyMode());
       }
-    }
 
-    if (tableConfig.getTableType() == TableType.REALTIME) {
+      validateTTLForUpsertConfig(tableConfig, schema);
+      validatePartialUpsertStrategies(tableConfig, schema);
       Preconditions.checkState(
-          tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
-              .containsKey(InstancePartitionsType.COMPLETED.name()),
-          "COMPLETED instance partitions can't be configured for upsert / dedup tables");
+          !(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
+          "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
+    } else {
+      // specifically for dedup
+      assert dedupConfig != null;
+
+      validateTTLForDedupConfig(tableConfig, schema);
+      Preconditions.checkState(
+          !(PinotMd5Mode.isPinotMd5Disabled() && dedupConfig.getHashFunction() == HashFunction.MD5),
+          "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
     }
-    validateAggregateMetricsForUpsertConfig(tableConfig);
-    validateTTLForUpsertConfig(tableConfig, schema);
-    validateTTLForDedupConfig(tableConfig, schema);
   }
 
   /**
@@ -1098,7 +1142,8 @@ public final class TableConfigUtils {
   @VisibleForTesting
   static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    if (upsertConfig == null || (upsertConfig.getMetadataTTL() == 0 && upsertConfig.getDeletedKeysTTL() == 0)) {
+    assert upsertConfig != null;
+    if (upsertConfig.getMetadataTTL() <= 0 && upsertConfig.getDeletedKeysTTL() <= 0) {
       return;
     }
 
@@ -1139,7 +1184,8 @@ public final class TableConfigUtils {
   @VisibleForTesting
   static void validateTTLForDedupConfig(TableConfig tableConfig, Schema schema) {
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
-    if (dedupConfig == null || (dedupConfig.getMetadataTTL() <= 0)) {
+    assert dedupConfig != null;
+    if (dedupConfig.getMetadataTTL() <= 0) {
       return;
     }
 
@@ -1271,23 +1317,6 @@ public final class TableConfigUtils {
   }
 
   /**
-   * Validates metrics aggregation when upsert config is enabled
-   * - Metrics aggregation cannot be enabled when Upsert Config is enabled.
-   * - Aggregation cannot be enabled in the Ingestion Config and Indexing Config at the same time.
-   */
-  private static void validateAggregateMetricsForUpsertConfig(TableConfig config) {
-    boolean isAggregateMetricsEnabledInIndexingConfig = config.getIndexingConfig().isAggregateMetrics();
-    boolean hasAggregationConfigs = config.getIngestionConfig() != null && CollectionUtils.isNotEmpty(
-        config.getIngestionConfig().getAggregationConfigs());
-    boolean bothAggregationConfigsEnabled = isAggregateMetricsEnabledInIndexingConfig && hasAggregationConfigs;
-    boolean anyOneAggregationConfigsEnabled = isAggregateMetricsEnabledInIndexingConfig || hasAggregationConfigs;
-    Preconditions.checkState(!bothAggregationConfigsEnabled,
-        "Metrics aggregation cannot be enabled in the Indexing Config and Ingestion Config at the same time");
-    Preconditions.checkState(!anyOneAggregationConfigsEnabled,
-        "Metrics aggregation and upsert cannot be enabled together");
-  }
-
-  /**
    * Validates the partial upsert-related configurations:
    *  - Null handling must be enabled
    *  - Merger cannot be applied to private key columns
@@ -1298,7 +1327,9 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validatePartialUpsertStrategies(TableConfig tableConfig, Schema schema) {
-    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    if (upsertConfig.getMode() != UpsertConfig.Mode.PARTIAL) {
       return;
     }
 
@@ -1306,8 +1337,6 @@ public final class TableConfigUtils {
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled(),
         "Null handling must be enabled for partial upsert tables");
 
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    assert upsertConfig != null;
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
     String partialUpsertMergerClass = upsertConfig.getPartialUpsertMergerClass();
 
@@ -1407,25 +1436,25 @@ public final class TableConfigUtils {
       if (!Objects.equals(existingUpsertConfig.getComparisonColumns(), newUpsertConfig.getComparisonColumns())) {
         violations.add(
             String.format("upsertConfig.comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
-              newUpsertConfig.getComparisonColumns()));
+                newUpsertConfig.getComparisonColumns()));
       }
       List<String> existingComparisonColumns = existingUpsertConfig.getComparisonColumns();
       if (existingComparisonColumns == null || existingComparisonColumns.isEmpty()) {
         String existingTimeColumn =
             existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
-              : null;
+                : null;
         String newTimeColumn =
             newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
         if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
           violations.add(
               String.format("timeColumnName (%s -> %s) - used as default comparison column", existingTimeColumn,
-                newTimeColumn));
+                  newTimeColumn));
         }
       }
       if (existingUpsertConfig.isDropOutOfOrderRecord() != newUpsertConfig.isDropOutOfOrderRecord()) {
         violations.add(
             String.format("upsertConfig.dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
-              newUpsertConfig.isDropOutOfOrderRecord()));
+                newUpsertConfig.isDropOutOfOrderRecord()));
       }
       if (!Objects.equals(existingUpsertConfig.getOutOfOrderRecordColumn(),
           newUpsertConfig.getOutOfOrderRecordColumn())) {
@@ -2121,10 +2150,8 @@ public final class TableConfigUtils {
   }
 
   public static boolean isCommitTimeCompactionEnabled(TableConfig tableConfig) {
-    if (tableConfig.getUpsertConfig() == null) {
-      return false;
-    }
-    return tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    return upsertConfig != null && upsertConfig.isEnableCommitTimeCompaction();
   }
 
   /**
@@ -2331,10 +2358,10 @@ public final class TableConfigUtils {
   }
 
   private static boolean hasConsumingSegmentTierOverwriteForRealtimeTable(TableConfig tableConfig) {
-    if (tableConfig.getTableType() != TableType.REALTIME
-        || (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())
-            && tableConfig.getTierConfigsList().stream()
-                .anyMatch(tierConfig -> CONSUMING_SEGMENT_TIER.equals(tierConfig.getName())))) {
+    if (tableConfig.getTableType() != TableType.REALTIME || (
+        CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList()) && tableConfig.getTierConfigsList()
+            .stream()
+            .anyMatch(tierConfig -> CONSUMING_SEGMENT_TIER.equals(tierConfig.getName())))) {
       return false;
     }
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();

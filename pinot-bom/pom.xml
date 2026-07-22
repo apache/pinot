@@ -326,6 +326,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-bson</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-csv</artifactId>
         <version>${project.version}</version>
       </dependency>

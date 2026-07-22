@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -75,8 +76,11 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.IS_SORTED;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
 import static org.testng.Assert.*;
 
 
@@ -131,6 +135,7 @@ public class ForwardIndexHandlerTest {
   private static final String DIM_MV_PASS_THROUGH_LONG = "DIM_MV_PASS_THROUGH_LONG";
   private static final String DIM_MV_PASS_THROUGH_STRING = "DIM_MV_PASS_THROUGH_STRING";
   private static final String DIM_MV_PASS_THROUGH_BYTES = "DIM_MV_PASS_THROUGH_BYTES";
+  private static final String DIM_MV_PASS_THROUGH_BIG_DECIMAL = "DIM_MV_PASS_THROUGH_BIG_DECIMAL";
 
   // Dictionary columns
   private static final String DIM_DICT_INTEGER = "DIM_DICT_INTEGER";
@@ -191,7 +196,8 @@ public class ForwardIndexHandlerTest {
   private static final List<String> RAW_PASS_THROUGH_COLUMNS =
       List.of(DIM_PASS_THROUGH_STRING, DIM_PASS_THROUGH_LONG, DIM_PASS_THROUGH_INTEGER, DIM_PASS_THROUGH_BYTES,
           METRIC_PASS_THROUGH_BIG_DECIMAL, METRIC_PASS_THROUGH_INTEGER, DIM_MV_PASS_THROUGH_INTEGER,
-          DIM_MV_PASS_THROUGH_LONG, DIM_MV_PASS_THROUGH_STRING, DIM_MV_PASS_THROUGH_BYTES);
+          DIM_MV_PASS_THROUGH_LONG, DIM_MV_PASS_THROUGH_STRING, DIM_MV_PASS_THROUGH_BYTES,
+          DIM_MV_PASS_THROUGH_BIG_DECIMAL);
 
   private static final List<String> RAW_LZ4_COLUMNS =
       List.of(DIM_LZ4_STRING, DIM_LZ4_LONG, DIM_LZ4_INTEGER, DIM_LZ4_BYTES, METRIC_LZ4_BIG_DECIMAL, METRIC_LZ4_INTEGER);
@@ -278,6 +284,7 @@ public class ForwardIndexHandlerTest {
       .addMultiValueDimension(DIM_MV_PASS_THROUGH_LONG, DataType.LONG)
       .addMultiValueDimension(DIM_MV_PASS_THROUGH_STRING, DataType.STRING)
       .addMultiValueDimension(DIM_MV_PASS_THROUGH_BYTES, DataType.BYTES)
+      .addMultiValueDimension(DIM_MV_PASS_THROUGH_BIG_DECIMAL, DataType.BIG_DECIMAL)
       .addMultiValueDimension(DIM_DICT_MV_BYTES, DataType.BYTES)
       .addMultiValueDimension(DIM_DICT_MV_INTEGER, DataType.INT)
       .addMultiValueDimension(DIM_DICT_MV_LONG, DataType.LONG)
@@ -321,6 +328,7 @@ public class ForwardIndexHandlerTest {
     Integer[][] tempMVIntRows = new Integer[numRows][maxNumberOfMVEntries];
     Long[][] tempMVLongRows = new Long[numRows][maxNumberOfMVEntries];
     byte[][][] tempMVByteRows = new byte[numRows][maxNumberOfMVEntries][];
+    BigDecimal[][] tempMVBigDecimalRows = new BigDecimal[numRows][maxNumberOfMVEntries];
 
     // For MV columns today adding duplicate entries within the same row will result in the total number of MV entries
     // reducing for that row since we cannot support rebuilding the forward index without losing duplicates within a
@@ -347,6 +355,7 @@ public class ForwardIndexHandlerTest {
           tempMVLongRows[i][j] = (long) (numRows + 1);
           tempMVStringRows[i][j] = str;
           tempMVByteRows[i][j] = str.getBytes();
+          tempMVBigDecimalRows[i][j] = BigDecimal.valueOf(numRows + 1);
         }
       } else {
         String str = "n" + i;
@@ -364,6 +373,7 @@ public class ForwardIndexHandlerTest {
           tempMVLongRows[i][j] = (long) j;
           tempMVStringRows[i][j] = str;
           tempMVByteRows[i][j] = str.getBytes();
+          tempMVBigDecimalRows[i][j] = BigDecimal.valueOf(j);
         }
       }
 
@@ -440,6 +450,7 @@ public class ForwardIndexHandlerTest {
       row.putValue(DIM_MV_PASS_THROUGH_LONG, tempMVLongRows[i]);
       row.putValue(DIM_MV_PASS_THROUGH_STRING, tempMVStringRows[i]);
       row.putValue(DIM_MV_PASS_THROUGH_BYTES, tempMVByteRows[i]);
+      row.putValue(DIM_MV_PASS_THROUGH_BIG_DECIMAL, tempMVBigDecimalRows[i]);
 
       // Forward index disabled columns
       row.putValue(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER, tempIntRows[i]);
@@ -1764,6 +1775,119 @@ public class ForwardIndexHandlerTest {
         metadata, false);
   }
 
+  @DataProvider(name = "coincidentallySortedRawTypes")
+  public Object[][] coincidentallySortedRawTypes() {
+    // Cover a fixed-width type and both variable-length types (STRING/BYTES take a different raw writer path).
+    return new Object[][]{
+        {DataType.LONG, 0L},
+        {DataType.STRING, "sameValue"},
+        {DataType.BYTES, new byte[]{0x1, 0x2, 0x3}},
+    };
+  }
+
+  /// Regression test for enabling a dictionary on a raw column whose persisted metadata says {@code isSorted=false}
+  /// but whose values happen to be monotonic (here, all identical). This is the shape produced by a realtime segment
+  /// committed while the column was raw: raw columns are persisted with {@code isSorted=false} regardless of the data.
+  /// On reload the fresh stats collector reads the identical values and reports the column as sorted, so before the
+  /// fix the forward-index creator emitted a `.sv.sorted.fwd` index while {@link ForwardIndexHandler} derived the temp
+  /// file name from the metadata ({@code .sv.unsorted.fwd}) and never updated {@code isSorted}, throwing
+  /// {@link java.io.FileNotFoundException} and leaving a format/metadata mismatch for the next read. The fix forces
+  /// the creator to honor the persisted {@code isSorted} flag, keeping the written format, the file name, and the
+  /// metadata consistent.
+  @Test(dataProvider = "coincidentallySortedRawTypes")
+  public void testEnableDictionaryForRawColumnWithCoincidentallySortedValues(DataType dataType, Object value)
+      throws Exception {
+    File tempDir = new File(FileUtils.getTempDirectory(), "ForwardIndexHandlerCoincidentalSortTest");
+    FileUtils.deleteQuietly(tempDir);
+    try {
+      String tableName = "coincidentalSortTable";
+      String column = "coincidentallySortedColumn";
+      String segmentName = "coincidentalSortSegment";
+      int numDocs = 48;
+
+      Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
+          .addSingleValueDimension(column, dataType)
+          .build();
+
+      // Build the segment with the column as raw (no dictionary).
+      TableConfig rawTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
+          .setNoDictionaryColumns(List.of(column))
+          .setFieldConfigList(
+              List.of(new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.PASS_THROUGH,
+                  null)))
+          .build();
+
+      // All-identical values -> trivially monotonic -> the stats collector treats the column as sorted.
+      List<GenericRow> rows = new ArrayList<>();
+      for (int i = 0; i < numDocs; i++) {
+        GenericRow row = new GenericRow();
+        row.putValue(column, value);
+        rows.add(row);
+      }
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(rawTableConfig, schema);
+      config.setOutDir(tempDir.getPath());
+      config.setSegmentName(segmentName);
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, new GenericRowRecordReader(rows));
+      driver.build();
+      File segmentDir = new File(tempDir, segmentName);
+
+      // Offline generation records isSorted from the data, so it would set isSorted=true for these all-equal values.
+      // Overwrite it to false to reproduce the realtime raw-segment condition.
+      PropertiesConfiguration metadataConfig = SegmentMetadataUtils.getPropertiesConfiguration(segmentDir);
+      metadataConfig.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(false));
+      SegmentMetadataUtils.savePropertiesConfiguration(metadataConfig, segmentDir);
+
+      ColumnMetadata beforeMetadata = new SegmentMetadataImpl(segmentDir).getColumnMetadataFor(column);
+      assertFalse(beforeMetadata.isSorted());
+      assertFalse(beforeMetadata.hasDictionary());
+
+      // Enable a dictionary on the column and run the forward-index handler (the reload path).
+      TableConfig dictTableConfig =
+          new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setNoDictionaryColumns(List.of()).build();
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(dictTableConfig, schema);
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
+          SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+        ForwardIndexHandler handler = new ForwardIndexHandler(segmentDirectory, indexLoadingConfig);
+        assertEquals(handler.computeOperations(writer),
+            Map.of(column, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY)));
+        // Before the fix this threw FileNotFoundException for the missing .sv.unsorted.fwd file.
+        handler.updateIndices(writer);
+        handler.postUpdateIndicesCleanup(writer);
+      }
+
+      // The column now has a dictionary; isSorted must stay false and the unsorted dict forward index must read back
+      // the original values without corruption.
+      ColumnMetadata afterMetadata = new SegmentMetadataImpl(segmentDir).getColumnMetadataFor(column);
+      assertTrue(afterMetadata.hasDictionary());
+      assertTrue(afterMetadata.isSorted());
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
+          SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+        assertTrue(reader.hasIndexFor(column, StandardIndexes.forward()));
+        assertTrue(reader.hasIndexFor(column, StandardIndexes.dictionary()));
+        IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+        FieldIndexConfigs fieldIndexConfigs = createFieldIndexConfigsFromMetadata(afterMetadata);
+        try (ForwardIndexReader<?> fwdReader =
+                readerFactory.createIndexReader(reader, fieldIndexConfigs, afterMetadata);
+            Dictionary dictionary = DictionaryIndexType.read(reader, afterMetadata)) {
+          PinotSegmentColumnReader columnReader =
+              new PinotSegmentColumnReader(column, fwdReader, dictionary, null,
+                  afterMetadata.getMaxNumberOfMultiValues());
+          for (int i = 0; i < numDocs; i++) {
+            Object actual = columnReader.getValue(i);
+            if (dataType == DataType.BYTES) {
+              assertEquals((byte[]) actual, (byte[]) value);
+            } else {
+              assertEquals(actual, value);
+            }
+          }
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
+  }
+
   @Test
   public void testDisableDictionaryForMultipleColumns()
       throws Exception {
@@ -2362,8 +2486,14 @@ public class ForwardIndexHandlerTest {
               break;
             }
             case BIG_DECIMAL: {
-              assertTrue(isSingleValue);
-              assertEquals(val, BigDecimal.valueOf(1001));
+              if (isSingleValue) {
+                assertEquals(val, BigDecimal.valueOf(1001));
+              } else {
+                Object[] values = (Object[]) val;
+                for (Object value : values) {
+                  assertEquals(value, BigDecimal.valueOf(1001));
+                }
+              }
               break;
             }
             default:
@@ -2555,7 +2685,8 @@ public class ForwardIndexHandlerTest {
     // For each var-length column, strip the 1.6.0-era stats from metadata to simulate a pre-1.6.0 segment, then
     // trigger a compression change. The pre-pass in `ForwardIndexHandler.updateIndices` should backfill the
     // missing stats from a column scan before any per-op handler runs.
-    for (String column : List.of(DIM_SNAPPY_STRING, DIM_MV_PASS_THROUGH_STRING)) {
+    for (String column : List.of(DIM_SNAPPY_STRING, DIM_MV_PASS_THROUGH_STRING, DIM_SNAPPY_BYTES,
+        DIM_MV_PASS_THROUGH_BYTES, METRIC_SNAPPY_BIG_DECIMAL, DIM_MV_PASS_THROUGH_BIG_DECIMAL)) {
       ColumnMetadata expected;
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
@@ -2596,6 +2727,41 @@ public class ForwardIndexHandlerTest {
       assertEquals(actual.isAscii(), expected.isAscii());
       assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
     }
+  }
+
+  @Test
+  public void testBackfillMissingStatsForDictionaryMvBytes()
+      throws Exception {
+    String column = DIM_DICT_MV_BYTES;
+    ColumnMetadata expected;
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      expected = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+
+      Map<String, String> stripped = new HashMap<>();
+      stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+          V1Constants.MetadataKeys.Column.LENGTH_OF_SHORTEST_ELEMENT), null);
+      stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+          V1Constants.MetadataKeys.Column.LENGTH_OF_LONGEST_ELEMENT), null);
+      stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+          V1Constants.MetadataKeys.Column.MAX_ROW_LENGTH_IN_BYTES), null);
+      SegmentMetadataUtils.updateMetadataProperties(segmentDirectory, stripped);
+      ColumnMetadata afterStrip = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertTrue(afterStrip.getLengthOfShortestElement() < 0);
+      assertTrue(afterStrip.getMaxRowLengthInBytes() < 0);
+
+      _fieldConfigMap.put(column,
+          new FieldConfig(column, FieldConfig.EncodingType.DICTIONARY, List.of(), CompressionCodec.MV_ENTRY_DICT,
+              null));
+      updateIndices();
+    }
+
+    ColumnMetadata actual = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column);
+    assertEquals(actual.getLengthOfShortestElement(), expected.getLengthOfShortestElement());
+    assertEquals(actual.getLengthOfLongestElement(), expected.getLengthOfLongestElement());
+    assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
   }
 
   @Test

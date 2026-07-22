@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.client.ClientBuilder;
@@ -42,6 +43,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.common.restlet.resources.ServerTableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
@@ -92,50 +94,65 @@ public class ServerSegmentMetadataReader {
    * - If table does not have replica groups, send requests to a minimal set of servers hosting all segments of the
    *   table.
    */
+  /// Reads aggregate metadata without compression statistics.
   public TableMetadataInfo getAggregatedTableMetadataFromServer(String tableNameWithType,
-      BiMap<String, String> serverEndPoints, List<String> columns, int numReplica, int timeoutMs) {
+      BiMap<String, String> serverEndPoints, @Nullable List<String> columns, int numReplica, int timeoutMs) {
+    return getAggregatedTableMetadataFromServer(tableNameWithType, serverEndPoints, columns, numReplica, timeoutMs,
+        false, false, Map.of());
+  }
+
+  public TableMetadataInfo getAggregatedTableMetadataFromServer(String tableNameWithType,
+      BiMap<String, String> serverEndPoints, @Nullable List<String> columns, int numReplica, int timeoutMs,
+      boolean compressionStatsEnabled, boolean includeColumnCompressionStats,
+      Map<String, List<String>> serverToSegmentsMap) {
     int numServers = serverEndPoints.size();
     LOGGER.info("Reading aggregated segment metadata from {} servers for table: {} with timeout: {}ms", numServers,
         tableNameWithType, timeoutMs);
+    long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
 
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String serverUrl = generateAggregateSegmentMetadataServerURL(tableNameWithType, columns, endpoint);
+      String serverUrl = generateAggregateSegmentMetadataServerURL(tableNameWithType, columns, endpoint, false);
       serverUrls.add(serverUrl);
     }
 
     // Helper service to run a http get call to the server
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse = compressionStatsEnabled
+        ? completionServiceHelper.doMultiGetRequestUntil(serverUrls, tableNameWithType, false, timeoutMs, deadlineNanos,
+            "aggregate segment metadata")
+        : completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs,
+            "aggregate segment metadata");
 
     long totalDiskSizeInBytes = 0;
     int totalNumSegments = 0;
     long totalNumRows = 0;
     int failedParses = 0;
-    final Map<String, Double> columnLengthMap = new HashMap<>();
-    final Map<String, Double> columnCardinalityMap = new HashMap<>();
-    final Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
-    final Map<String, Map<String, Double>> columnIndexSizeMap = new HashMap<>();
-    final Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
+    Map<String, Double> columnLengthMap = new HashMap<>();
+    Map<String, Double> columnCardinalityMap = new HashMap<>();
+    Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
+    Map<String, Map<String, Double>> columnIndexSizeMap = new HashMap<>();
+    Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        TableMetadataInfo tableMetadataInfo =
-            JsonUtils.stringToObject(streamResponse.getValue(), TableMetadataInfo.class);
+        ServerTableMetadataInfo tableMetadataInfo =
+            JsonUtils.stringToObject(streamResponse.getValue(), ServerTableMetadataInfo.class);
         totalDiskSizeInBytes += tableMetadataInfo.getDiskSizeInBytes();
         totalNumRows += tableMetadataInfo.getNumRows();
         totalNumSegments += tableMetadataInfo.getNumSegments();
         tableMetadataInfo.getColumnLengthMap().forEach((k, v) -> columnLengthMap.merge(k, v, Double::sum));
         tableMetadataInfo.getColumnCardinalityMap().forEach((k, v) -> columnCardinalityMap.merge(k, v, Double::sum));
         tableMetadataInfo.getMaxNumMultiValuesMap().forEach((k, v) -> maxNumMultiValuesMap.merge(k, v, Double::sum));
-        tableMetadataInfo.getColumnIndexSizeMap().forEach((k, v) -> columnIndexSizeMap.merge(k, v, (l, r) -> {
-          for (Map.Entry<String, Double> e : r.entrySet()) {
-            l.put(e.getKey(), l.getOrDefault(e.getKey(), 0d) + e.getValue());
+        tableMetadataInfo.getColumnIndexSizeMap().forEach((column, indexSizes) -> {
+          Map<String, Double> aggregateIndexSizes = columnIndexSizeMap.get(column);
+          if (aggregateIndexSizes == null) {
+            columnIndexSizeMap.put(column, new HashMap<>(indexSizes));
+          } else {
+            indexSizes.forEach((index, size) -> aggregateIndexSizes.merge(index, size, Double::sum));
           }
-          return l;
-        }));
+        });
         tableMetadataInfo.getPartitionToServerPrimaryKeyCountMap().forEach(
             (partition, serverToPrimaryKeyCount) -> partitionToServerPrimaryKeyCountMap.merge(partition,
                 new HashMap<>(serverToPrimaryKeyCount), (l, r) -> {
@@ -165,9 +182,15 @@ public class ServerSegmentMetadataReader {
     totalNumSegments /= numReplica;
     totalNumRows /= numReplica;
 
+    ServerCompressionStatsReader.CompressionStatsResult compressionStats = compressionStatsEnabled
+        ? new ServerCompressionStatsReader(_executor, _connectionManager).read(tableNameWithType,
+            serverToSegmentsMap, serverEndPoints, columns, includeColumnCompressionStats, deadlineNanos) : null;
+
     TableMetadataInfo aggregateTableMetadataInfo =
         new TableMetadataInfo(tableNameWithType, totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
-            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap, partitionToServerPrimaryKeyCountMap);
+            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap, partitionToServerPrimaryKeyCountMap,
+            compressionStats != null ? compressionStats.getColumnStats() : null,
+            compressionStats != null ? compressionStats.getSummary() : null);
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
           serverUrls.size());
@@ -267,8 +290,9 @@ public class ServerSegmentMetadataReader {
       @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
       int numSegmentsBatchPerServerRequest) {
     return getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegmentsMap, serverToEndpoints,
-        segmentNames, timeoutMs, validDocIdsType, numSegmentsBatchPerServerRequest).values().stream()
-        .filter(list -> list != null && !list.isEmpty()).map(list -> list.get(0)).collect(Collectors.toList());
+        segmentNames, timeoutMs, validDocIdsType, numSegmentsBatchPerServerRequest).getSegmentToMetadata().values()
+        .stream().filter(list -> list != null && !list.isEmpty()).map(list -> list.get(0))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -276,13 +300,14 @@ public class ServerSegmentMetadataReader {
    * This method will pick all servers that hosts the target segment and fetch the segment metadata result and
    * return as a list.
    *
-   * @return map of segment name to list of valid doc id metadata where each element is every server's metadata.
+   * @return the per-segment metadata from every responding server, plus the expected replica count per segment.
    */
-  public Map<String, List<ValidDocIdsMetadataInfo>> getSegmentToValidDocIdsMetadataFromServer(String tableNameWithType,
+  public ValidDocIdsMetadataResult getSegmentToValidDocIdsMetadataFromServer(String tableNameWithType,
       Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
       @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
       int numSegmentsBatchPerServerRequest) {
     List<Pair<String, String>> serverURLsAndBodies = new ArrayList<>();
+    Map<String, Integer> segmentToExpectedReplicaCount = new HashMap<>();
     for (Map.Entry<String, List<String>> serverToSegments : serverToSegmentsMap.entrySet()) {
       List<String> segmentsForServer = serverToSegments.getValue();
       List<String> segmentsToQuery = new ArrayList<>();
@@ -295,6 +320,9 @@ public class ServerSegmentMetadataReader {
             segmentsToQuery.add(segment);
           }
         }
+      }
+      for (String segment : segmentsToQuery) {
+        segmentToExpectedReplicaCount.merge(segment, 1, Integer::sum);
       }
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
@@ -352,7 +380,29 @@ public class ServerSegmentMetadataReader {
 
     LOGGER.info("Retrieved validDocIds metadata for {} segments from {} server requests.",
         validDocIdsMetadataInfos.size(), returnedServerRequestsCount);
-    return validDocIdsMetadataInfos;
+    return new ValidDocIdsMetadataResult(validDocIdsMetadataInfos, segmentToExpectedReplicaCount);
+  }
+
+  /// Result of [#getSegmentToValidDocIdsMetadataFromServer]: the per-segment metadata from every responding server,
+  /// plus the expected replica count per segment (how many servers host it). The count lets callers detect a replica
+  /// that did not respond, since a missing replica is simply absent from the metadata.
+  public static class ValidDocIdsMetadataResult {
+    private final Map<String, List<ValidDocIdsMetadataInfo>> _segmentToMetadata;
+    private final Map<String, Integer> _segmentToExpectedReplicaCount;
+
+    public ValidDocIdsMetadataResult(Map<String, List<ValidDocIdsMetadataInfo>> segmentToMetadata,
+        Map<String, Integer> segmentToExpectedReplicaCount) {
+      _segmentToMetadata = segmentToMetadata;
+      _segmentToExpectedReplicaCount = segmentToExpectedReplicaCount;
+    }
+
+    public Map<String, List<ValidDocIdsMetadataInfo>> getSegmentToMetadata() {
+      return _segmentToMetadata;
+    }
+
+    public Map<String, Integer> getSegmentToExpectedReplicaCount() {
+      return _segmentToExpectedReplicaCount;
+    }
   }
 
   /**
@@ -431,11 +481,20 @@ public class ServerSegmentMetadataReader {
   }
 
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, @Nullable List<String> columns,
-      String endpoint) {
+      String endpoint, boolean includeColumnCompressionStats) {
     tableNameWithType = encode(tableNameWithType);
     String columnsParam = UrlBuilderUtils.generateColumnsParam(columns);
     String url = String.format("%s/tables/%s/metadata", endpoint, tableNameWithType);
-    return columnsParam != null ? url + "?" + columnsParam : url;
+    StringBuilder sb = new StringBuilder(url);
+    if (columnsParam != null) {
+      sb.append("?").append(columnsParam);
+      if (includeColumnCompressionStats) {
+        sb.append("&includeColumnCompressionStats=true");
+      }
+    } else if (includeColumnCompressionStats) {
+      sb.append("?includeColumnCompressionStats=true");
+    }
+    return sb.toString();
   }
 
   public String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName,

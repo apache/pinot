@@ -47,12 +47,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java-version: ["21", "25"]
+        java-version: ["25"]
     name: Compile JDK-${{ matrix.java-version }} Pinot
     needs: [generate-build-info]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -71,7 +71,7 @@ jobs:
       fail-fast: false
       matrix:
         java-disto: ["ms-openjdk", "amazoncorretto"]
-        java-version: ["21", "25"]
+        java-version: ["25"]
         arch: ["amd64", "arm64"]
         include:
           - arch: amd64
@@ -82,7 +82,7 @@ jobs:
     needs: [generate-build-info, compile-pinot]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -104,12 +104,12 @@ jobs:
       fail-fast: false
       matrix:
         java-disto: ["ms-openjdk", "amazoncorretto"]
-        java-version: ["21", "25"]
+        java-version: ["25"]
     name: Create ${{ matrix.java-disto }}-${{ matrix.java-version }} Multi-Arch Manifest
     needs: [generate-build-info, package-pinot-docker-image]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

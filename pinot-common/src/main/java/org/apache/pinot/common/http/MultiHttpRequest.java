@@ -21,11 +21,13 @@ package org.apache.pinot.common.http;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import javax.annotation.Nullable;
@@ -80,6 +82,25 @@ public class MultiHttpRequest {
     return execute(urlsAndRequestBodies, requestHeaders, timeoutMs, "GET", HttpGet::new);
   }
 
+  /// Executes cancellable GET requests that buffer each response body before releasing its connection.
+  public BufferedRequestExecution executeGetBuffered(List<String> urls, @Nullable Map<String, String> requestHeaders,
+      int timeoutMs) {
+    BufferedRequestExecution execution = createBufferedExecution(timeoutMs);
+    try {
+      for (String url : urls) {
+        HttpGet request = new HttpGet(url);
+        if (requestHeaders != null) {
+          requestHeaders.forEach(request::setHeader);
+        }
+        execution.submit(request);
+      }
+      return execution;
+    } catch (RuntimeException | Error e) {
+      execution.close();
+      throw e;
+    }
+  }
+
   /**
    * POST urls in parallel using the executor service.
    * @param urlsAndRequestBodies absolute URLs to POST
@@ -118,34 +139,141 @@ public class MultiHttpRequest {
     CompletionService<MultiHttpRequestResponse> completionService = new ExecutorCompletionService<>(_executor);
     CloseableHttpClient client = httpClientBuilder.build();
     for (Pair<String, String> pair : urlsAndRequestBodies) {
+      String url = pair.getLeft();
+      String body = pair.getRight();
+      HttpUriRequestBase httpMethod = httpRequestBaseSupplier.apply(url);
+      // If the http method is POST, set the request body
+      if (httpMethod instanceof HttpPost) {
+        ((HttpPost) httpMethod).setEntity(new StringEntity(body));
+      }
+      if (requestHeaders != null) {
+        requestHeaders.forEach(httpMethod::setHeader);
+      }
       completionService.submit(() -> {
-        String url = pair.getLeft();
-        String body = pair.getRight();
-        HttpUriRequestBase httpMethod = httpRequestBaseSupplier.apply(url);
-        // If the http method is POST, set the request body
-        if (httpMethod instanceof HttpPost) {
-          ((HttpPost) httpMethod).setEntity(new StringEntity(body));
-        }
-        if (requestHeaders != null) {
-          requestHeaders.forEach(((HttpUriRequestBase) httpMethod)::setHeader);
-        }
         CloseableHttpResponse response = null;
+        boolean responseHandedOff = false;
         try {
           response = client.execute(httpMethod);
           httpMethod.setAbsoluteRequestUri(true);
-          return new MultiHttpRequestResponse(URI.create(httpMethod.getRequestUri()), response);
-        } catch (IOException ex) {
-          if (response != null) {
-            String error = EntityUtils.toString(response.getEntity());
-            LOGGER.warn("Caught '{}' while executing: {} on URL: {}", error, httpMethodName, url);
-          } else {
-            // Log only exception type and message instead of the whole stack trace
-            LOGGER.warn("Caught '{}' while executing: {} on URL: {}", ex, httpMethodName, url);
+          MultiHttpRequestResponse result =
+              new MultiHttpRequestResponse(URI.create(httpMethod.getRequestUri()), response);
+          responseHandedOff = true;
+          return result;
+        } finally {
+          if (response != null && !responseHandedOff) {
+            response.close();
           }
-          throw ex;
         }
       });
     }
     return completionService;
+  }
+
+  /// Creates a cancellable execution that buffers each response body before releasing its connection. Callers may
+  /// submit requests with per-request configuration and must close the execution when collection finishes.
+  public BufferedRequestExecution createBufferedExecution(int timeoutMs) {
+    Timeout timeout = Timeout.of(timeoutMs, TimeUnit.MILLISECONDS);
+    RequestConfig defaultRequestConfig =
+        RequestConfig.custom().setConnectionRequestTimeout(timeout).setResponseTimeout(timeout).build();
+    CloseableHttpClient client = HttpClients.custom().setConnectionManager(_connectionManager)
+        .setConnectionManagerShared(true).setDefaultRequestConfig(defaultRequestConfig).build();
+    return new BufferedRequestExecution(new ExecutorCompletionService<>(_executor), client);
+  }
+
+  private static MultiHttpRequestBufferedResponse executeBufferedRequest(CloseableHttpClient client,
+      HttpUriRequestBase httpMethod)
+      throws Exception {
+    try (CloseableHttpResponse response = client.execute(httpMethod)) {
+      httpMethod.setAbsoluteRequestUri(true);
+      URI uri = URI.create(httpMethod.getRequestUri());
+      return new MultiHttpRequestBufferedResponse(uri, response.getCode(), response.getReasonPhrase(),
+          EntityUtils.toString(response.getEntity()));
+    } catch (Exception e) {
+      throw new IOException("Failed to execute request on URL: " + httpMethod.getRequestUri() + ": "
+          + e.getMessage(), e);
+    }
+  }
+
+  /// Mutable execution state for buffered requests. A single collector thread must poll it and close it when done.
+  /// Closing cancels every unfinished request, including when collection exits early.
+  public static final class BufferedRequestExecution implements AutoCloseable {
+    private final CompletionService<MultiHttpRequestBufferedResponse> _completionService;
+    private final CloseableHttpClient _client;
+    private final Map<Future<MultiHttpRequestBufferedResponse>, HttpUriRequestBase> _pendingRequests = new HashMap<>();
+    private boolean _closed;
+
+    private BufferedRequestExecution(CompletionService<MultiHttpRequestBufferedResponse> completionService,
+        CloseableHttpClient client) {
+      _completionService = completionService;
+      _client = client;
+    }
+
+    /// Submits one request and returns its future. The request is cancelled automatically when this execution closes.
+    public Future<MultiHttpRequestBufferedResponse> submit(HttpUriRequestBase request) {
+      if (_closed) {
+        throw new IllegalStateException("Buffered request execution is closed");
+      }
+      try {
+        Future<MultiHttpRequestBufferedResponse> future =
+            _completionService.submit(() -> executeBufferedRequest(_client, request));
+        _pendingRequests.put(future, request);
+        return future;
+      } catch (RuntimeException | Error e) {
+        request.cancel();
+        throw e;
+      }
+    }
+
+    /// Waits for one completed request. The request's own HTTP timeout remains the only timeout applied.
+    public Future<MultiHttpRequestBufferedResponse> take()
+        throws InterruptedException {
+      if (_closed) {
+        throw new IllegalStateException("Buffered request execution is closed");
+      }
+      Future<MultiHttpRequestBufferedResponse> completedFuture = _completionService.take();
+      _pendingRequests.remove(completedFuture);
+      return completedFuture;
+    }
+
+    /// Waits up to the supplied timeout for one completed request.
+    @Nullable
+    public Future<MultiHttpRequestBufferedResponse> poll(long timeout, TimeUnit unit)
+        throws InterruptedException {
+      if (_closed) {
+        throw new IllegalStateException("Buffered request execution is closed");
+      }
+      Future<MultiHttpRequestBufferedResponse> completedFuture = _completionService.poll(timeout, unit);
+      if (completedFuture != null) {
+        _pendingRequests.remove(completedFuture);
+      }
+      return completedFuture;
+    }
+
+    /// Cancels one pending request. Calling this for a request that already completed is harmless.
+    public void cancel(Future<MultiHttpRequestBufferedResponse> future) {
+      HttpUriRequestBase request = _pendingRequests.remove(future);
+      if (request != null) {
+        request.cancel();
+      }
+      future.cancel(true);
+    }
+
+    /// Aborts unfinished HTTP requests and cancels their executor tasks. This method is idempotent.
+    @Override
+    public void close() {
+      if (_closed) {
+        return;
+      }
+      _closed = true;
+      for (Map.Entry<Future<MultiHttpRequestBufferedResponse>, HttpUriRequestBase> entry
+          : new ArrayList<>(_pendingRequests.entrySet())) {
+        cancel(entry.getKey());
+      }
+      try {
+        _client.close();
+      } catch (IOException e) {
+        LOGGER.warn("Failed to close buffered HTTP client: {}", e.getMessage());
+      }
+    }
   }
 }

@@ -34,7 +34,6 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
-import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -146,21 +145,34 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       ValidDocIdsType validDocIdsType = MinionTaskUtils.getValidDocIdsType(tableConfig.getUpsertConfig(), taskConfigs,
           UpsertCompactionTask.VALID_DOC_IDS_TYPE);
 
+      // Validate replicas before scheduling, matching the executor's checks, so inconsistent segments are never
+      // scheduled. With EXECUTOR_ONLY the generator skips these checks (the executor stays the gate).
+      MinionConstants.ValidDocIdsConsensusMode consensusMode = MinionTaskUtils.resolveGeneratorConsensusMode(
+          MinionTaskUtils.parseValidDocIdsConsensusMode(
+              taskConfigs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+                  MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)),
+          MinionTaskUtils.parseValidDocIdsValidationMode(
+              taskConfigs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_VALIDATION_MODE_KEY,
+                  MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_VALIDATION_MODE)));
+
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
       // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
       int numSegmentsBatchPerServerRequest = Integer.parseInt(
           taskConfigs.getOrDefault(UpsertCompactionTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
               String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
 
-      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
+      ServerSegmentMetadataReader.ValidDocIdsMetadataResult validDocIdsMetadataResult =
           serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
               serverToEndpoints, null, 60_000, validDocIdsType.toString(), numSegmentsBatchPerServerRequest);
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
+          validDocIdsMetadataResult.getSegmentToMetadata();
 
       Map<String, SegmentZKMetadata> completedSegmentsMap =
           completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
 
       SegmentSelectionResult segmentSelectionResult =
-          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList);
+          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList,
+              validDocIdsMetadataResult.getSegmentToExpectedReplicaCount(), consensusMode);
       int skippedSegmentsCount = validDocIdsMetadataList.size()
               - segmentSelectionResult.getSegmentsForCompaction().size()
               - segmentSelectionResult.getSegmentsForDeletion().size();
@@ -207,7 +219,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   @VisibleForTesting
   public static SegmentSelectionResult processValidDocIdsMetadata(Map<String, String> taskConfigs,
       Map<String, SegmentZKMetadata> completedSegmentsMap,
-      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap) {
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap,
+      Map<String, Integer> segmentToReplicaCount, MinionConstants.ValidDocIdsConsensusMode consensusMode) {
     double invalidRecordsThresholdPercent = Double.parseDouble(
         taskConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
@@ -223,43 +236,33 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         continue;
       }
       SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
-      for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {
-        long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
 
-        // Skip segments if the crc from zk metadata and server does not match. They may be being reloaded.
-        if (segment.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
-          LOGGER.warn("CRC mismatch for segment: {}, (segmentZKMetadata={}, validDocIdsMetadata={})", segmentName,
-              segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
-          continue;
-        }
+      // Validate replicas (CRC match, server health, validDocIds consensus) before scheduling. Returns null when the
+      // segment should be skipped so we never schedule a task the executor would later reject.
+      List<ValidDocIdsMetadataInfo> replicas = validDocIdsMetadataInfoMap.get(segmentName);
+      ValidDocIdsMetadataInfo validDocIdsMetadata = MinionTaskUtils.selectValidDocIdsMetadataForConsensus(
+          MinionConstants.UpsertCompactionTask.TASK_TYPE, segment, replicas,
+          segmentToReplicaCount.getOrDefault(segmentName, replicas.size()), consensusMode);
+      if (validDocIdsMetadata == null) {
+        continue;
+      }
 
-        // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
-        // server is NOT READY as UPDATING segments might be updating the ONLINE segments
-        if (validDocIdsMetadata.getServerStatus() != null && !validDocIdsMetadata.getServerStatus()
-            .equals(ServiceStatus.Status.GOOD)) {
-          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
-              validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
-              MinionConstants.UpsertCompactionTask.TASK_TYPE, segmentName);
-          continue;
-        }
-
-        long totalDocs = validDocIdsMetadata.getTotalDocs();
-        double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
-        if (totalInvalidDocs == totalDocs) {
-          LOGGER.debug("Segment {} contains only invalid records, adding it to the deletion list", segmentName);
-          segmentsForDeletion.add(segment.getSegmentName());
-        } else if (invalidRecordPercent >= invalidRecordsThresholdPercent
-            && totalInvalidDocs >= invalidRecordsThresholdCount) {
-          LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
-                  + "(count threshold: {}, percent threshold: {}), adding it to the compaction list", segmentName,
-              totalInvalidDocs, totalDocs, invalidRecordsThresholdCount, invalidRecordsThresholdPercent);
-          segmentsForCompaction.add(Pair.of(segment, totalInvalidDocs));
-        } else {
-          LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
-                  + "(count threshold: {}, percent threshold: {}), skipping it for compaction", segmentName,
-              totalInvalidDocs, totalDocs, invalidRecordsThresholdCount, invalidRecordsThresholdPercent);
-        }
-        break;
+      long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
+      long totalDocs = validDocIdsMetadata.getTotalDocs();
+      double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
+      if (totalInvalidDocs == totalDocs) {
+        LOGGER.debug("Segment {} contains only invalid records, adding it to the deletion list", segmentName);
+        segmentsForDeletion.add(segment.getSegmentName());
+      } else if (invalidRecordPercent >= invalidRecordsThresholdPercent
+          && totalInvalidDocs >= invalidRecordsThresholdCount) {
+        LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
+                + "(count threshold: {}, percent threshold: {}), adding it to the compaction list", segmentName,
+            totalInvalidDocs, totalDocs, invalidRecordsThresholdCount, invalidRecordsThresholdPercent);
+        segmentsForCompaction.add(Pair.of(segment, totalInvalidDocs));
+      } else {
+        LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
+                + "(count threshold: {}, percent threshold: {}), skipping it for compaction", segmentName,
+            totalInvalidDocs, totalDocs, invalidRecordsThresholdCount, invalidRecordsThresholdPercent);
       }
     }
     segmentsForCompaction.sort((o1, o2) -> {

@@ -40,6 +40,7 @@
     <module>pinot-arrow</module>
     <module>pinot-avro</module>
     <module>pinot-avro-base</module>
+    <module>pinot-bson</module>
     <module>pinot-clp-log</module>
     <module>pinot-confluent-avro</module>
     <module>pinot-confluent-json</module>

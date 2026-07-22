@@ -19,28 +19,28 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
 
 
-/**
- * Config for vector index.
- *
- * <p>This is the backend-neutral configuration for all vector index types. Common fields include
- * {@code vectorIndexType}, {@code vectorDimension}, {@code vectorDistanceFunction}, and {@code version}.
- * All backend-specific configuration (e.g., HNSW maxCon/beamWidth, IVF_FLAT nlist/trainSampleSize)
- * is stored in the {@code properties} map.</p>
- *
- * <p>The {@code vectorIndexType} field determines which backend is used. If absent or null, it defaults
- * to {@code HNSW} for backward compatibility. Use {@link #resolveBackendType()} to safely resolve the
- * backend type with this default applied.</p>
- *
- * @see VectorBackendType
- * @see VectorIndexConfigValidator
- */
+/// Config for vector index.
+///
+/// This is the backend-neutral configuration for all vector index types. Common fields include
+/// {@code vectorIndexType}, {@code vectorDimension}, {@code vectorDistanceFunction}, and {@code version}.
+/// All backend-specific configuration (e.g., HNSW maxCon/beamWidth, IVF_FLAT nlist/trainSampleSize)
+/// is stored in the {@code properties} map.
+///
+/// The {@code vectorIndexType} field determines which backend is used. If absent or null, it defaults
+/// to {@code HNSW} for backward compatibility. Use {@link #resolveBackendType()} to safely resolve the
+/// backend type with this default applied.
+///
+/// @see VectorBackendType
+/// @see VectorIndexConfigValidator
 public class VectorIndexConfig extends IndexConfig {
   public static final VectorIndexConfig DISABLED = new VectorIndexConfig(true);
   private static final String VECTOR_INDEX_TYPE = "vectorIndexType";
@@ -51,15 +51,20 @@ public class VectorIndexConfig extends IndexConfig {
   private static final VectorDistanceFunction DEFAULT_VECTOR_DISTANCE_FUNCTION =
       VectorDistanceFunction.COSINE;
 
+  /// Key in {@link #_properties} controlling whether the IVF vector index payload is consolidated
+  /// into the segment's combined index file ({@code columns.psf}) instead of living as a separate
+  /// combined file. Default {@code false} preserves the legacy combined layout. Mirrors the text
+  /// index's {@code storeInSegmentFile} flag.
+  public static final String STORE_IN_SEGMENT_FILE = "storeInSegmentFile";
+  public static final boolean DEFAULT_STORE_IN_SEGMENT_FILE = false;
+
   private String _vectorIndexType;
   private int _vectorDimension;
   private int _version;
   private VectorDistanceFunction _vectorDistanceFunction;
   private Map<String, String> _properties;
 
-  /**
-   * @param disabled whether the config is disabled. Null is considered enabled.
-   */
+  /// @param disabled whether the config is disabled. Null is considered enabled.
   public VectorIndexConfig(Boolean disabled) {
     super(disabled);
   }
@@ -139,15 +144,63 @@ public class VectorIndexConfig extends IndexConfig {
     return this;
   }
 
-  /**
-   * Resolves the {@link VectorBackendType} for this config. If {@code vectorIndexType} is null or empty,
-   * defaults to {@link VectorBackendType#HNSW} for backward compatibility.
-   *
-   * @return the resolved backend type
-   * @throws IllegalArgumentException if vectorIndexType is set to an unrecognized value
-   */
+  /// Whether the vector index payload is consolidated into the segment's combined index file
+  /// ({@code columns.psf}) rather than left beside it as a sidecar. Default {@code false}. Only
+  /// applies to V3 segments, and covers both IVF and HNSW backends.
+  ///
+  /// When {@code true} the segment build first produces a transient combined file (the IVF creator
+  /// writes the IVF `.combined.index`; for HNSW the Lucene directory is packed into
+  /// `.vector.hnsw.combined.index`); the {@code VectorIndexHandler} / V2→V3 converter then absorbs
+  /// it into {@code columns.psf} as a typed entry and deletes the sibling. The reader path is
+  /// selected by this flag — flag-on reads from
+  /// {@code segmentReader.getIndexFor(column, StandardIndexes.vector())} (the IVF reader consumes
+  /// the buffer directly; the HNSW reader builds a buffer-backed Lucene `Directory` over it),
+  /// flag-off reads the legacy sidecar (IVF combined mmap or HNSW Lucene directory).
+  ///
+  /// This accessor is intentionally not a JSON property: the value is carried inside the
+  /// {@code properties} map (key {@link #STORE_IN_SEGMENT_FILE}). Marking it {@link JsonIgnore}
+  /// keeps the on-wire shape of {@code VectorIndexConfig} unchanged for callers that round-trip
+  /// the config through Jackson.
+  @JsonIgnore
+  public boolean isStoreInSegmentFile() {
+    if (_properties == null) {
+      return DEFAULT_STORE_IN_SEGMENT_FILE;
+    }
+    String value = _properties.get(STORE_IN_SEGMENT_FILE);
+    return value == null ? DEFAULT_STORE_IN_SEGMENT_FILE : Boolean.parseBoolean(value);
+  }
+
+  /// Resolves the {@link VectorBackendType} for this config. If {@code vectorIndexType} is null or empty,
+  /// defaults to {@link VectorBackendType#HNSW} for backward compatibility.
+  ///
+  /// @return the resolved backend type
+  /// @throws IllegalArgumentException if vectorIndexType is set to an unrecognized value
   public VectorBackendType resolveBackendType() {
     return VectorIndexConfigValidator.resolveBackendType(this);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    VectorIndexConfig that = (VectorIndexConfig) o;
+    return _vectorDimension == that._vectorDimension && _version == that._version
+        && Objects.equals(_vectorIndexType, that._vectorIndexType)
+        && _vectorDistanceFunction == that._vectorDistanceFunction
+        && Objects.equals(_properties, that._properties);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _vectorIndexType, _vectorDimension, _version,
+        _vectorDistanceFunction, _properties);
   }
 
   public String toString() {
@@ -156,12 +209,10 @@ public class VectorIndexConfig extends IndexConfig {
         + _vectorDistanceFunction + ", _properties=" + _properties + '}';
   }
 
-  /**
-   * Distance functions supported by vector indexes.
-   *
-   * <p>Note: {@code L2} is an alias for {@code EUCLIDEAN}. Both refer to Euclidean (L2) distance.
-   * Existing configs using {@code EUCLIDEAN} continue to work unchanged.</p>
-   */
+  /// Distance functions supported by vector indexes.
+  ///
+  /// Note: {@code L2} is an alias for {@code EUCLIDEAN}. Both refer to Euclidean (L2) distance.
+  /// Existing configs using {@code EUCLIDEAN} continue to work unchanged.
   public enum VectorDistanceFunction {
     COSINE, INNER_PRODUCT, EUCLIDEAN, DOT_PRODUCT, L2;
   }

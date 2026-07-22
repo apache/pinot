@@ -51,6 +51,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -63,14 +64,11 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for {@link ArrowFileColumnReaderFactory} and {@link ArrowColumnReader}.
- *
- * <p>Each test materialises a small Arrow IPC file on disk with a known fixture and verifies
- * that the factory can read it back column-by-column using all three documented patterns:
- * generic sequential {@code next()}, typed sequential {@code nextInt() / nextLong() / ...},
- * and random-access {@code getInt(docId) / getLong(docId) / ...}.
- */
+/// Unit tests for [ArrowFileColumnReaderFactory] and [ArrowColumnReader].
+///
+/// Each test materialises a small Arrow IPC file on disk with a known fixture and verifies that the factory can read
+/// it back column-by-column via random access by document id (`getInt(docId) / getLong(docId) / getValue(docId) /
+/// ...`).
 public class ArrowFileColumnReaderFactoryTest {
 
   private static final int ROWS = 8;
@@ -99,7 +97,7 @@ public class ArrowFileColumnReaderFactoryTest {
   }
 
   @Test
-  public void testSequentialReadAllPrimitiveTypes()
+  public void testReadAllPrimitiveTypes()
       throws IOException {
     File arrowFile = writePrimitiveFixture("primitive.arrow");
     org.apache.pinot.spi.data.Schema schema = primitiveSchema();
@@ -111,7 +109,7 @@ public class ArrowFileColumnReaderFactoryTest {
       assertEquals(readers.size(), 6);
       for (ColumnReader r : readers.values()) {
         assertEquals(r.getTotalDocs(), ROWS);
-        assertTrue(r.isSingleValue());
+        assertNotNull(r.getValueType());
       }
 
       ColumnReader intReader = readers.get("intCol");
@@ -121,42 +119,30 @@ public class ArrowFileColumnReaderFactoryTest {
       ColumnReader stringReader = readers.get("stringCol");
       ColumnReader bytesReader = readers.get("bytesCol");
 
-      assertTrue(intReader.isInt());
-      assertTrue(longReader.isLong());
-      assertTrue(floatReader.isFloat());
-      assertTrue(doubleReader.isDouble());
-      assertTrue(stringReader.isString());
-      assertTrue(bytesReader.isBytes());
+      assertEquals(intReader.getValueType(), PinotDataType.INT);
+      assertEquals(longReader.getValueType(), PinotDataType.LONG);
+      assertEquals(floatReader.getValueType(), PinotDataType.FLOAT);
+      assertEquals(doubleReader.getValueType(), PinotDataType.DOUBLE);
+      assertEquals(stringReader.getValueType(), PinotDataType.STRING);
+      assertEquals(bytesReader.getValueType(), PinotDataType.BYTES);
 
-      // Pattern 2: typed sequential read with null handling
       for (int i = 0; i < ROWS; i++) {
         if (i == 3) {
-          assertTrue(intReader.isNextNull(), "Row 3 INT should be null");
-          intReader.skipNext();
-          assertTrue(longReader.isNextNull(), "Row 3 LONG should be null");
-          longReader.skipNext();
-          assertTrue(stringReader.isNextNull(), "Row 3 STRING should be null");
-          stringReader.skipNext();
-          floatReader.nextFloat();
-          doubleReader.nextDouble();
-          bytesReader.nextBytes();
+          assertTrue(intReader.isNull(i));
+          assertTrue(longReader.isNull(i));
+          assertTrue(stringReader.isNull(i));
         } else {
-          assertFalse(intReader.isNextNull());
-          assertEquals(intReader.nextInt(), i * 10);
-          assertEquals(longReader.nextLong(), (long) i * 100);
-          assertEquals(floatReader.nextFloat(), i + 0.5f, 0.0001f);
-          assertEquals(doubleReader.nextDouble(), i + 0.25, 0.0001);
-          assertEquals(stringReader.nextString(), "s_" + i);
-          assertEquals(new String(bytesReader.nextBytes()), "b_" + i);
+          assertFalse(intReader.isNull(i));
+          assertEquals(intReader.getInt(i), i * 10);
+          assertEquals(longReader.getLong(i), (long) i * 100);
         }
+        assertEquals(floatReader.getFloat(i), i + 0.5f, 0.0001f);
+        assertEquals(doubleReader.getDouble(i), i + 0.25, 0.0001);
+        if (i != 3) {
+          assertEquals(stringReader.getString(i), "s_" + i);
+        }
+        assertEquals(new String(bytesReader.getBytes(i)), "b_" + i);
       }
-
-      // Verify rewind enables a second pass.
-      intReader.rewind();
-      stringReader.rewind();
-      assertTrue(intReader.hasNext());
-      assertEquals(intReader.nextInt(), 0);
-      assertEquals(stringReader.nextString(), "s_0");
     }
   }
 
@@ -171,22 +157,18 @@ public class ArrowFileColumnReaderFactoryTest {
       ColumnReader intReader = factory.getColumnReader("intCol");
       ColumnReader longReader = factory.getColumnReader("longCol");
 
-      // Pattern 3: read out of order.
+      // Read out of order.
       assertEquals(intReader.getInt(5), 50);
       assertEquals(intReader.getInt(0), 0);
       assertEquals(intReader.getInt(7), 70);
       assertTrue(intReader.isNull(3));
       assertEquals(longReader.getLong(2), 200L);
       assertEquals(longReader.getValue(3), null);
-
-      // Sequential read is unaffected by prior random-access reads on the same reader.
-      assertTrue(intReader.hasNext());
-      assertEquals(intReader.nextInt(), 0);
     }
   }
 
   @Test
-  public void testGenericNextHandlesNulls()
+  public void testGetValueHandlesNulls()
       throws IOException {
     File arrowFile = writePrimitiveFixture("generic.arrow");
     org.apache.pinot.spi.data.Schema schema = primitiveSchema();
@@ -197,9 +179,8 @@ public class ArrowFileColumnReaderFactoryTest {
 
       int nullCount = 0;
       int nonNullCount = 0;
-      while (stringReader.hasNext()) {
-        Object value = stringReader.next();
-        if (value == null) {
+      for (int docId = 0; docId < stringReader.getTotalDocs(); docId++) {
+        if (stringReader.getValue(docId) == null) {
           nullCount++;
         } else {
           nonNullCount++;
@@ -223,7 +204,7 @@ public class ArrowFileColumnReaderFactoryTest {
       factory.init(schema);
       ColumnReader reader = factory.getColumnReader("intArr");
       assertNotNull(reader);
-      assertFalse(reader.isSingleValue());
+      assertEquals(reader.getValueType(), PinotDataType.INT_ARRAY);
       assertEquals(reader.getTotalDocs(), 3);
 
       MultiValueResult<int[]> doc0 = reader.getIntMV(0);
@@ -242,11 +223,8 @@ public class ArrowFileColumnReaderFactoryTest {
     }
   }
 
-  /**
-   * Type predicates on a multi-value reader reflect the list's <i>element</i> type, not the
-   * {@code ListVector} itself — so an INT multi-value column reports {@code isInt()} (and is not
-   * single-value), letting the build pick the right typed {@code getXxxMV} accessor.
-   */
+  /// The value type on a multi-value reader reflects the list's *element* type combined with its cardinality — so an
+  /// INT multi-value column reports `INT_ARRAY`, letting the build pick the right typed `getXxxMV` accessor.
   @Test
   public void testMultiValueColumnTypePredicates()
       throws IOException {
@@ -260,11 +238,7 @@ public class ArrowFileColumnReaderFactoryTest {
       factory.init(schema);
       ColumnReader reader = factory.getColumnReader("intArr");
       assertNotNull(reader);
-      assertFalse(reader.isSingleValue());
-      assertTrue(reader.isInt(), "INT element type should report isInt()");
-      assertFalse(reader.isLong());
-      assertFalse(reader.isString());
-      assertFalse(reader.isBytes());
+      assertEquals(reader.getValueType(), PinotDataType.INT_ARRAY);
     }
   }
 
@@ -366,14 +340,10 @@ public class ArrowFileColumnReaderFactoryTest {
       assertNotNull(reader);
       assertEquals(reader.getTotalDocs(), 12, "Expected 3 batches of 4 rows = 12 docs total");
 
-      // Sequential traversal yields the global doc order.
-      for (int i = 0; i < 12; i++) {
-        assertEquals(reader.nextInt(), i);
-      }
-      assertFalse(reader.hasNext());
-
       // Random access across batch boundaries.
-      reader.rewind();
+      for (int i = 0; i < 12; i++) {
+        assertEquals(reader.getInt(i), i);
+      }
       assertEquals(reader.getInt(0), 0);
       assertEquals(reader.getInt(3), 3);   // last row of batch 0
       assertEquals(reader.getInt(4), 4);   // first row of batch 1
@@ -429,7 +399,6 @@ public class ArrowFileColumnReaderFactoryTest {
       ColumnReader reader = factory.getColumnReader("seqCol");
       assertNotNull(reader);
       assertEquals(reader.getTotalDocs(), 0);
-      assertFalse(reader.hasNext());
       // SPI contract: an out-of-range docId yields IndexOutOfBoundsException, not an opaque internal
       // error from seeking a non-existent batch.
       assertThrows(IndexOutOfBoundsException.class, () -> reader.getValue(0));
@@ -458,10 +427,9 @@ public class ArrowFileColumnReaderFactoryTest {
       assertNotNull(reader);
       assertEquals(reader.getTotalDocs(), total);
       for (int pass = 0; pass < 2; pass++) {
-        reader.rewind();
         int count = 0;
-        while (reader.hasNext()) {
-          assertEquals(reader.nextInt(), count);
+        for (int docId = 0; docId < total; docId++) {
+          assertEquals(reader.getInt(docId), docId);
           count++;
         }
         assertEquals(count, total, "pass " + pass + " did not read every doc");

@@ -38,6 +38,17 @@ public class WindowValueAggregatorFactory {
    */
   public static WindowValueAggregator<Object> getWindowValueAggregator(String functionName,
       DataSchema.ColumnDataType columnDataType, boolean supportRemoval) {
+    return getWindowValueAggregator(functionName, columnDataType, supportRemoval, false);
+  }
+
+  /**
+   * Returns a window value aggregator for the given function/type. When {@code arbitraryRemoval} is set, MIN / MAX
+   * aggregators that normally use a monotonic deque (which assumes values are removed in arrival order) are replaced
+   * with a sorted-multiset implementation so callers may remove any value at any time — required for window frames
+   * with a non-default {@code EXCLUDE} clause.
+   */
+  public static WindowValueAggregator<Object> getWindowValueAggregator(String functionName,
+      DataSchema.ColumnDataType columnDataType, boolean supportRemoval, boolean arbitraryRemoval) {
     DataSchema.ColumnDataType storedType = columnDataType.getStoredType();
     switch (functionName) {
       // NOTE: Keep both 'SUM0' and '$SUM0' for backward compatibility where 'SUM0' is SqlKind and '$SUM0' is function
@@ -49,9 +60,11 @@ public class WindowValueAggregatorFactory {
       case "AVG":
         return new AvgWindowValueAggregator();
       case "MIN":
-        return createMinAggregator(storedType, supportRemoval);
+        return arbitraryRemoval ? new SortedMultisetMinMaxWindowValueAggregator(true)
+            : createMinAggregator(storedType, supportRemoval);
       case "MAX":
-        return createMaxAggregator(storedType, supportRemoval);
+        return arbitraryRemoval ? new SortedMultisetMinMaxWindowValueAggregator(false)
+            : createMaxAggregator(storedType, supportRemoval);
       case "COUNT":
         return new CountWindowValueAggregator();
       case "BOOLAND":

@@ -165,7 +165,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     assertTrue(operatorClass.isInstance(operator));
 
     SegmentContext segmentContext = new SegmentContext(_upsertIndexSegment);
-    segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(_upsertIndexSegment));
+    segmentContext.setDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(_upsertIndexSegment));
     Operator<?> upsertOperator = PLAN_MAKER.makeSegmentPlanNode(segmentContext, queryContext).run();
     assertTrue(upsertOperatorClass.isInstance(upsertOperator));
   }

@@ -116,6 +116,13 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   private final long _trainingSeed;
   private final VectorIndexConfig.VectorDistanceFunction _distanceFunction;
   private final VectorQuantizerType _quantizerType;
+  /**
+   * When {@code true}, {@link #seal()} writes to the combined-form extension
+   * ({@code .vector.ivfflat.combined.index}) instead of the legacy file extension. The V2→V3
+   * format converter recognises the combined extension and packs the bytes into {@code
+   * columns.psf} via the standard {@code copyIndexIfExists} path.
+   */
+  private final boolean _storeInSegmentFile;
 
   /** All vectors collected during add(), indexed by docId (ordinal). */
   private final List<float[]> _vectors = new ArrayList<>();
@@ -146,13 +153,15 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
         ? Long.parseLong(properties.get("trainingSeed"))
         : System.nanoTime();
     _quantizerType = VectorQuantizationUtils.resolveQuantizerType(properties);
+    _storeInSegmentFile = config.isStoreInSegmentFile();
 
     Preconditions.checkArgument(_dimension > 0, "Vector dimension must be positive, got: %s", _dimension);
     Preconditions.checkArgument(_nlist > 0, "nlist must be positive, got: %s", _nlist);
 
     LOGGER.info("Creating IVF_FLAT index for column: {} in dir: {}, dimension={}, nlist={}, distance={}, "
-            + "quantizer={}",
-        column, indexDir.getAbsolutePath(), _dimension, _nlist, _distanceFunction, _quantizerType);
+            + "quantizer={}, storeInSegmentFile={}",
+        column, indexDir.getAbsolutePath(), _dimension, _nlist, _distanceFunction, _quantizerType,
+        _storeInSegmentFile);
   }
 
   @Override
@@ -493,7 +502,10 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   private void writeIndex(float[][] centroids, int[] assignments, List<Integer>[] invertedLists, int effectiveNlist,
       VectorQuantizer quantizer)
       throws IOException {
-    File indexFile = new File(_indexDir, _column + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+    String extension = _storeInSegmentFile
+        ? V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION
+        : V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
+    File indexFile = new File(_indexDir, _column + extension);
     int numVectors = _vectors.size();
     byte[] quantizerParams = VectorQuantizationUtils.serializeQuantizerParams(quantizer);
     int encodedBytesPerVector = quantizer.getEncodedBytesPerVector();

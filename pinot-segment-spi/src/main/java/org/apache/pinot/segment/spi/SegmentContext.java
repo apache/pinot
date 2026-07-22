@@ -24,8 +24,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 public class SegmentContext {
   private final IndexSegment _indexSegment;
+  /// Queryable-docs bitmap by default, or valid-docs (tombstones included) when the query set `skipUpsertDelete`.
   @Nullable
-  private MutableRoaringBitmap _queryableDocIdsSnapshot = null;
+  private MutableRoaringBitmap _docIdsSnapshot = null;
 
   public SegmentContext(IndexSegment indexSegment) {
     _indexSegment = indexSegment;
@@ -36,11 +37,24 @@ public class SegmentContext {
   }
 
   @Nullable
-  public MutableRoaringBitmap getQueryableDocIdsSnapshot() {
-    return _queryableDocIdsSnapshot;
+  public MutableRoaringBitmap getDocIdsSnapshot() {
+    return _docIdsSnapshot;
   }
 
+  public void setDocIdsSnapshot(@Nullable MutableRoaringBitmap docIdsSnapshot) {
+    _docIdsSnapshot = docIdsSnapshot;
+  }
+
+  /// @deprecated Use {@link #getDocIdsSnapshot} instead; kept for binary compatibility.
+  @Deprecated
+  @Nullable
+  public MutableRoaringBitmap getQueryableDocIdsSnapshot() {
+    return getDocIdsSnapshot();
+  }
+
+  /// @deprecated Use {@link #setDocIdsSnapshot} instead; kept for binary compatibility.
+  @Deprecated
   public void setQueryableDocIdsSnapshot(@Nullable MutableRoaringBitmap queryableDocIdsSnapshot) {
-    _queryableDocIdsSnapshot = queryableDocIdsSnapshot;
+    setDocIdsSnapshot(queryableDocIdsSnapshot);
   }
 }

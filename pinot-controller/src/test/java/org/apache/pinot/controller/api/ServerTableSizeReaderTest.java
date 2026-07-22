@@ -26,12 +26,14 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
@@ -50,7 +52,7 @@ import static org.testng.Assert.assertTrue;
 public class ServerTableSizeReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableSizeReader.class);
 
-  private static final int SERVER_PORT_START = 10000;
+  private static final String LOOPBACK_HOST = "127.0.0.1";
   private static final String URI_PATH = "/table/";
   private static final String TABLE_NAME = "myTable";
   private static final int TIMEOUT_MSEC = 5000;
@@ -61,6 +63,7 @@ public class ServerTableSizeReaderTest {
   private final List<HttpServer> _servers = new ArrayList<>();
   private final List<String> _serverList = new ArrayList<>();
   private final List<String> _endpointList = new ArrayList<>();
+  private final AtomicInteger _compressionRequests = new AtomicInteger();
   private List<Integer> _server1Segments;
   private List<Integer> _server2Segments;
   private TableSizeInfo _tableInfo1;
@@ -72,7 +75,7 @@ public class ServerTableSizeReaderTest {
       throws IOException {
     for (int i = 0; i < SERVER_COUNT; i++) {
       _serverList.add("server_" + i);
-      _endpointList.add("http://localhost:" + (SERVER_PORT_START + i));
+      _endpointList.add(null);
     }
 
     _server1Segments = Arrays.asList(1, 3, 5);
@@ -81,11 +84,12 @@ public class ServerTableSizeReaderTest {
     _tableInfo1 = createTableSizeInfo(TABLE_NAME, _server1Segments);
     _tableInfo2 = createTableSizeInfo(TABLE_NAME, _server2Segments);
     _tableInfo3 = createTableSizeInfo(TABLE_NAME, new ArrayList<Integer>());
-    _servers.add(startServer(SERVER_PORT_START, createHandler(200, _tableInfo1, 0)));
-    _servers.add(startServer(SERVER_PORT_START + 1, createHandler(200, _tableInfo2, 0)));
-    _servers.add(startServer(SERVER_PORT_START + 3, createHandler(500, null, 0)));
-    _servers.add(startServer(SERVER_PORT_START + 4, createHandler(200, null, TIMEOUT_MSEC * 20)));
-    _servers.add(startServer(SERVER_PORT_START + 5, createHandler(200, _tableInfo3, 0)));
+    startServer(0, createHandler(200, _tableInfo1, 0));
+    startServer(1, createHandler(200, _tableInfo2, 0));
+    _endpointList.set(2, endpoint(findUnusedPort()));
+    startServer(3, createHandler(500, null, 0));
+    startServer(4, createHandler(200, null, TIMEOUT_MSEC + 1000));
+    startServer(5, createHandler(200, _tableInfo3, 0));
   }
 
   @AfterClass
@@ -117,6 +121,10 @@ public class ServerTableSizeReaderTest {
       @Override
       public void handle(HttpExchange httpExchange)
           throws IOException {
+        String query = httpExchange.getRequestURI().getQuery();
+        if (query != null && query.contains("includeCompressionStats=true")) {
+          _compressionRequests.incrementAndGet();
+        }
         if (sleepTimeMs > 0) {
           try {
             Thread.sleep(sleepTimeMs);
@@ -133,21 +141,30 @@ public class ServerTableSizeReaderTest {
     };
   }
 
-  private HttpServer startServer(int port, HttpHandler handler)
+  private void startServer(int serverIndex, HttpHandler handler)
       throws IOException {
-    final HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+    HttpServer server = HttpServer.create(new InetSocketAddress(LOOPBACK_HOST, 0), 0);
     server.createContext(URI_PATH, handler);
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        server.start();
-      }
-    }).start();
-    return server;
+    server.start();
+    _servers.add(server);
+    _endpointList.set(serverIndex, endpoint(server.getAddress().getPort()));
+  }
+
+  private static int findUnusedPort()
+      throws IOException {
+    try (ServerSocket socket = new ServerSocket()) {
+      socket.bind(new InetSocketAddress(LOOPBACK_HOST, 0));
+      return socket.getLocalPort();
+    }
+  }
+
+  private static String endpoint(int port) {
+    return "http://" + LOOPBACK_HOST + ":" + port;
   }
 
   @Test
   public void testServerSizeReader() {
+    _compressionRequests.set(0);
     ServerTableSizeReader reader = new ServerTableSizeReader(_executor, _httpConnectionManager);
     BiMap<String, String> endpoints = HashBiMap.create();
     for (int i = 0; i < 2; i++) {
@@ -164,6 +181,8 @@ public class ServerTableSizeReaderTest {
     assertEquals(serverSizes.get(_serverList.get(0)), _tableInfo1.getSegments());
     assertEquals(serverSizes.get(_serverList.get(1)), _tableInfo2.getSegments());
     assertEquals(serverSizes.get(_serverList.get(5)), _tableInfo3.getSegments());
+    assertEquals(_compressionRequests.get(), 0,
+        "The legacy size-reader overload must not request compression statistics");
   }
 
   @Test

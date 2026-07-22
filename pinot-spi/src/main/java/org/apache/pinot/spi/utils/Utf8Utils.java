@@ -34,6 +34,31 @@ public class Utf8Utils {
     return Utf8.encodedLength(s);
   }
 
+  /// Returns the UTF-8 byte length using the same malformed UTF-16 replacement behavior as [String#getBytes()].
+  /// Unlike [#encodedLength(String)], this method does not reject unpaired surrogate code units.
+  public static int encodedLengthWithReplacement(String s) {
+    int length = 0;
+    int index = 0;
+    while (index < s.length()) {
+      char character = s.charAt(index);
+      if (character <= 0x7f) {
+        length++;
+      } else if (character <= 0x7ff) {
+        length += 2;
+      } else if (Character.isHighSurrogate(character) && index + 1 < s.length()
+          && Character.isLowSurrogate(s.charAt(index + 1))) {
+        length += 4;
+        index++;
+      } else if (Character.isSurrogate(character)) {
+        length++;
+      } else {
+        length += 3;
+      }
+      index++;
+    }
+    return length;
+  }
+
   public static String decode(byte[] bytes) {
     return new String(bytes, StandardCharsets.UTF_8);
   }

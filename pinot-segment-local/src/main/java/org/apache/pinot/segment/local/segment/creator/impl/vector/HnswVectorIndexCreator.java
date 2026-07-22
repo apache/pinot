@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.vector;
 import java.io.File;
 import java.io.IOException;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.IndexWriter;
@@ -28,6 +29,7 @@ import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
 import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -50,6 +52,10 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   private final String _vectorColumn;
   private final VectorSimilarityFunction _vectorSimilarityFunction;
   private final int _vectorDimension;
+  // When true, close() packs the Lucene directory into a single combined file and removes the dir.
+  private final boolean _storeInSegmentFile;
+  private final File _segmentIndexDir;
+  private final File _hnswIndexDir;
 
   private int _nextDocId = 0;
 
@@ -57,19 +63,35 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
     _vectorColumn = column;
     _vectorDimension = vectorIndexConfig.getVectorDimension();
     _vectorSimilarityFunction = VectorIndexUtils.toSimilarityFunction(vectorIndexConfig.getVectorDistanceFunction());
+    _storeInSegmentFile = vectorIndexConfig.isStoreInSegmentFile();
+    _segmentIndexDir = segmentIndexDir;
+    // Use local variables so that, if IndexWriter construction fails after FSDirectory is already
+    // open, we can close the directory before rethrowing — preventing a file-descriptor leak.
+    Directory indexDirectory = null;
+    IndexWriter indexWriter;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       File indexFile = new File(segmentIndexDir, _vectorColumn
           + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
-      _indexDirectory = FSDirectory.open(indexFile.toPath());
+      _hnswIndexDir = indexFile;
+      indexDirectory = FSDirectory.open(indexFile.toPath());
       LOGGER.info("Creating HNSW index for column: {} at path: {} with {} for segment: {}", column,
           indexFile.getAbsolutePath(), vectorIndexConfig.getProperties(), segmentIndexDir.getAbsolutePath());
-      _indexWriter = new IndexWriter(_indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
+      indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
     } catch (Exception e) {
+      if (indexDirectory != null) {
+        try {
+          indexDirectory.close();
+        } catch (IOException closeEx) {
+          e.addSuppressed(closeEx);
+        }
+      }
       throw new RuntimeException(
           "Caught exception while instantiating the HnswVectorIndexCreator for column: " + column, e);
     }
+    _indexDirectory = indexDirectory;
+    _indexWriter = indexWriter;
   }
 
   @Override
@@ -115,6 +137,20 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
       _indexDirectory.close();
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while closing the HNSW index for column: " + _vectorColumn, e);
+    }
+    if (_storeInSegmentFile) {
+      // Pack the Lucene directory into a single combined file so the V2→V3 converter can absorb it
+      // into columns.psf as a typed entry (same pattern as LuceneTextIndexCreator).
+      String combinedPath = new File(_segmentIndexDir,
+          _vectorColumn + V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION).getAbsolutePath();
+      try {
+        HnswVectorIndexCombined.combineHnswIndexFiles(_hnswIndexDir, combinedPath, _segmentIndexDir, _vectorColumn);
+        FileUtils.deleteDirectory(_hnswIndexDir);
+        LOGGER.info("Packed HNSW index for column {} into combined file and removed Lucene directory", _vectorColumn);
+      } catch (IOException e) {
+        LOGGER.error("Failed to combine HNSW index for column: {}", _vectorColumn, e);
+        throw e;
+      }
     }
   }
 }

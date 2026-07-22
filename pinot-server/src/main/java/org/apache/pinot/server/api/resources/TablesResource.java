@@ -69,10 +69,12 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
+import org.apache.pinot.common.restlet.resources.SegmentCompressionStatsContribution;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
+import org.apache.pinot.common.restlet.resources.ServerCompressionStatsResponse;
 import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.ServerTableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
-import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
@@ -108,6 +110,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
@@ -239,11 +242,15 @@ public class TablesResource {
             totalSegmentSizeBytes += segmentSizeBytes;
             totalNumRows += segmentMetadata.getTotalDocs();
 
+            Set<String> allSegmentColumns = segmentMetadata.getAllColumns();
             if (columnSet == null) {
-              columnSet = segmentMetadata.getAllColumns();
+              columnSet = allSegmentColumns;
             } else {
-              columnSet.retainAll(segmentMetadata.getAllColumns());
+              columnSet.retainAll(allSegmentColumns);
             }
+            IndexService indexService = IndexService.getInstance();
+
+            // Column stats are scoped to the caller's column filter.
             for (String column : columnSet) {
               ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
               int columnLength = columnMetadata.getLengthOfLongestElement();
@@ -269,14 +276,12 @@ public class TablesResource {
                 maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
               }
 
-              IndexService indexService = IndexService.getInstance();
               for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
                 String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();
                 long value = columnMetadata.getIndexSize(i);
 
                 Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
-                Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + value;
-                columnIndexSizes.put(indexName, indexSize);
+                columnIndexSizes.put(indexName, columnIndexSizes.getOrDefault(indexName, 0d) + value);
                 columnIndexSizesMap.put(column, columnIndexSizes);
               }
             }
@@ -301,11 +306,98 @@ public class TablesResource {
         (partition, primaryKeyCount) -> partitionToServerPrimaryKeyCountMap.put(partition,
             Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
 
-    TableMetadataInfo tableMetadataInfo =
-        new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
-            totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
-            partitionToServerPrimaryKeyCountMap);
+    ServerTableMetadataInfo tableMetadataInfo = ServerTableMetadataInfo.builder(tableDataManager.getTableName())
+        .withDiskSizeInBytes(totalSegmentSizeBytes)
+        .withNumSegments(segmentDataManagers.size())
+        .withNumRows(totalNumRows)
+        .withColumnLengthMap(columnLengthMap)
+        .withColumnCardinalityMap(columnCardinalityMap)
+        .withMaxNumMultiValuesMap(maxNumMultiValuesMap)
+        .withColumnIndexSizeMap(columnIndexSizesMap)
+        .withPartitionToServerPrimaryKeyCountMap(partitionToServerPrimaryKeyCountMap)
+        .build();
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/compression-stats")
+  @ApiOperation(value = "Read compression statistics for selected table segments", hidden = true)
+  public String getCompressionStats(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @ApiParam(value = "Include per-column compression stats")
+      @DefaultValue("false") @QueryParam("includeColumnCompressionStats") boolean includeColumnCompressionStats,
+      @Nullable TableSegments tableSegments, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
+      throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableName);
+    if (tableDataManager == null) {
+      throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
+    }
+
+    List<String> requestedSegments = tableSegments != null && tableSegments.getSegments() != null
+        ? tableSegments.getSegments() : List.of();
+    Map<String, SegmentCompressionStatsContribution> contributions = new HashMap<>(requestedSegments.size());
+    for (String segment : requestedSegments) {
+      contributions.put(segment, new SegmentCompressionStatsContribution(segment, false, -1, -1, null));
+    }
+    Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
+    boolean compressionStatsEnabled = cachedPair != null && cachedPair.getLeft() != null
+        && cachedPair.getLeft().getIndexingConfig() != null
+        && cachedPair.getLeft().getIndexingConfig().isCompressionStatsEnabled();
+    if (compressionStatsEnabled && !requestedSegments.isEmpty()) {
+      Set<String> columnFilter = columns.isEmpty() || columns.contains("*") ? null : new HashSet<>(columns);
+      List<String> missingSegments = new ArrayList<>();
+      List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(requestedSegments,
+          missingSegments);
+      try {
+        int columnContributions = 0;
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          for (IndexSegment indexSegment : segmentDataManager.getReportableSegments()) {
+            if (indexSegment instanceof ImmutableSegment immutableSegment) {
+              if (includeColumnCompressionStats) {
+                columnContributions = addColumnContributions(columnContributions, immutableSegment, columnFilter);
+              }
+              SegmentCompressionStatsContribution contribution = SegmentCompressionStatsReader.read(
+                  immutableSegment.getSegmentMetadata(), includeColumnCompressionStats, columnFilter);
+              contributions.put(contribution.getSegmentName(), contribution);
+            }
+          }
+        }
+      } finally {
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          tableDataManager.releaseSegment(segmentDataManager);
+        }
+      }
+    }
+
+    ServerCompressionStatsResponse response = new ServerCompressionStatsResponse(
+        ServerCompressionStatsResponse.CURRENT_METADATA_VERSION, new ArrayList<>(contributions.values()));
+    return ResourceUtils.convertToJsonString(response);
+  }
+
+  static int addColumnContributions(int currentCount, ImmutableSegment segment,
+      @Nullable Set<String> columnFilter) {
+    int additionalCount = 0;
+    if (columnFilter == null) {
+      additionalCount = segment.getSegmentMetadata().getColumnMetadataMap().size();
+    } else {
+      for (String column : columnFilter) {
+        if (segment.getSegmentMetadata().getColumnMetadataMap().containsKey(column)) {
+          additionalCount++;
+        }
+      }
+    }
+    long totalCount = (long) currentCount + additionalCount;
+    if (totalCount > ServerCompressionStatsResponse.MAX_COLUMN_CONTRIBUTIONS_PER_RESPONSE) {
+      throw new WebApplicationException("Compression statistics response exceeds the per-request column "
+          + "contribution limit", Response.Status.REQUEST_ENTITY_TOO_LARGE);
+    }
+    return (int) totalCount;
   }
 
   @GET
@@ -573,8 +665,8 @@ public class TablesResource {
       }
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
-          finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(),
-          status);
+          toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc()), finalValidDocIdsType, validDocIdsBytes,
+          _serverInstance.getInstanceDataManager().getInstanceId(), status);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
@@ -747,6 +839,10 @@ public class TablesResource {
         validDocIdsMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
+        String reportableDataCrc = toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc());
+        if (reportableDataCrc != null) {
+          validDocIdsMetadata.put("segmentDataCrc", reportableDataCrc);
+        }
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
         validDocIdsMetadata.put("serverStatus", status);
         validDocIdsMetadata.put("instanceId", _serverInstance.getInstanceDataManager().getInstanceId());
@@ -772,6 +868,12 @@ public class TablesResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+  }
+
+  /// The segment's data CRC to report, or null when unavailable (negative).
+  @Nullable
+  private static String toReportableDataCrc(String dataCrc) {
+    return dataCrc != null && Long.parseLong(dataCrc) >= 0 ? dataCrc : null;
   }
 
   private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,

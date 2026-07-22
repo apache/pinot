@@ -40,6 +40,12 @@ $ cd target/pinot-perf-pkg/bin
 $ ./pinot-BenchmarkDictionary.sh
 ```
 
+# TDigest percentile aggregation benchmarks
+
+See the [100-million-row TDigest percentile benchmark](benchmark-results/percentile-tdigest-aggregation-100m-results.md)
+for sample `PERCENTILETDIGEST` queries, a sample star-tree index config, reproducible JMH commands, and
+baseline-versus-optimized raw-value, reduction, and star-tree results.
+
 # Vector benchmark suite
 
 `org.apache.pinot.perf.BenchmarkVectorIndex` is the canonical entry point for Pinot's vector

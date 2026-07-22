@@ -27,6 +27,7 @@ import org.apache.pinot.spi.metrics.PinotMeter;
  */
 public enum ServerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", true),
+  QUERIES_ON_TABLE("queries", false),
   UNCAUGHT_EXCEPTIONS("exceptions", true),
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", true),
   RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
@@ -221,6 +222,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
   PREDOWNLOAD_SUCCEED("predownloadSucceed", true),
   PREDOWNLOAD_FAILED("predownloadFailed", true),
+  PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_COUNT("predownloadPeerSegmentCount", true),
+  PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadPeerSegmentFailureCount", false),
+  PREDOWNLOAD_DEEPSTORE_DOWNLOAD_COUNT("predownloadDeepstoreDownloadCount", true),
 
   // reingestion metrics
   SEGMENT_REINGESTION_FAILURE("segments", false),
@@ -257,6 +261,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   TRANSFORMATION_ERROR_COUNT("rows", false),
   DROPPED_RECORD_COUNT("rows", false),
   CORRUPTED_RECORD_COUNT("rows", false),
+  OPEN_STRUCT_TYPE_COERCION_FAILURES("values", false,
+      "Number of OPEN_STRUCT values dropped because the value could not be coerced to the key's inferred type"),
   // Workload related metrics
   WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", true, "Number of times workload budget exceeded"),
   WORKLOAD_QUERIES("queries", false),

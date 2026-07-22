@@ -28,6 +28,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
@@ -432,14 +433,11 @@ public class BrokerRequestToQueryContextConverterTest {
       FilterContext firstChild = children.get(0);
       assertEquals(firstChild.getType(), FilterContext.Type.PREDICATE);
       Predicate predicate = firstChild.getPredicate();
-      assertEquals(predicate.getType(), Predicate.Type.RANGE);
-      RangePredicate rangePredicate = (RangePredicate) predicate;
-      assertEquals(rangePredicate.getLowerBound(), "0");
-      assertFalse(rangePredicate.isLowerInclusive());
-      assertEquals(rangePredicate.getUpperBound(), RangePredicate.UNBOUNDED);
-      assertFalse(rangePredicate.isUpperInclusive());
-      function = rangePredicate.getLhs().getFunction();
-      assertEquals(function.getFunctionName(), "minus");
+      assertEquals(predicate.getType(), Predicate.Type.EQ);
+      EqPredicate eqPredicate = (EqPredicate) predicate;
+      assertEquals(eqPredicate.getValue(), "true");
+      function = eqPredicate.getLhs().getFunction();
+      assertEquals(function.getFunctionName(), "greater_than");
       arguments = function.getArguments();
       assertEquals(arguments.size(), 2);
       assertEquals(arguments.get(0), ExpressionContext.forFunction(

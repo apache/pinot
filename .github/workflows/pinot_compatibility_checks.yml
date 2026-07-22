@@ -54,10 +54,10 @@ jobs:
     name: Pinot Binary Compatibility Check
     steps:
       - uses: actions/checkout@v7
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v5
         with:
-          java-version: 21
+          java-version: 25
           distribution: 'temurin'
           cache: 'maven'
       # Step that does that actual cache save and restore
@@ -184,14 +184,14 @@ jobs:
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v7
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v5
         with:
-          java-version: 21
+          java-version: 25
           distribution: 'temurin'
           cache: 'maven'
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: v16.15.0
           cache: 'npm'
@@ -243,14 +243,14 @@ jobs:
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v7
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v5
         with:
-          java-version: 21
+          java-version: 25
           distribution: 'temurin'
           cache: 'maven'
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: v16.15.0
           cache: 'npm'

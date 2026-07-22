@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.EmptyColumnStatistics;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
+import org.apache.pinot.segment.local.segment.index.openstruct.MutableOpenStructDataSource;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
@@ -77,6 +78,13 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
     // TODO: Add compaction support to MAP
     if (dataSource instanceof MutableMapDataSource) {
       return createMapColumnStatistics(dataSource, validDocIds, statsCollectorConfig);
+    }
+    // OPEN_STRUCT parent columns have no forward index of their own — per-key stats are recomputed
+    // by the splitter at offline-segment build time. Return EmptyColumnStatistics so the standard
+    // dispatch (which would call getForwardIndex / getDictionary) doesn't NPE.
+    if (dataSource instanceof MutableOpenStructDataSource) {
+      return new EmptyColumnStatistics(dataSourceMetadata.getFieldSpec(), dataSourceMetadata.getPartitionFunction(),
+          dataSourceMetadata.getPartitions());
     }
     if (validDocIds != null) {
       if (dataSource.getDictionary() != null) {

@@ -118,7 +118,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
 
     List<RecordReader> recordReaders = segmentMetadataList.stream().map(x -> {
       RoaringBitmap validDocIds = MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
-          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc(), consensusMode);
+          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc(), x.getDataCrc(), consensusMode);
       if (validDocIds == null) {
         // no valid crc match found or no validDocIds obtained from all servers
         // error out the task instead of silently failing so that we can track it via task-error metrics

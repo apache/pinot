@@ -50,6 +50,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreInd
 import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMetadata;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -472,7 +473,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // We always create a dictionary for default value columns.
     // We will have only one value in the dictionary.
     int dictionaryElementSize;
-    try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(fieldSpec, _indexDir, false)) {
+    try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(fieldSpec, _indexDir, false,
+        SegmentDictionaryCreator.UncompressedValueSizeTracking.fromEnabled(isCompressionStatsEnabled()))) {
       creator.build(sortedArray);
       dictionaryElementSize = creator.getNumBytesPerEntry();
     }
@@ -529,6 +531,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Add the column metadata information to the metadata properties.
     BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, totalDocs, fieldSpec, true,
         dictionaryElementSize, FieldConfig.EncodingType.DICTIONARY, true);
+    DataType storedType = fieldSpec.getDataType().getStoredType();
+    long uncompressedValueSizeInBytes = (long) columnStatistics.getTotalNumberOfEntries()
+        * (storedType.isFixedWidth() ? storedType.size() : dictionaryElementSize);
+    putDictionaryCompressionStats(column, uncompressedValueSizeInBytes);
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
@@ -1089,7 +1095,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Create dictionary
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, _indexDir,
-        useVarLengthDictionary)) {
+        useVarLengthDictionary,
+        SegmentDictionaryCreator.UncompressedValueSizeTracking.fromEnabled(isCompressionStatsEnabled()))) {
       dictionaryCreator.build(columnStatistics.getUniqueValuesSet());
 
       int numDocs = outputValues.length;
@@ -1112,6 +1119,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         // Add the column metadata
         BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, numDocs, fieldSpec, true,
             dictionaryCreator.getNumBytesPerEntry(), FieldConfig.EncodingType.DICTIONARY, true);
+        DataType storedType = fieldSpec.getDataType().getStoredType();
+        long uncompressedValueSizeInBytes = storedType.isFixedWidth()
+            ? (long) columnStatistics.getTotalNumberOfEntries() * storedType.size()
+            : dictionaryCreator.getTotalVariableLengthUncompressedValueSizeInBytes();
+        putDictionaryCompressionStats(column, uncompressedValueSizeInBytes);
       }
     }
   }
@@ -1127,6 +1139,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     int numDocs = outputValues.length;
     boolean isSingleValue = fieldSpec.isSingleValueField();
 
+    CompressionStatsMetadata compressionMetadata;
     try (ForwardIndexCreator forwardIndexCreator
         = getForwardIndexCreator(columnStatistics, column, false)) {
       if (isSingleValue) {
@@ -1192,19 +1205,30 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
       }
       forwardIndexCreator.seal();
+      compressionMetadata = CompressionStatsMetadata.forRawForwardIndex(
+          forwardIndexCreator.getRawForwardIndexUncompressedValueSizeInBytes(),
+          forwardIndexCreator.getRawForwardIndexChunkCompressionType());
     }
 
     // Add the column metadata
     BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, numDocs, fieldSpec, false,
         0, FieldConfig.EncodingType.RAW, true);
+    compressionMetadata.applyTo(_segmentProperties, column);
   }
 
   private ForwardIndexCreator getForwardIndexCreator(ColumnStatistics columnStatistics,
       String column, boolean hasDictionary)
       throws Exception {
     IndexCreationContext indexCreationContext =
-        new IndexCreationContext.Builder(_indexDir, _tableConfig, columnStatistics, hasDictionary).build();
+        new IndexCreationContext.Builder(_indexDir, _tableConfig, columnStatistics, hasDictionary)
+            .withCompressionStatsEnabled(isCompressionStatsEnabled())
+            .build();
 
+    ForwardIndexConfig forwardIndexConfig = getForwardIndexConfig(column, hasDictionary);
+    return StandardIndexes.forward().createIndexCreator(indexCreationContext, forwardIndexConfig);
+  }
+
+  private ForwardIndexConfig getForwardIndexConfig(String column, boolean hasDictionary) {
     ForwardIndexConfig forwardIndexConfig = null;
     FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
     if (fieldIndexConfig != null) {
@@ -1214,7 +1238,19 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       forwardIndexConfig = ForwardIndexConfig.getDefault(
           hasDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW);
     }
-    return StandardIndexes.forward().createIndexCreator(indexCreationContext, forwardIndexConfig);
+    return forwardIndexConfig;
+  }
+
+  private boolean isCompressionStatsEnabled() {
+    return _tableConfig.getIndexingConfig() != null
+        && _tableConfig.getIndexingConfig().isCompressionStatsEnabled();
+  }
+
+  private void putDictionaryCompressionStats(String column, long uncompressedValueSizeInBytes) {
+    CompressionStatsMetadata compressionMetadata = isCompressionStatsEnabled()
+        ? CompressionStatsMetadata.forDictionary(uncompressedValueSizeInBytes)
+        : CompressionStatsMetadata.unavailable();
+    compressionMetadata.applyTo(_segmentProperties, column);
   }
 
   @SuppressWarnings("rawtypes")

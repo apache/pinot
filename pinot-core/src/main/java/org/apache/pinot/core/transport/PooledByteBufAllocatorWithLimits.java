@@ -30,17 +30,42 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Utility class for setting limits in the PooledByteBufAllocator.
+ * Utility class that creates a {@link PooledByteBufAllocator} with a reduced number of direct arenas to limit the
+ * direct memory retained by the pool, and owns the process-wide shared instance of it. Thread-safe.
  */
 public class PooledByteBufAllocatorWithLimits {
   private static final Logger LOGGER = LoggerFactory.getLogger(PooledByteBufAllocatorWithLimits.class);
+  private static volatile PooledByteBufAllocator _sharedBufferAllocatorWithLimits;
 
   private PooledByteBufAllocatorWithLimits() {
   }
 
+  /**
+   * Returns the shared allocator, creating it on first use. All unshaded Netty query transports within the process
+   * (all broker side {@link ServerChannels} and the server side {@link QueryServer}) must share this single
+   * allocator: pooled arenas retain chunk memory after the buffers allocated from them are released, and free space
+   * in one allocator's pool can never serve another allocator's allocations, so per-connection allocators can retain
+   * many times the intended amount of direct memory and exhaust it. Note that the reduced arena count limits the
+   * worst case retention but is not a hard cap on direct memory usage. The gRPC based transports use shaded Netty
+   * classes and maintain their own allocators.
+   */
+  public static PooledByteBufAllocator getSharedBufferAllocatorWithLimits() {
+    PooledByteBufAllocator sharedAllocator = _sharedBufferAllocatorWithLimits;
+    if (sharedAllocator == null) {
+      synchronized (PooledByteBufAllocatorWithLimits.class) {
+        sharedAllocator = _sharedBufferAllocatorWithLimits;
+        if (sharedAllocator == null) {
+          sharedAllocator = getBufferAllocatorWithLimits(PooledByteBufAllocator.DEFAULT.metric());
+          _sharedBufferAllocatorWithLimits = sharedAllocator;
+        }
+      }
+    }
+    return sharedAllocator;
+  }
+
   // Reduce the number of direct arenas when using netty channels on broker and server side to limit the direct
   // memory usage
-  public static PooledByteBufAllocator getBufferAllocatorWithLimits(PooledByteBufAllocatorMetric metric) {
+  private static PooledByteBufAllocator getBufferAllocatorWithLimits(PooledByteBufAllocatorMetric metric) {
     int defaultPageSize = SystemPropertyUtil.getInt("io.netty.allocator.pageSize", 8192);
     final int defaultMinNumArena = NettyRuntime.availableProcessors() * 2;
     int defaultMaxOrder = SystemPropertyUtil.getInt("io.netty.allocator.maxOrder", 9);
@@ -48,10 +73,16 @@ public class PooledByteBufAllocatorWithLimits {
     long maxDirectMemory = PlatformDependent.maxDirectMemory();
     long remainingDirectMemory = maxDirectMemory - getReservedMemory();
 
+    // Floor the default at 1: this allocator is created once and shared for the lifetime of the process, so a
+    // depleted direct memory snapshot at creation time must not permanently disable pooling. An explicit
+    // io.netty.allocator.numDirectArenas=0 still disables direct arenas.
     int numDirectArenas = Math.max(0, SystemPropertyUtil.getInt("io.netty.allocator.numDirectArenas",
-        (int) Math.min(defaultMinNumArena, remainingDirectMemory / defaultChunkSize / 5)));
+        (int) Math.max(1, Math.min(defaultMinNumArena, remainingDirectMemory / defaultChunkSize / 5))));
     boolean useCacheForAllThreads = SystemPropertyUtil.getBoolean("io.netty.allocator.useCacheForAllThreads", false);
 
+    LOGGER.info("Creating PooledByteBufAllocator with numDirectArenas: {}, numHeapArenas: {}, chunkSize: {}, "
+            + "remainingDirectMemory: {}", numDirectArenas, metric.numHeapArenas(), defaultChunkSize,
+        remainingDirectMemory);
     return new PooledByteBufAllocator(true, metric.numHeapArenas(), numDirectArenas, defaultPageSize, defaultMaxOrder,
         metric.smallCacheSize(), metric.normalCacheSize(), useCacheForAllThreads);
   }

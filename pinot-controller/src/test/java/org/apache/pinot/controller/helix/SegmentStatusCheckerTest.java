@@ -57,13 +57,17 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -148,16 +152,77 @@ public class SegmentStatusCheckerTest {
   }
 
   private void runSegmentStatusChecker(PinotHelixResourceManager resourceManager, int waitForPushTimeInSeconds) {
+    runSegmentStatusChecker(resourceManager, waitForPushTimeInSeconds, mock(TableSizeReader.class));
+  }
+
+  private void runSegmentStatusChecker(PinotHelixResourceManager resourceManager, int waitForPushTimeInSeconds,
+      TableSizeReader tableSizeReader) {
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     ControllerConf controllerConf = mock(ControllerConf.class);
     when(controllerConf.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(waitForPushTimeInSeconds);
-    TableSizeReader tableSizeReader = mock(TableSizeReader.class);
     SegmentStatusChecker segmentStatusChecker =
         new SegmentStatusChecker(resourceManager, leadControllerManager, controllerConf, _controllerMetrics,
             tableSizeReader);
     segmentStatusChecker.start();
     segmentStatusChecker.run();
+  }
+
+  @DataProvider(name = "compressionMetricLifecycle")
+  public Object[][] compressionMetricLifecycle() {
+    return new Object[][]{
+        {TableType.OFFLINE, true, true, false},
+        {TableType.REALTIME, true, true, false},
+        {TableType.OFFLINE, false, true, false},
+        {TableType.REALTIME, false, true, false},
+        {TableType.OFFLINE, false, true, true},
+        {TableType.REALTIME, true, false, true},
+        {TableType.OFFLINE, true, true, true}
+    };
+  }
+
+  @Test(dataProvider = "compressionMetricLifecycle")
+  public void testCompressionMetricLifecycle(TableType tableType, boolean enabled, boolean tableSizePresent,
+      boolean subtypeMissing)
+      throws Exception {
+    TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(tableType).setTableName(RAW_TABLE_NAME)
+        .setCompressionStatsEnabled(enabled);
+    if (tableType == TableType.REALTIME) {
+      tableConfigBuilder.setTimeColumnName("timeColumn").setStreamConfigs(getStreamConfigMap());
+    }
+    TableConfig tableConfig = tableConfigBuilder.build();
+    String tableNameWithType = tableType == TableType.OFFLINE ? OFFLINE_TABLE_NAME : REALTIME_TABLE_NAME;
+
+    TableSizeReader.TableSubTypeSizeDetails subtypeDetails = new TableSizeReader.TableSubTypeSizeDetails();
+    TableSizeReader.TableSizeDetails tableSizeDetails = null;
+    if (tableSizePresent) {
+      tableSizeDetails = new TableSizeReader.TableSizeDetails(RAW_TABLE_NAME);
+      if (!subtypeMissing) {
+        if (tableType == TableType.OFFLINE) {
+          tableSizeDetails._offlineSegments = subtypeDetails;
+        } else {
+          tableSizeDetails._realtimeSegments = subtypeDetails;
+        }
+      }
+    }
+
+    TableSizeReader tableSizeReader = mock(TableSizeReader.class);
+    when(tableSizeReader.getTableSizeDetails(tableNameWithType, 30_000, true,
+        TableSizeReader.CompressionStatsMode.AGGREGATE_SUMMARY)).thenReturn(tableSizeDetails);
+    SegmentStatusChecker checker = new SegmentStatusChecker(mock(PinotHelixResourceManager.class),
+        mock(LeadControllerManager.class), mock(ControllerConf.class), _controllerMetrics, tableSizeReader);
+
+    checker.updateTableSizeMetrics(tableNameWithType, tableConfig);
+
+    verify(tableSizeReader).getTableSizeDetails(tableNameWithType, 30_000, true,
+        TableSizeReader.CompressionStatsMode.AGGREGATE_SUMMARY);
+    if (enabled && tableSizePresent && !subtypeMissing) {
+      verify(tableSizeReader).updateCompressionMetrics(tableNameWithType, subtypeDetails);
+      verify(tableSizeReader, never()).clearCompressionMetrics(tableNameWithType);
+    } else {
+      verify(tableSizeReader).clearCompressionMetrics(tableNameWithType);
+      verify(tableSizeReader, never()).updateCompressionMetrics(anyString(), any());
+    }
   }
 
   private void verifyControllerMetrics(String tableNameWithType, int expectedReplicationFromConfig,
@@ -689,7 +754,8 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
-  public void disabledTableTest() {
+  public void disabledTableTest()
+      throws Exception {
     IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
     // disable table in idealstate
     idealState.enable(false);
@@ -703,9 +769,12 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
     when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
 
-    runSegmentStatusChecker(resourceManager, 0);
+    TableSizeReader tableSizeReader = mock(TableSizeReader.class);
+    runSegmentStatusChecker(resourceManager, 0, tableSizeReader);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, ControllerGauge.DISABLED_TABLE_COUNT), 1);
     verifyControllerMetricsNotExist();
+    verify(tableSizeReader, never()).getTableSizeDetails(anyString(), anyInt(), anyBoolean(),
+        any(TableSizeReader.CompressionStatsMode.class));
   }
 
   @Test
