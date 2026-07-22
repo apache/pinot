@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.core.segment.processing.partitioner;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -31,15 +33,27 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class TableConfigPartitioner implements Partitioner {
   private final String _column;
   private final PartitionFunction _partitionFunction;
+  /// Non-null when the column's logical type is known. Used to render values via
+  /// {@link DataType#toString(Object)} so UUID columns produce the canonical RFC 4122 form
+  /// (matching MutableSegmentImpl's runtime partition path and the {@code Uuid} partition function's
+  /// expectation) instead of the bare-hex string that {@link FieldSpec#getStringValue} would emit.
+  @Nullable
+  private final DataType _dataType;
 
   public TableConfigPartitioner(String columnName, ColumnPartitionConfig columnPartitionConfig) {
+    this(columnName, columnPartitionConfig, null);
+  }
+
+  public TableConfigPartitioner(String columnName, ColumnPartitionConfig columnPartitionConfig,
+      @Nullable DataType dataType) {
     _column = columnName;
     _partitionFunction = PartitionFunctionFactory.getPartitionFunction(columnPartitionConfig);
+    _dataType = dataType;
   }
 
   @Override
   public String getPartition(GenericRow genericRow) {
-    return String.valueOf(_partitionFunction.getPartition(FieldSpec.getStringValue(genericRow.getValue(_column))));
+    return String.valueOf(_partitionFunction.getPartition(toPartitionString(genericRow.getValue(_column))));
   }
 
   @Override
@@ -53,6 +67,10 @@ public class TableConfigPartitioner implements Partitioner {
       throw new IllegalArgumentException(
           "TableConfigPartitioner expects exactly 1 column value, got " + columnValues.length);
     }
-    return String.valueOf(_partitionFunction.getPartition(FieldSpec.getStringValue(columnValues[0])));
+    return String.valueOf(_partitionFunction.getPartition(toPartitionString(columnValues[0])));
+  }
+
+  private String toPartitionString(Object value) {
+    return _dataType != null ? _dataType.toString(value) : FieldSpec.getStringValue(value);
   }
 }

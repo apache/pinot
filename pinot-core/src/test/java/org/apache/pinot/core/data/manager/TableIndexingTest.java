@@ -162,7 +162,7 @@ public class TableIndexingTest {
           || type == DataType.OPEN_STRUCT || type == DataType.UUID) {
         // UUID is excluded because this static expectation matrix (TableIndexingTest.csv) has no UUID rows.
         // UUID-specific index behavior (inverted, bloom, range, dictionary/no-dictionary, SV and MV) is covered by
-        // dedicated UUID unit and integration tests introduced in later PRs of this stack.
+        // the dedicated UUID tests (UuidTypeTest, UuidTypeRealtimeTest and the UUID segment/index unit tests).
         continue;
       }
 

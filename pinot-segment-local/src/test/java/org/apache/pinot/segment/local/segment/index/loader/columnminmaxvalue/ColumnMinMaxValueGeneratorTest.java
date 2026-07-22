@@ -39,49 +39,84 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/// Regression tests for [ColumnMinMaxValueGenerator] on raw BYTES columns.
-///
-/// The generator reads the forward index when column metadata does not contain min/max values. These tests exercise
-/// both single-value and multi-value forward index paths and verify their unsigned byte-wise ordering.
+/**
+ * Regression tests for {@link ColumnMinMaxValueGenerator} on raw (no-dictionary) BYTES and UUID columns.
+ *
+ * <p>The raw-BYTES loop once had its comparison directions inverted ({@code > 0} accepted as new min,
+ * {@code < 0} as new max), silently persisting swapped min/max metadata that value-based segment pruning then
+ * consumed. These tests build a real segment, strip the min/max metadata the segment-build stats collector wrote,
+ * re-generate via the loader path, and assert the persisted direction.
+ */
 public class ColumnMinMaxValueGeneratorTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), ColumnMinMaxValueGeneratorTest.class.getSimpleName());
   private static final String SEGMENT_NAME = "testSegment";
   private static final String BYTES_COLUMN = "bytesCol";
   private static final String BYTES_MV_COLUMN = "bytesMvCol";
+  private static final String UUID_COLUMN = "uuidCol";
 
+  // Ordered ascending by unsigned byte-wise comparison
   private static final byte[] BYTES_SMALL = new byte[]{0x00, 0x01};
   private static final byte[] BYTES_MID = new byte[]{0x10, (byte) 0xff};
   private static final byte[] BYTES_LARGE = new byte[]{(byte) 0x80, 0x00};
 
+  private static final String UUID_SMALL = "00000000-0000-0000-0000-000000000001";
+  private static final String UUID_MID = "550e8400-e29b-41d4-a716-446655440000";
+  private static final String UUID_LARGE = "ffffffff-ffff-ffff-ffff-fffffffffffe";
+
   @Test
-  public void testRawBytesMinMaxDirection()
+  public void testRawBytesAndUuidMinMaxDirection()
       throws Exception {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
         .addMultiValueDimension(BYTES_MV_COLUMN, DataType.BYTES)
+        .addSingleValueDimension(UUID_COLUMN, DataType.UUID)
         .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
-        .setNoDictionaryColumns(List.of(BYTES_COLUMN, BYTES_MV_COLUMN))
+        .setNoDictionaryColumns(List.of(BYTES_COLUMN, BYTES_MV_COLUMN, UUID_COLUMN))
         .build();
 
-    File indexDir = buildSegment(tableConfig, schema, createRows());
+    File indexDir = buildSegment(tableConfig, schema);
     removeMinMaxValuesFromMetadataFile(indexDir);
-
     generateMinMaxValues(indexDir);
 
     SegmentMetadataImpl reloaded = new SegmentMetadataImpl(indexDir);
-    assertMinMax(reloaded, BYTES_COLUMN);
-    assertMinMax(reloaded, BYTES_MV_COLUMN);
+
+    Comparable<?> bytesMin = reloaded.getColumnMetadataFor(BYTES_COLUMN).getMinValue();
+    Comparable<?> bytesMax = reloaded.getColumnMetadataFor(BYTES_COLUMN).getMaxValue();
+    assertNotNull(bytesMin);
+    assertNotNull(bytesMax);
+    assertEquals(bytesMin, new ByteArray(BYTES_SMALL), "Raw BYTES min must be the smallest unsigned value");
+    assertEquals(bytesMax, new ByteArray(BYTES_LARGE), "Raw BYTES max must be the largest unsigned value");
+    assertTrue(((ByteArray) bytesMin).compareTo((ByteArray) bytesMax) < 0, "min must order before max");
+
+    Comparable<?> uuidMin = reloaded.getColumnMetadataFor(UUID_COLUMN).getMinValue();
+    Comparable<?> uuidMax = reloaded.getColumnMetadataFor(UUID_COLUMN).getMaxValue();
+    assertNotNull(uuidMin);
+    assertNotNull(uuidMax);
+    assertEquals(uuidMin, new ByteArray(UuidUtils.toBytes(UUID_SMALL)),
+        "UUID min must be the smallest canonical UUID");
+    assertEquals(uuidMax, new ByteArray(UuidUtils.toBytes(UUID_LARGE)),
+        "UUID max must be the largest canonical UUID");
+
+    // The raw-BYTES MV loop is a distinct code path sharing the comparator with the SV loop
+    Comparable<?> bytesMvMin = reloaded.getColumnMetadataFor(BYTES_MV_COLUMN).getMinValue();
+    Comparable<?> bytesMvMax = reloaded.getColumnMetadataFor(BYTES_MV_COLUMN).getMaxValue();
+    assertNotNull(bytesMvMin);
+    assertNotNull(bytesMvMax);
+    assertEquals(bytesMvMin, new ByteArray(BYTES_SMALL), "Raw MV BYTES min must be the smallest unsigned value");
+    assertEquals(bytesMvMax, new ByteArray(BYTES_LARGE), "Raw MV BYTES max must be the largest unsigned value");
   }
 
   @Test
@@ -104,14 +139,6 @@ public class ColumnMinMaxValueGeneratorTest {
     assertTrue(reloaded.getColumnMetadataFor(BYTES_COLUMN).isMinMaxValueInvalid());
   }
 
-  private static void assertMinMax(SegmentMetadataImpl segmentMetadata, String column) {
-    ByteArray min = (ByteArray) segmentMetadata.getColumnMetadataFor(column).getMinValue();
-    ByteArray max = (ByteArray) segmentMetadata.getColumnMetadataFor(column).getMaxValue();
-    assertEquals(min, new ByteArray(BYTES_SMALL));
-    assertEquals(max, new ByteArray(BYTES_LARGE));
-    assertTrue(min.compareTo(max) < 0);
-  }
-
   private static void generateMinMaxValues(File indexDir)
       throws Exception {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -123,15 +150,24 @@ public class ColumnMinMaxValueGeneratorTest {
     }
   }
 
-  private static List<GenericRow> createRows() {
+  private static File buildSegment(TableConfig tableConfig, Schema schema)
+      throws Exception {
     List<GenericRow> rows = new ArrayList<>();
-    for (byte[] value : new byte[][]{BYTES_MID, BYTES_LARGE, BYTES_SMALL}) {
+    // Deliberately insert in non-sorted order so the running min/max comparisons are both exercised
+    for (Object[] values : new Object[][]{
+        {BYTES_MID, UuidUtils.toBytes(UUID_MID)},
+        {BYTES_LARGE, UuidUtils.toBytes(UUID_LARGE)},
+        {BYTES_SMALL, UuidUtils.toBytes(UUID_SMALL)}
+    }) {
       GenericRow row = new GenericRow();
-      row.putValue(BYTES_COLUMN, value);
-      row.putValue(BYTES_MV_COLUMN, new Object[]{value, BYTES_MID});
+      row.putValue(BYTES_COLUMN, values[0]);
+      // Each MV row carries two values so the inner per-value loop is exercised as well
+      row.putValue(BYTES_MV_COLUMN, new Object[]{values[0], BYTES_MID});
+      row.putValue(UUID_COLUMN, values[1]);
       rows.add(row);
     }
-    return rows;
+
+    return buildSegment(tableConfig, schema, rows);
   }
 
   private static File buildSegment(TableConfig tableConfig, Schema schema, List<GenericRow> rows)
