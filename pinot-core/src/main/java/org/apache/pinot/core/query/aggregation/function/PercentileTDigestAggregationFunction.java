@@ -300,13 +300,8 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
 
   @Override
   public SerializedIntermediateResult serializeIntermediateResult(TDigest tDigest) {
-    byte[] bytes;
-    if (tDigest instanceof PercentileTDigestAccumulator) {
-      bytes = ((PercentileTDigestAccumulator) tDigest).serialize();
-    } else {
-      bytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest);
-    }
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.TDigest.getValue(), bytes);
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.TDigest.getValue(),
+        ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest));
   }
 
   @Override
