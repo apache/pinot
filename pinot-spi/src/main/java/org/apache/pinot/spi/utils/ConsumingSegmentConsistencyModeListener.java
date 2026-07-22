@@ -31,7 +31,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Singleton class to manage the configuration for force commit on consuming segments
  * for upsert tables with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true or
- * outOfOrderColumn). By default, the force commit and reload is disabled
+ * outOfOrderColumn). By default, force commit and reload are enabled, with the upsert metadata reverted to
+ * resolve any detected inconsistencies (PROTECTED mode).
  * This configuration is dynamically updatable via ZK cluster config without requiring a server restart.
  */
 public class ConsumingSegmentConsistencyModeListener implements PinotClusterConfigChangeListener {
@@ -59,7 +60,7 @@ public class ConsumingSegmentConsistencyModeListener implements PinotClusterConf
      */
     UNSAFE(true);
 
-    public static final Mode DEFAULT_CONSUMING_SEGMENT_CONSISTENCY_MODE = RESTRICTED;
+    public static final Mode DEFAULT_CONSUMING_SEGMENT_CONSISTENCY_MODE = PROTECTED;
 
     private final boolean _forceCommitAllowed;
 
