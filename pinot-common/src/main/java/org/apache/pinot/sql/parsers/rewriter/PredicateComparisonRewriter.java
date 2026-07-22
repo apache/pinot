@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -107,10 +108,12 @@ public class PredicateComparisonRewriter implements QueryRewriter {
         case LESS_THAN_OR_EQUAL:
           Expression firstOperand = operands.get(0);
           Expression secondOperand = operands.get(1);
+          boolean firstOperandIsLiteral = RequestContextUtils.canEvaluateLiteral(firstOperand);
+          boolean secondOperandIsLiteral = RequestContextUtils.canEvaluateLiteral(secondOperand);
 
           // Handle predicate like '10 = a' -> 'a = 10'
-          if (firstOperand.isSetLiteral()) {
-            if (!secondOperand.isSetLiteral()) {
+          if (firstOperandIsLiteral) {
+            if (!secondOperandIsLiteral) {
               function.setOperator(getOppositeOperator(filterKind).name());
               operands.set(0, secondOperand);
               operands.set(1, firstOperand);
@@ -118,7 +121,8 @@ public class PredicateComparisonRewriter implements QueryRewriter {
             break;
           }
 
-          if (!secondOperand.isSetLiteral()) {
+          // Handle predicate like 'a > b' -> 'comparison(a, b) = true'
+          if (!secondOperandIsLiteral) {
             Expression comparisonExpression = RequestUtils.getFunctionExpression(
                 getComparisonFunctionName(filterKind), firstOperand, secondOperand);
             function.setOperator(FilterKind.EQUALS.name());
@@ -180,7 +184,7 @@ public class PredicateComparisonRewriter implements QueryRewriter {
         default:
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
-            if (!operands.get(i).isSetLiteral()) {
+            if (!RequestContextUtils.canEvaluateLiteral(operands.get(i))) {
               throw new SqlCompilationException(
                   String.format("For %s predicate, the operands except for the first one must be literal, got: %s",
                       filterKind, expression));

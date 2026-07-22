@@ -70,6 +70,9 @@ public class ArraysOverlapScalarFunction implements PinotScalarFunction {
       TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BYTES_ARRAY,
           new FunctionInfo(ArraysOverlapScalarFunction.class.getMethod("arraysOverlap", byte[][].class, byte[][].class),
               ArraysOverlapScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.UUID_ARRAY,
+          new FunctionInfo(ArraysOverlapScalarFunction.class.getMethod("arraysOverlap", byte[][].class, byte[][].class),
+              ArraysOverlapScalarFunction.class, false));
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }

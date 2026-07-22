@@ -20,6 +20,9 @@ package org.apache.pinot.core.segment.processing.partitioner;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -53,6 +56,17 @@ public final class PartitionerFactory {
    * Construct a Partitioner using the PartitioningConfig
    */
   public static Partitioner getPartitioner(PartitionerConfig config) {
+    return getPartitioner(config, null);
+  }
+
+  /**
+   * Construct a Partitioner using the PartitioningConfig. When {@code schema} is non-null and the partitioner
+   * is column-aware (e.g. {@link PartitionerType#TABLE_PARTITION_CONFIG}), the column's logical
+   * {@link FieldSpec.DataType} is threaded through so values are rendered via
+   * {@link FieldSpec.DataType#toString(Object)} (canonical UUID strings for UUID columns) instead of the bare
+   * hex from {@link FieldSpec#getStringValue}.
+   */
+  public static Partitioner getPartitioner(PartitionerConfig config, @Nullable Schema schema) {
 
     Partitioner partitioner = null;
     switch (config.getPartitionerType()) {
@@ -79,7 +93,14 @@ public final class PartitionerFactory {
             "Must provide columnName for TABLE_PARTITION_CONFIG Partitioner");
         Preconditions.checkState(config.getColumnPartitionConfig() != null,
             "Must provide columnPartitionConfig for TABLE_PARTITION_CONFIG Partitioner");
-        partitioner = new TableConfigPartitioner(config.getColumnName(), config.getColumnPartitionConfig());
+        FieldSpec.DataType dataType = null;
+        if (schema != null) {
+          FieldSpec fieldSpec = schema.getFieldSpecFor(config.getColumnName());
+          if (fieldSpec != null) {
+            dataType = fieldSpec.getDataType();
+          }
+        }
+        partitioner = new TableConfigPartitioner(config.getColumnName(), config.getColumnPartitionConfig(), dataType);
         break;
       default:
         break;
@@ -93,10 +114,17 @@ public final class PartitionerFactory {
    * @return Array of partitioners
    */
   public static Partitioner[] getPartitioners(List<PartitionerConfig> partitionerConfigs) {
+    return getPartitioners(partitionerConfigs, null);
+  }
+
+  /**
+   * Create partitioner array from configuration, optionally type-aware via the provided {@link Schema}.
+   */
+  public static Partitioner[] getPartitioners(List<PartitionerConfig> partitionerConfigs, @Nullable Schema schema) {
     int numPartitioners = partitionerConfigs.size();
     Partitioner[] partitioners = new Partitioner[numPartitioners];
     for (int i = 0; i < numPartitioners; i++) {
-      partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
+      partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i), schema);
     }
     return partitioners;
   }
