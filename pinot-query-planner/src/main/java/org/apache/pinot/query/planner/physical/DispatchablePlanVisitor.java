@@ -116,7 +116,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
     return null;
   }
 
-  @Deprecated
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public Void visitEnrichedJoin(EnrichedJoinNode node, DispatchablePlanContext context) {
     visitJoin(node, context);

@@ -33,7 +33,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 /// Sunset: this type, {@code plan.proto} field 17, {@link PlanNodeVisitor#visitEnrichedJoin} and the associated
 /// serde may be deleted once no supported broker version still emits proto field 17 (i.e. once rolling upgrades
 /// from any pre-removal release are no longer supported).
-@Deprecated
+@Deprecated(forRemoval = true, since = "1.6.0")
 public class EnrichedJoinNode extends JoinNode {
   private final List<FilterProjectRex> _filterProjectRexes;
   /// Output schema of the join

@@ -61,7 +61,7 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
   /// {@link EnrichedJoinNode}, so this is only reachable if a plan from an older-version broker is executed.
   ///
   /// @deprecated enriched joins are no longer supported; this method always throws.
-  @Deprecated
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public MultiStageOperator createEnrichedJoinOperator(OpChainExecutionContext context,
       MultiStageOperator leftOperator, PlanNode leftPlanNode, MultiStageOperator rightOperator, PlanNode rightPlanNode,

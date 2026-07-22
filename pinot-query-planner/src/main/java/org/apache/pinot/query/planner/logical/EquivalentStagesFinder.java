@@ -260,7 +260,7 @@ public class EquivalentStagesFinder {
             && node1.getJoinStrategy() == that.getJoinStrategy();
       }
 
-      @Deprecated
+      @Deprecated(forRemoval = true, since = "1.6.0")
       @Override
       public Boolean visitEnrichedJoin(EnrichedJoinNode node1, PlanNode node2) {
         if (!(node2 instanceof EnrichedJoinNode)) {
