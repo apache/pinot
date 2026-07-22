@@ -62,6 +62,10 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
   private static final String MY_MAP_STR_K2_FIELD_NAME = "myMapStr_k2";
   private static final String COMPLEX_MAP_STR_FIELD_NAME = "complexMapStr";
   private static final String COMPLEX_MAP_STR_K3_FIELD_NAME = "complexMapStr_k3";
+  // A physically sorted column. Ordering a selection by it DESC (with allowReverseOrder) drives descending doc-id
+  // blocks into the jsonExtractIndex projection, exercising the descending fast path in
+  // ImmutableJsonIndexReader.getValuesSV.
+  private static final String SORTED_ID_FIELD_NAME = "sortedId";
 
   // Query-option strings passed to postQueryWithOptions.
   private static final String OPT_USE_INDEX = QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR + "=true";
@@ -90,6 +94,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
         .addSingleValueDimension(MY_MAP_STR_K2_FIELD_NAME, DataType.STRING)
         .addSingleValueDimension(COMPLEX_MAP_STR_FIELD_NAME, DataType.STRING)
         .addMultiValueDimension(COMPLEX_MAP_STR_K3_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(SORTED_ID_FIELD_NAME, DataType.INT)
         .build();
   }
 
@@ -106,6 +111,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
         .setTableName(getTableName())
         .setIngestionConfig(ingestionConfig)
         .setJsonIndexColumns(List.of(MY_MAP_STR_FIELD_NAME))
+        .setSortedColumn(SORTED_ID_FIELD_NAME)
         .build();
   }
 
@@ -117,7 +123,9 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
         new org.apache.avro.Schema.Field(MY_MAP_STR_FIELD_NAME,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
         new org.apache.avro.Schema.Field(COMPLEX_MAP_STR_FIELD_NAME,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null)
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
+        new org.apache.avro.Schema.Field(SORTED_ID_FIELD_NAME,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT), null, null)
     );
     avroSchema.setFields(fields);
 
@@ -140,6 +148,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
             "met", i)
         );
         record.put(COMPLEX_MAP_STR_FIELD_NAME, JsonUtils.objectToString(complexMap));
+        record.put(SORTED_ID_FIELD_NAME, i);
         for (DataFileWriter<GenericData.Record> writer : avroFilesAndWriters.getWriters()) {
           writer.append(record);
         }
@@ -983,6 +992,41 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(extractOrderedDistinctValues(withSkip), List.of("value-k1-0"));
 
     assertEquals(withSkip.get("numEntriesScannedPostFilter").asInt(), getNumAvroFiles());
+  }
+
+  /**
+   * Regression test for the descending doc-id block path in ImmutableJsonIndexReader.getValuesSV. Ordering a selection
+   * by the sorted column DESC with allowReverseOrder=true routes the scan through ReverseDocIdSetOperator, which feeds
+   * strictly descending, gap-free doc-id blocks into the jsonExtractIndex SV projection. Before the fix that path
+   * silently returned null/default for every row instead of the doc's real value. Each returned row must satisfy
+   * jsonExtractIndex(myMapStr, '$.k2') == "value-k2-" + sortedId, which fails loudly if any value is dropped. Uses the
+   * single-stage engine because the reverse-order selection optimization is a single-stage segment-plan concern.
+   */
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testJsonExtractIndexUnderDescendingSortedOrder(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String expr = "jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k2', 'STRING')";
+    String query = "SELECT " + SORTED_ID_FIELD_NAME + ", " + expr + " FROM " + getTableName()
+        + " ORDER BY " + SORTED_ID_FIELD_NAME + " DESC LIMIT " + (NUM_DOCS_PER_SEGMENT * getNumAvroFiles());
+    JsonNode response = postQueryWithOptions(query, QueryOptionKey.ALLOW_REVERSE_ORDER + "=true");
+    assertEquals(response.get("exceptions").size(), 0);
+
+    ArrayNode rows = (ArrayNode) response.get("resultTable").get("rows");
+    assertNotNull(rows);
+    assertEquals(rows.size(), NUM_DOCS_PER_SEGMENT * getNumAvroFiles());
+    int previousSortedId = Integer.MAX_VALUE;
+    for (int i = 0; i < rows.size(); i++) {
+      int sortedId = rows.get(i).get(0).asInt();
+      JsonNode k2Cell = rows.get(i).get(1);
+      assertFalse(k2Cell.isNull(), "jsonExtractIndex returned null under DESC sorted order at row " + i);
+      assertEquals(k2Cell.textValue(), "value-k2-" + sortedId,
+          "jsonExtractIndex returned the wrong value under DESC sorted order at row " + i);
+      // Confirm the reverse-order optimization actually produced descending doc-id order.
+      assertTrue(sortedId <= previousSortedId, "Results are not in descending sorted order at row " + i);
+      previousSortedId = sortedId;
+    }
   }
 
   private static List<String> extractOrderedDistinctValues(JsonNode response) {

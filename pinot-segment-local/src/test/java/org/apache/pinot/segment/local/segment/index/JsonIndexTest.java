@@ -618,6 +618,36 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
           assertEquals(values, expected[i]);
         }
 
+        // Descending doc-id blocks: a selection ordering by a sorted column DESC feeds strictly descending doc ids
+        // (via ReverseDocIdSetOperator) into getValuesSV. The non-flattened SV fast path must still return each row's
+        // value in block order rather than silently dropping to null/default. Covers both the dense (gap-free) block
+        // [2, 1, 0] and a sparse descending block [2, 0].
+        int[] descDenseMask = ids(2, 1, 0);
+        String[][] descDenseExpected = new String[][]{
+            {"value1", "value2", "value1"},
+            {"value4", null, "value2"},
+            {null, null, "value3"},
+            {null, null, null}
+        };
+        int[] descSparseMask = ids(2, 0);
+        String[][] descSparseExpected =
+            new String[][]{{"value1", "value1"}, {"value4", "value2"}, {null, "value3"}, {null, null}};
+        for (int i = 0; i < testKeys.length; i++) {
+          Map<String, RoaringBitmap> descContext = offHeapReader.getMatchingFlattenedDocsMap(testKeys[i], null);
+          offHeapReader.convertFlattenedDocIdsToDocIds(descContext);
+          assertEquals(offHeapReader.getValuesSV(descDenseMask, descDenseMask.length, descContext, false),
+              descDenseExpected[i]);
+          assertEquals(offHeapReader.getValuesSV(descSparseMask, descSparseMask.length, descContext, false),
+              descSparseExpected[i]);
+
+          Map<String, RoaringBitmap> descMutableContext = mutableIndex.getMatchingFlattenedDocsMap(testKeys[i], null);
+          mutableIndex.convertFlattenedDocIdsToDocIds(descMutableContext);
+          assertEquals(mutableIndex.getValuesSV(descDenseMask, descDenseMask.length, descMutableContext, false),
+              descDenseExpected[i]);
+          assertEquals(mutableIndex.getValuesSV(descSparseMask, descSparseMask.length, descMutableContext, false),
+              descSparseExpected[i]);
+        }
+
         // Immutable index, context is reused for the second method call
         Map<String, RoaringBitmap> context = offHeapReader.getMatchingFlattenedDocsMap("$.field1", null);
         docMask = ids(0);

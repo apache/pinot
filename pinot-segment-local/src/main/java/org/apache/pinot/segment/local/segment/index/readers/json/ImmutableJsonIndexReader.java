@@ -822,15 +822,19 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       return values;
     }
 
-    // Non-flattened path (the only path used by jsonExtractIndex SV): docIds are real, ascending-sorted doc ids for
-    // the current block, and for a single-value path each doc belongs to at most one value's posting list. We can
-    // therefore scatter values directly, iterating each value's posting list only over the block's [lo, hi] doc id
-    // range with a peekable iterator. This avoids allocating a per-block doc id mask bitmap, a RoaringBitmap.and per
-    // distinct value, and an intermediate docId -> value hash map.
-    int lo = docIds[0];
-    int hi = docIds[length - 1];
-    if ((long) hi - lo + 1 == length) {
-      // Dense, gap-free block (the common full-scan case): the result position is simply the doc id offset.
+    // Non-flattened path (the only path used by jsonExtractIndex SV): docIds are real doc ids for the current block,
+    // and for a single-value path each doc belongs to at most one value's posting list. We can therefore scatter
+    // values directly, iterating each value's posting list only over the block's [lo, hi] doc id range with a peekable
+    // iterator. This avoids allocating a per-block doc id mask bitmap, a RoaringBitmap.and per distinct value, and an
+    // intermediate docId -> value hash map. Doc-id blocks are monotonic (DocIdSetOperator emits ascending runs,
+    // ReverseDocIdSetOperator descending runs), so a gap-free block is a contiguous ascending or descending run and its
+    // result position can be derived from the endpoints without a lookup map.
+    int first = docIds[0];
+    int last = docIds[length - 1];
+    if (first <= last && (long) last - first + 1 == length) {
+      // Dense, gap-free, ascending block (the common full-scan case): the result position is simply the doc id offset.
+      int lo = first;
+      int hi = last;
       for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
         String value = entry.getKey();
         PeekableIntIterator it = entry.getValue().getIntIterator();
@@ -843,13 +847,42 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
           values[docId - lo] = value;
         }
       }
+    } else if (first >= last && (long) first - last + 1 == length) {
+      // Dense, gap-free, descending block (e.g. ORDER BY <sortedCol> DESC via ReverseDocIdSetOperator): the run is
+      // contiguous but reversed, so the result position of a doc id is (first - docId). Handle it with a symmetric
+      // offset write over the true [last, first] range rather than falling through to the hash-map branch, which would
+      // allocate a per-block Int2IntOpenHashMap on this hot path.
+      int lo = last;
+      int hi = first;
+      for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
+        String value = entry.getKey();
+        PeekableIntIterator it = entry.getValue().getIntIterator();
+        it.advanceIfNeeded(lo);
+        while (it.hasNext()) {
+          int docId = it.next();
+          if (docId > hi) {
+            break;
+          }
+          values[first - docId] = value;
+        }
+      }
     } else {
-      // Sparse block (e.g. after a selective filter): map each doc id to its result position once, then range-scan
-      // each value's posting list within [lo, hi].
+      // Sparse block (e.g. after a selective filter), or a non-contiguous ordering: map each doc id to its result
+      // position once (order-independent), then range-scan each value's posting list within the block's true [lo, hi].
+      // lo/hi are the actual min/max doc ids, computed here so the scan bounds are correct regardless of the ordering.
       Int2IntOpenHashMap docIdToPos = new Int2IntOpenHashMap(length);
       docIdToPos.defaultReturnValue(-1);
+      int lo = Integer.MAX_VALUE;
+      int hi = Integer.MIN_VALUE;
       for (int i = 0; i < length; i++) {
-        docIdToPos.put(docIds[i], i);
+        int docId = docIds[i];
+        docIdToPos.put(docId, i);
+        if (docId < lo) {
+          lo = docId;
+        }
+        if (docId > hi) {
+          hi = docId;
+        }
       }
       for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
         String value = entry.getKey();
