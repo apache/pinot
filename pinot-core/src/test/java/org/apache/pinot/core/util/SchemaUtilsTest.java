@@ -245,6 +245,31 @@ public class SchemaUtilsTest {
     checkValidationFails(pinotSchema);
   }
 
+  /**
+   * Regression test: when a transformed column is reused as an argument to another transform, the validation error
+   * must list the actual conflicting columns. Historically this message reported a boolean ("true"/"false") because
+   * {@link java.util.Set#retainAll} was passed as the format argument.
+   */
+  @Test
+  public void testChainedTransformErrorMessageListsConflictingColumns() {
+    Schema pinotSchema =
+        new Schema.SchemaBuilder().addSingleValueDimension("x", DataType.INT).addSingleValueDimension("z", DataType.INT)
+            .build();
+    pinotSchema.getFieldSpecFor("x").setTransformFunction("Groovy({y + 10}, y)");
+    pinotSchema.getFieldSpecFor("z").setTransformFunction("Groovy({x*w*20}, x, w)");
+
+    try {
+      SchemaUtils.validate(pinotSchema);
+      Assert.fail("Schema validation should have failed for chained transforms.");
+    } catch (IllegalStateException e) {
+      String message = e.getMessage();
+      Assert.assertNotNull(message);
+      // The chained column set has a single deterministic element here, so the formatted set form is "[x]".
+      Assert.assertEquals(message,
+          "Columns: [x] are a result of transformations, and cannot be used as arguments to other transform functions");
+    }
+  }
+
   @Test
   public void testValidateTimeFieldSpec() {
     Schema pinotSchema;
