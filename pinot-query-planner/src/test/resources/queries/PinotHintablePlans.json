@@ -22,6 +22,28 @@
         "expectedException": ".*Partition function mismatch \\(hint: murmur, table: Hashcode\\).*"
       },
       {
+        "description": "explicit partition key in a partial hint should override the inferred partition key (wrong key should throw exception)",
+        "sql": "SET inferPartitionHint=true; EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col1') */ LIMIT 10",
+        "expectedException": ".*Partition key: col1 does not match partition column: col2.*"
+      },
+      {
+        "description": "explicit partition function in a partial hint should override the inferred partition function (wrong function should throw exception)",
+        "sql": "SET inferPartitionHint=true; EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_function='murmur') */ LIMIT 10",
+        "expectedException": ".*Partition function mismatch \\(hint: murmur, table: Hashcode\\).*"
+      },
+      {
+        "description": "explicit partition key in a partial hint matching the inferred partition key should plan successfully",
+        "sql": "SET inferPartitionHint=true; EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col2') */ LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[10])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Inner join with group by",
         "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1",
         "output": [

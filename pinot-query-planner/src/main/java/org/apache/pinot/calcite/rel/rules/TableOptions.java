@@ -35,4 +35,11 @@ public interface TableOptions {
 
   @Nullable
   Integer getPartitionParallelism();
+
+  /**
+   * Whether the table is replicated across all workers. This is never inferred; it is only ever populated from an
+   * explicitly supplied table options hint.
+   */
+  @Nullable
+  Boolean isReplicated();
 }
