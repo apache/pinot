@@ -1788,6 +1788,98 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     runPreProcessor(_newColumnsSchemaWithH3Json);
   }
 
+  @Test(dataProvider = "bothV1AndV3")
+  public void testBloomFilterFppUpdate(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    // Create bloom filter with fpp 0.1
+    _bloomFilterConfigs = Map.of("column3", new BloomFilterConfig(0.1, 0, false));
+    runPreProcessor();
+
+    // Verify no processing needed with same config
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            createIndexLoadingConfig(_schema))) {
+      assertFalse(processor.needProcess());
+    }
+
+    // Update bloom filter fpp to 0.01
+    _bloomFilterConfigs = Map.of("column3", new BloomFilterConfig(0.01, 0, false));
+
+    // Verify that preprocessing is needed due to fpp change
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            createIndexLoadingConfig(_schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify no more processing is needed after rebuild
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            createIndexLoadingConfig(_schema))) {
+      assertFalse(processor.needProcess());
+    }
+
+    // Remove bloom filter config
+    resetIndexConfigs();
+    runPreProcessor();
+  }
+
+  /**
+   * Tests that the formula for computing the expected number of hash functions is correct for very small cardinalities.
+   * With cardinality=1 and fpp=0.01, the old two-step formula (via optimalNumOfBits with a long cast) computes k=6
+   * but Guava actually writes k=7, causing an infinite rebuild loop on every segment reload. The fixed direct formula
+   * gives k=7, matching Guava exactly, so the idempotency check below would fail without the fix.
+   */
+  @Test(dataProvider = "bothV1AndV3")
+  public void testBloomFilterFppUpdateSmallCardinality(SegmentVersion segmentVersion)
+      throws Exception {
+    // Build a segment with a cardinality-1 STRING column (single repeated value → exactly 1 unique entry in dict)
+    String[] singleValueArray = {"only_value", "only_value", "only_value", "only_value", "only_value"};
+    long[] longValues = {1L, 2L, 3L, 4L, 5L};
+    TableConfig smallCardTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema smallCardSchema =
+        new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+            .addMetric("longCol", FieldSpec.DataType.LONG)
+            .build();
+    buildTestSegment(smallCardTableConfig, smallCardSchema, singleValueArray, longValues);
+
+    // Create bloom filter with fpp 0.1
+    IndexingConfig indexingConfig = smallCardTableConfig.getIndexingConfig();
+    indexingConfig.setBloomFilterConfigs(Map.of("stringCol", new BloomFilterConfig(0.1, 0, false)));
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(smallCardTableConfig, smallCardSchema))) {
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify no processing needed with same fpp
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(smallCardTableConfig, smallCardSchema))) {
+      assertFalse(processor.needProcess());
+    }
+
+    // Update fpp to 0.01 — should trigger rebuild (k changes: 0.1→k=3, 0.01→k=7)
+    indexingConfig.setBloomFilterConfigs(Map.of("stringCol", new BloomFilterConfig(0.01, 0, false)));
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(smallCardTableConfig, smallCardSchema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify no more processing needed after rebuild — proves no infinite rebuild loop (the formula bug)
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(smallCardTableConfig, smallCardSchema))) {
+      assertFalse(processor.needProcess());
+    }
+  }
+
   private void verifyProcessNeeded()
       throws Exception {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);

@@ -44,11 +44,24 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapGuavaBloomFilterCreator.class);
 
   public static final int TYPE_VALUE = 1;
+  /** V1 format (current write format): {@code [TYPE_VALUE=1 (int)][VERSION=1 (int)][Guava bytes...]}. */
   public static final int VERSION = 1;
+  /**
+   * V2 format: {@code [TYPE_VALUE=1 (int)][VERSION_V2=2 (int)][effective FPP (double)][Guava bytes...]}.
+   * This format was introduced to embed the effective FPP in the header for change detection, but it broke
+   * backward compatibility because release-1.5.0 and older servers throw
+   * {@code IllegalStateException: Unsupported bloom filter type value: 1 and version: 2} on load.
+   * New segments are written in V1 format; this constant is kept so the reader can still handle any
+   * V2 segments that were created during the short window when V2 was the write format.
+   */
+  public static final int VERSION_V2 = 2;
+  /** Byte offset of the fpp field in a v2 bloom filter file (after TYPE_VALUE + VERSION_V2). */
+  public static final int FPP_OFFSET = 8;
 
   private final File _bloomFilterFile;
   private final BloomFilter<String> _bloomFilter;
   private final FieldSpec.DataType _dataType;
+  private final double _effectiveFpp;
 
   // TODO: This method is here for compatibility reasons, should be removed in future PRs
   //  exit_criteria: Not needed in Apache Pinot once #10184 is merged
@@ -69,6 +82,7 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
       double minFpp = GuavaBloomFilterReaderUtils.computeFPP(maxSizeInBytes, cardinality);
       fpp = Math.max(fpp, minFpp);
     }
+    _effectiveFpp = fpp;
     LOGGER.info("Creating bloom filter with cardinality: {}, fpp: {}", cardinality, fpp);
     _bloomFilter = BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8), cardinality, fpp);
   }
