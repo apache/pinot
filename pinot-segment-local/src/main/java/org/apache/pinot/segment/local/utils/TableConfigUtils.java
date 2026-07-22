@@ -63,6 +63,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.LazyLoadConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -214,10 +215,29 @@ public final class TableConfigUtils {
 
     validateTaskConfig(tableConfig);
     validateMaterializedViewInvariants(tableConfig);
+    validateLazyLoadConfig(tableConfig);
 
     if (_enforcePoolBasedAssignment) {
       validateInstancePoolsAndReplicaGroups(tableConfig);
     }
+  }
+
+  /**
+   * Lazy segment loading is only supported on plain OFFLINE tables: REALTIME, upsert, dedup and dimension tables
+   * rely on segments being materialized locally at assignment time.
+   */
+  static void validateLazyLoadConfig(TableConfig tableConfig) {
+    LazyLoadConfig lazyLoadConfig = tableConfig.getLazyLoadConfig();
+    if (lazyLoadConfig == null || !lazyLoadConfig.isEnabled()) {
+      return;
+    }
+    Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
+        "lazyLoadConfig can only be enabled on OFFLINE tables");
+    Preconditions.checkState(!tableConfig.isUpsertEnabled(), "lazyLoadConfig cannot be enabled with upsert");
+    Preconditions.checkState(!tableConfig.isDedupEnabled(), "lazyLoadConfig cannot be enabled with dedup");
+    Preconditions.checkState(!tableConfig.isDimTable(), "lazyLoadConfig cannot be enabled on dimension tables");
+    Preconditions.checkState(lazyLoadConfig.getIdleEvictionSeconds() > 0,
+        "lazyLoadConfig.idleEvictionSeconds must be positive");
   }
 
   /**

@@ -92,4 +92,35 @@ public interface InstanceDataManagerConfig {
   boolean shouldCheckCRCOnSegmentLoad();
 
   boolean isDimensionTablePreloadDisabled();
+
+  /**
+   * Instance-level kill switch for lazy segment loading. When false, tables with lazyLoadConfig enabled fall back
+   * to the regular eager loading path on this instance. Default methods keep other implementors compiling.
+   */
+  default boolean isLazyLoadEnabled() {
+    return false;
+  }
+
+  /**
+   * Interval in seconds between lazy-loading idle-eviction sweeps.
+   */
+  default int getLazyLoadSweepIntervalSeconds() {
+    return 60;
+  }
+
+  /**
+   * Maximum number of stubbed segments a single query materializes in parallel.
+   */
+  default int getLazyLoadMaterializeParallelism() {
+    return 4;
+  }
+
+  /**
+   * Maximum time in seconds a multi-segment query waits for its stubbed segments to materialize before reporting
+   * the still-stubbed ones as missing (their downloads continue in the background for subsequent queries). Brokers
+   * typically give up well before long downloads finish, so waiting longer mostly pins server query workers.
+   */
+  default long getLazyLoadMaterializeTimeoutSeconds() {
+    return 60;
+  }
 }

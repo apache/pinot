@@ -31,6 +31,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.LazyLoadConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -204,6 +205,13 @@ public class TableConfigSerDeUtils {
             tableSamplerConfigs, isMaterializedView);
     tableConfig.setDescription(description);
     tableConfig.setTags(tags);
+
+    // NOTE: lazyLoadConfig is not part of the @JsonCreator constructor, set it explicitly. Any TableConfig
+    // sub-config missing from this class is silently dropped when the controller persists the config to ZK.
+    String lazyLoadConfigString = simpleFields.get(TableConfig.LAZY_LOAD_CONFIG_KEY);
+    if (lazyLoadConfigString != null) {
+      tableConfig.setLazyLoadConfig(JsonUtils.stringToObject(lazyLoadConfigString, LazyLoadConfig.class));
+    }
     return tableConfig;
   }
 
@@ -291,6 +299,10 @@ public class TableConfigSerDeUtils {
     List<String> tags = tableConfig.getTags();
     if (tags != null && !tags.isEmpty()) {
       simpleFields.put(TableConfig.TAGS_KEY, JsonUtils.objectToString(tags));
+    }
+    LazyLoadConfig lazyLoadConfig = tableConfig.getLazyLoadConfig();
+    if (lazyLoadConfig != null) {
+      simpleFields.put(TableConfig.LAZY_LOAD_CONFIG_KEY, JsonUtils.objectToString(lazyLoadConfig));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());

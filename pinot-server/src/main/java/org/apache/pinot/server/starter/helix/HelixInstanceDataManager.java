@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -122,6 +123,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Nullable
   private ExecutorService _segmentPreloadExecutor;
 
+  // Lazy loading: single scheduled daemon thread evicting idle lazy segments across all tables.
+  @Nullable
+  private ScheduledExecutorService _lazyEvictionSweeper;
+
   @Override
   public void setSupplierOfIsServerReadyToConsumeData(BooleanSupplier isServerReadyToConsumeData) {
     _isServerReadyToConsumeData = isServerReadyToConsumeData;
@@ -187,6 +192,30 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _errorCache = CacheBuilder.newBuilder().maximumSize(_instanceDataManagerConfig.getErrorCacheSize()).build();
     _recentlyDeletedTables = CacheBuilder.newBuilder()
         .expireAfterWrite(_instanceDataManagerConfig.getDeletedTablesCacheTtlMinutes(), TimeUnit.MINUTES).build();
+
+    // Start the lazy-loading eviction sweeper only when the instance kill switch is on. Tables without
+    // lazyLoadConfig enabled are no-ops inside evictIdleLazySegments().
+    if (_instanceDataManagerConfig.isLazyLoadEnabled()) {
+      int sweepIntervalSeconds = Math.max(1, _instanceDataManagerConfig.getLazyLoadSweepIntervalSeconds());
+      _lazyEvictionSweeper = Executors.newSingleThreadScheduledExecutor(
+          new ThreadFactoryBuilder().setNameFormat("lazy-eviction-sweeper").setDaemon(true).build());
+      _lazyEvictionSweeper.scheduleWithFixedDelay(this::sweepIdleLazySegments, sweepIntervalSeconds,
+          sweepIntervalSeconds, TimeUnit.SECONDS);
+      LOGGER.info("Started lazy-loading eviction sweeper with sweep interval: {}s", sweepIntervalSeconds);
+    }
+  }
+
+  private void sweepIdleLazySegments() {
+    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+      try {
+        if (tableDataManager instanceof BaseTableDataManager) {
+          ((BaseTableDataManager) tableDataManager).evictIdleLazySegments();
+        }
+      } catch (Throwable t) {
+        LOGGER.error("Caught exception while evicting idle lazy segments for table: {}",
+            tableDataManager.getTableName(), t);
+      }
+    }
   }
 
   ServerIngestionOomProtectionManager.ServerThrottleState getServerIngestionOomProtectionThrottleState() {
@@ -280,6 +309,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void shutDown() {
+    if (_lazyEvictionSweeper != null) {
+      _lazyEvictionSweeper.shutdownNow();
+    }
     _segmentReloadRefreshExecutor.shutdownNow();
     if (_segmentPreloadExecutor != null) {
       _segmentPreloadExecutor.shutdownNow();
