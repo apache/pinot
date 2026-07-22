@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -39,6 +40,12 @@ import static org.testng.Assert.assertNotNull;
 
 
 public class ProtoBufCodeGenMessageDecoderTest {
+
+  @AfterMethod
+  public void clearCache() {
+    ProtoBufCodeGenMessageDecoder.clearCacheForTest();
+  }
+
   @Test
   public void testComplexClass()
       throws Exception {
@@ -340,6 +347,67 @@ public class ProtoBufCodeGenMessageDecoderTest {
     Assert.assertEquals(row.getValue(fd.getName()), pinotVal);
   }
 
+  @Test
+  public void testCacheHit()
+      throws Exception {
+    // First init — fetches JAR and populates JAR_CACHE
+    ProtoBufCodeGenMessageDecoder decoder1 = setupDecoder("sample.jar",
+        "org.apache.pinot.plugin.inputformat.protobuf.Sample$SampleRecord",
+        getFieldsInSampleRecord());
+
+    // Second init with same topic name and same jarPath — should hit the cache (no re-fetch)
+    ProtoBufCodeGenMessageDecoder decoder2 = setupDecoder("sample.jar",
+        "org.apache.pinot.plugin.inputformat.protobuf.Sample$SampleRecord",
+        getFieldsInSampleRecord());
+
+    // Both decoders must produce correct output, proving the cache hit path is functional
+    Sample.SampleRecord sampleRecord = getSampleRecordMessage();
+
+    GenericRow row1 = new GenericRow();
+    decoder1.decode(sampleRecord.toByteArray(), row1);
+    assertEquals(row1.getValue("email"), "foobar@hello.com");
+    assertEquals(row1.getValue("name"), "Alice");
+    assertEquals(row1.getValue("id"), 18);
+
+    GenericRow row2 = new GenericRow();
+    decoder2.decode(sampleRecord.toByteArray(), row2);
+    assertEquals(row2.getValue("email"), "foobar@hello.com");
+    assertEquals(row2.getValue("name"), "Alice");
+    assertEquals(row2.getValue("id"), 18);
+  }
+
+  @Test
+  public void testStaleFallbackOnFetchFailure()
+      throws Exception {
+    // First init — fetches JAR, caches local file
+    ProtoBufCodeGenMessageDecoder decoder = setupDecoder("sample.jar",
+        "org.apache.pinot.plugin.inputformat.protobuf.Sample$SampleRecord",
+        getFieldsInSampleRecord());
+
+    Sample.SampleRecord sampleRecord = getSampleRecordMessage();
+    GenericRow row = new GenericRow();
+    decoder.decode(sampleRecord.toByteArray(), row);
+    assertEquals(row.getValue("email"), "foobar@hello.com");
+
+    // Second init with same topic name but an invalid/unreachable jarPath — fetch will fail,
+    // but the decoder must fall back to the stale cached local file and still decode correctly
+    Map<String, String> decoderProps = new HashMap<>();
+    decoderProps.put(ProtoBufCodeGenMessageDecoder.PROTOBUF_JAR_FILE_PATH,
+        "file:///nonexistent/path/to/missing.jar");
+    decoderProps.put(ProtoBufCodeGenMessageDecoder.PROTO_CLASS_NAME,
+        "org.apache.pinot.plugin.inputformat.protobuf.Sample$SampleRecord");
+    ProtoBufCodeGenMessageDecoder decoder2 = new ProtoBufCodeGenMessageDecoder();
+    // topic name "sample.jar" matches the one already in cache from setupDecoder above,
+    // but the jarPath has changed — triggering a fetch attempt that will fail
+    decoder2.init(decoderProps, getFieldsInSampleRecord(), "sample.jar");
+
+    GenericRow row2 = new GenericRow();
+    decoder2.decode(sampleRecord.toByteArray(), row2);
+    assertEquals(row2.getValue("email"), "foobar@hello.com");
+    assertEquals(row2.getValue("name"), "Alice");
+    assertEquals(row2.getValue("id"), 18);
+  }
+
   private static Set<String> getAllSourceFieldsForComplexType() {
     return Sets.newHashSet(STRING_FIELD, INT_FIELD, LONG_FIELD, DOUBLE_FIELD, FLOAT_FIELD, BOOL_FIELD, BYTES_FIELD,
         REPEATED_STRINGS, NESTED_MESSAGE, REPEATED_NESTED_MESSAGES, COMPLEX_MAP, SIMPLE_MAP, ENUM_FIELD,
@@ -355,7 +423,7 @@ public class ProtoBufCodeGenMessageDecoderTest {
     decoderProps.put(PROTOBUF_JAR_FILE_PATH, jarFIle.toURI().toString());
     decoderProps.put(PROTO_CLASS_NAME, value);
     ProtoBufCodeGenMessageDecoder messageDecoder = new ProtoBufCodeGenMessageDecoder();
-    messageDecoder.init(decoderProps, sourceFieldsForComplexType, "");
+    messageDecoder.init(decoderProps, sourceFieldsForComplexType, name);
     return messageDecoder;
   }
 }
