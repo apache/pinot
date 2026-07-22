@@ -1391,6 +1391,7 @@ public final class TableConfigUtils {
     List<String> violations = new ArrayList<>();
     validateUpsertConfigUpdate(newConfig, existingConfig, violations);
     validateDedupConfigUpdate(newConfig, existingConfig, violations);
+    validatePartitionConfigUpdate(newConfig, existingConfig, violations);
     validateMaterializedViewConfigUpdate(newConfig, existingConfig, violations);
 
     return violations;
@@ -1549,6 +1550,60 @@ public final class TableConfigUtils {
           "MaterializedViewTask is configured but definedSQL is missing or empty for table: %s",
           tableConfig.getTableName()));
     }
+  }
+
+  /**
+   * On upsert/dedup tables, rejects only the segmentPartitionConfig change that would silently break broker query
+   * pruning against already-written segments — i.e., changing {@code numPartitions} on a column that was already
+   * partitioned. All other changes are allowed:
+   * <ul>
+   *   <li>Adding segmentPartitionConfig to a table that had none (or a new column) — existing segments simply
+   *       carry no partition metadata for that column, so broker pruning falls back to a full scan for them.</li>
+   *   <li>Removing segmentPartitionConfig (or dropping a partitioned column) — broker stops pruning by that column;
+   *       no correctness impact.</li>
+   *   <li>Changing {@code functionName} (users may need to migrate between hash functions).</li>
+   *   <li>Changing {@code functionConfig} (a tuning parameter that does not alter the partition mapping).</li>
+   * </ul>
+   * Upsert/dedup routing correctness itself is enforced by stream-side partitioning on the primary key, not by
+   * segmentPartitionConfig. Can be bypassed with a force update.
+   */
+  private static void validatePartitionConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
+      List<String> violations) {
+    boolean existingIsUpsertOrDedup = existingConfig.isUpsertEnabled() || existingConfig.isDedupEnabled();
+    boolean newIsUpsertOrDedup = newConfig.isUpsertEnabled() || newConfig.isDedupEnabled();
+    if (!existingIsUpsertOrDedup || !newIsUpsertOrDedup) {
+      return;
+    }
+    Map<String, ColumnPartitionConfig> existingMap = getColumnPartitionMap(existingConfig);
+    Map<String, ColumnPartitionConfig> newMap = getColumnPartitionMap(newConfig);
+    // Only compare columns that were partitioned in the existing config AND remain partitioned in the new config.
+    // Additions and removals are allowed (see method Javadoc).
+    for (Map.Entry<String, ColumnPartitionConfig> entry : existingMap.entrySet()) {
+      String column = entry.getKey();
+      ColumnPartitionConfig existingCol = entry.getValue();
+      ColumnPartitionConfig newCol = newMap.get(column);
+      if (newCol == null) {
+        continue;
+      }
+      if (existingCol.getNumPartitions() != newCol.getNumPartitions()) {
+        violations.add(String.format(
+            "segmentPartitionConfig for column '%s' (numPartitions=%d -> numPartitions=%d) - changing numPartitions "
+                + "is not allowed for upsert/dedup tables as it silently breaks broker query pruning against "
+                + "already-written segments",
+            column, existingCol.getNumPartitions(), newCol.getNumPartitions()));
+      }
+    }
+  }
+
+  private static Map<String, ColumnPartitionConfig> getColumnPartitionMap(TableConfig tableConfig) {
+    if (tableConfig.getIndexingConfig() == null) {
+      return Map.of();
+    }
+    SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (partitionConfig == null || partitionConfig.getColumnPartitionMap() == null) {
+      return Map.of();
+    }
+    return partitionConfig.getColumnPartitionMap();
   }
 
   private static void validateMaterializedViewConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
