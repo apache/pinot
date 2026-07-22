@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
+import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -203,11 +203,9 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
               DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
               return inferred != null ? inferred : DataType.STRING;
             });
-        if (!_presenceBitmaps.containsKey(key)) {
-          _presenceBitmaps.put(key, new RoaringBitmap());
-          _values.put(key, new ArrayList<>());
-        }
-        _presenceBitmaps.get(key).add(_numDocs);
+        RoaringBitmap bitmap = _presenceBitmaps.computeIfAbsent(key, k -> new RoaringBitmap());
+        List<Object> values = _values.computeIfAbsent(key, k -> new ArrayList<>());
+        bitmap.add(_numDocs);
         Object coerced;
         try {
           PinotDataType sourceType = PinotDataType.getSingleValueType(rawValue);
@@ -218,7 +216,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           _presenceBitmaps.get(key).remove(_numDocs);
           continue;
         }
-        _values.get(key).add(coerced);
+        values.add(coerced);
       }
     }
     _numDocs++;
@@ -478,7 +476,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         try {
           String json = JsonUtils.objectToString(sparseEntries);
           jsonPerDoc[docId] = json;
-          maxLen = Math.max(maxLen, json.getBytes(StandardCharsets.UTF_8).length);
+          maxLen = Math.max(maxLen, Utf8.encodedLength(json));
           nonNullCount++;
         } catch (IOException e) {
           throw new RuntimeException("Failed to serialize sparse entries for docId " + docId, e);

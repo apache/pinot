@@ -1309,18 +1309,6 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /// Returns the per-column mutable OPEN_STRUCT index, or `null` if the column is not OPEN_STRUCT
-  /// or the index has not been initialized.
-  @Nullable
-  public MutableOpenStructIndex getOpenStructIndex(String column) {
-    IndexContainer container = _indexContainerMap.get(column);
-    if (container == null) {
-      return null;
-    }
-    MutableIndex index = container._mutableIndexes.get(StandardIndexes.openStruct());
-    return index instanceof MutableOpenStructIndex ? (MutableOpenStructIndex) index : null;
-  }
-
   @Override
   public void offload() {
     if (_partitionUpsertMetadataManager != null) {
