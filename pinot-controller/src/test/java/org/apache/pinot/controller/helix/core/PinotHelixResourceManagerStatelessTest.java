@@ -1769,6 +1769,28 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(inProgressWatermark.getSequenceNumber(), 200L);
     assertEquals(inProgressWatermark.getOffset(), 789L);
 
+    // Test legacy-format multi-topic segments, where the raw partitionGroupId is still a padded composite id
+    // (partitionGroupId != streamPartitionId): the watermark must use the decoded streamPartitionId, not the
+    // raw padded partitionGroupId. Covers both the IN_PROGRESS and DONE branches.
+    PartitionGroupConsumptionStatus legacyFormatInProgressStatus = new PartitionGroupConsumptionStatus(10001, 1, 1,
+        300, new LongMsgOffset(111), null, "IN_PROGRESS");
+    PartitionGroupConsumptionStatus legacyFormatDoneStatus = new PartitionGroupConsumptionStatus(20002, 2, 2, 400,
+        new LongMsgOffset(222), new LongMsgOffset(333), "done");
+    when(mockSegmentManager.getPartitionGroupConsumptionStatusList(any(), any()))
+        .thenReturn(List.of(legacyFormatInProgressStatus, legacyFormatDoneStatus));
+    WatermarkInductionResult legacyFormatResult = _helixResourceManager.getConsumerWatermarks(rawTableName);
+    assertEquals(legacyFormatResult.getWatermarks().size(), 2);
+    WatermarkInductionResult.Watermark legacyFormatInProgressWatermark = legacyFormatResult.getWatermarks().get(0);
+    assertEquals(legacyFormatInProgressWatermark.getPartitionGroupId(), 1);
+    assertEquals(legacyFormatInProgressWatermark.getTopicId(), 1);
+    assertEquals(legacyFormatInProgressWatermark.getSequenceNumber(), 300L);
+    assertEquals(legacyFormatInProgressWatermark.getOffset(), 111L);
+    WatermarkInductionResult.Watermark legacyFormatDoneWatermark = legacyFormatResult.getWatermarks().get(1);
+    assertEquals(legacyFormatDoneWatermark.getPartitionGroupId(), 2);
+    assertEquals(legacyFormatDoneWatermark.getTopicId(), 2);
+    assertEquals(legacyFormatDoneWatermark.getSequenceNumber(), 401L);
+    assertEquals(legacyFormatDoneWatermark.getOffset(), 333L);
+
     // recover the original values
     helixAdminField.set(_helixResourceManager, originalHelixAdmin);
     llcManagerField.set(_helixResourceManager, originalLlcManager);

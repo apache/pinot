@@ -31,12 +31,14 @@ package org.apache.pinot.spi.stream;
  * and recorded the end
  * offset)
  * 6. status - the consumption status IN_PROGRESS/DONE
+ * 7. topicId - The id of the topic (stream config) this partition group belongs to, for tables with multiple topics
  *
  * This information is needed by the stream, when grouping the partitions/shards into new partition groups.
  */
 public class PartitionGroupConsumptionStatus {
   private final int _partitionGroupId;
   private final int _streamPartitionId;
+  private final int _topicId;
   private int _sequenceNumber;
   private StreamPartitionMsgOffset _startOffset;
   private StreamPartitionMsgOffset _endOffset;
@@ -44,8 +46,14 @@ public class PartitionGroupConsumptionStatus {
 
   public PartitionGroupConsumptionStatus(int partitionGroupId, int streamPartitionId, int sequenceNumber,
       StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
+    this(partitionGroupId, streamPartitionId, 0, sequenceNumber, startOffset, endOffset, status);
+  }
+
+  public PartitionGroupConsumptionStatus(int partitionGroupId, int streamPartitionId, int topicId,
+      int sequenceNumber, StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
     _partitionGroupId = partitionGroupId;
     _streamPartitionId = streamPartitionId;
+    _topicId = topicId;
     _sequenceNumber = sequenceNumber;
     _startOffset = startOffset;
     _endOffset = endOffset;
@@ -63,6 +71,10 @@ public class PartitionGroupConsumptionStatus {
 
   public int getStreamPartitionGroupId() {
     return _streamPartitionId;
+  }
+
+  public int getTopicId() {
+    return _topicId;
   }
 
   public int getSequenceNumber() {

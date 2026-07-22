@@ -1973,6 +1973,65 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Assert.assertEquals(partitionIds.size(), 2);
   }
 
+  @Test
+  public void testGetPartitionIdsWithIdealStateSingleStreamFallbackLargePartitionId()
+      throws Exception {
+    List<StreamConfig> streamConfigs = List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs());
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+
+    // Simulate the case where getPartitionIds(StreamConfig) throws, forcing the fallback path
+    PinotLLCRealtimeSegmentManager segmentManagerSpy = spy(new FakePinotLLCRealtimeSegmentManager());
+    doThrow(new RuntimeException()).when(segmentManagerSpy).getPartitionIds(any(StreamConfig.class));
+    doReturn(List.of()).when(segmentManagerSpy).getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+
+    // A single-stream table is not multi-topic, so a partition id above PARTITION_PADDING_OFFSET must be passed
+    // through unchanged rather than decoded into (topicId, streamPartitionId).
+    int largePartitionId = 20003;
+    List<StreamMetadata> streamMetadataList = List.of(new StreamMetadata(streamConfigs.get(0), 2,
+        List.of(new PartitionGroupMetadata(largePartitionId, new LongMsgOffset(1)))));
+    doReturn(streamMetadataList).when(segmentManagerSpy)
+        .getNewStreamMetadataList(eq(streamConfigs), any(), eq(idealState));
+
+    PinotLLCRealtimeSegmentManager.PartitionIdsWithIdealState result =
+        segmentManagerSpy.getPartitionIdsWithIdealState(streamConfigs, () -> idealState);
+    Assert.assertEquals(result.getPartitionIdsByTopic().get(0), Set.of(largePartitionId));
+  }
+
+  @Test
+  public void testGetPartitionIdsWithIdealStateMultiTopicFallback()
+      throws Exception {
+    List<StreamConfig> streamConfigs =
+        List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(), FakeStreamConfigUtils
+            .getDefaultLowLevelStreamConfigs());
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+
+    // Simulate the case where getPartitionIds(StreamConfig) throws for both streams, forcing the fallback path
+    PinotLLCRealtimeSegmentManager segmentManagerSpy = spy(new FakePinotLLCRealtimeSegmentManager());
+    doThrow(new RuntimeException()).when(segmentManagerSpy).getPartitionIds(any(StreamConfig.class));
+    doReturn(List.of()).when(segmentManagerSpy).getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+
+    // Topic 0, raw partitions 0 and 3 (two groups for the same topic, to verify they accumulate into one Set
+    // instead of the second overwriting the first)
+    // Topic 1, raw partition 5
+    // topicId and streamPartitionId are chosen to differ per entry so a transposed topicId/streamPartitionId
+    // formula would produce a visibly wrong result rather than accidentally matching.
+    List<StreamMetadata> streamMetadataList = List.of(
+        new StreamMetadata(streamConfigs.get(0), 2,
+            List.of(new PartitionGroupMetadata(0, 0, new LongMsgOffset(1), 0),
+                new PartitionGroupMetadata(3, 0, new LongMsgOffset(1), 0))),
+        new StreamMetadata(streamConfigs.get(1), 2,
+            List.of(new PartitionGroupMetadata(5, 1, new LongMsgOffset(1), 0))));
+    doReturn(streamMetadataList).when(segmentManagerSpy)
+        .getNewStreamMetadataList(eq(streamConfigs), any(), eq(idealState));
+
+    PinotLLCRealtimeSegmentManager.PartitionIdsWithIdealState result =
+        segmentManagerSpy.getPartitionIdsWithIdealState(streamConfigs, () -> idealState);
+    // Asserting on the per-topic map (not the flattened union) so a transposed topicId/streamPartitionId formula
+    // would be caught even though it could coincidentally produce the same flattened set.
+    Assert.assertEquals(result.getPartitionIdsByTopic().get(0), Set.of(0, 3));
+    Assert.assertEquals(result.getPartitionIdsByTopic().get(1), Set.of(5));
+  }
+
   /**
    * Verifies that {@code buildPartitionGroupConsumptionStatusFromZKMetadata} produces the same results as
    * {@code getPartitionGroupConsumptionStatusList} for the common case where IdealState and ZK metadata are in sync.
@@ -2036,6 +2095,129 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertEquals(zkEnd, isEnd, "End offset mismatch for partition " + isStatus.getPartitionGroupId());
       assertEquals(zkStatus.getStatus(), isStatus.getStatus(),
           "Status mismatch for partition " + isStatus.getPartitionGroupId());
+      assertEquals(isStatus.getTopicId(), 0, "Expected topicId 0 for single-stream table, partition "
+          + isStatus.getPartitionGroupId());
+      assertEquals(zkStatus.getTopicId(), 0, "Expected topicId 0 for single-stream table, partition "
+          + isStatus.getPartitionGroupId());
+    }
+  }
+
+  /**
+   * Verifies that {@code getPartitionGroupConsumptionStatusList} and
+   * {@code buildPartitionGroupConsumptionStatusFromZKMetadata} correctly populate {@code topicId} (rather than
+   * silently defaulting it to 0) for a multi-stream table, by decoding it from the padded partition group id.
+   */
+  @Test
+  public void testPartitionGroupConsumptionStatusTopicIdMultiStream() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    Map<String, String> streamConfigMap = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(Arrays.asList(streamConfigMap, streamConfigMap)));
+    TableConfig multiStreamTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setIngestionConfig(ingestionConfig)
+            .build();
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(multiStreamTableConfig);
+
+    // Topic 0, raw partition 1 -> padded pinot partition id 1
+    // Topic 1, raw partition 2 -> padded pinot partition id 10002
+    int topic0PartitionGroupId = IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(1, 0);
+    int topic1PartitionGroupId = IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(2, 1);
+
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = new HashMap<>();
+    for (int partitionGroupId : new int[]{topic0PartitionGroupId, topic1PartitionGroupId}) {
+      String segmentName =
+          new LLCSegmentName(RAW_TABLE_NAME, partitionGroupId, 0, CURRENT_TIME_MS).getSegmentName();
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+      segmentZKMetadata.setStatus(Status.IN_PROGRESS);
+      segmentZKMetadata.setStartOffset(new LongMsgOffset(0).toString());
+      segmentManager._segmentZKMetadataMap.put(segmentName, segmentZKMetadata);
+      latestSegmentZKMetadataMap.put(partitionGroupId, segmentZKMetadata);
+      idealState.getRecord().setMapField(segmentName, Map.of("server0", SegmentStateModel.CONSUMING));
+    }
+
+    List<PartitionGroupConsumptionStatus> fromIdealState =
+        segmentManager.getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+    List<PartitionGroupConsumptionStatus> fromZKMetadata =
+        segmentManager.buildPartitionGroupConsumptionStatusFromZKMetadata(latestSegmentZKMetadataMap, streamConfigs);
+
+    for (List<PartitionGroupConsumptionStatus> statusList : List.of(fromIdealState, fromZKMetadata)) {
+      Map<Integer, PartitionGroupConsumptionStatus> byPartitionGroupId = new HashMap<>();
+      for (PartitionGroupConsumptionStatus status : statusList) {
+        byPartitionGroupId.put(status.getPartitionGroupId(), status);
+      }
+      assertEquals(byPartitionGroupId.get(topic0PartitionGroupId).getTopicId(), 0,
+          "Expected topicId 0 for partition group " + topic0PartitionGroupId);
+      assertEquals(byPartitionGroupId.get(topic0PartitionGroupId).getStreamPartitionGroupId(), 1,
+          "Expected streamPartitionId 1 for partition group " + topic0PartitionGroupId);
+      assertEquals(byPartitionGroupId.get(topic1PartitionGroupId).getTopicId(), 1,
+          "Expected topicId 1 for partition group " + topic1PartitionGroupId);
+      assertEquals(byPartitionGroupId.get(topic1PartitionGroupId).getStreamPartitionGroupId(), 2,
+          "Expected streamPartitionId 2 for partition group " + topic1PartitionGroupId);
+    }
+  }
+
+  /**
+   * Same as {@link #testPartitionGroupConsumptionStatusTopicIdMultiStream}, but using the newer multi-topic-format
+   * segment name (topicId embedded directly in the segment name, e.g. {@code table__1__5__100__...}) instead of the
+   * legacy padded-partition-id encoding, to verify {@code LLCSegmentName.getTopicId(true)}/
+   * {@code getStreamPartitionGroupId(true)} are used (rather than always re-deriving from the padded id, which
+   * would be wrong for multi-topic-format segment names).
+   */
+  @Test
+  public void testPartitionGroupConsumptionStatusTopicIdMultiStreamMultiTopicFormat() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    Map<String, String> streamConfigMap = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(Arrays.asList(streamConfigMap, streamConfigMap)));
+    TableConfig multiStreamTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setIngestionConfig(ingestionConfig)
+            .build();
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(multiStreamTableConfig);
+
+    // Multi-topic-format segment names encode topicId and (unpadded) streamPartitionId directly, so use
+    // deliberately "unaligned" values (e.g. streamPartitionId 7 for topic 0) that a padded-id-arithmetic decode
+    // would get wrong, to make sure the test would actually catch the regression. topicId values must stay within
+    // [0, numStreams) since they're used to index into the configured stream configs.
+    int topicId0 = 0;
+    int streamPartitionId0 = 7;
+    int topicId1 = 1;
+    int streamPartitionId1 = 2;
+
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = new HashMap<>();
+    for (int[] topicAndPartition : new int[][]{{topicId0, streamPartitionId0}, {topicId1, streamPartitionId1}}) {
+      // Round-trip through the segment name string, since only the string-parsing constructor sets
+      // isMultiTopicFormat=true.
+      String segmentNameStr =
+          new LLCSegmentName(RAW_TABLE_NAME, topicAndPartition[0], topicAndPartition[1], 0, CURRENT_TIME_MS)
+              .getSegmentName();
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentNameStr);
+      Assert.assertTrue(llcSegmentName.isMultiTopicFormat());
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentNameStr);
+      segmentZKMetadata.setStatus(Status.IN_PROGRESS);
+      segmentZKMetadata.setStartOffset(new LongMsgOffset(0).toString());
+      segmentManager._segmentZKMetadataMap.put(segmentNameStr, segmentZKMetadata);
+      latestSegmentZKMetadataMap.put(llcSegmentName.getPartitionGroupId(), segmentZKMetadata);
+      idealState.getRecord().setMapField(segmentNameStr, Map.of("server0", SegmentStateModel.CONSUMING));
+    }
+
+    List<PartitionGroupConsumptionStatus> fromIdealState =
+        segmentManager.getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+    List<PartitionGroupConsumptionStatus> fromZKMetadata =
+        segmentManager.buildPartitionGroupConsumptionStatusFromZKMetadata(latestSegmentZKMetadataMap, streamConfigs);
+
+    for (List<PartitionGroupConsumptionStatus> statusList : List.of(fromIdealState, fromZKMetadata)) {
+      Map<Integer, PartitionGroupConsumptionStatus> byStreamPartitionId = new HashMap<>();
+      for (PartitionGroupConsumptionStatus status : statusList) {
+        byStreamPartitionId.put(status.getStreamPartitionGroupId(), status);
+      }
+      assertEquals(byStreamPartitionId.get(streamPartitionId0).getTopicId(), topicId0,
+          "Expected topicId " + topicId0 + " for stream partition " + streamPartitionId0);
+      assertEquals(byStreamPartitionId.get(streamPartitionId1).getTopicId(), topicId1,
+          "Expected topicId " + topicId1 + " for stream partition " + streamPartitionId1);
     }
   }
 

@@ -5460,7 +5460,8 @@ public class PinotHelixResourceManager {
       } catch (NumericException e) {
         throw new RuntimeException(e);
       }
-      return new WatermarkInductionResult.Watermark(status.getPartitionGroupId(), seq, startOffset);
+      return new WatermarkInductionResult.Watermark(status.getStreamPartitionGroupId(), status.getTopicId(), seq,
+          startOffset);
     }).collect(Collectors.toList());
     return new WatermarkInductionResult(watermarks);
   }

@@ -31,6 +31,8 @@ import static org.testng.Assert.assertTrue;
  * Tests for the realtime segment name builder.
  */
 public class LLCSegmentNameTest {
+  private static final String TABLE_NAME = "myTable";
+  private static final long TIMESTAMP_MS = 1465508537069L;
 
   @Test
   public void testSegmentNameBuilder() {
@@ -94,5 +96,71 @@ public class LLCSegmentNameTest {
     LLCSegmentName[] testSorted = new LLCSegmentName[]{segName3, segName1, segName4, segName5, segName6};
     Arrays.sort(testSorted);
     Assert.assertEquals(testSorted, new LLCSegmentName[]{segName5, segName1, segName6, segName3, segName4});
+  }
+
+  @Test
+  public void testSegmentNameWithoutTopicIdDefaultsTopicIdToZero() {
+    LLCSegmentName segmentName = new LLCSegmentName("myTable__4__27__20160617T2150Z");
+    assertEquals(segmentName.getTopicId(), 0);
+  }
+
+  @Test
+  public void testSegmentNameWithTopicIdParsesTopicIdAndOtherFields() {
+    LLCSegmentName segmentName = new LLCSegmentName("myTable__2__4__27__20160617T2150Z");
+    assertEquals(segmentName.getTopicId(), 2);
+    assertEquals(segmentName.getTableName(), "myTable");
+    assertEquals(segmentName.getPartitionGroupId(), 4);
+    assertEquals(segmentName.getSequenceNumber(), 27);
+    assertEquals(segmentName.getCreationTime(), "20160617T2150Z");
+    assertTrue(LLCSegmentName.isLLCSegment(segmentName.getSegmentName()));
+  }
+
+  @Test
+  public void testConstructorWithTopicIdBuildsFivePartSegmentName() {
+    LLCSegmentName segmentName = new LLCSegmentName(TABLE_NAME, 2, 0, 1, TIMESTAMP_MS);
+    assertEquals(segmentName.getSegmentName(), "myTable__2__0__1__20160609T2142Z");
+    assertEquals(segmentName.getTopicId(), 2);
+  }
+
+  @Test
+  public void testConstructorWithoutTopicIdDefaultsTopicIdToZero() {
+    LLCSegmentName segmentName = new LLCSegmentName(TABLE_NAME, 0, 1, TIMESTAMP_MS);
+    assertEquals(segmentName.getTopicId(), 0);
+  }
+
+  @Test
+  public void testIsMultiTopicLLCSegmentRecognizesFivePartNumericSegmentName() {
+    assertTrue(LLCSegmentName.isMultiTopicLLCSegment("myTable__2__4__27__20160617T2150Z"));
+  }
+
+  @Test
+  public void testIsMultiTopicLLCSegmentRejectsFourPartSegmentName() {
+    assertFalse(LLCSegmentName.isMultiTopicLLCSegment("myTable__4__27__20160617T2150Z"));
+  }
+
+  @Test
+  public void testIsMultiTopicLLCSegmentRejectsNonNumericParts() {
+    assertFalse(LLCSegmentName.isMultiTopicLLCSegment("myTable__uploaded__4__27__20160617T2150Z"));
+  }
+
+  @Test
+  public void testCompareToThrowsWhenTopicIdsDiffer() {
+    LLCSegmentName segmentInTopic1 = new LLCSegmentName(TABLE_NAME, 1, 0, 1, TIMESTAMP_MS);
+    LLCSegmentName segmentInTopic2 = new LLCSegmentName(TABLE_NAME, 2, 0, 1, TIMESTAMP_MS);
+    try {
+      segmentInTopic1.compareTo(segmentInTopic2);
+      Assert.fail("Expected compareTo to throw for segments from different topic ids");
+    } catch (IllegalArgumentException e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testCompareToOrdersSegmentsWithSameNonZeroTopicId() {
+    LLCSegmentName segment1 = new LLCSegmentName(TABLE_NAME, 3, 0, 1, TIMESTAMP_MS);
+    LLCSegmentName segment2 = new LLCSegmentName(TABLE_NAME, 3, 0, 2, TIMESTAMP_MS);
+    assertTrue(segment1.compareTo(segment2) < 0);
+    assertTrue(segment2.compareTo(segment1) > 0);
+    assertEquals(segment1.compareTo(new LLCSegmentName(TABLE_NAME, 3, 0, 1, TIMESTAMP_MS)), 0);
   }
 }

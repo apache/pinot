@@ -57,6 +57,7 @@ public class WatermarkInductionResult {
    */
   public static class Watermark {
     private int _partitionGroupId;
+    private int _topicId;
     private int _sequenceNumber;
     private long _offset;
 
@@ -65,26 +66,54 @@ public class WatermarkInductionResult {
      * a WaterMark instance from a JSON object. The @JsonProperty annotations
      * map the keys in the JSON object to the constructor parameters.
      *
-     * @param partitionGroupId The ID of the partition group.
+     * @param partitionGroupId The stream partition id of the partition group, decoded from any legacy
+     *                         padded/composite id. Defaults topicId to 0 (single-topic tables).
+     * @param sequenceNumber The segment sequence number of the consuming segment.
+      * @param offset The first Kafka offset whose corresponding record has not yet sealed in Pinot
+     */
+    public Watermark(int partitionGroupId, int sequenceNumber, long offset) {
+      this(partitionGroupId, 0, sequenceNumber, offset);
+    }
+
+    /**
+     * The @JsonCreator annotation tells Jackson to use this constructor to create
+     * a WaterMark instance from a JSON object. The @JsonProperty annotations
+     * map the keys in the JSON object to the constructor parameters.
+     *
+     * @param partitionGroupId The stream partition id of the partition group (i.e. the partition id within its
+     *                         topic/stream config), not the raw/composite id used by legacy padded encodings.
+     * @param topicId The id of the topic (stream config) this partition group belongs to, for tables with
+     *                multiple topics.
      * @param sequenceNumber The segment sequence number of the consuming segment.
       * @param offset The first Kafka offset whose corresponding record has not yet sealed in Pinot
      */
     @JsonCreator
-    public Watermark(@JsonProperty("partitionGroupId") int partitionGroupId,
+    public Watermark(@JsonProperty("partitionGroupId") int partitionGroupId, @JsonProperty("topicId") int topicId,
         @JsonProperty("sequenceNumber") int sequenceNumber, @JsonProperty("offset") long offset) {
       _partitionGroupId = partitionGroupId;
+      _topicId = topicId;
       _sequenceNumber = sequenceNumber;
       _offset = offset;
     }
 
     /**
-     * Gets the partition group ID.
+     * Gets the stream partition id of the partition group.
      *
-     * @return The partition group ID.
+     * @return The stream partition id.
      */
     @JsonGetter("partitionGroupId")
     public int getPartitionGroupId() {
       return _partitionGroupId;
+    }
+
+    /**
+     * Gets the topic ID (stream config index) this partition group belongs to.
+     *
+     * @return The topic ID.
+     */
+    @JsonGetter("topicId")
+    public int getTopicId() {
+      return _topicId;
     }
 
     /**
