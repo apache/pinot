@@ -97,8 +97,12 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
       return List.of(segments.get(0));
     }
 
-    // Skip pruning segments for upsert table because valid doc index is equivalent to a filter
-    if (segments.get(0).getValidDocIds() != null) {
+    // Skip pruning when a post-selection doc mask makes the raw total-doc count overstate the surviving rows, which
+    // would otherwise under-return under LIMIT. Both signals are set uniformly across a table's segments, so the
+    // first segment suffices: upsert's valid-doc index, or an externally-supplied deleted-doc set. Skipping keeps
+    // results correct -- every segment is still scanned and the mask applied during the scan.
+    IndexSegment firstSegment = segments.get(0);
+    if (firstSegment.getValidDocIds() != null || firstSegment.hasDeletedDocIds()) {
       return segments;
     }
 

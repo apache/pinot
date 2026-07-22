@@ -85,6 +85,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private ThreadSafeMutableRoaringBitmap _validDocIds;
   private ThreadSafeMutableRoaringBitmap _queryableDocIds;
+  private volatile boolean _hasDeletedDocIds;
 
   public ImmutableSegmentImpl(
       SegmentDirectory segmentDirectory,
@@ -360,6 +361,19 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public ThreadSafeMutableRoaringBitmap getQueryableDocIds() {
     return _queryableDocIds;
+  }
+
+  @Override
+  public boolean hasDeletedDocIds() {
+    return _hasDeletedDocIds;
+  }
+
+  /**
+   * Marks that this segment has externally-supplied deleted docs -- excluded at query time but still counted in
+   * total docs -- so selection LIMIT pruning skips it.
+   */
+  public void setHasDeletedDocIds(boolean hasDeletedDocIds) {
+    _hasDeletedDocIds = hasDeletedDocIds;
   }
 
   @Override
