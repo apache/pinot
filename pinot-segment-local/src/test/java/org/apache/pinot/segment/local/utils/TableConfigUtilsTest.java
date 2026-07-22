@@ -3705,10 +3705,11 @@ public class TableConfigUtilsTest {
 
     Map<String, String> expectedStreamConfigsMap = getTestStreamConfigs();
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setSegmentPushFrequency(expectedPushFrequency)
-        .setSegmentPushType(expectedPushType)
         .setStreamConfigs(expectedStreamConfigsMap)
         .build();
+    // Simulate a legacy table config that carries push type/frequency in the validation config
+    tableConfig.getValidationConfig().setSegmentPushFrequency(expectedPushFrequency);
+    tableConfig.getValidationConfig().setSegmentPushType(expectedPushType);
 
     // Before conversion, the ingestion config should be null.
     assertNull(tableConfig.getIngestionConfig());
