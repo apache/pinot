@@ -93,6 +93,7 @@ public class PlanNodeSorter {
       return defaultNode(node, comparator);
     }
 
+    @Deprecated(forRemoval = true, since = "1.6.0")
     @Override
     public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Comparator<PlanNode> comparator) {
       return visitJoin(node, comparator);

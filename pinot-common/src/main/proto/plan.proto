@@ -40,7 +40,9 @@ message PlanNode {
     ValueNode valueNode = 14;
     WindowNode windowNode = 15;
     ExplainNode explainNode = 16;
-    EnrichedJoinNode enrichedJoinNode = 17;
+    // Deprecated: enriched joins have been removed. Field 17 is retained (never reused) so that plans
+    // serialized by an older-version broker can still be deserialized. No current broker sets this field.
+    EnrichedJoinNode enrichedJoinNode = 17 [deprecated = true];
     UnnestNode unnestNode = 18;
   }
 }
@@ -121,7 +123,10 @@ message FilterProjectRex {
   optional ProjectAndResultSchema projectAndResultSchema = 3;
 }
 
+// Deprecated: enriched joins have been removed. Retained only so plans from an older-version broker
+// can still be deserialized. No current broker produces this message.
 message EnrichedJoinNode {
+  option deprecated = true;
   JoinType joinType = 1;
   repeated int32 leftKeys = 2;
   repeated int32 rightKeys = 3;

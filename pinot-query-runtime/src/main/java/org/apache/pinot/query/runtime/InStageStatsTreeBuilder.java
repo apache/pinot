@@ -286,6 +286,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
     }
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public ObjectNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
     return visitJoin(node, context);

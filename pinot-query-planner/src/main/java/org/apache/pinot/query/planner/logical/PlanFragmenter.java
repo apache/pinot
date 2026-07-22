@@ -128,6 +128,7 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     return process(node, context);
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
     return visitJoin(node, context);

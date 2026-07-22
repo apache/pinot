@@ -45,6 +45,7 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNode
     return process(node, context);
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public T visitEnrichedJoin(EnrichedJoinNode node, C context) {
     return visitJoin(node, context);

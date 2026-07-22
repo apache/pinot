@@ -54,6 +54,9 @@ public class PlanNodeDeserializer {
   private PlanNodeDeserializer() {
   }
 
+  // ENRICHEDJOINNODE is a deprecated node case retained for backward-compatible deserialization of plans from
+  // older-version brokers.
+  @SuppressWarnings({"deprecation", "removal"})
   public static PlanNode process(Plan.PlanNode protoNode) {
     switch (protoNode.getNodeCase()) {
       case AGGREGATENODE:
@@ -114,6 +117,7 @@ public class PlanNodeDeserializer {
             protoJoinNode.getMatchCondition()) : null);
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   private static EnrichedJoinNode deserializeEnrichedJoinNode(Plan.PlanNode protoNode) {
     Plan.EnrichedJoinNode protoEnrichedJoinNode = protoNode.getEnrichedJoinNode();
     // reconstruct filterProjectRex
