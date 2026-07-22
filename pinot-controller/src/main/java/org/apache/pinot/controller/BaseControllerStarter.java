@@ -97,6 +97,8 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.InMemorySessionManager;
+import org.apache.pinot.controller.api.access.SessionManager;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
@@ -746,6 +748,34 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     final MetadataEventNotifierFactory metadataEventNotifierFactory =
         MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX), _helixResourceManager);
 
+    // Create a singleton SessionManager for session-based UI authentication.
+    //
+    // IMPORTANT: This is a per-process in-memory store. In a multi-controller deployment behind
+    // a load balancer, a session token minted on controller-A is not known to controller-B, and
+    // a logout request routed to controller-B will not invalidate the token held by controller-A.
+    // To preserve the server-side logout guarantee, configure the load balancer with sticky
+    // sessions (e.g., consistent hashing on the session cookie or source IP) so that all requests
+    // from a given browser are always routed to the same controller. Without sticky sessions,
+    // session-based UI authentication degrades to best-effort: login and most API calls will work
+    // (the LB will route them to the controller that knows the session), but logout may silently
+    // fail if it hits a different controller.
+    //
+    // The session TTL is set to the configured session timeout plus a 120s grace period.
+    // The grace period absorbs clock skew and in-flight requests: a request that arrives at
+    // the server just before the browser cookie's Max-Age expires will still see a valid
+    // server-side session. Both the server session and the browser cookie Max-Age are set to
+    // serverSessionTtlSeconds at login, so they expire at the same absolute time.
+    //
+    // Note: CONTROLLER_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS controls the session *ceiling*
+    // (loginTime + timeout + 120s), not a sliding inactivity window. The UI enforces inactivity
+    // detection client-side (JavaScript timer that redirects to login after timeout seconds of
+    // no user interaction). The server does not extend the session on each request.
+    long uiInactivityTimeoutSeconds = _config.getProperty(
+        ControllerConf.CONTROLLER_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS,
+        ControllerConf.DEFAULT_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS);
+    long serverSessionTtlSeconds = uiInactivityTimeoutSeconds + 120;
+    final SessionManager sessionManager = new InMemorySessionManager(serverSessionTtlSeconds);
+
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
     // register all the controller objects for injection to jersey resources
@@ -775,6 +805,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
+        bind(sessionManager).to(SessionManager.class);
 
         bindAsContract(PinotTableReloadService.class).in(Singleton.class);
         bindAsContract(PinotTableReloadStatusReporter.class).in(Singleton.class);

@@ -34,11 +34,13 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.glassfish.grizzly.http.server.Request;
@@ -51,7 +53,8 @@ import org.glassfish.grizzly.http.server.Request;
 @javax.ws.rs.ext.Provider
 public class AuthenticationFilter implements ContainerRequestFilter {
   private static final Set<String> UNPROTECTED_PATHS =
-      new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "auth/verify/v2", "health"));
+      new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "auth/verify/v2", "auth/login",
+          "auth/logout", "auth/session", "auth/session/renew", "health"));
   private static final String KEY_TABLE_NAME = "tableName";
   private static final String KEY_TABLE_NAME_WITH_TYPE = "tableNameWithType";
   private static final String KEY_SCHEMA_NAME = "schemaName";
@@ -62,11 +65,21 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   @Inject
   AccessControlFactory _accessControlFactory;
 
+  @Inject
+  SessionManager _sessionManager;
+
+  @Inject
+  ControllerConf _controllerConf;
+
   @Context
   ResourceInfo _resourceInfo;
 
   @Context
   HttpHeaders _httpHeaders;
+
+  // Cached result of isSessionEnabled() — computed lazily on first request and never changes.
+  // volatile ensures all threads see the result once it is written.
+  private volatile Boolean _sessionEnabled;
 
   @Override
   public void filter(ContainerRequestContext requestContext)
@@ -81,6 +94,18 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     if (isBaseFile(AuthProviderUtils.stripMatrixParams(uriInfo.getPath()))
         || UNPROTECTED_PATHS.contains(AuthProviderUtils.stripMatrixParams(uriInfo.getPath()))) {
       return;
+    }
+
+    // SESSION WORKFLOW: If session mode is enabled and the request carries a valid session cookie,
+    // retrieve the stored Basic-auth token and inject it as an Authorization header. This lets
+    // validatePermission() and FineGrainedAuthUtils below run with the session user's credentials
+    // instead of skipping authorization entirely.
+    if (isSessionEnabled()) {
+      Cookie sessionCookie = requestContext.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
+      if (sessionCookie != null && sessionCookie.getValue() != null) {
+        _sessionManager.getBasicAuthToken(sessionCookie.getValue()).ifPresent(
+            authToken -> requestContext.getHeaders().putSingle(HttpHeaders.AUTHORIZATION, authToken));
+      }
     }
 
     // check if authentication is required implicitly
@@ -149,6 +174,23 @@ public class AuthenticationFilter implements ContainerRequestFilter {
       return mmap.getFirst(KEY_SCHEMA_NAME);
     }
     return null;
+  }
+
+  private boolean isSessionEnabled() {
+    if (_sessionEnabled == null) {
+      // Compute once and cache. Double-checked locking is safe here because the result
+      // is idempotent: all threads compute the same value from the same injected beans.
+      boolean enabled = _sessionManager != null && (
+          (_controllerConf != null
+              && _controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false))
+          // Also enable when the factory itself advertises SESSION workflow (e.g.
+          // SessionBasicAuthAccessControlFactory configured without the explicit flag).
+          || (_accessControlFactory != null
+              && AccessControl.WORKFLOW_SESSION.equals(
+                  _accessControlFactory.create().getAuthWorkflowInfo().getWorkflow())));
+      _sessionEnabled = enabled;
+    }
+    return _sessionEnabled;
   }
 
   private static boolean isBaseFile(String path) {

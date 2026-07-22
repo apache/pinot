@@ -357,6 +357,18 @@ public class ControllerConf extends PinotConfiguration {
   public static final String INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM =
       "controller.ingestFromURI.allowLocalFileSystem";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
+
+  /** When {@code true}, enables session-based UI auth (HttpOnly cookie / POST /auth/login). Default: {@code false}. */
+  public static final String CONTROLLER_UI_SESSION_ENABLED = "controller.ui.session.authentication.enabled";
+
+  /** When {@code true}, the session cookie is flagged Secure (HTTPS only). Default: {@code true}. */
+  public static final String CONTROLLER_UI_SESSION_COOKIE_SECURE = "controller.ui.session.cookie.secure";
+
+  /** Inactivity timeout in seconds before the UI session expires. Server TTL = this + 120s. Default: {@code 300}. */
+  public static final String CONTROLLER_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS =
+      "controller.ui.session.inactivity.timeout.seconds";
+  public static final long DEFAULT_UI_SESSION_INACTIVITY_TIMEOUT_SECONDS = 300L;
+
   public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
   public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
   public static final String LINEAGE_MANAGER_CLASS = "controller.lineage.manager.class";

@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -53,6 +54,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -74,6 +76,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.SessionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
@@ -119,6 +122,12 @@ public class PinotQueryResource {
 
   @Inject
   ControllerConf _controllerConf;
+
+  // @Optional: SessionManager is always bound in production but may be absent in unit-test contexts
+  // where HK2 is not fully configured. Without @Optional, injection would fail in those environments.
+  @Inject
+  @org.jvnet.hk2.annotations.Optional
+  SessionManager _sessionManager;
 
   @POST
   @Path("sql")
@@ -414,7 +423,7 @@ public class PinotQueryResource {
             ? getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, traceEnabled)
             : getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
       case DML:
-        Map<String, String> headers = extractHeaders(httpHeaders);
+        Map<String, String> headers = buildBrokerHeaders(httpHeaders);
         return output -> {
           try (OutputStream os = output) {
             _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers).toOutputStream(os);
@@ -427,7 +436,6 @@ public class PinotQueryResource {
 
   private StreamingOutput getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
       String traceEnabled) {
-
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
     AccessControl accessControl = _accessControlFactory.create();
@@ -608,8 +616,7 @@ public class PinotQueryResource {
     String url = getQueryURL(protocol, hostName, port);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions);
 
-    // Forward client-supplied headers
-    Map<String, String> headers = extractHeaders(httpHeaders);
+    Map<String, String> headers = buildBrokerHeaders(httpHeaders);
 
     return sendRequestRaw(url, "POST", query, requestJson, headers);
   }
@@ -745,8 +752,7 @@ public class PinotQueryResource {
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int port = getPort(instanceConfig);
 
-    // Forward client-supplied headers
-    Map<String, String> headers = extractHeaders(httpHeaders);
+    Map<String, String> headers = buildBrokerHeaders(httpHeaders);
 
     if (useBrokerCompatibleApi) {
       // Use POST /query/timeseries endpoint (broker compatible API)
@@ -805,10 +811,37 @@ public class PinotQueryResource {
     }
   }
 
-  private Map<String, String> extractHeaders(HttpHeaders httpHeaders) {
-    return httpHeaders.getRequestHeaders().entrySet().stream()
-      .filter(entry -> !entry.getValue().isEmpty())
-      .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().get(0)));
+  /**
+   * Builds the header map to forward to the broker. Resolves any server-side session credential
+   * exactly once: if the request carries a valid session cookie, the caller-supplied Authorization
+   * header is replaced with the stored session token; otherwise all headers (including Authorization)
+   * are forwarded unchanged so that API clients keep their own credentials.
+   */
+  private Map<String, String> buildBrokerHeaders(HttpHeaders httpHeaders) {
+    Optional<String> sessionCredential = resolveSessionCredential(httpHeaders);
+    Map<String, String> headers = httpHeaders.getRequestHeaders().entrySet().stream()
+        .filter(entry -> !entry.getValue().isEmpty())
+        .filter(entry -> !sessionCredential.isPresent() || !entry.getKey().equalsIgnoreCase(HttpHeaders.AUTHORIZATION))
+        .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().get(0)));
+    sessionCredential.ifPresent(token -> headers.put(HttpHeaders.AUTHORIZATION, token));
+    return headers;
+  }
+
+  /**
+   * Returns the stored Basic-auth token for the session cookie carried by this request, or
+   * {@code Optional.empty()} if session mode is disabled, no cookie is present, or the session
+   * has expired.
+   */
+  private Optional<String> resolveSessionCredential(HttpHeaders httpHeaders) {
+    if (_sessionManager == null || _controllerConf == null
+        || !_controllerConf.getProperty(ControllerConf.CONTROLLER_UI_SESSION_ENABLED, false)) {
+      return Optional.empty();
+    }
+    Cookie sessionCookie = httpHeaders.getCookies().get(SessionManager.SESSION_COOKIE_NAME);
+    if (sessionCookie == null || sessionCookie.getValue() == null) {
+      return Optional.empty();
+    }
+    return _sessionManager.getBasicAuthToken(sessionCookie.getValue());
   }
 
   private InstanceConfig getInstanceConfig(String instanceId) {

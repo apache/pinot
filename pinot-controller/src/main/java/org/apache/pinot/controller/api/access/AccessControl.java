@@ -30,6 +30,8 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 public interface AccessControl extends FineGrainedAccessControl {
   String WORKFLOW_NONE = "NONE";
   String WORKFLOW_BASIC = "BASIC";
+  /** Session-based workflow: credentials validated once at login; subsequent requests use an HttpOnly cookie. */
+  String WORKFLOW_SESSION = "SESSION";
 
   /**
    * Return whether the client has permission to the given table
@@ -78,14 +80,22 @@ public interface AccessControl extends FineGrainedAccessControl {
   /**
    * Container for authentication workflow info for the Pinot UI. May be extended by implementations.
    *
-   * Auth workflow info hold any configuration necessary to execute a UI workflow. We currently foresee supporting NONE
-   * (auth disabled) and BASIC (basic auth with username and password)
+   * Auth workflow info holds any configuration necessary to execute a UI workflow. Supports NONE
+   * (auth disabled), BASIC (basic auth with username and password), and SESSION (session-based
+   * UI authentication with HttpOnly cookie).
    */
   class AuthWorkflowInfo {
     String _workflow;
+    /** UI inactivity timeout in seconds. -1 means not applicable (non-SESSION workflows). */
+    long _inactivityTimeoutSeconds = -1;
 
     public AuthWorkflowInfo(String workflow) {
       _workflow = workflow;
+    }
+
+    public AuthWorkflowInfo(String workflow, long inactivityTimeoutSeconds) {
+      _workflow = workflow;
+      _inactivityTimeoutSeconds = inactivityTimeoutSeconds;
     }
 
     public String getWorkflow() {
@@ -94,6 +104,15 @@ public interface AccessControl extends FineGrainedAccessControl {
 
     public void setWorkflow(String workflow) {
       _workflow = workflow;
+    }
+
+    /** Returns the UI inactivity timeout in seconds, or -1 if not applicable. */
+    public long getInactivityTimeoutSeconds() {
+      return _inactivityTimeoutSeconds;
+    }
+
+    public void setInactivityTimeoutSeconds(long inactivityTimeoutSeconds) {
+      _inactivityTimeoutSeconds = inactivityTimeoutSeconds;
     }
   }
 }
