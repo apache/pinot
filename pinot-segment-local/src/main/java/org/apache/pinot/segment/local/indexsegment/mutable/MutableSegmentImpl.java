@@ -1692,6 +1692,8 @@ public class MutableSegmentImpl implements MutableSegment {
     DataSource toDataSource() {
       if (_fieldSpec.getDataType() == DataType.OPEN_STRUCT) {
         MutableIndex idx = _mutableIndexes.get(StandardIndexes.openStruct());
+        Preconditions.checkState(idx instanceof MutableOpenStructIndex,
+            "OPEN_STRUCT column '%s' requires the open_struct_index to be enabled", _fieldSpec.getName());
         return new MutableOpenStructDataSource((ComplexFieldSpec) _fieldSpec, (MutableOpenStructIndex) idx,
             _numDocsIndexed);
       }
