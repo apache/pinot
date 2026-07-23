@@ -100,7 +100,7 @@ public class QueryRouter {
     // Create the asynchronous query response with the request map
     AsyncQueryResponse asyncQueryResponse =
         new AsyncQueryResponse(this, requestId, requestMap.keySet(), System.currentTimeMillis(), timeoutMs,
-            _serverRoutingStatsManager);
+            _serverRoutingStatsManager, skipUnavailableServers);
     _asyncQueryResponseMap.put(requestId, asyncQueryResponse);
     for (Map.Entry<ServerRoutingInstance, InstanceRequest> entry : requestMap.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
@@ -118,7 +118,7 @@ public class QueryRouter {
       } catch (Exception e) {
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SEND_EXCEPTIONS, 1);
         if (skipUnavailableServers) {
-          asyncQueryResponse.skipServerResponse();
+          asyncQueryResponse.skipServerResponse(serverRoutingInstance);
         } else {
           markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
           break;
@@ -188,9 +188,23 @@ public class QueryRouter {
     }
   }
 
-  void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
+  /// Marks a server as unavailable for every in-flight query. Called when a server's channel goes inactive
+  /// ([DataTableHandler]) or a request write to it fails ([ServerChannels]). Queries submitted with
+  /// `skipUnavailableServers=true` degrade to partial results for this genuine unavailability; others are failed.
+  void markServerUnavailable(ServerRoutingInstance serverRoutingInstance, Exception exception) {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
-      asyncQueryResponse.markServerDown(serverRoutingInstance, exception);
+      if (asyncQueryResponse.markServerUnavailable(serverRoutingInstance, exception)) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SERVER_MARKED_DOWN_SKIPPED, 1);
+      }
+    }
+  }
+
+  /// Cancels every in-flight query. Unlike
+  /// [#markServerUnavailable], this always fails the queries even under `skipUnavailableServers`: all
+  /// channels are being closed so there is no partial data to return.
+  void markServerCancelled(ServerRoutingInstance serverRoutingInstance, Exception exception) {
+    for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
+      asyncQueryResponse.markServerCancelled(serverRoutingInstance, exception);
     }
   }
 
