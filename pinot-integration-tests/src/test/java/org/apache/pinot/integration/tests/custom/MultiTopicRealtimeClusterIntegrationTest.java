@@ -256,7 +256,7 @@ public class MultiTopicRealtimeClusterIntegrationTest extends CustomDataQueryClu
       Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
       if (stateMap != null
           && stateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
-        consumingPartitions.add(new LLCSegmentName(segmentName).getPartitionGroupId());
+        consumingPartitions.add(new LLCSegmentName(segmentName).getTopicPartitionId().toMultiTopicPinotPartitionId());
       }
     }
     return consumingPartitions.size();
@@ -383,7 +383,7 @@ public class MultiTopicRealtimeClusterIntegrationTest extends CustomDataQueryClu
     Set<Integer> topicIndicesSeen = new HashSet<>();
     for (String segmentName : idealState.getPartitionSet()) {
       if (LLCSegmentName.isLLCSegment(segmentName)) {
-        int pgId = new LLCSegmentName(segmentName).getPartitionGroupId();
+        int pgId = new LLCSegmentName(segmentName).getTopicPartitionId().toMultiTopicPinotPartitionId();
         topicIndicesSeen.add(IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(pgId));
       }
     }

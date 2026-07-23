@@ -337,6 +337,7 @@ public class MutableSegmentImpl implements MutableSegment {
               .withEstimatedColSize(_statsHistory.getEstimatedAvgColSize(column))
               .withAvgNumMultiValues(_statsHistory.getEstimatedAvgColSize(column))
               .withConsumerDir(_consumerDir)
+              .withHasMultipleStreams(config.hasMultipleStreams())
               .withFixedLengthBytes(fixedByteSize).build();
 
       // Partition info
@@ -492,7 +493,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
       _multiColumnTextIndex =
           new MultiColumnRealtimeLuceneTextIndex(textColumns, columnsSV, _consumerDir, config.getSegmentName(),
-              textConfig);
+              textConfig, config.hasMultipleStreams());
       _multiColumnPos = _multiColumnTextIndex.getMapping();
       _multiColumnValues = new ArrayList<>(_multiColumnPos.size());
       for (int i = 0; i < _multiColumnPos.size(); i++) {

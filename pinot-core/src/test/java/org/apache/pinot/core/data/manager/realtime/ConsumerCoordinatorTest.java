@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.util.TestUtils;
@@ -55,7 +56,7 @@ public class ConsumerCoordinatorTest {
     }
 
     @Override
-    ConsumerCoordinator getConsumerCoordinator(int partitionId) {
+    ConsumerCoordinator getConsumerCoordinator(TopicPartitionId partitionId) {
       return _consumerCoordinator;
     }
 

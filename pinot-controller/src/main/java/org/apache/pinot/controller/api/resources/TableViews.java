@@ -57,6 +57,7 @@ import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -210,14 +211,15 @@ public class TableViews {
         return JsonUtils.objectToPrettyString(new HashMap<>());
       }
 
-      Map<Integer, SortedSet<LLCSegmentName>> partitionIdToSegments = new HashMap<>();
+      Map<TopicPartitionId, SortedSet<LLCSegmentName>> partitionIdToSegments = new HashMap<>();
       for (SegmentStatusInfo segmentStatusInfo : segmentStatusInfoList) {
         String segmentName = segmentStatusInfo.getSegmentName();
         LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
         if (llcSegmentName == null) {
           continue;
         }
-        partitionIdToSegments.computeIfAbsent(llcSegmentName.getPartitionGroupId(), k -> new TreeSet<>())
+        partitionIdToSegments.computeIfAbsent(
+            llcSegmentName.getTopicPartitionId(), k -> new TreeSet<>())
             .add(llcSegmentName);
       }
 

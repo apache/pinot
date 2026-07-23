@@ -68,15 +68,33 @@ public class SegmentUtils {
 
   /// Returns the partition id of a segment based on segment name.
   /// Can return `null` if the partition id cannot be determined.
+  /// @deprecated Use {@link #getTopicPartitionIdFromSegmentName(String, boolean)} instead.
+  @Deprecated
   @Nullable
   public static Integer getPartitionIdFromSegmentName(String segmentName) {
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     if (llcSegmentName != null) {
-      return llcSegmentName.getPartitionGroupId();
+      return llcSegmentName.getTopicPartitionId().toMultiTopicPinotPartitionId();
     }
     UploadedRealtimeSegmentName uploadedRealtimeSegmentName = UploadedRealtimeSegmentName.of(segmentName);
     if (uploadedRealtimeSegmentName != null) {
       return uploadedRealtimeSegmentName.getPartitionId();
+    }
+    return null;
+  }
+
+  /// Returns the topic-partition ID of a segment based on segment name.
+  /// Can return {@code null} if the partition ID cannot be determined.
+  @Nullable
+  public static TopicPartitionId getTopicPartitionIdFromSegmentName(
+      String segmentName, boolean hasMultipleStreams) {
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName, hasMultipleStreams);
+    if (llcSegmentName != null) {
+      return llcSegmentName.getTopicPartitionId();
+    }
+    UploadedRealtimeSegmentName uploadedRealtimeSegmentName = UploadedRealtimeSegmentName.of(segmentName);
+    if (uploadedRealtimeSegmentName != null) {
+      return new TopicPartitionId(uploadedRealtimeSegmentName.getPartitionId());
     }
     return null;
   }

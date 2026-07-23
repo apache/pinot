@@ -64,7 +64,8 @@ public class SingleTierStrictRealtimeSegmentAssignment extends BaseStrictRealtim
       } else {
         // Reassign CONSUMING and COMPLETED segments
         List<String> instancesAssigned =
-            assignConsumingSegment(getPartitionIdUsingCache(segmentName), instancePartitions);
+            assignConsumingSegment(getPartitionIdUsingCache(segmentName),
+                instancePartitions);
         String state = instanceStateMap.containsValue(SegmentStateModel.CONSUMING) ? SegmentStateModel.CONSUMING
             : SegmentStateModel.ONLINE;
         newAssignment.put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, state));

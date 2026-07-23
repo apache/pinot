@@ -24,6 +24,7 @@ import com.google.common.cache.CacheBuilder;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
@@ -140,21 +142,22 @@ public class IngestionDelayTracker {
   // This map is accessed by:
   // 1. _ingestionDelayTrackingScheduler thread.
   // 2. All threads which can removes metrics - Consumer thread, Helix Thread, Server API Thread, etc.
-  private final Map<Integer, Boolean> _partitionsTracked = new ConcurrentHashMap<>();
+  private final Map<TopicPartitionId, Boolean> _partitionsTracked = new ConcurrentHashMap<>();
   // Map to hold the ingestion info reported by the consumer.
   // This map is accessed by:
   // 1. _ingestionDelayTrackingScheduler thread.
   // 2. All threads which can removes metrics - Consumer thread, Helix Thread, Server API Thread, etc.
   // 3. Consumer thread when it updates the ingestion info of the partition.
-  private final Map<Integer, IngestionInfo> _ingestionInfoMap = new ConcurrentHashMap<>();
-  private final Map<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
+  private final Map<TopicPartitionId, IngestionInfo> _ingestionInfoMap = new ConcurrentHashMap<>();
+  private final Map<TopicPartitionId, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
   private final ScheduledExecutorService _metricsRemovalScheduler;
   private final ScheduledExecutorService _ingestionDelayTrackingScheduler;
 
   private Clock _clock = Clock.systemUTC();
 
-  protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
-  protected volatile ConcurrentHashMap<Integer, Boolean> _partitionsHostedByThisServer = new ConcurrentHashMap<>();
+  protected volatile Map<TopicPartitionId, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
+  protected volatile ConcurrentHashMap<TopicPartitionId, Boolean> _partitionsHostedByThisServer =
+      new ConcurrentHashMap<>();
   // Map of StreamMetadataProvider to fetch upstream latest stream offset (Table can have multiple upstream topics)
   // This map is accessed by:
   // 1. _ingestionDelayTrackingScheduler thread.
@@ -232,7 +235,8 @@ public class IngestionDelayTracker {
         // or once the table data manager has been shutdown.
         return;
       }
-      Set<Integer> partitionsHosted = new HashSet<>(_partitionsHostedByThisServer.keySet());
+      Set<TopicPartitionId> partitionsHosted =
+          new HashSet<>(_partitionsHostedByThisServer.keySet());
 
       if (_ingestionInfoMap.size() > partitionsHosted.size()) {
         // In-case new partition got assigned to the server before _partitionsHostedByThisServer was updated.
@@ -245,7 +249,7 @@ public class IngestionDelayTracker {
 
       updateLatestStreamOffset(partitionsHosted);
 
-      for (Integer partitionId : partitionsHosted) {
+      for (TopicPartitionId partitionId : partitionsHosted) {
         _partitionsTracked.computeIfAbsent(partitionId, k -> {
           // Check below condition in-case partition was stopped being tracked. Eg: due to manual operations like -
           // calling remove ingestion metrics API
@@ -267,9 +271,12 @@ public class IngestionDelayTracker {
   }
 
   @VisibleForTesting
-  void updateLatestStreamOffset(Set<Integer> partitionsHosted) {
-    Map<Integer, Set<Integer>> streamIndexToStreamPartitionIds =
-        IngestionConfigUtils.getStreamConfigIndexToStreamPartitions(partitionsHosted);
+  void updateLatestStreamOffset(Set<TopicPartitionId> partitionsHosted) {
+    Map<Integer, Set<Integer>> streamIndexToStreamPartitionIds = new HashMap<>();
+    for (TopicPartitionId tpId : partitionsHosted) {
+      streamIndexToStreamPartitionIds.computeIfAbsent(tpId.getTopicId(), k -> new HashSet<>())
+          .add(tpId.getPartitionId());
+    }
 
     if (streamIndexToStreamPartitionIds.size() > _streamConfigIndexToStreamMetadataProvider.size()) {
       // There might be a new stream config added or need to retry creation of streamMetadataProvider for a stream
@@ -293,15 +300,19 @@ public class IngestionDelayTracker {
               streamMetadataProvider.fetchLatestStreamOffset(streamPartitionIds,
                   LATEST_STREAM_OFFSET_FETCH_TIMEOUT_MS);
           if (streamIndex > 0) {
-            // Need to convert stream partition Ids back to pinot partition Ids.
+            // Need to convert stream partition Ids back to TopicPartitionId keys.
             for (Map.Entry<Integer, StreamPartitionMsgOffset> latestOffsetEntry
                 : streamPartitionIdToLatestOffset.entrySet()) {
               _partitionIdToLatestOffset.put(
-                  IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(latestOffsetEntry.getKey(),
-                      streamIndex), latestOffsetEntry.getValue());
+                  new TopicPartitionId(streamIndex, latestOffsetEntry.getKey()),
+                  latestOffsetEntry.getValue());
             }
           } else {
-            _partitionIdToLatestOffset.putAll(streamPartitionIdToLatestOffset);
+            for (Map.Entry<Integer, StreamPartitionMsgOffset> e
+                : streamPartitionIdToLatestOffset.entrySet()) {
+              _partitionIdToLatestOffset.put(
+                  new TopicPartitionId(e.getKey()), e.getValue());
+            }
           }
         } catch (Exception e) {
           _serverMetrics.addMeteredTableValue(_realTimeTableDataManager.getTableName(),
@@ -331,7 +342,7 @@ public class IngestionDelayTracker {
    *
    * @param partitionId partition ID which we should stop tracking.
    */
-  private void removePartitionId(int partitionId) {
+  private void removePartitionId(TopicPartitionId partitionId) {
     _partitionsHostedByThisServer.remove(partitionId);
     _ingestionInfoMap.remove(partitionId);
     _partitionsTracked.computeIfPresent(partitionId, (k, v) -> {
@@ -347,9 +358,10 @@ public class IngestionDelayTracker {
    * Helper functions that creates a list of all the partitions that are marked for verification and whose
    * timeouts are expired. This helps us optimize checks of the ideal state.
    */
-  private List<Integer> getPartitionsToBeVerified() {
-    List<Integer> partitionsToVerify = new ArrayList<>();
-    for (Map.Entry<Integer, Long> entry : _partitionsMarkedForVerification.entrySet()) {
+  private List<TopicPartitionId> getPartitionsToBeVerified() {
+    List<TopicPartitionId> partitionsToVerify = new ArrayList<>();
+    for (Map.Entry<TopicPartitionId, Long> entry
+        : _partitionsMarkedForVerification.entrySet()) {
       long timeMarked = _clock.millis() - entry.getValue();
       if (timeMarked > PARTITION_TIMEOUT_MS) {
         // Partition must be verified
@@ -370,45 +382,57 @@ public class IngestionDelayTracker {
   }
 
   @VisibleForTesting
-  void createMetrics(int partitionId) {
-    int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
-    StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
+  void createMetrics(TopicPartitionId partitionId) {
+    int streamConfigIndex = partitionId.getTopicId();
+    StreamMetadataProvider streamMetadataProvider =
+        _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
+    int pinotPartitionId = partitionId.toMultiTopicPinotPartitionId();
 
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
+      _serverMetrics.setOrUpdatePartitionGauge(_metricName, pinotPartitionId,
+          ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
           () -> getPartitionIngestionOffsetLag(partitionId));
 
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-          ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET, () -> getPartitionIngestionConsumingOffset(partitionId));
+      _serverMetrics.setOrUpdatePartitionGauge(_metricName, pinotPartitionId,
+          ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET,
+          () -> getPartitionIngestionConsumingOffset(partitionId));
 
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-          ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getLatestPartitionOffset(partitionId));
+      _serverMetrics.setOrUpdatePartitionGauge(_metricName, pinotPartitionId,
+          ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET,
+          () -> getLatestPartitionOffset(partitionId));
     }
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
+    _serverMetrics.setOrUpdatePartitionGauge(_metricName, pinotPartitionId,
+        ServerGauge.REALTIME_INGESTION_DELAY_MS,
         () -> getPartitionIngestionDelayMs(partitionId));
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> getPartitionEndToEndIngestionDelayMs(partitionId));
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-        ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS, () -> getPartitionIngestionReportingStatus(partitionId));
+    _serverMetrics.setOrUpdatePartitionGauge(_metricName, pinotPartitionId,
+        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
+        () -> getPartitionEndToEndIngestionDelayMs(partitionId));
+    _serverMetrics.setOrUpdatePartitionGauge(_metricName, pinotPartitionId,
+        ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS,
+        () -> getPartitionIngestionReportingStatus(partitionId));
 
     LOGGER.info("Successfully created ingestion metrics for partition id: {}", partitionId);
   }
 
-  private void removeMetrics(int partitionId) {
-    int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
+  private void removeMetrics(TopicPartitionId partitionId) {
+    int streamConfigIndex = partitionId.getTopicId();
+    int pinotPartitionId = partitionId.toMultiTopicPinotPartitionId();
     StreamMetadataProvider streamMetadataProvider =
         _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
     // Remove all metrics associated with this partition
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
-      _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
-      _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
-      _serverMetrics.removePartitionGauge(_metricName, partitionId,
+      _serverMetrics.removePartitionGauge(_metricName, pinotPartitionId,
+          ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
+      _serverMetrics.removePartitionGauge(_metricName, pinotPartitionId,
+          ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
+      _serverMetrics.removePartitionGauge(_metricName, pinotPartitionId,
           ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
     }
-    _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
-    _serverMetrics.removePartitionGauge(_metricName, partitionId,
+    _serverMetrics.removePartitionGauge(_metricName, pinotPartitionId,
+        ServerGauge.REALTIME_INGESTION_DELAY_MS);
+    _serverMetrics.removePartitionGauge(_metricName, pinotPartitionId,
         ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
-    _serverMetrics.removePartitionGauge(_metricName, partitionId,
+    _serverMetrics.removePartitionGauge(_metricName, pinotPartitionId,
         ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS);
 
     LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
@@ -425,7 +449,8 @@ public class IngestionDelayTracker {
    * {@link StreamMessageMetadata})
    * @param currentOffset              offset of the last consumed message (from {@link StreamMessageMetadata})
    */
-  public void updateMetrics(String segmentName, int partitionId, long ingestionTimeMs,
+  public void updateMetrics(String segmentName, TopicPartitionId partitionId,
+      long ingestionTimeMs,
       long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
     if (!_isServerReadyToServeQueries.getAsBoolean() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
@@ -460,7 +485,7 @@ public class IngestionDelayTracker {
    *
    * @param partitionId partition id that we should stop tracking.
    */
-  public void stopTrackingPartition(int partitionId) {
+  public void stopTrackingPartition(TopicPartitionId partitionId) {
     removePartitionId(partitionId);
   }
 
@@ -470,9 +495,10 @@ public class IngestionDelayTracker {
    *
    * @return Set of partitionIds for which ingestion metrics were removed.
    */
-  public Set<Integer> stopTrackingAllPartitions() {
-    Set<Integer> removedPartitionIds = new HashSet<>(_ingestionInfoMap.keySet());
-    for (Integer partitionId : _ingestionInfoMap.keySet()) {
+  public Set<TopicPartitionId> stopTrackingAllPartitions() {
+    Set<TopicPartitionId> removedPartitionIds =
+        new HashSet<>(_ingestionInfoMap.keySet());
+    for (TopicPartitionId partitionId : _ingestionInfoMap.keySet()) {
       removePartitionId(partitionId);
     }
     return removedPartitionIds;
@@ -485,7 +511,8 @@ public class IngestionDelayTracker {
    */
   public void stopTrackingPartition(String segmentName) {
     _segmentsToIgnore.put(segmentName, true);
-    removePartitionId(new LLCSegmentName(segmentName).getPartitionGroupId());
+    removePartitionId(
+        new LLCSegmentName(segmentName).getTopicPartitionId());
   }
 
   /**
@@ -501,27 +528,31 @@ public class IngestionDelayTracker {
     }
     // Check if we have any partition to verify, else don't make the call to check ideal state as that
     // involves network traffic and may be inefficient.
-    List<Integer> partitionsToVerify = getPartitionsToBeVerified();
+    List<TopicPartitionId> partitionsToVerify = getPartitionsToBeVerified();
     if (partitionsToVerify.isEmpty()) {
       // Don't make the call to getHostedPartitionsGroupIds() as it involves checking ideal state.
       return;
     }
-    Set<Integer> partitionsHostedByThisServer;
+    Set<TopicPartitionId> partitionsHostedByThisServer;
     try {
-      partitionsHostedByThisServer = _realTimeTableDataManager.getHostedPartitionsGroupIds();
+      partitionsHostedByThisServer =
+          _realTimeTableDataManager.getHostedPartitionsGroupIds();
     } catch (Exception e) {
-      LOGGER.error("Failed to get partitions hosted by this server, table={}, exception={}:{}", _tableNameWithType,
-          e.getClass(), e.getMessage());
+      LOGGER.error(
+          "Failed to get partitions hosted by this server, table={}, "
+              + "exception={}:{}",
+          _tableNameWithType, e.getClass(), e.getMessage());
       return;
     }
-    for (int partitionId : partitionsToVerify) {
+    for (TopicPartitionId partitionId : partitionsToVerify) {
       if (!partitionsHostedByThisServer.contains(partitionId)) {
         // Partition is not hosted in this server anymore, stop tracking it
         removePartitionId(partitionId);
       }
     }
 
-    ConcurrentHashMap<Integer, Boolean> newMap = new ConcurrentHashMap<>();
+    ConcurrentHashMap<TopicPartitionId, Boolean> newMap =
+        new ConcurrentHashMap<>();
     partitionsHostedByThisServer.forEach(p -> newMap.put(p, true));
     _partitionsHostedByThisServer = newMap;
   }
@@ -535,7 +566,9 @@ public class IngestionDelayTracker {
       // Do not update the tracker state during server startup period or if the segment is marked to be ignored
       return;
     }
-    _partitionsMarkedForVerification.put(new LLCSegmentName(segmentName).getPartitionGroupId(), _clock.millis());
+    _partitionsMarkedForVerification.put(
+        new LLCSegmentName(segmentName).getTopicPartitionId(),
+        _clock.millis());
   }
 
   /**
@@ -545,7 +578,7 @@ public class IngestionDelayTracker {
    *
    * @return ingestion delay timestamp in milliseconds for the given partition ID.
    */
-  public long getPartitionIngestionTimeMs(int partitionId) {
+  public long getPartitionIngestionTimeMs(TopicPartitionId partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     return ingestionInfo != null ? ingestionInfo._ingestionTimeMs : Long.MIN_VALUE;
   }
@@ -559,7 +592,7 @@ public class IngestionDelayTracker {
    * or null if first stream ingestion time is not available for the partition.
    */
   @Nullable
-  public Long getPartitionEndToEndIngestionDelayMs(int partitionId) {
+  public Long getPartitionEndToEndIngestionDelayMs(TopicPartitionId partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     if (ingestionInfo == null || ingestionInfo._firstStreamIngestionTimeMs < 0) {
       return null;
@@ -579,7 +612,7 @@ public class IngestionDelayTracker {
    * or null if ingestion time is not available for the partition.
    */
   @Nullable
-  public Long getPartitionIngestionDelayMs(int partitionId) {
+  public Long getPartitionIngestionDelayMs(TopicPartitionId partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     if (ingestionInfo == null || ingestionInfo._ingestionTimeMs < 0) {
       return null;
@@ -591,6 +624,7 @@ public class IngestionDelayTracker {
   }
 
   /**
+  /**
    * Method to get if ingestion delay data is available for the given partition (i.e.
    * ingestion info has been reported)
    *
@@ -598,7 +632,7 @@ public class IngestionDelayTracker {
    *
    * @return 1 if ingestion delay data is available, 0 otherwise
    */
-  public long getPartitionIngestionReportingStatus(int partitionId) {
+  public long getPartitionIngestionReportingStatus(TopicPartitionId partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     if (ingestionInfo == null) {
       return 0;
@@ -615,7 +649,7 @@ public class IngestionDelayTracker {
    * @param partitionId partition for which the ingestion lag is computed
    * @return offset lag for the given partition
    */
-  public long getPartitionIngestionOffsetLag(int partitionId) {
+  public long getPartitionIngestionOffsetLag(TopicPartitionId partitionId) {
     StreamPartitionMsgOffset latestOffset = _partitionIdToLatestOffset.get(partitionId);
     if (latestOffset == null) {
       return 0;
@@ -644,7 +678,7 @@ public class IngestionDelayTracker {
    * @param partitionId partition for which the consuming offset was retrieved
    * @return consuming offset value for the given partition, or {@code 0} if no ingestion info is available
    */
-  public long getPartitionIngestionConsumingOffset(int partitionId) {
+  public long getPartitionIngestionConsumingOffset(TopicPartitionId partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     if (ingestionInfo == null) {
       return 0;
@@ -667,7 +701,7 @@ public class IngestionDelayTracker {
    * @param partitionId partition for which the latest upstream offset is retrieved
    * @return latest offset value for the given partition, or {@code 0} if not available
    */
-  public long getLatestPartitionOffset(int partitionId) {
+  public long getLatestPartitionOffset(TopicPartitionId partitionId) {
     StreamPartitionMsgOffset latestOffset = _partitionIdToLatestOffset.get(partitionId);
     if (latestOffset == null) {
       return 0;
@@ -698,7 +732,7 @@ public class IngestionDelayTracker {
       return;
     }
     // Remove partitions so their related metrics get uninstalled.
-    for (Integer partitionId : _ingestionInfoMap.keySet()) {
+    for (TopicPartitionId partitionId : _ingestionInfoMap.keySet()) {
       removePartitionId(partitionId);
     }
   }

@@ -48,7 +48,7 @@ public class TableRebalancerTest {
   private static final TableRebalancer.PartitionIdFetcher DUMMY_PARTITION_FETCHER = segmentName -> 0;
   private static final TableRebalancer.PartitionIdFetcher SIMPLE_PARTITION_FETCHER = segmentName -> {
     LLCSegmentName name = LLCSegmentName.of(segmentName);
-    return name == null ? -1 : name.getPartitionGroupId();
+    return name == null ? -1 : name.getTopicPartitionId().toMultiTopicPinotPartitionId();
   };
 
   private static final TableRebalancer.DataLossRiskAssessor DEFAULT_DATA_LOSS_RISK_ASSESSOR =

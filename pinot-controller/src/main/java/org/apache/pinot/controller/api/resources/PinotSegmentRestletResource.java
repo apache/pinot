@@ -73,6 +73,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.controller.ControllerConf;
@@ -1046,17 +1047,17 @@ public class PinotSegmentRestletResource {
     Preconditions.checkState(idealState != null, "Ideal State does not exist for table " + tableNameWithType);
 
     Set<String> idealStateSegmentsSet = idealState.getRecord().getMapFields().keySet();
-    Map<Integer, LLCSegmentName> partitionToOldestSegment =
+    Map<TopicPartitionId, LLCSegmentName> partitionToOldestSegment =
         getPartitionIDToOldestSegment(segments, idealStateSegmentsSet);
-    Map<Integer, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
-    Map<Integer, Set<String>> partitionIdToSegmentsToDeleteMap =
-        getPartitionIdToSegmentsToDeleteMap(partitionToOldestSegment, idealStateSegmentsSet,
-            partitionIdToLatestSegment);
+    Map<TopicPartitionId, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
+    Map<TopicPartitionId, Set<String>> partitionIdToSegmentsToDeleteMap =
+        getPartitionIdToSegmentsToDeleteMap(partitionToOldestSegment,
+            idealStateSegmentsSet, partitionIdToLatestSegment);
 
     Map<String, Object> response = new HashMap<>();
-    Map<Integer, Object> partitionDetails = new HashMap<>();
+    Map<TopicPartitionId, Object> partitionDetails = new HashMap<>();
 
-    for (Integer partitionID : partitionToOldestSegment.keySet()) {
+    for (TopicPartitionId partitionID : partitionToOldestSegment.keySet()) {
       Set<String> segmentsToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
       LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionID);
       LLCSegmentName latestSegment = partitionIdToLatestSegment.get(partitionID);
@@ -1111,12 +1112,13 @@ public class PinotSegmentRestletResource {
    *         for that particular partition.
    */
   @VisibleForTesting
-  Map<Integer, Set<String>> getPartitionIdToSegmentsToDeleteMap(
-      Map<Integer, LLCSegmentName> partitionToOldestSegment,
-      Set<String> idealStateSegmentsSet, Map<Integer, LLCSegmentName> partitionIdToLatestSegment) {
+  Map<TopicPartitionId, Set<String>> getPartitionIdToSegmentsToDeleteMap(
+      Map<TopicPartitionId, LLCSegmentName> partitionToOldestSegment,
+      Set<String> idealStateSegmentsSet,
+      Map<TopicPartitionId, LLCSegmentName> partitionIdToLatestSegment) {
 
     // Find segments to delete (those with higher sequence numbers)
-    Map<Integer, Set<String>> partitionToSegmentsToDelete = new HashMap<>();
+    Map<TopicPartitionId, Set<String>> partitionToSegmentsToDelete = new HashMap<>();
 
     for (String segmentName : idealStateSegmentsSet) {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
@@ -1124,7 +1126,7 @@ public class PinotSegmentRestletResource {
         LOGGER.info("Skip segment: {} not in low-level consumer format", segmentName);
         continue;
       }
-      int partitionId = llcSegmentName.getPartitionGroupId();
+      TopicPartitionId partitionId = llcSegmentName.getTopicPartitionId();
 
       LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionId);
       if (oldestSegment == null) {
@@ -1148,8 +1150,9 @@ public class PinotSegmentRestletResource {
   }
 
   @VisibleForTesting
-  Map<Integer, LLCSegmentName> getPartitionIDToOldestSegment(List<String> segments, Set<String> idealStateSegmentsSet) {
-    Map<Integer, LLCSegmentName> partitionToOldestSegment = new HashMap<>();
+  Map<TopicPartitionId, LLCSegmentName> getPartitionIDToOldestSegment(
+      List<String> segments, Set<String> idealStateSegmentsSet) {
+    Map<TopicPartitionId, LLCSegmentName> partitionToOldestSegment = new HashMap<>();
 
     for (String segment : segments) {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
@@ -1163,7 +1166,7 @@ public class PinotSegmentRestletResource {
         LOGGER.warn("Segment: {} is not present in the ideal state", segment);
         continue;
       }
-      int partitionId = llcSegmentName.getPartitionGroupId();
+      TopicPartitionId partitionId = llcSegmentName.getTopicPartitionId();
 
       LLCSegmentName currentOldest = partitionToOldestSegment.get(partitionId);
       if (currentOldest == null || llcSegmentName.getSequenceNumber() < currentOldest.getSequenceNumber()) {

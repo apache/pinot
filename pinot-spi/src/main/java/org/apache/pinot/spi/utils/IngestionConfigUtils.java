@@ -124,7 +124,9 @@ public final class IngestionConfigUtils {
   }
 
   /// Returns the stream partition id from the Pinot segment partition id.
-  /// Returns {@code partitionId} unchanged for tables without multiple streams.
+  /// Safe to call for any table type: returns `partitionId` unchanged for OFFLINE tables or REALTIME tables
+  /// that lack stream configs (treat as single-stream).
+  @Deprecated
   public static int getStreamPartitionIdFromPinotPartitionId(TableConfig tableConfig, int partitionId) {
     return hasMultipleStreams(tableConfig) ? getStreamPartitionIdFromPinotPartitionId(partitionId) : partitionId;
   }
@@ -132,6 +134,7 @@ public final class IngestionConfigUtils {
   /// Returns the stream partition id from the Pinot segment partition id.
   /// NOTE: First verify if there are multiple stream configs before invoking this method. User might plug in a stream
   ///       that generates large partition id.
+  @Deprecated
   public static int getStreamPartitionIdFromPinotPartitionId(int partitionId) {
     return partitionId % PARTITION_PADDING_OFFSET;
   }
@@ -145,6 +148,7 @@ public final class IngestionConfigUtils {
   /// Returns the index of the StreamConfigs from the Pinot segment partition id.
   /// NOTE: First verify if there are multiple stream configs before invoking this method. User might plug in a stream
   ///       that generates large partition id.
+  @Deprecated
   public static int getStreamConfigIndexFromPinotPartitionId(int partitionId) {
     return partitionId / PARTITION_PADDING_OFFSET;
   }
@@ -351,6 +355,7 @@ public final class IngestionConfigUtils {
    * Returns a Map of stream config index to Set of stream partition Ids.
    * @param pinotPartitionIds Set of pinot partition ids.
    */
+  @Deprecated
   public static Map<Integer, Set<Integer>> getStreamConfigIndexToStreamPartitions(Set<Integer> pinotPartitionIds) {
     Map<Integer, Set<Integer>> streamIndexToPartitions = new HashMap<>();
     for (Integer partition : pinotPartitionIds) {
