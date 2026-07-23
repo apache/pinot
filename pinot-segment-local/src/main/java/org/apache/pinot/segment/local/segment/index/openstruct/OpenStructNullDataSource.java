@@ -22,24 +22,14 @@ import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
-import org.apache.pinot.segment.spi.index.IndexReader;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
-import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
-import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
-import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
-import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -48,26 +38,23 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/// Typed all-null {@link DataSource} for an OPEN_STRUCT key that is absent from a segment.
+/// Typed all-null {@link org.apache.pinot.segment.spi.datasource.DataSource} for an OPEN_STRUCT key
+/// that is absent from a segment.
 ///
 /// Unlike the MAP column's {@code NullDataSource} (which is hardcoded as INT with numDocs=0),
 /// this class uses the correct {@link DataType} from the OPEN_STRUCT child {@link FieldSpec} and
 /// reports the segment's actual doc count. Every document is null: the forward index returns the
 /// type-correct default null value, and the {@link NullValueVectorReader} returns a full-segment
 /// bitmap.
-public class OpenStructNullDataSource implements DataSource {
-  private final FieldSpec _fieldSpec;
-  private final int _numDocs;
-  private final ColumnIndexContainer _indexes;
-  private final AllNullValueVector _nullVector;
-
+///
+/// Extends {@link BaseDataSource}: every other index accessor (dictionary, inverted, range, text,
+/// bloom filter, vector, etc.) resolves to {@code null} automatically since the index container
+/// only holds a forward index and a null value vector.
+public class OpenStructNullDataSource extends BaseDataSource {
   public OpenStructNullDataSource(FieldSpec fieldSpec, int numDocs) {
-    _fieldSpec = fieldSpec;
-    _numDocs = numDocs;
-    _nullVector = new AllNullValueVector(numDocs);
-    _indexes = new ColumnIndexContainer.FromMap(Map.of(
+    super(new AllNullMetadata(fieldSpec, numDocs), new ColumnIndexContainer.FromMap(Map.of(
         StandardIndexes.forward(), new TypedNullForwardIndex(fieldSpec.getDataType().getStoredType()),
-        StandardIndexes.nullValueVector(), _nullVector));
+        StandardIndexes.nullValueVector(), new AllNullValueVector(numDocs))));
   }
 
   /// Creates an all-null DataSource for a key absent from this OPEN_STRUCT segment.
@@ -79,91 +66,6 @@ public class OpenStructNullDataSource implements DataSource {
     }
     int numDocs = osDs.getDataSourceMetadata().getNumDocs();
     return new OpenStructNullDataSource(childSpec, numDocs);
-  }
-
-  @Override
-  public DataSourceMetadata getDataSourceMetadata() {
-    return new AllNullMetadata(_fieldSpec, _numDocs);
-  }
-
-  @Override
-  public ColumnIndexContainer getIndexContainer() {
-    return _indexes;
-  }
-
-  @Override
-  public <R extends IndexReader> R getIndex(IndexType<?, R, ?> type) {
-    return type.getIndexReader(_indexes);
-  }
-
-  @Override
-  public ForwardIndexReader<?> getForwardIndex() {
-    return getIndex(StandardIndexes.forward());
-  }
-
-  @Nullable
-  @Override
-  public Dictionary getDictionary() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public InvertedIndexReader<?> getInvertedIndex() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public RangeIndexReader<?> getRangeIndex() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public TextIndexReader getTextIndex() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public TextIndexReader getFSTIndex() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public TextIndexReader getIFSTIndex() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public JsonIndexReader getJsonIndex() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public H3IndexReader getH3Index() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public BloomFilterReader getBloomFilter() {
-    return null;
-  }
-
-  @Override
-  public NullValueVectorReader getNullValueVector() {
-    return _nullVector;
-  }
-
-  @Nullable
-  @Override
-  public VectorIndexReader getVectorIndex() {
-    return null;
   }
 
   /// Forward index that returns the type-correct default null value for every document.
