@@ -49,6 +49,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -785,6 +786,117 @@ public class JsonUtils {
         throw e;
       }
     }
+  }
+
+  /// Flattens an already-parsed JSON value ({@link Map} / {@link List} / {@link JsonNode}) for the JSON index, avoiding
+  /// the string tokenization that {@link #flatten(String, JsonIndexConfig)} performs. Used by the realtime JSON index
+  /// when the source value is already a parsed object (e.g. cached on the `GenericRow` before it is serialized to a
+  /// string for the forward index), so the document is parsed once at ingestion instead of being serialized and
+  /// re-parsed here. The result must match {@link #flatten(String, JsonIndexConfig)} on the serialized form (both go
+  /// through `DEFAULT_MAPPER`). A {@link String} input is delegated to {@link #flatten(String, JsonIndexConfig)}.
+  public static List<Map<String, String>> flattenParsed(Object jsonValue, JsonIndexConfig jsonIndexConfig)
+      throws IOException {
+    if (jsonValue instanceof String) {
+      return flatten((String) jsonValue, jsonIndexConfig);
+    }
+    JsonNode jsonNode = jsonValue instanceof JsonNode ? (JsonNode) jsonValue : DEFAULT_MAPPER.valueToTree(jsonValue);
+    int classification = classifyForFlatten(jsonNode);
+    if (classification == FLATTEN_UNSAFE) {
+      // A leaf renders differently than the string path (e.g. a Float or byte[] from a non-JSON RecordReader). Fall
+      // back to serialize+reparse so the flattened records are byte-for-byte identical. Rare: the JSON decoders never
+      // produce these types.
+      return flatten(objectToString(jsonValue), jsonIndexConfig);
+    }
+    try {
+      // A DecimalNode (a BigDecimal float, e.g. from stringToJsonNodeWithBigDecimal) renders its plain value, but the
+      // string path re-parses it: an integral value becomes an int/long, a fractional one a double (possibly in
+      // scientific notation). Re-parse just those leaves the same way so flatten matches, without re-tokenizing the
+      // whole document as the serialize+reparse fallback would.
+      JsonNode toFlatten =
+          classification == FLATTEN_SAFE_WITH_BIG_DECIMAL ? normalizeBigDecimalNodes(jsonNode) : jsonNode;
+      return JsonUtils.flatten(toFlatten, jsonIndexConfig);
+    } catch (Exception e) {
+      if (jsonIndexConfig.getSkipInvalidJson()) {
+        return SKIPPED_FLATTENED_RECORD;
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  private static final int FLATTEN_UNSAFE = 0;
+  private static final int FLATTEN_SAFE = 1;
+  private static final int FLATTEN_SAFE_WITH_BIG_DECIMAL = 2;
+
+  /// Classifies whether a parsed value can be flattened directly so the records are byte-for-byte identical to
+  /// flattening its serialized string (both paths render each leaf via {@link JsonNode#asText()}). {@code Integer},
+  /// {@code Long}, {@code Double} and {@code BigInteger} nodes render identically to the string path
+  /// ({@link #FLATTEN_SAFE}); a {@code DecimalNode} (a {@code BigDecimal} float) renders its plain value while the
+  /// string path re-parses it (an integral value as an int/long, a fractional one as a double), so it is re-parsed the
+  /// same way first ({@link #FLATTEN_SAFE_WITH_BIG_DECIMAL}, e.g. {@code "2.0"} -> {@code "2"},
+  /// {@code "1234567890.5"} -> {@code "1.2345678905E9"}); a {@code FloatNode} or a binary / POJO node does not
+  /// round-trip and forces the serialize+reparse fallback ({@link #FLATTEN_UNSAFE}). The JSON decoders only produce
+  /// String / Integer / Long / Double / BigInteger / BigDecimal, so a parsed {@link JsonNode} is never
+  /// {@code FLATTEN_UNSAFE}; the fallback only applies to Float / byte[] leaves from a non-JSON RecordReader.
+  private static int classifyForFlatten(JsonNode node) {
+    switch (node.getNodeType()) {
+      case NUMBER:
+        if (node.isFloat()) {
+          return FLATTEN_UNSAFE;
+        }
+        return node.isBigDecimal() ? FLATTEN_SAFE_WITH_BIG_DECIMAL : FLATTEN_SAFE;
+      case OBJECT:
+      case ARRAY: {
+        int result = FLATTEN_SAFE;
+        for (JsonNode child : node) {
+          int childClassification = classifyForFlatten(child);
+          if (childClassification == FLATTEN_UNSAFE) {
+            return FLATTEN_UNSAFE;
+          }
+          if (childClassification == FLATTEN_SAFE_WITH_BIG_DECIMAL) {
+            result = FLATTEN_SAFE_WITH_BIG_DECIMAL;
+          }
+        }
+        return result;
+      }
+      case STRING:
+      case BOOLEAN:
+      case NULL:
+        return FLATTEN_SAFE;
+      default:
+        // BINARY, POJO, MISSING
+        return FLATTEN_UNSAFE;
+    }
+  }
+
+  /// Returns a copy of the tree with every {@code DecimalNode} re-parsed the way the string path does (serialize via
+  /// {@code toString}, parse with the default reader), so {@link #flatten}'s {@code asText()} is identical -- whether
+  /// the value renders as an integer, a double, or in scientific notation -- while sharing all other leaf nodes. Only
+  /// called when the tree actually contains a {@code BigDecimal} node. Using {@code doubleValue()} instead would be
+  /// wrong: an integral decimal ({@code 2.0}) re-parses to an integer ({@code "2"}, not {@code "2.0"}) and values past
+  /// 2^53 would lose precision.
+  private static JsonNode normalizeBigDecimalNodes(JsonNode node)
+      throws IOException {
+    if (node.isBigDecimal()) {
+      return stringToJsonNode(node.toString());
+    }
+    if (node.isObject()) {
+      ObjectNode result = JsonNodeFactory.instance.objectNode();
+      Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+      while (fields.hasNext()) {
+        Map.Entry<String, JsonNode> field = fields.next();
+        result.set(field.getKey(), normalizeBigDecimalNodes(field.getValue()));
+      }
+      return result;
+    }
+    if (node.isArray()) {
+      ArrayNode result = JsonNodeFactory.instance.arrayNode(node.size());
+      for (JsonNode child : node) {
+        result.add(normalizeBigDecimalNodes(child));
+      }
+      return result;
+    }
+    return node;
   }
 
   /**

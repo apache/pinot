@@ -22,12 +22,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,12 +47,88 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertEqualsNoOrder;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
 public class JsonUtilsTest {
   private static final String JSON_FILE = "json_util_test.json";
+
+  /**
+   * The parse-once index path: {@code flattenParsed(parsedValue)} must produce the same flattened records as the old
+   * serialize-then-reparse path (the records are a set, so order is ignored). Covers diverse leaf types - including
+   * non-Jackson types (Float / BigInteger / BigDecimal / large long) that a non-JSON RecordReader could place on a
+   * JSON column - plus nested objects/arrays, a top-level list, null, and empty containers, across maxLevels.
+   */
+  @Test
+  public void testFlattenParsedValueMatchesString()
+      throws Exception {
+    Map<String, Object> nested = new HashMap<>();
+    nested.put("a", "x");
+    nested.put("arr", Arrays.asList(1, 2, 3));
+    Map<String, Object> doc = new HashMap<>();
+    doc.put("s", "line 1\nline 2 \"quoted\" é");
+    doc.put("i", 7);
+    doc.put("lng", 9007199254740993L);
+    doc.put("f", 0.1f);
+    doc.put("d", 3.140625);
+    doc.put("bd", new BigDecimal("1234567890.5"));
+    doc.put("bi", new BigInteger("123456789012345678901234567890"));
+    doc.put("bool", true);
+    doc.put("nul", null);
+    doc.put("obj", nested);
+    doc.put("arrObj", Arrays.asList(Collections.singletonMap("k", "v1"), Collections.singletonMap("k", "v2")));
+    doc.put("empty", new HashMap<>());
+    // The old path serialized the Map (objectToString) and re-parsed it; flattenParsed must match that.
+    String oldPathInput = JsonUtils.objectToString(doc);
+
+    for (int maxLevels : new int[]{-1, 1, 2, 3}) {
+      JsonIndexConfig config = new JsonIndexConfig();
+      config.setMaxLevels(maxLevels);
+      List<Map<String, String>> fromParsed = JsonUtils.flattenParsed(doc, config);
+      List<Map<String, String>> fromString = JsonUtils.flatten(oldPathInput, config);
+      assertEqualsNoOrder(fromParsed.toArray(), fromString.toArray(),
+          "flattenParsed(Map) must match serialize+reparse at maxLevels=" + maxLevels);
+    }
+
+    // Top-level list input (the cache stores List values too).
+    List<Object> topList = Arrays.asList(Collections.singletonMap("k", "a"), Collections.singletonMap("k", "b"));
+    JsonIndexConfig config = new JsonIndexConfig();
+    assertEqualsNoOrder(JsonUtils.flattenParsed(topList, config).toArray(),
+        JsonUtils.flatten(JsonUtils.objectToString(topList), config).toArray());
+  }
+
+  @Test
+  public void testFlattenParsedJsonNodeMatchesString()
+      throws Exception {
+    // A JSON column fed as text (the common case) is parsed once and the JsonNode is cached for the JSON index. The
+    // node is parsed with BigDecimal (matching PinotDataType's JSON canonicalization), so flattenParsed(node) must
+    // match flatten(node.toString()) -- the string the forward index stores and the index used to re-parse.
+    String noDecimal = "{\"s\":\"a\\nb \\\"q\\\"\",\"i\":7,\"lng\":9007199254740993,"
+        + "\"bi\":123456789012345678901234567890,\"bool\":true,\"nul\":null,"
+        + "\"obj\":{\"a\":\"x\",\"arr\":[1,2,3]},\"arr\":[{\"k\":\"v1\"},{\"k\":\"v2\"}]}";
+    // Numbers parse to DecimalNode under BigDecimal, which can render differently than the re-parsed string path: a
+    // fractional value as a double (e.g. "1234567890.5" -> "1.2345678905E9") and an INTEGRAL-valued decimal as an
+    // integer ("2.0" -> "2", not "2.0"; past 2^53 the integer must be preserved exactly). flattenParsed re-parses each
+    // DecimalNode the same way, so it must still match -- across integral, large-magnitude, tiny, high-precision,
+    // exponent, negative, >2^53, nested and array values.
+    String withDecimal = "{\"f\":0.1,\"d\":3.140625,\"bd\":1234567890.5,\"tiny\":0.0000001,"
+        + "\"prec\":3.141592653589793238462643383279,\"neg\":-9876543210.125,\"exp\":1.5e10,"
+        + "\"whole\":2.0,\"negWhole\":-5.0,\"zero\":0.0,\"expWhole\":1.5e1,\"bigWhole\":9007199254740993.0,"
+        + "\"arr\":[0.5,123456.789,2,1234567890.5,7.0,-100.00],\"nested\":{\"x\":98765.4321,\"w\":42.0},"
+        + "\"i\":42,\"s\":\"hi\"}";
+    for (String json : new String[]{noDecimal, withDecimal}) {
+      JsonNode node = JsonUtils.stringToJsonNodeWithBigDecimal(json);
+      for (int maxLevels : new int[]{-1, 1, 2, 3}) {
+        JsonIndexConfig config = new JsonIndexConfig();
+        config.setMaxLevels(maxLevels);
+        assertEqualsNoOrder(JsonUtils.flattenParsed(node, config).toArray(),
+            JsonUtils.flatten(node.toString(), config).toArray(),
+            "flattenParsed(JsonNode) must match flatten(node.toString()) for " + json + " at maxLevels=" + maxLevels);
+      }
+    }
+  }
 
   @Test
   public void testFlatten()
