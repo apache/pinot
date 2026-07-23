@@ -42,6 +42,7 @@ import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.AccessOption;
@@ -653,11 +654,22 @@ public class TableRebalancer {
           // If all the segments to be moved remain unchanged (same instance state map) in the new ideal state, apply
           // the same target instance state map for these segments to the new ideal state as the target assignment
           segmentsToMoveChanged = false;
-          if (segmentAssignment instanceof BaseStrictRealtimeSegmentAssignment) {
-            // For StrictRealtimeSegmentAssignment, we need to recompute the target assignment because the assignment
-            // for new added segments is based on the existing assignment
+          if (isStrictRealtimeSegmentAssignment
+              && !isMovingOnlyTierSegments(segmentsToMove, providedTierToSegmentsMap)) {
+            // For strict segment assignment, a newly added segment (a new consuming segment or an uploaded segment) is
+            // assigned by the instance partitions, then overridden to match the existing assignment of its partition
+            // in the IdealState when they differ, keeping the partition collocated. This rebalance moves a non-tier
+            // segment, i.e. the base placement of a partition, so a segment added to the IdealState while we wait can
+            // be placed on the partition's old placement and must be re-collocated to the target: recompute the full
+            // target assignment.
             segmentsToMoveChanged = true;
           } else {
+            // Non-strict segment assignment, or strict assignment that only moves tier segments (completed segments
+            // assigned to a tier). In the latter case the base placements do not move, so a segment added while we
+            // wait is placed consistently with the target; a full recompute is only needed if a segment we are moving
+            // actually changed state. Skipping it (a full recompute reads segment ZK metadata for the completed
+            // segments) narrows the window in which the versioned IdealState update below can lose the race to a
+            // concurrent write on a continuously-ingesting table.
             for (String segment : segmentsToMove) {
               Map<String, String> oldInstanceStateMap = oldAssignment.get(segment);
               Map<String, String> currentInstanceStateMap = currentAssignment.get(segment);
@@ -2226,6 +2238,29 @@ public class TableRebalancer {
       _instanceStateMap = instanceStateMap;
       _availableInstances = availableInstances;
     }
+  }
+
+  /// Returns whether all the segments to be moved are tier segments, i.e. contained in the provided tier-to-segments
+  /// map. When true, this rebalance only relocates completed segments onto tiers and leaves the base (non-tier)
+  /// placements of the partitions untouched, so a segment added to the IdealState mid-rebalance is still placed
+  /// consistently with the target. Returns false when the tier segments are not pre-computed (the map is null/empty),
+  /// conservatively treating the moves as base placement changes.
+  private static boolean isMovingOnlyTierSegments(List<String> segmentsToMove,
+      @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
+    if (segmentsToMove.isEmpty()) {
+      return true;
+    }
+    if (MapUtils.isEmpty(providedTierToSegmentsMap)) {
+      return false;
+    }
+    Set<String> tierSegments;
+    if (providedTierToSegmentsMap.size() == 1) {
+      tierSegments = providedTierToSegmentsMap.values().iterator().next();
+    } else {
+      tierSegments = new HashSet<>();
+      providedTierToSegmentsMap.values().forEach(tierSegments::addAll);
+    }
+    return tierSegments.size() >= segmentsToMove.size() && tierSegments.containsAll(segmentsToMove);
   }
 
   @VisibleForTesting
