@@ -158,8 +158,15 @@ public class IntegerTupleSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    FieldSpec.DataType dataType = blockValSet.getValueType();
+    FieldSpec.DataType storedType = dataType.getStoredType();
+    // UUID columns are stored as BYTES but contain raw 16-byte UUID values, not serialized tuple sketches.
+    // Surface a clear error rather than letting the deserialize step fail with a confusing sketch-format message.
+    if (dataType == FieldSpec.DataType.UUID) {
+      throw new IllegalStateException(getType() + " does not accept raw UUID values; pre-serialize the column as "
+          + "Integer Tuple Sketches first");
+    }
     // Treat BYTES value as serialized Integer Tuple Sketch
-    FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
@@ -182,8 +189,12 @@ public class IntegerTupleSketchAggregationFunction
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized Integer Tuple Sketch
-    FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
+    FieldSpec.DataType dataType = blockValSet.getValueType();
+    FieldSpec.DataType storedType = dataType.getStoredType();
+    if (dataType == FieldSpec.DataType.UUID) {
+      throw new IllegalStateException(getType() + " does not accept raw UUID values; pre-serialize the column as "
+          + "Integer Tuple Sketches first");
+    }
 
     if (storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
@@ -208,8 +219,12 @@ public class IntegerTupleSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized Integer Tuple Sketch
-    FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
+    FieldSpec.DataType dataType = blockValSet.getValueType();
+    FieldSpec.DataType storedType = dataType.getStoredType();
+    if (dataType == FieldSpec.DataType.UUID) {
+      throw new IllegalStateException(getType() + " does not accept raw UUID values; pre-serialize the column as "
+          + "Integer Tuple Sketches first");
+    }
     boolean singleValue = blockValSet.isSingleValue();
 
     if (singleValue && storedType == FieldSpec.DataType.BYTES) {
