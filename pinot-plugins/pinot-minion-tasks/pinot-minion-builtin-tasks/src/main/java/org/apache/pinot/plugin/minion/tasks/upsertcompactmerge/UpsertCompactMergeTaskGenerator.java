@@ -481,6 +481,12 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
     Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
         "'snapshot' from UpsertConfig must not be 'DISABLE' for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
+    // check metadataTTL is not set: UpsertCompactMergeTask does not compact tombstoned rows in a way that is
+    // consistent with metadataTTL-driven cleanup, so enabling them together can leave stale rows behind or
+    // resurface aged-out keys. Block the combination to avoid silent correctness issues.
+    Preconditions.checkState(upsertConfig.getMetadataTTL() <= 0,
+        "%s does not support tables with 'metadataTTL' enabled, got metadataTTL: %s",
+        MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertConfig.getMetadataTTL());
     // check no malformed period
     if (taskConfigs.containsKey(MinionConstants.UpsertCompactMergeTask.BUFFER_TIME_PERIOD_KEY)) {
       TimeUtils.convertPeriodToMillis(taskConfigs.get(MinionConstants.UpsertCompactMergeTask.BUFFER_TIME_PERIOD_KEY));
