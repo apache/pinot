@@ -22,6 +22,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -38,6 +39,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.upsert.UpsertUtils;
@@ -55,6 +57,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -71,19 +75,27 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class MetadataAndDictionaryAggregationPlanMakerTest {
   private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
   private static final String SEGMENT_NAME = "testTable_201711219_20171120";
+  // A small segment with fully predictable data so aggregation results can be asserted exactly. It holds the 10 rows
+  // metricCol = i, intCol = i + 10, bytesCol = new byte[]{(byte) i} for i = 1..10, with every row duplicated (20 rows
+  // total).
+  private static final String PREDICTABLE_TABLE_NAME = "predictableTable";
+  private static final String PREDICTABLE_SEGMENT_NAME = "predictableTable_segment";
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), "MetadataAndDictionaryAggregationPlanMakerTest");
   private static final InstancePlanMakerImplV2 PLAN_MAKER = new InstancePlanMakerImplV2();
 
   private IndexSegment _indexSegment;
   private IndexSegment _upsertIndexSegment;
+  private IndexSegment _predictableSegment;
 
   @BeforeTest
   public void buildSegment()
@@ -130,6 +142,45 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig);
     driver.build();
+
+    buildPredictableSegment();
+  }
+
+  /**
+   * Builds a segment with fully predictable data so that aggregation results can be asserted exactly. It contains the
+   * 10 rows where row {@code i} (for {@code i = 1..10}) has {@code metricCol = i}, {@code intCol = i + 10} and
+   * {@code bytesCol = new byte[]{(byte) i}}, and every row is duplicated (20 rows total).
+   */
+  private void buildPredictableSegment()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(PREDICTABLE_TABLE_NAME)
+        .addMetric("metricCol", FieldSpec.DataType.INT)
+        .addMetric("intCol", FieldSpec.DataType.INT)
+        .addSingleValueDimension("bytesCol", FieldSpec.DataType.BYTES)
+        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(PREDICTABLE_TABLE_NAME).build();
+
+    List<GenericRow> records = new ArrayList<>(20);
+    // Add each row twice.
+    for (int n = 0; n < 2; n++) {
+      for (int i = 1; i <= 10; i++) {
+        GenericRow record = new GenericRow();
+        record.putValue("metricCol", i);
+        record.putValue("intCol", i + 10);
+        record.putValue("bytesCol", new byte[]{(byte) i});
+        records.add(record);
+      }
+    }
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setTableName(PREDICTABLE_TABLE_NAME);
+    segmentGeneratorConfig.setSegmentName(PREDICTABLE_SEGMENT_NAME);
+    segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+    driver.build();
   }
 
   @BeforeClass
@@ -138,6 +189,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     ServerMetrics.register(mock(ServerMetrics.class));
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _upsertIndexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
+    _predictableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, PREDICTABLE_SEGMENT_NAME), ReadMode.heap);
     TableDataManager tableDataManager = mock(TableDataManager.class);
     when(tableDataManager.getTableDataDir()).thenReturn(INDEX_DIR);
     UpsertContext upsertContext = new UpsertContext.Builder()
@@ -158,6 +210,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     _indexSegment.destroy();
     _upsertIndexSegment.offload();
     _upsertIndexSegment.destroy();
+    _predictableSegment.destroy();
   }
 
   @AfterTest
@@ -185,23 +238,24 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
    * functions were metadata eligible; a mixed query would have scanned every function.
    * <p>
    * To prove the eligible function is actually served from metadata (and not scanned), the column dictionary is
-   * overridden to report a bogus max value that does not exist in the data. The query result equals the bogus value
-   * only if the metadata path is taken; a scan would return the true max.
+   * overridden to report a bogus max value that does not exist in the data. MAX equals the bogus value only if the
+   * metadata path is taken (a scan would return the true max of 10), while SUM equals the true scanned sum of
+   * {@code metricCol} ((1 + 2 + ... + 10) over the two row copies = 110).
    */
   @Test
   public void testPartialMetadataBasedAggregationServesEligibleFromMetadata() {
     int bogusMax = 999_999_999;
-    QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContext("select max(daysSinceEpoch), sum(column1) from testTable");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "select max(metricCol), sum(metricCol) from " + PREDICTABLE_TABLE_NAME);
 
-    // Override only daysSinceEpoch's dictionary max value; everything else delegates to the real segment.
-    DataSource realDataSource = _indexSegment.getDataSource("daysSinceEpoch", queryContext.getSchema());
+    // Override only metricCol's dictionary max value; everything else delegates to the real segment.
+    DataSource realDataSource = _predictableSegment.getDataSource("metricCol", queryContext.getSchema());
     Dictionary dictionaryWithBogusMax = mock(Dictionary.class, delegatesTo(realDataSource.getDictionary()));
     doReturn(bogusMax).when(dictionaryWithBogusMax).getMaxVal();
     DataSource dataSourceWithBogusMax = mock(DataSource.class, delegatesTo(realDataSource));
     doReturn(dictionaryWithBogusMax).when(dataSourceWithBogusMax).getDictionary();
-    IndexSegment segment = mock(IndexSegment.class, delegatesTo(_indexSegment));
-    doReturn(dataSourceWithBogusMax).when(segment).getDataSource(eq("daysSinceEpoch"), any());
+    IndexSegment segment = mock(IndexSegment.class, delegatesTo(_predictableSegment));
+    doReturn(dataSourceWithBogusMax).when(segment).getDataSource(eq("metricCol"), any());
 
     Operator<?> operator = PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(segment), queryContext).run();
     // A mixed query must use the (partial) AggregationOperator, not the fully non-scan based operator.
@@ -212,6 +266,100 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     assertNotNull(results);
     // MAX is served from the (overridden) dictionary metadata, so the bogus value proves the metadata path was used.
     assertEquals(((Number) results.get(0)).doubleValue(), (double) bogusMax);
+    // SUM is scanned, so the result is the true sum of metricCol: (1 + 2 + ... + 10) over the two row copies = 110.
+    assertEquals(((Number) results.get(1)).doubleValue(), 110.0);
+  }
+
+  /**
+   * {@code distinctcount} over a dictionary-encoded column is resolved entirely from the dictionary (its cardinality is
+   * the number of distinct values), so it must plan to the fully non-scan {@link NonScanBasedAggregationOperator}
+   * without a mock. {@code metricCol} holds the 10 distinct values 1..10 across 20 (duplicated) rows, so the distinct
+   * count is 10 even though the segment has 20 docs.
+   */
+  @Test
+  public void testDistinctCountResolvedFromDictionary() {
+    // Sanity check that the fixture actually has duplicate rows, so distinct count < total docs is a meaningful result.
+    assertEquals(_predictableSegment.getSegmentMetadata().getTotalDocs(), 20);
+
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("select distinctcount(metricCol) from " + PREDICTABLE_TABLE_NAME);
+
+    Operator<?> operator =
+        PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(_predictableSegment), queryContext).run();
+    // The column is dictionary-encoded, so DISTINCTCOUNT is resolved from the dictionary without scanning the segment.
+    assertTrue(operator instanceof NonScanBasedAggregationOperator);
+
+    AggregationResultsBlock resultsBlock = (AggregationResultsBlock) operator.nextBlock();
+    List<Object> results = resultsBlock.getResults();
+    assertNotNull(results);
+    // The intermediate result is the set of distinct dictionary values: metricCol has 10 distinct values (1..10),
+    // fewer than the 20 total docs, proving DISTINCTCOUNT counts distinct values rather than rows.
+    assertEquals(((Set<?>) results.get(0)).size(), 10);
+  }
+
+  /**
+   * Tests for aggregations that cannot be resolved from dictionary/metadata and must therefore fall back to
+   * the scan-based {@link AggregationOperator}, still returning the correct scanned result:
+   * <ul>
+   *   <li>a single non-resolvable aggregation with no filter ({@code sum(metricCol)}): the partial metadata path
+   *   evaluates eligibility per function, and when none is resolvable it must fall back to a full scan rather than
+   *   emitting a (partial) non-scan operator with zero resolved functions;</li>
+   *   <li>an aggregation over an expression argument ({@code max(add(metricCol, intCol))}): the argument is not a plain
+   *   column reference, so it cannot be resolved from dictionary/metadata.</li>
+   * </ul>
+   */
+  @Test(dataProvider = "nonResolvableScanQueries")
+  public void testNonResolvableAggregationFallsToScan(String description, String query, double expectedResult) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    Operator<?> operator =
+        PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(_predictableSegment), queryContext).run();
+    assertTrue(operator instanceof AggregationOperator, description);
+
+    AggregationResultsBlock resultsBlock = (AggregationResultsBlock) operator.nextBlock();
+    List<Object> results = resultsBlock.getResults();
+    assertNotNull(results, description);
+    assertEquals(((Number) results.get(0)).doubleValue(), expectedResult, description);
+  }
+
+  @DataProvider(name = "nonResolvableScanQueries")
+  public Object[][] nonResolvableScanQueries() {
+    return new Object[][]{
+        // SUM is not resolvable from metadata and is scanned: (1 + 2 + ... + 10) over the two row copies = 110.
+        {"single non-resolvable aggregation", "select sum(metricCol) from " + PREDICTABLE_TABLE_NAME, 110.0},
+        // add(metricCol, intCol) = i + (i + 10) is an expression argument, so it is scanned; max over i = 1..10 is 30.
+        {"aggregation over expression argument",
+            "select max(add(metricCol, intCol)) from " + PREDICTABLE_TABLE_NAME, 30.0}
+    };
+  }
+
+  /**
+   * MIN/MAX derive their result numerically from the column min/max, which is only valid for numeric columns.
+   * For a non-numeric (BYTES) column the dictionary stores raw values that cannot be
+   * parsed as numbers, so {@code max(bytesCol)} and {@code min(bytesCol)} must fall back to the scan-based
+   * {@link AggregationOperator} rather than being (wrongly) resolved from the dictionary by a
+   * {@link NonScanBasedAggregationOperator}. The scan path in turn throws a
+   * {@link BadQueryRequestException} for non-numeric aggregation.
+   */
+  @Test
+  public void testMinMaxOnNonNumericColumnFallsToScan() {
+    assertNotNull(_predictableSegment.getDataSourceNullable("bytesCol").getDictionary());
+
+    for (String function : List.of("max", "min")) {
+      String query = "select " + function + "(bytesCol) from " + PREDICTABLE_TABLE_NAME;
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      Operator<?> operator =
+          PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(_predictableSegment), queryContext).run();
+      // MIN/MAX on a non-numeric column must fall back to the scan-based AggregationOperator, not the metadata path.
+      assertTrue(operator instanceof AggregationOperator, query);
+      assertFalse(operator instanceof NonScanBasedAggregationOperator, query);
+
+      // Running the scan path proves it still executes and correctly rejects the non-numeric aggregation rather than
+      // producing a wrong result.
+      BadQueryRequestException exception = expectThrows(BadQueryRequestException.class, operator::nextBlock);
+      assertTrue(exception.getMessage().contains("Cannot compute " + function + " for non-numeric type: BYTES"),
+          exception.getMessage());
+    }
   }
 
   @DataProvider(name = "testPlanMakerDataProvider")
@@ -266,6 +414,9 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     // Aggregation
     entries.add(new Object[]{
         "select sum(column1) from testTable", AggregationOperator.class, AggregationOperator.class
+    });
+    entries.add(new Object[]{
+        "select count(*), sum(column1) from testTable", AggregationOperator.class, AggregationOperator.class
     });
     // Aggregation group-by
     entries.add(new Object[]{

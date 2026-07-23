@@ -250,9 +250,9 @@ public class AggregationPlanNode implements PlanNode {
    */
   @Nullable
   private DataSource getDataSourceForAggregationFunction(AggregationFunction<?, ?> aggregationFunction) {
-    List<?> inputExpressions = aggregationFunction.getInputExpressions();
+    List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
     if (!inputExpressions.isEmpty()) {
-      ExpressionContext argument = aggregationFunction.getInputExpressions().get(0);
+      ExpressionContext argument = inputExpressions.get(0);
       if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
         return null;
       }
