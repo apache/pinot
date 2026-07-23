@@ -281,25 +281,22 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
   }
 
   /**
-   * A segment that is eligible for a tier can appear in the current assignment in a later rebalanceTable() invocation
-   * (e.g. after the ideal state changes during a long rebalance), i.e. after the initial bulk read that populates the
-   * tier cache. It must still be resolved (on demand, without a second bulk read) and routed to its tier rather than
-   * silently kept on the default instances.
+   * The segment to tier resolution is computed once (single bulk ZK read) at the start of the rebalance and reused
+   * across the multiple rebalanceTable() invocations of that rebalance. A segment that appears in the current
+   * assignment only in a later invocation (e.g. after the ideal state changes during a long rebalance) is absent from
+   * the resolution map, so it is kept on the default instances rather than triggering another ZK read.
    */
   @Test
-  public void testResolvesSegmentAddedAfterInitialBulkRead() {
+  public void testSegmentAddedAfterInitialBulkReadStaysOnDefaultTier() {
     HelixManager helixManager = mock(HelixManager.class);
     //noinspection rawtypes
     ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
-    when(propertyStore.get(anyString(), eq(null), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
-      String path = invocation.getArgument(0, String.class);
-      return new ZNRecord(path.substring(path.lastIndexOf('/') + 1));
-    });
     // The initial bulk read only returns the segments that existed when the rebalance started (segment_0 .. 99)
     List<ZNRecord> segmentZNRecords = new ArrayList<>(NUM_SEGMENTS);
     for (String segmentName : SEGMENTS) {
       segmentZNRecords.add(new ZNRecord(segmentName));
     }
+    //noinspection unchecked
     when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
         segmentZNRecords);
     //noinspection unchecked
@@ -314,12 +311,14 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
           SegmentAssignmentUtils.getInstanceStateMap(INSTANCES.subList(0, NUM_REPLICAS), SegmentStateModel.ONLINE));
     }
 
-    // First rebalance populates the tier cache from the single bulk read
+    // First rebalance resolves the segment to tier map from the single bulk read
     segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
         _tierInstancePartitionsMap, new RebalanceConfig());
+    //noinspection unchecked
     verify(propertyStore, times(1)).getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt());
 
-    // A new segment eligible for tierC (segId >= 120) appears in the assignment after the initial bulk read
+    // A new segment that would be eligible for tierC (segId >= 120) appears in the assignment after the initial bulk
+    // read
     String newSegment = SEGMENT_NAME_PREFIX + 200;
     currentAssignment.put(newSegment,
         SegmentAssignmentUtils.getInstanceStateMap(INSTANCES.subList(0, NUM_REPLICAS), SegmentStateModel.ONLINE));
@@ -327,10 +326,11 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
         segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
             _tierInstancePartitionsMap, new RebalanceConfig());
 
-    // The new segment is resolved on demand (no second bulk read) and routed to tierC
+    // No second bulk read happens, and the new segment is kept on the default instances (not relocated to tierC)
+    //noinspection unchecked
     verify(propertyStore, times(1)).getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt());
     Assert.assertEquals(newAssignment.get(newSegment).size(), NUM_REPLICAS);
-    Assert.assertTrue(INSTANCES_TIER_C.containsAll(newAssignment.get(newSegment).keySet()));
+    Assert.assertTrue(INSTANCES.containsAll(newAssignment.get(newSegment).keySet()));
   }
 
   /**

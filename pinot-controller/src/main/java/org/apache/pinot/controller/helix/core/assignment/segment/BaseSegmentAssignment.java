@@ -118,17 +118,10 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
 
     // Resolve the eligible tier of each segment once (single bulk ZK read) and reuse it across the multiple
     // rebalanceTiers() invocations of this rebalance, instead of reading each segment's ZK metadata every time.
+    // Any new segments come later would not be in _segmentToTierName map, and categorized in the null (default) tier.
     if (_segmentToTierName == null) {
       _segmentToTierName =
           SegmentAssignmentUtils.getSegmentToTierNameMap(_helixManager, _tableNameWithType, sortedTiers);
-    }
-    // Resolve any segment that appeared after the initial bulk read (e.g. a segment that committed during a long
-    // rebalance) so that it is still routed to the correct tier.
-    for (String segmentName : currentAssignment.keySet()) {
-      if (!_segmentToTierName.containsKey(segmentName)) {
-        _segmentToTierName.put(segmentName,
-            SegmentAssignmentUtils.getSegmentToTierName(_helixManager, _tableNameWithType, sortedTiers, segmentName));
-      }
     }
 
     // Get tier to segment assignment map i.e. current assignments split by tiers they are eligible for

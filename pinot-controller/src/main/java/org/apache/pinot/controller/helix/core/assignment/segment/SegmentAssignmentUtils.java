@@ -454,12 +454,12 @@ public class SegmentAssignmentUtils {
 
   /**
    * Resolves, for each segment of the table, the name of the first tier (in {@code sortedTiers} order) that the segment
-   * is eligible for. The returned map contains an entry for <b>every</b> segment (so that callers can tell already
-   * resolved segments apart from segments added later via {@link Map#containsKey}); the value is the tier name, or
-   * {@code null} if the segment (including COMMITTING segments) is not eligible for any tier. This performs a single
-   * bulk ZK read for all segment ZK metadata, so it is meant to be computed once per rebalance and reused across the
-   * multiple {@code rebalanceTable()} invocations of that rebalance rather than reading each segment's ZK metadata
-   * every time.
+   * is eligible for. The value is the tier name, or {@code null} if the segment (including COMMITTING segments) is not
+   * eligible for any tier. This performs a single bulk ZK read for all segment ZK metadata, so it is meant to be
+   * computed once per rebalance and reused across the multiple {@code rebalanceTable()} invocations of that rebalance
+   * rather than reading each segment's ZK metadata every time. Segments that appear only after this map is computed
+   * (e.g. segments that commit during a long rebalance) are absent from the map and treated as not eligible for any
+   * tier.
    */
   static Map<String, String> getSegmentToTierNameMap(HelixManager helixManager, String tableNameWithType,
       List<Tier> sortedTiers) {
@@ -472,19 +472,6 @@ public class SegmentAssignmentUtils {
           segmentZKMetadata));
     }
     return segmentToTierName;
-  }
-
-  /**
-   * Resolves the name of the tier a single segment is eligible for. Used to resolve segments that were added after
-   * {@link #getSegmentToTierNameMap} was computed (e.g. realtime segments that commit during a long rebalance).
-   * Returns {@code null} if the segment does not exist, is COMMITTING, or is not eligible for any tier.
-   */
-  @Nullable
-  static String getSegmentToTierName(HelixManager helixManager, String tableNameWithType, List<Tier> sortedTiers,
-      String segmentName) {
-    SegmentZKMetadata segmentZKMetadata =
-        ZKMetadataProvider.getSegmentZKMetadata(helixManager.getHelixPropertyStore(), tableNameWithType, segmentName);
-    return segmentZKMetadata != null ? getTierName(tableNameWithType, sortedTiers, segmentZKMetadata) : null;
   }
 
   /**
