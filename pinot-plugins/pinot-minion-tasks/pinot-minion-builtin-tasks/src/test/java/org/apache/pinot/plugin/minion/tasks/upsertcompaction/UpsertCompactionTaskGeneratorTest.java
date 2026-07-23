@@ -478,6 +478,17 @@ public class UpsertCompactionTaskGeneratorTest {
         .build();
     Assert.assertThrows(IllegalStateException.class,
         () -> _taskGenerator.validateTaskConfigs(invalidTableConfig, new Schema(), upsertCompactionTaskConfig5));
+
+    // metadataTTL enabled is not supported with UpsertCompactionTask
+    UpsertConfig ttlUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    ttlUpsertConfig.setSnapshot(Enablement.ENABLE);
+    ttlUpsertConfig.setMetadataTTL(30);
+    TableConfig metadataTtlTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(ttlUpsertConfig)
+            .setTaskConfig(new TableTaskConfig(Map.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+            .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> _taskGenerator.validateTaskConfigs(metadataTtlTableConfig, new Schema(), upsertCompactionTaskConfig));
   }
 
   @Test
