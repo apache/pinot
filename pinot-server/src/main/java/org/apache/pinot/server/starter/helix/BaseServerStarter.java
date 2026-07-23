@@ -59,6 +59,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.auth.AuthProviderFactory;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -304,6 +305,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     initTransitionThreadPoolManager();
 
     NettyInspector.logAllChecks();
+
+    // Initialize authentication provider (Vault or static token)
+    AuthProviderFactory.create(_serverConf);
   }
 
   /**
