@@ -51,16 +51,12 @@ public class SimpleIndexedTable extends IndexedTable {
         resize();
       }
     } else {
+      // Preserve the existing map iteration behavior for unordered results. Changing the insertion primitive can
+      // reorder collision chains and alter rows consumed by downstream reducers.
       if (_lookupMap.size() < _resultSize) {
-        Record existingRecord = _lookupMap.putIfAbsent(key, record);
-        if (existingRecord != null) {
-          updateRecord(existingRecord, record);
-        }
+        addOrUpdateRecord(key, record);
       } else {
-        Record existingRecord = _lookupMap.get(key);
-        if (existingRecord != null) {
-          updateRecord(existingRecord, record);
-        }
+        updateExistingRecord(key, record);
       }
     }
     return true;

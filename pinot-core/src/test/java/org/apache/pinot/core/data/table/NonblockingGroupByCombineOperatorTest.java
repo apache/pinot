@@ -48,6 +48,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -95,6 +96,81 @@ public class NonblockingGroupByCombineOperatorTest {
         threadContext.getExecutionContext().terminate(QueryErrorCode.QUERY_CANCELLATION, "cancelled for test");
         Assert.expectThrows(TerminationException.class, () -> target.mergeUnfinishedTable(source, "test"));
       }
+    } finally {
+      executorService.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testMergeUnfinishedTableStopsAfterPartialDrainWhenRequested() {
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT a, SUM(b) FROM t GROUP BY a LIMIT 2048");
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+    try {
+      SimpleIndexedTable target = createTable(queryContext, executorService, 2048);
+      SimpleIndexedTable source = createTable(queryContext, executorService, 2048);
+      for (int i = 0; i < 1025; i++) {
+        source.upsert(new Key(new Object[]{"key-" + i}), new Record(new Object[]{"key-" + i, 1.0}));
+      }
+      AtomicInteger abortChecks = new AtomicInteger();
+
+      target.mergeUnfinishedTable(source, "test", () -> abortChecks.incrementAndGet() == 2);
+
+      assertEquals(abortChecks.get(), 2);
+      assertEquals(target.size(), 1024);
+      assertEquals(source.size(), 1);
+    } finally {
+      executorService.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testFailedTournamentSkipsPartialTableMerge() {
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT a, SUM(b) FROM t GROUP BY a LIMIT 10");
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+    try {
+      ContendedNonblockingGroupByCombineOperator combineOperator =
+          new ContendedNonblockingGroupByCombineOperator(queryContext, executorService, 2);
+      SimpleIndexedTable table = createTable(queryContext, executorService);
+      table.upsert(new Key(new Object[]{"key"}), new Record(new Object[]{"key", 1.0}));
+      combineOperator.onProcessSegmentsException(new RuntimeException("test"));
+
+      combineOperator.mergeTable(table);
+
+      assertEquals(table.size(), 1);
+      assertNull(combineOperator.takeTable());
+    } finally {
+      executorService.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testFailedTournamentDiscardsPartiallyMergedTables() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT a, SUM(b) FROM t GROUP BY a ORDER BY SUM(b) DESC LIMIT 5000");
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+    try {
+      ContendedNonblockingGroupByCombineOperator combineOperator =
+          new ContendedNonblockingGroupByCombineOperator(queryContext, executorService, 2);
+      FailingSimpleIndexedTable sharedTable =
+          new FailingSimpleIndexedTable(queryContext, executorService, 5000);
+      for (int i = 0; i < 2049; i++) {
+        sharedTable.upsert(new Key(new Object[]{"shared-" + i}), new Record(new Object[]{"shared-" + i, 1.0}));
+      }
+      combineOperator.mergeTable(sharedTable);
+
+      SimpleIndexedTable source = createTable(queryContext, executorService, 5000);
+      for (int i = 0; i < 1025; i++) {
+        source.upsert(new Key(new Object[]{"source-" + i}), new Record(new Object[]{"source-" + i, 1.0}));
+      }
+      sharedTable.failOnNextUpsert(() -> combineOperator.onProcessSegmentsException(new RuntimeException("test")));
+
+      combineOperator.mergeTable(source);
+
+      assertEquals(sharedTable.size(), 3073);
+      assertEquals(source.size(), 1);
+      assertNull(combineOperator.takeTable());
     } finally {
       executorService.shutdownNow();
     }
@@ -184,8 +260,36 @@ public class NonblockingGroupByCombineOperatorTest {
   }
 
   private static SimpleIndexedTable createTable(QueryContext queryContext, ExecutorService executorService) {
-    return new SimpleIndexedTable(DATA_SCHEMA, false, queryContext, 10, Integer.MAX_VALUE, Integer.MAX_VALUE, 16,
-        executorService);
+    return createTable(queryContext, executorService, 10);
+  }
+
+  private static SimpleIndexedTable createTable(QueryContext queryContext, ExecutorService executorService,
+      int resultSize) {
+    return new SimpleIndexedTable(DATA_SCHEMA, false, queryContext, resultSize, Integer.MAX_VALUE, Integer.MAX_VALUE,
+        16, executorService);
+  }
+
+  private static class FailingSimpleIndexedTable extends SimpleIndexedTable {
+    private Runnable _failure;
+
+    FailingSimpleIndexedTable(QueryContext queryContext, ExecutorService executorService, int resultSize) {
+      super(DATA_SCHEMA, false, queryContext, resultSize, Integer.MAX_VALUE, Integer.MAX_VALUE, 16, executorService);
+    }
+
+    void failOnNextUpsert(Runnable failure) {
+      _failure = failure;
+    }
+
+    @Override
+    public boolean upsert(Key key, Record record) {
+      boolean updated = super.upsert(key, record);
+      if (_failure != null) {
+        Runnable failure = _failure;
+        _failure = null;
+        failure.run();
+      }
+      return updated;
+    }
   }
 
   private static class StaticGroupByOperator extends BaseOperator<GroupByResultsBlock> {

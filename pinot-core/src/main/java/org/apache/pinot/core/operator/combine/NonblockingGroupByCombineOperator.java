@@ -87,7 +87,7 @@ public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
    * Merges an exclusively owned table into the atomic tournament slot.
    */
   protected void mergeIntoSharedTable(IndexedTable indexedTable) {
-    while (indexedTable != null) {
+    while (indexedTable != null && _processingException.get() == null) {
       if (tryDepositSharedTable(indexedTable)) {
         return;
       }
@@ -96,9 +96,11 @@ public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
         continue;
       }
       if (indexedTable.size() > indexedTableToMerge.size()) {
-        indexedTable.mergeUnfinishedTable(indexedTableToMerge, EXPLAIN_NAME);
+        indexedTable.mergeUnfinishedTable(indexedTableToMerge, EXPLAIN_NAME,
+            () -> _processingException.get() != null);
       } else {
-        indexedTableToMerge.mergeUnfinishedTable(indexedTable, EXPLAIN_NAME);
+        indexedTableToMerge.mergeUnfinishedTable(indexedTable, EXPLAIN_NAME,
+            () -> _processingException.get() != null);
         indexedTable = indexedTableToMerge;
       }
     }

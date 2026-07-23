@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -45,6 +46,8 @@ import org.apache.pinot.spi.query.QueryThreadContext;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
+  private static final int MERGE_ABORT_CHECK_MASK = 0x3FF;
+
   private final ExecutorService _executorService;
   protected final Map<Key, Record> _lookupMap;
   protected final boolean _hasFinalInput;
@@ -287,12 +290,23 @@ public abstract class IndexedTable extends BaseTable {
    * this method returns.
    */
   public void mergeUnfinishedTable(IndexedTable other, String scope) {
+    mergeUnfinishedTable(other, scope, () -> false);
+  }
+
+  /**
+   * Merges an exclusively owned, unfinished indexed table, stopping early when requested. If the merge is aborted,
+   * the source can be partially drained and both tables must be discarded.
+   */
+  public void mergeUnfinishedTable(IndexedTable other, String scope, BooleanSupplier shouldAbort) {
     Preconditions.checkState(_topRecords == null, "Cannot merge into a finished indexed table");
     Preconditions.checkState(other._topRecords == null, "Cannot merge a finished indexed table");
     Preconditions.checkArgument(other != this, "Cannot merge an indexed table into itself");
     int mergedRecords = 0;
     Iterator<Map.Entry<Key, Record>> iterator = other._lookupMap.entrySet().iterator();
     while (iterator.hasNext()) {
+      if ((mergedRecords & MERGE_ABORT_CHECK_MASK) == 0 && shouldAbort.getAsBoolean()) {
+        return;
+      }
       Map.Entry<Key, Record> entry = iterator.next();
       QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedRecords++, scope);
       upsert(entry.getKey(), entry.getValue());

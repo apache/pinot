@@ -62,13 +62,16 @@ import org.openjdk.jmh.runner.options.TimeValue;
  *
  * <p>Group key cardinality: {@code CARDINALITY_D1 × CARDINALITY_D2 = 5000 × 2000 = 10M} unique groups.
  *
- * <p>Approximate unique groups in the combined result by (numSegments, numRecordsPerSegment):
+ * <p>Approximate unique groups in the combined result by (numSegments, numRecordsPerSegment) with the default pool of
+ * ten segment datasets:
  * <ul>
  *   <li>(10,  100k) ≈ 0.95 M unique groups (1M total input records per combine)</li>
  *   <li>(100, 100k) ≈ 0.95 M unique groups (10M total input records per combine, repeated pool)</li>
  *   <li>(10,  1M)   ≈ 6.32 M unique groups (10M total input records per combine)</li>
  *   <li>(100, 1M)   ≈ 6.32 M unique groups (100M total input records per combine, repeated pool)</li>
  * </ul>
+ * A pool of 100 unique datasets with (100, 100k) yields approximately 6.32M unique groups and exercises the
+ * low-overlap tournament path.
  *
  * <p>Segment data is stored in a configurable pool of unique {@link SegmentData} objects and cycled across all
  * {@code numSegments} operators. This allows key overlap to vary independently of input volume. Records are created
@@ -187,10 +190,12 @@ public class BenchmarkGroupByCombineOperator {
 
   private BaseCombineOperator<?> createCombineOperator() {
     switch (_algorithm) {
+      case GroupByCombineOperator.ALGORITHM:
+        return new GroupByCombineOperator(_operators, _queryContext, _executorService);
       case NonblockingGroupByCombineOperator.ALGORITHM:
         return new NonblockingGroupByCombineOperator(_operators, _queryContext, _executorService);
       default:
-        return new GroupByCombineOperator(_operators, _queryContext, _executorService);
+        throw new IllegalArgumentException("Unsupported group-by combine algorithm: " + _algorithm);
     }
   }
 
