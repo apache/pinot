@@ -591,7 +591,8 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
-        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip);
+        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip,
+            _pinotHelixResourceManager.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)));
         TaskConfigUtils.validateTaskConfigs(tableConfigs.getOffline(), schema, _pinotTaskManager, typesToSkip);
         TableConfigValidatorRegistry.validate(offlineTableConfig, schema);
       }
@@ -601,7 +602,8 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
-        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip);
+        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip,
+            _pinotHelixResourceManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)));
         TaskConfigUtils.validateTaskConfigs(tableConfigs.getRealtime(), schema, _pinotTaskManager, typesToSkip);
         TableConfigValidatorRegistry.validate(realtimeTableConfig, schema);
       }

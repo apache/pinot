@@ -569,11 +569,10 @@ public class DateTimeFunctions {
     return results;
   }
 
-  /**
-   * Return current time as epoch millis
-   * TODO: Consider changing the return type to Timestamp
-   */
-  @ScalarFunction
+  /// Returns current time as epoch millis.
+  ///
+  /// TODO: Consider changing the return type to Timestamp.
+  @ScalarFunction(isDeterministic = false)
   public static long now() {
     return System.currentTimeMillis();
   }
@@ -591,25 +590,25 @@ public class DateTimeFunctions {
     return millis;
   }
 
-  /**
-   * Return time as epoch millis before the given period (in ISO-8601 duration format).
-   * Examples:
-   *           "PT20.345S" -- parses as "20.345 seconds"
-   *           "PT15M"     -- parses as "15 minutes" (where a minute is 60 seconds)
-   *           "PT10H"     -- parses as "10 hours" (where an hour is 3600 seconds)
-   *           "P2D"       -- parses as "2 days" (where a day is 24 hours or 86400 seconds)
-   *           "P2DT3H4M"  -- parses as "2 days, 3 hours and 4 minutes"
-   *           "P-6H3M"    -- parses as "-6 hours and +3 minutes"
-   *           "-P6H3M"    -- parses as "-6 hours and -3 minutes"
-   *           "-P-6H+3M"  -- parses as "+6 hours and -3 minutes"
-   */
-  @ScalarFunction
+  /// Returns time as epoch millis before the given period (in ISO-8601 duration format).
+  ///
+  /// Examples:
+  ///
+  /// - `"PT20.345S"` parses as "20.345 seconds".
+  /// - `"PT15M"` parses as "15 minutes" (where a minute is 60 seconds).
+  /// - `"PT10H"` parses as "10 hours" (where an hour is 3600 seconds).
+  /// - `"P2D"` parses as "2 days" (where a day is 24 hours or 86400 seconds).
+  /// - `"P2DT3H4M"` parses as "2 days, 3 hours and 4 minutes".
+  /// - `"P-6H3M"` parses as "-6 hours and +3 minutes".
+  /// - `"-P6H3M"` parses as "-6 hours and -3 minutes".
+  /// - `"-P-6H+3M"` parses as "+6 hours and -3 minutes".
+  @ScalarFunction(isDeterministic = false)
   public static long ago(String periodString) {
     Duration period = Duration.parse(periodString);
     return System.currentTimeMillis() - period.toMillis();
   }
 
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static long[] agoMV(String[] periodString) {
     long[] results = new long[periodString.length];
     for (int i = 0; i < periodString.length; i++) {
