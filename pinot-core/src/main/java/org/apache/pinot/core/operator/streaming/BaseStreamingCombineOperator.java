@@ -115,7 +115,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         if (isChildOperatorSingleBlock()) {
-          T resultsBlock = operator.nextBlock();
+          T resultsBlock = detachFromWorkerThreadState(operator.nextBlock());
           addResultsBlock(resultsBlock);
           // When query is satisfied, skip processing the remaining segments
           if (isQuerySatisfied(resultsBlock, tracker)) {
@@ -125,6 +125,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
         } else {
           T resultsBlock;
           while ((resultsBlock = operator.nextBlock()) != null) {
+            resultsBlock = detachFromWorkerThreadState(resultsBlock);
             addResultsBlock(resultsBlock);
             // When query is satisfied, skip processing the remaining segments
             if (isQuerySatisfied(resultsBlock, tracker)) {
@@ -143,6 +144,15 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
       // offer the LAST_RESULTS_BLOCK indicate finish of the current operator.
       addResultsBlock(LAST_RESULTS_BLOCK);
     }
+  }
+
+  /// Hook invoked on the worker thread for each child results block, before it is handed off to the
+  /// consumer thread via [#addResultsBlock]. Subclasses override this to eagerly materialize any
+  /// per-segment state that is backed by reused worker-thread-local storage (e.g. the group-by
+  /// group-key maps), so the consumer thread never reads state the worker may mutate for its next
+  /// segment. The default implementation returns the block unchanged.
+  protected T detachFromWorkerThreadState(T resultsBlock) {
+    return resultsBlock;
   }
 
   // NOTE: Throw EarlyTerminationException when interrupted or timed out

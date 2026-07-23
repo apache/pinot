@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.streaming;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -143,6 +144,54 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     return attachExecutionStats(new MetadataResultsBlock());
   }
 
+  /// Detaches a per-segment group-by result from the worker thread's reused thread-local group-key state.
+  ///
+  /// <p>A raw {@link AggregationGroupByResult} is backed by the group-key map returned by
+  /// {@link org.apache.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKeyGenerator}'s thread-locals,
+  /// which the same worker thread clears and repopulates for its next segment. If such a block were handed to
+  /// the consumer thread (as {@link BaseStreamingCombineOperator} does), the consumer would iterate that map
+  /// while the worker mutates it — a data race that yields corrupted group ids and out-of-bounds result-holder
+  /// access. We therefore materialize the result into self-contained {@link IntermediateRecord}s here, on the
+  /// producing worker thread, before hand-off — mirroring how the non-streaming
+  /// {@link org.apache.pinot.core.operator.combine.GroupByCombineOperator} merges inline on the worker thread.
+  ///
+  /// <p>Blocks that already carry intermediate records (order-by / segment-trim path) are self-contained and
+  /// returned unchanged.
+  @Override
+  protected GroupByResultsBlock detachFromWorkerThreadState(GroupByResultsBlock resultsBlock) {
+    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    if (aggregationGroupByResult == null || resultsBlock.getIntermediateRecords() != null) {
+      return resultsBlock;
+    }
+    List<IntermediateRecord> records = new ArrayList<>();
+    try {
+      Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+      int extractedKeys = 0;
+      while (groupKeyIterator.hasNext()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(extractedKeys++, EXPLAIN_NAME);
+        GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+        Object[] keys = groupKey._keys;
+        Object[] values = Arrays.copyOf(keys, _numColumns);
+        int groupId = groupKey._groupId;
+        for (int i = 0; i < _numAggregationFunctions; i++) {
+          values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+        }
+        records.add(IntermediateRecord.withoutOrderByValues(new Key(keys), new Record(values)));
+      }
+    } finally {
+      aggregationGroupByResult.closeGroupKeyGenerator();
+    }
+    GroupByResultsBlock detached =
+        new GroupByResultsBlock(resultsBlock.getDataSchema(), records, _queryContext);
+    detached.setGroupsTrimmed(resultsBlock.isGroupsTrimmed());
+    detached.setNumGroupsLimitReached(resultsBlock.isNumGroupsLimitReached());
+    detached.setNumGroupsWarningLimitReached(resultsBlock.isNumGroupsWarningLimitReached());
+    return detached;
+  }
+
+  /// Merges a (self-contained) per-segment block into the accumulating indexed table. By the time a block
+  /// reaches this consumer-thread method it always carries intermediate records — raw results are converted
+  /// on the worker thread by {@link #detachFromWorkerThreadState}.
   private void mergeBlock(GroupByResultsBlock resultsBlock) {
     if (_indexedTable == null) {
       _dataSchema = resultsBlock.getDataSchema();
@@ -158,28 +207,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
       _numGroupsWarningLimitReached = true;
     }
     List<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
-    if (intermediateRecords == null) {
-      AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-      if (aggregationGroupByResult != null) {
-        try {
-          Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-          int mergedKeys = 0;
-          while (groupKeyIterator.hasNext()) {
-            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
-            GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-            Object[] keys = groupKey._keys;
-            Object[] values = Arrays.copyOf(keys, _numColumns);
-            int groupId = groupKey._groupId;
-            for (int i = 0; i < _numAggregationFunctions; i++) {
-              values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
-            }
-            _indexedTable.upsert(new Key(keys), new Record(values));
-          }
-        } finally {
-          aggregationGroupByResult.closeGroupKeyGenerator();
-        }
-      }
-    } else {
+    if (intermediateRecords != null) {
       int mergedKeys = 0;
       for (IntermediateRecord intermediateResult : intermediateRecords) {
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
