@@ -25,11 +25,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
 import org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator;
+import org.apache.pinot.controller.recommender.realtime.provisioning.RealtimeProvisioningWarnings;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
@@ -199,7 +201,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
                 + "that in -retentionHours").append(
             "\nDoing so will let this program assume that you are willing to take a page hit when querying older data")
         .append("\nand optimize memory and number of hosts accordingly.")
-        .append("\n See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime for details");
+        .append("\n See ").append(RealtimeProvisioningWarnings.REALTIME_TUNING_DOCS_URL).append(" for details");
     System.out.println(builder);
   }
 
@@ -288,7 +290,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     memoryEstimator
         .estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);
 
-    note.append("\n* See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime");
+    note.append("\n* See ").append(RealtimeProvisioningWarnings.REALTIME_TUNING_DOCS_URL);
     // TODO: Make a recommendation of what config to choose by considering more inputs such as qps
     displayOutputHeader(note);
     LOGGER.info("\nMemory used per host (Active/Mapped)");
@@ -299,6 +301,15 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     displayResults(memoryEstimator.getConsumingMemoryPerHost(), numHosts, numHours);
     LOGGER.info("\nTotal number of segments queried per host (for all partitions)");
     displayResults(memoryEstimator.getNumSegmentsQueriedPerHost(), numHosts, numHours);
+
+    List<String> warnings = RealtimeProvisioningWarnings.generate(memoryEstimator.getOptimalSegmentSize(),
+        memoryEstimator.getActiveMemoryPerHost(), memoryEstimator.getNumSegmentsQueriedPerHost(),
+        maxUsableHostMemBytes, numHours, numHosts);
+    String warningsDisplay = RealtimeProvisioningWarnings.formatForDisplay(warnings);
+    if (!warningsDisplay.isEmpty()) {
+      System.out.print(warningsDisplay);
+      LOGGER.warn("Realtime provisioning sanity checks produced {} warning(s)", warnings.size());
+    }
     return true;
   }
 
