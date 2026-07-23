@@ -32,9 +32,7 @@ import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -46,7 +44,6 @@ public class ItemTransformFunction extends BaseTransformFunction {
   private String[] _keyPath;
   private Dictionary _dictionary;
   private TransformResultMetadata _resultMetadata;
-  private NullValueVectorReader _nullValueVector;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
@@ -80,7 +77,6 @@ public class ItemTransformFunction extends BaseTransformFunction {
         valueDataSource = OpenStructNullDataSource.forAbsentKey(osDs, key);
       }
     }
-    _nullValueVector = valueDataSource.getNullValueVector();
     // Only expose the dictionary when the forward index is dict-encoded. A column can have a dictionary alongside
     // a RAW forward index (e.g. dict + inverted/range), in which case transformToDictIdsSV would fail because
     // BlockValueSet.getDictionaryIdsSV requires a dict-encoded forward index.
@@ -109,11 +105,7 @@ public class ItemTransformFunction extends BaseTransformFunction {
 
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    if (_nullValueVector == null) {
-      return null;
-    }
-    ImmutableRoaringBitmap nullBitmap = _nullValueVector.getNullBitmap();
-    return nullBitmap != null ? nullBitmap.toRoaringBitmap() : null;
+    return valueBlock.getBlockValueSet(_keyPath).getNullBitmap();
   }
 
   @Override

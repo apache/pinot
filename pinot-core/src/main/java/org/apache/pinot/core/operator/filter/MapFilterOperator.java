@@ -267,7 +267,7 @@ public class MapFilterOperator extends BaseFilterOperator {
     attributeBuilder.putString("indexLookUp", "map_index");
     attributeBuilder.putString("operator", _predicate.getType().name());
     attributeBuilder.putString("predicate", _predicate.toString());
-    attributeBuilder.putString("delegateTo", _delegateType.name().toLowerCase());
+    attributeBuilder.putString("delegateTo", _delegateType.name().toLowerCase(Locale.ROOT));
   }
 
   private static boolean canUseJsonIndex(Predicate.Type predicateType) {
