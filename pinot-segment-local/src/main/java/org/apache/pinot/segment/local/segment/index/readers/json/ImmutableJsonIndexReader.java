@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.readers.json;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.ByteArrayOutputStream;
@@ -60,7 +61,9 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -146,16 +149,24 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in order
       // to get the correct result, and it cannot be nested
       ImmutableRoaringBitmap flattenedDocIds = getMatchingFlattenedDocIds(predicate);
-      MutableRoaringBitmap resultDocIds = new MutableRoaringBitmap();
-      flattenedDocIds.forEach((IntConsumer) flattenedDocId -> resultDocIds.add(getDocId(flattenedDocId)));
+      MutableRoaringBitmap resultDocIds = flattenedToDocIds(flattenedDocIds);
       resultDocIds.flip(0, _numDocs);
       return resultDocIds;
     } else {
       ImmutableRoaringBitmap flattenedDocIds = getMatchingFlattenedDocIds(filter);
-      MutableRoaringBitmap resultDocIds = new MutableRoaringBitmap();
-      flattenedDocIds.forEach((IntConsumer) flattenedDocId -> resultDocIds.add(getDocId(flattenedDocId)));
-      return resultDocIds;
+      return flattenedToDocIds(flattenedDocIds);
     }
+  }
+
+  /// Maps a posting list of flattened doc ids to real doc ids. The flattened ids are iterated in ascending order and
+  /// the flattened -> real doc id mapping is monotonically non-decreasing (the index flattens documents in doc-id
+  /// order), so the real doc ids are produced sorted. We therefore append them through an ordered
+  /// [RoaringBitmapWriter] rather than calling [MutableRoaringBitmap#add(int)] per element, which avoids a binary
+  /// search and a possible container-array reallocation on every doc id.
+  private MutableRoaringBitmap flattenedToDocIds(ImmutableRoaringBitmap flattenedDocIds) {
+    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+    flattenedDocIds.forEach((IntConsumer) flattenedDocId -> writer.add(getDocId(flattenedDocId)));
+    return writer.get();
   }
 
   /**
@@ -476,9 +487,12 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
   public void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
     valueToFlattenedDocIds.replaceAll((key, value) -> {
-      RoaringBitmap docIds = new RoaringBitmap();
-      value.forEach((IntConsumer) flattenedDocId -> docIds.add(getDocId(flattenedDocId)));
-      return docIds;
+      // Flattened ids are iterated in ascending order and the flattened -> real doc id mapping is monotonically
+      // non-decreasing, so the real doc ids are produced sorted. Append them through an ordered RoaringBitmapWriter
+      // to avoid a per-element binary search and container reallocation that RoaringBitmap.add(int) would incur.
+      RoaringBitmapWriter<RoaringBitmap> writer = RoaringBitmapWriter.writer().get();
+      value.forEach((IntConsumer) flattenedDocId -> writer.add(getDocId(flattenedDocId)));
+      return writer.get();
     });
   }
 
@@ -783,33 +797,108 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   @Override
   public String[] getValuesSV(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingDocs,
       boolean isFlattenedDocIds) {
-    Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
-    RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
+    String[] values = new String[length];
+    if (length == 0) {
+      return values;
+    }
 
-    for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
-      String value = entry.getKey();
-      RoaringBitmap matchingDocIds = entry.getValue();
-      if (isFlattenedDocIds) {
-        matchingDocIds.forEach((IntConsumer) flattenedDocId -> {
+    if (isFlattenedDocIds) {
+      // Flattened doc ids must be converted to real doc ids before they can be matched against the block's doc ids,
+      // so we still build a docId -> value lookup keyed by the converted doc id.
+      Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(length);
+      RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
+      for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
+        String value = entry.getKey();
+        entry.getValue().forEach((IntConsumer) flattenedDocId -> {
           int docId = getDocId(flattenedDocId);
           if (docIdMask.contains(docId)) {
             docIdToValues.put(docId, value);
           }
         });
-      } else {
-        RoaringBitmap intersection = RoaringBitmap.and(matchingDocIds, docIdMask);
-        if (intersection.isEmpty()) {
-          continue;
-        }
-        for (int docId : intersection) {
-          docIdToValues.put(docId, entry.getKey());
-        }
       }
+      for (int i = 0; i < length; i++) {
+        values[i] = docIdToValues.get(docIds[i]);
+      }
+      return values;
     }
 
-    String[] values = new String[length];
-    for (int i = 0; i < length; i++) {
-      values[i] = docIdToValues.get(docIds[i]);
+    // Non-flattened path (the only path used by jsonExtractIndex SV): docIds are real doc ids for the current block,
+    // and for a single-value path each doc belongs to at most one value's posting list. We can therefore scatter
+    // values directly, iterating each value's posting list only over the block's [lo, hi] doc id range with a peekable
+    // iterator. This avoids allocating a per-block doc id mask bitmap, a RoaringBitmap.and per distinct value, and an
+    // intermediate docId -> value hash map. Doc-id blocks are monotonic (DocIdSetOperator emits ascending runs,
+    // ReverseDocIdSetOperator descending runs), so a gap-free block is a contiguous ascending or descending run and its
+    // result position can be derived from the endpoints without a lookup map.
+    int first = docIds[0];
+    int last = docIds[length - 1];
+    if (first <= last && (long) last - first + 1 == length) {
+      // Dense, gap-free, ascending block (the common full-scan case): the result position is simply the doc id offset.
+      int lo = first;
+      int hi = last;
+      for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
+        String value = entry.getKey();
+        PeekableIntIterator it = entry.getValue().getIntIterator();
+        it.advanceIfNeeded(lo);
+        while (it.hasNext()) {
+          int docId = it.next();
+          if (docId > hi) {
+            break;
+          }
+          values[docId - lo] = value;
+        }
+      }
+    } else if (first >= last && (long) first - last + 1 == length) {
+      // Dense, gap-free, descending block (e.g. ORDER BY <sortedCol> DESC via ReverseDocIdSetOperator): the run is
+      // contiguous but reversed, so the result position of a doc id is (first - docId). Handle it with a symmetric
+      // offset write over the true [last, first] range rather than falling through to the hash-map branch, which would
+      // allocate a per-block Int2IntOpenHashMap on this hot path.
+      int lo = last;
+      int hi = first;
+      for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
+        String value = entry.getKey();
+        PeekableIntIterator it = entry.getValue().getIntIterator();
+        it.advanceIfNeeded(lo);
+        while (it.hasNext()) {
+          int docId = it.next();
+          if (docId > hi) {
+            break;
+          }
+          values[first - docId] = value;
+        }
+      }
+    } else {
+      // Sparse block (e.g. after a selective filter), or a non-contiguous ordering: map each doc id to its result
+      // position once (order-independent), then range-scan each value's posting list within the block's true [lo, hi].
+      // lo/hi are the actual min/max doc ids, computed here so the scan bounds are correct regardless of the ordering.
+      Int2IntOpenHashMap docIdToPos = new Int2IntOpenHashMap(length);
+      docIdToPos.defaultReturnValue(-1);
+      int lo = Integer.MAX_VALUE;
+      int hi = Integer.MIN_VALUE;
+      for (int i = 0; i < length; i++) {
+        int docId = docIds[i];
+        docIdToPos.put(docId, i);
+        if (docId < lo) {
+          lo = docId;
+        }
+        if (docId > hi) {
+          hi = docId;
+        }
+      }
+      for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
+        String value = entry.getKey();
+        PeekableIntIterator it = entry.getValue().getIntIterator();
+        it.advanceIfNeeded(lo);
+        while (it.hasNext()) {
+          int docId = it.next();
+          if (docId > hi) {
+            break;
+          }
+          int pos = docIdToPos.get(docId);
+          if (pos >= 0) {
+            values[pos] = value;
+          }
+        }
+      }
     }
     return values;
   }
