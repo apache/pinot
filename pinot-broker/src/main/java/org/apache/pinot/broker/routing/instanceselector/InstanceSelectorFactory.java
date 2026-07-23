@@ -106,6 +106,14 @@ public class InstanceSelectorFactory {
           }
           case RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE: {
             LOGGER.info("Using StrictReplicaGroupInstanceSelector for table: {}", tableNameWithType);
+            boolean enableStrictReplicaGroupAdaptiveRouting = brokerConfig.getProperty(
+                CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STRICT_REPLICA_GROUP,
+                CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_ENABLE_STRICT_REPLICA_GROUP);
+            if (!enableStrictReplicaGroupAdaptiveRouting && adaptiveServerSelector != null) {
+              LOGGER.info("Adaptive routing disabled for StrictReplicaGroupInstanceSelector table: {}",
+                  tableNameWithType);
+              adaptiveServerSelector = null;
+            }
             instanceSelector = new StrictReplicaGroupInstanceSelector();
             break;
           }

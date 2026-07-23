@@ -1280,6 +1280,13 @@ public class CommonConstants {
       public static final String CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS =
           CONFIG_PREFIX + ".stats.metric.export.interval.ms";
       public static final long DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS = 10 * 1000;
+
+      // Controls whether pool-level adaptive routing is enabled for StrictReplicaGroupInstanceSelector.
+      // When false, StrictReplicaGroupInstanceSelector falls back to round-robin even if adaptive server
+      // selection is configured.
+      public static final String CONFIG_OF_ENABLE_STRICT_REPLICA_GROUP =
+          CONFIG_PREFIX + ".enable.strict.replica.group";
+      public static final boolean DEFAULT_ENABLE_STRICT_REPLICA_GROUP = true;
     }
 
     public static class Grpc {

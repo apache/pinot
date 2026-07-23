@@ -2077,7 +2077,9 @@
               <importOrder>
                 <order>,\#</order>
               </importOrder>
-              <removeUnusedImports />
+              <removeUnusedImports>
+                <engine>cleanthat-javaparser-unnecessaryimport</engine>
+              </removeUnusedImports>
             </java>
           </configuration>
         </plugin>

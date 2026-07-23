@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -86,7 +85,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   }
 
   @Override
-  public Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+  public InstanceMapping select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
@@ -110,8 +109,9 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * Returns a map from the segmentName to the corresponding server. It tries to select all servers from the
    * preferredReplicaGroup, but if it fails, it will try to select the relevant server from other instance partitions.
    *
-   * @return A pair of maps, where the first map contains the segments that are assigned to a server and the second
-   * map contains the segments that are optional (i.e., the server is not online to serve that segment).
+   * @return An {@link InstanceMapping} whose {@code segmentToInstanceMap} contains the segments assigned to a server
+   * and whose {@code optionalSegmentToInstanceMap} contains segments that are optional (i.e., the server is not
+   * online to serve that segment).
    * Example:
    * {
    *   "required_segments": {
@@ -124,7 +124,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    *   }
    * }
    */
-  private Pair<Map<String, String>, Map<String, String>> assign(Set<String> segments,
+  private InstanceMapping assign(Set<String> segments,
       SegmentStates segmentStates, InstancePartitions instancePartitions, int preferredReplicaId) {
     Map<String, Integer> instanceToPartitionMap = instancePartitions.getInstanceToPartitionIdMap();
     Map<String, Set<String>> instanceToSegmentsMap = new HashMap<>();
@@ -229,7 +229,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * Based on whether the selected instance for the segment is online to serve that segment or not,
    * this method computes the segments that are optional and the segments that are not.
    */
-  private Pair<Map<String, String>, Map<String, String>> computeOptionalSegments(
+  private InstanceMapping computeOptionalSegments(
       Map<String, String> segmentToSelectedInstanceMap, SegmentStates segmentStates) {
 
     Map<String, String> segmentsToInstanceMap = new HashMap<>();
@@ -258,7 +258,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       }
     }
 
-    return Pair.of(segmentsToInstanceMap, optionalSegmentToInstanceMap);
+    return new InstanceMapping(segmentsToInstanceMap, optionalSegmentToInstanceMap);
   }
 
   @VisibleForTesting
