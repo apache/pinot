@@ -2424,14 +2424,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     tgt3.put("server2", "ONLINE");
     targetAssignment.put("segment3", tgt3);
 
-    // Segment 4: one instance is ONLINE, should not be considered
+    // Segment 4: OFFLINE (no CONSUMING replica), should not be considered
     Map<String, String> cur4 = new HashMap<>();
-    cur4.put("server1", "ONLINE");
-    cur4.put("server2", "CONSUMING");
+    cur4.put("server1", "OFFLINE");
+    cur4.put("server2", "OFFLINE");
     currentAssignment.put("segment4", cur4);
     Map<String, String> tgt4 = new HashMap<>();
-    tgt4.put("server1", "ONLINE");
-    tgt4.put("server2", "CONSUMING");
+    tgt4.put("server3", "OFFLINE");
+    tgt4.put("server4", "OFFLINE");
     targetAssignment.put("segment4", tgt4);
 
     // Segment 5: no ONLINE instance, but at least one in CONSUMING, should be considered moving

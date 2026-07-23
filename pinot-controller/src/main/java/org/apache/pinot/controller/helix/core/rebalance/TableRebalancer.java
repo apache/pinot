@@ -2263,6 +2263,12 @@ public class TableRebalancer {
     return tierSegments.size() >= segmentsToMove.size() && tierSegments.containsAll(segmentsToMove);
   }
 
+  /// Returns the consuming segments that would be moved between the current and target assignment: those whose target
+  /// has a `CONSUMING` replica and whose assigned instances differ from the current assignment. Assumes a segment's
+  /// replicas are never a mix of `ONLINE` and `CONSUMING` (a realtime segment is either consuming or completed, and
+  /// completion flips the whole segment at once), so the scan over a segment's replicas can stop at the first `ONLINE`
+  /// replica (the segment is completed, hence not consuming) or the first `CONSUMING` replica (the segment is
+  /// consuming), skipping only `OFFLINE` replicas.
   @VisibleForTesting
   static Set<String> getMovingConsumingSegments(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment) {
@@ -2271,12 +2277,21 @@ public class TableRebalancer {
       String segmentName = entry.getKey();
       Map<String, String> currentInstanceStateMap = entry.getValue();
       Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
-      if (targetInstanceStateMap != null && targetInstanceStateMap.values().stream()
-          .noneMatch(state -> state.equals(SegmentStateModel.ONLINE)) && targetInstanceStateMap.values().stream()
-          .anyMatch(state -> state.equals(SegmentStateModel.CONSUMING))) {
-        if (!currentInstanceStateMap.keySet().equals(targetInstanceStateMap.keySet())) {
-          movingConsumingSegments.add(segmentName);
+      if (targetInstanceStateMap == null) {
+        continue;
+      }
+      for (String state : targetInstanceStateMap.values()) {
+        if (state.equals(SegmentStateModel.ONLINE)) {
+          // Completed segment (no CONSUMING replica by the assumption above), not a moving consuming segment.
+          break;
         }
+        if (state.equals(SegmentStateModel.CONSUMING)) {
+          if (!currentInstanceStateMap.keySet().equals(targetInstanceStateMap.keySet())) {
+            movingConsumingSegments.add(segmentName);
+          }
+          break;
+        }
+        // OFFLINE replica, keep scanning for an ONLINE or CONSUMING replica.
       }
     }
     return movingConsumingSegments;
