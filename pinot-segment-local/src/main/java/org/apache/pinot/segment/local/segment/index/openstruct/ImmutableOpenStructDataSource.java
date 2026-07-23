@@ -84,8 +84,7 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   @Override
   @Nullable
   public DataSource getDataSource(String key) {
-    DataSource ds = _perKeyDataSources.get(key);
-    return ds != null ? ds : _sparseDataSource;
+    return _perKeyDataSources.get(key);
   }
 
   @Override
@@ -98,6 +97,8 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     return _sparseDataSource == null;
   }
 
+  /// Returns only the materialized (dense) key DataSources. Sparse keys are not included because
+  /// they share a single JSON column and have no individual DataSource.
   @Override
   public Map<String, DataSource> getDataSources() {
     return _perKeyDataSources;

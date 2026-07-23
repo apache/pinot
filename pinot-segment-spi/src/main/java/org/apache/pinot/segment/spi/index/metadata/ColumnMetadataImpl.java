@@ -474,9 +474,11 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         List<String> childFieldNames =
             config.getList(String.class, Column.getKeyFor(column, Column.COMPLEX_CHILD_FIELD_NAMES));
         Map<String, FieldSpec> childFieldSpecs = new HashMap<>();
-        for (String childField : childFieldNames) {
-          childFieldSpecs.put(childField,
-              extractFieldSpec(ComplexFieldSpec.getFullChildName(column, childField), config));
+        if (childFieldNames != null) {
+          for (String childField : childFieldNames) {
+            childFieldSpecs.put(childField,
+                extractFieldSpec(ComplexFieldSpec.getFullChildName(column, childField), config));
+          }
         }
         return new ComplexFieldSpec(fieldName, dataType, true, childFieldSpecs);
       default:

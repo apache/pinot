@@ -57,8 +57,8 @@ public class ImmutableOpenStructDataSourceTest {
         container);
 
     assertSame(ds.getDataSource("clicks"), clicksDs);
-    // absent key falls back to sparse
-    assertSame(ds.getDataSource("unknown"), sparseDs);
+    // absent key returns null (callers handle the fallback)
+    assertNull(ds.getDataSource("unknown"));
   }
 
   @Test
