@@ -50,6 +50,8 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.TimestampConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -2208,6 +2210,42 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail for Json Index defined on a multi value column");
+    } catch (Exception e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testValidateStarTreeIndexWithTimestampIndexDerivedColumns() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime("OrderDate", FieldSpec.DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS")
+        .addMetric("value", FieldSpec.DataType.LONG)
+        .build();
+
+    // Derived TIMESTAMP-index columns ($OrderDate$DAY, ...) are declared via TimestampConfig granularities and are
+    // materialized only at segment generation time, so they are absent from the schema here. The star-tree config
+    // referencing them in dimensionsSplitOrder must still validate.
+    FieldConfig timestampFieldConfig = new FieldConfig.Builder("OrderDate").withTimestampConfig(
+        new TimestampConfig(List.of(TimestampIndexGranularity.DAY, TimestampIndexGranularity.WEEK,
+            TimestampIndexGranularity.MONTH))).build();
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(
+        List.of("$OrderDate$DAY", "$OrderDate$WEEK", "$OrderDate$MONTH"), null, List.of("COUNT__*"), null, 10000);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setFieldConfigList(List.of(timestampFieldConfig))
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // A derived-looking column whose granularity was NOT declared in TimestampConfig must still be rejected.
+    StarTreeIndexConfig undeclaredGranularity = new StarTreeIndexConfig(
+        List.of("$OrderDate$HOUR"), null, List.of("COUNT__*"), null, 10000);
+    TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setFieldConfigList(List.of(timestampFieldConfig))
+        .setStarTreeIndexConfigs(List.of(undeclaredGranularity))
+        .build();
+    try {
+      TableConfigUtils.validate(invalidTableConfig, schema);
+      fail("Should fail for star-tree dimension referencing an undeclared timestamp-index granularity");
     } catch (Exception e) {
       // expected
     }
