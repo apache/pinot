@@ -29,8 +29,18 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 public class DefaultAggregationExecutor implements AggregationExecutor {
   protected final AggregationFunction[] _aggregationFunctions;
   protected final AggregationResultHolder[] _aggregationResultHolders;
+  protected final Object[] _preAggregatedResults;
 
-  public DefaultAggregationExecutor(AggregationFunction[] aggregationFunctions) {
+  /**
+   * Creates an executor that skips functions with a pre-aggregated result. For each index {@code i} where
+   * {@code preAggregatedResults[i]} is non-null, the function is not aggregated over the scanned blocks and the
+   * pre-aggregated value is emitted directly in the results. A {@code null} array disables this behavior and all
+   * functions are computed by scanning.
+   *
+   * @param preAggregatedResults per-function pre-aggregated results, or {@code null} if none are pre-aggregated
+   */
+  public DefaultAggregationExecutor(AggregationFunction[] aggregationFunctions, Object[] preAggregatedResults) {
+    _preAggregatedResults = preAggregatedResults;
     _aggregationFunctions = aggregationFunctions;
     int numAggregationFunctions = aggregationFunctions.length;
     _aggregationResultHolders = new AggregationResultHolder[numAggregationFunctions];
@@ -39,11 +49,18 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     }
   }
 
+  public DefaultAggregationExecutor(AggregationFunction[] aggregationFunctions) {
+    this(aggregationFunctions, null);
+  }
+
   @Override
   public void aggregate(ValueBlock valueBlock) {
     int numAggregationFunctions = _aggregationFunctions.length;
     int length = valueBlock.getNumDocs();
     for (int i = 0; i < numAggregationFunctions; i++) {
+      if (_preAggregatedResults != null && _preAggregatedResults[i] != null) {
+        continue; // skip — already resolved from metadata
+      }
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       aggregationFunction.aggregate(length, _aggregationResultHolders[i],
           AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, valueBlock));
@@ -55,7 +72,11 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     int numFunctions = _aggregationFunctions.length;
     List<Object> aggregationResults = new ArrayList<>(numFunctions);
     for (int i = 0; i < numFunctions; i++) {
-      aggregationResults.add(_aggregationFunctions[i].extractAggregationResult(_aggregationResultHolders[i]));
+      if (_preAggregatedResults != null && _preAggregatedResults[i] != null) {
+        aggregationResults.add(_preAggregatedResults[i]);
+      } else {
+        aggregationResults.add(_aggregationFunctions[i].extractAggregationResult(_aggregationResultHolders[i]));
+      }
     }
     return aggregationResults;
   }
