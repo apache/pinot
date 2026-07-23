@@ -72,8 +72,8 @@ public class AggregationFunctionUtilsTest {
     // MODE cannot be resolved from dictionary/metadata; the resolver must reject it rather than return a wrong result.
     DataSource dataSource = mock(DataSource.class);
     assertThrows(IllegalStateException.class,
-        () -> AggregationFunctionUtils.getAggregationResult(mockFunction(AggregationFunctionType.MODE), dataSource, 100,
-            "TEST"));
+        () -> AggregationFunctionUtils.getAggregationResult(mockFunction(AggregationFunctionType.MODE), dataSource,
+            100, "TEST"));
   }
 
   @Test
