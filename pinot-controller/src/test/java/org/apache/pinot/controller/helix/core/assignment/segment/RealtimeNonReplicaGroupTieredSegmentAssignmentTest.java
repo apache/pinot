@@ -47,6 +47,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -126,6 +127,13 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
       String segmentName = path.substring(path.lastIndexOf('/') + 1);
       return new ZNRecord(segmentName);
     });
+    // Bulk read of all segment ZK metadata, used to resolve the eligible tier of each segment once per rebalance
+    List<ZNRecord> segmentZNRecords = new ArrayList<>(NUM_SEGMENTS);
+    for (String segmentName : _segments) {
+      segmentZNRecords.add(new ZNRecord(segmentName));
+    }
+    when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
+        segmentZNRecords);
     //noinspection unchecked
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
