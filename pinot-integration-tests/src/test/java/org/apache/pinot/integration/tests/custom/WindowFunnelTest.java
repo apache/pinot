@@ -1056,7 +1056,7 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
                 + "sum(arrayElementAtDouble(stats, 10)) AS count_step3 "
                 + "FROM durationStats "
                 + "OPTION(useMultistageEngine=true, numGroupsLimit=2000000, timeoutMs=1800000, "
-                + "serverReturnFinalResult=true, numThreadsForFinalReduce=4)",
+                + "serverReturnFinalResult=true, numThreadsExtractFinalResult=4)",
             getTableName());
     JsonNode jsonNode = postQuery(query);
     JsonNode rows = jsonNode.get("resultTable").get("rows");

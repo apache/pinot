@@ -65,6 +65,74 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void resolveAndValidateAcceptsCanonicalAndCaseAliases() {
+    Map<String, String> resolved = QueryOptionsUtils.resolveAndValidateSqlQueryOptions(
+        Map.of("timeoutMS", "100", "SKIPUPSERT", "true", "enableNullHandling", "false"));
+
+    assertEquals(resolved.get(TIMEOUT_MS), "100");
+    assertEquals(resolved.get(SKIP_UPSERT), "true");
+    assertEquals(resolved.get(ENABLE_NULL_HANDLING), "false");
+  }
+
+  @Test
+  public void resolveAndValidateCanonicalizesTraceAndDatabaseCaseAliases() {
+    Map<String, String> resolved = QueryOptionsUtils.resolveAndValidateSqlQueryOptions(
+        Map.of("TRACE", "true", "Database", "db1"));
+
+    // Must land on exact canonical keys used by broker lookups (not the raw input casing).
+    assertEquals(resolved.get("trace"), "true");
+    assertEquals(resolved.get("database"), "db1");
+    assertFalse(resolved.containsKey("TRACE"));
+    assertFalse(resolved.containsKey("Database"));
+  }
+
+  @Test
+  public void resolveAndValidateRejectsUserSuppliedRlsFilters() {
+    // Broker injects rlsFilters* after parse; user SQL must not set them.
+    try {
+      QueryOptionsUtils.resolveAndValidateSqlQueryOptions(Map.of("rlsFilters-myTable", "col=1"));
+      fail("Expected IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Unsupported query option 'rlsFilters-myTable'"));
+    }
+  }
+
+  @Test
+  public void resolveAndValidateRejectsUnknownOption() {
+    try {
+      QueryOptionsUtils.resolveAndValidateSqlQueryOptions(Map.of("notARealOption", "1"));
+      fail("Expected IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Unsupported query option 'notARealOption'"));
+    }
+  }
+
+  @Test
+  public void resolveAndValidateAcceptsEmptyMap() {
+    assertTrue(QueryOptionsUtils.resolveAndValidateSqlQueryOptions(Map.of()).isEmpty());
+  }
+
+  @Test
+  public void resolveAndValidateSuggestsClosestCanonicalName() {
+    try {
+      QueryOptionsUtils.resolveAndValidateSqlQueryOptions(Map.of("timoutMs", "1"));
+      fail("Expected IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Unsupported query option 'timoutMs'"));
+      assertTrue(e.getMessage().contains("Did you mean 'timeoutMs'"));
+    }
+  }
+
+  @Test
+  public void resolveCaseInsensitiveStillPreservesUnknownKeys() {
+    // REST/JSON path must keep free-form keys (no validation).
+    Map<String, String> resolved =
+        QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("customFreeForm", "x", "timeoutMS", "5"));
+    assertEquals(resolved.get("customFreeForm"), "x");
+    assertEquals(resolved.get(TIMEOUT_MS), "5");
+  }
+
+  @Test
   public void shouldResolveSamplerOptionCaseInsensitively() {
     Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("SAMPLER", "firstOnly"));
 
