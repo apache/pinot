@@ -42,6 +42,7 @@ import static org.testng.Assert.fail;
 /**
  * Unit tests verifying null-safety fixes in GcsPinotFS:
  * - open() throws FileNotFoundException (not NPE) when the blob does not exist
+ * - openForRead() throws FileNotFoundException (not NPE) when the blob does not exist
  * - copy() throws FileNotFoundException (not NPE) when the source blob does not exist
  */
 public class GcsPinotFSNullSafetyTest {
@@ -81,6 +82,30 @@ public class GcsPinotFSNullSafetyTest {
 
     // Must throw FileNotFoundException, not NullPointerException
     assertThrows(FileNotFoundException.class, () -> _gcsPinotFS.open(uri));
+  }
+
+  @Test
+  public void testOpenForReadThrowsFileNotFoundExceptionWhenBlobDoesNotExist()
+      throws IOException {
+    URI uri = URI.create("gs://test-bucket/missing-file");
+    when(_mockStorage.get(any(BlobId.class))).thenReturn(null);
+
+    try {
+      _gcsPinotFS.openForRead(uri, 0, 128);
+      fail("Expected FileNotFoundException");
+    } catch (FileNotFoundException ex) {
+      assertEquals(ex.getMessage(), "File '" + uri + "' does not exist");
+    }
+  }
+
+  @Test
+  public void testOpenForReadDoesNotThrowNullPointerException()
+      throws IOException {
+    URI uri = URI.create("gs://test-bucket/missing-file");
+    when(_mockStorage.get(any(BlobId.class))).thenReturn(null);
+
+    // A ranged read against a missing object must throw FileNotFoundException, not NullPointerException
+    assertThrows(FileNotFoundException.class, () -> _gcsPinotFS.openForRead(uri, 0, 128));
   }
 
   @SuppressWarnings("unchecked")

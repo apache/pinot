@@ -21,10 +21,13 @@ package org.apache.pinot.spi.filesystem;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -195,6 +198,30 @@ public class LocalPinotFS extends BasePinotFS {
     return new BufferedInputStream(new FileInputStream(toFile(uri)));
   }
 
+  @Override
+  public InputStream openForRead(URI uri, long offset, long length)
+      throws IOException {
+    if (offset < 0 || length < 0) {
+      throw new IllegalArgumentException(
+          "offset and length must be non-negative, got offset=" + offset + ", length=" + length);
+    }
+    RandomAccessFile randomAccessFile = new RandomAccessFile(toFile(uri), "r");
+    try {
+      randomAccessFile.seek(offset);
+      // Closing the stream returned by Channels.newInputStream closes the channel, which closes the
+      // RandomAccessFile, so the caller closing the returned stream releases the file handle.
+      return new RangeInputStream(Channels.newInputStream(randomAccessFile.getChannel()), length);
+    } catch (IOException | RuntimeException e) {
+      randomAccessFile.close();
+      throw e;
+    }
+  }
+
+  @Override
+  public boolean supportsRangedRead() {
+    return true;
+  }
+
   private static File toFile(URI uri) {
     // NOTE: Do not use new File(uri) because scheme might not exist and it does not decode '+' to ' '
     //       Do not use uri.getPath() because it does not decode '+' to ' '
@@ -246,6 +273,51 @@ public class LocalPinotFS extends BasePinotFS {
   public static class LocalPinotFSException extends IOException {
     LocalPinotFSException(Throwable e) {
       super(e);
+    }
+  }
+
+  /**
+   * Wraps an InputStream to expose at most {@code limit} bytes. Closing this stream propagates to the
+   * delegate (which releases the underlying file handle).
+   */
+  private static class RangeInputStream extends FilterInputStream {
+    private long _remaining;
+
+    RangeInputStream(InputStream in, long limit) {
+      super(in);
+      _remaining = limit;
+    }
+
+    @Override
+    public int read()
+        throws IOException {
+      if (_remaining <= 0) {
+        return -1;
+      }
+      int b = in.read();
+      if (b >= 0) {
+        _remaining--;
+      }
+      return b;
+    }
+
+    @Override
+    public int read(byte[] b, int off, int len)
+        throws IOException {
+      if (_remaining <= 0) {
+        return -1;
+      }
+      int read = in.read(b, off, (int) Math.min(len, _remaining));
+      if (read > 0) {
+        _remaining -= read;
+      }
+      return read;
+    }
+
+    @Override
+    public int available()
+        throws IOException {
+      return (int) Math.min(in.available(), _remaining);
     }
   }
 }

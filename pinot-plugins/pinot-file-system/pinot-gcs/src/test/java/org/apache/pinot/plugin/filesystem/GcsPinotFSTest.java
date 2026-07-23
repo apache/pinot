@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.filesystem;
 import com.google.common.io.Closer;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -168,6 +169,36 @@ public class GcsPinotFSTest {
   private Stream<GcsUri> listFilesToStream(GcsUri gcsUri)
       throws IOException {
     return Arrays.asList(_pinotFS.listFiles(gcsUri.getUri(), true)).stream().map(URI::create).map(GcsUri::new);
+  }
+
+  @Test
+  public void testOpenForRead()
+      throws Exception {
+    skipIfNotConfigured();
+    assertTrue(_pinotFS.supportsRangedRead());
+
+    byte[] data = new byte[256];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+    Path localFile = _localTmpDir.resolve("rangeFile");
+    Files.write(localFile, data);
+    GcsUri gcsUri = _dataDir.resolve("rangeFile");
+    _pinotFS.copyFromLocalFile(localFile.toFile(), gcsUri.getUri());
+    URI uri = gcsUri.getUri();
+
+    // Mid-file range [10, 30)
+    try (InputStream in = _pinotFS.openForRead(uri, 10, 20)) {
+      assertEquals(in.readAllBytes(), Arrays.copyOfRange(data, 10, 30));
+    }
+    // Length beyond EOF is truncated at end-of-file
+    try (InputStream in = _pinotFS.openForRead(uri, 250, 100)) {
+      assertEquals(in.readAllBytes(), Arrays.copyOfRange(data, 250, 256));
+    }
+    // Whole file
+    try (InputStream in = _pinotFS.openForRead(uri, 0, 256)) {
+      assertEquals(in.readAllBytes(), data);
+    }
   }
 
   @Test

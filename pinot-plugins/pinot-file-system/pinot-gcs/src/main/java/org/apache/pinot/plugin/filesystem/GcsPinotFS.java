@@ -22,6 +22,7 @@ import com.google.api.gax.paging.Page;
 import com.google.api.gax.rpc.FixedHeaderProvider;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
@@ -388,6 +389,34 @@ public class GcsPinotFS extends BasePinotFS {
     } catch (StorageException e) {
       throw new IOException(e);
     }
+  }
+
+  @Override
+  public InputStream openForRead(URI uri, long offset, long length)
+      throws IOException {
+    if (offset < 0 || length < 0) {
+      throw new IllegalArgumentException(
+          "offset and length must be non-negative, got offset=" + offset + ", length=" + length);
+    }
+    try {
+      Blob blob = getBlob(new GcsUri(uri));
+      if (blob == null) {
+        throw new FileNotFoundException("File '" + uri + "' does not exist");
+      }
+      // ReadChannel.limit is the absolute, exclusive end position; seek positions the start. This issues a
+      // ranged GET so only [offset, offset + length) is transferred (truncated at end-of-file).
+      ReadChannel reader = blob.reader();
+      reader.seek(offset);
+      reader.limit(offset + length);
+      return Channels.newInputStream(reader);
+    } catch (StorageException e) {
+      throw new IOException(e);
+    }
+  }
+
+  @Override
+  public boolean supportsRangedRead() {
+    return true;
   }
 
   private Bucket getBucket(GcsUri gcsUri) {
