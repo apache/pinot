@@ -531,7 +531,7 @@ final class PercentileTDigestAccumulator extends TDigest {
 
   @Override
   public double quantile(double quantile) {
-    if (quantile < 0.0 || quantile > 1.0) {
+    if (Double.isNaN(quantile) || quantile < 0.0 || quantile > 1.0) {
       throw new IllegalArgumentException("q should be in [0,1], got " + quantile);
     }
     materializePendingSerializedTDigest();
@@ -614,8 +614,10 @@ final class PercentileTDigestAccumulator extends TDigest {
   public Collection<Centroid> centroids() {
     compress();
     List<Centroid> centroids = new ArrayList<>(_numCentroids);
+    // `Centroid` holds the weight as an `int`. Narrow it the same way `MergingDigest.centroids()` does, which
+    // saturates at `Integer.MAX_VALUE`, instead of throwing on digests whose centroid weight exceeds it.
     for (int i = 0; i < _numCentroids; i++) {
-      centroids.add(Centroid.createWeighted(_centroidMeans[i], Math.toIntExact((long) _centroidWeights[i]), null));
+      centroids.add(Centroid.createWeighted(_centroidMeans[i], (int) _centroidWeights[i], null));
     }
     return centroids;
   }

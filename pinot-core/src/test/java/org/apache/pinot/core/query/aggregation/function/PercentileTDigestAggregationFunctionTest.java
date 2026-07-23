@@ -544,6 +544,38 @@ public class PercentileTDigestAggregationFunctionTest {
     }
   }
 
+  /// `quantile()` must reject `NaN` like the non-finite-aware digest does, instead of letting it slip past the
+  /// range guard (every `NaN` comparison is false) and propagate through the computation.
+  @Test
+  public void testQuantileRejectsNaN() {
+    PercentileTDigestAccumulator accumulator = PercentileTDigestAccumulator.forReduction(100.0);
+    accumulator.add(1.0);
+    IllegalArgumentException exception =
+        Assert.expectThrows(IllegalArgumentException.class, () -> accumulator.quantile(Double.NaN));
+    Assert.assertEquals(exception.getMessage(), "q should be in [0,1], got NaN");
+  }
+
+  /// `Centroid` stores the weight as an `int`, so `centroids()` must saturate like `MergingDigest.centroids()`
+  /// rather than throwing on a centroid whose weight exceeds `Integer.MAX_VALUE`.
+  @Test
+  public void testCentroidsSaturateWeightExceedingIntegerMaxValue()
+      throws ReflectiveOperationException {
+    PercentileTDigestAccumulator accumulator = PercentileTDigestAccumulator.forReduction(100.0);
+    accumulator.add(1.0);
+    accumulator.compress();
+
+    // A centroid weight above Integer.MAX_VALUE is only reachable from an externally produced digest, since
+    // add(double, int) caps a single contribution at Integer.MAX_VALUE.
+    double oversizedWeight = Integer.MAX_VALUE + 1_000.0;
+    setAccumulatorField(accumulator, "_centroidWeights", new double[]{oversizedWeight});
+    setAccumulatorField(accumulator, "_totalWeight", oversizedWeight);
+
+    List<Centroid> centroids = new ArrayList<>(accumulator.centroids());
+    Assert.assertEquals(centroids.size(), 1);
+    Assert.assertEquals(centroids.get(0).mean(), 1.0);
+    Assert.assertEquals(centroids.get(0).count(), Integer.MAX_VALUE);
+  }
+
   @Test
   public void testSerializedGroupByMVSharedInputReservesBoundaryCapacity()
       throws ReflectiveOperationException {
