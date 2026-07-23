@@ -64,7 +64,7 @@
       <plugin>
         <groupId>com.mycila</groupId>
         <artifactId>license-maven-plugin</artifactId>
-        <version>5.0.0</version>
+        <version>5.1.1</version>
         <configuration>
           <skip>true</skip>
         </configuration>
