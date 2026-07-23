@@ -146,11 +146,37 @@ public class ServerPlanRequestUtils {
       Map<String, String> requestMetadata) {
     StagePlan stagePlan = serverContext.getStagePlan();
     PinotQuery pinotQuery = serverContext.getPinotQuery();
-    // attach leaf node limit it not set
+    // attach leaf node limit if not set
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadata);
     pinotQuery.setLimit(leafNodeLimit != null ? leafNodeLimit : DEFAULT_LEAF_NODE_LIMIT);
     // visit the plan and create PinotQuery and determine the leaf stage boundary PlanNode.
+    // The visitor may override the limit (e.g., visitSort sets limit = SortNode.fetch).
     ServerPlanRequestVisitor.walkPlanNode(stagePlan.getRootNode(), serverContext);
+    // Tag provenance AFTER visitor so the check reflects whether the cap actually survived.
+    int finalLimit = pinotQuery.getLimit();
+    tagLeafLimitTruncationRiskIfTightened(pinotQuery, requestMetadata, leafNodeLimit, finalLimit);
+  }
+
+  /**
+   * Tags queryOptions["leafLimitTruncationRisk"]="LITE_CAP" when {@code multiStageLeafLimit} is explicitly set,
+   * the cap survived the visitor (finalLimit == cap), and the query is truncation-sensitive (ORDER BY / DISTINCT).
+   * Lite-mode limits are handled at the planner level by {@code LiteModeSortInsertRule} and PR #18725.
+   */
+  private static void tagLeafLimitTruncationRiskIfTightened(PinotQuery pinotQuery,
+      @Nullable Map<String, String> requestMetadata, @Nullable Integer explicitCap, int finalLimit) {
+    Map<String, String> qOpts = pinotQuery.getQueryOptions();
+    if (qOpts == null) {
+      qOpts = new HashMap<>();
+      pinotQuery.setQueryOptions(qOpts);
+    }
+    boolean tightened = explicitCap != null && finalLimit == explicitCap;
+    boolean truncationSensitive = "true".equals(qOpts.get("truncationSensitive"))
+        || (requestMetadata != null && "true".equals(requestMetadata.get("truncationSensitive")));
+    if (tightened && truncationSensitive) {
+      qOpts.put("leafLimitTruncationRisk", "LITE_CAP");
+    } else {
+      qOpts.remove("leafLimitTruncationRisk");
+    }
   }
 
   /**

@@ -88,7 +88,6 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
   @Override
   protected SelectionResultsBlock getNextBlock() {
     if (_numDocsScanned >= _limit) {
-      // Already returned enough documents
       return null;
     }
     ValueBlock valueBlock = _projectOperator.nextBlock();
@@ -128,7 +127,18 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
       scanCost.addEntriesScannedPostFilter(
           (long) numDocs * _projectOperator.getNumColumnsProjected());
     }
-    return new SelectionResultsBlock(_dataSchema, rows, _queryContext);
+    SelectionResultsBlock block = new SelectionResultsBlock(_dataSchema, rows, _queryContext);
+    if (_numDocsScanned >= _limit) {
+      String risk = _queryContext.getQueryOptions() != null
+          ? _queryContext.getQueryOptions().get("leafLimitTruncationRisk") : null;
+      if ("LITE_CAP".equals(risk)) {
+        boolean hasMoreDocs = numDocs > numDocsToReturn || _projectOperator.nextBlock() != null;
+        if (hasMoreDocs) {
+          block.setHasMoreFilteredDocs(true);
+        }
+      }
+    }
+    return block;
   }
 
   @Override
