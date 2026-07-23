@@ -38,6 +38,7 @@
     <module>pinot-dropwizard</module>
     <module>pinot-yammer</module>
     <module>pinot-compound-metrics</module>
+    <module>pinot-micrometer</module>
   </modules>
 
   <dependencies>
