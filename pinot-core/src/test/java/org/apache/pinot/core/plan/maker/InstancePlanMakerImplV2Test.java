@@ -19,6 +19,8 @@
 package org.apache.pinot.core.plan.maker;
 
 import java.util.Map;
+import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.NonblockingGroupByCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -36,6 +38,7 @@ import static org.testng.Assert.assertEquals;
 public class InstancePlanMakerImplV2Test {
 
   private static final String BASE_QUERY = "SELECT * FROM testTable";
+  private static final String GROUP_BY_QUERY = "SELECT d, COUNT(*) FROM testTable GROUP BY d";
 
   private static QueryContext buildQueryContext(String maxExecutionThreadsOption) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(BASE_QUERY);
@@ -99,6 +102,40 @@ public class InstancePlanMakerImplV2Test {
     PinotConfiguration config = new PinotConfiguration();
     config.setProperty(Server.MAX_EXECUTION_THREADS, 4);
     config.setProperty(Server.DEFAULT_EXECUTION_THREADS, 8);
+    planMaker.init(config);
+  }
+
+  @Test
+  public void testDefaultAndPerQueryGroupByAlgorithm() {
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(GROUP_BY_QUERY);
+    planMaker.applyQueryOptions(queryContext);
+    assertEquals(queryContext.getGroupByAlgorithm(), GroupByCombineOperator.ALGORITHM);
+
+    // The query option cannot bypass the safe server-level rollout gate.
+    queryContext = QueryContextConverterUtils.getQueryContext(GROUP_BY_QUERY);
+    queryContext.getQueryOptions().put(QueryOptionKey.GROUP_BY_ALGORITHM, NonblockingGroupByCombineOperator.ALGORITHM);
+    planMaker.applyQueryOptions(queryContext);
+    assertEquals(queryContext.getGroupByAlgorithm(), GroupByCombineOperator.ALGORITHM);
+
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(Server.GROUP_BY_ALGORITHM, NonblockingGroupByCombineOperator.ALGORITHM);
+    planMaker.init(config);
+    queryContext = QueryContextConverterUtils.getQueryContext(GROUP_BY_QUERY);
+    planMaker.applyQueryOptions(queryContext);
+    assertEquals(queryContext.getGroupByAlgorithm(), NonblockingGroupByCombineOperator.ALGORITHM);
+
+    queryContext = QueryContextConverterUtils.getQueryContext(GROUP_BY_QUERY);
+    queryContext.getQueryOptions().put(QueryOptionKey.GROUP_BY_ALGORITHM, GroupByCombineOperator.ALGORITHM);
+    planMaker.applyQueryOptions(queryContext);
+    assertEquals(queryContext.getGroupByAlgorithm(), GroupByCombineOperator.ALGORITHM);
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testInitRejectsInvalidGroupByAlgorithm() {
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(Server.GROUP_BY_ALGORITHM, "UNKNOWN");
     planMaker.init(config);
   }
 }

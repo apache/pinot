@@ -31,7 +31,6 @@ import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.NonblockingGroupByCombineOperator;
-import org.apache.pinot.core.operator.combine.PartitionedGroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SequentialSortedGroupByCombineOperator;
@@ -179,17 +178,16 @@ public class CombinePlanNode implements PlanNode {
       return new SortedGroupByCombineOperator(operators, _queryContext, _executorService);
     }
 
-    // Allow per-query algorithm override via instance config or query option
+    // Allow per-query algorithm override via instance config or query option. Unknown values use the stable concurrent
+    // fallback instead of implicitly opting into a new algorithm.
     String algo = _queryContext.getGroupByAlgorithm();
-    if (GroupByCombineOperator.ALGORITHM.equalsIgnoreCase(algo)) {
-      return new GroupByCombineOperator(operators, _queryContext, _executorService);
+    // Without ORDER BY, combine tables stop accepting unseen keys at LIMIT. A table per worker can therefore retain
+    // different keys and lose partial aggregates when the tables are merged. The shared concurrent table is required
+    // for this query shape so every worker can still update whichever keys won admission globally.
+    if (NonblockingGroupByCombineOperator.ALGORITHM.equalsIgnoreCase(algo)
+        && _queryContext.getOrderByExpressions() != null) {
+      return new NonblockingGroupByCombineOperator(operators, _queryContext, _executorService);
     }
-    if (PartitionedGroupByCombineOperator.ALGORITHM.equalsIgnoreCase(algo)) {
-      return new PartitionedGroupByCombineOperator(operators, _queryContext, _executorService);
-    }
-
-    // Default to non-blocking combine which uses per-thread SimpleIndexedTables
-    // to eliminate ConcurrentHashMap contention (1.8x-3.1x faster than the CONCURRENT algorithm)
-    return new NonblockingGroupByCombineOperator(operators, _queryContext, _executorService);
+    return new GroupByCombineOperator(operators, _queryContext, _executorService);
   }
 }

@@ -34,9 +34,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Each worker thread builds its own thread-local {@link org.apache.pinot.core.data.table.SimpleIndexedTable}
  * (uncontended {@code HashMap}) and processes segments without any cross-thread contention during accumulation.
- * After all segments are processed, threads merge their local tables into a single result via a lock-free tournament
- * exchange protocol: each thread tries to claim the empty shared slot, or steals the current occupant and merges
- * (larger absorbs smaller), looping until the winning table is deposited.
+ * After all assigned segments are processed, workers merge their local tables into a single result via a lock-free
+ * tournament exchange: each worker tries to claim the empty shared slot, or atomically steals the current occupant and
+ * merges smaller into larger.
  *
  * <p>Parallelism is bounded by the configured max execution threads via {@link GroupByCombineOperator}.
  */
@@ -53,8 +53,8 @@ public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
   }
 
   /**
-   * Processes all assigned segments into a thread-local indexed table, then deposits it into the shared slot via the
-   * lock-free tournament exchange.
+   * Processes all assigned segments into an exclusively owned indexed table, then deposits it into the shared slot via
+   * the lock-free tournament exchange.
    */
   @Override
   protected void processSegments() {
@@ -80,24 +80,25 @@ public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
       }
     }
 
-    boolean setGroupByResult = false;
-    while (indexedTable != null && !setGroupByResult) {
-      IndexedTable indexedTableToMerge;
-      synchronized (this) {
-        if (!hasSharedTable()) {
-          depositSharedTable(indexedTable);
-          setGroupByResult = true;
-          continue;
-        } else {
-          indexedTableToMerge = stealSharedTable();
-        }
+    mergeIntoSharedTable(indexedTable);
+  }
+
+  /**
+   * Merges an exclusively owned table into the atomic tournament slot.
+   */
+  protected void mergeIntoSharedTable(IndexedTable indexedTable) {
+    while (indexedTable != null) {
+      if (tryDepositSharedTable(indexedTable)) {
+        return;
+      }
+      IndexedTable indexedTableToMerge = stealSharedTable();
+      if (indexedTableToMerge == null) {
+        continue;
       }
       if (indexedTable.size() > indexedTableToMerge.size()) {
-        indexedTable.merge(indexedTableToMerge);
-        indexedTable.absorbTrimStats(indexedTableToMerge);
+        indexedTable.mergeUnfinishedTable(indexedTableToMerge, EXPLAIN_NAME);
       } else {
-        indexedTableToMerge.merge(indexedTable);
-        indexedTableToMerge.absorbTrimStats(indexedTable);
+        indexedTableToMerge.mergeUnfinishedTable(indexedTable, EXPLAIN_NAME);
         indexedTable = indexedTableToMerge;
       }
     }

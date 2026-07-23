@@ -28,9 +28,10 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.NonblockingGroupByCombineOperator;
-import org.apache.pinot.core.operator.combine.PartitionedGroupByCombineOperator;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -40,17 +41,25 @@ import org.testng.annotations.Test;
  * Verifies ResultTable responses for both standard and trim-enabled execution paths.
  */
 public class InterSegmentNonBlockingGroupBySingleValueQueriesTest extends BaseSingleValueQueriesTest {
-  private static final InstancePlanMakerImplV2 TRIM_ENABLED_PLAN_MAKER = new InstancePlanMakerImplV2();
+  private static final InstancePlanMakerImplV2 NON_BLOCKING_PLAN_MAKER = createNonBlockingPlanMaker();
+  private static final InstancePlanMakerImplV2 TRIM_ENABLED_NON_BLOCKING_PLAN_MAKER = createNonBlockingPlanMaker();
 
   static {
-    TRIM_ENABLED_PLAN_MAKER.setMinSegmentGroupTrimSize(1);
+    TRIM_ENABLED_NON_BLOCKING_PLAN_MAKER.setMinSegmentGroupTrimSize(1);
+  }
+
+  private static InstancePlanMakerImplV2 createNonBlockingPlanMaker() {
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+    planMaker.init(new PinotConfiguration(Map.of(Server.GROUP_BY_ALGORITHM,
+        NonblockingGroupByCombineOperator.ALGORITHM)));
+    return planMaker;
   }
 
   @Test(dataProvider = "groupByOrderByDataProvider")
   public void testGroupByOrderBy(String query, long expectedNumEntriesScannedPostFilter,
       ResultTable expectedResultTable) {
     QueriesTestUtils.testInterSegmentsResult(
-        getBrokerResponse(query, Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
+        getBrokerResponse(query, NON_BLOCKING_PLAN_MAKER, Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
             NonblockingGroupByCombineOperator.ALGORITHM)),
         120000L, 0L, expectedNumEntriesScannedPostFilter, 120000L, expectedResultTable);
   }
@@ -59,7 +68,7 @@ public class InterSegmentNonBlockingGroupBySingleValueQueriesTest extends BaseSi
   public void testGroupByOrderByWithTrim(String query, long expectedNumEntriesScannedPostFilter,
       ResultTable expectedResultTable) {
     QueriesTestUtils.testInterSegmentsResult(
-        getBrokerResponse(query, TRIM_ENABLED_PLAN_MAKER, Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
+        getBrokerResponse(query, TRIM_ENABLED_NON_BLOCKING_PLAN_MAKER, Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
             NonblockingGroupByCombineOperator.ALGORITHM)), 120000L, 0L,
         expectedNumEntriesScannedPostFilter, 120000L, expectedResultTable);
   }
@@ -76,27 +85,10 @@ public class InterSegmentNonBlockingGroupBySingleValueQueriesTest extends BaseSi
   public void testGroupByOrderByWithConcurrentAlgorithmAndTrim(String query, long expectedNumEntriesScannedPostFilter,
       ResultTable expectedResultTable) {
     QueriesTestUtils.testInterSegmentsResult(
-        getBrokerResponse(query, TRIM_ENABLED_PLAN_MAKER, Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
+        getBrokerResponse(query, TRIM_ENABLED_NON_BLOCKING_PLAN_MAKER,
+            Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
             GroupByCombineOperator.ALGORITHM)), 120000L, 0L,
         expectedNumEntriesScannedPostFilter, 120000L, expectedResultTable);
-  }
-
-  @Test(dataProvider = "groupByOrderByDataProvider")
-  public void testGroupByOrderByWithPartitionedAlgorithm(String query, long expectedNumEntriesScannedPostFilter,
-      ResultTable expectedResultTable) {
-    QueriesTestUtils.testInterSegmentsResult(
-        getBrokerResponse(query, Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
-            PartitionedGroupByCombineOperator.ALGORITHM)),
-        120000L, 0L, expectedNumEntriesScannedPostFilter, 120000L, expectedResultTable);
-  }
-
-  @Test(dataProvider = "groupByOrderByDataProvider")
-  public void testGroupByOrderByWithPartitionedAlgorithmAndTrim(String query, long expectedNumEntriesScannedPostFilter,
-      ResultTable expectedResultTable) {
-    QueriesTestUtils.testInterSegmentsResult(
-        getBrokerResponse(query, TRIM_ENABLED_PLAN_MAKER, Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
-            PartitionedGroupByCombineOperator.ALGORITHM)),
-        120000L, 0L, expectedNumEntriesScannedPostFilter, 120000L, expectedResultTable);
   }
 
   /**

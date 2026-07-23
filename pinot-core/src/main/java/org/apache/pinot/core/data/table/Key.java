@@ -38,11 +38,6 @@ import java.util.Arrays;
  */
 public class Key implements Comparable<Key> {
   private final Object[] _values;
-  // Lazily cached hash code. Declared volatile so that threads reading a Key from a shared map (e.g.
-  // ConcurrentHashMap in the CONCURRENT algorithm) observe the cached value written by the inserting thread.
-  // 0 means not yet computed; if Arrays.hashCode returns 0 the field stays 0 and is recomputed on every
-  // call (extremely rare, not a correctness concern).
-  private volatile int _hashCode;
 
   public Key(Object[] values) {
     _values = values;
@@ -61,12 +56,7 @@ public class Key implements Comparable<Key> {
 
   @Override
   public int hashCode() {
-    int h = _hashCode;
-    if (h == 0) {
-      h = Arrays.hashCode(_values);
-      _hashCode = h;
-    }
-    return h;
+    return Arrays.hashCode(_values);
   }
 
   @Override

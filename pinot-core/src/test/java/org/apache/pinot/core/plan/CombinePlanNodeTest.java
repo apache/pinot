@@ -29,6 +29,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.core.operator.combine.BaseCombineOperator;
+import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.NonblockingGroupByCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -224,5 +227,29 @@ public class CombinePlanNodeTest {
     }
     TestUtils.waitForCondition((aVoid) -> exp.get() instanceof QueryCancelledException, 10_000,
         "Should have been cancelled");
+  }
+
+  @Test
+  public void testGroupByCombineAlgorithmSelection() {
+    assertGroupByCombineOperator(null, true, GroupByCombineOperator.class);
+    assertGroupByCombineOperator(NonblockingGroupByCombineOperator.ALGORITHM, true,
+        NonblockingGroupByCombineOperator.class);
+    assertGroupByCombineOperator(GroupByCombineOperator.ALGORITHM, true, GroupByCombineOperator.class);
+    assertGroupByCombineOperator("UNKNOWN", true, GroupByCombineOperator.class);
+    assertGroupByCombineOperator(NonblockingGroupByCombineOperator.ALGORITHM, false,
+        GroupByCombineOperator.class);
+  }
+
+  private void assertGroupByCombineOperator(String algorithm, boolean hasOrderBy,
+      Class<? extends BaseCombineOperator> expectedClass) {
+    String query = "SELECT d, COUNT(*) FROM testTable GROUP BY d";
+    if (hasOrderBy) {
+      query += " ORDER BY COUNT(*) DESC";
+    }
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    queryContext.setGroupByAlgorithm(algorithm);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(List.of(() -> null), queryContext, _executorService, null);
+    assertEquals(combinePlanNode.run().getClass(), expectedClass);
   }
 }

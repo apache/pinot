@@ -32,6 +32,8 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.NonblockingGroupByCombineOperator;
 import org.apache.pinot.core.plan.AcquireReleaseColumnsSegmentPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
@@ -148,6 +150,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
     _defaultGroupByAlgorithm = queryExecutorConfig.getProperty(Server.GROUP_BY_ALGORITHM,
         Server.DEFAULT_QUERY_EXECUTOR_GROUP_BY_ALGORITHM);
+    Preconditions.checkState(GroupByCombineOperator.ALGORITHM.equalsIgnoreCase(_defaultGroupByAlgorithm)
+            || NonblockingGroupByCombineOperator.ALGORITHM.equalsIgnoreCase(_defaultGroupByAlgorithm),
+        "Invalid configurable: groupByAlgorithm: %s must be one of: %s, %s", _defaultGroupByAlgorithm,
+        NonblockingGroupByCombineOperator.ALGORITHM, GroupByCombineOperator.ALGORITHM);
     LOGGER.info("Initialized plan maker with maxExecutionThreads: {}, defaultExecutionThreads: {}, "
             + "maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, minSegmentGroupTrimSize: {}, "
             + "minServerGroupTrimSize: {}, groupByTrimThreshold: {}, defaultGroupByAlgorithm: {}",
@@ -203,11 +209,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @VisibleForTesting
   public void setGroupByTrimThreshold(int groupByTrimThreshold) {
     _groupByTrimThreshold = groupByTrimThreshold;
-  }
-
-  @VisibleForTesting
-  public void setDefaultGroupByAlgorithm(String defaultGroupByAlgorithm) {
-    _defaultGroupByAlgorithm = defaultGroupByAlgorithm;
   }
 
   @Override
@@ -347,9 +348,14 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       if (streamingGroupByFlushThreshold != null) {
         queryContext.setStreamingGroupByFlushThreshold(streamingGroupByFlushThreshold);
       }
-      // Set groupByAlgorithm: per-query option takes precedence over instance default
+      // The higher-memory non-blocking algorithm must be enabled at the instance level before a query can select it.
+      // Once enabled, queries can still fall back to the concurrent algorithm.
       String groupByAlgorithm = QueryOptionsUtils.getGroupByAlgorithm(queryOptions);
-      queryContext.setGroupByAlgorithm(groupByAlgorithm != null ? groupByAlgorithm : _defaultGroupByAlgorithm);
+      if (NonblockingGroupByCombineOperator.ALGORITHM.equalsIgnoreCase(_defaultGroupByAlgorithm)) {
+        queryContext.setGroupByAlgorithm(groupByAlgorithm != null ? groupByAlgorithm : _defaultGroupByAlgorithm);
+      } else {
+        queryContext.setGroupByAlgorithm(GroupByCombineOperator.ALGORITHM);
+      }
     }
   }
 

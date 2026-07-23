@@ -37,6 +37,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -125,7 +126,7 @@ public abstract class IndexedTable extends BaseTable {
     _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
   }
 
-  private Record updateRecord(Record existingRecord, Record newRecord) {
+  protected Record updateRecord(Record existingRecord, Record newRecord) {
     Object[] existingValues = existingRecord.getValues();
     Object[] newValues = newRecord.getValues();
     int numAggregations = _aggregationFunctions.length;
@@ -153,16 +154,6 @@ public abstract class IndexedTable extends BaseTable {
     long resizeTimeNs = System.nanoTime() - startTimeNs;
     _numResizes++;
     _resizeTimeNs += resizeTimeNs;
-  }
-
-  /**
-   * Trims this table to at most {@code trimSize} entries if it has an ORDER BY clause. No-op otherwise.
-   * Intended for coordinated trim across multiple tables (e.g., in a partitioned combine).
-   */
-  public void trim() {
-    if (_hasOrderBy && !_lookupMap.isEmpty()) {
-      resize();
-    }
   }
 
   @Override
@@ -289,14 +280,30 @@ public abstract class IndexedTable extends BaseTable {
   }
 
   /**
-   * Accumulates the resize/trim statistics from {@code other} into this table.
-   * <p>
-   * This method is <em>not</em> thread-safe. It must only be called when both tables are exclusively owned by the
-   * calling thread (i.e., neither table is concurrently modified or iterated).
+   * Merges an exclusively owned, unfinished indexed table into this unfinished table.
    *
-   * @param other the table whose stats are absorbed; must be exclusively owned by the caller
+   * <p>This specialized path reuses the source table's {@link Key} objects instead of reconstructing a key from every
+   * record. Both tables must be exclusively owned by the calling thread, and the source table must not be used after
+   * this method returns.
    */
-  public void absorbTrimStats(IndexedTable other) {
+  public void mergeUnfinishedTable(IndexedTable other, String scope) {
+    Preconditions.checkState(_topRecords == null, "Cannot merge into a finished indexed table");
+    Preconditions.checkState(other._topRecords == null, "Cannot merge a finished indexed table");
+    Preconditions.checkArgument(other != this, "Cannot merge an indexed table into itself");
+    int mergedRecords = 0;
+    Iterator<Map.Entry<Key, Record>> iterator = other._lookupMap.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<Key, Record> entry = iterator.next();
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedRecords++, scope);
+      upsert(entry.getKey(), entry.getValue());
+      // The source table is exclusively owned and must not be reused. Drain it incrementally so its map nodes can be
+      // reclaimed while the target map grows instead of retaining both complete maps until the merge returns.
+      iterator.remove();
+    }
+    absorbTrimStats(other);
+  }
+
+  private void absorbTrimStats(IndexedTable other) {
     _numResizes += other._numResizes;
     _resizeTimeNs += other._resizeTimeNs;
   }

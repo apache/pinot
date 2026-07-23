@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -67,11 +68,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
 
-  // Shared indexed table for the single-slot tournament exchange. Written exactly once (null → non-null) under
-  // synchronized(this) via DCL. Subsequent reads are unsynchronized volatile reads, which is safe because the field
-  // never reverts to null in this class. Subclasses that call stealSharedTable() / depositSharedTable() must do so
-  // under synchronized(this).
-  private volatile IndexedTable _indexedTable;
+  // Shared indexed table. The legacy concurrent algorithm initializes it once; the non-blocking algorithm uses it as
+  // an atomic single-slot tournament exchange.
+  private final AtomicReference<IndexedTable> _indexedTable = new AtomicReference<>();
   // Written by multiple worker threads via updateCombineResultsStats(). Only transitions false→true,
   // so concurrent volatile writes are safe without additional synchronization.
   private volatile boolean _groupsTrimmed;
@@ -80,28 +79,17 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
   /**
    * Atomically steals the shared indexed table (setting it to null) and returns it.
-   * Returns null if no shared table is available. Must be called under {@code synchronized(this)}.
+   * Returns null if no shared table is available.
    */
   protected IndexedTable stealSharedTable() {
-    IndexedTable table = _indexedTable;
-    _indexedTable = null;
-    return table;
+    return _indexedTable.getAndSet(null);
   }
 
   /**
-   * Deposits the given indexed table as the shared result.
-   * Must be called under {@code synchronized(this)}.
+   * Deposits the given indexed table only when the shared slot is empty.
    */
-  protected void depositSharedTable(IndexedTable table) {
-    _indexedTable = table;
-  }
-
-  /**
-   * Returns true if the shared indexed table is non-null.
-   * Must be called under {@code synchronized(this)}.
-   */
-  protected boolean hasSharedTable() {
-    return _indexedTable != null;
+  protected boolean tryDepositSharedTable(IndexedTable table) {
+    return _indexedTable.compareAndSet(null, table);
   }
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
@@ -146,14 +134,17 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
-        if (_indexedTable == null) {
+        IndexedTable indexedTable = _indexedTable.get();
+        if (indexedTable == null) {
           synchronized (this) {
-            if (_indexedTable == null) {
-              _indexedTable = createIndexedTable(resultsBlock, _numTasks);
+            indexedTable = _indexedTable.get();
+            if (indexedTable == null) {
+              indexedTable = createIndexedTable(resultsBlock, _numTasks);
+              _indexedTable.set(indexedTable);
             }
           }
         }
-        mergeGroupByResultsBlock(_indexedTable, resultsBlock, EXPLAIN_NAME);
+        mergeGroupByResultsBlock(indexedTable, resultsBlock, EXPLAIN_NAME);
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
       } finally {
@@ -166,17 +157,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
   protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock, int numThreads) {
     return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, numThreads, _executorService);
-  }
-
-  protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock, int numThreads, int numGroupsHint) {
-    return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, numThreads, _executorService,
-        numGroupsHint);
-  }
-
-  protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock, int numThreads, int numGroupsHint,
-      int groupTrimThresholdOverride) {
-    return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, numThreads, _executorService,
-        numGroupsHint, groupTrimThresholdOverride);
   }
 
   protected void updateCombineResultsStats(GroupByResultsBlock resultsBlock) {
@@ -271,7 +251,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       return getExceptionResultsBlock(ex);
     }
 
-    if (_indexedTable == null) {
+    IndexedTable indexedTable = _indexedTable.get();
+    if (indexedTable == null) {
       // No segments were processed (e.g. _numOperators == 0 or all blocks contained no groups).
       // This should not happen in normal execution but is guarded defensively.
       String msg = "No groups produced by combine operator (indexedTable is null)";
@@ -279,7 +260,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       return new ExceptionResultsBlock(new QueryErrorMessage(QueryErrorCode.QUERY_EXECUTION, msg, msg));
     }
 
-    return getMergedResultsBlock(_indexedTable);
+    return getMergedResultsBlock(indexedTable);
   }
 
   protected ExceptionResultsBlock getTimeoutResultsBlock(long timeoutMs) {

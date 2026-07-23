@@ -43,15 +43,24 @@ public class SimpleIndexedTable extends IndexedTable {
   @Override
   public boolean upsert(Key key, Record record) {
     if (_hasOrderBy) {
-      addOrUpdateRecord(key, record);
+      Record existingRecord = _lookupMap.putIfAbsent(key, record);
+      if (existingRecord != null) {
+        updateRecord(existingRecord, record);
+      }
       if (_lookupMap.size() >= _trimThreshold) {
         resize();
       }
     } else {
       if (_lookupMap.size() < _resultSize) {
-        addOrUpdateRecord(key, record);
+        Record existingRecord = _lookupMap.putIfAbsent(key, record);
+        if (existingRecord != null) {
+          updateRecord(existingRecord, record);
+        }
       } else {
-        updateExistingRecord(key, record);
+        Record existingRecord = _lookupMap.get(key);
+        if (existingRecord != null) {
+          updateRecord(existingRecord, record);
+        }
       }
     }
     return true;

@@ -43,6 +43,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -186,10 +187,14 @@ public class TableResizer {
    */
   private IntermediateRecord getIntermediateRecord(Key key, Record record) {
     Comparable[] orderByValues = new Comparable[_numOrderByExpressions];
+    extractOrderByValues(record, orderByValues);
+    return new IntermediateRecord(key, record, orderByValues);
+  }
+
+  private void extractOrderByValues(Record record, Comparable[] orderByValues) {
     for (int i = 0; i < _numOrderByExpressions; i++) {
       orderByValues[i] = _orderByValueExtractors[i].extract(record);
     }
-    return new IntermediateRecord(key, record, orderByValues);
   }
 
   /**
@@ -235,12 +240,19 @@ public class TableResizer {
     }
     makeHeap(heap, size, comparator);
 
-    // Keep updating the heap with the remaining map entries
+    // Reuse one candidate wrapper while scanning. Allocate a persistent IntermediateRecord only when the candidate
+    // enters the heap, instead of allocating an object and values array for every record in the map.
+    Comparable[] candidateValues = new Comparable[_numOrderByExpressions];
+    IntermediateRecord candidate = new IntermediateRecord(null, null, candidateValues);
+    int recordsScanned = size;
     while (mapEntryIterator.hasNext()) {
       Map.Entry<Key, Record> entry = mapEntryIterator.next();
-      IntermediateRecord intermediateRecord = getIntermediateRecord(entry.getKey(), entry.getValue());
-      if (comparator.compare(intermediateRecord, heap[0]) > 0) {
-        heap[0] = intermediateRecord;
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(recordsScanned++,
+          "TableResizer#getTopRecordsHeap");
+      extractOrderByValues(entry.getValue(), candidateValues);
+      if (comparator.compare(candidate, heap[0]) > 0) {
+        Comparable[] retainedValues = Arrays.copyOf(candidateValues, candidateValues.length);
+        heap[0] = new IntermediateRecord(entry.getKey(), entry.getValue(), retainedValues);
         downHeap(heap, size, 0, comparator);
       }
     }
