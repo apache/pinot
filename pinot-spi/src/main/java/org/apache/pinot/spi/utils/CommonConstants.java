@@ -1843,10 +1843,41 @@ public class CommonConstants {
     public static final String DEPRECATED_PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
 
     /**
-     * Service token for accessing protected controller APIs.
-     * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
+     * Namespace prefix for minion task authentication settings. Used by
+     * {@link org.apache.pinot.minion.BaseMinionStarter} to extract the
+     * {@link org.apache.pinot.common.auth.AuthProvider} that minion tasks use when calling
+     * protected controller APIs.
+     *
+     * <p>Example config key: {@code pinot.minion.task.auth.token=Basic YWRtaW46dmVyeXNlY3JldA==}
+     *
+     * <p>Accepted token formats:
+     * <ul>
+     *   <li>absent / {@code null} — auth disabled</li>
+     *   <li>{@code Basic <base64(user:password)>} — HTTP Basic auth</li>
+     *   <li>{@code Bearer <token>} — OAuth2 bearer token</li>
+     * </ul>
      */
-    public static final String CONFIG_TASK_AUTH_NAMESPACE = "task.auth";
+    public static final String CONFIG_TASK_AUTH_NAMESPACE = "pinot.minion.task.auth";
+
+    /**
+     * Legacy namespace prefix for minion task auth settings, kept for backward compatibility.
+     *
+     * <p>Before this change, minion task auth was configured under the unprefixed {@code task.auth}
+     * namespace (e.g. {@code task.auth.token=Basic ...}). It has been renamed to
+     * {@code pinot.minion.task.auth} (see {@link #CONFIG_TASK_AUTH_NAMESPACE}) for consistency
+     * with the {@code pinot.<component>.*} convention used by controller and server.
+     *
+     * <p>{@link org.apache.pinot.minion.BaseMinionStarter} reads {@link #CONFIG_TASK_AUTH_NAMESPACE}
+     * first. When that namespace is empty, it falls back to this deprecated namespace and logs a
+     * warning so operators know a config migration is needed.
+     *
+     * <p>Migration: rename {@code task.auth.token} to {@code pinot.minion.task.auth.token} in your
+     * minion configuration file.
+     *
+     * @deprecated Use {@link #CONFIG_TASK_AUTH_NAMESPACE} ({@code pinot.minion.task.auth}) instead.
+     */
+    @Deprecated
+    public static final String DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE = "task.auth";
     public static final String MINION_TLS_PREFIX = "pinot.minion.tls";
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.minion.logger.root.dir";

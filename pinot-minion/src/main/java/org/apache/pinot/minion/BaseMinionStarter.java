@@ -256,9 +256,30 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
     }
 
-    // initialize authentication
-    minionContext.setTaskAuthProvider(
-        AuthProviderUtils.extractAuthProvider(_config, CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE));
+    // Initialize task authentication.
+    // Prefer the current namespace (pinot.minion.task.auth.*). If nothing is configured there,
+    // fall back to the deprecated namespace (task.auth.*) for deployments that have not yet
+    // migrated their config files, and log a warning so operators know migration is needed.
+    // See CommonConstants.Minion.DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE for migration instructions.
+    PinotConfiguration taskAuthConfig = _config.subset(CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE);
+    if (taskAuthConfig.isEmpty()) {
+      PinotConfiguration deprecatedTaskAuthConfig =
+          _config.subset(CommonConstants.Minion.DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE);
+      if (!deprecatedTaskAuthConfig.isEmpty()) {
+        LOGGER.warn("Minion task auth is configured under the deprecated namespace '{}'. "
+                + "Please migrate to the new namespace '{}'.",
+            CommonConstants.Minion.DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE,
+            CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE);
+        minionContext.setTaskAuthProvider(AuthProviderUtils.extractAuthProvider(_config,
+            CommonConstants.Minion.DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE));
+      } else {
+        minionContext.setTaskAuthProvider(
+            AuthProviderUtils.extractAuthProvider(_config, CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE));
+      }
+    } else {
+      minionContext.setTaskAuthProvider(
+          AuthProviderUtils.extractAuthProvider(_config, CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE));
+    }
 
     // Start all components
     LOGGER.info("Initializing PinotFSFactory");
