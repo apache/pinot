@@ -58,7 +58,7 @@ public class MutableOpenStructIndexTest {
   public void testAddAndGetKeys()
       throws IOException {
     try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
-        "metrics", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
+        "metrics", "testTable_REALTIME", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
 
       idx.index(0, Map.of("clicks", 42L, "impressions", 100L));
       idx.index(1, Map.of("clicks", 7L, "revenue", "1.5"));
@@ -75,7 +75,7 @@ public class MutableOpenStructIndexTest {
   public void testIndexNullIsNoop()
       throws IOException {
     try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
-        "metrics", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
+        "metrics", "testTable_REALTIME", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
 
       idx.index(0, null);
 
@@ -88,7 +88,7 @@ public class MutableOpenStructIndexTest {
   public void testFillRateTracking()
       throws IOException {
     try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
-        "metrics", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
+        "metrics", "testTable_REALTIME", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
 
       for (int docId = 0; docId < 10; docId++) {
         if (docId < 7) {
@@ -111,7 +111,7 @@ public class MutableOpenStructIndexTest {
       throws IOException {
     // No childFieldSpecs — type inference from rawValue
     ComplexFieldSpec spec = new ComplexFieldSpec("metrics", DataType.OPEN_STRUCT, true, Map.of());
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec,
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec,
         OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
       idx.index(0, java.util.Map.of("clicks", 5L));
       assertEquals(idx.getKeyColumn("clicks").getStoredType(), DataType.LONG);
@@ -122,7 +122,7 @@ public class MutableOpenStructIndexTest {
 
   @Test
   public void testImplementsOpenStructIndexReader() throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", openStructSpec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
         OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
       assertTrue(idx instanceof org.apache.pinot.segment.spi.index.reader.OpenStructIndexReader);
     }
@@ -130,7 +130,7 @@ public class MutableOpenStructIndexTest {
 
   @Test
   public void testGetIndexesReturnsForwardIndexForMaterializedKey() throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", openStructSpec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
         OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       Map<org.apache.pinot.segment.spi.index.IndexType, org.apache.pinot.segment.spi.index.IndexReader> indexes =
@@ -141,7 +141,7 @@ public class MutableOpenStructIndexTest {
 
   @Test
   public void testGetIndexesUnknownKeyReturnsEmpty() throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", openStructSpec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
         OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
       assertTrue(idx.getIndexes("missing").isEmpty());
     }
@@ -149,7 +149,7 @@ public class MutableOpenStructIndexTest {
 
   @Test
   public void testGetColumnMetadataReturnsKeyMetadata() throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", openStructSpec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
         OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       assertNotNull(idx.getColumnMetadata("clicks"));

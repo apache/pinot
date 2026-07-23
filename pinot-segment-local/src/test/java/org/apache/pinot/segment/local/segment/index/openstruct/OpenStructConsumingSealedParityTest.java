@@ -116,7 +116,7 @@ public class OpenStructConsumingSealedParityTest {
     // --- Consuming side ---
     List<Object> consumingValues;
     MutableRoaringBitmap consumingDefaultDocIds;
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, NUM_DOCS)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
         idx.index(docId, metricsForDoc(docId));

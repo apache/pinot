@@ -82,7 +82,7 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testClassifyByFillRate()
       throws Exception {
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     for (int d = 0; d < 10; d++) {
       Map<String, Object> doc = d < 7 ? Map.of("clicks", (long) d) : Map.of();
@@ -95,7 +95,7 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testExplicitDenseKeysAlwaysMaterialized()
       throws Exception {
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.99, -1, Set.of("rare")));
     s.add(Map.of("rare", "x"), 0);
     for (int d = 1; d < 100; d++) {
@@ -108,7 +108,7 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testRareKeyDroppedFromDense()
       throws Exception {
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     s.add(Map.of("rare", "x"), 0);
     for (int d = 1; d < 100; d++) {
@@ -121,7 +121,7 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testMaxDenseKeysCap()
       throws Exception {
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.1, 1, null));
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("a", "x", "b", "y", "c", "z"), d);
@@ -133,7 +133,7 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testZeroDocsIsNoop()
       throws Exception {
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     s.seal();
     assertTrue(s.getResolvedDenseKeys().isEmpty());
@@ -142,7 +142,7 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testSealEmitsParentMetadataForDense()
       throws Exception {
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("clicks", (long) d), d);
@@ -167,7 +167,7 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testDenseColumnMetadataKeysPresent()
       throws Exception {
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("clicks", (long) d), d);
@@ -194,7 +194,7 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testSparseJsonColumnWritten()
       throws Exception {
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.9, -1, null));
     s.add(Map.of("rare", "x"), 0);
     for (int d = 1; d < 10; d++) {
@@ -210,7 +210,7 @@ public class OpenStructColumnSplitterTest {
       throws Exception {
     // Regression: an untyped key whose value is a BigDecimal used to crash seal() with
     // IllegalStateException("Unsupported OPEN_STRUCT stored type for dictionary build: BIG_DECIMAL").
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("amount", new BigDecimal("12.34").add(BigDecimal.valueOf(d))), d);
@@ -233,7 +233,7 @@ public class OpenStructColumnSplitterTest {
     // 1.0 and 1.00 are equal by compareTo but distinct by equals; they must stay separate dictionary
     // entries. Doc 2 is absent, so the default (BigDecimal.ZERO) is also collected -> 3 distinct values.
     // A compareTo-based dedup would wrongly collapse 1.0/1.00 and yield 2.
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     s.add(Map.of("amount", new BigDecimal("1.0")), 0);
     s.add(Map.of("amount", new BigDecimal("1.00")), 1);
@@ -254,7 +254,7 @@ public class OpenStructColumnSplitterTest {
     Map<String, FieldSpec> children = Map.of(
         "amount", new DimensionFieldSpec("amount", DataType.BIG_DECIMAL, true));
     ComplexFieldSpec specWithChild = new ComplexFieldSpec("metrics", DataType.OPEN_STRUCT, true, children);
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", specWithChild,
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", specWithChild,
         config(0.5, -1, null));
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("amount", new BigDecimal("100.5")), d);
@@ -276,7 +276,7 @@ public class OpenStructColumnSplitterTest {
         .withEncodingType(FieldConfig.EncodingType.RAW).build();
     OpenStructIndexConfig cfg = new OpenStructIndexConfig(
         false, null, -1, null, 0.5, List.of(rawConfig), null);
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(), cfg);
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("amount", new BigDecimal("7.5").add(BigDecimal.valueOf(d))), d);
     }
@@ -296,7 +296,7 @@ public class OpenStructColumnSplitterTest {
   public void testBigDecimalSparseKey()
       throws Exception {
     // A BIG_DECIMAL key below the fill-rate threshold goes to the sparse JSON column without crashing.
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.9, -1, null));
     s.add(Map.of("rare", new BigDecimal("3.14159")), 0);
     for (int d = 1; d < 10; d++) {
@@ -311,7 +311,7 @@ public class OpenStructColumnSplitterTest {
       throws Exception {
     // Absent docs now store the standard Pinot dimension null value (INT -> Integer.MIN_VALUE),
     // so the column min reflects that default rather than the old metric-style 0.
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     for (int d = 0; d < 5; d++) {
       s.add(Map.of("clicks", 10 + d), d);   // present: 10..14
@@ -338,7 +338,7 @@ public class OpenStructColumnSplitterTest {
       throws Exception {
     // Default keys are dictionary-encoded with an inverted index (both default on), now written via the
     // standard ForwardIndexCreator and inverted index creator.
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("tag", "v" + (d % 3)), d);
@@ -364,7 +364,7 @@ public class OpenStructColumnSplitterTest {
     FieldConfig rawConfig = new FieldConfig.Builder("note")
         .withEncodingType(FieldConfig.EncodingType.RAW).build();
     OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(rawConfig), null);
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(), cfg);
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("note", "n" + d), d);
     }
@@ -387,7 +387,7 @@ public class OpenStructColumnSplitterTest {
     JsonNode indexes = JsonUtils.stringToJsonNode("{\"range\": {}, \"bloom\": {}}");
     FieldConfig keyConfig = new FieldConfig.Builder("clicks").withIndexes(indexes).build();
     OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig), null);
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(), cfg);
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("clicks", d), d);
     }
@@ -412,7 +412,7 @@ public class OpenStructColumnSplitterTest {
         .withIndexes(indexes)
         .build();
     OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig), null);
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(), cfg);
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("tag", "v" + d), d);
     }
@@ -424,7 +424,7 @@ public class OpenStructColumnSplitterTest {
   public void testParentMetadataCarriesSparseKeyManifest()
       throws Exception {
     // maxDenseKeys=0 forces every key sparse regardless of fill rate.
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, 0, null));
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("region", "us", "latencyMs", (long) d), d);
@@ -446,7 +446,7 @@ public class OpenStructColumnSplitterTest {
       throws Exception {
     // "clicks" is present on every doc (dense); "rare" is present on one doc (sparse). The manifest
     // must list only the sparse key, not the dense one.
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     s.add(Map.of("clicks", 1L, "rare", "x"), 0);
     for (int d = 1; d < 10; d++) {
@@ -467,7 +467,7 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testParentMetadataOmitsManifestWhenNoSparseKeys()
       throws Exception {
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, -1, null));
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("clicks", (long) d), d);
@@ -485,7 +485,7 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testParentMetadataManifestIncludesCommaKey()
       throws Exception {
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
         config(0.5, 0, null));
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("region", "us", "weird,key", "x"), d);
@@ -505,7 +505,7 @@ public class OpenStructColumnSplitterTest {
       throws Exception {
     // Pins bare key form (not "$."-prefixed) — MapFilterOperator fast path relies on this.
     OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, 0, null, null, null, true);
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(), cfg);
     s.add(Map.of("region", "us"), 0);
     s.add(Map.of(), 1);
     s.add(Map.of("region", "eu"), 2);
@@ -538,7 +538,7 @@ public class OpenStructColumnSplitterTest {
   public void testSparseJsonIndexAbsentByDefault()
       throws Exception {
     OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, 0, null, null, null, null);
-    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(), cfg);
     s.add(Map.of("region", "us"), 0);
     s.add(Map.of(), 1);
     s.add(Map.of("region", "eu"), 2);
