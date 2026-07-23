@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
@@ -29,6 +30,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,6 +107,16 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     if (implicitLimit != null && baseResultsBlock.getNumRows() >= implicitLimit) {
       instanceResponseBlock.addMetadata(
           MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
+    }
+    // Drain any generic per-query custom counters recorded during execution (shared by reference on
+    // the query's QueryExecutionContext) into the response metadata. Runs on the same thread that
+    // opened the QueryThreadContext, so the execution context is available here. Keys are opaque.
+    QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
+    if (threadContext != null) {
+      Map<String, String> customStats = threadContext.getExecutionContext().getCustomStats();
+      for (Map.Entry<String, String> entry : customStats.entrySet()) {
+        instanceResponseBlock.addMetadata(entry.getKey(), entry.getValue());
+      }
     }
     return instanceResponseBlock;
   }
