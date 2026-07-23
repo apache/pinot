@@ -28,7 +28,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.readers.geospatial.ImmutableH3IndexReader;
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -215,7 +214,10 @@ public class H3IndexHandler extends BaseIndexHandler {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         int dictId = forwardIndexReader.getDictId(i, readerContext);
-        h3IndexCreator.add(GeometrySerializer.deserialize(dictionary.getBytesValue(dictId)));
+        // Route through add(value, dictId) so that empty/default geometry values (e.g. old segments reloaded after
+        // the geo column was added, which have no source data to build a Point from) are tolerated the same way the
+        // segment-creation path tolerates them, instead of failing the whole reload with a BufferUnderflowException.
+        h3IndexCreator.add(dictionary.getBytesValue(dictId), dictId);
       }
       h3IndexCreator.seal();
     }
@@ -234,7 +236,8 @@ public class H3IndexHandler extends BaseIndexHandler {
         GeoSpatialIndexCreator h3IndexCreator = StandardIndexes.h3().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
-        h3IndexCreator.add(GeometrySerializer.deserialize(forwardIndexReader.getBytes(i, readerContext)));
+        // See handleDictionaryBasedColumn: add(value, dictId) tolerates empty/default geometry values on reload.
+        h3IndexCreator.add(forwardIndexReader.getBytes(i, readerContext), -1);
       }
       h3IndexCreator.seal();
     }
