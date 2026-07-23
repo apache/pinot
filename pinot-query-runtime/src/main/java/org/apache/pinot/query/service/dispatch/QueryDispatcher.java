@@ -25,7 +25,11 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ConnectivityState;
 import io.grpc.Deadline;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import java.io.DataInputStream;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,11 +49,13 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
@@ -79,6 +85,7 @@ import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
+import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -104,6 +111,18 @@ import org.slf4j.LoggerFactory;
  * {@code QueryDispatcher} dispatch a query to different workers.
  */
 public class QueryDispatcher {
+
+  static final class CancelOutcome {
+    static final CancelOutcome NONE = new CancelOutcome(null, Set.of());
+
+    @Nullable final MultiStageQueryStats _stats;
+    final Set<String> _respondingServerIds;
+
+    CancelOutcome(@Nullable MultiStageQueryStats stats, Set<String> respondingServerIds) {
+      _stats = stats;
+      _respondingServerIds = respondingServerIds;
+    }
+  }
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
   /**
@@ -136,11 +155,14 @@ public class QueryDispatcher {
   /// Cluster-level default for stream-stats mode. Used as the fallback in {@link #submitAndReduce} when the query
   /// does not carry an explicit {@link QueryOptionKey#STREAM_STATS} override.
   private final boolean _streamStatsDefault;
+  // Injectable for tests that need to manipulate time (e.g. to simulate a timeout without actually waiting).
+  private final LongSupplier _clock;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
-        DispatchClient.KeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS);
+        DispatchClient.KeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS,
+        System::currentTimeMillis);
   }
 
   /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
@@ -150,12 +172,19 @@ public class QueryDispatcher {
       boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
         new DispatchClient.KeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
-        streamStatsDefault, statsDrainMs);
+        streamStatsDefault, statsDrainMs, System::currentTimeMillis);
+  }
+
+  @VisibleForTesting
+  QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, LongSupplier clock) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+        DispatchClient.KeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS, clock);
   }
 
   private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, DispatchClient.KeepAliveConfig keepAliveConfig,
-      boolean streamStatsDefault, long statsDrainMs) {
+      boolean streamStatsDefault, long statsDrainMs, LongSupplier clock) {
     _cancelTimeout = cancelTimeout;
     _statsDrainMs = statsDrainMs;
     _mailboxService = mailboxService;
@@ -166,6 +195,7 @@ public class QueryDispatcher {
     _keepAliveConfig = keepAliveConfig;
     _failureDetector = failureDetector;
     _streamStatsDefault = streamStatsDefault;
+    _clock = clock;
 
     if (enableCancellation) {
       _serversByQuery = new ConcurrentHashMap<>();
@@ -196,14 +226,16 @@ public class QueryDispatcher {
   /// in-flight request statistics into {@code statsManager} for use by the adaptive query router.
   /// When {@code statsManager} is non-null:
   /// <ul>
-  ///   <li>Each leaf server is registered as having one more in-flight request via
-  ///       {@link ServerRoutingStatsManager#recordStatsForQuerySubmission} after the fan-out begins.</li>
-  ///   <li>After the full fan-out completes (or fails), each server is decremented via
-  ///       {@link ServerRoutingStatsManager#recordStatsUponResponseArrival} with {@code latency = -1}
-  ///       (no latency is recorded at this stage).</li>
+  ///   <li>Each submitted server is registered as having one more in-flight request via
+  ///       {@link ServerRoutingStatsManager#recordStatsForQuerySubmission} before the fan-out begins,
+  ///       so the counter is incremented even when {@code submit()} hangs and times out.</li>
+  ///   <li>For servers that reported leaf-stage timing via {@code UPSTREAM_SERVER_RESPONSE_TIMES_MS} stats,
+  ///       {@link ServerRoutingStatsManager#recordStatsUponResponseArrival} is called with measured elapsed time.
+  ///   <li>For all submitted servers not already recorded by the upstream timing extraction
+  ///       (e.g. intermediate-stage servers, or any server when the reduce phase fails),
+  ///       the finally block calls {@code recordStatsUponResponseArrival} with the total wall-clock
+  ///       elapsed time since dispatch.</li>
   /// </ul>
-  /// TODO: Replace the coarse end-of-fanout decrement with per-sender arrival once per-sender EOS
-  ///       interception is in place, and record real leaf-stage latency at that point.
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions, @Nullable ServerRoutingStatsManager statsManager)
       throws Exception {
@@ -212,36 +244,64 @@ public class QueryDispatcher {
     }
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
-    // Tracks servers where recordStatsForQuerySubmission was actually called, so the finally block only
-    // decrements servers that were incremented — guarding against a partial failure in submit().
     Set<QueryServerInstance> incrementedServers = new HashSet<>();
-    try {
-      submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      // The SSE engine increments before `submit`, but here we increment after because `submit` populates
-      // the list of servers. Getting the list of servers before calling `submit` would expose
-      // implementation details of `submit`.
-      if (statsManager != null) {
-        for (QueryServerInstance server : servers) {
-          statsManager.recordStatsForQuerySubmission(requestId, server.getInstanceId());
-          incrementedServers.add(server);
+    long submitTimeMs = _clock.getAsLong();
+    QueryResult result = null;
+    CancelOutcome cancelOutcome = CancelOutcome.NONE;
+
+    AdaptiveRoutingStageClassification classification = null;
+    Consumer<QueryServerInstance> preDispatchHook = null;
+    if (statsManager != null) {
+      classification = AdaptiveRoutingStageClassification.classify(dispatchableSubPlan);
+      dispatchableSubPlan.getQueryStageMap().get(0).getCustomProperties()
+          .put(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY, "true");
+      for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStagesWithoutRoot()) {
+        int stageId = fragment.getPlanFragment().getFragmentId();
+        if (classification._trustedStageIds.contains(stageId)) {
+          fragment.getCustomProperties().put(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY, "true");
         }
       }
-      QueryResult result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
+      preDispatchHook = server -> {
+        if (incrementedServers.add(server)) {
+          statsManager.recordStatsForQuerySubmission(requestId, server.getInstanceId());
+        }
+      };
+    }
+
+    try {
+      submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions, preDispatchHook);
+      result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
-        cancel(requestId);
+        if (statsManager != null) {
+          cancelOutcome = cancelWithStats(requestId, servers);
+        } else {
+          // Don't bother getting stats if we won't do anything with them
+          cancel(requestId, servers);
+        }
       }
       return result;
     } catch (Exception ex) {
-      return tryRecover(context.getRequestId(), servers, ex);
+      Pair<QueryResult, CancelOutcome> recovered = tryRecover(context.getRequestId(), servers, ex);
+      result = recovered.getLeft();
+      cancelOutcome = recovered.getRight();
+      return result;
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
+      // We don't cancelWithStats here because likely something more severe has happened.
       cancel(requestId);
       throw e;
     } finally {
       if (statsManager != null) {
-        for (QueryServerInstance server : incrementedServers) {
-          statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1);
+        Map<String, Long> knownTimings = Map.of();
+        if (result != null && !incrementedServers.isEmpty() && !classification._trustedStageIds.isEmpty()) {
+          try {
+            knownTimings = extractMaxTimingsPerInstance(result, classification, requestId, cancelOutcome);
+          } catch (Exception e) {
+            LOGGER.warn("Failed to apply upstream timings for request {}", requestId, e);
+          }
         }
+        recordPerServerLatencies(statsManager, requestId, incrementedServers, classification, knownTimings,
+            cancelOutcome, _clock.getAsLong() - submitTimeMs);
       }
       if (isQueryCancellationEnabled()) {
         _serversByQuery.remove(requestId);
@@ -455,26 +515,35 @@ public class QueryDispatcher {
         brokerResult.getBrokerReduceTimeMs(), stageCoverage, accumulator);
   }
 
-  /// Tries to recover from an exception thrown during legacy (non-streaming) query dispatching.
+  private static void recordPerServerLatencies(ServerRoutingStatsManager statsManager, long requestId,
+      Set<QueryServerInstance> incrementedServers, AdaptiveRoutingStageClassification classification,
+      Map<String, Long> knownTimings, CancelOutcome cancelOutcome, long elapsedMs) {
+    for (QueryServerInstance server : incrementedServers) {
+      String id = server.getInstanceId();
+      long latency;
+      if (knownTimings.containsKey(id)) {
+        // Tier 1: actual upstream timing extracted — use it for tracked (leaf) servers, -1 otherwise.
+        latency = classification._trackedServers.contains(id) ? knownTimings.get(id) : -1L;
+      } else if (classification._trackedServers.contains(id) && !knownTimings.isEmpty()) {
+        // Tier 2: tracked leaf server whose timing is missing while other servers had data — mark degraded.
+        latency = elapsedMs;
+      } else if (cancelOutcome != CancelOutcome.NONE && !cancelOutcome._respondingServerIds.contains(id)) {
+        // Tier 3: cancel was attempted but this server didn't respond — mark degraded.
+        latency = elapsedMs;
+      } else {
+        // Tier 4: no timing data, but server is responsive.
+        latency = -1L;
+      }
+      LOGGER.debug("==[UPSTREAM_TIMING]== request {} recording server {} latency={}ms", requestId, id, latency);
+      statsManager.recordStatsUponResponseArrival(requestId, id, latency);
+    }
+  }
+
+  /// Tries to recover from an exception thrown during query dispatching.
   ///
-  /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and empty
-  /// stats, while other exceptions are directly rethrown. Stats are not collected on the legacy cancel path.
-  ///
-  /// <b>Why {@code cancelWithStats} was removed:</b> a previous revision of this method called a synchronous
-  /// {@code cancelWithStats} RPC on every participating server (fan-out) to collect partial per-stage stats on the
-  /// error path. That approach was reverted for two reasons:
-  /// <ol>
-  ///   <li><b>Cascade risk.</b> At high QPS, every query failure triggered an extra fan-out RPC to every server that
-  ///       already handled the failed query. Servers under stress would receive a second wave of requests just as they
-  ///       were trying to recover, risking a cascading overload.</li>
-  ///   <li><b>No consumer.</b> The call site that used the returned {@code Map<Integer, StageStats.Closed>} was also
-  ///       reverted as part of the same change, leaving the RPC overhead with no benefit.</li>
-  /// </ol>
-  ///
-  /// Stats on the error path are now available only in stream mode ({@code SubmitWithStream}), where servers push
-  /// {@code OpChainComplete} messages independently and the broker collects whatever arrives before the drain
-  /// timeout (see {@link #tryRecoverWithStream}).
-  private QueryResult tryRecover(long requestId, Set<QueryServerInstance> servers, Exception ex)
+  /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and stats,
+  /// while other exceptions are not known, so they are directly rethrown.
+  private Pair<QueryResult, CancelOutcome> tryRecover(long requestId, Set<QueryServerInstance> servers, Exception ex)
       throws Exception {
     if (servers.isEmpty()) {
       throw ex;
@@ -488,13 +557,19 @@ public class QueryDispatcher {
     } else if (ex instanceof QueryException) {
       errorCode = ((QueryException) ex).getErrorCode();
     } else {
+      // in case of unknown exceptions, the exception will be rethrown, so we don't need stats
       cancel(requestId, servers);
       throw ex;
     }
-    LOGGER.warn("Query failed with a known exception. Cancelling remaining opchains.");
-    cancel(requestId, servers);
+    // in case of known exceptions (timeout or query exception), we need can build here the erroneous QueryResult
+    // that include the stats.
+    LOGGER.warn("Query failed with a known exception. Trying to cancel the other opchains");
+    CancelOutcome outcome = cancelWithStats(requestId, servers);
+    if (outcome._stats == null) {
+      throw ex;
+    }
     QueryProcessingException processingException = new QueryProcessingException(errorCode, ex.getMessage());
-    return new QueryResult(processingException, MultiStageQueryStats.emptyStats(0), 0L);
+    return Pair.of(new QueryResult(processingException, outcome._stats, 0L), outcome);
   }
 
   /// Tries to recover from an exception thrown during stream-mode ({@code SubmitWithStream}) query dispatching.
@@ -521,18 +596,14 @@ public class QueryDispatcher {
     }
     LOGGER.warn("Stream-mode query failed with a known exception. Fanning out cancel and waiting for stats.");
     session.fanOutCancel();
-    // Cap the wait: the query result is already determined, so we collect stats on a best-effort basis only.
-    // Using the full remaining timeout here would regress error-path latency to the query deadline.
     long statsWaitMs = Math.min(_statsDrainMs, Math.max(0, deadlineMs - System.currentTimeMillis()));
     try {
       session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException ie) {
-      // Restore the interrupt flag but continue: mergeSessionStatsIntoResult does not block, so the flag will be
-      // observed by the caller rather than firing an unexpected InterruptedException inside this method.
       Thread.currentThread().interrupt();
     }
-    QueryProcessingException processingException = new QueryProcessingException(errorCode, ex.getMessage());
-    QueryResult errorResult = new QueryResult(processingException, MultiStageQueryStats.emptyStats(0), 0L);
+    QueryProcessingException streamProcessingException = new QueryProcessingException(errorCode, ex.getMessage());
+    QueryResult errorResult = new QueryResult(streamProcessingException, MultiStageQueryStats.emptyStats(0), 0L);
     return mergeSessionStatsIntoResult(errorResult, session, expectedByStage);
   }
 
@@ -566,7 +637,7 @@ public class QueryDispatcher {
             }
           }
         }
-      });
+      }, null);
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
       cancel(requestId, servers);
@@ -579,6 +650,14 @@ public class QueryDispatcher {
   void submit(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Set<QueryServerInstance> serversOut, Map<String, String> queryOptions)
       throws Exception {
+    submit(requestId, dispatchableSubPlan, timeoutMs, serversOut, queryOptions, null);
+  }
+
+  @VisibleForTesting
+  void submit(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
+      Set<QueryServerInstance> serversOut, Map<String, String> queryOptions,
+      @Nullable Consumer<QueryServerInstance> preDispatchHook)
+      throws Exception {
     SendRequest<Worker.QueryRequest, Worker.QueryResponse> requestSender = DispatchClient::submit;
     Set<DispatchablePlanFragment> plansWithoutRoot = dispatchableSubPlan.getQueryStagesWithoutRoot();
     execute(requestId, plansWithoutRoot, timeoutMs, queryOptions, requestSender, serversOut,
@@ -589,7 +668,7 @@ public class QueryDispatcher {
                 String.format("Unable to execute query plan for request: %d on server: %s, ERROR: %s", requestId,
                     serverInstance, response.getMetadataOrDefault(ServerResponseStatus.STATUS_ERROR, "null")));
           }
-        });
+        }, preDispatchHook);
     if (isQueryCancellationEnabled()) {
       _serversByQuery.put(requestId, serversOut);
     }
@@ -621,15 +700,89 @@ public class QueryDispatcher {
     return _serversByQuery != null;
   }
 
+
+  /**
+   * Extracts the maximum observed latency per instance from consulted stages' stats.
+   * Takes the maximum when the same server appears in multiple consulted stages.
+   */
+  @VisibleForTesting
+  static Map<String, Long> extractMaxTimingsPerInstance(QueryResult result,
+      AdaptiveRoutingStageClassification classification, long requestId,
+      CancelOutcome cancelOutcome) {
+    Map<String, Long> maxTimingPerInstance = new HashMap<>();
+    List<MultiStageQueryStats.StageStats.Closed> queryStatsList = result.getQueryStats();
+    for (int stageIdx = 0; stageIdx < queryStatsList.size(); stageIdx++) {
+      if (!classification._trustedStageIds.contains(stageIdx)) {
+        continue;
+      }
+      MultiStageQueryStats.StageStats.Closed stageStats = queryStatsList.get(stageIdx);
+      if (stageStats != null) {
+        extractTimingsFromStage(stageStats, stageIdx, classification, requestId, maxTimingPerInstance);
+      }
+    }
+    if (cancelOutcome._stats != null) {
+      MultiStageQueryStats cancelStats = cancelOutcome._stats;
+      for (int stageId = cancelStats.getCurrentStageId() + 1; stageId <= cancelStats.getMaxStageId(); stageId++) {
+        if (!classification._trustedStageIds.contains(stageId)) {
+          continue;
+        }
+        MultiStageQueryStats.StageStats.Closed stageStats = cancelStats.getUpstreamStageStats(stageId);
+        if (stageStats != null) {
+          extractTimingsFromStage(stageStats, stageId, classification, requestId, maxTimingPerInstance);
+        }
+      }
+    }
+    return maxTimingPerInstance;
+  }
+
+  private static void extractTimingsFromStage(MultiStageQueryStats.StageStats.Closed stageStats, int stageIdx,
+      AdaptiveRoutingStageClassification classification, long requestId, Map<String, Long> maxTimingPerInstance) {
+    stageStats.forEach((opType, statMap) -> {
+      if (opType != MultiStageOperator.Type.MAILBOX_RECEIVE) {
+        return;
+      }
+      @SuppressWarnings("unchecked")
+      StatMap<BaseMailboxReceiveOperator.StatKey> receiveStats =
+          (StatMap<BaseMailboxReceiveOperator.StatKey>) statMap;
+      String encoded =
+          receiveStats.getString(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS);
+      if (encoded == null) {
+        LOGGER.debug("==[UPSTREAM_TIMING]== request {} consulted stage {} MAILBOX_RECEIVE has null timing",
+              requestId, stageIdx);
+        return;
+      }
+      LOGGER.debug("==[UPSTREAM_TIMING]== request {} consulted stage {} encoded timing: {}",
+            requestId, stageIdx, encoded);
+      Map<String, Long> timings = AdaptiveRoutingUpstreamTimings.decode(encoded);
+      for (Map.Entry<String, Long> entry : timings.entrySet()) {
+        String instanceId = classification._senderKeyToInstanceId.get(entry.getKey());
+        if (instanceId != null) {
+          maxTimingPerInstance.merge(instanceId, entry.getValue(), Math::max);
+        } else {
+          LOGGER.debug("==[UPSTREAM_TIMING]== request {} senderKey={} not found in known servers, skipping",
+              requestId, entry.getKey());
+        }
+      }
+    });
+  }
+
+
   private <E> void execute(long requestId, Set<DispatchablePlanFragment> stagePlans, long timeoutMs,
       Map<String, String> queryOptions, SendRequest<Worker.QueryRequest, E> sendRequest,
-      Set<QueryServerInstance> serverInstancesOut, BiConsumer<E, QueryServerInstance> resultConsumer)
+      Set<QueryServerInstance> serverInstancesOut, BiConsumer<E, QueryServerInstance> resultConsumer,
+      @Nullable Consumer<QueryServerInstance> preDispatchHook)
       throws ExecutionException, InterruptedException, TimeoutException {
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
 
     Map<DispatchablePlanFragment, StageInfo> stageInfos = serializePlanFragments(stagePlans, serverInstancesOut);
     if (serverInstancesOut.isEmpty()) {
       return;
+    }
+
+    if (preDispatchHook != null) {
+      for (QueryServerInstance server : serverInstancesOut) {
+        preDispatchHook.accept(server);
+      }
     }
 
     Map<String, String> requestMetadata =
@@ -677,6 +830,13 @@ public class QueryDispatcher {
           dispatchCallbacks.poll(Math.max(1, deadline.timeRemaining(TimeUnit.MILLISECONDS)), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
+          // DEADLINE_EXCEEDED means our own deadline fired on the gRPC channel. Skip throwing here so the
+          // deadline.isExpired() check below converts this into a TimeoutException that tryRecover() handles.
+          if (resp.getThrowable() instanceof StatusRuntimeException
+                  && ((StatusRuntimeException) resp.getThrowable()).getStatus().getCode()
+                  == Status.Code.DEADLINE_EXCEEDED) {
+            continue;
+          }
           // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
           // subsequent query failures
           if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)
@@ -814,6 +974,46 @@ public class QueryDispatcher {
     return true;
   }
 
+  @Nullable
+  private CancelOutcome cancelWithStats(long requestId, @Nullable Set<QueryServerInstance> servers) {
+    if (servers == null) {
+      return CancelOutcome.NONE;
+    }
+
+    Deadline deadline = Deadline.after(_cancelTimeout.toMillis(), TimeUnit.MILLISECONDS);
+    SendRequest<Long, Worker.CancelResponse> sendRequest = DispatchClient::cancel;
+    BlockingQueue<AsyncResponse<Worker.CancelResponse>> dispatchCallbacks =
+        dispatch(sendRequest, servers, deadline, serverInstance -> requestId);
+
+    Set<String> respondedServerIds = new HashSet<>();
+    MultiStageQueryStats stats = MultiStageQueryStats.emptyStats(0);
+    StatMap<BaseMailboxReceiveOperator.StatKey> rootStats = new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
+    stats.getCurrentStats().addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE, rootStats);
+    try {
+      processResults(requestId, servers.size(), (response, server) -> {
+        respondedServerIds.add(server.getInstanceId());
+        Map<Integer, ByteString> statsByStage = response.getStatsByStageMap();
+        for (Map.Entry<Integer, ByteString> entry : statsByStage.entrySet()) {
+          try (InputStream is = entry.getValue().newInput(); DataInputStream dis = new DataInputStream(is)) {
+            MultiStageQueryStats.StageStats.Closed closed = MultiStageQueryStats.StageStats.Closed.deserialize(dis);
+            stats.mergeUpstream(entry.getKey(), closed);
+          } catch (Exception e) {
+            LOGGER.debug("Caught exception while deserializing stats on server: {}", server, e);
+          }
+        }
+      }, deadline, dispatchCallbacks);
+      return new CancelOutcome(stats, respondedServerIds);
+    } catch (InterruptedException e) {
+      throw QueryErrorCode.INTERNAL.asException("Interrupted while waiting for cancel response", e);
+    } catch (TimeoutException e) {
+      LOGGER.debug("Timed out waiting for cancel response", e);
+      return new CancelOutcome(stats, respondedServerIds);
+    } catch (RuntimeException e) {
+      LOGGER.debug("Cancel RPC failed for request {}", requestId, e);
+      return new CancelOutcome(stats, respondedServerIds);
+    }
+  }
+
   private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
@@ -869,8 +1069,14 @@ public class QueryDispatcher {
         workerMetadata.size());
 
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
+    Map<String, String> opChainMetadata = new HashMap<>(queryOptions);
+    String collectTiming = stagePlan.getCustomProperties()
+        .get(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY);
+    if (collectTiming != null) {
+      opChainMetadata.put(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY, collectTiming);
+    }
     OpChainExecutionContext opChainExecutionContext =
-        OpChainExecutionContext.fromQueryContext(mailboxService, queryOptions, stageMetadata, workerMetadata.get(0),
+        OpChainExecutionContext.fromQueryContext(mailboxService, opChainMetadata, stageMetadata, workerMetadata.get(0),
             null, true, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
