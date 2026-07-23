@@ -381,6 +381,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_QUERY_LOG_BEFORE_PROCESSING =
         "pinot.broker.query.log.logBeforeProcessing";
     public static final boolean DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING = true;
+    public static final String CONFIG_OF_BROKER_QUERY_LOG_ON_RATE_LIMIT =
+        "broker.query.log.on.rate.limit";
+    public static final String DEFAULT_BROKER_QUERY_LOG_ON_RATE_LIMIT = "drop";
+
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     /**
      * When true, the broker initializes the materialized view metadata cache and query rewrite
