@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
@@ -62,10 +63,13 @@ public class MutableOpenStructDataSource extends BaseDataSource implements OpenS
   @Override
   @Nullable
   public DataSource getDataSource(String key) {
-    Map<IndexType, IndexReader> indexes = _index.getIndexes(key);
-    if (indexes == null || indexes.isEmpty()) {
+    MutableKeyColumn col = _index.getKeyColumn(key);
+    if (col == null) {
       return null;
     }
+    Map<IndexType, IndexReader> indexes = new HashMap<>(_index.getIndexes(key));
+    indexes.put(StandardIndexes.nullValueVector(),
+        new PresenceBasedNullValueVector(col.getPresenceBitmap(), _numDocs));
     ColumnMetadata metadata = _index.getColumnMetadata(key);
     return new ImmutableDataSource(metadata,
         new ColumnIndexContainer.FromMap.Builder().withAll(indexes).build());

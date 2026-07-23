@@ -22,6 +22,7 @@ import java.util.EnumSet;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -30,6 +31,7 @@ import org.apache.pinot.core.operator.query.EmptyAggregationOperator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
+import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
@@ -38,6 +40,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.MapDataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
@@ -187,6 +191,15 @@ public class AggregationPlanNode implements PlanNode {
             }
             break;
           case FUNCTION:
+            DataSource resolvedDs = resolveDataSource(argument);
+            if (resolvedDs == null) {
+              return true;
+            }
+            NullValueVectorReader resolvedNullVector = resolvedDs.getNullValueVector();
+            if (resolvedNullVector != null && !resolvedNullVector.getNullBitmap().isEmpty()) {
+              return true;
+            }
+            break;
           default:
             return true;
         }
@@ -238,22 +251,64 @@ public class AggregationPlanNode implements PlanNode {
   }
 
   /// Returns the data source for the given aggregation function's argument, or {@code null} if the function has no
-  /// argument (e.g. {@code COUNT(*)}) or its argument is not a single column identifier (e.g. {@code COUNT(1)} or a
-  /// transform expression), in which case it cannot be resolved from dictionary/metadata.
+  /// argument (e.g. {@code COUNT(*)}) or its argument cannot be resolved to a single column-like data source (e.g.
+  /// {@code COUNT(1)} or an arbitrary transform expression), in which case it cannot be resolved from
+  /// dictionary/metadata. An `item(mapColumn, 'key')` argument resolves to the per-key data source when the column
+  /// materializes that key.
   ///
   /// @param aggregationFunction aggregation function whose argument data source is resolved
-  /// @return the argument's data source, or {@code null} if it has no single identifier argument
+  /// @return the argument's data source, or {@code null} if it cannot be resolved
   @Nullable
   private DataSource getDataSourceForAggregationFunction(AggregationFunction<?, ?> aggregationFunction) {
     List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
     if (!inputExpressions.isEmpty()) {
-      ExpressionContext argument = inputExpressions.get(0);
-      if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
-        return null;
-      }
-      return _indexSegment.getDataSource(argument.getIdentifier(), _queryContext.getSchema());
+      return resolveDataSource(inputExpressions.get(0));
     }
 
+    return null;
+  }
+
+  @Nullable
+  private DataSource resolveDataSource(ExpressionContext expression) {
+    return resolveDataSource(expression, _indexSegment, _queryContext.getSchema());
+  }
+
+  @Nullable
+  static DataSource resolveDataSource(ExpressionContext expression, IndexSegment segment,
+      @Nullable org.apache.pinot.spi.data.Schema schema) {
+    if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
+      return segment.getDataSource(expression.getIdentifier(), schema);
+    }
+    if (expression.getType() == ExpressionContext.Type.FUNCTION) {
+      return tryResolveKeyedDataSource(expression, segment, schema);
+    }
+    return null;
+  }
+
+  @Nullable
+  static DataSource tryResolveKeyedDataSource(ExpressionContext expression, IndexSegment segment,
+      @Nullable org.apache.pinot.spi.data.Schema schema) {
+    FunctionContext function = expression.getFunction();
+    if (function == null
+        || !ItemTransformFunction.FUNCTION_NAME.equals(function.getFunctionName())) {
+      return null;
+    }
+    List<ExpressionContext> args = function.getArguments();
+    if (args.size() != 2
+        || args.get(0).getType() != ExpressionContext.Type.IDENTIFIER
+        || args.get(1).getType() != ExpressionContext.Type.LITERAL) {
+      return null;
+    }
+    String columnName = args.get(0).getIdentifier();
+    String key = args.get(1).getLiteral().getStringValue();
+    DataSource columnDs = segment.getDataSource(columnName, schema);
+    if (columnDs instanceof MapDataSource) {
+      return ((MapDataSource) columnDs).getDataSource(key);
+    }
+    if (columnDs instanceof OpenStructDataSource) {
+      OpenStructDataSource osDs = (OpenStructDataSource) columnDs;
+      return osDs.isMaterialized(key) ? osDs.getDataSource(key) : null;
+    }
     return null;
   }
 }
