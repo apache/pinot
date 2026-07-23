@@ -54,6 +54,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -78,7 +79,7 @@ public class StrictRealtimeSegmentAssignmentTest {
   private static final String CONSUMING_INSTANCE_PARTITIONS_NAME =
       InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME);
 
-  private List<String> _segments;
+  private static List<String> _segments;
   private Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMap;
   private InstancePartitions _newConsumingInstancePartitions;
 
@@ -493,6 +494,17 @@ public class StrictRealtimeSegmentAssignmentTest {
       }
       return record;
     });
+    // Bulk read of all segment ZK metadata, used to resolve the eligible tier of each segment once per rebalance
+    List<ZNRecord> segmentZNRecords = new ArrayList<>(_segments.size());
+    for (String segmentName : _segments) {
+      ZNRecord record = new ZNRecord(segmentName);
+      if (tieredSegments.contains(segmentName)) {
+        record.setSimpleField(Segment.TIER, "coldTier");
+      }
+      segmentZNRecords.add(record);
+    }
+    when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
+        segmentZNRecords);
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     return helixManager;
   }

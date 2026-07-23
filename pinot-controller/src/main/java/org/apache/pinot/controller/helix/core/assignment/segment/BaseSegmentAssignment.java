@@ -71,6 +71,20 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
   protected TableConfig _tableConfig;
   protected ControllerMetrics _controllerMetrics;
 
+  // Cache of segment name to the name of the tier it is eligible for (null value means not eligible for any tier), to
+  // avoid reading each segment's ZK metadata on every rebalanceTiers() invocation.
+  // NOTE:
+  // 1. This cache is used for table rebalance only. During rebalance, rebalanceTable() (and thus rebalanceTiers()) can
+  //    be invoked multiple times when the ideal state changes during the rebalance process. The eligible tier of a
+  //    segment is derived from its ZK metadata, which is not expected to change during a rebalance, so it is resolved
+  //    once (with a single bulk ZK read) and reused across invocations. A fresh SegmentAssignment instance is created
+  //    per rebalance (see SegmentAssignmentFactory), so the cache is scoped to a single rebalance.
+  // 2. Segments that are added after the initial bulk read (e.g. realtime segments that commit during a long
+  //    rebalance) will be absent from the cache; they are resolved on demand and merged in, so they are still routed
+  //    to the correct tier.
+  @Nullable
+  private Map<String, String> _segmentToTierName;
+
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig, @Nullable ControllerMetrics controllerMetrics) {
     _helixManager = helixManager;
@@ -102,10 +116,24 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
     _logger.info("Rebalancing tiers: {} for table: {} with bootstrap: {}", tierInstancePartitionsMap.keySet(),
         _tableNameWithType, bootstrap);
 
+    // Resolve the eligible tier of each segment once (single bulk ZK read) and reuse it across the multiple
+    // rebalanceTiers() invocations of this rebalance, instead of reading each segment's ZK metadata every time.
+    if (_segmentToTierName == null) {
+      _segmentToTierName =
+          SegmentAssignmentUtils.getSegmentToTierNameMap(_helixManager, _tableNameWithType, sortedTiers);
+    }
+    // Resolve any segment that appeared after the initial bulk read (e.g. a segment that committed during a long
+    // rebalance) so that it is still routed to the correct tier.
+    for (String segmentName : currentAssignment.keySet()) {
+      if (!_segmentToTierName.containsKey(segmentName)) {
+        _segmentToTierName.put(segmentName,
+            SegmentAssignmentUtils.getSegmentToTierName(_helixManager, _tableNameWithType, sortedTiers, segmentName));
+      }
+    }
+
     // Get tier to segment assignment map i.e. current assignments split by tiers they are eligible for
     SegmentAssignmentUtils.TierSegmentAssignment tierSegmentAssignment =
-        new SegmentAssignmentUtils.TierSegmentAssignment(_helixManager, _tableNameWithType, sortedTiers,
-            currentAssignment);
+        new SegmentAssignmentUtils.TierSegmentAssignment(sortedTiers, currentAssignment, _segmentToTierName);
     Map<String, Map<String, Map<String, String>>> tierNameToSegmentAssignmentMap =
         tierSegmentAssignment.getTierNameToSegmentAssignmentMap();
 

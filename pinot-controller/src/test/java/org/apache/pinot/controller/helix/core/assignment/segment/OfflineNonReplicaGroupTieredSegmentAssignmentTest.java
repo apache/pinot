@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -47,9 +48,12 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -116,6 +120,13 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
       String segmentName = path.substring(path.lastIndexOf('/') + 1);
       return new ZNRecord(segmentName);
     });
+    // Bulk read of all segment ZK metadata, used to resolve the eligible tier of each segment once per rebalance
+    List<ZNRecord> segmentZNRecords = new ArrayList<>(NUM_SEGMENTS);
+    for (String segmentName : SEGMENTS) {
+      segmentZNRecords.add(new ZNRecord(segmentName));
+    }
+    when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
+        segmentZNRecords);
     //noinspection unchecked
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
@@ -267,6 +278,59 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
         }
       }
     }
+  }
+
+  /**
+   * A segment that is eligible for a tier can appear in the current assignment in a later rebalanceTable() invocation
+   * (e.g. after the ideal state changes during a long rebalance), i.e. after the initial bulk read that populates the
+   * tier cache. It must still be resolved (on demand, without a second bulk read) and routed to its tier rather than
+   * silently kept on the default instances.
+   */
+  @Test
+  public void testResolvesSegmentAddedAfterInitialBulkRead() {
+    HelixManager helixManager = mock(HelixManager.class);
+    //noinspection rawtypes
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get(anyString(), eq(null), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      String path = invocation.getArgument(0, String.class);
+      return new ZNRecord(path.substring(path.lastIndexOf('/') + 1));
+    });
+    // The initial bulk read only returns the segments that existed when the rebalance started (segment_0 .. 99)
+    List<ZNRecord> segmentZNRecords = new ArrayList<>(NUM_SEGMENTS);
+    for (String segmentName : SEGMENTS) {
+      segmentZNRecords.add(new ZNRecord(segmentName));
+    }
+    when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
+        segmentZNRecords);
+    //noinspection unchecked
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(helixManager,
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build(),
+        null);
+
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    for (String segmentName : SEGMENTS) {
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(INSTANCES.subList(0, NUM_REPLICAS), SegmentStateModel.ONLINE));
+    }
+
+    // First rebalance populates the tier cache from the single bulk read
+    segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
+        _tierInstancePartitionsMap, new RebalanceConfig());
+    verify(propertyStore, times(1)).getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt());
+
+    // A new segment eligible for tierC (segId >= 120) appears in the assignment after the initial bulk read
+    String newSegment = SEGMENT_NAME_PREFIX + 200;
+    currentAssignment.put(newSegment,
+        SegmentAssignmentUtils.getInstanceStateMap(INSTANCES.subList(0, NUM_REPLICAS), SegmentStateModel.ONLINE));
+    Map<String, Map<String, String>> newAssignment =
+        segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
+            _tierInstancePartitionsMap, new RebalanceConfig());
+
+    // The new segment is resolved on demand (no second bulk read) and routed to tierC
+    verify(propertyStore, times(1)).getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt());
+    Assert.assertEquals(newAssignment.get(newSegment).size(), NUM_REPLICAS);
+    Assert.assertTrue(INSTANCES_TIER_C.containsAll(newAssignment.get(newSegment).keySet()));
   }
 
   /**

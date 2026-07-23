@@ -453,6 +453,61 @@ public class SegmentAssignmentUtils {
   }
 
   /**
+   * Resolves, for each segment of the table, the name of the first tier (in {@code sortedTiers} order) that the segment
+   * is eligible for. The returned map contains an entry for <b>every</b> segment (so that callers can tell already
+   * resolved segments apart from segments added later via {@link Map#containsKey}); the value is the tier name, or
+   * {@code null} if the segment (including COMMITTING segments) is not eligible for any tier. This performs a single
+   * bulk ZK read for all segment ZK metadata, so it is meant to be computed once per rebalance and reused across the
+   * multiple {@code rebalanceTable()} invocations of that rebalance rather than reading each segment's ZK metadata
+   * every time.
+   */
+  static Map<String, String> getSegmentToTierNameMap(HelixManager helixManager, String tableNameWithType,
+      List<Tier> sortedTiers) {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
+    List<SegmentZKMetadata> segmentsZKMetadata = ZKMetadataProvider.getSegmentsZKMetadata(propertyStore,
+        tableNameWithType);
+    Map<String, String> segmentToTierName = new HashMap<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      segmentToTierName.put(segmentZKMetadata.getSegmentName(), getTierName(tableNameWithType, sortedTiers,
+          segmentZKMetadata));
+    }
+    return segmentToTierName;
+  }
+
+  /**
+   * Resolves the name of the tier a single segment is eligible for. Used to resolve segments that were added after
+   * {@link #getSegmentToTierNameMap} was computed (e.g. realtime segments that commit during a long rebalance).
+   * Returns {@code null} if the segment does not exist, is COMMITTING, or is not eligible for any tier.
+   */
+  @Nullable
+  static String getSegmentToTierName(HelixManager helixManager, String tableNameWithType, List<Tier> sortedTiers,
+      String segmentName) {
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(helixManager.getHelixPropertyStore(), tableNameWithType, segmentName);
+    return segmentZKMetadata != null ? getTierName(tableNameWithType, sortedTiers, segmentZKMetadata) : null;
+  }
+
+  /**
+   * Returns the name of the first tier (in {@code sortedTiers} order) the given segment is eligible for, or
+   * {@code null} if the segment is COMMITTING or not eligible for any tier.
+   */
+  @Nullable
+  private static String getTierName(String tableNameWithType, List<Tier> sortedTiers,
+      SegmentZKMetadata segmentZKMetadata) {
+    // Skip COMMITTING segments
+    if (segmentZKMetadata.getStatus() == Status.COMMITTING) {
+      return null;
+    }
+    // Find an eligible tier for the segment, from the ordered list of tiers
+    for (Tier tier : sortedTiers) {
+      if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentZKMetadata)) {
+        return tier.getName();
+      }
+    }
+    return null;
+  }
+
+  /**
    * Takes a segment assignment and splits them up based on which tiers the segments are eligible for. Only considers
    * ONLINE segments.
    * Tiers are selected according to the order provided in the tiers list.
@@ -463,44 +518,32 @@ public class SegmentAssignmentUtils {
     private final Map<String, Map<String, String>> _nonTierSegmentAssignment = new TreeMap<>();
 
     /**
-     * Creates a TierSegmentAssignment from the given segmentAssignment
-     * @param tableNameWithType table to which the segment assignment belongs
+     * Creates a TierSegmentAssignment from the given segmentAssignment.
      * @param sortedTiers list of tiers, pre-sorted as per desired order by caller
      * @param segmentAssignment segment assignment of the table
+     * @param segmentToTierName map from segment name to the name of the tier it is eligible for (see
+     *                          {@link #getSegmentToTierNameMap}); segments absent from this map are not eligible for
+     *                          any tier
      */
-    TierSegmentAssignment(HelixManager helixManager, String tableNameWithType, List<Tier> sortedTiers,
-        Map<String, Map<String, String>> segmentAssignment) {
+    TierSegmentAssignment(List<Tier> sortedTiers, Map<String, Map<String, String>> segmentAssignment,
+        Map<String, String> segmentToTierName) {
 
       // initialize tier to segmentAssignment map
       sortedTiers.forEach(t -> _tierNameToSegmentAssignmentMap.put(t.getName(), new TreeMap<>()));
 
       // iterate over all segments
-      // TODO: Reduce ZK access
-      ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
       for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
         String segmentName = entry.getKey();
         Map<String, String> instanceStateMap = entry.getValue();
-        boolean selected = false;
 
-        // only consider ONLINE segments for tiers
-        if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
-          // find an eligible tier for the segment, from the ordered list of tiers
-          SegmentZKMetadata segmentZKMetadata =
-              ZKMetadataProvider.getSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
-          // Skip COMMITTING segments
-          if (segmentZKMetadata != null && segmentZKMetadata.getStatus() != Status.COMMITTING) {
-            for (Tier tier : sortedTiers) {
-              if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentZKMetadata)) {
-                _tierNameToSegmentAssignmentMap.get(tier.getName()).put(segmentName, instanceStateMap);
-                selected = true;
-                break;
-              }
-            }
-          }
-        }
-
-        // if segment not eligible for any tier, put in ordinary segments map
-        if (!selected) {
+        // Only consider ONLINE segments for tiers. The eligible tier for each segment is resolved once via
+        // segmentToTierName, avoiding a per-segment ZK read on every rebalanceTable() invocation.
+        String tierName = instanceStateMap.containsValue(SegmentStateModel.ONLINE)
+            ? segmentToTierName.get(segmentName) : null;
+        if (tierName != null) {
+          _tierNameToSegmentAssignmentMap.get(tierName).put(segmentName, instanceStateMap);
+        } else {
+          // if segment not eligible for any tier, put in ordinary segments map
           _nonTierSegmentAssignment.put(segmentName, instanceStateMap);
         }
       }
