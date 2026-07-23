@@ -178,7 +178,12 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   THROTTLE_EXECUTOR_QUEUE_SIZE("count", true,
       "Current number of tasks in the throttle executor queue"),
   // Workload config fetch status: 1 = success, 0 = failure
-  WORKLOAD_CONFIG_FETCH_STATUS("status", true);
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true),
+  // OPEN_STRUCT segment build observability
+  OPEN_STRUCT_DENSE_KEY_COUNT("keys", false, "Number of OPEN_STRUCT keys classified as dense"),
+  OPEN_STRUCT_SPARSE_KEY_COUNT("keys", false, "Number of OPEN_STRUCT keys classified as sparse"),
+  OPEN_STRUCT_TOTAL_KEYS_DISCOVERED("keys", false, "Total unique keys discovered in an OPEN_STRUCT column"),
+  OPEN_STRUCT_KEY_FILL_RATE("percent", false, "Fill rate (0-100) of an OPEN_STRUCT key across docs in a segment");
 
   private final String _gaugeName;
   private final String _unit;
