@@ -115,7 +115,7 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
         uploadedSegments.add(entry.getKey());
         continue;
       }
-      if (llcSegmentName.getPartitionGroupId() == partitionId) {
+      if (llcSegmentName.getTopicPartitionId().getPartitionId() == partitionId) {
         return entry.getValue().keySet();
       }
     }

@@ -1860,7 +1860,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     for (String segmentName : idealState.getPartitionSet()) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-      int partitionGroupId = llcSegmentName.getPartitionGroupId();
+      int partitionGroupId = llcSegmentName.getTopicPartitionId().getPartitionId();
       if (partitionGroupId == 0) {
         assertEquals(llcSegmentName.getSequenceNumber(), 5);
       } else if (partitionGroupId == 1) {

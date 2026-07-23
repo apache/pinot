@@ -259,7 +259,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Verify segments are created with the explicit sequence numbers
     for (String segmentName : instanceStatesMap.keySet()) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-      int partitionGroupId = llcSegmentName.getPartitionGroupId();
+      int partitionGroupId = llcSegmentName.getTopicPartitionId().getPartitionId();
       int sequence = llcSegmentName.getSequenceNumber();
       if (partitionGroupId == 0) {
         assertEquals(sequence, 5);
@@ -296,7 +296,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     for (String segmentName : instanceStatesMap.keySet()) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       assertEquals(llcSegmentName.getSequenceNumber(), 0,
-          "Default sequence number -1 should resolve to 0 for partition " + llcSegmentName.getPartitionGroupId());
+          "Default sequence number -1 should resolve to 0 for partition "
+              + llcSegmentName.getTopicPartitionId().getPartitionId());
     }
   }
 
@@ -777,7 +778,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertTrue(oldSegmentZKMetadataMap.containsKey(segmentName));
       assertTrue(segmentZKMetadataMap.containsKey(segmentName));
       assertEquals(segmentZKMetadataMap.get(segmentName), oldSegmentZKMetadataMap.get(segmentName));
-      oldNumPartitions = Math.max(oldNumPartitions, new LLCSegmentName(segmentName).getPartitionGroupId() + 1);
+      oldNumPartitions = Math.max(oldNumPartitions,
+          new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId() + 1);
     }
 
     // Check that for new partition groups, each partition group should have exactly 1 new segment in CONSUMING
@@ -786,7 +788,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Map<Integer, List<String>> partitionGroupIdToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : instanceStatesMap.entrySet()) {
       String segmentName = entry.getKey();
-      int partitionGroupId = new LLCSegmentName(segmentName).getPartitionGroupId();
+      int partitionGroupId = new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId();
       partitionGroupIdToSegmentsMap.computeIfAbsent(partitionGroupId, k -> new ArrayList<>()).add(segmentName);
     }
     for (int partitionGroupId = oldNumPartitions; partitionGroupId < segmentManager._numPartitions;
@@ -1154,7 +1156,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap.containsValue(
           SegmentStateModel.CONSUMING)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-        int partitionsId = llcSegmentName.getPartitionGroupId();
+        int partitionsId = llcSegmentName.getTopicPartitionId().getPartitionId();
         Map<Integer, String> sequenceNumberToSegmentMap = partitionGroupIdToSegmentsMap.get(partitionsId);
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         assertFalse(sequenceNumberToSegmentMap.containsKey(sequenceNumber));
@@ -1996,7 +1998,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = new HashMap<>();
     for (Map.Entry<String, SegmentZKMetadata> entry : segmentManager._segmentZKMetadataMap.entrySet()) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(entry.getKey());
-      int partitionId = llcSegmentName.getPartitionGroupId();
+      int partitionId = llcSegmentName.getTopicPartitionId().getPartitionId();
       latestSegmentZKMetadataMap.merge(partitionId, entry.getValue(), (existing, candidate) -> {
         int existingSeq = new LLCSegmentName(existing.getSegmentName()).getSequenceNumber();
         int candidateSeq = new LLCSegmentName(candidate.getSegmentName()).getSequenceNumber();

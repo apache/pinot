@@ -351,7 +351,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * {@code Long.MIN_VALUE} when it is not available.
    */
   public long getPartitionIngestionTimeMs(String segmentName) {
-    return _ingestionDelayTracker.getPartitionIngestionTimeMs(new LLCSegmentName(segmentName).getPartitionGroupId());
+    return _ingestionDelayTracker.getPartitionIngestionTimeMs(
+        new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId());
   }
 
   /**
@@ -372,7 +373,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void onConsumingToDropped(String segmentName) {
     // NOTE: No need to mark segment ignored here because it should have already been dropped.
-    _ingestionDelayTracker.stopTrackingPartition(new LLCSegmentName(segmentName).getPartitionGroupId());
+    _ingestionDelayTracker.stopTrackingPartition(
+        new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId());
   }
 
   /**
@@ -413,7 +415,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
     for (String segmentNameStr : segments) {
       LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-      partitionsHostedByThisServer.add(segmentName.getPartitionGroupId());
+      partitionsHostedByThisServer.add(segmentName.getTopicPartitionId().getPartitionId());
     }
     return partitionsHostedByThisServer;
   }
@@ -524,7 +526,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (_enforceConsumptionInOrder) {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       if (llcSegmentName != null) {
-        getConsumerCoordinator(llcSegmentName.getPartitionGroupId()).register(llcSegmentName);
+        getConsumerCoordinator(llcSegmentName.getTopicPartitionId().getPartitionId()).register(llcSegmentName);
       }
     }
   }
@@ -599,7 +601,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     // Generates only one semaphore for every partition
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    int partitionGroupId = llcSegmentName.getPartitionGroupId();
+    int partitionGroupId = llcSegmentName.getTopicPartitionId().getPartitionId();
     ConsumerCoordinator consumerCoordinator = getConsumerCoordinator(partitionGroupId);
 
     // Create the segment data manager and register it

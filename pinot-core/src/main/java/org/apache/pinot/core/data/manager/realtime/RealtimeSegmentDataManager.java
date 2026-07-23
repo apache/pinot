@@ -1858,7 +1858,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    _partitionGroupId = llcSegmentName.getPartitionGroupId();
+    _partitionGroupId = llcSegmentName.getTopicPartitionId().getPartitionId();
     List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(_tableConfig);
     int numStreams = streamConfigMaps.size();
     if (numStreams == 1) {

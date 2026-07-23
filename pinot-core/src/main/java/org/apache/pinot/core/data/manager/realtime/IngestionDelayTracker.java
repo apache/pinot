@@ -485,7 +485,7 @@ public class IngestionDelayTracker {
    */
   public void stopTrackingPartition(String segmentName) {
     _segmentsToIgnore.put(segmentName, true);
-    removePartitionId(new LLCSegmentName(segmentName).getPartitionGroupId());
+    removePartitionId(new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId());
   }
 
   /**
@@ -535,7 +535,8 @@ public class IngestionDelayTracker {
       // Do not update the tracker state during server startup period or if the segment is marked to be ignored
       return;
     }
-    _partitionsMarkedForVerification.put(new LLCSegmentName(segmentName).getPartitionGroupId(), _clock.millis());
+    _partitionsMarkedForVerification.put(new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId(),
+        _clock.millis());
   }
 
   /**

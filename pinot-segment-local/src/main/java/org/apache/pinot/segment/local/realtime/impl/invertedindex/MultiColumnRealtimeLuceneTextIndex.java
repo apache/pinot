@@ -115,7 +115,7 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       _refreshListener = new RealtimeLuceneRefreshListener(llcSegmentName.getTableName(), segmentName,
           MultiColumnTextIndexConstants.INDEX_DIR_NAME,
-          llcSegmentName.getPartitionGroupId(), _indexCreator::getNumDocs);
+          llcSegmentName.getTopicPartitionId().getPartitionId(), _indexCreator::getNumDocs);
       _searcherManager.addListener(_refreshListener);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
       _queryParserClassConstructor =

@@ -1098,7 +1098,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
       if (stateMap != null
           && stateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
-        consumingPartitions.add(new LLCSegmentName(segmentName).getPartitionGroupId());
+        consumingPartitions.add(new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId());
       }
     }
     return consumingPartitions.size();

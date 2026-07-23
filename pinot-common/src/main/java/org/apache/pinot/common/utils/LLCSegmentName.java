@@ -34,7 +34,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormat.forPattern(DATE_FORMAT).withZoneUTC();
 
   private final String _tableName;
-  private final int _partitionGroupId;
+  private final TopicPartitionId _topicPartitionId;
   private final int _sequenceNumber;
   private final String _creationTime;
   private final String _segmentName;
@@ -43,7 +43,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
     Preconditions.checkArgument(parts.length == 4, "Invalid LLC segment name: %s", segmentName);
     _tableName = parts[0];
-    _partitionGroupId = Integer.parseInt(parts[1]);
+    _topicPartitionId = new TopicPartitionId(Integer.parseInt(parts[1]));
     _sequenceNumber = Integer.parseInt(parts[2]);
     _creationTime = parts[3];
     _segmentName = segmentName;
@@ -52,7 +52,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   public LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
     Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
     _tableName = tableName;
-    _partitionGroupId = partitionGroupId;
+    _topicPartitionId = new TopicPartitionId(partitionGroupId);
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
     _creationTime = DATE_FORMATTER.print(msSinceEpoch);
@@ -101,8 +101,13 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return _tableName;
   }
 
+  public TopicPartitionId getTopicPartitionId() {
+    return _topicPartitionId;
+  }
+
+  @Deprecated
   public int getPartitionGroupId() {
-    return _partitionGroupId;
+    return _topicPartitionId.getPartitionId();
   }
 
   public int getSequenceNumber() {
@@ -127,8 +132,9 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   public int compareTo(LLCSegmentName other) {
     Preconditions.checkArgument(_tableName.equals(other._tableName),
         "Cannot compare segment names from different table: %s, %s", _segmentName, other.getSegmentName());
-    if (_partitionGroupId != other._partitionGroupId) {
-      return Integer.compare(_partitionGroupId, other._partitionGroupId);
+    int cmp = _topicPartitionId.compareTo(other._topicPartitionId);
+    if (cmp != 0) {
+      return cmp;
     }
     return Integer.compare(_sequenceNumber, other._sequenceNumber);
   }
