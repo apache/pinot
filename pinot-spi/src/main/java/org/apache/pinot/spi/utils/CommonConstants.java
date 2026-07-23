@@ -941,7 +941,10 @@ public class CommonConstants {
         // divided across all servers processing the query.
         public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
 
-        // If query submission causes an exception, still continue to submit the query to other servers
+        // If a server is unavailable, still return results from the other servers instead of failing the query. This
+        // covers both a send-time failure at request submission and a mid-query channel-inactive / write failure: the
+        // unavailable server is skipped, its down status is recorded so the failure detector can quarantine it from
+        // routing, and the query returns partial results
         public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
 
         // Ignore server-side segment missing errors and proceed without marking the query as failed.
