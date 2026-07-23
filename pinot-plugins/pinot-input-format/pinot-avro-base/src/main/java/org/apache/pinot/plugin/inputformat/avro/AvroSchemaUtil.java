@@ -20,14 +20,21 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.avro.LogicalType;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// Stateless helpers for mapping between Avro schema shapes and Pinot's [DataType] / Avro JSON schema representations.
 public class AvroSchemaUtil {
+  // Avro logical-type name for UUID (see org.apache.avro.LogicalTypes). Value-level logical-type conversion lives
+  // in AvroRecordExtractor; this class only deals with schema-shape mapping.
+  private static final String UUID = "uuid";
+
   private AvroSchemaUtil() {
   }
 
@@ -60,7 +67,31 @@ public class AvroSchemaUtil {
     }
   }
 
-  /// Returns whether the given Avro type is a primitive type.
+  /**
+   * Returns the Pinot data type associated with the given Avro schema, including logical types.
+   *
+   * <p>Recognizes the UUID logical type on both STRING-backed schemas (Avro spec §logical-types.uuid) and FIXED(16)
+   * schemas (used by some producers including Confluent's fixed-uuid mode). Both forms arrive at
+   * {@link org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor} as either a {@link java.util.UUID} (for
+   * STRING-backed logical UUIDs) or a 16-byte {@code byte[]} (for FIXED-backed ones), and both are accepted by
+   * {@link org.apache.pinot.spi.utils.UuidUtils#toBytes(Object)}.
+   */
+  public static DataType valueOf(Schema schema) {
+    LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(schema);
+    if (logicalType != null && UUID.equals(logicalType.getName())) {
+      if (schema.getType() == Schema.Type.STRING) {
+        return DataType.UUID;
+      }
+      if (schema.getType() == Schema.Type.FIXED && schema.getFixedSize() == UuidUtils.UUID_NUM_BYTES) {
+        return DataType.UUID;
+      }
+    }
+    return valueOf(schema.getType());
+  }
+
+  /**
+   * @return if the given avro type is a primitive type.
+   */
   public static boolean isPrimitiveType(Schema.Type avroType) {
     switch (avroType) {
       case INT:
@@ -122,19 +153,23 @@ public class AvroSchemaUtil {
       case JSON:
         jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
         return jsonSchema;
-      case UUID:
-        // UUID is a logical type; represent it faithfully as an Avro string annotated with logicalType "uuid" rather
-        // than collapsing to raw bytes, so generated sample data round-trips as canonical UUID strings.
-        ObjectNode uuidType = JsonUtils.newObjectNode();
-        uuidType.put("type", "string");
-        uuidType.put("logicalType", "uuid");
-        ArrayNode uuidUnion = JsonUtils.newArrayNode();
-        uuidUnion.add("null");
-        uuidUnion.add(uuidType);
-        jsonSchema.set("type", uuidUnion);
-        return jsonSchema;
       case BYTES:
         jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
+        return jsonSchema;
+      case UUID:
+        // UUID is a logical type; represent it in Avro as a string carrying the "uuid" logical type (single-value),
+        // or an array of such strings (multi-value).
+        ObjectNode uuidType = JsonUtils.newObjectNode();
+        uuidType.put("type", "string");
+        uuidType.put("logicalType", UUID);
+        if (fieldSpec.isSingleValueField()) {
+          jsonSchema.set("type", convertToJsonArray("null", uuidType));
+        } else {
+          ObjectNode uuidArrayType = JsonUtils.newObjectNode();
+          uuidArrayType.put("type", "array");
+          uuidArrayType.set("items", uuidType);
+          jsonSchema.set("type", convertToJsonArray("null", uuidArrayType));
+        }
         return jsonSchema;
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
@@ -146,6 +181,13 @@ public class AvroSchemaUtil {
     for (String string : strings) {
       jsonArray.add(string);
     }
+    return jsonArray;
+  }
+
+  private static ArrayNode convertToJsonArray(String string, ObjectNode objectNode) {
+    ArrayNode jsonArray = JsonUtils.newArrayNode();
+    jsonArray.add(string);
+    jsonArray.add(objectNode);
     return jsonArray;
   }
 }

@@ -41,6 +41,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidKey;
 
 
 /**
@@ -149,6 +150,14 @@ public class NotInPredicateEvaluatorFactory {
           nonMatchingValues.add(value);
         }
         return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
+      }
+      case UUID: {
+        ByteArray[] uuidValues = notInPredicate.getUuidValues();
+        Set<UuidKey> nonMatchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(uuidValues.length));
+        for (ByteArray value : uuidValues) {
+          nonMatchingValues.add(UuidKey.fromByteArray(value));
+        }
+        return new UuidRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
@@ -489,6 +498,40 @@ public class NotInPredicateEvaluatorFactory {
     @Override
     public <R> R accept(Visitor<R> visitor) {
       return visitor.visitBytes(_nonMatchingValues);
+    }
+  }
+
+  private static final class UuidRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
+    final Set<UuidKey> _nonMatchingValues;
+
+    UuidRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Set<UuidKey> nonMatchingValues) {
+      super(notInPredicate);
+      _nonMatchingValues = nonMatchingValues;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return -_nonMatchingValues.size();
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.UUID;
+    }
+
+    @Override
+    public boolean applySV(byte[] value) {
+      return !_nonMatchingValues.contains(UuidKey.fromBytes(value));
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      Set<ByteArray> nonMatchingByteArrays =
+          new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(_nonMatchingValues.size()));
+      for (UuidKey nonMatchingValue : _nonMatchingValues) {
+        nonMatchingByteArrays.add(nonMatchingValue.toByteArray());
+      }
+      return visitor.visitBytes(nonMatchingByteArrays);
     }
   }
 }

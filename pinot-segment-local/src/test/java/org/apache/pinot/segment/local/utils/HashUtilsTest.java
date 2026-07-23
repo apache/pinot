@@ -21,9 +21,11 @@ package org.apache.pinot.segment.local.utils;
 import java.util.UUID;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -47,6 +49,7 @@ public class HashUtilsTest {
     // Test happy cases: when all UUID values are valid
     testHashUUID(new UUID[]{UUID.randomUUID()});
     testHashUUID(new UUID[]{UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()});
+    testHashUUIDNormalizedPrimaryKeyValues();
 
     // Test failure scenario when there's a non-null invalid uuid value
     PrimaryKey invalidUUIDs = new PrimaryKey(new String[]{"some-random-string"});
@@ -62,6 +65,80 @@ public class HashUtilsTest {
     } catch (IllegalArgumentException e) {
       assertTrue(e.getMessage().contains("Found null value"));
     }
+  }
+
+  @Test
+  public void testHashUUIDNormalizedPrimaryKeyValues() {
+    UUID firstUuid = UUID.randomUUID();
+    UUID secondUuid = UUID.randomUUID();
+
+    byte[] expectedHash = HashUtils.hashUUID(new PrimaryKey(new Object[]{firstUuid, secondUuid}));
+    assertEquals(HashUtils.hashUUID(new PrimaryKey(
+        new Object[]{new ByteArray(UuidUtils.toBytes(firstUuid)), new ByteArray(UuidUtils.toBytes(secondUuid))})),
+        expectedHash);
+    assertEquals(HashUtils.hashUUID(
+        new PrimaryKey(new Object[]{UuidUtils.toBytes(firstUuid), UuidUtils.toBytes(secondUuid)})), expectedHash);
+  }
+
+  /**
+   * Regression: {@link HashUtils#hashUUID} must accept non-canonical-but-Java-parseable UUID strings
+   * (e.g. {@code "1-2-3-4-5"}) so existing upsert tables using {@code HashFunction.UUID} keep producing
+   * the same hash before and after this PR. {@link UuidUtils#toBytes(String)} is strict and would reject
+   * such inputs — for the legacy hash path we route String inputs through {@code UUID.fromString} directly
+   * to preserve the lenient pre-PR behavior.
+   */
+  @Test
+  public void testHashUUIDLenientForNonCanonicalStrings() {
+    String nonCanonical = "1-2-3-4-5";
+    UUID expected = UUID.fromString(nonCanonical);
+
+    byte[] hashResult = HashUtils.hashUUID(new PrimaryKey(new Object[]{nonCanonical}));
+    assertEquals(hashResult.length, 16);
+
+    long msb = 0;
+    long lsb = 0;
+    for (int i = 0; i < 8; i++) {
+      msb = (msb << 8) | (hashResult[i] & 0xFF);
+    }
+    for (int i = 8; i < 16; i++) {
+      lsb = (lsb << 8) | (hashResult[i] & 0xFF);
+    }
+    assertEquals(new UUID(msb, lsb), expected,
+        "hashUUID(\"1-2-3-4-5\") must equal UUID.fromString output for backward compatibility");
+  }
+
+  /**
+   * Multi-column PK regression: each element must independently round-trip through the lenient
+   * {@code UUID.fromString} path. A composite PK mixing one non-canonical and one canonical UUID must
+   * produce a 32-byte concatenation where each 16-byte half matches its corresponding
+   * {@code UUID.fromString} output.
+   */
+  @Test
+  public void testHashUUIDLenientForMultiColumnPrimaryKey() {
+    String nonCanonical = "1-2-3-4-5";
+    String canonical = "550e8400-e29b-41d4-a716-446655440000";
+    UUID expectedFirst = UUID.fromString(nonCanonical);
+    UUID expectedSecond = UUID.fromString(canonical);
+
+    byte[] hashResult = HashUtils.hashUUID(new PrimaryKey(new Object[]{nonCanonical, canonical}));
+    assertEquals(hashResult.length, 32, "Two-column PK must produce 32 bytes (16 per UUID)");
+
+    assertEquals(reconstructUuid(hashResult, 0), expectedFirst,
+        "First half must match UUID.fromString of the non-canonical input");
+    assertEquals(reconstructUuid(hashResult, 16), expectedSecond,
+        "Second half must match UUID.fromString of the canonical input");
+  }
+
+  private static UUID reconstructUuid(byte[] hashBytes, int offset) {
+    long msb = 0;
+    long lsb = 0;
+    for (int i = 0; i < 8; i++) {
+      msb = (msb << 8) | (hashBytes[offset + i] & 0xFF);
+    }
+    for (int i = 0; i < 8; i++) {
+      lsb = (lsb << 8) | (hashBytes[offset + 8 + i] & 0xFF);
+    }
+    return new UUID(msb, lsb);
   }
 
   @Test
