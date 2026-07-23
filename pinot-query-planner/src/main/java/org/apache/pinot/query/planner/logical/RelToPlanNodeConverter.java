@@ -64,6 +64,7 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.calcite.rel.logical.RuntimeFilterRel;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -79,6 +80,7 @@ import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -150,6 +152,8 @@ public final class RelToPlanNodeConverter {
       result = convertLogicalAggregate((PinotLogicalAggregate) node);
     } else if (node instanceof LogicalSort) {
       result = convertLogicalSort((LogicalSort) node);
+    } else if (node instanceof RuntimeFilterRel) {
+      result = convertRuntimeFilter((RuntimeFilterRel) node);
     } else if (node instanceof Exchange) {
       result = convertLogicalExchange((Exchange) node);
     } else if (node instanceof LogicalJoin) {
@@ -616,6 +620,25 @@ public final class RelToPlanNodeConverter {
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), convertInputs(node.getInputs()),
         exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null, null,
         _hashFunction);
+  }
+
+  private RuntimeFilterNode convertRuntimeFilter(RuntimeFilterRel node) {
+    return new RuntimeFilterNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), null,
+        convertInputs(node.getInputs()), node.getProbeKeys(), node.getBuildKeys(),
+        convertRuntimeFilterType(node.getFilterType()));
+  }
+
+  private static RuntimeFilterNode.Type convertRuntimeFilterType(RuntimeFilterRel.RuntimeFilterType filterType) {
+    switch (filterType) {
+      case IN:
+        return RuntimeFilterNode.Type.IN;
+      case BLOOM:
+        return RuntimeFilterNode.Type.BLOOM;
+      case AUTO:
+        return RuntimeFilterNode.Type.AUTO;
+      default:
+        throw new IllegalStateException("Unsupported RuntimeFilterType: " + filterType);
+    }
   }
 
   private SetOpNode convertLogicalSetOp(SetOp node) {

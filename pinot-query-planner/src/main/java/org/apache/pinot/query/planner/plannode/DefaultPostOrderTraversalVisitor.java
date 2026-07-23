@@ -114,4 +114,14 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNode
     node.getInputs().get(0).visit(this, context);
     return process(node, context);
   }
+
+  @Override
+  public T visitRuntimeFilter(RuntimeFilterNode node, C context) {
+    // input[0] is the probe pipeline, input[1] is the pipeline-breaker receive carrying the build keys.
+    // Both must be traversed so the pipeline breaker is discovered and its mailbox assigned, mirroring
+    // how visitJoin traverses the SEMI dynamic-broadcast receive.
+    node.getInputs().get(0).visit(this, context);
+    node.getInputs().get(1).visit(this, context);
+    return process(node, context);
+  }
 }

@@ -840,4 +840,31 @@ public class QueryOptionsUtils {
     }
     return i;
   }
+
+  /**
+   * Resolves whether the additive INNER-join probe-side runtime filter is enabled for this query.
+   * The {@link QueryOptionKey#RUNTIME_FILTER_JOIN} query option (if present) overrides the cluster
+   * default. This is an enable/disable switch: {@code off}/{@code false} disable, {@code on}/{@code true}
+   * enable (defaulting to the AUTO tier); any other value throws. The per-join reducer mode (in / bloom /
+   * auto) is selected via the {@code runtime_filter} join hint, not this option. NOTE: this only resolves
+   * the cluster/query-level default — a per-join {@code runtime_filter} hint can still force-enable when
+   * this is false.
+   */
+  public static boolean getRuntimeFilterJoinEnabled(Map<String, String> options, boolean defaultValue) {
+    String value = options.get(QueryOptionKey.RUNTIME_FILTER_JOIN);
+    if (value == null) {
+      return defaultValue;
+    }
+    switch (value.toLowerCase()) {
+      case "off":
+      case "false":
+        return false;
+      case "on":
+      case "true":
+        return true;
+      default:
+        throw new IllegalArgumentException(QueryOptionKey.RUNTIME_FILTER_JOIN
+            + " must be one of: on, off (or true/false), got: " + value);
+    }
+  }
 }

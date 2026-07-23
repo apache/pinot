@@ -610,6 +610,31 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN = true;
 
     /**
+     * Enables the additive probe-side runtime filter for equi-INNER joins (build the small build side's
+     * join keys into a reducer pushed onto the probe leaf scan). Disabled by default; can be
+     * force-enabled per-join via the {@code runtime_filter} join hint.
+     * <p>NOTE: requires all servers to support {@code RuntimeFilterNode}; enabling it (or using the
+     * {@code runtime_filter} hint) on a mixed-version cluster mid-rolling-upgrade will cause query
+     * failures on not-yet-upgraded servers.
+     */
+    public static final String CONFIG_OF_BROKER_ENABLE_RUNTIME_FILTER_JOIN =
+        "pinot.broker.enable.runtime.filter.join";
+    public static final boolean DEFAULT_ENABLE_RUNTIME_FILTER_JOIN = false;
+    // Runtime-filter sizing knobs are fixed defaults (not cluster-configurable). They affect
+    // only filter selectivity/size, never correctness (the real hash join is the source of truth). The
+    // planner and the leaf both read these same constants so their decisions stay aligned.
+    /** Build-key row count at/below which the {@code AUTO} runtime filter uses an exact IN list rather
+     * than a bloom (the build keys are not deduplicated, so this counts rows, not distinct values). */
+    public static final int DEFAULT_RUNTIME_FILTER_MAX_IN_SIZE = 10_000;
+    /** Max build-key rows materialized for a runtime filter, enforced as a planner fetch cap; above it the
+     * filter is abandoned because the truncated key set would be incomplete (would risk false negatives). */
+    public static final int DEFAULT_RUNTIME_FILTER_MAX_BUILD_ROWS = 1 << 20;
+    /** Target false-positive probability for the bloom runtime filter tier. */
+    public static final double DEFAULT_RUNTIME_FILTER_FPP = 0.01;
+    /** Max serialized size of a bloom runtime filter; above this the filter is abandoned. */
+    public static final int DEFAULT_RUNTIME_FILTER_MAX_BYTES = 16 * 1024 * 1024;
+
+    /**
      * Whether to use physical optimizer by default.
      * This value can always be overridden by {@link Request.QueryOptionKey#USE_PHYSICAL_OPTIMIZER} query option
      */
@@ -1032,6 +1057,13 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
+
+        /// Per-query enable/disable override for [Broker#CONFIG_OF_BROKER_ENABLE_RUNTIME_FILTER_JOIN].
+        /// Accepts `off`/`false` (disable) or `on`/`true` (enable, defaulting to the AUTO tier). The
+        /// per-join reducer mode (in / bloom / auto) is selected via the `runtime_filter` join hint, not
+        /// this option. Disabling on a mixed-version cluster is the safe default; enabling
+        /// mid-rolling-upgrade can fail on not-yet-upgraded servers.
+        public static final String RUNTIME_FILTER_JOIN = "runtimeFilterJoin";
 
         // Vector search query options
 

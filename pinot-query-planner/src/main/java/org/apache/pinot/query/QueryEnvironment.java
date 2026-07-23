@@ -59,6 +59,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
+import org.apache.pinot.calcite.rel.rules.PinotJoinToInnerRuntimeFilterRule;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
@@ -215,8 +216,11 @@ public class QueryEnvironment {
         _envConfig.defaultSortExchangeCopyLimit());
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(options,
         _envConfig.defaultUsePhysicalOptimizer());
+    boolean enableRuntimeFilterJoin = QueryOptionsUtils.getRuntimeFilterJoinEnabled(options,
+        _envConfig.defaultEnableRuntimeFilterJoin());
     HepProgram traitProgram = getTraitProgram(
-        workerManager, _envConfig, usePhysicalOptimizer, useRuleSet, sortExchangeCopyLimit);
+        workerManager, _envConfig, usePhysicalOptimizer, useRuleSet, sortExchangeCopyLimit,
+        enableRuntimeFilterJoin);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
@@ -649,7 +653,8 @@ public class QueryEnvironment {
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,
-      boolean usePhysicalOptimizer, Set<String> useRuleSet, int sortExchangeCopyLimit) {
+      boolean usePhysicalOptimizer, Set<String> useRuleSet, int sortExchangeCopyLimit,
+      boolean enableRuntimeFilterJoin) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     PinotRuleSet ruleSet = config.getRuleSet();
 
@@ -659,9 +664,10 @@ public class QueryEnvironment {
     // ----
     // Run pinot specific rules that should run after all other rules, using 1 HepInstruction per rule.
     if (!usePhysicalOptimizer) {
-      // POST_LOGICAL list comes from PinotRuleSet; we copy it because we may need to
-      // swap every PinotSortExchangeCopyRule with one configured for the per-query
-      // (or broker-config) sortExchangeCopyLimit if it differs from the rule's default.
+      // POST_LOGICAL list comes from PinotRuleSet; we copy it because a couple of its rules are swapped
+      // for per-query-configured instances (the rule classes themselves are positioned in PinotRuleSet):
+      //   - PinotSortExchangeCopyRule, configured with the per-query/broker sortExchangeCopyLimit;
+      //   - PinotJoinToInnerRuntimeFilterRule, configured with the resolved runtime-filter enable flag.
       List<RelOptRule> postLogical = new ArrayList<>(ruleSet.rulesFor(Phase.POST_LOGICAL));
       if (sortExchangeCopyLimit != PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY.config.getFetchLimitThreshold()) {
         PinotSortExchangeCopyRule overridden = ImmutablePinotSortExchangeCopyRule.Config.builder()
@@ -671,6 +677,8 @@ public class QueryEnvironment {
             .toRule();
         postLogical.replaceAll(r -> r instanceof PinotSortExchangeCopyRule ? overridden : r);
       }
+      postLogical.replaceAll(r -> r instanceof PinotJoinToInnerRuntimeFilterRule
+          ? new PinotJoinToInnerRuntimeFilterRule(PinotRuleUtils.PINOT_REL_FACTORY, enableRuntimeFilterJoin) : r);
       for (RelOptRule relOptRule : postLogical) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
           hepProgramBuilder.addRuleInstance(relOptRule);
@@ -822,6 +830,17 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultEnableDynamicFilteringSemiJoin() {
       return CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN;
+    }
+
+    /**
+     * Whether the additive INNER-join probe-side runtime filter is enabled by default. Disabled by
+     * default; can be overridden per-query by {@link
+     * CommonConstants.Broker.Request.QueryOptionKey#RUNTIME_FILTER_JOIN} or force-enabled per-join via
+     * the {@code runtime_filter} join hint.
+     */
+    @Value.Default
+    default boolean defaultEnableRuntimeFilterJoin() {
+      return CommonConstants.Broker.DEFAULT_ENABLE_RUNTIME_FILTER_JOIN;
     }
 
     /**

@@ -32,6 +32,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -261,6 +262,18 @@ public class EquivalentStagesFinder {
       }
 
       @Deprecated(forRemoval = true, since = "1.6.0")
+      @Override
+      public Boolean visitRuntimeFilter(RuntimeFilterNode node1, PlanNode node2) {
+        if (!(node2 instanceof RuntimeFilterNode)) {
+          return false;
+        }
+        RuntimeFilterNode that = (RuntimeFilterNode) node2;
+        return areBaseNodesEquivalent(node1, node2)
+            && Objects.equals(node1.getProbeKeys(), that.getProbeKeys())
+            && Objects.equals(node1.getBuildKeys(), that.getBuildKeys())
+            && node1.getType() == that.getType();
+      }
+
       @Override
       public Boolean visitEnrichedJoin(EnrichedJoinNode node1, PlanNode node2) {
         if (!(node2 instanceof EnrichedJoinNode)) {

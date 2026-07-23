@@ -42,6 +42,7 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -87,6 +88,8 @@ public class PlanNodeDeserializer {
         return deserializeEnrichedJoinNode(protoNode);
       case UNNESTNODE:
         return deserializeUnnestNode(protoNode);
+      case RUNTIMEFILTERNODE:
+        return deserializeRuntimeFilterNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -258,6 +261,26 @@ public class PlanNodeDeserializer {
 
     return new UnnestNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), arrayExprs, context);
+  }
+
+  private static RuntimeFilterNode deserializeRuntimeFilterNode(Plan.PlanNode protoNode) {
+    Plan.RuntimeFilterNode protoRuntimeFilterNode = protoNode.getRuntimeFilterNode();
+    return new RuntimeFilterNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), protoRuntimeFilterNode.getProbeKeysList(), protoRuntimeFilterNode.getBuildKeysList(),
+        convertRuntimeFilterType(protoRuntimeFilterNode.getFilterType()));
+  }
+
+  private static RuntimeFilterNode.Type convertRuntimeFilterType(Plan.RuntimeFilterType filterType) {
+    switch (filterType) {
+      case IN:
+        return RuntimeFilterNode.Type.IN;
+      case BLOOM:
+        return RuntimeFilterNode.Type.BLOOM;
+      case AUTO:
+        return RuntimeFilterNode.Type.AUTO;
+      default:
+        throw new IllegalStateException("Unsupported RuntimeFilterType: " + filterType);
+    }
   }
 
   private static DataSchema extractDataSchema(Plan.DataSchema protoDataSchema) {

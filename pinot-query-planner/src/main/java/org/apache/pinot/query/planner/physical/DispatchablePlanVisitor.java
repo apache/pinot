@@ -39,6 +39,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -120,6 +121,13 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   @Override
   public Void visitEnrichedJoin(EnrichedJoinNode node, DispatchablePlanContext context) {
     visitJoin(node, context);
+    return null;
+  }
+
+  @Override
+  public Void visitRuntimeFilter(RuntimeFilterNode node, DispatchablePlanContext context) {
+    node.getInputs().forEach(input -> input.visit(this, context));
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 
