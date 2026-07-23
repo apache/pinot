@@ -154,7 +154,8 @@ public class ServerChannelsTest {
     }
 
     verify(mockChannel).close();
-    verify(asyncQueryResponse).markServerDown(any(ServerRoutingInstance.class), any(Exception.class));
+
+    verify(asyncQueryResponse).markServerUnavailable(any(ServerRoutingInstance.class), any(Exception.class));
     verify(asyncQueryResponse, never()).markRequestSent(any(ServerRoutingInstance.class), any(Integer.class));
 
     serverChannels.shutDown();
@@ -191,7 +192,7 @@ public class ServerChannelsTest {
     }
 
     verify(asyncQueryResponse).markRequestSent(any(ServerRoutingInstance.class), any(Integer.class));
-    verify(asyncQueryResponse, never()).markServerDown(any(ServerRoutingInstance.class), any(Exception.class));
+    verify(asyncQueryResponse, never()).markServerUnavailable(any(ServerRoutingInstance.class), any(Exception.class));
     verify(mockChannel, never()).close();
 
     serverChannels.shutDown();
