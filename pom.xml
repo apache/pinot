@@ -328,7 +328,10 @@
 
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
-    <junit-jupiter-api.version>5.14.4</junit-jupiter-api.version>
+    <!-- JUnit BOM aligns junit-platform, jupiter, and vintage on a single (unified) version -->
+    <junit-bom.version>6.0.3</junit-bom.version>
+    <!-- TestNG engine for the JUnit Platform: runs existing TestNG tests under the platform -->
+    <testng-engine.version>1.1.0</testng-engine.version>
     <mockito-core.version>5.23.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>2.0.5</testcontainers.version>
@@ -1990,10 +1993,21 @@
         <scope>test</scope>
       </dependency>
 
+      <!-- JUnit Platform / Jupiter / Vintage BOM (unified versioning since JUnit 6) -->
       <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit-jupiter-api.version}</version>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit-bom.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- TestNG engine for the JUnit Platform: lets the junit-platform provider run
+           existing TestNG tests unchanged alongside new JUnit Jupiter tests -->
+      <dependency>
+        <groupId>org.junit.support</groupId>
+        <artifactId>testng-engine</artifactId>
+        <version>${testng-engine.version}</version>
         <scope>test</scope>
       </dependency>
 
@@ -2182,6 +2196,7 @@
               --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
               --add-opens=java.base/java.lang=ALL-UNNAMED
               --add-opens=java.base/java.util=ALL-UNNAMED
+              --add-opens=java.base/java.net=ALL-UNNAMED
               --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
               --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
               --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
@@ -2193,14 +2208,12 @@
               -XX:+EnableDynamicAgentLoading
             </argLine>
           </configuration>
-          <!-- Explicitly select the test provider, instead of relying on the classpath -->
-          <dependencies>
-            <dependency>
-              <groupId>org.apache.maven.surefire</groupId>
-              <artifactId>surefire-testng</artifactId>
-              <version>${surefire.version}</version>
-            </dependency>
-          </dependencies>
+          <!-- No explicit provider dependency: Surefire auto-selects its junit-platform
+               provider once a JUnit Platform engine is on the test classpath. Each test
+               module declares testng-engine + junit-platform-launcher (and junit-jupiter
+               where it has Jupiter tests) next to org.testng:testng; the launcher must be a
+               test-classpath dependency so it stays version-aligned with the engines in the
+               forked JVM (Surefire's bundled launcher is an older, incompatible version). -->
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

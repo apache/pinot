@@ -49,6 +49,18 @@
       <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- JUnit Platform engine that runs these TestNG tests, plus the launcher
+         (must be a test-classpath dependency to stay version-aligned with the engines). -->
+    <dependency>
+      <groupId>org.junit.support</groupId>
+      <artifactId>testng-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

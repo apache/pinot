@@ -151,11 +151,15 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
+            <!-- Former custom-cluster-integration-test-suite.xml scanned the
+                 org.apache.pinot.integration.tests.custom package. The TestNG engine does
+                 not support testng.xml suites, so select that package via an include glob;
+                 the engine runs the matched TestNG classes (the abstract base is skipped). -->
             <configuration>
               <skipTests>false</skipTests>
-              <suiteXmlFiles>
-                <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
-              </suiteXmlFiles>
+              <includes>
+                <include>**/integration/tests/custom/*Test.java</include>
+              </includes>
             </configuration>
           </plugin>
         </plugins>
@@ -265,6 +269,18 @@
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- JUnit Platform engine that runs these TestNG tests, plus the launcher
+         (must be a test-classpath dependency to stay version-aligned with the engines). -->
+    <dependency>
+      <groupId>org.junit.support</groupId>
+      <artifactId>testng-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
