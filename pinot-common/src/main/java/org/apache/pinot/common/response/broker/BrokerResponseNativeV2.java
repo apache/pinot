@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.response.broker;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
@@ -495,6 +496,10 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return Map.of();
   }
 
+  // JsonIgnore(false) re-enables the property here: the interface default getter is @JsonIgnore
+  // (so it does not register responseMetadata as a known setterless property on legacy impls that
+  // don't override it), and that ignore would otherwise be inherited by this override.
+  @JsonIgnore(false)
   @JsonProperty("responseMetadata")
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @Override

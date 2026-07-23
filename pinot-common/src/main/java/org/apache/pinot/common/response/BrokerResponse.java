@@ -469,6 +469,14 @@ public interface BrokerResponse {
   /// This is distinct from [#getTraceInfo()] (per-server trace strings, only populated when tracing
   /// is enabled) and from [#getExceptions()] (the error/warning list). The default is an empty,
   /// unmodifiable map for implementations that do not support response metadata.
+  ///
+  /// Marked [JsonIgnore] on the interface default so it does not register `responseMetadata` as a
+  /// known (setterless) property on deserializable implementations such as `BrokerResponseNative`
+  /// that do not override it. Otherwise Jackson would try to populate the immutable [Map#of()]
+  /// returned here via USE_GETTERS_AS_SETTERS and fail with an [UnsupportedOperationException] when
+  /// a legacy response carries a non-empty `responseMetadata`. Concrete implementations that support
+  /// the field re-expose it by overriding this method with an explicit [JsonProperty].
+  @JsonIgnore
   default Map<String, JsonNode> getResponseMetadata() {
     return Map.of();
   }
