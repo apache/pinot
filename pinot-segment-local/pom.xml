@@ -39,6 +39,12 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
     </dependency>
+    <!-- Java 21+ (Panama FFM) PinotDataBuffer implementation, opt-in via pinot.offheap.buffer.factory. Kept in its own
+         Java 25 module so pinot-segment-spi can stay Java 11 for driver/client consumers. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi-foreign</artifactId>
+    </dependency>
 
     <!-- Lucene dependencies -->
     <dependency>

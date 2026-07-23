@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.spi.memory.ByteBufferPinotBufferFactory;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.SmallWithFallbackPinotBufferFactory;
+import org.apache.pinot.segment.spi.memory.foreign.ForeignPinotBufferFactory;
 import org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -49,9 +50,16 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 3, time = 1)
+// Mirror the --add-opens that the production launcher (appAssemblerScriptTemplate) and surefire pass on JDK 11+. The
+// Unsafe/Chronicle mmap path (sun.nio.ch) and Netty's zero-copy path require them; without them the "unsafe" factory
+// fails in the forked JVM.
 @Fork(value = 1, jvmArgsPrepend = {
     "--add-opens=java.base/java.nio=ALL-UNNAMED",
-    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+    "--add-opens=java.base/java.util=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED"
 })
 @State(Scope.Benchmark)
 public class BenchmarkPinotDataBuffer {
@@ -60,7 +68,7 @@ public class BenchmarkPinotDataBuffer {
 
   @Param({"1", "32", "1024"})
   private int _valueLength;
-  @Param({"bytebuffer", "unsafe", "wrapper+unsafe"})
+  @Param({"bytebuffer", "unsafe", "wrapper+unsafe", "foreign", "wrapper+foreign"})
   private String _bufferLibrary;
   private byte[] _bytes;
   private PinotDataBuffer _buffer;
@@ -101,6 +109,13 @@ public class BenchmarkPinotDataBuffer {
       case "wrapper+unsafe":
         PinotDataBuffer.useFactory(new SmallWithFallbackPinotBufferFactory(
             new ByteBufferPinotBufferFactory(), new UnsafePinotBufferFactory()));
+        break;
+      case "foreign":
+        PinotDataBuffer.useFactory(new ForeignPinotBufferFactory());
+        break;
+      case "wrapper+foreign":
+        PinotDataBuffer.useFactory(new SmallWithFallbackPinotBufferFactory(
+            new ByteBufferPinotBufferFactory(), new ForeignPinotBufferFactory()));
         break;
       default:
         throw new IllegalArgumentException("Unrecognized buffer library \"" + _bufferLibrary + "\"");

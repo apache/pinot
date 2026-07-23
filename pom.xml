@@ -42,6 +42,7 @@
     <module>pinot-dependency-verifier</module>
     <module>pinot-spi</module>
     <module>pinot-segment-spi</module>
+    <module>pinot-segment-spi-foreign</module>
     <module>pinot-broker</module>
     <module>pinot-common</module>
     <module>pinot-clients</module>
