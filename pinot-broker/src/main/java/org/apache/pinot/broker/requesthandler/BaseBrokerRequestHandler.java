@@ -29,6 +29,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -36,6 +37,14 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlOrderBy;
+import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
@@ -58,6 +67,10 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -69,6 +82,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -189,6 +203,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
     }
 
+    //check if we need to add extra time based pruning.
+    applySkipOutOfRetentionValuesIfNeeded(sqlNodeAndOptions);
     // check app qps before doing anything
     String application = sqlNodeAndOptions.getOptions().get(QueryOptionKey.APPLICATION_NAME);
     if (application != null && !_queryQuotaManager.acquireApplication(application)) {
@@ -479,5 +495,111 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   protected boolean isQueryCancellationEnabled() {
     return _enableQueryCancellation;
+  }
+
+  /**
+   * Appends a where clause to the query to filter out of retention data if SKIP_OUT_OF_RETENTION_VALUES is
+   * set to True in query Options.
+   * @param sqlNodeAndOptions
+   */
+  private void applySkipOutOfRetentionValuesIfNeeded(SqlNodeAndOptions sqlNodeAndOptions) {
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
+    if (!Boolean.parseBoolean(options.get(QueryOptionKey.SKIP_OUT_OF_RETENTION_VALUES))) {
+      return;
+    }
+
+    SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
+    if (sqlNode == null) {
+      return;
+    }
+
+    // Resolve the inner SqlSelect, unwrapping SqlOrderBy if needed.
+    // SqlWith (CTEs) and other statement types are not supported.
+    SqlSelect sqlSelect;
+    if (sqlNode instanceof SqlSelect) {
+      sqlSelect = (SqlSelect) sqlNode;
+    } else if (sqlNode instanceof SqlOrderBy) {
+      SqlNode query = ((SqlOrderBy) sqlNode).query;
+      if (!(query instanceof SqlSelect)) {
+        return;
+      }
+      sqlSelect = (SqlSelect) query;
+    } else {
+      return;
+    }
+
+    TableNameExtractor tableNameExtractor = new TableNameExtractor();
+    tableNameExtractor.extractTableNames(sqlSelect);
+    Set<String> tableNames = tableNameExtractor.getTableNames();
+    if (tableNames.isEmpty()) {
+      return;
+    }
+
+    // Multi-table queries (JOINs) are not supported: it is ambiguous which table's retention
+    // applies, and injecting a filter with the wrong table's time column would produce
+    // incorrect results. Callers must issue separate single-table queries.
+    if (tableNames.size() > 1) {
+      LOGGER.debug("skipOutOfRetentionValues is not supported for multi-table queries; skipping filter injection");
+      return;
+    }
+
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNames.iterator().next());
+
+    TableConfig tableConfig = _tableCache.getTableConfig(rawTableName);
+    Schema schema = _tableCache.getSchema(rawTableName);
+    if (tableConfig == null || schema == null || tableConfig.getValidationConfig() == null) {
+      return;
+    }
+
+    //get timestamp column and retention details
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    String retentionTimeUnit = tableConfig.getValidationConfig().getRetentionTimeUnit();
+    String retentionTimeValue = tableConfig.getValidationConfig().getRetentionTimeValue();
+    if (StringUtils.isEmpty(timeColumnName) || StringUtils.isEmpty(retentionTimeUnit)
+        || StringUtils.isEmpty(retentionTimeValue)) {
+      return;
+    }
+    try {
+      long retentionTimeMs =
+          TimeUnit.valueOf(retentionTimeUnit.toUpperCase()).toMillis(Long.parseLong(retentionTimeValue));
+      long cutoffMs = System.currentTimeMillis() - retentionTimeMs;
+      DateTimeFieldSpec timeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+      if (timeFieldSpec == null) {
+        return;
+      }
+
+      DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(timeFieldSpec.getFormat());
+      String formattedCutoffTime = formatSpec.fromMillisToFormat(cutoffMs);
+
+      //add where clause to the AST
+      SqlIdentifier timeColNode = new SqlIdentifier(timeColumnName, SqlParserPos.ZERO);
+      SqlLiteral cutoffNode;
+      if (timeFieldSpec.getDataType().isNumeric()) {
+        cutoffNode = SqlLiteral.createExactNumeric(formattedCutoffTime, SqlParserPos.ZERO);
+      } else {
+        cutoffNode = SqlLiteral.createCharString(formattedCutoffTime, SqlParserPos.ZERO);
+      }
+
+      SqlBasicCall rangeFilter = new SqlBasicCall(
+          SqlStdOperatorTable.GREATER_THAN_OR_EQUAL, List.of(timeColNode, cutoffNode),
+          SqlParserPos.ZERO);
+
+      SqlNode existingWhere = sqlSelect.getWhere();
+      if (existingWhere != null) {
+        //add an AND if the where exists
+        SqlBasicCall andExpr = new SqlBasicCall(
+            SqlStdOperatorTable.AND,
+            List.of(existingWhere, rangeFilter),
+            SqlParserPos.ZERO
+        );
+        sqlSelect.setWhere(andExpr);
+      } else {
+        sqlSelect.setWhere(rangeFilter);
+      }
+      LOGGER.debug("Injected Calcite AST filter for skipOutOfRetentionValues on table: {}. Cutoff: {}", rawTableName,
+          formattedCutoffTime);
+    } catch (RuntimeException e) {
+      throw new IllegalStateException("Failed to apply skipOutOfRetentionValues on table: " + rawTableName, e);
+    }
   }
 }

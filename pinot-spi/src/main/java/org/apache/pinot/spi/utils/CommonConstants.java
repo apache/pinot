@@ -1064,6 +1064,9 @@ public class CommonConstants {
         /** Controls whether HNSW uses a bounded top-K collector queue. Defaults to true.
          *  Setting false uses an unbounded per-query collector and requires vectorEfSearch. */
         public static final String VECTOR_USE_BOUNDED_QUEUE = "vectorUseBoundedQueue";
+
+        /** Controls whether out of retention records are excluded at query time. Defaults to false. */
+        public static final String SKIP_OUT_OF_RETENTION_VALUES = "skipOutOfRetentionValues";
       }
 
       public static class QueryOptionValue {
