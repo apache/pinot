@@ -369,21 +369,56 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     // Window functions are only supported in the multi-stage query engine
     setUseMultiStageQueryEngine(true);
     String sqlQuery =
-        "SELECT salary, LAST_VALUE(salary) IGNORE NULLS OVER (ORDER BY DaysSinceEpoch) AS gapfilledSalary from "
-            + "mytable";
+        "SELECT salary, "
+            + "LAST_VALUE(salary) IGNORE NULLS OVER (ORDER BY DaysSinceEpoch) AS gapfilledSalary, "
+            + "LAG(salary) IGNORE NULLS OVER (ORDER BY DaysSinceEpoch) AS prevSalary, "
+            + "LEAD(salary) IGNORE NULLS OVER (ORDER BY DaysSinceEpoch) AS nextSalary "
+            + "FROM mytable";
     JsonNode response = postQuery(sqlQuery);
     assertNoError(response);
-
-    // Check if the LAST_VALUE window function with IGNORE NULLS has effectively gap-filled the salary values
-    Integer lastSalary = null;
     JsonNode rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < rows.size(); i++) {
+    int numRows = rows.size();
+    // The rows are returned in the shared window ORDER BY (DaysSinceEpoch) order, so scanning them in iteration order
+    // reproduces each window function's per-row result even when DaysSinceEpoch has ties (both the window computation
+    // and the verification below see the same row sequence).
+
+    // LAST_VALUE(salary) IGNORE NULLS gap-fills each row with the most recent non-null salary (including itself).
+    Integer lastSalary = null;
+    for (int i = 0; i < numRows; i++) {
       JsonNode row = rows.get(i);
       if (!row.get(0).isNull()) {
         lastSalary = row.get(0).asInt();
-        assertEquals(row.get(1).asInt(), lastSalary);
+        assertEquals(row.get(1).asInt(), (int) lastSalary);
       } else {
         assertEquals(row.get(1).numberValue(), lastSalary);
+      }
+    }
+
+    // LAG(salary) IGNORE NULLS returns the closest preceding non-null salary, or null before the first non-null one.
+    Integer prevNonNullSalary = null;
+    for (int i = 0; i < numRows; i++) {
+      JsonNode row = rows.get(i);
+      if (prevNonNullSalary == null) {
+        assertTrue(row.get(2).isNull());
+      } else {
+        assertEquals(row.get(2).asInt(), (int) prevNonNullSalary);
+      }
+      if (!row.get(0).isNull()) {
+        prevNonNullSalary = row.get(0).asInt();
+      }
+    }
+
+    // LEAD(salary) IGNORE NULLS returns the closest following non-null salary, or null after the last non-null one.
+    Integer nextNonNullSalary = null;
+    for (int i = numRows - 1; i >= 0; i--) {
+      JsonNode row = rows.get(i);
+      if (nextNonNullSalary == null) {
+        assertTrue(row.get(3).isNull());
+      } else {
+        assertEquals(row.get(3).asInt(), (int) nextNonNullSalary);
+      }
+      if (!row.get(0).isNull()) {
+        nextNonNullSalary = row.get(0).asInt();
       }
     }
   }
