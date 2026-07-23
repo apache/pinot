@@ -268,6 +268,7 @@ public class NonblockingGroupByCombineOperatorTest {
   private static class ContendedNonblockingGroupByCombineOperator extends NonblockingGroupByCombineOperator {
     private final CountDownLatch _firstFailedDeposits;
     private final CyclicBarrier _firstStealBarrier;
+    private final CyclicBarrier _firstStealCompletedBarrier;
     private final ThreadLocal<Boolean> _firstDeposit = ThreadLocal.withInitial(() -> true);
     private final ThreadLocal<Boolean> _firstSteal = ThreadLocal.withInitial(() -> true);
     private final AtomicInteger _nullSteals = new AtomicInteger();
@@ -277,6 +278,7 @@ public class NonblockingGroupByCombineOperatorTest {
       super(List.of(), queryContext, executorService);
       _firstFailedDeposits = new CountDownLatch(numTables - 1);
       _firstStealBarrier = new CyclicBarrier(numTables - 1);
+      _firstStealCompletedBarrier = new CyclicBarrier(numTables - 1);
     }
 
     @Override
@@ -293,13 +295,18 @@ public class NonblockingGroupByCombineOperatorTest {
 
     @Override
     protected IndexedTable stealSharedTable() {
-      if (_firstSteal.get()) {
+      boolean firstSteal = _firstSteal.get();
+      if (firstSteal) {
         _firstSteal.set(false);
         await(_firstStealBarrier);
       }
       IndexedTable table = super.stealSharedTable();
       if (table == null) {
         _nullSteals.incrementAndGet();
+      }
+      if (firstSteal) {
+        // Do not let the winner merge and republish before all contenders have attempted the same steal.
+        await(_firstStealCompletedBarrier);
       }
       return table;
     }
