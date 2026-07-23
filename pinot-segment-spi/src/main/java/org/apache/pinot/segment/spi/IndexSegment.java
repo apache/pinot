@@ -166,6 +166,16 @@ public interface IndexSegment {
   }
 
   /**
+   * Lifecycle callback invoked after this segment has been successfully added to the serving set (i.e. registered and
+   * swapped in so queries can reach it). Default is a no-op; implementations may override to run post-registration
+   * work. It is invoked only on the success path.
+   * Implementations must be best-effort: this fires after the segment is already serving, so a failure here cannot
+   * roll back the registration and should be handled internally rather than propagated.
+   */
+  default void onSegmentAdded() {
+  }
+
+  /**
    * Offloads the segment from the metadata management (e.g. upsert metadata), but not releases the resources yet
    * because there might be queries still accessing the segment.
    */

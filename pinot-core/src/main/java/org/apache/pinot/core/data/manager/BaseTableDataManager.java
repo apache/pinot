@@ -1248,6 +1248,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       oldSegmentDataManager = _segmentDataManagerMap.put(segmentName, segmentDataManager);
     }
     _recentlyDeletedSegments.invalidate(segmentName);
+    // Fire the post-registration lifecycle hook now that the segment is swapped into the serving set
+    for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+      segment.onSegmentAdded();
+    }
     return oldSegmentDataManager;
   }
 

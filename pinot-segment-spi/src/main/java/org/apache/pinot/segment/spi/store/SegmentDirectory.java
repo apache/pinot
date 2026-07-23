@@ -152,6 +152,15 @@ public abstract class SegmentDirectory implements Closeable {
   }
 
   /**
+   * Lifecycle callback invoked after the segment backed by this directory has been successfully added to the serving
+   * set (registered and swapped in). Default is a no-op; Must be best-effort: it fires after the segment is already
+   * serving, so failures cannot roll back the registration and should be handled internally.
+   */
+  public void onSegmentAdded()
+      throws Exception {
+  }
+
+  /**
    * Get the storage tier where the segment directory is placed by server.
    *
    * @return storage tier, null by default.
