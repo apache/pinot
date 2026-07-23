@@ -27,6 +27,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
@@ -360,6 +362,93 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
       assertTrue(exception.getMessage().contains("Cannot compute " + function + " for non-numeric type: BYTES"),
           exception.getMessage());
     }
+  }
+
+  /**
+   * Verifies that a column aggregation resolved by metadata is excluded from the scan projection,
+   * so the partial path only reads the columns needed by the scanned aggregations. The reduced projection is also
+   * reflected in numEntriesScannedPostFilter (20 docs * 1 column instead of 40).
+   */
+  @Test
+  public void testResolvedOnlyColumnExcludedFromProjection() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "select max(metricCol), sum(intCol) from " + PREDICTABLE_TABLE_NAME);
+    Operator<?> operator =
+        PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(_predictableSegment), queryContext).run();
+    assertTrue(operator instanceof AggregationOperator);
+
+    BaseProjectOperator<?> projectOperator = ((AggregationOperator) operator).getChildOperators().get(0);
+    // Only intCol (used by the scanned sum) is projected; metricCol (used solely by the resolved max) is excluded.
+    assertEquals(projectOperator.getNumColumnsProjected(), 1);
+    assertTrue(projectOperator.getSourceColumnContextMap().containsKey("intCol"));
+    assertFalse(projectOperator.getSourceColumnContextMap().containsKey("metricCol"));
+
+    AggregationResultsBlock resultsBlock = (AggregationResultsBlock) operator.nextBlock();
+    List<Object> results = resultsBlock.getResults();
+    assertNotNull(results);
+    // max(metricCol) is resolved from the dictionary; sum(intCol) is scanned.
+    // intCol = i + 10 for i = 1..10 over the two row copies, so sum(intCol) = 2 * (11 + 12 + ... + 20) = 310.
+    assertEquals(((Number) results.get(0)).doubleValue(), 10.0);
+    assertEquals(((Number) results.get(1)).doubleValue(), 310.0);
+
+    // All 20 docs are still scanned for the unresolved sum(intCol).
+    assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 20);
+    // With metricCol excluded, only 1 column is projected, so entries scanned post-filter is 20 docs * 1 column = 20
+    // (it would be 40 if the resolved-only metricCol were still projected).
+    assertEquals(operator.getExecutionStatistics().getNumEntriesScannedPostFilter(), 20);
+  }
+
+  /**
+   * Verifies numDocsScanned and numEntriesScannedPostFilter across the three routing paths: partial metadata
+   * resolution, fully metadata-resolvable (non-scan), and full scan over multiple aggregations.
+   */
+  @Test(dataProvider = "scanCostStatistics")
+  public void testScanCostStatistics(String description, String query, Class<?> expectedOperatorClass,
+      long expectedNumDocsScanned, long expectedNumEntriesScannedPostFilter) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    Operator<?> operator =
+        PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(_predictableSegment), queryContext).run();
+    assertTrue(expectedOperatorClass.isInstance(operator), description);
+    // Drain the blocks so scan operators accumulate their document counts (harmless for the non-scan operator, whose
+    // statistics are constant).
+    operator.nextBlock();
+    ExecutionStatistics stats = operator.getExecutionStatistics();
+    assertEquals(stats.getNumDocsScanned(), expectedNumDocsScanned, description);
+    assertEquals(stats.getNumEntriesScannedPostFilter(), expectedNumEntriesScannedPostFilter, description);
+  }
+
+  @DataProvider(name = "scanCostStatistics")
+  public Object[][] scanCostStatistics() {
+    return new Object[][]{
+        // Partial metadata resolution: max(metricCol) is resolved from the dictionary and only sum(intCol) is
+        // scanned, so a single column is projected -> 20 docs * 1 column = 20 entries scanned post-filter.
+        {
+            "partial metadata resolution",
+            "select max(metricCol), sum(intCol) from " + PREDICTABLE_TABLE_NAME,
+            AggregationOperator.class,
+            20L,
+            20L
+        },
+        // Fully metadata-resolvable: max + min on the numeric dictionary column are both resolved, so the non-scan
+        // operator is used and nothing is scanned post-filter. numDocsScanned is reported as numTotalDocs (20) for
+        // backward compatibility even though no rows are actually scanned.
+        {
+            "fully metadata-resolvable",
+            "select max(metricCol), min(metricCol) from " + PREDICTABLE_TABLE_NAME,
+            NonScanBasedAggregationOperator.class,
+            20L,
+            0L
+        },
+        // Full scan over multiple aggregations: neither sum is resolvable, so both columns are scanned for all 20
+        // docs -> 20 docs * 2 columns = 40 entries scanned post-filter.
+        {
+            "full scan multiple aggregations",
+            "select sum(metricCol), sum(intCol) from " + PREDICTABLE_TABLE_NAME,
+            AggregationOperator.class,
+            20L,
+            40L
+        }
+    };
   }
 
   @DataProvider(name = "testPlanMakerDataProvider")

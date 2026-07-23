@@ -144,10 +144,17 @@ public class AggregationPlanNode implements PlanNode {
           return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
         }
         if (numResolved > 0) {
-          // some functions can be resolved from dictionary/metadata; the rest fall back to scan-based
-          // execution in the AggregationOperator.
+          // Some functions are resolved from dictionary/metadata; the rest are scanned by the AggregationOperator.
+          // Project only the scanned functions' columns so a column that is resolved by metadata is not counted as
+          // scanned (keeps it out of numEntriesScannedPostFilter).
+          AggregationFunction[] scannedFunctions = new AggregationFunction[aggregationFunctions.length - numResolved];
+          for (int i = 0, j = 0; i < aggregationFunctions.length; i++) {
+            if (!metadataResolvable[i]) {
+              scannedFunctions[j++] = aggregationFunctions[i];
+            }
+          }
           aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithoutStarTree(_segmentContext, _queryContext,
-              aggregationFunctions, filterOperator);
+              aggregationFunctions, scannedFunctions, filterOperator);
           return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs, metadataResolvable, dataSources);
         }
       }

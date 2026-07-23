@@ -80,7 +80,7 @@ public class AggregationFunctionUtilsTest {
   public void testNonCountWithNullDataSourceThrows() {
     // Every non-COUNT function reads from the column dictionary/metadata and therefore requires a non-null data source.
     assertThrows(NullPointerException.class,
-        () -> AggregationFunctionUtils.getAggregationResult(mockFunction(AggregationFunctionType.MIN), null, 100,
+          () -> AggregationFunctionUtils.getAggregationResult(mockFunction(AggregationFunctionType.MIN), null, 100,
             "TEST"));
   }
 }

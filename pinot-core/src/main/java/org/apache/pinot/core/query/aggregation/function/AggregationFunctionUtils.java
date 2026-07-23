@@ -403,6 +403,23 @@ public class AggregationFunctionUtils {
   }
 
   /**
+   * Builds {@link AggregationInfo} for aggregations without using star-tree index, projecting only the columns
+   * required by {@code projectionFunctions} (a subset of {@code allFunctions}). The partial metadata path passes just
+   * the scanned functions here so that columns used solely by metadata-resolved functions are excluded from the scan,
+   * while {@link AggregationInfo} still carries the full function set. For a full scan the two arrays are identical.
+   */
+  public static AggregationInfo buildAggregationInfoWithoutStarTree(SegmentContext segmentContext,
+      QueryContext queryContext, AggregationFunction[] allFunctions, AggregationFunction[] projectionFunctions,
+      BaseFilterOperator filterOperator) {
+    Set<ExpressionContext> expressionsToTransform =
+        collectExpressionsToTransform(projectionFunctions, queryContext.getGroupByExpressions());
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(segmentContext, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+            filterOperator).run();
+    return new AggregationInfo(allFunctions, projectOperator, false);
+  }
+
+  /**
    * Builds swim-lanes (list of {@link AggregationInfo}) for filtered aggregations.
    */
   public static List<AggregationInfo> buildFilteredAggregationInfos(SegmentContext segmentContext,
