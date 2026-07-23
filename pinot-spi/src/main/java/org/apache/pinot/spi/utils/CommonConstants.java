@@ -598,6 +598,29 @@ public class CommonConstants {
     public static final String CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS = "pinot.broker.new.segment.expiration.seconds";
     public static final long DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS = TimeUnit.MINUTES.toSeconds(5);
 
+    // ---------------------------------------------------------------------------
+    // Cost-based optimizer (CBO) stats store — EXPERIMENTAL
+    // ---------------------------------------------------------------------------
+
+    /// [EXPERIMENTAL] When `true`, the broker collects per-segment statistics into a local
+    /// SQLite store ([#CONFIG_OF_STATS_DIR]) and exposes them to the multi-stage query
+    /// planner. Disabled by default.
+    ///
+    /// Note: enabling this changes the row-count and selectivity ESTIMATES the planner sees for
+    /// ALL multi-stage queries (any planner rule consulting cardinality metadata observes the
+    /// statistics-backed numbers instead of Calcite defaults). It never affects query correctness,
+    /// but plans — and therefore performance characteristics — may change. The cost-based join
+    /// reorder phase is additionally gated by its own option
+    /// ([Request.QueryOptionKey#USE_JOIN_REORDER]).
+    public static final String CONFIG_OF_STATS_ENABLED = "pinot.broker.stats.enabled";
+    public static final boolean DEFAULT_STATS_ENABLED = false;
+
+    /// [EXPERIMENTAL] Directory in which the broker stores the CBO statistics database file
+    /// (`broker-stats.sqlite`). Defaults to `<java.io.tmpdir>/<instanceId>/broker-stats`
+    /// (per-instance so multiple brokers on one host do not share a database). Configure a path on
+    /// a persistent volume to preserve collected statistics across restarts.
+    public static final String CONFIG_OF_STATS_DIR = "pinot.broker.stats.dir";
+
     // If this config is set to true, the broker will check every query executed using the v1 query engine and attempt
     // to determine whether the query could have successfully been run on the v2 / multi-stage query engine. If not,
     // a counter metric will be incremented - if this counter remains 0 during regular query workload execution, it
@@ -615,6 +638,19 @@ public class CommonConstants {
      */
     public static final String CONFIG_OF_USE_PHYSICAL_OPTIMIZER = "pinot.broker.multistage.use.physical.optimizer";
     public static final boolean DEFAULT_USE_PHYSICAL_OPTIMIZER = false;
+
+    /// Whether to run the cost-based join-reordering phase by default.
+    /// This value can always be overridden by [Request.QueryOptionKey#USE_JOIN_REORDER] query option.
+    public static final String CONFIG_OF_USE_JOIN_REORDER = "pinot.broker.multistage.use.join.reorder";
+    public static final boolean DEFAULT_USE_JOIN_REORDER = false;
+
+    /// Maximum number of joins in a plan for which the cost-based join-reordering phase will run.
+    /// Plans with more joins than this cap skip the reorder phase to avoid excessive planning time.
+    /// This value can always be overridden by
+    /// [Request.QueryOptionKey#JOIN_REORDER_MAX_JOINS] query option.
+    public static final String CONFIG_OF_JOIN_REORDER_MAX_JOINS =
+        "pinot.broker.multistage.join.reorder.max.joins";
+    public static final int DEFAULT_JOIN_REORDER_MAX_JOINS = 10;
 
     /**
      * Whether to use lite mode by default.
@@ -826,6 +862,10 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+        public static final String USE_JOIN_REORDER = "useJoinReorder";
+        /// Maximum number of joins that the cost-based join-reordering phase will handle.
+        /// Plans with more joins than this cap are left unchanged.
+        public static final String JOIN_REORDER_MAX_JOINS = "joinReorderMaxJoins";
         // When true, the multi-stage planner prunes input (passthrough) columns - notably the unnested source array -
         // from the UNNEST output when they are not referenced downstream, avoiding copying them into every exploded
         // row. Defaults to false: enabling it makes the broker emit a smaller UNNEST output schema, which an

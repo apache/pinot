@@ -20,6 +20,7 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -290,7 +291,12 @@ public class MultistageEngineQuickStart extends Quickstart {
 
   @Override
   protected Map<String, Object> getConfigOverrides() {
-    return Map.of(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    // Merge the base overrides so a -configFile passed on the command line is honored (the base
+    // implementation reads it); entries here act as defaults that the config file can override.
+    Map<String, Object> overrides = new HashMap<>();
+    overrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    overrides.putAll(super.getConfigOverrides());
+    return overrides;
   }
 
   @Override

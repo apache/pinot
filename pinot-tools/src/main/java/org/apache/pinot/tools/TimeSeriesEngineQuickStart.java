@@ -69,6 +69,7 @@ public class TimeSeriesEngineQuickStart extends Quickstart {
         "org.apache.pinot.tsdb.m3ql.M3TimeSeriesPlanner");
     configs.put(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey("m3ql"),
         SimpleTimeSeriesBuilderFactory.class.getName());
+    configs.putAll(super.getConfigOverrides());
     return configs;
   }
 
