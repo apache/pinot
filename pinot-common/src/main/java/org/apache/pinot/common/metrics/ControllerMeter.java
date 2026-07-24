@@ -95,7 +95,43 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   QUERY_WORKLOAD_REQUEST_DROPPED("count", true),
   QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED("count", true),
   // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
-  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false);
+  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false),
+
+  // Insert statement metrics — naming convention: PascalCase string, mirroring the older meter
+  // names in this enum (e.g. "PinotControllerHealthCheckStatus"). Once shipped, these strings
+  // are externally consumed by dashboards/alerts and cannot be renamed without coordinated
+  // operator migration; see InsertStatementState's wire-compatibility note for the same constraint.
+  INSERT_STATEMENTS_SUBMITTED("InsertStatementsSubmitted", true),
+  INSERT_STATEMENTS_ABORTED("InsertStatementsAborted", true),
+  INSERT_STATEMENTS_GC("InsertStatementsGarbageCollected", true),
+  INSERT_STATEMENTS_VISIBLE("InsertStatementsVisible", true),
+  /**
+   * Increments when {@code InsertExecutor.abort} throws or returns an error result. Persistent
+   * non-zero values indicate plugin abort handlers leaking resources without surfacing failures.
+   */
+  INSERT_ABORT_HOOK_FAILED("InsertAbortHookFailed", true),
+  /**
+   * Increments when the cleanup sweep throws while processing a table. Persistent non-zero values
+   * indicate a wedged manifest (e.g., corrupt JSON, forward-incompatible schemaVersion) — the
+   * sweep retries every 5 minutes and the metric makes the wedge visible without log scraping.
+   */
+  INSERT_CLEANUP_SWEEP_FAILURES("InsertCleanupSweepFailures", true),
+  /**
+   * Increments when {@code InsertStatementStore.deleteStatement} returns false during cleanup
+   * GC of a terminal manifest. Distinct from INSERT_CLEANUP_SWEEP_FAILURES (which counts thrown
+   * exceptions) — this one counts silent transient ZK failures that would otherwise be invisible.
+   * Persistent non-zero values indicate cleanup wedge requiring operator attention.
+   */
+  INSERT_GC_FAILED("InsertGcFailed", true),
+  /**
+   * Increments when a FILE insert reaches the rare TASK_NAME_PERSIST_ERROR branch — task was
+   * scheduled with the Minion task framework but persisting its name to ZK failed after retries.
+   * The manifest is best-effort aborted to prevent orphan post-failover, but the Minion task may
+   * still be running and pushing segments. This is a v1 limitation; persistent non-zero values
+   * mean operator cleanup of orphan segments may be required. Should be near-zero in healthy
+   * clusters; alert on any non-zero rate.
+   */
+  INSERT_TASK_NAME_PERSIST_FAILED("InsertTaskNamePersistFailed", true);
 
   private final String _brokerMeterName;
   private final String _unit;

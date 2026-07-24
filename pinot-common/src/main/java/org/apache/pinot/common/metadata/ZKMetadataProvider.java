@@ -86,6 +86,19 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_MATERIALIZED_VIEW_RUNTIME_PREFIX = "/CONFIGS/MATERIALIZED_VIEW/RUNTIME";
   private static final String PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX = "/CONFIGS/QUERYWORKLOAD";
   private static final String PROPERTYSTORE_TASK_LOCK_SUFFIX = "-Lock";
+  /**
+   * Top-level propertyStore prefix for push-based INSERT statement manifests. Each manifest is
+   * keyed by {@code /INSERT_STATEMENTS/{tableNameWithType}/{statementId}}. Centralized here so
+   * the full set of reserved Pinot ZK paths is visible in one file.
+   */
+  public static final String PROPERTYSTORE_INSERT_STATEMENTS_PREFIX = "/INSERT_STATEMENTS";
+  /**
+   * Top-level propertyStore prefix for push-based INSERT request-id reservations (idempotency
+   * tombstone tree). Each reservation is keyed by
+   * {@code /INSERT_REQUEST_IDS/{tableNameWithType}/{requestId}}. See
+   * {@link #PROPERTYSTORE_INSERT_STATEMENTS_PREFIX}.
+   */
+  public static final String PROPERTYSTORE_INSERT_REQUEST_IDS_PREFIX = "/INSERT_REQUEST_IDS";
 
   public static void setUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
