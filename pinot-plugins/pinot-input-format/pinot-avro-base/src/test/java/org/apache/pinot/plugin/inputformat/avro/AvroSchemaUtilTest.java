@@ -31,7 +31,12 @@ import static org.testng.Assert.assertThrows;
 
 public class AvroSchemaUtilTest {
 
-  /// The switch must be driven by the original (logical) data type, not the stored type. Otherwise BOOLEAN collapses
+  /// Every Pinot data type that has an Avro representation.
+  private static final DataType[] SUPPORTED_DATA_TYPES =
+      {DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.BOOLEAN, DataType.TIMESTAMP,
+          DataType.BIG_DECIMAL, DataType.STRING, DataType.JSON, DataType.BYTES, DataType.UUID};
+
+  /// The mapping must be driven by the original (logical) data type, not the stored type. Otherwise BOOLEAN collapses
   /// to "int" and TIMESTAMP to a plain "long", misrepresenting the column in the generated Avro schema.
   @Test
   public void testToAvroSchemaJsonObjectUsesOriginalType() {
@@ -44,28 +49,50 @@ public class AvroSchemaUtilTest {
     assertPrimitiveType(DataType.BYTES, "bytes");
     // Logical types must not collapse to their stored INT/LONG type.
     assertPrimitiveType(DataType.BOOLEAN, "boolean");
-
-    JsonNode type = typeOf(DataType.TIMESTAMP);
-    assertEquals(type.get(0).asText(), "null");
-    JsonNode timestampBranch = type.get(1);
-    assertEquals(timestampBranch.get("type").asText(), "long");
-    assertEquals(timestampBranch.get("logicalType").asText(), "timestamp-millis");
-  }
-
-  /// Types with no Avro mapping (e.g. BIG_DECIMAL) must be rejected rather than silently mishandled.
-  @Test
-  public void testToAvroSchemaJsonObjectRejectsUnsupportedType() {
-    assertThrows(UnsupportedOperationException.class,
-        () -> AvroSchemaUtil.toAvroSchemaJsonObject(new DimensionFieldSpec("col", DataType.BIG_DECIMAL, true)));
+    assertLogicalType(DataType.TIMESTAMP, "long", "timestamp-millis");
+    assertLogicalType(DataType.BIG_DECIMAL, "bytes", "big-decimal");
   }
 
   /// UUID is a logical type; a single-value column maps to an Avro string carrying the "uuid" logical type.
   @Test
   public void testToAvroSchemaJsonObjectForUuid() {
-    JsonNode type = typeOf(DataType.UUID);
-    assertEquals(type.get(0).asText(), "null");
-    assertEquals(type.get(1).get("type").asText(), "string");
-    assertEquals(type.get(1).get("logicalType").asText(), "uuid");
+    assertLogicalType(DataType.UUID, "string", "uuid");
+  }
+
+  /// The Avro-schema and JSON forms are two views of one mapping, so they must agree for every supported type.
+  @Test
+  public void testToAvroSchemaJsonObjectMatchesToAvroSchema() {
+    for (DataType dataType : SUPPORTED_DATA_TYPES) {
+      JsonNode type = typeOf(dataType);
+      assertEquals(type.get(1).toString(), AvroSchemaUtil.toAvroSchema(dataType).toString(),
+          "mismatch for " + dataType);
+    }
+  }
+
+  /// Single-value columns map to the bare value schema; multi-value columns to an array of it.
+  @Test
+  public void testToAvroSchemaHonorsMultiValue() {
+    for (DataType dataType : SUPPORTED_DATA_TYPES) {
+      Schema valueSchema = AvroSchemaUtil.toAvroSchema(dataType);
+      assertEquals(AvroSchemaUtil.toAvroSchema(new DimensionFieldSpec("col", dataType, true)), valueSchema,
+          "SV mismatch for " + dataType);
+      if (dataType == DataType.JSON) {
+        // JSON has no multi-value form in Pinot.
+        continue;
+      }
+      Schema mvSchema = AvroSchemaUtil.toAvroSchema(new DimensionFieldSpec("col", dataType, false));
+      assertEquals(mvSchema.getType(), Schema.Type.ARRAY, "MV mismatch for " + dataType);
+      assertEquals(mvSchema.getElementType(), valueSchema, "MV element mismatch for " + dataType);
+    }
+  }
+
+  /// Types with no Avro representation must be rejected rather than silently mishandled.
+  @Test
+  public void testToAvroSchemaRejectsUnsupportedType() {
+    for (DataType dataType : new DataType[]{DataType.MAP, DataType.STRUCT, DataType.OPEN_STRUCT, DataType.LIST,
+        DataType.UNKNOWN}) {
+      assertThrows(UnsupportedOperationException.class, () -> AvroSchemaUtil.toAvroSchema(dataType));
+    }
   }
 
   @Test
@@ -107,6 +134,14 @@ public class AvroSchemaUtilTest {
     JsonNode type = typeOf(dataType);
     assertEquals(type.get(0).asText(), "null");
     assertEquals(type.get(1).asText(), expectedAvroType);
+  }
+
+  private static void assertLogicalType(DataType dataType, String expectedAvroType, String expectedLogicalType) {
+    JsonNode type = typeOf(dataType);
+    assertEquals(type.get(0).asText(), "null");
+    JsonNode branch = type.get(1);
+    assertEquals(branch.get("type").asText(), expectedAvroType);
+    assertEquals(branch.get("logicalType").asText(), expectedLogicalType);
   }
 
   private static JsonNode typeOf(DataType dataType) {
