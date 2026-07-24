@@ -30,12 +30,10 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Unit tests for the dictionary-based distinct value extraction in {@link NonScanBasedAggregationOperator},
- * specifically the LONG sortedness-detection loop: immutable dictionaries are value-sorted (fast path), while mutable
- * (realtime consuming segment) dictionaries are insertion-ordered and may contain any order — the detection must
- * classify them correctly, or DISTINCT results would silently over-count.
- */
+/// Unit tests for the dictionary-based distinct value extraction in [NonScanBasedAggregationOperator] for LONG
+/// columns: immutable dictionaries are value-sorted (`isSorted()` = true, wrapped as-is), while mutable (realtime
+/// consuming segment) dictionaries are insertion-ordered (`isSorted()` = false) and must be sorted first — otherwise
+/// DISTINCT results would be silently wrong.
 public class NonScanBasedAggregationOperatorTest {
 
   private static Set invokeGetDistinctValueSet(Dictionary dictionary)
@@ -45,10 +43,11 @@ public class NonScanBasedAggregationOperatorTest {
     return (Set) method.invoke(null, dictionary);
   }
 
-  private static Dictionary mockLongDictionary(long... values) {
+  private static Dictionary mockLongDictionary(boolean sorted, long... values) {
     Dictionary dictionary = mock(Dictionary.class);
     when(dictionary.getValueType()).thenReturn(DataType.LONG);
     when(dictionary.length()).thenReturn(values.length);
+    when(dictionary.isSorted()).thenReturn(sorted);
     for (int i = 0; i < values.length; i++) {
       when(dictionary.getLongValue(i)).thenReturn(values[i]);
     }
@@ -59,7 +58,7 @@ public class NonScanBasedAggregationOperatorTest {
   public void testLongDistinctValuesFromSortedDictionary()
       throws Exception {
     // Immutable dictionary: value-sorted, duplicate-free
-    Set set = invokeGetDistinctValueSet(mockLongDictionary(-5L, 0L, 3L, 42L, 1_000_000L));
+    Set set = invokeGetDistinctValueSet(mockLongDictionary(true, -5L, 0L, 3L, 42L, 1_000_000L));
     assertEquals(set.size(), 5);
     assertEquals(new LongOpenHashSet(set), new LongOpenHashSet(new long[]{-5L, 0L, 3L, 42L, 1_000_000L}));
   }
@@ -67,18 +66,19 @@ public class NonScanBasedAggregationOperatorTest {
   @Test
   public void testLongDistinctValuesFromUnsortedDictionary()
       throws Exception {
-    // Mutable (realtime) dictionary: insertion-ordered, arbitrary order — the detection loop must fall back to
-    // sort + dedupe rather than trusting sortedness
-    Set set = invokeGetDistinctValueSet(mockLongDictionary(42L, -5L, 1_000_000L, 0L, 3L, 42L));
+    // Mutable (realtime) dictionary: insertion-ordered (isSorted() = false), so the values must be sorted before
+    // being wrapped as a sorted run
+    Set set = invokeGetDistinctValueSet(mockLongDictionary(false, 42L, -5L, 1_000_000L, 0L, 3L));
     assertEquals(set.size(), 5);
     assertEquals(new LongOpenHashSet(set), new LongOpenHashSet(new long[]{-5L, 0L, 3L, 42L, 1_000_000L}));
   }
 
   @Test
-  public void testLongDistinctValuesWithAdjacentDuplicates()
+  public void testLongDistinctValuesFromAscendingDictionaryReportedUnsorted()
       throws Exception {
-    // Ascending but with equal neighbors: must be classified as not sorted-distinct and deduped
-    Set set = invokeGetDistinctValueSet(mockLongDictionary(1L, 1L, 2L, 3L, 3L));
+    // A mutable dictionary whose insertions happened to arrive ascending still reports isSorted() = false; the
+    // redundant sort must not change the result
+    Set set = invokeGetDistinctValueSet(mockLongDictionary(false, 1L, 2L, 3L));
     assertEquals(set.size(), 3);
     assertEquals(new LongOpenHashSet(set), new LongOpenHashSet(new long[]{1L, 2L, 3L}));
   }
@@ -86,7 +86,7 @@ public class NonScanBasedAggregationOperatorTest {
   @Test
   public void testLongDistinctValuesEmptyAndSingle()
       throws Exception {
-    assertEquals(invokeGetDistinctValueSet(mockLongDictionary()).size(), 0);
-    assertEquals(invokeGetDistinctValueSet(mockLongDictionary(7L)).size(), 1);
+    assertEquals(invokeGetDistinctValueSet(mockLongDictionary(true)).size(), 0);
+    assertEquals(invokeGetDistinctValueSet(mockLongDictionary(false, 7L)).size(), 1);
   }
 }

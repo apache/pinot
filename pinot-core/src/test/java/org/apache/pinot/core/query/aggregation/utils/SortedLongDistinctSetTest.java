@@ -94,16 +94,17 @@ public class SortedLongDistinctSetTest {
   }
 
   @Test
-  public void testFromValuesUnsortedWithDuplicates() {
-    // fromValues must sort and de-duplicate when told the input is not already sorted-distinct.
-    long[] raw = {7L, 3L, 7L, 1L, 3L, 9L, 1L};
+  public void testFromValuesUnsorted() {
+    // fromValues must sort when told the input is not already sorted (mutable/realtime dictionaries are
+    // insertion-ordered). Input is duplicate-free per the dictionary contract.
+    long[] raw = {7L, 3L, 1L, 9L, -2L};
     SortedLongDistinctSet set = SortedLongDistinctSet.fromValues(raw, raw.length, false);
-    assertSameAsHashSet(set, new LongOpenHashSet(new long[]{1L, 3L, 7L, 9L}));
+    assertSameAsHashSet(set, new LongOpenHashSet(new long[]{-2L, 1L, 3L, 7L, 9L}));
   }
 
   @Test
   public void testFromValuesPrefix() {
-    long[] raw = {1L, 2L, 3L, 999L, 999L};
+    long[] raw = {1L, 2L, 3L, 999L, 998L};
     SortedLongDistinctSet set = SortedLongDistinctSet.fromValues(raw, 3, true);
     assertSameAsHashSet(set, new LongOpenHashSet(new long[]{1L, 2L, 3L}));
   }

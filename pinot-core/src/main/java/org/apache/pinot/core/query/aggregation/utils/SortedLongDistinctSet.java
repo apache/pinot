@@ -21,47 +21,42 @@ package org.apache.pinot.core.query.aggregation.utils;
 import it.unimi.dsi.fastutil.longs.AbstractLongSet;
 import it.unimi.dsi.fastutil.longs.LongCollection;
 import it.unimi.dsi.fastutil.longs.LongIterator;
-import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * A {@link LongSet} for exact DISTINCT aggregation over LONG columns that stores distinct values as sorted runs and
- * unions them lazily.
- *
- * <p>Distinct LONG values read from a value-sorted dictionary (the whole dictionary, as the unfiltered no-scan
- * aggregation path does; a filtered path iterating matched dictionary ids in ascending order could adopt the same
- * approach) are already sorted and duplicate-free, so they are kept as a {@code long[]} run without hashing. Merging
- * two of these sets during the (serial) combine phase appends the other set's runs instead of inserting every element
- * into a hash table; the accumulated runs are unioned into one sorted, duplicate-free array on demand, the first time
- * {@link #size()}, {@link #iterator()} or {@link #contains(long)} is called (i.e. when the result is serialized or
- * its distinct count / sum / average is extracted). The union runs on the calling query thread as a multi-pass merge
- * between two pre-sized buffers -- a single up-front allocation instead of one per pairwise merge, no shared
- * ForkJoin/common-pool usage -- and checks query termination between passes. To bound retained memory when many
- * segments carry overlapping values, pending runs are eagerly compacted (deduplicated) once their total length
- * crosses an internal threshold, so pending memory does not grow unboundedly with segment count.
- *
- * <p>This replaces per-element hashing (which dominated the wall-clock cost of high-cardinality DISTINCT_COUNT
- * queries) with sorted merging. Serialization as a {@code LongSet} and DISTINCT_SUM / DISTINCT_AVG value iteration
- * work unchanged. Inputs that are not already sorted-and-distinct (e.g. a {@code LongOpenHashSet} arriving via a
- * mixed merge) are sorted and de-duplicated before being added. One documented contract deviation:
- * {@link #addAll(LongCollection)} returns {@code true} for any non-empty operand, even if every element was already
- * present -- computing the exact "changed" answer would force the union eagerly. No caller on the aggregation path
- * reads the return value.
- *
- * <p>Not thread-safe, and more strongly so than a typical mutable collection: the read accessors {@link #size()},
- * {@link #contains(long)} and {@link #iterator()} are <em>not</em> pure reads -- the first such call triggers
- * {@code materialize()}, which reassigns internal state to union the pending runs. Instances are therefore built per
- * segment and both mutated and first-read only by the single-threaded combine phase; a finished result must be safely
- * published before any other thread reads it, and the first read must not race a mutation.
- *
- * <p>Element removal is unsupported: {@code remove}/{@code rem} and the iterator's {@code remove()} are not
- * implemented, so the inherited {@code removeAll}/{@code retainAll} throw {@link UnsupportedOperationException}. The
- * DISTINCT aggregation path never removes elements (it only builds, merges, counts, sums, iterates and serializes).
- */
+/// A `LongSet` for exact DISTINCT aggregation over LONG columns that stores distinct values as sorted runs and unions
+/// them lazily.
+///
+/// Distinct LONG values read from a dictionary are duplicate-free, and value-sorted for immutable segments, so they
+/// are kept as a `long[]` run without hashing (mutable/realtime dictionaries are insertion-ordered and get sorted
+/// first). Merging two of these sets during the (serial) combine phase appends the other set's runs instead of
+/// inserting every element into a hash table; the accumulated runs are unioned into one sorted, duplicate-free array
+/// on demand, the first time [#size()], [#iterator()] or [#contains(long)] is called (i.e. when the result is
+/// serialized or its distinct count / sum / average is extracted). The union runs on the calling query thread as a
+/// multi-pass merge between two pre-sized buffers -- a single up-front allocation instead of one per pairwise merge,
+/// no shared ForkJoin/common-pool usage -- and checks query termination between passes. To bound retained memory when
+/// many segments carry overlapping values, pending runs are eagerly compacted (deduplicated) once their total length
+/// crosses an internal threshold, so pending memory does not grow unboundedly with segment count.
+///
+/// This replaces per-element hashing (which dominated the wall-clock cost of high-cardinality DISTINCT_COUNT queries)
+/// with sorted merging. Serialization as a `LongSet` and DISTINCT_SUM / DISTINCT_AVG value iteration work unchanged.
+/// Inputs that are not already sorted-and-distinct (e.g. a `LongOpenHashSet` arriving via a mixed merge) are sorted
+/// and de-duplicated before being added. One documented contract deviation: [#addAll(LongCollection)] returns `true`
+/// for any non-empty operand, even if every element was already present -- computing the exact "changed" answer would
+/// force the union eagerly. No caller on the aggregation path reads the return value.
+///
+/// Not thread-safe, and more strongly so than a typical mutable collection: the read accessors [#size()],
+/// [#contains(long)] and [#iterator()] are *not* pure reads -- the first such call triggers `materialize()`, which
+/// reassigns internal state to union the pending runs. Instances are therefore built per segment and both mutated and
+/// first-read only by the single-threaded combine phase; a finished result must be safely published before any other
+/// thread reads it, and the first read must not race a mutation.
+///
+/// Element removal is unsupported: `remove`/`rem` and the iterator's `remove()` are not implemented, so the inherited
+/// `removeAll`/`retainAll` throw [UnsupportedOperationException]. The DISTINCT aggregation path never removes
+/// elements (it only builds, merges, counts, sums, iterates and serializes).
 public final class SortedLongDistinctSet extends AbstractLongSet {
   private static final long[] EMPTY = new long[0];
   private static final String SCOPE = "SortedLongDistinctSet";
@@ -89,11 +84,9 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
   private long[] _values;
   private int _size;
 
-  /**
-   * Wraps a single run that is already sorted ascending and duplicate-free. Private so the checked {@link #fromValues}
-   * factory is the only entry point: an unsorted or duplicate-bearing array here would silently corrupt results
-   * ({@link #size()} over-counts, {@link #contains(long)} misreports) rather than fail loudly.
-   */
+  /// Wraps a single run that is already sorted ascending and duplicate-free. Private so the checked [#fromValues]
+  /// factory is the only entry point: an unsorted or duplicate-bearing array here would silently corrupt results
+  /// ([#size()] over-counts, [#contains(long)] misreports) rather than fail loudly.
   private SortedLongDistinctSet(long[] sortedDistinct) {
     _runs = new ArrayList<>(4);
     if (sortedDistinct.length > 0) {
@@ -102,22 +95,19 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
     }
   }
 
-  /**
-   * Creates a set from the prefix {@code [0, size)} of {@code values}. When {@code sortedDistinct} is false the prefix
-   * is sorted and de-duplicated first (which reorders the caller's {@code values} array in place) so the sorted-run
-   * invariant always holds; when true the caller guarantees the prefix is already sorted ascending and duplicate-free.
-   * The set takes ownership of {@code values} (it is retained without copying when {@code size == values.length}), so
-   * the caller must not modify the array after this call.
-   */
-  public static SortedLongDistinctSet fromValues(long[] values, int size, boolean sortedDistinct) {
-    if (!sortedDistinct) {
+  /// Creates a set from the prefix `[0, size)` of `values`, which must be duplicate-free (dictionary values are, by
+  /// construction). When `sorted` is false (mutable/realtime dictionaries are insertion-ordered) the prefix is sorted
+  /// first; when true the caller guarantees it is already sorted ascending. The set takes ownership of `values` (it
+  /// is retained without copying when `size == values.length`), so the caller must not modify the array after this
+  /// call.
+  public static SortedLongDistinctSet fromValues(long[] values, int size, boolean sorted) {
+    if (!sorted) {
       Arrays.sort(values, 0, size);
-      size = dedupeSorted(values, size);
     }
     return new SortedLongDistinctSet(size == values.length ? values : Arrays.copyOf(values, size));
   }
 
-  /** Removes consecutive duplicates from the sorted prefix {@code [0, size)}; returns the distinct count. */
+  /// Removes consecutive duplicates from the sorted prefix `[0, size)`; returns the distinct count.
   private static int dedupeSorted(long[] values, int size) {
     if (size <= 1) {
       return size;
@@ -131,10 +121,8 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
     return w;
   }
 
-  /**
-   * Appends a sorted, duplicate-free, exact-length run to the pending list, guarding the representable-size cap and
-   * eagerly compacting when pending memory crosses {@link #COMPACT_THRESHOLD}.
-   */
+  /// Appends a sorted, duplicate-free, exact-length run to the pending list, guarding the representable-size cap and
+  /// eagerly compacting when pending memory crosses [#COMPACT_THRESHOLD].
   private void appendRun(long[] run) {
     if (run.length == 0) {
       return;
@@ -155,12 +143,10 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
     }
   }
 
-  /**
-   * Unions sorted, duplicate-free runs into one sorted, duplicate-free sequence via a multi-pass adjacent-pair merge
-   * between two pre-sized buffers on the calling thread: exactly two array allocations regardless of run count, no
-   * per-merge garbage, and a query-termination check between passes. Returns the buffer holding the result; the
-   * logical size is written to {@code sizeOut[0]} and may be smaller than the buffer where duplicates collapsed.
-   */
+  /// Unions sorted, duplicate-free runs into one sorted, duplicate-free sequence via a multi-pass adjacent-pair merge
+  /// between two pre-sized buffers on the calling thread: exactly two array allocations regardless of run count, no
+  /// per-merge garbage, and a query-termination check between passes. Returns the buffer holding the result; the
+  /// logical size is written to `sizeOut[0]` and may be smaller than the buffer where duplicates collapsed.
   private static long[] mergeRuns(List<long[]> runs, int[] sizeOut) {
     int numRuns = runs.size();
     if (numRuns == 1) {
@@ -211,17 +197,15 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
     return src;
   }
 
-  /** Like {@link #mergeRuns} but always returns an exact-length array, preserving the run-length invariant. */
+  /// Like [#mergeRuns] but always returns an exact-length array, preserving the run-length invariant.
   private static long[] mergeRunsExact(List<long[]> runs) {
     int[] sizeOut = new int[1];
     long[] merged = mergeRuns(runs, sizeOut);
     return sizeOut[0] == merged.length ? merged : Arrays.copyOf(merged, sizeOut[0]);
   }
 
-  /**
-   * Two-pointer union with dedupe of the adjacent sorted, duplicate-free chunks {@code [aFrom, aTo)} and
-   * {@code [aTo, bTo)} of {@code src} into {@code dst} starting at {@code w}; returns the new write position.
-   */
+  /// Two-pointer union with dedupe of the adjacent sorted, duplicate-free chunks `[aFrom, aTo)` and `[aTo, bTo)` of
+  /// `src` into `dst` starting at `w`; returns the new write position.
   private static int unionInto(long[] src, int aFrom, int aTo, int bTo, long[] dst, int w) {
     int i = aFrom;
     int j = aTo;
@@ -249,7 +233,7 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
     return w;
   }
 
-  /** Unions all pending runs into the materialized array, trimming when the dedupe waste is material (>= 25%). */
+  /// Unions all pending runs into the materialized array, trimming when the dedupe waste is material (>= 25%).
   private void materialize() {
     if (_runs == null) {
       return;
@@ -268,7 +252,7 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
     _size = size;
   }
 
-  /** Converts a materialized set back into a single-run pending state so more runs can be appended cheaply. */
+  /// Converts a materialized set back into a single-run pending state so more runs can be appended cheaply.
   private void demoteToRuns() {
     List<long[]> runs = new ArrayList<>(4);
     if (_size > 0) {
@@ -315,10 +299,8 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
     };
   }
 
-  /**
-   * Merges another collection of longs into this set by appending its runs. Contract deviation (documented in the
-   * class Javadoc): returns {@code true} for any non-empty operand even if no new element was added.
-   */
+  /// Merges another collection of longs into this set by appending its runs. Contract deviation (documented in the
+  /// class doc): returns `true` for any non-empty operand even if no new element was added.
   @Override
   public boolean addAll(LongCollection c) {
     if (c.isEmpty()) {
@@ -346,12 +328,10 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
     return true;
   }
 
-  /**
-   * Inserts a single value, keeping the sorted invariant. This is an O(n) operation (materialize + binary search +
-   * array copy) provided only to honor the {@link LongSet} contract; it is not used on the aggregation path (which
-   * builds via {@link #fromValues} and merges via {@link #addAll}). Do not call it in a loop -- repeated single
-   * inserts are O(n^2). Use {@link #addAll} to combine sets.
-   */
+  /// Inserts a single value, keeping the sorted invariant. This is an O(n) operation (materialize + binary search +
+  /// array copy) provided only to honor the `LongSet` contract; it is not used on the aggregation path (which builds
+  /// via [#fromValues] and merges via [#addAll]). Do not call it in a loop -- repeated single inserts are O(n^2). Use
+  /// [#addAll] to combine sets.
   @Override
   public boolean add(long k) {
     materialize();

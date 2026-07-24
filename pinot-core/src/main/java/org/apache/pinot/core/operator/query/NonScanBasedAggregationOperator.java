@@ -254,26 +254,20 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
         }
         return intSet;
       case LONG:
-        // A numeric dictionary is value-sorted and duplicate-free, so its values are already the sorted distinct set:
-        // read them straight into a sorted run instead of hashing each one. SortedLongDistinctSet then unions the
-        // per-segment runs during combine without hashing (the dominant cost for high-cardinality DISTINCT_COUNT).
+        // A dictionary is duplicate-free, and an immutable dictionary is also value-sorted, so its values are already
+        // the sorted distinct set: read them straight into a sorted run instead of hashing each one.
+        // SortedLongDistinctSet then unions the per-segment runs during combine without hashing (the dominant cost
+        // for high-cardinality DISTINCT_COUNT). Mutable (realtime) dictionaries are insertion-ordered and report
+        // isSorted() = false, in which case the values are sorted first.
         // Only LONG is optimized here -- it is the common high-cardinality distinct case (IDs, timestamps); INT /
         // FLOAT / DOUBLE keep the hash-set path. The same sorted-run approach generalizes to them if profiling shows
         // it is worthwhile.
-        // Sortedness is verified per value during the copy (near-zero cost) rather than trusting
-        // Dictionary.isSorted(), because a mis-reporting dictionary implementation would silently corrupt DISTINCT
-        // results instead of failing loudly.
         long[] longValues = new long[dictionarySize];
-        boolean longSorted = true;
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
-          long value = dictionary.getLongValue(dictId);
-          if (dictId > 0 && value <= longValues[dictId - 1]) {
-            longSorted = false;
-          }
-          longValues[dictId] = value;
+          longValues[dictId] = dictionary.getLongValue(dictId);
         }
-        return SortedLongDistinctSet.fromValues(longValues, dictionarySize, longSorted);
+        return SortedLongDistinctSet.fromValues(longValues, dictionarySize, dictionary.isSorted());
       case FLOAT:
         FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
