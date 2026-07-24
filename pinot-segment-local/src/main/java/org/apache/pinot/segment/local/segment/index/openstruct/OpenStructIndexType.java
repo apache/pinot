@@ -134,7 +134,8 @@ public class OpenStructIndexType
   public ColumnarOpenStructIndexCreator createIndexCreator(IndexCreationContext context,
       OpenStructIndexConfig indexConfig) {
     FieldSpec fieldSpec = context.getFieldSpec();
-    return new OpenStructColumnSplitter(context.getIndexDir(), fieldSpec.getName(), fieldSpec, indexConfig);
+    return new OpenStructColumnSplitter(context.getIndexDir(), fieldSpec.getName(), context.getTableNameWithType(),
+        fieldSpec, indexConfig);
   }
 
   @Override

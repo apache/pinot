@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -84,6 +85,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
 
   private final File _indexDir;
   private final String _columnName;
+  private final String _tableNameWithType;
   private final Map<String, FieldSpec> _childFieldSpecs;
   private final OpenStructIndexConfig _config;
   private final int _maxDenseKeys;
@@ -92,18 +94,20 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   private final Map<String, RoaringBitmap> _presenceBitmaps = new HashMap<>();
   private final Map<String, List<Object>> _values = new HashMap<>();
   private final Map<String, DataType> _inferredTypes = new HashMap<>();
+  private final Map<String, Long> _coercionFailuresPerKey = new HashMap<>();
+  private final Map<String, Long> _inferenceFailuresPerKey = new HashMap<>();
   private int _numDocs;
-  private int _coercionFailures;
 
   // Resolved at seal time
   @Nullable
   private Set<String> _resolvedDenseKeys;
   private final Map<String, PropertiesConfiguration> _materializedColumnMetadata = new LinkedHashMap<>();
 
-  public OpenStructColumnSplitter(File indexDir, String columnName, FieldSpec fieldSpec,
+  public OpenStructColumnSplitter(File indexDir, String columnName, String tableNameWithType, FieldSpec fieldSpec,
       OpenStructIndexConfig config) {
     _indexDir = indexDir;
     _columnName = columnName;
+    _tableNameWithType = tableNameWithType;
     _config = config;
     _maxDenseKeys = config.getMaxDenseKeys();
 
@@ -198,7 +202,11 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
             ? keySpec.getDataType()
             : _inferredTypes.computeIfAbsent(key, k -> {
               DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
-              return inferred != null ? inferred : DataType.STRING;
+              if (inferred == null) {
+                _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
+                return DataType.STRING;
+              }
+              return inferred;
             });
         if (!_presenceBitmaps.containsKey(key)) {
           _presenceBitmaps.put(key, new RoaringBitmap());
@@ -211,7 +219,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           PinotDataType destType = ColumnDataType.fromDataTypeSV(valueType.getStoredType()).toPinotDataType();
           coerced = destType.convert(rawValue, sourceType);
         } catch (Exception e) {
-          _coercionFailures++;
+          _coercionFailuresPerKey.merge(key, 1L, Long::sum);
           _presenceBitmaps.get(key).remove(_numDocs);
           continue;
         }
@@ -243,15 +251,55 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       writeSparseJsonColumn(sparseKeys);
     }
 
-    if (_coercionFailures > 0) {
-      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures", _columnName, _coercionFailures);
-      ServerMetrics serverMetrics = ServerMetrics.get();
-      if (serverMetrics != null) {
-        serverMetrics.addMeteredGlobalValue(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, _coercionFailures);
-      }
+    long totalCoercionFailures = _coercionFailuresPerKey.values().stream().mapToLong(Long::longValue).sum();
+    if (totalCoercionFailures > 0) {
+      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures (keys: {})",
+          _columnName, totalCoercionFailures, _coercionFailuresPerKey);
     }
+    long totalInferenceFailures = _inferenceFailuresPerKey.values().stream().mapToLong(Long::longValue).sum();
+    if (totalInferenceFailures > 0) {
+      LOGGER.info("OPEN_STRUCT '{}': {} type inference failures fell back to STRING (keys: {})",
+          _columnName, totalInferenceFailures, _inferenceFailuresPerKey);
+    }
+    emitMetrics(sparseKeys.size());
 
     emitParentColumnMetadata(!sparseKeys.isEmpty());
+  }
+
+  private void emitMetrics(int sparseKeyCount) {
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    if (serverMetrics == null || _numDocs == 0) {
+      return;
+    }
+    String col = _columnName;
+
+    long totalCoercion = _coercionFailuresPerKey.values().stream().mapToLong(Long::longValue).sum();
+    if (totalCoercion > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, col,
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, totalCoercion);
+    }
+    long totalInference = _inferenceFailuresPerKey.values().stream().mapToLong(Long::longValue).sum();
+    if (totalInference > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, col,
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, totalInference);
+    }
+
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
+        ServerGauge.OPEN_STRUCT_DENSE_KEY_COUNT, _resolvedDenseKeys.size());
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
+        ServerGauge.OPEN_STRUCT_SPARSE_KEY_COUNT, sparseKeyCount);
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
+        ServerGauge.OPEN_STRUCT_TOTAL_KEYS_DISCOVERED, _presenceBitmaps.size());
+
+    for (String key : _resolvedDenseKeys) {
+      RoaringBitmap presence = _presenceBitmaps.get(key);
+      if (presence != null) {
+        long fillPct = (long) presence.getCardinality() * 100 / _numDocs;
+        serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
+            OpenStructNaming.materializedColumnName(col, key),
+            ServerGauge.OPEN_STRUCT_KEY_FILL_RATE, fillPct);
+      }
+    }
   }
 
   @Override

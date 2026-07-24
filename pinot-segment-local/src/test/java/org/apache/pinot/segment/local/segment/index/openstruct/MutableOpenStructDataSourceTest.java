@@ -58,7 +58,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testGetDataSourcePerKey()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
@@ -72,7 +72,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testGetDataSourceForUnknownKey()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 0);
       assertNull(ds.getDataSource("missing"));
@@ -83,7 +83,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testGetDataSourcesReturnsAllKeys()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L, "country", "US"));
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
