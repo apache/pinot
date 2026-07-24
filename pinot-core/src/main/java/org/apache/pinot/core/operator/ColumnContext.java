@@ -95,4 +95,13 @@ public class ColumnContext {
     return new ColumnContext(resultMetadata.getDataType(), resultMetadata.isSingleValue(), dictionary,
         dictionary != null, null);
   }
+
+  public static ColumnContext forDataType(DataType dataType, boolean isSingleValue) {
+    return new ColumnContext(dataType, isSingleValue, null, false, null);
+  }
+
+  public static ColumnContext withSingleValue(ColumnContext columnContext, boolean isSingleValue) {
+    return new ColumnContext(columnContext.getDataType(), isSingleValue, columnContext.getDictionary(),
+        columnContext.isDictionaryEncoded(), columnContext.getDataSource());
+  }
 }

@@ -80,6 +80,7 @@ public class QueryContext {
   private final List<ExpressionContext> _selectExpressions;
   private final boolean _distinct;
   private final List<String> _aliasList;
+  private final List<ArrayJoinContext> _arrayJoinContexts;
   private final FilterContext _filter;
   private final List<ExpressionContext> _groupByExpressions;
   private final FilterContext _havingFilter;
@@ -160,15 +161,18 @@ public class QueryContext {
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
-      @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
-      @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
-      int offset, Map<String, String> queryOptions,
-      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, ExplainMode explain) {
+      @Nullable List<ArrayJoinContext> arrayJoinContexts, @Nullable FilterContext filter,
+      @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
+      @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
+      Map<String, String> queryOptions, @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
+      ExplainMode explain) {
     _tableName = tableName;
     _subquery = subquery;
     _selectExpressions = selectExpressions;
     _distinct = distinct;
     _aliasList = Collections.unmodifiableList(aliasList);
+    _arrayJoinContexts = arrayJoinContexts != null ? Collections.unmodifiableList(arrayJoinContexts)
+        : List.of();
     _filter = filter;
     _groupByExpressions = groupByExpressions;
     _havingFilter = havingFilter;
@@ -231,6 +235,13 @@ public class QueryContext {
    */
   public List<String> getAliasList() {
     return _aliasList;
+  }
+
+  /**
+   * Returns the ARRAY JOIN contexts associated with the query.
+   */
+  public List<ArrayJoinContext> getArrayJoinContexts() {
+    return _arrayJoinContexts;
   }
 
   /**
@@ -651,10 +662,11 @@ public class QueryContext {
   @Override
   public String toString() {
     return "QueryContext{" + "_tableName='" + _tableName + '\'' + ", _subquery=" + _subquery + ", _selectExpressions="
-        + _selectExpressions + ", _distinct=" + _distinct + ", _aliasList=" + _aliasList + ", _filter=" + _filter
-        + ", _groupByExpressions=" + _groupByExpressions + ", _havingFilter=" + _havingFilter + ", _orderByExpressions="
-        + _orderByExpressions + ", _limit=" + _limit + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions
-        + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
+        + _selectExpressions + ", _distinct=" + _distinct + ", _aliasList=" + _aliasList + ", _arrayJoinContexts="
+        + _arrayJoinContexts + ", _filter=" + _filter + ", _groupByExpressions=" + _groupByExpressions
+        + ", _havingFilter=" + _havingFilter + ", _orderByExpressions=" + _orderByExpressions + ", _limit=" + _limit
+        + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions + ", _expressionOverrideHints="
+        + _expressionOverrideHints + ", _explain=" + _explain + '}';
   }
 
   public void setSkipIndexes(Map<String, Set<FieldConfig.IndexType>> skipIndexes) {
@@ -694,6 +706,7 @@ public class QueryContext {
     private List<ExpressionContext> _selectExpressions;
     private boolean _distinct;
     private List<String> _aliasList;
+    private List<ArrayJoinContext> _arrayJoinContexts = List.of();
     private FilterContext _filter;
     private List<ExpressionContext> _groupByExpressions;
     private List<int[]> _groupingSets;
@@ -732,6 +745,11 @@ public class QueryContext {
 
     public Builder setAliasList(List<String> aliasList) {
       _aliasList = aliasList;
+      return this;
+    }
+
+    public Builder setArrayJoinContexts(List<ArrayJoinContext> arrayJoinContexts) {
+      _arrayJoinContexts = arrayJoinContexts;
       return this;
     }
 
@@ -805,8 +823,8 @@ public class QueryContext {
       }
       QueryContext queryContext =
           new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList,
-              _filter, _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
-              _expressionOverrideHints, _explain);
+              _arrayJoinContexts, _filter, _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset,
+               _queryOptions, _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
       queryContext.setServerReturnFinalResultKeyUnpartitioned(
@@ -965,6 +983,13 @@ public class QueryContext {
 
       for (ExpressionContext expression : query._selectExpressions) {
         expression.getColumns(columns);
+      }
+      if (!query._arrayJoinContexts.isEmpty()) {
+        for (ArrayJoinContext arrayJoinContext : query._arrayJoinContexts) {
+          for (ArrayJoinContext.Operand operand : arrayJoinContext.getOperands()) {
+            operand.getExpression().getColumns(columns);
+          }
+        }
       }
       if (query._filter != null) {
         query._filter.getColumns(columns);
