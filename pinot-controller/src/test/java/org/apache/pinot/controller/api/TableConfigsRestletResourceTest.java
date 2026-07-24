@@ -393,6 +393,71 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
   }
 
   @Test
+  public void testCreateConfigReportsDeprecatedTablePropertiesAsWarning()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    String tableName = "testDeprecatedCreate";
+    TableConfigs tableConfigs =
+        new TableConfigs(tableName, createDummySchema(tableName), createOfflineTableConfig(tableName),
+            createRealtimeTableConfig(tableName));
+    ObjectNode tableConfigsJson = (ObjectNode) JsonUtils.stringToJsonNode(tableConfigs.toPrettyJsonString());
+    ((ObjectNode) tableConfigsJson.get(TableType.REALTIME.name().toLowerCase()).get("segmentsConfig"))
+        .put("replicasPerPartition", "3");
+
+    try {
+      String response =
+          adminClient.getTableClient().createTableConfigs(tableConfigsJson.toPrettyString(), null, null);
+      Assert.assertTrue(response.contains("realtime.segmentsConfig.replicasPerPartition"),
+          "Expected deprecation warning in response: " + response);
+    } finally {
+      adminClient.getTableClient().deleteTableConfigs(tableName, null);
+    }
+  }
+
+  @Test
+  public void testUpdateConfigReportsNewlyIntroducedDeprecatedPropertyAsWarning()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    String tableName = "testDeprecatedUpdateNew";
+    TableConfigs tableConfigs =
+        new TableConfigs(tableName, createDummySchema(tableName), createOfflineTableConfig(tableName),
+            createRealtimeTableConfig(tableName));
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
+    try {
+      ObjectNode tableConfigsJson = (ObjectNode) JsonUtils.stringToJsonNode(tableConfigs.toPrettyJsonString());
+      ((ObjectNode) tableConfigsJson.get(TableType.REALTIME.name().toLowerCase()).get("segmentsConfig"))
+          .put("replicasPerPartition", "3");
+      String response = adminClient.getTableClient()
+          .updateTableConfigs(tableName, tableConfigsJson.toPrettyString(), null, false, false);
+      Assert.assertTrue(response.contains("realtime.segmentsConfig.replicasPerPartition"),
+          "Expected deprecation warning in update response: " + response);
+    } finally {
+      adminClient.getTableClient().deleteTableConfigs(tableName, null);
+    }
+  }
+
+  @Test
+  public void testUpdateMissingTableConfigsReportsNotExistsNotDeprecation()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    String tableName = "testMissingUpdate";
+    TableConfigs tableConfigs =
+        new TableConfigs(tableName, createDummySchema(tableName), createOfflineTableConfig(tableName),
+            createRealtimeTableConfig(tableName));
+    ObjectNode tableConfigsJson = (ObjectNode) JsonUtils.stringToJsonNode(tableConfigs.toPrettyJsonString());
+    ((ObjectNode) tableConfigsJson.get(TableType.REALTIME.name().toLowerCase()).get("segmentsConfig"))
+        .put("replicasPerPartition", "3");
+    try {
+      adminClient.getTableClient()
+          .updateTableConfigs(tableName, tableConfigsJson.toPrettyString(), null, false, false);
+      fail("Update of a non-existent TableConfigs should have failed");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("does not exist"),
+          "Expected 'does not exist' error to take precedence over deprecation, but got: " + e.getMessage());
+    }
+  }
+
+  @Test
   public void testListConfigs()
       throws Exception {
     PinotAdminClient adminClient = getOrCreateAdminClient();
@@ -661,15 +726,19 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
 
     // Create
     response = adminClient.getTableClient().createTableConfigs(tableConfigsJson.toPrettyString(), null, null);
-    Assert.assertEquals(response, "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs "
-        + "testUnrecognized1 successfully added\"}");
+    JsonNode createJson = JsonUtils.stringToJsonNode(response);
+    Assert.assertTrue(createJson.path("unrecognizedProperties").has("/illegalKey1"),
+        "expected unrecognizedProperties./illegalKey1 in: " + response);
+    Assert.assertEquals(createJson.path("status").asText(), "TableConfigs testUnrecognized1 successfully added");
 
     // Update
     response =
         adminClient.getTableClient().updateTableConfigs(tableName, tableConfigsJson.toPrettyString(), null, false,
             false);
-    Assert.assertEquals(response,
-        "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs updated for testUnrecognized1\"}");
+    JsonNode updateJson = JsonUtils.stringToJsonNode(response);
+    Assert.assertTrue(updateJson.path("unrecognizedProperties").has("/illegalKey1"),
+        "expected unrecognizedProperties./illegalKey1 in: " + response);
+    Assert.assertEquals(updateJson.path("status").asText(), "TableConfigs updated for testUnrecognized1");
     // Delete
     adminClient.getTableClient().deleteTableConfigs(tableName, null);
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
@@ -29,6 +30,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -50,12 +52,16 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
+import org.apache.pinot.common.exception.TableConfigVersionConflictException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
+import org.apache.pinot.common.utils.config.DeprecatedTableConfigValidationUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -79,10 +85,12 @@ import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -208,7 +216,7 @@ public class TableConfigsRestletResource {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs. %s", e.getMessage()),
+      throw new ControllerApplicationException(LOGGER, "Invalid TableConfigs. " + e.getMessage(),
           Response.Status.BAD_REQUEST, e);
     }
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
@@ -221,22 +229,38 @@ public class TableConfigsRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
-    validateConfig(tableConfigs, databaseName, typesToSkip);
-    tableConfigs.setTableName(rawTableName);
+    /// Permission check runs BEFORE validateNoDeprecatedConfigs (which reads stored configs from ZK on update-mode
+    /// paths). Mirrors the /tableConfigs/validate ordering and prevents an unauthenticated caller from probing
+    /// stored config contents via the deprecation-diff response shape.
+    String endpointUrl = request.getRequestURL().toString();
+    AccessControl accessControl = _accessControlFactory.create();
+    AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.CREATE_TABLE)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
+
+    List<String> deprecationWarnings;
+    try {
+      deprecationWarnings = validateNoDeprecatedConfigs(tableConfigs, JsonUtils.stringToJsonNode(tableConfigsStr),
+          databaseName)._warnings;
+      validateConfig(tableConfigs, databaseName, typesToSkip);
+      tableConfigs.setTableName(rawTableName);
+    } catch (ControllerApplicationException e) {
+      throw e;
+    } catch (IOException | IllegalArgumentException | IllegalStateException e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid TableConfigs. " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
+    } catch (RuntimeException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
+      LOGGER.warn("Failed to validate TableConfigs for create of table: {}", rawTableName, e);
+      throw e;
+    }
 
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
     Schema schema = tableConfigs.getSchema();
 
     try {
-      // validate permission
-      String endpointUrl = request.getRequestURL().toString();
-      AccessControl accessControl = _accessControlFactory.create();
-      AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders, endpointUrl,
-          accessControl);
-      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.CREATE_TABLE)) {
-        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-      }
 
       if (offlineTableConfig != null) {
         applyTuning(offlineTableConfig, schema);
@@ -271,7 +295,7 @@ public class TableConfigsRestletResource {
       }
 
       return new ConfigSuccessResponse("TableConfigs " + rawTableName + " successfully added",
-          tableConfigsAndUnrecognizedProps.getRight());
+          tableConfigsAndUnrecognizedProps.getRight(), deprecationWarnings);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof InvalidTableConfigException) {
@@ -348,11 +372,25 @@ public class TableConfigsRestletResource {
   }
 
   /**
-   * Updated the {@link TableConfigs} by updating the schema tableName,
+   * Updates the {@link TableConfigs} by updating the schema tableName,
    * then updating the offline tableConfig or creating a new one if it doesn't already exist in the cluster,
    * then updating the realtime tableConfig or creating a new one if it doesn't already exist in the cluster.
    *
-   * The option to skip table config validation (validationTypesToSkip) and force update the table schema
+   * <p><b>Atomicity caveat (HTTP 409 CONFLICT and 5xx responses):</b> this endpoint performs up to THREE
+   * sequential ZK writes — schema, offline sub-config (CAS), realtime sub-config (CAS) — and rolls none of them
+   * back on later failure. Implications:
+   * <ul>
+   *   <li>If the schema update succeeds and a sub-config CAS later fails (409 / 5xx), the schema has ALREADY
+   *       landed. A naive client retry that re-reads the schema sees the updated schema and may overwrite it
+   *       again as a no-op.</li>
+   *   <li>If the offline CAS succeeds and the realtime CAS fails, the offline sub-config has ALREADY landed at
+   *       v+1. The 409 response signals partial application of the intended transaction.</li>
+   * </ul>
+   * Clients receiving 409 MUST re-read schema and both sub-configs and merge their intent against the observed
+   * state — do NOT interpret 409 as "no change applied". A future PR may collapse the three writes into a single
+   * Helix multi-write; until then this behaviour is documented contract, not a bug.
+   *
+   * <p>The option to skip table config validation (validationTypesToSkip) and force update the table schema
    * (forceTableSchemaUpdate) are provided for testing purposes and should be used with caution.
    */
   @PUT
@@ -376,25 +414,39 @@ public class TableConfigsRestletResource {
     tableName = DatabaseUtils.translateTableName(tableName, databaseName);
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     TableConfigs tableConfigs;
-    try {
-      tableConfigsAndUnrecognizedProps =
-          JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
-      tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      validateConfig(tableConfigs, databaseName, typesToSkip);
-      Preconditions.checkState(
-          DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName).equals(tableName),
-          "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
-      tableConfigs.setTableName(tableName);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s. Reason: %s", tableName,
-          e.getMessage()), Response.Status.BAD_REQUEST, e);
-    }
+    DeprecationValidationResult deprecationResult;
 
+    /// Existence check runs before deprecation validation so a PUT to a missing TableConfigs reports the actual
+    /// problem (table does not exist) instead of a misleading "deprecated property" 400 from create-mode fallback.
     if (!_pinotHelixResourceManager.hasOfflineTable(tableName) && !_pinotHelixResourceManager.hasRealtimeTable(
         tableName)) {
       throw new ControllerApplicationException(LOGGER,
           String.format("TableConfigs: %s does not exist. Use POST to create it first.", tableName),
           Response.Status.BAD_REQUEST);
+    }
+
+    try {
+      tableConfigsAndUnrecognizedProps =
+          JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
+      tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+      deprecationResult = validateNoDeprecatedConfigs(tableConfigs, JsonUtils.stringToJsonNode(tableConfigsStr),
+          databaseName);
+      validateConfig(tableConfigs, databaseName, typesToSkip);
+      Preconditions.checkState(
+          DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName).equals(tableName),
+          "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
+      tableConfigs.setTableName(tableName);
+    } catch (ControllerApplicationException e) {
+      throw e;
+    } catch (IOException | IllegalArgumentException | IllegalStateException e) {
+      /// Narrowed to client-input exception types so transient ZK / Helix errors propagate as 5xx instead of being
+      /// mis-reported as 400.
+      throw new ControllerApplicationException(LOGGER, "Invalid TableConfigs: " + tableName + ". " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
+    } catch (RuntimeException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
+      LOGGER.warn("Failed to validate TableConfigs for update of table: {}", tableName, e);
+      throw e;
     }
 
     TableConfig offlineTableConfig = tableConfigs.getOffline();
@@ -408,7 +460,11 @@ public class TableConfigsRestletResource {
       if (offlineTableConfig != null) {
         applyTuning(offlineTableConfig, schema);
         if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          _pinotHelixResourceManager.updateTableConfig(offlineTableConfig, forceTableSchemaUpdate);
+          /// Version-checked CAS: a concurrent writer that landed between the deprecation-diff read and this write
+          /// bumps the znode version, so the CAS fails and we return 5xx — preventing a deprecated key from
+          /// slipping past the diff via a racing update on the same sub-config.
+          _pinotHelixResourceManager.updateTableConfig(offlineTableConfig,
+              deprecationResult._offlineExpectedVersion, forceTableSchemaUpdate);
           LOGGER.info("Updated offline table config: {}", tableName);
         } else {
           _pinotHelixResourceManager.addTable(offlineTableConfig);
@@ -418,13 +474,21 @@ public class TableConfigsRestletResource {
       if (realtimeTableConfig != null) {
         applyTuning(realtimeTableConfig, schema);
         if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig, forceTableSchemaUpdate);
+          _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig,
+              deprecationResult._realtimeExpectedVersion, forceTableSchemaUpdate);
           LOGGER.info("Updated realtime table config: {}", tableName);
         } else {
           _pinotHelixResourceManager.addTable(realtimeTableConfig);
           LOGGER.info("Created realtime table config: {}", tableName);
         }
       }
+    } catch (TableConfigVersionConflictException e) {
+      /// CAS lost on at least one sub-config (offline or realtime). Note: the offline write may have already
+      /// landed before the realtime CAS failed — TableConfigs PUT writes each sub-type sequentially. The 409
+      /// response signals that the caller should re-read both sub-configs and retry the full transaction.
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Conflict updating TableConfigs for %s: %s. Re-read both sub-configs and retry.", tableName,
+              e.getMessage()), Response.Status.CONFLICT, e);
     } catch (TableConfigBackwardIncompatibleException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
@@ -441,7 +505,7 @@ public class TableConfigsRestletResource {
     }
 
     return new ConfigSuccessResponse("TableConfigs updated for " + tableName,
-        tableConfigsAndUnrecognizedProps.getRight());
+        tableConfigsAndUnrecognizedProps.getRight(), deprecationResult._warnings);
   }
 
   /**
@@ -458,11 +522,13 @@ public class TableConfigsRestletResource {
           + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
+    TableConfigsValidationResult result =
         parseAndValidateTableConfigs(tableConfigsStr, typesToSkip, httpHeaders, request);
-    TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-    ObjectNode response = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
-    response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));
+    ObjectNode response = JsonUtils.objectToJsonNode(result._tableConfigs).deepCopy();
+    response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(result._unrecognizedProps));
+    if (!result._deprecationWarnings.isEmpty()) {
+      response.set("deprecationWarnings", JsonUtils.objectToJsonNode(result._deprecationWarnings));
+    }
     return response.toString();
   }
 
@@ -482,9 +548,9 @@ public class TableConfigsRestletResource {
           + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
+    TableConfigsValidationResult result =
         parseAndValidateTableConfigs(tableConfigsStr, typesToSkip, httpHeaders, request);
-    TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+    TableConfigs tableConfigs = result._tableConfigs;
     Schema schema = tableConfigs.getSchema();
     if (tableConfigs.getOffline() != null) {
       applyTuning(tableConfigs.getOffline(), schema);
@@ -493,26 +559,28 @@ public class TableConfigsRestletResource {
       applyTuning(tableConfigs.getRealtime(), schema);
     }
     ObjectNode response = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
-    response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));
+    response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(result._unrecognizedProps));
+    if (!result._deprecationWarnings.isEmpty()) {
+      response.set("deprecationWarnings", JsonUtils.objectToJsonNode(result._deprecationWarnings));
+    }
     return response.toString();
   }
 
-  private Pair<TableConfigs, Map<String, Object>> parseAndValidateTableConfigs(String tableConfigsStr,
+  private TableConfigsValidationResult parseAndValidateTableConfigs(String tableConfigsStr,
       @Nullable String typesToSkip, HttpHeaders httpHeaders, Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
+    JsonNode tableConfigsJson;
     try {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
+      tableConfigsJson = JsonUtils.stringToJsonNode(tableConfigsStr);
     } catch (IOException e) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableConfigs json string: %s. Reason: %s", tableConfigsStr, e.getMessage()),
+      throw new ControllerApplicationException(LOGGER, "Invalid TableConfigs json string. " + e.getMessage(),
           Response.Status.BAD_REQUEST, e);
     }
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-    validateConfig(tableConfigs, databaseName, typesToSkip);
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
-    tableConfigs.setTableName(rawTableName);
 
     // Cluster-aware validations are exclusive to the validate/tune pre-flight endpoints so that users get fail-fast
     // feedback on tenant/minion/active-task issues without re-running them in the create/update paths (which already
@@ -533,14 +601,52 @@ public class TableConfigsRestletResource {
           String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
     }
 
-    // validate permission
+    /// Validate permission BEFORE running validateNoDeprecatedConfigs (which reads stored configs from ZK).
+    /// Mirrors PinotTableRestletResource.checkTableConfig and prevents an unauthenticated caller from probing
+    /// table existence via the deprecation-diff response shape.
+    /// setTableName is deferred until AFTER validateConfig because it has the side effect of overwriting the
+    /// schema name (TableConfigs.setTableName calls _schema.setSchemaName), which would mask the schema-mismatch
+    /// check inside validateConfig.
     String endpointUrl = request.getRequestURL().toString();
     AccessControl accessControl = _accessControlFactory.create();
     AccessControlUtils.validatePermission(rawTableName, AccessType.READ, httpHeaders, endpointUrl, accessControl);
     if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
-    return tableConfigsAndUnrecognizedProps;
+
+    List<String> deprecationWarnings;
+    try {
+      deprecationWarnings = validateNoDeprecatedConfigs(tableConfigs, tableConfigsJson, databaseName)._warnings;
+      validateConfig(tableConfigs, databaseName, typesToSkip);
+      tableConfigs.setTableName(rawTableName);
+    } catch (ControllerApplicationException e) {
+      /// Preserve the upstream status (e.g. 500 from validateConfig); don't downgrade to 400.
+      throw e;
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid TableConfigs. " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
+    } catch (RuntimeException e) {
+      LOGGER.warn("Failed to validate TableConfigs for: {}", tableConfigs.getTableName(), e);
+      throw e;
+    }
+    return new TableConfigsValidationResult(tableConfigs, tableConfigsAndUnrecognizedProps.getRight(),
+        deprecationWarnings);
+  }
+
+  /// Carries the parsed [TableConfigs], the map of unrecognized JSON properties, and the list of deprecation
+  /// warnings out of [#parseAndValidateTableConfigs] so the calling REST methods (`/validate`, `/tune`) can
+  /// surface the same set of fields on their response without duplicating the parsing pipeline.
+  private static final class TableConfigsValidationResult {
+    final TableConfigs _tableConfigs;
+    final Map<String, Object> _unrecognizedProps;
+    final List<String> _deprecationWarnings;
+
+    TableConfigsValidationResult(TableConfigs tableConfigs, Map<String, Object> unrecognizedProps,
+        List<String> deprecationWarnings) {
+      _tableConfigs = tableConfigs;
+      _unrecognizedProps = unrecognizedProps;
+      _deprecationWarnings = deprecationWarnings;
+    }
   }
 
   private void validateClusterAwareConfig(TableConfig tableConfig, Set<TableConfigUtils.ValidationType> skipTypes) {
@@ -612,5 +718,97 @@ public class TableConfigsRestletResource {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
     }
+  }
+
+  /// Validates the offline and realtime sub-configs for deprecated properties. For each sub-type, if a stored
+  /// table config already exists for `rawTableName` the validation runs in update mode (diffing against the
+  /// stored config), otherwise it runs in create mode. Aggregated warnings from all sub-types are returned along
+  /// with the ZK znode versions observed at diff time so callers can issue a version-checked CAS on the
+  /// subsequent write.
+  private DeprecationValidationResult validateNoDeprecatedConfigs(TableConfigs tableConfigs,
+      JsonNode tableConfigsJson, String database) {
+    /// All call sites verify tableName non-null before reaching here; assert the invariant so a future refactor
+    /// that moves the call earlier fails loudly instead of silently skipping the deprecation pass.
+    Preconditions.checkState(tableConfigs.getTableName() != null,
+        "tableName must be set before deprecation validation");
+    String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), database);
+    List<String> warnings = new ArrayList<>();
+    int offlineExpectedVersion = -1;
+    int realtimeExpectedVersion = -1;
+    JsonNode offlineTableConfigJson = subConfigJson(tableConfigsJson, TableType.OFFLINE);
+    if (offlineTableConfigJson != null) {
+      ReadStoredConfigResult read =
+          readStoredTableConfigJsonWithVersion(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+      offlineExpectedVersion = read._version;
+      String prefix = TableType.OFFLINE.name().toLowerCase();
+      if (read._json == null) {
+        warnings.addAll(DeprecatedTableConfigValidationUtils.validateOnCreate(offlineTableConfigJson, prefix));
+      } else {
+        warnings.addAll(DeprecatedTableConfigValidationUtils.validateOnUpdate(offlineTableConfigJson, read._json,
+            prefix));
+      }
+    }
+    JsonNode realtimeTableConfigJson = subConfigJson(tableConfigsJson, TableType.REALTIME);
+    if (realtimeTableConfigJson != null) {
+      ReadStoredConfigResult read =
+          readStoredTableConfigJsonWithVersion(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+      realtimeExpectedVersion = read._version;
+      String prefix = TableType.REALTIME.name().toLowerCase();
+      if (read._json == null) {
+        warnings.addAll(DeprecatedTableConfigValidationUtils.validateOnCreate(realtimeTableConfigJson, prefix));
+      } else {
+        warnings.addAll(DeprecatedTableConfigValidationUtils.validateOnUpdate(realtimeTableConfigJson, read._json,
+            prefix));
+      }
+    }
+    return new DeprecationValidationResult(warnings, offlineExpectedVersion, realtimeExpectedVersion);
+  }
+
+  /// Read result paired with the ZK znode version observed at read time. Used to thread the CAS expected-version
+  /// through to the subsequent `updateTableConfig` write.
+  private static final class ReadStoredConfigResult {
+    @Nullable
+    final JsonNode _json;
+    final int _version;
+
+    ReadStoredConfigResult(@Nullable JsonNode json, int version) {
+      _json = json;
+      _version = version;
+    }
+  }
+
+  /// Aggregated deprecation-diff result. Carries the per-sub-type ZK znode versions so the subsequent
+  /// `updateTableConfig` call can issue a version-checked CAS. A `-1` version means the sub-type did not exist at
+  /// diff time (create path), so no version check is required.
+  static final class DeprecationValidationResult {
+    final List<String> _warnings;
+    final int _offlineExpectedVersion;
+    final int _realtimeExpectedVersion;
+
+    DeprecationValidationResult(List<String> warnings, int offlineExpectedVersion, int realtimeExpectedVersion) {
+      _warnings = warnings;
+      _offlineExpectedVersion = offlineExpectedVersion;
+      _realtimeExpectedVersion = realtimeExpectedVersion;
+    }
+  }
+
+  private ReadStoredConfigResult readStoredTableConfigJsonWithVersion(String tableNameWithType) {
+    Stat stat = new Stat();
+    ZNRecord stored = ZKMetadataProvider.getTableConfigZNRecord(_pinotHelixResourceManager.getPropertyStore(),
+        tableNameWithType, stat);
+    return new ReadStoredConfigResult(TableConfigSerDeUtils.toRawJsonNode(stored),
+        stored == null ? -1 : stat.getVersion());
+  }
+
+  @Nullable
+  private static JsonNode subConfigJson(JsonNode tableConfigsJson, TableType type) {
+    /// Mirror what Jackson populates on the deserialized POJO: TableConfigs uses @JsonProperty("offline") /
+    /// @JsonProperty("realtime"), so any uppercase variant in the raw user JSON is already silently ignored at
+    /// deserialization time. We use the same lowercase-only lookup here so the deprecation pass agrees with what
+    /// ends up in the stored config. The Jackson-ignores-uppercase invariant is locked at the SPI layer by
+    /// TableConfigsSerializationTest#testUppercaseOfflineRealtimeKeysAreIgnoredByJackson — if Jackson is ever
+    /// configured to ACCEPT_CASE_INSENSITIVE_PROPERTIES, that SPI test fails first, surfacing the regression
+    /// before any request reaches this code path.
+    return tableConfigsJson.get(type.name().toLowerCase());
   }
 }

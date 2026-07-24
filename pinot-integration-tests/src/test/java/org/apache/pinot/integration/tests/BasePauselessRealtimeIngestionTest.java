@@ -40,6 +40,7 @@ import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
@@ -146,7 +147,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
 
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(
-        new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
+        new StreamIngestionConfig(List.of(IngestionConfigUtils.getFirstStreamConfigMap(tableConfig))));
     ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
     tableConfig.getIndexingConfig().setStreamConfigs(null);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -230,9 +231,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
         _helixResourceManager.getSegmentsZKMetadata(tableNameWithType2));
   }
 
-  /**
-   * Basic test to verify segment assignment and metadata without any failures
-   */
+  /// Basic test to verify segment assignment and metadata without any failures.
   protected void testBasicSegmentAssignment() {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
 
