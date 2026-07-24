@@ -64,6 +64,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -1838,6 +1839,70 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       fail("Should not fail for single FieldConfig entry", e);
     }
+  }
+
+  @Test
+  public void testValidateNullValueVectorBackfill()
+      throws Exception {
+    // Valid: opting a scalar column into null value vector backfill (indexes.null.backfill) passes validation.
+    Schema scalarSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("intCol", DataType.INT)
+        .build();
+    FieldConfig scalarFieldConfig = new FieldConfig.Builder("intCol")
+        .withIndexes(JsonUtils.stringToJsonNode("{\"null\": {\"backfill\": true}}"))
+        .build();
+    TableConfig scalarTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setFieldConfigList(List.of(scalarFieldConfig))
+        .build();
+    TableConfigUtils.validate(scalarTableConfig, scalarSchema);
+
+    // Invalid: opting a MAP column into backfill is rejected with a clear message.
+    Schema mapSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+    mapSchema.addField(new ComplexFieldSpec("mapCol", DataType.MAP, true, Map.of(
+        "key", new DimensionFieldSpec("key", DataType.STRING, true),
+        "value", new DimensionFieldSpec("value", DataType.INT, true)
+    )));
+    FieldConfig mapFieldConfig = new FieldConfig.Builder("mapCol")
+        .withIndexes(JsonUtils.stringToJsonNode("{\"null\": {\"backfill\": true}}"))
+        .build();
+    TableConfig mapTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setFieldConfigList(List.of(mapFieldConfig))
+        .build();
+    IllegalStateException e =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(mapTableConfig, mapSchema));
+    assertTrue(e.getMessage().contains("Null value vector backfill is not supported"),
+        "Unexpected validation failure: " + e.getMessage());
+  }
+
+  @Test
+  public void testValidateNullValueVectorBackfillOnTimeColumn()
+      throws Exception {
+    FieldConfig timeFieldConfig = new FieldConfig.Builder(TIME_COLUMN)
+        .withIndexes(JsonUtils.stringToJsonNode("{\"null\": {\"backfill\": true}}"))
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setNullHandlingEnabled(true)
+        .setFieldConfigList(List.of(timeFieldConfig))
+        .build();
+
+    // Invalid: the default default null value (Long.MIN_VALUE) is outside the valid time range, so ingestion stores the
+    // current time for null values and a backfill scan could never match it.
+    Schema defaultDefaultSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    IllegalStateException e =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, defaultDefaultSchema));
+    assertTrue(e.getMessage().contains("Null value vector backfill is not supported for time column"),
+        "Unexpected validation failure: " + e.getMessage());
+
+    // Valid: an explicit in-range default null value is stored as-is for null values, so backfill can match it.
+    Schema inRangeDefaultSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", 1600000000000L, null)
+        .build();
+    TableConfigUtils.validate(tableConfig, inRangeDefaultSchema);
   }
 
   @Test
