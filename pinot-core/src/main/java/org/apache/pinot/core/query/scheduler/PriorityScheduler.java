@@ -119,8 +119,11 @@ public abstract class PriorityScheduler extends QueryScheduler {
             break;
           }
           try {
+            // Global runtime throttling gate: optional pause/limit of inflight queries
+            ThrottlingRuntime.acquireSchedulerPermit();
             SchedulerQueryContext request = _queryQueue.take();
             if (request == null) {
+              ThrottlingRuntime.releaseSchedulerPermit();
               continue;
             }
             ServerQueryRequest queryRequest = request.getQueryRequest();
@@ -133,6 +136,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
                 executorService.releaseWorkers();
                 schedulerGroup.endQuery();
                 _runningQueriesSemaphore.release();
+                ThrottlingRuntime.releaseSchedulerPermit();
                 checkStopResourceManager();
                 if (!_isRunning && _runningQueriesSemaphore.availablePermits() == _numRunners) {
                   _resourceManager.stop();
