@@ -57,8 +57,8 @@ public class FieldIndexConfigsUtil {
         .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().build()));
   }
 
-  /// Builds a {@link FieldIndexConfigs} for a single column directly from one {@link FieldConfig}, without a
-  /// `TableConfig` or `Schema`. The dictionary entry is derived from `fieldConfig.getEncodingType()`
+  /// Builds a [FieldIndexConfigs] for a single column directly from one [FieldConfig], without a
+  /// `TableConfig` or `Schema`. The dictionary entry is derived from `fieldConfig.indexes.forward.encodingType`
   /// (RAW => disabled, otherwise default-enabled); every other index type is read from the modern
   /// `fieldConfig.getIndexes()` JSON (keyed by index pretty name), falling back to each type's default config.
   /// A `null` fieldConfig yields built-in defaults (dictionary enabled).
@@ -67,7 +67,7 @@ public class FieldIndexConfigsUtil {
   /// synthetic columns (e.g. OPEN_STRUCT materialized children) that exist in no schema.
   public static FieldIndexConfigs fromFieldConfig(@Nullable FieldConfig fieldConfig, FieldSpec fieldSpec) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
-    boolean rawEncoded = fieldConfig != null && fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW;
+    boolean rawEncoded = isRawForwardEncoded(fieldConfig);
     builder.add(StandardIndexes.dictionary(),
         rawEncoded ? DictionaryIndexConfig.DISABLED : DictionaryIndexConfig.DEFAULT);
     JsonNode indexes = fieldConfig != null ? fieldConfig.getIndexes() : null;
@@ -78,6 +78,24 @@ public class FieldIndexConfigsUtil {
       addConfigFromIndexes(builder, indexType, indexes);
     }
     return builder.build();
+  }
+
+  @SuppressWarnings("deprecation")
+  private static boolean isRawForwardEncoded(@Nullable FieldConfig fieldConfig) {
+    if (fieldConfig == null) {
+      return false;
+    }
+    JsonNode indexes = fieldConfig.getIndexes();
+    JsonNode forward = indexes != null ? indexes.get("forward") : null;
+    if (forward != null && forward.isObject()) {
+      try {
+        return JsonUtils.jsonNodeToObject(forward, ForwardIndexConfig.class).getEncodingType()
+            == FieldConfig.EncodingType.RAW;
+      } catch (IOException e) {
+        throw new IllegalArgumentException("Failed to parse forward index config from FieldConfig", e);
+      }
+    }
+    return fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW;
   }
 
   private static <C extends IndexConfig> void addConfigFromIndexes(FieldIndexConfigs.Builder builder,

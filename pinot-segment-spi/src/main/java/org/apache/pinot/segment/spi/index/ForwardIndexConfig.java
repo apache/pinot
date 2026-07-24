@@ -98,8 +98,8 @@ public class ForwardIndexConfig extends IndexConfig {
   private ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
       @JsonProperty("encodingType") @Nullable EncodingType encodingType,
       @JsonProperty("compressionCodec") @Nullable CompressionCodec compressionCodec,
-      @Deprecated @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
-      @Deprecated @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType,
+      @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
+      @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType,
       @JsonProperty("deriveNumDocsPerChunk") @Nullable Boolean deriveNumDocsPerChunk,
       @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion,
       @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
@@ -108,7 +108,7 @@ public class ForwardIndexConfig extends IndexConfig {
     super(disabled);
     // Backward-compat for legacy JSON that lacks `encodingType`: default to DICTIONARY (matches the historical
     // implicit behavior where ForwardIndexConfig had no encoding distinction). Programmatic callers must use
-    // Builder(EncodingType) and pass an explicit value, typically from FieldConfig.getEncodingType().
+    // Builder(EncodingType) and pass the resolved forward-index encoding.
     _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
     _compressionCodec = getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType);
     _deriveNumDocsPerChunk = Boolean.TRUE.equals(deriveNumDocsPerChunk);
@@ -285,8 +285,7 @@ public class ForwardIndexConfig extends IndexConfig {
     private int _targetDocsPerChunk = _defaultTargetDocsPerChunk;
     private Map<String, Object> _configs = new HashMap<>();
 
-    /// Constructs a builder with the given forward-index encoding. Callers should pass `FieldConfig.getEncodingType()`
-    /// so the forward-index encoding stays consistent with the column-level encoding.
+    /// Constructs a builder with the given forward-index encoding.
     public Builder(EncodingType encodingType) {
       _encodingType = Preconditions.checkNotNull(encodingType, "encodingType must not be null");
     }
