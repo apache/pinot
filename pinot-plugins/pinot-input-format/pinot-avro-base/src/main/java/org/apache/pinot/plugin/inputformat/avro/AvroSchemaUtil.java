@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
@@ -37,6 +38,70 @@ public class AvroSchemaUtil {
   // Avro logical-type name for UUID (see org.apache.avro.LogicalTypes). Value-level logical-type conversion lives
   // in AvroRecordExtractor; this class only deals with schema-shape mapping.
   private static final String UUID = "uuid";
+
+  /// Returns the Avro schema for a single value of the given Pinot [DataType]. This is the canonical Pinot-to-Avro
+  /// type mapping; it is driven by the **original (logical)** data type rather than the stored type, so logical types
+  /// stay self-describing in the generated Avro schema instead of collapsing to their physical storage type.
+  ///
+  /// | Pinot type    | Avro type                | Value handed to the Avro writer                          |
+  /// |---------------|--------------------------|----------------------------------------------------------|
+  /// | INT           | `int`                    | `Integer`                                                 |
+  /// | LONG          | `long`                   | `Long`                                                    |
+  /// | FLOAT         | `float`                  | `Float`                                                   |
+  /// | DOUBLE        | `double`                 | `Double`                                                  |
+  /// | BOOLEAN       | `boolean`                | `Boolean` (Pinot stores `int` 0/1 — see note below)       |
+  /// | TIMESTAMP     | `long{timestamp-millis}` | `Long` millis since epoch (the logical type's base type)   |
+  /// | BIG_DECIMAL   | `bytes{big-decimal}`     | [java.math.BigDecimal] via Avro's `BigDecimalConversion`   |
+  /// | STRING / JSON | `string`                 | `String`                                                  |
+  /// | BYTES         | `bytes`                  | [java.nio.ByteBuffer]                                     |
+  /// | UUID          | `string{uuid}`           | 16-byte `byte[]` via a `uuid` `Conversion`                |
+  ///
+  /// `timestamp-millis` needs no write-side conversion because `Long` *is* that logical type's base representation.
+  /// `big-decimal` is used for BIG_DECIMAL rather than `decimal(precision, scale)` because Pinot does not pin a
+  /// per-column precision/scale, and `big-decimal` encodes the scale with every value. BOOLEAN is the one type with
+  /// no Avro logical type to hang a `Conversion` on, so writers must coerce Pinot's stored `int` 0/1 to `Boolean`
+  /// themselves (see `SegmentProcessorAvroUtils#convertGenericRowToAvroRecord` and `AvroWriter`).
+  ///
+  /// This mapping is intentionally one-way: [#valueOf(Schema)] does **not** map `timestamp-millis` back to TIMESTAMP
+  /// or `big-decimal` back to BIG_DECIMAL, so that Pinot schema inference from existing Avro data keeps its
+  /// long-standing behavior.
+  ///
+  /// Throws [UnsupportedOperationException] for types with no Avro representation (STRUCT / MAP / OPEN_STRUCT /
+  /// LIST / UNKNOWN).
+  public static Schema toAvroSchema(DataType dataType) {
+    switch (dataType) {
+      case INT:
+        return Schema.create(Schema.Type.INT);
+      case LONG:
+        return Schema.create(Schema.Type.LONG);
+      case FLOAT:
+        return Schema.create(Schema.Type.FLOAT);
+      case DOUBLE:
+        return Schema.create(Schema.Type.DOUBLE);
+      case BOOLEAN:
+        return Schema.create(Schema.Type.BOOLEAN);
+      case TIMESTAMP:
+        return LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG));
+      case BIG_DECIMAL:
+        return LogicalTypes.bigDecimal().addToSchema(Schema.create(Schema.Type.BYTES));
+      case STRING:
+      case JSON:
+        return Schema.create(Schema.Type.STRING);
+      case BYTES:
+        return Schema.create(Schema.Type.BYTES);
+      case UUID:
+        return LogicalTypes.uuid().addToSchema(Schema.create(Schema.Type.STRING));
+      default:
+        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
+    }
+  }
+
+  /// Returns the Avro schema for a whole Pinot column: [#toAvroSchema(DataType)] for a single-value field, or an
+  /// array of it for a multi-value field.
+  public static Schema toAvroSchema(FieldSpec fieldSpec) {
+    Schema valueSchema = toAvroSchema(fieldSpec.getDataType());
+    return fieldSpec.isSingleValueField() ? valueSchema : Schema.createArray(valueSchema);
+  }
 
   /// Returns the Pinot data type for a bare Avro type. This does not honor logical types (e.g. a `string` or `fixed`
   /// carrying `logicalType:uuid` maps to STRING/BYTES, not UUID); prefer [#valueOf(Schema)] when a full [Schema] is
@@ -104,76 +169,26 @@ public class AvroSchemaUtil {
     }
   }
 
-  /// Builds the Avro schema JSON for a single Pinot field. Used to generate sample Avro data from a Pinot schema
-  /// (see `AvroWriter`). Each field is emitted as a nullable union `["null", <type>]`.
+  /// Builds the Avro schema JSON for a single Pinot field, as a nullable union `["null", <type>]`. Used to generate
+  /// sample Avro data from a Pinot schema (see `AvroWriter`).
   ///
-  /// The switch is driven by the original (logical) [DataType] rather than the stored type, so logical types are
-  /// represented faithfully instead of collapsing to their physical storage type: BOOLEAN maps to Avro `boolean`,
-  /// TIMESTAMP to a `timestamp-millis` long (not a plain `int`/`long`), and UUID to a `uuid`-logical-type string
-  /// (not raw `bytes`).
-  ///
-  /// This intentionally differs from the segment-processing converters `AvroUtils.getAvroSchemaFromPinotSchema` and
-  /// `SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema`, which switch on the stored type because they
-  /// serialize Pinot's physically-stored values (e.g. an int for BOOLEAN) directly.
+  /// The `<type>` branch is [#toAvroSchema(DataType)] rendered as JSON, so this shares the single logical-type
+  /// mapping documented there. The field is always emitted as the single-value type even for a multi-value
+  /// [FieldSpec] — the data generator backing `AvroWriter` has never produced Avro arrays.
   public static ObjectNode toAvroSchemaJsonObject(FieldSpec fieldSpec) {
     ObjectNode jsonSchema = JsonUtils.newObjectNode();
     jsonSchema.put("name", fieldSpec.getName());
-    DataType dataType = fieldSpec.getDataType();
-    switch (dataType) {
-      case INT:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "int"));
-        return jsonSchema;
-      case LONG:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "long"));
-        return jsonSchema;
-      case FLOAT:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "float"));
-        return jsonSchema;
-      case DOUBLE:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "double"));
-        return jsonSchema;
-      case BOOLEAN:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "boolean"));
-        return jsonSchema;
-      case TIMESTAMP:
-        // TIMESTAMP is stored as LONG millis-since-epoch; annotate the long branch with the timestamp-millis
-        // logical type so the value stays a long but is self-describing as a timestamp.
-        ObjectNode timestampType = JsonUtils.newObjectNode();
-        timestampType.put("type", "long");
-        timestampType.put("logicalType", "timestamp-millis");
-        ArrayNode timestampUnion = JsonUtils.newArrayNode();
-        timestampUnion.add("null");
-        timestampUnion.add(timestampType);
-        jsonSchema.set("type", timestampUnion);
-        return jsonSchema;
-      case STRING:
-      case JSON:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
-        return jsonSchema;
-      case UUID:
-        // UUID is a logical type; represent it faithfully as an Avro string annotated with logicalType "uuid" rather
-        // than collapsing to raw bytes, so generated sample data round-trips as canonical UUID strings.
-        ObjectNode uuidType = JsonUtils.newObjectNode();
-        uuidType.put("type", "string");
-        uuidType.put("logicalType", "uuid");
-        ArrayNode uuidUnion = JsonUtils.newArrayNode();
-        uuidUnion.add("null");
-        uuidUnion.add(uuidType);
-        jsonSchema.set("type", uuidUnion);
-        return jsonSchema;
-      case BYTES:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
-        return jsonSchema;
-      default:
-        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
+    ArrayNode nullableUnion = JsonUtils.newArrayNode();
+    nullableUnion.add("null");
+    // Schema.toString() emits valid JSON: a bare name for primitives ("int"), an object for logical types
+    // ({"type":"long","logicalType":"timestamp-millis"}).
+    try {
+      nullableUnion.add(JsonUtils.stringToJsonNode(toAvroSchema(fieldSpec.getDataType()).toString()));
+    } catch (IOException e) {
+      throw new IllegalStateException("Caught exception while parsing the Avro schema generated for field: "
+          + fieldSpec.getName(), e);
     }
-  }
-
-  private static ArrayNode convertStringsToJsonArray(String... strings) {
-    ArrayNode jsonArray = JsonUtils.newArrayNode();
-    for (String string : strings) {
-      jsonArray.add(string);
-    }
-    return jsonArray;
+    jsonSchema.set("type", nullableUnion);
+    return jsonSchema;
   }
 }

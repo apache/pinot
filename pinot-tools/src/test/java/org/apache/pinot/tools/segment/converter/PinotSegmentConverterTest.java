@@ -20,6 +20,8 @@ package org.apache.pinot.tools.segment.converter;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
@@ -262,6 +264,79 @@ public class PinotSegmentConverterTest {
       assertUuidRecord(reader.next());
       assertFalse(reader.hasNext());
     }
+  }
+
+  private static final String BOOLEAN_SV_COLUMN = "boolSVColumn";
+  private static final String TIMESTAMP_SV_COLUMN = "tsSVColumn";
+  private static final String BIG_DECIMAL_SV_COLUMN = "bigDecimalSVColumn";
+  private static final String BOOLEAN_MV_COLUMN = "boolMVColumn";
+  private static final String TIMESTAMP_MV_COLUMN = "tsMVColumn";
+  private static final long TIMESTAMP_VALUE = 1609491661001L;
+  // Beyond long precision and with a non-trivial scale, to prove the exported Avro `big-decimal` carries arbitrary
+  // precision and the value's own scale. Trailing zeros are deliberately avoided: ingestion's SpecialValueTransformer
+  // strips them, so a value like "123.45000" would already be "123.45" by the time it reaches the segment.
+  private static final BigDecimal BIG_DECIMAL_VALUE = new BigDecimal("-9999999999999999999999.12345");
+
+  /// Builds a segment with BOOLEAN, TIMESTAMP and BIG_DECIMAL columns and converts it through both the Avro and
+  /// Parquet converters. These are exported using their Avro logical types (`boolean`, `long{timestamp-millis}` and
+  /// `bytes{big-decimal}`) rather than their stored types, so this covers the stored-int-to-Boolean coercion and the
+  /// big-decimal Conversion on both write paths — including Parquet's distinct AvroParquetWriter.withDataModel path.
+  /// Before the fix, BOOLEAN exported as a bare `int`, TIMESTAMP as a bare `long`, and BIG_DECIMAL threw.
+  @Test
+  public void testLogicalTypeConverters()
+      throws Exception {
+    Schema logicalSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(BOOLEAN_SV_COLUMN, DataType.BOOLEAN)
+        .addSingleValueDimension(TIMESTAMP_SV_COLUMN, DataType.TIMESTAMP)
+        .addSingleValueDimension(BIG_DECIMAL_SV_COLUMN, DataType.BIG_DECIMAL)
+        .addMultiValueDimension(BOOLEAN_MV_COLUMN, DataType.BOOLEAN)
+        .addMultiValueDimension(TIMESTAMP_MV_COLUMN, DataType.TIMESTAMP)
+        .build();
+    TableConfig logicalTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("logicalTable").build();
+
+    GenericRow record = new GenericRow();
+    record.putValue(BOOLEAN_SV_COLUMN, true);
+    record.putValue(TIMESTAMP_SV_COLUMN, new Timestamp(TIMESTAMP_VALUE));
+    record.putValue(BIG_DECIMAL_SV_COLUMN, BIG_DECIMAL_VALUE);
+    record.putValue(BOOLEAN_MV_COLUMN, new Object[]{true, false});
+    record.putValue(TIMESTAMP_MV_COLUMN, new Object[]{new Timestamp(TIMESTAMP_VALUE), new Timestamp(0L)});
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(logicalTableConfig, logicalSchema);
+    config.setTableName("logicalTable");
+    config.setSegmentName("logicalSegment");
+    config.setOutDir(new File(TEMP_DIR, "logicalSegment").getPath());
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(List.of(record)));
+    driver.build();
+    String segmentDir = driver.getOutputDirectory().getPath();
+
+    File avroOut = new File(TEMP_DIR, "logicalSegment.avro");
+    new PinotSegmentToAvroConverter(segmentDir, avroOut.getPath()).convert();
+    try (AvroRecordReader reader = new AvroRecordReader()) {
+      reader.init(avroOut, logicalSchema.getFieldSpecMap().keySet(), null);
+      assertLogicalTypeRecord(reader.next());
+      assertFalse(reader.hasNext());
+    }
+
+    File parquetOut = new File(TEMP_DIR, "logicalSegment.parquet");
+    new PinotSegmentToParquetConverter(segmentDir, parquetOut.getPath()).convert();
+    try (ParquetRecordReader reader = new ParquetRecordReader()) {
+      reader.init(parquetOut, logicalSchema.getFieldSpecMap().keySet(), null);
+      assertLogicalTypeRecord(reader.next());
+      assertFalse(reader.hasNext());
+    }
+  }
+
+  private static void assertLogicalTypeRecord(GenericRow record) {
+    // BOOLEAN reads back as a Boolean rather than the stored int, TIMESTAMP as a Timestamp rather than a bare long.
+    assertEquals(record.getValue(BOOLEAN_SV_COLUMN), Boolean.TRUE);
+    assertEquals(record.getValue(TIMESTAMP_SV_COLUMN), new Timestamp(TIMESTAMP_VALUE));
+    BigDecimal bigDecimal = (BigDecimal) record.getValue(BIG_DECIMAL_SV_COLUMN);
+    assertEquals(bigDecimal, BIG_DECIMAL_VALUE);
+    assertEquals(bigDecimal.scale(), BIG_DECIMAL_VALUE.scale(), "big-decimal must preserve the value's own scale");
+    assertEquals(record.getValue(BOOLEAN_MV_COLUMN), new Object[]{Boolean.TRUE, Boolean.FALSE});
+    assertEquals(record.getValue(TIMESTAMP_MV_COLUMN),
+        new Object[]{new Timestamp(TIMESTAMP_VALUE), new Timestamp(0L)});
   }
 
   private static void assertUuidRecord(GenericRow record) {
