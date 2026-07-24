@@ -60,6 +60,7 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.transport.QueryProgressTracker;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.GrpcRequesterIdentity;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
@@ -86,6 +87,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   private final ExecutorService _executorService;
   private final AccessControl _accessControl;
   private final ThreadAccountant _threadAccountant;
+  private final QueryProgressTracker _queryProgressTracker;
   // Memory allocator and throttling configuration
   private final PooledByteBufAllocator _bufAllocator;
   private final long _memoryThresholdBytes;
@@ -115,6 +117,13 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
   public GrpcQueryServer(String instanceId, int port, GrpcConfig config, TlsConfig tlsConfig,
       QueryExecutor queryExecutor, AccessControl accessControl, ThreadAccountant threadAccountant) {
+    this(instanceId, port, config, tlsConfig, queryExecutor, accessControl, threadAccountant,
+        new QueryProgressTracker(false));
+  }
+
+  public GrpcQueryServer(String instanceId, int port, GrpcConfig config, TlsConfig tlsConfig,
+      QueryExecutor queryExecutor, AccessControl accessControl, ThreadAccountant threadAccountant,
+      QueryProgressTracker queryProgressTracker) {
     _instanceId = instanceId;
     _executorService = QueryThreadContext.contextAwareExecutorService(
         Executors.newFixedThreadPool(config.isQueryWorkerThreadsSet()
@@ -171,6 +180,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
     _accessControl = accessControl;
     _threadAccountant = threadAccountant;
+    _queryProgressTracker = queryProgressTracker;
     LOGGER.info("Initialized GrpcQueryServer on port: {} with numWorkerThreads: {}", port,
         ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
   }
@@ -272,6 +282,9 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
     // Process the query
     QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceId);
+    String queryId = queryRequest.getQueryId();
+    _queryProgressTracker.register(queryId, executionContext);
+    boolean successful = false;
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       InstanceResponseBlock instanceResponse;
       try {
@@ -302,6 +315,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       responseObserver.onNext(serverResponse);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_SENT, serverResponse.getSerializedSize());
       responseObserver.onCompleted();
+      successful = true;
       _serverMetrics.addTimedTableValue(queryRequest.getTableNameWithType(), ServerTimer.GRPC_QUERY_EXECUTION_MS,
           System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
 
@@ -309,6 +323,8 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       if (_queryLogger != null) {
         _queryLogger.logQuery(queryRequest, instanceResponse, "GrpcQueryServer");
       }
+    } finally {
+      _queryProgressTracker.complete(queryId, executionContext, successful);
     }
   }
 }

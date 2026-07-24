@@ -31,6 +31,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -81,6 +82,14 @@ public interface BrokerRequestHandler {
   }
 
   Map<Long, String> getRunningQueries();
+
+  /// Returns progress for a running query, or `null` if the query is not running or progress is disabled. Single-stage
+  /// progress uses selected segments as work units. Multi-stage progress also includes stage op-chains and may contain
+  /// component detail rows.
+  @Nullable
+  QueryProgressStats getQueryProgressStats(long queryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr)
+      throws Exception;
 
   /**
    * Cancel a query as identified by the queryId. This method is non-blocking so the query may still run for a while

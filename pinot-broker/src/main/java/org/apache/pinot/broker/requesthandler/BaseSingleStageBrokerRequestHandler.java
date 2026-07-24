@@ -122,6 +122,7 @@ import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -129,6 +130,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -200,7 +202,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
     _queryResponseLimit =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
-    if (isQueryCancellationEnabled()) {
+    if (isQueryTrackingEnabled()) {
       _serversById = new ConcurrentHashMap<>();
     } else {
       _serversById = null;
@@ -268,7 +270,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   @VisibleForTesting
   Set<ServerInstance> getRunningServers(long requestId) {
-    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
+    Preconditions.checkState(isQueryTrackingEnabled(), "Query tracking is not enabled on broker");
     QueryServers queryServers = _serversById.get(requestId);
     return queryServers != null ? queryServers._servers : Set.of();
   }
@@ -276,7 +278,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @Override
   protected void onQueryFinish(long requestId) {
     super.onQueryFinish(requestId);
-    if (isQueryCancellationEnabled()) {
+    if (isQueryTrackingEnabled()) {
       _serversById.remove(requestId);
     }
   }
@@ -290,14 +292,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return false;
     }
 
-    // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils for
-    //       details
-    String globalQueryId = getGlobalQueryId(queryId);
-    List<Pair<String, String>> serverUrls = new ArrayList<>();
-    for (ServerInstance serverInstance : queryServers._servers) {
-      // TODO: how should we add the cid here? Maybe as a query param?
-      //  we can get the cid from QueryThreadContext
-      serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
+    List<Pair<String, String>> serverUrls = new ArrayList<>(queryServers.numServerRequests());
+    for (Map.Entry<Long, Set<ServerInstance>> entry : queryServers._serversByRequestId.entrySet()) {
+      String globalQueryId = getGlobalQueryId(entry.getKey());
+      for (ServerInstance serverInstance : entry.getValue()) {
+        serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
+      }
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
     CompletionService<MultiHttpRequestResponse> completionService =
@@ -335,6 +335,78 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throw new Exception("Unexpected responses from servers: " + StringUtils.join(errMsgs, ","));
     }
     return true;
+  }
+
+  @Override
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long queryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr)
+      throws Exception {
+    if (!isQueryProgressEnabled()) {
+      return null;
+    }
+    QueryServers queryServers = _serversById.get(queryId);
+    if (queryServers == null) {
+      return null;
+    }
+
+    List<String> serverUrls = new ArrayList<>(queryServers.numServerRequests());
+    for (Map.Entry<Long, Set<ServerInstance>> entry : queryServers._serversByRequestId.entrySet()) {
+      String globalQueryId = getGlobalQueryId(entry.getKey());
+      for (ServerInstance serverInstance : entry.getValue()) {
+        serverUrls.add(String.format("%s/query/%s/progress", serverInstance.getAdminEndpoint(), globalQueryId));
+      }
+    }
+    if (serverUrls.isEmpty()) {
+      return null;
+    }
+
+    CompletionService<MultiHttpRequestResponse> completionService =
+        new MultiHttpRequest(executor, connMgr).executeGet(serverUrls, null, timeoutMs);
+    List<QueryProgressStats> serverProgressStats = new ArrayList<>(serverUrls.size());
+    List<String> errMsgs = new ArrayList<>(serverUrls.size());
+    for (int i = 0; i < serverUrls.size(); i++) {
+      MultiHttpRequestResponse httpRequestResponse = null;
+      URI uri = null;
+      try {
+        httpRequestResponse = completionService.take().get();
+        uri = httpRequestResponse.getURI();
+        int status = httpRequestResponse.getResponse().getCode();
+        if (status == 200) {
+          String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
+          serverProgressStats.add(JsonUtils.stringToObject(responseString, QueryProgressStats.class));
+        } else if (status != 404) {
+          String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
+          throw new Exception(
+              String.format("Unexpected status=%d and response='%s' from uri='%s'", status, responseString, uri));
+        }
+      } catch (Exception e) {
+        LOGGER.debug("Failed to get progress for query id: {} from uri: {}", queryId, uri, e);
+        errMsgs.add(e.getMessage());
+      } finally {
+        if (httpRequestResponse != null) {
+          httpRequestResponse.close();
+        }
+      }
+    }
+    return aggregateSingleStageProgressStats(serverProgressStats, serverUrls.size(), errMsgs);
+  }
+
+  @Nullable
+  static QueryProgressStats aggregateSingleStageProgressStats(List<QueryProgressStats> serverProgressStats,
+      int numServers, List<String> errMsgs)
+      throws Exception {
+    if (!serverProgressStats.isEmpty()) {
+      List<QueryProgressStats> progressStats = new ArrayList<>(serverProgressStats);
+      for (int i = serverProgressStats.size(); i < numServers; i++) {
+        progressStats.add(QueryProgressStats.unknown("Server", true));
+      }
+      return QueryProgressStats.aggregate(progressStats);
+    }
+    if (!errMsgs.isEmpty()) {
+      throw new Exception("Unexpected responses from servers: " + StringUtils.join(errMsgs, ","));
+    }
+    return null;
   }
 
   @Override
@@ -932,7 +1004,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     }
     BrokerResponseNative brokerResponse;
-    if (isQueryCancellationEnabled()) {
+    if (isQueryTrackingEnabled()) {
       // Start to track the running query for cancellation just before sending it out to servers to avoid any
       // potential failures that could happen before sending it out, like failures to calculate the routing table etc.
       // TODO: Even tracking the query as late as here, a potential race condition between calling cancel API and
@@ -943,7 +1015,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       //       servers takes time, but will address later if needed.
       String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
       onQueryStart(requestId, clientRequestId, query,
-          new QueryServers(query, offlineExecutionServers, realtimeExecutionServers));
+          new QueryServers(query, requestId, offlineExecutionServers, realtimeExecutionServers));
       try {
         brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, routeInfo,
             remainingTimeMs, serverStats, requestContext);
@@ -1397,7 +1469,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @Override
   protected void onQueryStart(long requestId, @Nullable String clientRequestId, String query, Object... extras) {
     super.onQueryStart(requestId, clientRequestId, query, extras);
-    if (isQueryCancellationEnabled() && extras.length > 0 && extras[0] instanceof QueryServers) {
+    if (isQueryTrackingEnabled() && extras.length > 0 && extras[0] instanceof QueryServers) {
       _serversById.put(requestId, (QueryServers) extras[0]);
     }
   }
@@ -1587,9 +1659,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // Pass false for queryWasLogged to avoid logging subqueries separately
+      long subqueryRequestId = _requestIdGenerator.get();
       BrokerResponse response =
-          doHandleRequest(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
-              httpHeaders, accessControl, false);
+          doHandleRequest(subqueryRequestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity,
+              requestContext, httpHeaders, accessControl, false);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }
@@ -2496,17 +2569,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     long materializedViewRequestId = _requestIdGenerator.get();
-    if (isQueryCancellationEnabled()) {
-      /// Track the union of base + MV server sets against the user's `requestId`.  Cancel will
-      /// be sent under the user's global query id; the MV-side servers may already have
-      /// finished by the time cancel fires, but they would not be reached by global-id cancel
-      /// anyway (they ran under `materializedViewRequestId`).  Improving per-sub-request cancel
-      /// is out of scope for this PR — see the TODO in `handleCancel` for the eventual fix.
-      Set<ServerInstance> offlineUnion =
-          unionServers(hybridBaseRoute.getOfflineExecutionServers(), viewRouteInfo.getOfflineExecutionServers());
-      Set<ServerInstance> realtimeUnion =
-          unionServers(hybridBaseRoute.getRealtimeExecutionServers(), viewRouteInfo.getRealtimeExecutionServers());
-      onQueryStart(requestId, clientRequestId, query, new QueryServers(query, offlineUnion, realtimeUnion));
+    if (isQueryTrackingEnabled()) {
+      QueryServers queryServers = new QueryServers(query);
+      queryServers.addRequest(requestId, hybridBaseRoute.getOfflineExecutionServers(),
+          hybridBaseRoute.getRealtimeExecutionServers());
+      queryServers.addRequest(materializedViewRequestId, viewRouteInfo.getOfflineExecutionServers(),
+          viewRouteInfo.getRealtimeExecutionServers());
+      onQueryStart(requestId, clientRequestId, query, queryServers);
       try {
         return processMaterializedViewSplitBrokerRequest(requestId, materializedViewRequestId, reduceBrokerRequest,
             hybridBaseRoute, viewRouteInfo, timeoutMs, serverStats, requestContext);
@@ -2518,20 +2587,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     return processMaterializedViewSplitBrokerRequest(requestId, materializedViewRequestId, reduceBrokerRequest,
         hybridBaseRoute, viewRouteInfo, timeoutMs, serverStats, requestContext);
-  }
-
-  @Nullable
-  private static Set<ServerInstance> unionServers(@Nullable Set<ServerInstance> a, @Nullable Set<ServerInstance> b) {
-    if (a == null) {
-      return b;
-    }
-    if (b == null) {
-      return a;
-    }
-    Set<ServerInstance> union = new HashSet<>(a.size() + b.size());
-    union.addAll(a);
-    union.addAll(b);
-    return union;
   }
 
   /**
@@ -2698,19 +2753,36 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /**
    * Helper class to track the query plaintext and the requested servers.
    */
-  private static class QueryServers {
+  @VisibleForTesting
+  static class QueryServers {
     final String _query;
     final Set<ServerInstance> _servers = new HashSet<>();
+    final Map<Long, Set<ServerInstance>> _serversByRequestId = new HashMap<>();
 
-    QueryServers(String query, @Nullable Set<ServerInstance> offlineExecutionServers,
-        @Nullable Set<ServerInstance> realtimeExecutionServers) {
+    QueryServers(String query) {
       _query = query;
+    }
+
+    QueryServers(String query, long requestId, @Nullable Set<ServerInstance> offlineExecutionServers,
+        @Nullable Set<ServerInstance> realtimeExecutionServers) {
+      this(query);
+      addRequest(requestId, offlineExecutionServers, realtimeExecutionServers);
+    }
+
+    void addRequest(long requestId, @Nullable Set<ServerInstance> offlineExecutionServers,
+        @Nullable Set<ServerInstance> realtimeExecutionServers) {
+      Set<ServerInstance> requestServers = _serversByRequestId.computeIfAbsent(requestId, ignored -> new HashSet<>());
       if (offlineExecutionServers != null) {
-        _servers.addAll(offlineExecutionServers);
+        requestServers.addAll(offlineExecutionServers);
       }
       if (realtimeExecutionServers != null) {
-        _servers.addAll(realtimeExecutionServers);
+        requestServers.addAll(realtimeExecutionServers);
       }
+      _servers.addAll(requestServers);
+    }
+
+    int numServerRequests() {
+      return _serversByRequestId.values().stream().mapToInt(Set::size).sum();
     }
   }
 }

@@ -29,6 +29,8 @@ service PinotQueryWorker {
 
   rpc Cancel(CancelRequest) returns (CancelResponse);
 
+  rpc GetQueryProgress(QueryProgressRequest) returns (QueryProgressResponse);
+
   rpc Explain(QueryRequest) returns (stream ExplainResponse);
 
   // Long-lived bidi RPC used by the "stream" stats-reporting mode (S3-variant).
@@ -48,6 +50,24 @@ message CancelResponse {
   // Deprecated: always empty since the stream-stats push feature was introduced; per-opchain stats
   // now flow via OpChainComplete on the SubmitWithStream bidi RPC and are no longer collected on cancel.
   map<int32, bytes> statsByStage = 1;
+}
+
+message QueryProgressRequest {
+  int64 requestId = 1;
+}
+
+message QueryProgressResponse {
+  QueryProgress progress = 1;
+}
+
+message QueryProgress {
+  int64 processedWorkUnits = 1;
+  int64 totalWorkUnits = 2;
+  int64 processedSegments = 3;
+  int64 totalSegmentsToProcess = 4;
+  bool estimated = 5;
+  string label = 6;
+  repeated QueryProgress details = 7;
 }
 
 // QueryRequest is the dispatched content for all query stages to a physical worker.

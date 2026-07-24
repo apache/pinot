@@ -102,6 +102,13 @@ public class ChannelHandlerFactory {
     return new InstanceRequestHandler(instanceName, config, queryScheduler, accessControl, threadAccountant);
   }
 
+  public static ChannelHandler getInstanceRequestHandler(String instanceName, PinotConfiguration config,
+      QueryScheduler queryScheduler, AccessControl accessControl, ThreadAccountant threadAccountant,
+      QueryProgressTracker queryProgressTracker) {
+    return new InstanceRequestHandler(instanceName, config, queryScheduler, accessControl, threadAccountant,
+        queryProgressTracker);
+  }
+
   public static ChannelHandler getDirectOOMHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
       ConcurrentHashMap<ServerRoutingInstance, ServerChannels.ServerChannel> serverToChannelMap,
       ConcurrentHashMap<SocketChannel, Boolean> allChannels, ServerSocketChannel serverSocketChannel) {

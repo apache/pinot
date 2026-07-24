@@ -107,6 +107,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
+      markSegmentProcessed();
       _blockingQueue.offer(resultsBlock);
       // When query is satisfied, skip processing the remaining segments
       if (_resultsBlockMerger.isQuerySatisfied(resultsBlock)) {

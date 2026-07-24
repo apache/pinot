@@ -54,7 +54,9 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +67,8 @@ public class OpChainSchedulerService {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainSchedulerService.class);
   private static final int NUM_QUERY_LOCKS = 1 << 10; // 1024 locks
   private static final int QUERY_LOCK_MASK = NUM_QUERY_LOCKS - 1;
+  private static final int COMPLETED_PROGRESS_STATS_CACHE_SIZE = 10_000;
+  private static final int COMPLETED_PROGRESS_STATS_CACHE_EXPIRATION_MINUTES = 10;
 
   private final String _instanceId;
   /// This [ExecutorService] must be wrapped with [QueryThreadContext#contextAwareExecutorService].
@@ -92,6 +96,8 @@ public class OpChainSchedulerService {
   /// when the forEach observes the cache entry.
   private final ConcurrentMap<Long, QueryExecutionContext> _executionContextByRequest = new ConcurrentHashMap<>();
   private final ConcurrentMap<Long, AtomicInteger> _activeOpChainsByRequest = new ConcurrentHashMap<>();
+  @Nullable
+  private final Cache<Long, QueryProgressStats> _completedProgressStats;
 
   public OpChainSchedulerService(String instanceId, ExecutorService executorService, PinotConfiguration config) {
     this(instanceId, executorService, config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_SIZE,
@@ -101,7 +107,9 @@ public class OpChainSchedulerService {
         config.getProperty(MultiStageQueryRunner.KEY_OF_CANCELLED_QUERY_CACHE_SIZE,
             MultiStageQueryRunner.DEFAULT_OF_CANCELLED_QUERY_CACHE_SIZE),
         config.getProperty(MultiStageQueryRunner.KEY_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS,
-            MultiStageQueryRunner.DEFAULT_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS));
+            MultiStageQueryRunner.DEFAULT_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS),
+        config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_PROGRESS_ENABLED,
+            CommonConstants.Server.DEFAULT_QUERY_PROGRESS_ENABLED));
   }
 
   @VisibleForTesting
@@ -109,11 +117,12 @@ public class OpChainSchedulerService {
     this("testServer", executorService, MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_SIZE,
         MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS,
         MultiStageQueryRunner.DEFAULT_OF_CANCELLED_QUERY_CACHE_SIZE,
-        MultiStageQueryRunner.DEFAULT_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS);
+        MultiStageQueryRunner.DEFAULT_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS, true);
   }
 
   private OpChainSchedulerService(String instanceId, ExecutorService executorService, int opStatsCacheSize,
-      long opStatsCacheExpireMs, int cancelledQueryCacheSize, long cancelledQueryCacheExpireMs) {
+      long opStatsCacheExpireMs, int cancelledQueryCacheSize, long cancelledQueryCacheExpireMs,
+      boolean enableQueryProgress) {
     _instanceId = instanceId;
     _executorService = executorService;
     _opChainCache = CacheBuilder.newBuilder()
@@ -129,6 +138,10 @@ public class OpChainSchedulerService {
         .maximumSize(cancelledQueryCacheSize)
         .expireAfterWrite(cancelledQueryCacheExpireMs, TimeUnit.MILLISECONDS)
         .build();
+    _completedProgressStats = enableQueryProgress
+        ? CacheBuilder.newBuilder().maximumSize(COMPLETED_PROGRESS_STATS_CACHE_SIZE)
+            .expireAfterWrite(COMPLETED_PROGRESS_STATS_CACHE_EXPIRATION_MINUTES, TimeUnit.MINUTES).build()
+        : null;
   }
 
   public void register(OpChain operatorChain) {
@@ -181,6 +194,9 @@ public class OpChainSchedulerService {
     // that observes count==0 and removes the context entry cannot race with a new putIfAbsent arriving between the
     // counter update and the context-map update.
     _activeOpChainsByRequest.compute(requestId, (k, v) -> {
+      if (_completedProgressStats != null) {
+        _completedProgressStats.invalidate(requestId);
+      }
       _executionContextByRequest.putIfAbsent(requestId, executionContext);
       if (v == null) {
         return new AtomicInteger(1);
@@ -223,6 +239,7 @@ public class OpChainSchedulerService {
     Futures.addCallback(listenableFutureTask, new FutureCallback<>() {
       @Override
       public void onSuccess(Void result) {
+        executionContext.incrementProcessedWorkUnits();
         _metrics.onOpChainFinished(rootOperator);
         decrementActiveOpChains(requestId);
         notifyCompletionListener(opChainId, operatorChain, statsRef.get(), null);
@@ -232,6 +249,7 @@ public class OpChainSchedulerService {
       @Override
       public void onFailure(Throwable t) {
         String logMsg = "Failed to execute operator chain: " + t.getMessage();
+        executionContext.incrementProcessedWorkUnits();
         _metrics.onOpChainFinished(rootOperator);
         if (t instanceof QueryException) {
           switch (((QueryException) t).getErrorCode()) {
@@ -271,14 +289,28 @@ public class OpChainSchedulerService {
     }
   }
 
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long requestId) {
+    if (_completedProgressStats == null) {
+      return null;
+    }
+    QueryExecutionContext executionContext = _executionContextByRequest.get(requestId);
+    return executionContext != null ? executionContext.getProgressStats()
+        : _completedProgressStats.getIfPresent(requestId);
+  }
+
   private void decrementActiveOpChains(long requestId) {
-    // Use compute() so the "decrement-to-zero → remove" step is atomic with a concurrent registerInternal()
+    // Use compute() so the "decrement-to-zero -> remove" step is atomic with a concurrent registerInternal()
     // that would otherwise interleave a putIfAbsent + increment between our remove() calls.
     _activeOpChainsByRequest.compute(requestId, (k, counter) -> {
       if (counter == null) {
         return null;
       }
       if (counter.decrementAndGet() <= 0) {
+        QueryExecutionContext executionContext = _executionContextByRequest.get(requestId);
+        if (executionContext != null && _completedProgressStats != null) {
+          _completedProgressStats.put(requestId, executionContext.getProgressStats());
+        }
         _executionContextByRequest.remove(requestId);
         return null;
       }
@@ -351,6 +383,9 @@ public class OpChainSchedulerService {
       // putIfAbsent() on _executionContextByRequest.
       _activeOpChainsByRequest.compute(requestId, (k, counter) -> {
         ctxRef.set(_executionContextByRequest.remove(requestId));
+        if (_completedProgressStats != null) {
+          _completedProgressStats.invalidate(requestId);
+        }
         return null; // unconditionally evict the counter on cancel
       });
       _cancelledQueryCache.put(requestId, Boolean.TRUE);
@@ -398,6 +433,11 @@ public class OpChainSchedulerService {
 
   private ReadWriteLock getQueryLock(long requestId) {
     return _queryLocks[(int) (requestId & QUERY_LOCK_MASK)];
+  }
+
+  @VisibleForTesting
+  boolean hasRunningExecutionContext(long requestId) {
+    return _executionContextByRequest.containsKey(requestId);
   }
 
   private static class Metrics {

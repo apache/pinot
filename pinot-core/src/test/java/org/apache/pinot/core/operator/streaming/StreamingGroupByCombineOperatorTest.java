@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -235,6 +236,33 @@ public class StreamingGroupByCombineOperatorTest {
       // Each group appears 2 times per segment * NUM_SEGMENTS
       assertEquals(groupCounts.get(g).longValue(), NUM_SEGMENTS * 2L,
           "Incorrect count for group " + g);
+    }
+  }
+
+  @Test
+  public void testTracksProcessedSegments() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT groupColumn, COUNT(*) FROM testTable GROUP BY groupColumn");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    ExecutorService executor = QueryThreadContext.contextAwareExecutorService(Executors.newCachedThreadPool());
+
+    try (QueryThreadContext threadContext = QueryThreadContext.openForSseTest()) {
+      StreamingGroupByCombineOperator combineOperator =
+          new StreamingGroupByCombineOperator(buildOperators(queryContext), queryContext, executor, 10);
+      combineOperator.start();
+      try {
+        BaseResultsBlock block = combineOperator.nextBlock();
+        while (!(block instanceof MetadataResultsBlock)) {
+          assertNull(block.getErrorMessages());
+          block = combineOperator.nextBlock();
+        }
+      } finally {
+        combineOperator.stop();
+      }
+
+      assertEquals(threadContext.getExecutionContext().getProgressStats().getProcessedSegments(), NUM_SEGMENTS);
+    } finally {
+      executor.shutdownNow();
     }
   }
 

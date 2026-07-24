@@ -58,6 +58,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -126,8 +128,16 @@ public class ServerPlanRequestUtils {
     }
     int numRequests = instanceRequests.size();
     List<ServerQueryRequest> serverQueryRequests = new ArrayList<>(numRequests);
+    QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
+    QueryExecutionContext queryExecutionContext =
+        threadContext != null ? threadContext.getExecutionContext() : null;
     for (InstanceRequest instanceRequest : instanceRequests) {
-      serverQueryRequests.add(new ServerQueryRequest(instanceRequest, ServerMetrics.get(), queryArrivalTimeMs, true));
+      ServerQueryRequest serverQueryRequest =
+          new ServerQueryRequest(instanceRequest, ServerMetrics.get(), queryArrivalTimeMs, true);
+      if (queryExecutionContext != null) {
+        serverQueryRequest.setExecutionContext(queryExecutionContext);
+      }
+      serverQueryRequests.add(serverQueryRequest);
     }
     serverContext.setServerQueryRequests(serverQueryRequests);
     // 3. Compile the OpChain
