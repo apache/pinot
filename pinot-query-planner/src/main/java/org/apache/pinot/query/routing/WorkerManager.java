@@ -58,6 +58,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -83,12 +84,21 @@ public class WorkerManager {
   private final String _hostName;
   private final int _port;
   private final RoutingManager _routingManager;
+  // Default for colocated (partition-based) join routing when the COLOCATED_JOIN_BEST_EFFORT query option is not set.
+  // When true, partitions with transiently-unavailable segments are routed best-effort instead of failing the query.
+  private final boolean _colocatedJoinBestEffortDefault;
 
   public WorkerManager(String instanceId, String hostName, int port, RoutingManager routingManager) {
+    this(instanceId, hostName, port, routingManager, CommonConstants.Broker.DEFAULT_COLOCATED_JOIN_BEST_EFFORT);
+  }
+
+  public WorkerManager(String instanceId, String hostName, int port, RoutingManager routingManager,
+      boolean colocatedJoinBestEffortDefault) {
     _instanceId = instanceId;
     _hostName = hostName;
     _port = port;
     _routingManager = routingManager;
+    _colocatedJoinBestEffortDefault = colocatedJoinBestEffortDefault;
   }
 
   public String getInstanceId() {
@@ -985,13 +995,21 @@ public class WorkerManager {
 
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
+    boolean bestEffort = resolveColocatedJoinBestEffort(context.getPlannerContext().getOptions());
+    Set<String> unavailableSegments = new HashSet<>();
     if (numPartitionsPerWorker == 1) {
       assignOnePartitionPerWorker(tableName, context.getRequestId(), partitionInfoMap, partitionsToKeep,
-          _routingManager.getEnabledServerInstanceMap(), workerIdToServerInstanceMap, workerIdToSegmentsMap);
+          _routingManager.getEnabledServerInstanceMap(), workerIdToServerInstanceMap, workerIdToSegmentsMap, bestEffort,
+          unavailableSegments);
     } else {
       assignMultiplePartitionsPerWorker(tableName, context.getRequestId(), numPartitionsPerWorker, partitionInfoMap,
           partitionsToKeep, _routingManager.getEnabledServerInstanceMap(), workerIdToServerInstanceMap,
-          workerIdToSegmentsMap);
+          workerIdToSegmentsMap, bestEffort, unavailableSegments);
+    }
+    // Surface best-effort dropped segments the same way the non-partitioned leaf path does, so the broker can attach a
+    // non-fatal "unavailable segments" warning to the response (suppressible via the ignoreMissingSegments option).
+    if (!unavailableSegments.isEmpty()) {
+      metadata.addUnavailableSegments(tableName, unavailableSegments);
     }
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
@@ -1091,12 +1109,38 @@ public class WorkerManager {
     return numPrunedSegments;
   }
 
+  private boolean resolveColocatedJoinBestEffort(Map<String, String> queryOptions) {
+    String optionValue = queryOptions.get(QueryOptionKey.COLOCATED_JOIN_BEST_EFFORT);
+    return optionValue != null ? Boolean.parseBoolean(optionValue) : _colocatedJoinBestEffortDefault;
+  }
+
+  /// Handles a partition's transiently-unavailable segments for colocated routing. In strict mode (default), a
+  /// partition with any unavailable segment fails the query to guarantee complete results (preserving the original
+  /// all-or-nothing behavior). In best-effort mode, the unavailable segments are collected so they can be surfaced as a
+  /// non-fatal warning while the partition's available segments are still routed to a fully replicated server.
+  private static void collectUnavailableSegments(String tableName, int partitionId, PartitionInfo partitionInfo,
+      boolean bestEffort, Set<String> unavailableSegments) {
+    List<String> partitionUnavailableSegments = partitionInfo._unavailableSegments;
+    if (partitionUnavailableSegments.isEmpty()) {
+      return;
+    }
+    int numUnavailable = partitionUnavailableSegments.size();
+    Preconditions.checkState(bestEffort,
+        "Failed to find fully replicated server for table: %s, partition: %s with %s unavailable segment(s): %s. Set "
+            + "query option '%s=true' to route the available segments instead of failing the query.", tableName,
+        partitionId, numUnavailable,
+        numUnavailable <= 10 ? partitionUnavailableSegments : partitionUnavailableSegments.subList(0, 10) + "...",
+        QueryOptionKey.COLOCATED_JOIN_BEST_EFFORT);
+    unavailableSegments.addAll(partitionUnavailableSegments);
+  }
+
   /// Pick one worker per partition for partitioned leaf stage. When {@code partitionsToKeep} is non-null (broker
   /// pruning is active), partitions absent from the set are pruned by the query filter and skipped.
   private void assignOnePartitionPerWorker(String tableName, long requestId, PartitionInfo[] partitionInfoMap,
       @Nullable Set<Integer> partitionsToKeep, Map<String, ServerInstance> enabledServerInstanceMap,
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap,
-      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap, boolean bestEffort,
+      Set<String> unavailableSegments) {
     int numPartitions = partitionInfoMap.length;
     int workerId = 0;
     for (int i = 0; i < numPartitions; i++) {
@@ -1110,6 +1154,7 @@ public class WorkerManager {
       //       the leaf stage won't be able to directly return empty response.
       Preconditions.checkState(partitionInfo != null, "Failed to find any segment for table: %s, partition: %s",
           tableName, i);
+      collectUnavailableSegments(tableName, i, partitionInfo, bestEffort, unavailableSegments);
       // NOTE: Pick worker based on the request id plus the partition id (not a running counter) so that the same worker
       //       is picked across different table scans when the segments for the same partition are colocated, and so
       //       that skipping pruned partitions does not shift the server assignment of the surviving ones.
@@ -1133,7 +1178,8 @@ public class WorkerManager {
       PartitionInfo[] partitionInfoMap, @Nullable Set<Integer> partitionsToKeep,
       Map<String, ServerInstance> enabledServerInstanceMap,
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap,
-      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap, boolean bestEffort,
+      Set<String> unavailableSegments) {
     int numPartitions = partitionInfoMap.length;
     assert numPartitions % numPartitionsPerWorker == 0;
     int numWorkers = numPartitions / numPartitionsPerWorker;
@@ -1151,6 +1197,7 @@ public class WorkerManager {
         if (partitionInfo == null) {
           continue;
         }
+        collectUnavailableSegments(tableName, j, partitionInfo, bestEffort, unavailableSegments);
         if (fullyReplicatedServers == null) {
           fullyReplicatedServers = new HashSet<>(partitionInfo._fullyReplicatedServers);
         } else {
@@ -1248,21 +1295,26 @@ public class WorkerManager {
             continue;
           }
           if (offlinePartitionInfo == null) {
-            partitionInfoMap[i] =
-                new PartitionInfo(realtimePartitionInfo._fullyReplicatedServers, null, realtimePartitionInfo._segments);
+            partitionInfoMap[i] = new PartitionInfo(realtimePartitionInfo._fullyReplicatedServers, null,
+                realtimePartitionInfo._segments, realtimePartitionInfo._unavailableSegments);
             continue;
           }
           if (realtimePartitionInfo == null) {
-            partitionInfoMap[i] =
-                new PartitionInfo(offlinePartitionInfo._fullyReplicatedServers, offlinePartitionInfo._segments, null);
+            partitionInfoMap[i] = new PartitionInfo(offlinePartitionInfo._fullyReplicatedServers,
+                offlinePartitionInfo._segments, null, offlinePartitionInfo._unavailableSegments);
             continue;
           }
           Set<String> fullyReplicatedServers = new HashSet<>(offlinePartitionInfo._fullyReplicatedServers);
           fullyReplicatedServers.retainAll(realtimePartitionInfo._fullyReplicatedServers);
           Preconditions.checkState(!fullyReplicatedServers.isEmpty(),
               "Failed to find fully replicated server for partition: %s in hybrid table: %s", i, tableName);
+          List<String> unavailableSegments =
+              new ArrayList<>(offlinePartitionInfo._unavailableSegments.size()
+                  + realtimePartitionInfo._unavailableSegments.size());
+          unavailableSegments.addAll(offlinePartitionInfo._unavailableSegments);
+          unavailableSegments.addAll(realtimePartitionInfo._unavailableSegments);
           partitionInfoMap[i] = new PartitionInfo(fullyReplicatedServers, offlinePartitionInfo._segments,
-              realtimePartitionInfo._segments);
+              realtimePartitionInfo._segments, unavailableSegments);
         }
         return new PartitionTableInfo(offlineTpi.getPartitionColumn(), offlineTpi.getPartitionFunctionName(),
             partitionInfoMap, timeBoundaryInfo);
@@ -1360,12 +1412,12 @@ public class WorkerManager {
         if (partitionInfo != null) {
           switch (tableType) {
             case OFFLINE:
-              workerPartitionInfoMap[i] =
-                  new PartitionInfo(partitionInfo._fullyReplicatedServers, partitionInfo._segments, null);
+              workerPartitionInfoMap[i] = new PartitionInfo(partitionInfo._fullyReplicatedServers,
+                  partitionInfo._segments, null, partitionInfo._unavailableSegments);
               break;
             case REALTIME:
-              workerPartitionInfoMap[i] =
-                  new PartitionInfo(partitionInfo._fullyReplicatedServers, null, partitionInfo._segments);
+              workerPartitionInfoMap[i] = new PartitionInfo(partitionInfo._fullyReplicatedServers, null,
+                  partitionInfo._segments, partitionInfo._unavailableSegments);
               break;
             default:
               throw new IllegalStateException("Unsupported table type: " + tableType);
@@ -1381,12 +1433,16 @@ public class WorkerManager {
     final Set<String> _fullyReplicatedServers;
     final List<String> _offlineSegments;
     final List<String> _realtimeSegments;
+    // Segments of this partition with no online replica, excluded from the routable segment lists above. Surfaced as a
+    // non-fatal warning in best-effort mode, or used to fail the query in strict mode.
+    final List<String> _unavailableSegments;
 
     PartitionInfo(Set<String> fullyReplicatedServers, @Nullable List<String> offlineSegments,
-        @Nullable List<String> realtimeSegments) {
+        @Nullable List<String> realtimeSegments, List<String> unavailableSegments) {
       _fullyReplicatedServers = fullyReplicatedServers;
       _offlineSegments = offlineSegments;
       _realtimeSegments = realtimeSegments;
+      _unavailableSegments = unavailableSegments;
     }
   }
 
