@@ -69,6 +69,7 @@ public class PinotSegmentToParquetConverter implements PinotSegmentConverter {
     try (pinotSegmentRecordReader) {
       try (ParquetWriter<Record> parquetWriter =
           AvroParquetWriter.<Record>builder(outputFile).withSchema(avroSchema)
+              .withDataModel(SegmentProcessorAvroUtils.getAvroDataModel())
               .withCompressionCodec(_compressionCodec)
               .withConf(hadoopConf).build()) {
         GenericRow row = new GenericRow();

@@ -20,18 +20,27 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.avro.LogicalType;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
-
+import org.apache.pinot.spi.utils.UuidUtils;
 
 /// Stateless helpers for mapping between Avro schema shapes and Pinot's [DataType] / Avro JSON schema representations.
 public class AvroSchemaUtil {
+
   private AvroSchemaUtil() {
   }
 
-  /// Returns the data type stored in Pinot that is associated with the given Avro type.
+  // Avro logical-type name for UUID (see org.apache.avro.LogicalTypes). Value-level logical-type conversion lives
+  // in AvroRecordExtractor; this class only deals with schema-shape mapping.
+  private static final String UUID = "uuid";
+
+  /// Returns the Pinot data type for a bare Avro type. This does not honor logical types (e.g. a `string` or `fixed`
+  /// carrying `logicalType:uuid` maps to STRING/BYTES, not UUID); prefer [#valueOf(Schema)] when a full [Schema] is
+  /// available.
   public static DataType valueOf(Schema.Type avroType) {
     switch (avroType) {
       case INT:
@@ -58,6 +67,25 @@ public class AvroSchemaUtil {
       default:
         throw new IllegalStateException("Unsupported Avro type: " + avroType);
     }
+  }
+
+  /// Returns the Pinot data type associated with the given Avro schema, including logical types.
+  ///
+  /// Recognizes the UUID logical type on both STRING-backed schemas (Avro spec §logical-types.uuid) and FIXED(16)
+  /// schemas (used by some producers including Confluent's fixed-uuid mode). Both forms arrive at
+  /// [AvroRecordExtractor] as either a [java.util.UUID] (for STRING-backed logical UUIDs) or a 16-byte `byte[]`
+  /// (for FIXED-backed ones), and both are accepted by [UuidUtils#toBytes].
+  public static DataType valueOf(Schema schema) {
+    LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(schema);
+    if (logicalType != null && UUID.equals(logicalType.getName())) {
+      if (schema.getType() == Schema.Type.STRING) {
+        return DataType.UUID;
+      }
+      if (schema.getType() == Schema.Type.FIXED && schema.getFixedSize() == UuidUtils.UUID_NUM_BYTES) {
+        return DataType.UUID;
+      }
+    }
+    return valueOf(schema.getType());
   }
 
   /// Returns whether the given Avro type is a primitive type.
