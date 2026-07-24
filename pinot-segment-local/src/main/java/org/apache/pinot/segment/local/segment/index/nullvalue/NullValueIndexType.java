@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.nullvalue;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -34,6 +35,7 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -41,35 +43,37 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.NullValueVectorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
+public class NullValueIndexType
+    extends AbstractIndexType<NullValueVectorConfig, NullValueVectorReader, NullValueVectorCreator> {
   public static final String INDEX_DISPLAY_NAME = "null";
-  private static final List<String> EXTENSIONS =
-      List.of(V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
+  private static final NullValueVectorConfig DEFAULT_CONFIG = new NullValueVectorConfig(false, false);
+  private static final List<String> EXTENSIONS = List.of(V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
 
   protected NullValueIndexType() {
     super(StandardIndexes.NULL_VALUE_VECTOR_ID);
   }
 
   @Override
-  public Class<IndexConfig> getIndexConfigClass() {
-    return IndexConfig.class;
+  public Class<NullValueVectorConfig> getIndexConfigClass() {
+    return NullValueVectorConfig.class;
   }
 
   @Override
-  public NullValueVectorCreator createIndexCreator(IndexCreationContext context, IndexConfig indexConfig)
+  public NullValueVectorCreator createIndexCreator(IndexCreationContext context, NullValueVectorConfig indexConfig)
       throws Exception {
     return new NullValueVectorCreator(context.getIndexDir(), context.getFieldSpec().getName());
   }
 
   @Override
-  public IndexConfig getDefaultConfig() {
-    return IndexConfig.ENABLED;
+  public NullValueVectorConfig getDefaultConfig() {
+    return DEFAULT_CONFIG;
   }
 
   @Override
@@ -77,25 +81,27 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
     return INDEX_DISPLAY_NAME;
   }
 
+  /// Resolves the per-column null value vector config. Unlike a normal index, the `enabled` state is not set directly
+  /// by the user but derived from null handling (column-based [FieldSpec#isNullable] when the schema opts into
+  /// column-based null handling, otherwise the table-level `nullHandlingEnabled` flag). The user-facing part is the
+  /// `backfill` flag, read from the column's `indexes` config. The two are merged here rather than treated as
+  /// exclusive alternatives (which is what the default [#createDeserializerForLegacyConfigs] composition would do).
   @Override
-  public ColumnConfigDeserializer<IndexConfig> createDeserializerForLegacyConfigs() {
+  protected ColumnConfigDeserializer<NullValueVectorConfig> createDeserializer() {
+    ColumnConfigDeserializer<NullValueVectorConfig> fromIndexes =
+        IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
     return (TableConfig tableConfig, Schema schema) -> {
+      Map<String, NullValueVectorConfig> fromIndexesMap = fromIndexes.deserialize(tableConfig, schema);
       Collection<FieldSpec> allFieldSpecs = schema.getAllFieldSpecs();
-      Map<String, IndexConfig> configMap = Maps.newHashMapWithExpectedSize(allFieldSpecs.size());
-
+      Map<String, NullValueVectorConfig> configMap = Maps.newHashMapWithExpectedSize(allFieldSpecs.size());
       boolean columnBasedNullHandlingEnabled = schema.isEnableColumnBasedNullHandling();
       boolean nullHandlingEnabled = tableConfig.getIndexingConfig().isNullHandlingEnabled();
-
       for (FieldSpec fieldSpec : allFieldSpecs) {
-        IndexConfig indexConfig;
-        boolean enabled;
-        if (columnBasedNullHandlingEnabled) {
-          enabled = fieldSpec.isNullable();
-        } else {
-          enabled = nullHandlingEnabled;
-        }
-        indexConfig = enabled ? IndexConfig.ENABLED : IndexConfig.DISABLED;
-        configMap.put(fieldSpec.getName(), indexConfig);
+        String column = fieldSpec.getName();
+        boolean enabled = columnBasedNullHandlingEnabled ? fieldSpec.isNullable() : nullHandlingEnabled;
+        NullValueVectorConfig fromIndex = fromIndexesMap.get(column);
+        boolean backfill = fromIndex != null && fromIndex.isBackfill();
+        configMap.put(column, new NullValueVectorConfig(!enabled, backfill));
       }
       return configMap;
     };
@@ -111,19 +117,52 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   }
 
   @Override
-  public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      Schema schema, TableConfig tableConfig) {
-    return IndexHandler.NoOp.INSTANCE;
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    if (indexConfigs.getConfig(this).isBackfill()) {
+      // Backfill reconstructs nulls by comparing each stored value against the column's default null value, which is
+      // only meaningful for scalar stored types. MAP (and other complex types) are not supported because:
+      //   - the default null value for a MAP is an empty map — an ordinary value rather than a rare sentinel — so
+      //     treating every empty map as null would be far too lossy to be safe; and
+      //   - an OPEN_STRUCT-backed MAP is materialized into child columns with no single scannable parent forward
+      //     index, so there is nothing coherent to scan for the parent column.
+      // TODO: Revisit MAP/complex backfill if complex-type null handling matures and a safe (non-occurring) sentinel
+      //   default null value becomes available.
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      Preconditions.checkState(isBackfillSupported(storedType),
+          "Null value vector backfill is not supported for column: %s of type: %s", fieldSpec.getName(),
+          fieldSpec.getDataType());
+    }
+  }
+
+  private static boolean isBackfillSupported(DataType storedType) {
+    switch (storedType) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case BIG_DECIMAL:
+      case STRING:
+      case BYTES:
+        return true;
+      default:
+        return false;
+    }
   }
 
   @Override
-  public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
+  public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
+      Schema schema, TableConfig tableConfig) {
+    return new NullValueVectorHandler(segmentDirectory, configsByCol, tableConfig, schema);
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, NullValueVectorConfig indexConfig) {
     // The null value vector is a bitmap of doc IDs whose value is null; no dictionary involvement.
     return false;
   }
 
   @Override
-  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, IndexConfig indexConfig) {
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, NullValueVectorConfig indexConfig) {
     // The null value vector is keyed by doc ID and independent of the column's value representation.
     return false;
   }
@@ -144,8 +183,8 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
     @Override
     public NullValueVectorReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
-          throws IOException {
-      IndexType<IndexConfig, NullValueVectorReader, ?> indexType = StandardIndexes.nullValueVector();
+        throws IOException {
+      IndexType<NullValueVectorConfig, NullValueVectorReader, ?> indexType = StandardIndexes.nullValueVector();
       if (fieldIndexConfigs.getConfig(indexType).isDisabled()) {
         return null;
       }

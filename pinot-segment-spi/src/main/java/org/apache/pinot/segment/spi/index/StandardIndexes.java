@@ -45,6 +45,7 @@ import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.NullValueVectorConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 
 
@@ -97,8 +98,8 @@ public class StandardIndexes {
         IndexService.getInstance().get(DICTIONARY_ID);
   }
 
-  public static IndexType<IndexConfig, NullValueVectorReader, ?> nullValueVector() {
-    return (IndexType<IndexConfig, NullValueVectorReader, ?>)
+  public static IndexType<NullValueVectorConfig, NullValueVectorReader, ?> nullValueVector() {
+    return (IndexType<NullValueVectorConfig, NullValueVectorReader, ?>)
         IndexService.getInstance().get(NULL_VALUE_VECTOR_ID);
   }
 
