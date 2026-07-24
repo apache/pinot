@@ -20,13 +20,18 @@ package org.apache.pinot.core.query.aggregation.utils;
 
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeSet;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -259,6 +264,52 @@ public class SortedLongDistinctSetTest {
     assertFalse(acc.contains(6_000_001L)); // not a multiple of 3, above the even/odd range
     assertTrue(acc.contains(8_999_997L));
     assertFalse(acc.contains(8_999_998L));
+  }
+
+  @Test
+  public void testUnionNormalizesMixedTypes() {
+    // Whichever side the sorted set arrives on, it must absorb the hash set — a hash set absorbing a sorted set
+    // would re-hash every value and lose the sorted-run optimization (block merge order is nondeterministic when
+    // scan-based and no-scan segments mix within one query).
+    LongOpenHashSet expected = new LongOpenHashSet(new long[]{1L, 2L, 3L, 4L, 5L});
+
+    Set merged = SortedLongDistinctSet.union(new LongOpenHashSet(new long[]{2L, 4L}),
+        sortedSet(sortedDistinct(1L, 3L, 5L)));
+    assertTrue(merged instanceof SortedLongDistinctSet);
+    assertEquals(new LongOpenHashSet(merged), expected);
+
+    merged = SortedLongDistinctSet.union(sortedSet(sortedDistinct(1L, 3L, 5L)),
+        new LongOpenHashSet(new long[]{2L, 4L}));
+    assertTrue(merged instanceof SortedLongDistinctSet);
+    assertEquals(new LongOpenHashSet(merged), expected);
+
+    // Same-type unions keep the plain addAll behavior
+    merged = SortedLongDistinctSet.union(new LongOpenHashSet(new long[]{1L, 2L, 3L}),
+        new LongOpenHashSet(new long[]{4L, 5L}));
+    assertTrue(merged instanceof LongOpenHashSet);
+    assertEquals(merged, expected);
+
+    SortedLongDistinctSet first = sortedSet(sortedDistinct(1L, 2L, 3L));
+    merged = SortedLongDistinctSet.union(first, sortedSet(sortedDistinct(4L, 5L)));
+    assertSame(merged, first);
+    assertEquals(new LongOpenHashSet(merged), expected);
+  }
+
+  @Test
+  public void testAggregationFunctionMergeNormalizesMixedTypes() {
+    // End-to-end through DistinctCountAggregationFunction.merge, the path the combine phase actually uses
+    DistinctCountAggregationFunction function =
+        new DistinctCountAggregationFunction(List.of(ExpressionContext.forIdentifier("col")), false);
+    LongOpenHashSet expected = new LongOpenHashSet(new long[]{1L, 2L, 3L, 4L, 5L});
+
+    Set merged = function.merge(new LongOpenHashSet(new long[]{2L, 4L}), sortedSet(sortedDistinct(1L, 3L, 5L)));
+    assertTrue(merged instanceof SortedLongDistinctSet);
+    assertEquals(new LongOpenHashSet(merged), expected);
+    assertEquals((int) function.extractFinalResult(merged), 5);
+
+    merged = function.merge(sortedSet(sortedDistinct(1L, 3L, 5L)), new LongOpenHashSet(new long[]{2L, 4L}));
+    assertTrue(merged instanceof SortedLongDistinctSet);
+    assertEquals((int) function.extractFinalResult(merged), 5);
   }
 
   @Test

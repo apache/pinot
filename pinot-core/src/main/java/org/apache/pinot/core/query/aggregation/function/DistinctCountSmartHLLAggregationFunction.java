@@ -33,6 +33,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.utils.SortedLongDistinctSet;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -311,7 +312,9 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     if (valueSet2.isEmpty()) {
       return valueSet1;
     }
-    valueSet1.addAll(valueSet2);
+    // Segments may mix the no-scan path (SortedLongDistinctSet) with the scan path (hash set); the union
+    // helper makes the sorted set the absorbing side regardless of block merge order.
+    valueSet1 = SortedLongDistinctSet.union(valueSet1, valueSet2);
 
     // Convert to HLL if the set size exceeds the threshold
     if (valueSet1.size() > _threshold) {

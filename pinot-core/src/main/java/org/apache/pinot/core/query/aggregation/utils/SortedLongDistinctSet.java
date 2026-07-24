@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.longs.LongIterator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
@@ -105,6 +106,23 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
       Arrays.sort(values, 0, size);
     }
     return new SortedLongDistinctSet(size == values.length ? values : Arrays.copyOf(values, size));
+  }
+
+  /// Unions two distinct-value sets when segments may mix the no-scan path (which produces this class) with the scan
+  /// path (which produces hash sets), e.g. a filter that matches all documents in only some segments: whichever side
+  /// the `SortedLongDistinctSet` arrives on, it absorbs the other operand. Merge order of segment blocks is
+  /// nondeterministic, and letting a hash set absorb a sorted set would re-hash every dictionary-sourced value,
+  /// silently losing the sorted-run optimization. For any other type combination this behaves exactly like
+  /// `set1.addAll(set2)`.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static Set union(Set set1, Set set2) {
+    if (set2 instanceof SortedLongDistinctSet && !(set1 instanceof SortedLongDistinctSet)
+        && set1 instanceof LongCollection) {
+      ((SortedLongDistinctSet) set2).addAll((LongCollection) set1);
+      return set2;
+    }
+    set1.addAll(set2);
+    return set1;
   }
 
   /// Removes consecutive duplicates from the sorted prefix `[0, size)`; returns the distinct count.
