@@ -19,28 +19,52 @@
 
 -->
 
-# TDigest Percentile Aggregation: 100-Million-Row Benchmark
+# TDigest 3.2 to 3.3 Upgrade: Compatibility and Performance
 
-- Date: 2026-07-15
-- Baseline: `068b458883d6`
-- Reducer baseline: `633aab66c6`
-- Host: Apple M4 Pro (14 cores, 24 GiB), macOS 26.5.2 aarch64, OpenJDK 21.0.10
+- Date: 2026-07-23
+- Follow-up baseline: `706b772334e`, t-digest 3.2
+- Follow-up candidate: PR #19015 rebased onto the baseline, plus the path-aware accumulator optimization below
+- Host: Apple M4 Pro (14 cores, 24 GiB), macOS 26.5.2 aarch64
+- Runtime: OpenJDK 25, JMH 1.37
 
-These benchmarks measure single-threaded TDigest aggregation-function performance over deterministic pseudo-random
-`DOUBLE` values. The raw-value workload exercises the production block aggregation API over 100 million rows. The
-star-tree query workload merges 10,000 stored TDigest entries that represent 100 million source rows, and the construction
-workload isolates the raw-value aggregator used to build those entries. These numbers describe aggregation kernels on
-one machine, not distributed end-to-end query latency or complete segment-generation time.
+## Decision
 
-## User guide
+Upgrade Pinot to t-digest 3.3 and keep Pinot's existing TDigest API and serialized state. Do not replace it with the
+Apache DataSketches quantiles implementation as part of this dependency upgrade. A DataSketches replacement would
+change the user-visible aggregation type and wire format and therefore needs a separate format, migration, and
+mixed-version design.
 
-The optimizations are automatic and require no query changes. `PERCENTILETDIGEST` maintains bounded, mergeable
-aggregation state, and a star-tree can pre-aggregate it.
+Pinot explicitly selects `ScaleFunction.K_1`. T-digest 3.3 changed its default scale function, and retaining K1 avoids
+the middle-quantile accuracy regression measured with the new default. Pinot also centralizes construction and
+serialization, repairs legacy weighted boundary centroids, and uses a primitive accumulator for serialized and
+reducer paths.
 
-| Function | Result | Aggregation state |
-|---|---|---|
-| `PERCENTILETDIGEST(metric, 75)` | Approximate P75, default compression `100` | Bounded TDigest |
-| `PERCENTILETDIGEST(metric, 75, 200)` | Approximate P75 with higher compression | Larger TDigest with potentially better accuracy |
+The follow-up removes the query-path regressions measured in the original PR. Raw query aggregation is 1.3% faster.
+With dependency-native stored digests, the StarTree query kernels are 35.5-43.4% faster. The group-by improvement also
+reduces allocation by 34.8%. Raw and direct serialized aggregation now merge incrementally at the configured public
+compression when it is at least 50, avoiding a redundant final recompression. Buffered reducer inputs and compression
+below 50 retain the two-level working compression for accuracy.
+
+This does not establish that every synthetic operation is always faster. With byte-for-byte fixed verbose inputs, the
+non-grouped StarTree kernel is 6.4% faster, while the 1,000-group kernel is 1.3% slower and allocates 8.6% less. That
+small residual control-case regression is reported rather than hidden; every measured production-shaped `NATIVE`
+query path is faster.
+
+## User and rollout guide
+
+For finite values produced by Pinot, the upgrade requires no SQL, schema, table-config, or segment rebuild change.
+The compatibility serializer emits compact or verbose `MergingDigest` state readable by both t-digest 3.2 and 3.3,
+so finite intermediate results can flow in either direction during a rolling upgrade. Existing stored TDigest values
+continue to be readable. Exact bytes, centroid counts, and approximate percentile answers can change across versions.
+
+Compression values below 10 continue to run, but t-digest 3.3 normalizes their effective compression to 10. This is
+upstream 3.3 behavior. Compression 10 and above retains the configured value.
+
+Repeated positive or negative infinity values need special care during a mixed-version rollout. Pinot's 3.3 path
+preserves them, but the generic t-digest 3.2 reader can return `NaN` or incorrect middle quantiles for a structurally
+valid digest containing infinity centroids. Sanitize or filter non-finite values while any 3.2 reader can consume new
+partial results, or complete the reader upgrade before relying on non-finite percentile semantics. `NaN` input remains
+rejected.
 
 ### Sample queries
 
@@ -53,17 +77,16 @@ FROM myTable;
 SELECT PERCENTILETDIGEST(latencyMs, 75, 200) AS p75Approx
 FROM myTable;
 
--- Approximate P75 per region; a matching star-tree can serve the stored TDigest metric.
+-- Approximate P75 per region; a matching StarTree can serve the stored TDigest metric.
 SELECT region, PERCENTILETDIGEST(latencyMs, 75) AS p75Approx
 FROM myTable
 GROUP BY region;
 ```
 
-### Sample star-tree table config
+### Sample StarTree table config
 
-Add the TDigest function-column pair to a star-tree index when common queries group or filter on a stable set of
-dimensions. This sample uses the default compression `100` and matches the two-argument `PERCENTILETDIGEST` query
-shown above; a query with an explicit compression must match the compression configured for the index.
+The compression in the query must match the compression used by the StarTree function-column pair. This example uses
+the default compression of 100.
 
 ```json
 {
@@ -81,134 +104,101 @@ shown above; a query with an explicit compression must match the compression con
 ```
 
 Choose the split order and leaf size for the table's query patterns and cardinalities. The benchmark below isolates
-the stored-metric aggregation path after star-tree traversal; it does not measure planner, traversal, or forward-index
-I/O. The optimized serialized merge applies to both non-grouped and group-by aggregation. Each serialized group keeps
-its first digest pending and allocates primitive merge buffers only if another stored digest reaches that group; its
-raw-value buffer remains lazy unless a raw value is added.
+stored-metric aggregation after traversal; it does not measure planning, StarTree traversal, forward-index I/O, or
+network transfer.
+
+## Methodology
+
+Each follow-up comparison used independently built runtime packages containing exactly one t-digest JAR. The baseline
+and candidate used matched benchmark bytecode, deterministic input, parameters, JVM, and JMH settings. T-digest 3.3
+and the 3.2 control both use K1 in the benchmark helper. Reducer sources are immutable so one invocation cannot mutate
+the next invocation's input.
+
+The affected query paths were run in `3.2, 3.3, 3.3, 3.2` order to reduce machine-drift bias. Each run used one fork,
+two one-second warmup iterations, five one-second measurement iterations, one thread, an 8 GiB maximum heap, and the
+GC profiler. Each displayed score is therefore the mean of two runs and ten measured iterations. Dataset and
+exact-oracle creation occurs outside the timed methods.
+
+The raw aggregation and construction workloads process 100 million deterministic values. The StarTree query workload
+merges 10,000 stored digests representing 100 million source rows. Its group-by case distributes them across 1,000
+groups. `NATIVE` includes each dependency version's production serialization and centroid layout. `FIXED_VERBOSE`
+uses the same deterministic bytes, including singleton endpoint centroids, with both versions to isolate query-time
+merging from source-layout differences. The leaf-to-parent construction benchmark merges ten serialized leaves into
+each parent. The reducer control uses 32 fixed verbose inputs at compression 100. The accuracy sweep uses 128 native
+immutable inputs and 32 independent deterministic source orders for randomized-order cases.
+
+The segment-construction and reducer-throughput tables are the original PR characterization against `fae8080bc7`.
+They are retained as context and were not used to decide whether the follow-up fixed the affected query paths.
 
 ## Results
 
-JMH 1.37 ran two forks, five one-second measurement iterations, one thread, an 8 GiB maximum heap, and the GC profiler
-for each matched comparison. The raw-value and construction comparisons used two one-second warmup iterations; the
-serialized star-tree query comparison used three. Each reported comparison contains ten measured iterations.
+Positive deltas are regressions; negative deltas are improvements. Allocation is normalized bytes per benchmark
+operation.
 
-### TDigest percentile
+### Raw and StarTree query aggregation
 
-| Benchmark | Baseline (ms/op) | Optimized (ms/op) | Latency reduction | Speedup |
-|---|---:|---:|---:|---:|
-| Aggregation plus TDigest P75 | 5,677.240 ± 149.058 | 2,555.127 ± 49.673 | 54.994% | 2.222x |
+| Workload | Source layout | 3.2 (ms/op) | 3.3 (ms/op) | Latency delta | 3.2 allocation | 3.3 allocation | Allocation delta |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Raw aggregation plus P75, 100M rows | N/A | 3,377.903 | 3,334.669 | -1.3% | 15,954 | 16,018 | +0.4% |
+| StarTree merge plus P75, 10K stored digests | Native | 10.763 | 6.947 | -35.5% | 10,524 | 11,573 | +10.0% |
+| StarTree group-by, 1,000 groups | Native | 15.395 | 8.711 | -43.4% | 13,168,809 | 8,590,700 | -34.8% |
+| StarTree merge plus P75, 10K stored digests | Fixed verbose | 11.200 | 10.479 | -6.4% | 10,528 | 11,488 | +9.1% |
+| StarTree group-by, 1,000 groups | Fixed verbose | 14.674 | 14.860 | +1.3% | 13,124,164 | 11,990,374 | -8.6% |
 
-TDigest throughput improved from 17.614 million to 39.137 million rows per second. The optimized result was
-`0.7499280847`, compared with the exact result `0.7499315464`, for an absolute error of `0.0000034617`. Neither TDigest
-run triggered garbage collection; normalized allocation changed from 20,520 to 31,872 bytes per operation.
+The native rows represent the end-to-end production layout and improve materially because 3.3 emits fewer source
+centroids and the accumulator merges them without a redundant public recompression. The fixed rows are an attribution
+control. They show a query-kernel improvement without group-by and a near-parity group-by latency result with lower
+allocation.
 
-### Star-tree TDigest query path
+### Earlier segment-construction characterization
 
-| Benchmark | Baseline (ms/op) | Optimized (ms/op) | Latency reduction | Speedup |
-|---|---:|---:|---:|---:|
-| Merge 10,000 stored digests representing 100 million rows, then P75 | 85.658 ± 1.211 | 7.100 ± 0.186 | 91.711% | 12.065x |
+| Workload | 3.2 (ms/op) | 3.3 (ms/op) | Latency delta | 3.2 allocation | 3.3 allocation | Allocation delta |
+|---|---:|---:|---:|---:|---:|---:|
+| Aggregate and serialize raw values | 5,999.450 ± 539.794 | 5,528.188 ± 346.021 | -7.9% | 1,569,923,324 | 1,581,851,411 | +0.8% |
+| Merge and serialize pre-aggregated leaves | 1,256.659 ± 380.261 | 466.930 ± 58.190 | -62.8% | 1,926,851,492 | 1,795,782,790 | -6.8% |
 
-Normalized allocation fell from 198,223,964 bytes to 26,361 bytes per operation, and measured GC events fell from ten
-to zero. The optimized digest retained an exact size of 100 million and produced P75 `0.7498860479`, versus the fully
-sorted oracle `0.7499315464` (absolute error `0.0000454985`). Profiling showed the baseline repeatedly materializing,
-shuffling, and sorting centroids as each stored digest was added. The optimized path decodes already-sorted serialized
-centroids and linearly merges them into the accumulator.
+Both workloads use 100 million source rows and 1,000 rows per leaf group. The pre-aggregated case merges ten serialized
+leaves into each parent and validates total size and a finite median. Accuracy is measured separately below.
 
-### Star-tree TDigest group-by query path
+### Earlier server-local and distributed-reduction characterization
 
-This incremental comparison uses commit `4a950bde9455`, the preceding version of this change with the optimized
-non-grouped path but the original group-by implementation, as its baseline. Every workload aggregates 10,000 stored
-digests representing 100 million source rows. Entries are distributed round-robin, and the timed operation extracts
-and validates every group result.
+This table compares the 3.2 production-style pairwise merge with the 3.3 serialized accumulator used by the updated
+reducer. All inputs use the same fixed verbose centroid layout.
 
-| Groups | Stored digests per group | Baseline (ms/op) | Optimized (ms/op) | Latency reduction | Speedup | Baseline allocation (B/op) | Optimized allocation (B/op) |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 100 | 100 | 119.244 ± 66.230 | 9.275 ± 0.161 | 92.222% | 12.856x | 197,636,620 | 2,894,952 |
-| 1,000 | 10 | 96.039 ± 11.979 | 11.371 ± 0.257 | 88.159% | 8.446x | 192,278,646 | 28,821,662 |
-| 10,000 | 1 | 12.107 ± 6.227 | 9.078 ± 0.412 | Not distinguishable | Parity | 136,520,147 | 137,480,126 |
+| Workload | 3.2 pairwise (ms/op) | 3.3 accumulator (ms/op) | Latency delta | 3.2 allocation | 3.3 allocation | Allocation delta |
+|---|---:|---:|---:|---:|---:|---:|
+| Merge kernel | 0.2444 ± 0.0039 | 0.0385 ± 0.0013 | -84.3% | 77,930 | 36,552 | -53.1% |
+| `IndexedTable` combine | 0.2452 ± 0.0036 | 0.0394 ± 0.0010 | -83.9% | 81,626 | 40,248 | -50.7% |
+| Combine plus final percentile extraction | 0.2602 ± 0.0045 | 0.0412 ± 0.0016 | -84.2% | 81,722 | 40,345 | -50.6% |
 
-The 100- and 1,000-group workloads exercise centroid merging and reduce normalized allocation by 98.535% and 85.010%,
-respectively. With 10,000 groups, each group receives exactly one stored digest, so there is no source digest merge to
-optimize; extraction dominates and allocation is effectively unchanged (+0.703%). Its baseline and optimized latency
-confidence intervals overlap, so the nominal difference between their means is not claimed as a speedup. That
-high-cardinality case keeps the first
-serialized digest pending, constructs only the final result digest, and does not allocate the accumulator's raw-value
-buffer. The baseline had isolated latency outliers, reflected in its wider confidence intervals.
+The accumulator decodes sorted serialized centroids and linearly merges them rather than repeatedly materializing and
+sorting a `MergingDigest`. The benchmark also retains pairwise and accumulator controls under both dependency versions
+to distinguish library changes from the production implementation change.
 
-### Server-local and distributed TDigest reduction
+### Reducer accuracy
 
-The reducer benchmark runs on the same host with OpenJDK 25. It prebuilds segment digests and exact raw-value oracles
-outside the timed region, creates fresh targets per invocation, and measures both the merge kernel and the complete
-`ConcurrentIndexedTable` update path. `PROMOTED_LOCAL` models raw group-by segment results that arrive as ordinary
-`MergingDigest` objects. `ACCUMULATOR_LOCAL` models materialized accumulator results from non-grouped and StarTree
-segment execution. `ACCUMULATOR_WIRE` models lazy broker-side deserialization of standard TDigest bytes.
+The accuracy counters report mean absolute quantile-value error in parts per billion against fully sorted raw-value
+oracles. The randomized-order sweep now uses 32 independent deterministic source orders instead of repeating one
+order, which exposes the merge-order sensitivity hidden by the earlier table. JMH event counters are normalized over
+measurement iterations and forks. Duplicate-heavy input is exact or within floating-point noise. The largest
+candidate P99 error observed across the 32 source orders was 1,870,494 ppb (`0.001870494` absolute value error for
+values in `[0, 1]`).
 
-The representative comparison uses 32 segment results, compression 100, uniform input, two forks, and five measured
-iterations per fork.
+| Distribution | Implementation | P75 error (ppb) | P95 error (ppb) | P99 error (ppb) | Mean centroids |
+|---|---|---:|---:|---:|---:|
+| Uniform | 3.2 pairwise | 84,669 | 190,823 | 152,434 | 125 |
+| Uniform | 3.3 accumulator | 192,884 | 255,414 | 210,463 | 65 |
+| Skewed | 3.2 pairwise | 459,832 | 591,766 | 979,104 | 127 |
+| Skewed | 3.3 accumulator | 1,095,175 | 277,086 | 1,262,052 | 64 |
+| Bimodal | 3.2 pairwise | 23,796 | 18,924 | 61,153 | 124 |
+| Bimodal | 3.3 accumulator | 27,069 | 84,881 | 170,251 | 66 |
+| Duplicate-heavy | 3.2 pairwise | 0 | 0 | 0 | 141 |
+| Duplicate-heavy | 3.3 accumulator | 0 | 117 | 0 | 71 |
 
-| Benchmark | Pairwise 3.2 (ms/op) | Promoted local | Accumulator local | Serialized/wire |
-|---|---:|---:|---:|---:|
-| Merge kernel | 0.2573 | 0.0325 (7.92x) | 0.0186 (13.82x) | 0.0220 (11.68x) |
-| Full `IndexedTable` combine | 0.2683 | 0.0340 (7.90x) | 0.0201 (13.33x) | 0.0233 (11.52x) |
-| Full combine plus final percentile extraction | 0.2983 | 0.0353 (8.46x) | 0.0201 (14.83x) | 0.0239 (12.47x) |
-
-Normalized kernel allocation fell from 205,162 B/op to 24,000 B/op for promoted local state (-88.3%), 11,936 B/op
-for accumulator-local state (-94.2%), and 15,328 B/op for wire state (-92.5%). Direct percentile extraction reads the
-primitive centroid buffers and does not construct a temporary source digest.
-
-The production-shaped workload uses 1,440 groups, seven TDigest metrics, fan-in 32, and distinct prebuilt source
-objects for every group and metric. This removes the cache-locality advantage of the smaller shared-corpus kernel.
-
-| Path | Full combine (ms/op) | Speedup | Allocation (B/op) | Allocation reduction |
-|---|---:|---:|---:|---:|
-| TDigest 3.2 pairwise | 4,574.358 ± 309.333 | 1.00x | 2,074,920,845 | - |
-| Promoted raw group-by state | 856.308 ± 176.240 | 5.34x | 248,823,888 | 88.01% |
-| Materialized accumulator / StarTree-local | 222.986 ± 2.308 | 20.51x | 127,215,599 | 93.87% |
-| Lazy distributed wire state | 283.015 ± 6.168 | 16.16x | 161,407,415 | 92.22% |
-
-A separate non-forked `/usr/bin/time -l` diagnostic over the same unique-source shape measured maximum RSS of
-5,701 MB for pairwise, 5,773 MB for promoted local (+1.26%), 3,042 MB for accumulator-local (-46.65%), and 3,017 MB
-for wire state (-47.09%). It is a peak-memory check only; the two-fork JMH results above are the latency measurements.
-
-The improvement holds across configured compression factors:
-
-| Compression | Promoted local | Accumulator local | Serialized/wire |
-|---:|---:|---:|---:|
-| 50 | 7.17x / -84.8% allocation | 12.14x / -90.5% | 10.98x / -88.8% |
-| 100 | 7.67x / -86.7% allocation | 13.63x / -92.5% | 11.80x / -90.9% |
-| 200 | 8.62x / -87.9% allocation | 15.27x / -93.6% | 12.75x / -92.1% |
-
-A 36-shape fan-in/distribution/order sweep covered fan-in 8/32/128; uniform, skewed, bimodal, and duplicate-heavy
-inputs; and original, reversed, and seeded-random order across all four implementations (144 implementation/shape
-cases). Every result retained exact total weight, finite positive centroids, and monotonic p0/p50/p75/p95/p99/p100.
-Mean P75 error improved from 0.000175 for pairwise 3.2 to 0.000144 for every primitive-accumulator mode; the maximum
-sample error was 0.001353 for pairwise and 0.000709 for the candidates. The focused correctness suite additionally
-covers compression 20, 100, and 1,000 for the full parameter cross-product and round-trips every reduced result
-through standard TDigest 3.2 bytes.
-
-#### TDigest 3.3 dependency-only experiment
-
-A separate build changed only the TDigest dependency from 3.2 to 3.3. The control harness supplies the same 128
-verbose centroids to both versions. Across 36 workload shapes, the geometric mean speedup was 4.47x in the kernel and
-4.03x through `IndexedTable`, with 70.7% and 65.6% lower allocation. It is not used by this change: mean P75 error
-increased 18.9x, the maximum sampled P75 error reached 0.01138, and mean resulting centroids changed from 123.1 to
-42.2. A high-compression small-encoding mixed-version boundary also failed. In a separate 3.3 representative run,
-`add(List.of(source))` was 2.27x slower than pairwise and bounded batches were 1.31-1.52x slower while allocating more.
-The accepted reducer therefore stays on TDigest 3.2 and preserves standard TDigest wire bytes.
-
-### Star-tree TDigest construction kernel
-
-| Workload | Baseline (ms/op) | Optimized (ms/op) | Latency reduction | Speedup |
-|---|---:|---:|---:|---:|
-| 1 million rows, 1,000 rows per dimension group | 1,840.391 ± 47.275 | 53.770 ± 1.470 | 97.078% | 34.227x |
-
-The previous size-accounting call compressed the TDigest after every input value, defeating the digest's batching.
-The optimized path maintains a safe serialized-size bound without compressing and defers compression until
-serialization. A separate optimized 100-million-row run with 1,000 rows per group completed in 5,455.170 ms, or
-18.331 million rows per second. The 100-million-row number is an actual optimized measurement; no unmeasured baseline
-is extrapolated for it.
-This construction benchmark includes one serialization per group but excludes dimension sorting and forward-index
-I/O.
+Every measured result retained exact total weight, positive centroid weights, sorted finite centroid means, and
+monotonic P0/P50/P75/P95/P99/P100. Unit tests separately cover standard wire round-trips, compression 20, 100, and
+1,000, compact and verbose encodings, fractional compression, large double-precision weights, weighted legacy
+boundaries, and repeated infinities.
 
 ## Reproduce
 
@@ -218,71 +208,61 @@ Build the benchmark package from the repository root:
 ./mvnw -pl pinot-perf -am clean package -DskipTests
 ```
 
-Run the TDigest benchmark:
+Run raw aggregation:
 
 ```bash
-java -Xms4g -Xmx8g \
-  -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
+java -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
   org.openjdk.jmh.Main \
-  'org.apache.pinot.perf.aggregation.BenchmarkPercentileTDigestAggregation.*' \
-  -wi 2 -i 5 -f 2 -w 1s -r 1s -t 1 -to 30m -gc true -prof gc
+  'org.apache.pinot.perf.aggregation.BenchmarkPercentileTDigestAggregation.aggregatePercentileTDigest75' \
+  -wi 2 -i 5 -f 2 -w 1s -r 1s -t 1 -to 30m -gc true -foe true -prof gc
 ```
 
-Run the stored star-tree TDigest query benchmark. Its 10,000 input entries represent 100 million source rows:
+Run the stored StarTree query paths:
 
 ```bash
-java -Xms4g -Xmx8g \
-  -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
+java -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
   org.openjdk.jmh.Main \
   'org.apache.pinot.perf.aggregation.BenchmarkPercentileTDigestStarTreeAggregation.*' \
-  -wi 3 -i 5 -f 2 -w 1s -r 1s -t 1 -to 30m -gc true -prof gc
+  -p _numGroups=1000 -p _sourceLayout=NATIVE,FIXED_VERBOSE \
+  -wi 2 -i 5 -f 2 -w 1s -r 1s -t 1 -to 30m -gc true -foe true -prof gc
 ```
 
-Run the star-tree construction kernel over 100 million raw rows with 1,000 rows per dimension group:
+Run raw and pre-aggregated construction:
 
 ```bash
-java -Xms4g -Xmx8g \
-  -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
+java -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
   org.openjdk.jmh.Main \
   'org.apache.pinot.perf.aggregation.BenchmarkPercentileTDigestValueAggregator.*' \
   -p _numRows=100000000 -p _rowsPerGroup=1000 \
-  -wi 1 -i 3 -f 1 -w 1s -r 1s -t 1 -to 30m -gc true -prof gc
+  -wi 2 -i 5 -f 2 -w 1s -r 1s -t 1 -to 30m -gc true -foe true -prof gc
 ```
 
-Run the representative reducer comparison:
+Run the controlled reducer comparison:
 
 ```bash
-java -Xms4g -Xmx8g \
-  -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
+java -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
   org.openjdk.jmh.Main \
-  'org.apache.pinot.perf.aggregation.BenchmarkPercentileTDigestCombine.*' \
+  'org.apache.pinot.perf.aggregation.BenchmarkPercentileTDigestCombine.(mergeKernel|combineIndexedTable|combineIndexedTableAndExtract)' \
   -p _numGroups=1 -p _numMetrics=1 -p _fanIn=32 -p _compression=100 \
   -p _distribution=UNIFORM -p _mergeOrder=ORIGINAL \
-  -p _implementation=PAIRWISE,PROMOTED_LOCAL,ACCUMULATOR_LOCAL,ACCUMULATOR_WIRE \
-  -p _sourceLayout=NATIVE -p _sourceReuse=SHARED \
-  -wi 2 -i 5 -f 2 -w 1s -r 1s -t 1 -prof gc
+  -p _sourceLayout=FIXED_VERBOSE -p _sourceReuse=SHARED \
+  -p _implementation=PAIRWISE,ACCUMULATOR_WIRE \
+  -wi 2 -i 5 -f 2 -w 1s -r 1s -t 1 -to 30m -gc true -foe true -prof gc
 ```
 
-Run the production-shaped combine with unique prebuilt source state:
+Run reducer accuracy over skewed and duplicate-heavy inputs:
 
 ```bash
-java -Xms4g -Xmx8g \
-  -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
+java -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
   org.openjdk.jmh.Main \
-  'org.apache.pinot.perf.aggregation.BenchmarkPercentileTDigestCombine.combineIndexedTable$' \
-  -p _numGroups=1440 -p _numMetrics=7 -p _fanIn=32 -p _compression=100 \
-  -p _distribution=UNIFORM -p _mergeOrder=ORIGINAL \
-  -p _implementation=PAIRWISE,PROMOTED_LOCAL,ACCUMULATOR_LOCAL,ACCUMULATOR_WIRE \
-  -p _sourceLayout=NATIVE -p _sourceReuse=UNIQUE \
-  -wi 2 -i 5 -f 2 -w 1s -r 1s -t 1 -prof gc
+  'org.apache.pinot.perf.aggregation.BenchmarkPercentileTDigestCombine.mergeKernel' \
+  -p _numGroups=1 -p _numMetrics=1 -p _fanIn=128 -p _compression=100 \
+  -p _distribution=SKEWED,DUPLICATE_HEAVY -p _mergeOrder=RANDOMIZED \
+  -p _sourceLayout=NATIVE -p _sourceReuse=SHARED \
+  -p _implementation=PAIRWISE,ACCUMULATOR_WIRE \
+  -wi 2 -i 5 -f 2 -w 1s -r 1s -t 1 -to 30m -gc true -foe true -prof gc
 ```
 
-For the dependency-only experiment, change only `<t-digest.version>` in the root `pom.xml` from `3.2` to `3.3`,
-rebuild `pinot-core` and `pinot-perf`, and run the same command for each build with `_implementation=PAIRWISE` and
-`_sourceLayout=FIXED_VERBOSE`. Write each result with `-rf json -rff <result-file>` and construct the runtime
-classpath with exactly one `t-digest` JAR; a package directory reused across builds can otherwise retain both JARs.
-
-The raw-value benchmark generates the same 100 million values from `SplittableRandom(42)` during trial setup. The
-timed methods include result extraction and validation. Dataset generation and exact-oracle construction are outside
-the measured region. The star-tree query benchmark similarly generates its stored digests during trial setup. The
-construction benchmark generates a reusable deterministic value block before measurement.
+For a strict dependency comparison, build the baseline and candidate into separate package directories and verify that
+each `lib` directory contains only its intended `t-digest-3.2.jar` or `t-digest-3.3.jar`. Reusing one package directory
+can leave both versions on the classpath and invalidate the result.

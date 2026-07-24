@@ -71,8 +71,9 @@ import org.openjdk.jmh.infra.BenchmarkParams;
 ///
 /// Source digests and the exact raw-value oracle are built once per trial. Each invocation receives fresh merge
 /// targets so a previous invocation cannot change its input. Accuracy and centroid statistics come from an untimed
-/// 32-merge quality sweep. Run with JMH's GC profiler to report allocation and GC metrics, for example `-prof gc`.
-/// Error counters report absolute error in billionths because all generated distributions are bounded to `[0, 1]`.
+/// quality sweep: 32 deterministic independent source orders for `RANDOMIZED`, and one order for fixed-order modes.
+/// Run with JMH's GC profiler to report allocation and GC metrics, for example `-prof gc`. Error counters report
+/// absolute error in billionths because all generated distributions are bounded to `[0, 1]`.
 ///
 /// The TDigest dependency version is deliberately a build-level dimension. Compare identical `PAIRWISE` runs from a
 /// 3.2 build and a 3.3 build. Use `_sourceLayout=FIXED_VERBOSE` to hold the serialized centroid shape constant for the
@@ -93,6 +94,7 @@ import org.openjdk.jmh.infra.BenchmarkParams;
 public class BenchmarkPercentileTDigestCombine {
   private static final int VALUES_PER_DIGEST = 10_000;
   private static final int QUALITY_SAMPLES = 32;
+  private static final long QUALITY_ORDER_SEED = 0x3C6EF372FE94F82BL;
   private static final double ERROR_SCALE = 1_000_000_000.0;
   private static final Pattern TDIGEST_JAR_VERSION = Pattern.compile("t-digest-(\\d+)\\.(\\d+)(?:\\.[^/]*)?\\.jar");
 
@@ -276,10 +278,10 @@ public class BenchmarkPercentileTDigestCombine {
     double[] rawValues = new double[_fanIn * VALUES_PER_DIGEST];
     int totalInputCentroids = 0;
     for (int sourceId = 0; sourceId < _fanIn; sourceId++) {
-      MergingDigest nativeDigest = null;
+      ImmutableMergingDigest nativeDigest = null;
       if (_sourceLayout == SourceLayout.NATIVE) {
-        nativeDigest = _implementation == Implementation.PAIRWISE ? new MergingDigest(_compression)
-            : new ImmutableMergingDigest(_compression);
+        nativeDigest = new ImmutableMergingDigest(_compression);
+        TDigestBenchmarkUtils.usePinotScaleFunction(nativeDigest);
       }
       double[] sourceValues = new double[VALUES_PER_DIGEST];
       SplittableRandom random = new SplittableRandom(0x6A09E667F3BCC909L + sourceId);
@@ -295,11 +297,7 @@ public class BenchmarkPercentileTDigestCombine {
       TDigest digest;
       byte[] fixedBytes = null;
       if (nativeDigest != null) {
-        if (nativeDigest instanceof ImmutableMergingDigest immutableDigest) {
-          immutableDigest.freeze();
-        } else {
-          nativeDigest.compress();
-        }
+        nativeDigest.freeze();
         digest = nativeDigest;
       } else {
         Arrays.sort(sourceValues);
@@ -365,28 +363,6 @@ public class BenchmarkPercentileTDigestCombine {
     }
   }
 
-  private static byte[] createFixedVerboseBytes(double[] sortedValues, double compression) {
-    int numCentroids = Math.min(sortedValues.length, (int) Math.ceil(compression * 1.28));
-    ByteBuffer buffer = ByteBuffer.allocate(32 + numCentroids * 16);
-    buffer.putInt(1);
-    buffer.putDouble(sortedValues[0]);
-    buffer.putDouble(sortedValues[sortedValues.length - 1]);
-    buffer.putDouble(compression);
-    buffer.putInt(numCentroids);
-    for (int centroidId = 0; centroidId < numCentroids; centroidId++) {
-      int start = centroidId * sortedValues.length / numCentroids;
-      int end = (centroidId + 1) * sortedValues.length / numCentroids;
-      double sum = 0.0;
-      for (int valueId = start; valueId < end; valueId++) {
-        sum += sortedValues[valueId];
-      }
-      double weight = end - start;
-      buffer.putDouble(weight);
-      buffer.putDouble(sum / weight);
-    }
-    return buffer.array();
-  }
-
   private void buildMergeOrder() {
     _sourceOrder = new int[_fanIn];
     for (int i = 0; i < _fanIn; i++) {
@@ -446,11 +422,15 @@ public class BenchmarkPercentileTDigestCombine {
     double maxP95Error = 0.0;
     double totalP99Error = 0.0;
     double maxP99Error = 0.0;
-    for (int sampleId = 0; sampleId < QUALITY_SAMPLES; sampleId++) {
+    int qualitySamples = _mergeOrder == MergeOrder.RANDOMIZED ? QUALITY_SAMPLES : 1;
+    SplittableRandom qualityOrderRandom = new SplittableRandom(QUALITY_ORDER_SEED);
+    for (int sampleId = 0; sampleId < qualitySamples; sampleId++) {
+      int[] sourceOrder =
+          _mergeOrder == MergeOrder.RANDOMIZED ? buildRandomizedSourceOrder(qualityOrderRandom.split()) : _sourceOrder;
       resetPending();
-      TDigest digest = newFirstSource(sourceSlot(0, 0), 0);
+      TDigest digest = newFirstSource(sourceSlot(sourceOrder, 0, 0), 0);
       for (int position = 1; position < _fanIn; position++) {
-        digest = _functions[0].merge(digest, _sources[sourceSlot(position, 0)]);
+        digest = _functions[0].merge(digest, _sources[sourceSlot(sourceOrder, position, 0)]);
       }
       flushPending();
       digest.compress();
@@ -468,11 +448,25 @@ public class BenchmarkPercentileTDigestCombine {
       totalP99Error += p99Error;
       maxP99Error = Math.max(maxP99Error, p99Error);
     }
-    _qualityStats = new QualityStats(_averageInputCentroidCount, totalResultingCentroids / QUALITY_SAMPLES,
-        maxResultingCentroids, totalP75Error / QUALITY_SAMPLES, maxP75Error, totalP95Error / QUALITY_SAMPLES,
-        maxP95Error, totalP99Error / QUALITY_SAMPLES, maxP99Error);
+    _qualityStats = new QualityStats(_averageInputCentroidCount, totalResultingCentroids / qualitySamples,
+        maxResultingCentroids, totalP75Error / qualitySamples, maxP75Error, totalP95Error / qualitySamples,
+        maxP95Error, totalP99Error / qualitySamples, maxP99Error);
     prepareFirstSources();
     validateIndexedTable(buildIndexedTable(false));
+  }
+
+  private int[] buildRandomizedSourceOrder(SplittableRandom random) {
+    int[] sourceOrder = new int[_fanIn];
+    for (int i = 0; i < _fanIn; i++) {
+      sourceOrder[i] = i;
+    }
+    for (int i = _fanIn - 1; i > 0; i--) {
+      int other = random.nextInt(i + 1);
+      int value = sourceOrder[i];
+      sourceOrder[i] = sourceOrder[other];
+      sourceOrder[other] = value;
+    }
+    return sourceOrder;
   }
 
   private void validateIndexedTable(IndexedTable table) {
@@ -516,7 +510,11 @@ public class BenchmarkPercentileTDigestCombine {
   }
 
   private int sourceSlot(int position, int targetIndex) {
-    int sourceId = _sourceOrder[position];
+    return sourceSlot(_sourceOrder, position, targetIndex);
+  }
+
+  private int sourceSlot(int[] sourceOrder, int position, int targetIndex) {
+    int sourceId = sourceOrder[position];
     return _sourceReuse == SourceReuse.SHARED ? sourceId : sourceId * _numGroups * _numMetrics + targetIndex;
   }
 
@@ -668,6 +666,7 @@ public class BenchmarkPercentileTDigestCombine {
 
     @Setup(Level.Trial)
     public void setUp(BenchmarkParams benchmarkParams) {
+      // Event counters are summed across measurement iterations and forks in the final JMH result.
       _aggregationDivisor = (double) benchmarkParams.getMeasurement().getCount()
           * Math.max(1, benchmarkParams.getForks());
     }
@@ -752,7 +751,7 @@ public class BenchmarkPercentileTDigestCombine {
     private final List<Centroid> _centroids;
 
     private FixedTDigest(double[] sortedValues, double compression) {
-      this(createFixedVerboseBytes(sortedValues, compression));
+      this(TDigestBenchmarkUtils.createFixedVerboseBytes(sortedValues, compression));
     }
 
     private FixedTDigest(byte[] bytes) {
@@ -969,7 +968,7 @@ public class BenchmarkPercentileTDigestCombine {
       if (pending.isEmpty()) {
         return;
       }
-      TDigest batch = TDigest.createMergingDigest(_compressionFactor);
+      TDigest batch = TDigestBenchmarkUtils.usePinotScaleFunction(TDigest.createMergingDigest(_compressionFactor));
       batch.add(pending);
       pending.clear();
       target.add(batch);
