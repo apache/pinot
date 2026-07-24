@@ -25,7 +25,6 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -47,6 +46,7 @@ import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAgg
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLPlusAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartULLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountULLAggregationFunction;
+import org.apache.pinot.core.query.aggregation.utils.SortedLongDistinctSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
@@ -254,12 +254,20 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
         }
         return intSet;
       case LONG:
-        LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
+        // A dictionary is duplicate-free, and an immutable dictionary is also value-sorted, so its values are already
+        // the sorted distinct set: read them straight into a sorted run instead of hashing each one.
+        // SortedLongDistinctSet then unions the per-segment runs during combine without hashing (the dominant cost
+        // for high-cardinality DISTINCT_COUNT). Mutable (realtime) dictionaries are insertion-ordered and report
+        // isSorted() = false, in which case the values are sorted first.
+        // Only LONG is optimized here -- it is the common high-cardinality distinct case (IDs, timestamps); INT /
+        // FLOAT / DOUBLE keep the hash-set path. The same sorted-run approach generalizes to them if profiling shows
+        // it is worthwhile.
+        long[] longValues = new long[dictionarySize];
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
-          longSet.add(dictionary.getLongValue(dictId));
+          longValues[dictId] = dictionary.getLongValue(dictId);
         }
-        return longSet;
+        return SortedLongDistinctSet.fromValues(longValues, dictionarySize, dictionary.isSorted());
       case FLOAT:
         FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
