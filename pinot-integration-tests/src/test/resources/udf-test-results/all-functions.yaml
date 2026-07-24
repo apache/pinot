@@ -981,6 +981,14 @@ jsonextractscalar:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction"
   udf: null
+jsonextractscalarfast:
+  scalar: null
+  transform: "org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction.Fast"
+  udf: null
+jsonextractscalarfirstmatch:
+  scalar: null
+  transform: "org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction.FirstMatch"
+  udf: null
 jsonformat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonFormat}"
   transform: null
@@ -1007,6 +1015,14 @@ jsonpathdouble:
     \ 3: org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathDouble]}"
   transform: null
   udf: null
+jsonpathdoublefast:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathDoubleFast}"
+  transform: null
+  udf: null
+jsonpathdoublefirstmatch:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathDoubleFirstMatch}"
+  transform: null
+  udf: null
 jsonpathexists:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathExists}"
   transform: null
@@ -1016,9 +1032,25 @@ jsonpathlong:
     \ 3: org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathLong]}"
   transform: null
   udf: null
+jsonpathlongfast:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathLongFast}"
+  transform: null
+  udf: null
+jsonpathlongfirstmatch:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathLongFirstMatch}"
+  transform: null
+  udf: null
 jsonpathstring:
   scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathString,\
     \ 3: org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathString]}"
+  transform: null
+  udf: null
+jsonpathstringfast:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathStringFast}"
+  transform: null
+  udf: null
+jsonpathstringfirstmatch:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathStringFirstMatch}"
   transform: null
   udf: null
 jsonstringtoarray:

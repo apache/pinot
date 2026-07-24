@@ -29,7 +29,13 @@ public class ParserUtils {
   public static void validateFunction(String canonicalName, List<Expression> operands) {
     switch (canonicalName) {
       case "jsonextractscalar":
-        validateJsonExtractScalarFunction(operands);
+        validateJsonExtractScalarFunction("jsonExtractScalar", operands);
+        break;
+      case "jsonextractscalarfast":
+        validateJsonExtractScalarFunction("jsonExtractScalarFast", operands);
+        break;
+      case "jsonextractscalarfirstmatch":
+        validateJsonExtractScalarFunction("jsonExtractScalarFirstMatch", operands);
         break;
       case "jsonextractkey":
         validateJsonExtractKeyFunction(operands);
@@ -133,19 +139,20 @@ public class ParserUtils {
     return result.toString();
   }
 
-  private static void validateJsonExtractScalarFunction(List<Expression> operands) {
+  private static void validateJsonExtractScalarFunction(String functionName, List<Expression> operands) {
     // Check that there are 3 or 4 arguments
     int numOperands = operands.size();
     if (numOperands != 3 && numOperands != 4) {
       throw new SqlCompilationException(
-          "Expect 3 or 4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', "
-              + "'resultsType', ['defaultValue'])");
+          "Expect 3 or 4 arguments for transform function: " + functionName
+              + "(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue'])");
     }
     if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral() || (numOperands == 4 && !operands.get(3)
         .isSetLiteral())) {
       throw new SqlCompilationException(
-          "Expect the 2nd/3rd/4th argument of transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', "
-              + "'resultsType', ['defaultValue']) to be a single-quoted literal value.");
+          "Expect the 2nd and 3rd arguments of transform function: " + functionName
+              + "(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be single-quoted literal values, "
+              + "and the optional 4th argument to be a literal value.");
     }
   }
 
