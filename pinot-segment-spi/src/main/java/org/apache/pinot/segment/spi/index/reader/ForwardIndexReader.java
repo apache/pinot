@@ -66,6 +66,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     return null;
   }
 
+  /// Returns the canonical codec spec string stored in the forward index header, or `null` if the forward index
+  /// does not use the codec-pipeline format (version 7). This is the counterpart of [#getCompressionType()] for
+  /// codec-pipeline segments: exactly one of the two will be non-null for a raw fixed-byte SV forward index.
+  ///
+  /// Used by `ForwardIndexHandler` to detect when a codec-spec change requires rewriting an existing
+  /// codec-pipeline segment during segment reload.
+  @Nullable
+  default String getCodecSpec() {
+    return null;
+  }
+
   /**
    * Returns the compression type for dictionary encoded forward index.
    */

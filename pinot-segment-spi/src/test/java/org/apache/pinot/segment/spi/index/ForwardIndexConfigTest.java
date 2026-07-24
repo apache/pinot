@@ -191,4 +191,131 @@ public class ForwardIndexConfigTest {
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
     assertEquals(config.getEncodingType(), FieldConfig.EncodingType.RAW);
   }
+
+  @Test
+  public void withCodecSpecRoundTrip()
+      throws JsonProcessingException {
+    String confStr = "{\"encodingType\": \"RAW\", \"codecSpec\": \"CODEC(DELTA,ZSTD(3))\"}";
+    ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
+
+    assertTrue(config.hasCodecSpec(), "Expected hasCodecSpec() to be true");
+    assertEquals(config.getEncodingType(), FieldConfig.EncodingType.RAW, "Unexpected encodingType");
+    assertEquals(config.getCodecSpec(), "CODEC(DELTA,ZSTD(3))", "Unexpected codecSpec");
+    assertNull(config.getCompressionCodec(), "compressionCodec should be null when codecSpec is set");
+    assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion(),
+        "codecSpec should not force the rawIndexWriterVersion");
+
+    // Serialize back to JSON and deserialize again — spec must survive the round-trip
+    String serialized = JsonUtils.objectToString(config);
+    ForwardIndexConfig roundTripped = JsonUtils.stringToObject(serialized, ForwardIndexConfig.class);
+
+    assertTrue(roundTripped.hasCodecSpec(), "hasCodecSpec() lost after round-trip");
+    assertEquals(roundTripped.getCodecSpec(), "CODEC(DELTA,ZSTD(3))", "codecSpec changed after round-trip");
+    assertEquals(roundTripped.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion(),
+        "rawIndexWriterVersion changed after round-trip");
+  }
+
+  @Test
+  public void withCodecSpecClearsCompressionCodec() {
+    // withCodecSpec() is mutually exclusive with compressionCodec — setting codecSpec must clear compressionCodec
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec.ZSTANDARD)
+        .withCodecSpec("ZSTD(3)")
+        .build();
+    assertEquals(config.getCodecSpec(), "ZSTD(3)");
+    assertNull(config.getCompressionCodec(), "compressionCodec must be cleared when codecSpec is set via Builder");
+  }
+
+  @Test
+  public void withRawIndexWriterVersionThenCodecSpecPreservesVersion() {
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withRawIndexWriterVersion(3)
+        .withCodecSpec("DELTA")
+        .build();
+
+    assertEquals(config.getCodecSpec(), "DELTA");
+    assertEquals(config.getRawIndexWriterVersion(), 3);
+  }
+
+  @Test
+  public void withBuilderCopyPreservesRawIndexWriterVersion() {
+    // Builder(ForwardIndexConfig) copy constructor must preserve a non-default rawIndexWriterVersion
+    // so that round-tripping through a builder does not silently revert to the default.
+    ForwardIndexConfig original = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.DICTIONARY)
+        .withRawIndexWriterVersion(3)
+        .build();
+    assertEquals(original.getRawIndexWriterVersion(), 3);
+
+    ForwardIndexConfig copy = new ForwardIndexConfig.Builder(original).build();
+    assertEquals(copy.getRawIndexWriterVersion(), 3,
+        "copy constructor must preserve non-default rawIndexWriterVersion");
+  }
+
+  @Test
+  public void withLegacyPropertiesHonorsVersionWhenCodecSpecSet() {
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("ZSTD(3)")
+        .withLegacyProperties(java.util.Map.of(
+            org.apache.pinot.spi.config.table.FieldConfig.RAW_INDEX_WRITER_VERSION, "4"))
+        .build();
+    assertEquals(config.getCodecSpec(), "ZSTD(3)");
+    assertEquals(config.getRawIndexWriterVersion(), 4);
+  }
+
+  @Test
+  public void withBuilderCopyFromCodecSpecAllowsWithCodecSpec() {
+    // Copying a codecSpec-based config and changing the spec must not throw.
+    ForwardIndexConfig original = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("ZSTD(3)")
+        .build();
+    assertEquals(original.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion());
+
+    ForwardIndexConfig copy = new ForwardIndexConfig.Builder(original).withCodecSpec("LZ4").build();
+    assertEquals(copy.getCodecSpec(), "LZ4", "codecSpec must be updatable after copy");
+    assertEquals(copy.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion());
+  }
+
+  @Test
+  public void withCodecSpecEquality() {
+    ForwardIndexConfig a = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("CODEC(DELTA,ZSTD(3))")
+        .build();
+    ForwardIndexConfig b = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("CODEC(DELTA,ZSTD(3))")
+        .build();
+    ForwardIndexConfig c = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("ZSTD(3)")
+        .build();
+
+    assertEquals(a, b, "Configs with identical codecSpec must be equal");
+    assertEquals(a.hashCode(), b.hashCode(), "Equal configs must have same hashCode");
+    assertNotEquals(a, c, "Configs with different codecSpec must not be equal");
+  }
+
+  /// Regression: codecSpec is parser-canonicalized at construction so syntactic variations
+  /// (case, whitespace, redundant CODEC wrapper) compare equal. Prevents spurious "config
+  /// changed" detections in higher-level diff logic.
+  @Test
+  public void testCodecSpecCanonicalizedOnConstruction() {
+    ForwardIndexConfig lowercase = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("delta")
+        .build();
+    ForwardIndexConfig uppercase = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("DELTA")
+        .build();
+    ForwardIndexConfig wrapped = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("CODEC(DELTA)")
+        .build();
+    ForwardIndexConfig whitespaced = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("CODEC( DELTA , ZSTD(3) )")
+        .build();
+    ForwardIndexConfig clean = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("CODEC(DELTA,ZSTD(3))")
+        .build();
+
+    assertEquals(lowercase, uppercase, "lowercase and uppercase codecSpec must compare equal after canonicalization");
+    // Single-stage spec canonicalizes without the CODEC(...) wrapper.
+    assertEquals(uppercase, wrapped, "single-stage spec with redundant CODEC wrapper must compare equal");
+    assertEquals(whitespaced, clean, "internal whitespace must not affect equality");
+  }
 }

@@ -30,7 +30,8 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
  * each entry has fixed number of bytes.
  */
 @NotThreadSafe
-public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter {
+public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter
+    implements FixedByteValueWriter {
   private int _chunkDataOffset;
 
   /**
