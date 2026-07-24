@@ -23,15 +23,19 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.fail;
 
 
@@ -115,6 +119,72 @@ public class ArrowResponseEncoderTest {
   }
 
   @Test
+  public void testEncodeDecodeUuidColumn()
+      throws IOException {
+    DataSchema schema = new DataSchema(new String[]{"uuidCol"}, new ColumnDataType[]{ColumnDataType.UUID});
+    List<Object[]> rows = Arrays.asList(
+        new Object[]{"550e8400-e29b-41d4-a716-446655440000"},
+        new Object[]{"f81d4fae-7dec-11d0-a765-00a0c91e6bf6"}
+    );
+
+    ResultTable resultTable = new ResultTable(schema, rows);
+    ArrowResponseEncoder encoder = new ArrowResponseEncoder();
+    byte[] encodedBytes = encoder.encodeResultTable(resultTable, 0, rows.size());
+    ResultTable decodedTable = encoder.decodeResultTable(encodedBytes, rows.size(), schema);
+
+    assertEquals(decodedTable.getRows().size(), rows.size(), "Row count should match");
+    for (int i = 0; i < rows.size(); i++) {
+      assertEquals(decodedTable.getRows().get(i)[0], rows.get(i)[0], "UUID row " + i + " should match");
+    }
+  }
+
+  /// Mirrors the real broker path: a UUID column is rendered to its canonical string *before* it reaches the
+  /// encoder -- via `convertAndFormat` in the single-stage engine, and `format(toExternal(..))` in the multi-stage
+  /// engine (see QueryDispatcher#toExternalList). The encoder therefore only ever sees Strings in this group.
+  @Test
+  public void testEncodeDecodeUuidColumnRenderedFromInternalValue()
+      throws IOException {
+    String uuidValue = "550e8400-e29b-41d4-a716-446655440000";
+    DataSchema schema = new DataSchema(new String[]{"uuidCol", "cnt"},
+        new ColumnDataType[]{ColumnDataType.UUID, ColumnDataType.LONG});
+    Object internalValue = ColumnDataType.UUID.toInternal(UUID.fromString(uuidValue));
+    List<Object[]> rows =
+        Collections.singletonList(new Object[]{ColumnDataType.UUID.convertAndFormat(internalValue), 3L});
+
+    ResultTable resultTable = new ResultTable(schema, rows);
+    ArrowResponseEncoder encoder = new ArrowResponseEncoder();
+    byte[] encodedBytes = encoder.encodeResultTable(resultTable, 0, rows.size());
+    ResultTable decodedTable = encoder.decodeResultTable(encodedBytes, rows.size(), schema);
+
+    assertEquals(decodedTable.getRows().size(), 1, "Row count should match");
+    assertEquals(decodedTable.getRows().get(0)[0], uuidValue, "UUID value should round-trip as canonical string");
+    assertEquals(decodedTable.getRows().get(0)[1], 3L, "Non-UUID columns should be preserved");
+  }
+
+  @Test
+  public void testEncodeDecodeUuidColumnWithNulls()
+      throws IOException {
+    String uuidValue = "550e8400-e29b-41d4-a716-446655440000";
+    DataSchema schema = new DataSchema(new String[]{"uuidCol", "uuidArrayCol"},
+        new ColumnDataType[]{ColumnDataType.UUID, ColumnDataType.UUID_ARRAY});
+    List<Object[]> rows = Arrays.asList(
+        new Object[]{uuidValue, new String[]{uuidValue}},
+        new Object[]{null, null}
+    );
+
+    ResultTable resultTable = new ResultTable(schema, rows);
+    ArrowResponseEncoder encoder = new ArrowResponseEncoder();
+    byte[] encodedBytes = encoder.encodeResultTable(resultTable, 0, rows.size());
+    ResultTable decodedTable = encoder.decodeResultTable(encodedBytes, rows.size(), schema);
+
+    assertEquals(decodedTable.getRows().size(), 2, "Row count should match");
+    assertEquals(decodedTable.getRows().get(0)[0], uuidValue, "Non-null UUID should round-trip");
+    assertEquals(decodedTable.getRows().get(0)[1], new String[]{uuidValue}, "Non-null UUID array should round-trip");
+    assertNull(decodedTable.getRows().get(1)[0], "Null UUID should round-trip as null");
+    assertNull(decodedTable.getRows().get(1)[1], "Null UUID array should round-trip as null");
+  }
+
+  @Test
   public void testEncodeDecodeAllDataTypes()
       throws IOException {
     // Define the column names and corresponding data types.
@@ -122,7 +192,7 @@ public class ArrowResponseEncoderTest {
         "intCol", "longCol", "floatCol", "doubleCol", "bigDecimalCol", "booleanCol", "timestampCol",
         "stringCol", "jsonCol", "mapCol", "bytesCol", "objectCol", "intArrayCol", "longArrayCol",
         "floatArrayCol", "doubleArrayCol", "booleanArrayCol", "timestampArrayCol", "stringArrayCol",
-        "bytesArrayCol", "unknownCol"
+        "bytesArrayCol", "uuidArrayCol", "unknownCol"
     };
 
     DataSchema.ColumnDataType[] columnTypes = {
@@ -146,6 +216,7 @@ public class ArrowResponseEncoderTest {
         ColumnDataType.TIMESTAMP_ARRAY,
         ColumnDataType.STRING_ARRAY,
         ColumnDataType.BYTES_ARRAY,
+        ColumnDataType.UUID_ARRAY,
         ColumnDataType.UNKNOWN
     };
 
@@ -178,6 +249,10 @@ public class ArrowResponseEncoderTest {
     byte[][] bytesArrayVal = new byte[][]{
         new byte[]{1, 2}, new byte[]{3, 4}
     };
+    byte[][] uuidArrayVal = new byte[][]{
+        UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000"),
+        UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440001")
+    };
     Object unknownVal = null;  // UNKNOWN is represented as null in this example.
 
     // Build a single row that contains all the above values.
@@ -185,7 +260,7 @@ public class ArrowResponseEncoderTest {
     Object[] row = new Object[]{
         intVal, longVal, floatVal, doubleVal, bigDecimalVal, booleanVal, timestampVal, stringVal,
         jsonVal, mapVal, bytesVal, objectVal, intArrayVal, longArrayVal, floatArrayVal, doubleArrayVal,
-        booleanArrayVal, timestampArrayVal, stringArrayVal, bytesArrayVal, unknownVal
+        booleanArrayVal, timestampArrayVal, stringArrayVal, bytesArrayVal, uuidArrayVal, unknownVal
     };
     for (int i = 0; i < row.length; i++) {
       row[i] = columnTypes[i].format(row[i]); // Convert to internal representation.

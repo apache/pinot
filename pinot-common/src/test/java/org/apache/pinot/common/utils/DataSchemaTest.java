@@ -21,8 +21,11 @@ package org.apache.pinot.common.utils;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import java.util.Locale;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -31,14 +34,19 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 
 public class DataSchemaTest {
   private static final String[] COLUMN_NAMES = {
-      "int", "long", "float", "double", "string", "object", "int_array", "long_array", "float_array", "double_array",
-      "string_array", "boolean_array", "timestamp_array", "bytes_array"
+      "int", "long", "float", "double", "string", "uuid", "object", "int_array", "long_array", "float_array",
+      "double_array", "string_array", "boolean_array", "timestamp_array", "bytes_array", "uuid_array"
   };
   private static final int NUM_COLUMNS = COLUMN_NAMES.length;
   private static final DataSchema.ColumnDataType[] COLUMN_DATA_TYPES = {
-      INT, LONG, FLOAT, DOUBLE, STRING, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY,
-      BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY
+      INT, LONG, FLOAT, DOUBLE, STRING, UUID, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY,
+      BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY, UUID_ARRAY
   };
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
+  private static final String UUID_VALUE_2 = "550e8400-e29b-41d4-a716-446655440001";
+  // Fully qualified: the static ColumnDataType.* import below binds the simple name UUID to the enum constant.
+  private static final java.util.UUID JAVA_UUID = java.util.UUID.fromString(UUID_VALUE);
+  private static final java.util.UUID JAVA_UUID_2 = java.util.UUID.fromString(UUID_VALUE_2);
 
   @Test
   public void testGetters() {
@@ -71,9 +79,10 @@ public class DataSchemaTest {
   public void testToString() {
     DataSchema dataSchema = new DataSchema(COLUMN_NAMES, COLUMN_DATA_TYPES);
     Assert.assertEquals(dataSchema.toString(),
-        "[int(INT),long(LONG),float(FLOAT),double(DOUBLE),string(STRING),object(OBJECT),int_array(INT_ARRAY),"
-            + "long_array(LONG_ARRAY),float_array(FLOAT_ARRAY),double_array(DOUBLE_ARRAY),string_array(STRING_ARRAY),"
-            + "boolean_array(BOOLEAN_ARRAY),timestamp_array(TIMESTAMP_ARRAY),bytes_array(BYTES_ARRAY)]");
+        "[int(INT),long(LONG),float(FLOAT),double(DOUBLE),string(STRING),uuid(UUID),object(OBJECT),"
+            + "int_array(INT_ARRAY),long_array(LONG_ARRAY),float_array(FLOAT_ARRAY),double_array(DOUBLE_ARRAY),"
+            + "string_array(STRING_ARRAY),boolean_array(BOOLEAN_ARRAY),timestamp_array(TIMESTAMP_ARRAY),"
+            + "bytes_array(BYTES_ARRAY),uuid_array(UUID_ARRAY)]");
   }
 
   @Test
@@ -115,6 +124,16 @@ public class DataSchemaTest {
     Assert.assertFalse(STRING.isCompatible(STRING_ARRAY));
     Assert.assertFalse(STRING.isCompatible(BYTES_ARRAY));
 
+    Assert.assertFalse(UUID.isNumber());
+    Assert.assertFalse(UUID.isWholeNumber());
+    Assert.assertFalse(UUID.isArray());
+    Assert.assertFalse(UUID.isNumberArray());
+    Assert.assertFalse(UUID.isWholeNumberArray());
+    Assert.assertFalse(UUID.isCompatible(DOUBLE));
+    Assert.assertTrue(UUID.isCompatible(UUID));
+    Assert.assertFalse(UUID.isCompatible(BYTES));
+    Assert.assertFalse(UUID.isCompatible(STRING));
+
     Assert.assertFalse(OBJECT.isNumber());
     Assert.assertFalse(OBJECT.isWholeNumber());
     Assert.assertFalse(OBJECT.isArray());
@@ -154,7 +173,7 @@ public class DataSchemaTest {
     }
 
     for (DataSchema.ColumnDataType columnDataType : new DataSchema.ColumnDataType[]{
-        STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY
+        STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY, UUID_ARRAY
     }) {
       Assert.assertFalse(columnDataType.isNumber());
       Assert.assertFalse(columnDataType.isWholeNumber());
@@ -178,6 +197,8 @@ public class DataSchemaTest {
     Assert.assertEquals(fromDataType(FieldSpec.DataType.DOUBLE, false), DOUBLE_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.STRING, true), STRING);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.STRING, false), STRING_ARRAY);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.UUID, true), UUID);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.UUID, false), UUID_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.BOOLEAN, false), BOOLEAN_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.TIMESTAMP, false), TIMESTAMP_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.BYTES, false), BYTES_ARRAY);
@@ -186,7 +207,58 @@ public class DataSchemaTest {
     Assert.assertEquals(BIG_DECIMAL.format(bigDecimalValue), bigDecimalValue.toPlainString());
     Timestamp timestampValue = new Timestamp(1234567890123L);
     Assert.assertEquals(TIMESTAMP.format(timestampValue), timestampValue.toString());
+    ByteArray uuidValue = new ByteArray(UuidUtils.toBytes(UUID_VALUE));
+    Assert.assertEquals(UUID.convert(uuidValue), JAVA_UUID);
+    Assert.assertEquals(UUID.format(uuidValue), UUID_VALUE);
+    Assert.assertEquals(UUID.convertAndFormat(uuidValue), UUID_VALUE);
+    // format() also accepts the external form and re-canonicalizes non-canonical strings.
+    Assert.assertEquals(UUID.format(JAVA_UUID), UUID_VALUE);
+    Assert.assertEquals(UUID.format(UUID_VALUE.toUpperCase(Locale.ROOT)), UUID_VALUE);
+    byte[][] uuidArrayBytesValue = {UuidUtils.toBytes(UUID_VALUE), UuidUtils.toBytes(UUID_VALUE_2)};
+    ByteArray[] uuidArrayValue = (ByteArray[]) UUID_ARRAY.toInternal(new String[]{UUID_VALUE, UUID_VALUE_2});
+    java.util.UUID[] expectedUuidArray = {JAVA_UUID, JAVA_UUID_2};
+    String[] expectedFormatted = {UUID_VALUE, UUID_VALUE_2};
+    Assert.assertEquals(UUID_ARRAY.toExternal(uuidArrayValue), expectedUuidArray);
+    Assert.assertEquals(UUID_ARRAY.toExternal(uuidArrayBytesValue), expectedUuidArray);
+    Assert.assertEquals(UUID_ARRAY.convert(uuidArrayValue), expectedUuidArray);
+    Assert.assertEquals(UUID_ARRAY.toInternal(expectedUuidArray), uuidArrayValue);
+    Assert.assertEquals(UUID_ARRAY.toInternal(uuidArrayBytesValue), uuidArrayValue);
+    Assert.assertEquals(UUID_ARRAY.format(uuidArrayBytesValue), expectedFormatted);
+    Assert.assertEquals(UUID_ARRAY.format(expectedUuidArray), expectedFormatted);
+    Assert.assertEquals(UUID_ARRAY.format(uuidArrayValue), expectedFormatted);
+    Assert.assertEquals(UUID_ARRAY.convertAndFormat(uuidArrayValue), expectedFormatted);
+    Assert.assertEquals(UUID_ARRAY.convertAndFormat(uuidArrayBytesValue), expectedFormatted);
     byte[] bytesValue = {12, 34, 56};
     Assert.assertEquals(BYTES.format(bytesValue), BytesUtils.toHexString(bytesValue));
+  }
+
+  /// The null placeholder must be resolved on the *logical* type. UUID is the only type whose placeholder differs
+  /// from its stored type's: it needs the 16-byte nil UUID, while BYTES supplies a zero-length one. Every other
+  /// logical type must agree with its stored type, otherwise callers that resolve the stored type (DataBlockBuilder,
+  /// GroupByResultsBlock, GroupByDataTableReducer) would silently write the wrong placeholder.
+  @Test
+  public void testNullPlaceholderMatchesStoredTypeExceptUuid() {
+    for (DataSchema.ColumnDataType columnDataType : DataSchema.ColumnDataType.values()) {
+      DataSchema.ColumnDataType storedType = columnDataType.getStoredType();
+      if (columnDataType == UUID) {
+        Assert.assertEquals(storedType, BYTES);
+        Assert.assertEquals(columnDataType.getNullPlaceholder(), new ByteArray(UuidUtils.nullUuidBytes()));
+        Assert.assertNotEquals(columnDataType.getNullPlaceholder(), storedType.getNullPlaceholder());
+      } else {
+        Assert.assertEquals(columnDataType.getNullPlaceholder(), storedType.getNullPlaceholder(),
+            "Null placeholder mismatch between " + columnDataType + " and its stored type " + storedType);
+      }
+    }
+  }
+
+  /// The nil-UUID placeholder wraps a mutable 16-byte array, unlike every other placeholder (all empty or
+  /// immutable), so each call must hand back a fresh instance.
+  @Test
+  public void testUuidNullPlaceholderIsNotShared() {
+    ByteArray first = (ByteArray) UUID.getNullPlaceholder();
+    ByteArray second = (ByteArray) UUID.getNullPlaceholder();
+    Assert.assertNotSame(first, second);
+    first.getBytes()[0] = 1;
+    Assert.assertEquals(second, new ByteArray(UuidUtils.nullUuidBytes()));
   }
 }

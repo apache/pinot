@@ -564,7 +564,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
       Object[] nullPlaceholders = new Object[_numColumns];
       for (int colId = 0; colId < _numColumns; colId++) {
         nullBitmaps[colId] = new RoaringBitmap();
-        nullPlaceholders[colId] = storedColumnDataTypes[colId].getNullPlaceholder();
+        // Resolved on the logical type, not the stored type: UUID overrides getNullPlaceholder() to return the nil
+        // UUID, whereas its stored type BYTES would yield a zero-length placeholder that is not a valid UUID.
+        nullPlaceholders[colId] = dataSchema.getColumnDataType(colId).getNullPlaceholder();
       }
       int rowId = 0;
       while (iterator.hasNext()) {
