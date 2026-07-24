@@ -237,7 +237,15 @@ public class TextIndexHandler extends BaseIndexHandler {
         _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         TextIndexCreator textIndexCreator = StandardIndexes.text().createIndexCreator(context, config)) {
-      if (columnMetadata.isSingleValue()) {
+      if (config.isBuildOnDictionary()) {
+        // Dictionary-based text index: build one Lucene document per distinct value (Lucene docId == dictId),
+        // independent of single/multi-value. Mirrors FSTIndexHandler. Requires a dictionary (validated upstream).
+        try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
+          for (int dictId = 0; dictId < dictionary.length(); dictId++) {
+            textIndexCreator.add(dictionary.getStringValue(dictId));
+          }
+        }
+      } else if (columnMetadata.isSingleValue()) {
         processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
             columnMetadata);
       } else {
