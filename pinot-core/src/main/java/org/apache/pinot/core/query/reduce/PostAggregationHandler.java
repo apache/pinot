@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -48,9 +49,13 @@ public class PostAggregationHandler implements ValueExtractorFactory {
   /// Number of key columns (union group-by columns + the synthetic $groupingId column for grouping sets);
   /// aggregation columns start at this offset in the row.
   private final int _numKeyColumns;
-  /// Row index of the synthetic $groupingId discriminator column (read by GROUPING()/GROUPING_ID()), or -1
-  /// when the query has no grouping sets.
+  /// Row index of the synthetic $groupingId discriminator column (the grouping-set ordinal, read by
+  /// GROUPING()/GROUPING_ID()), or -1 when the query has no grouping sets.
   private final int _groupingIdColumnIndex;
+  /// Per grouping set (in ordinal order), the participating union-column indexes; null when the query has no
+  /// grouping sets.
+  @Nullable
+  private final List<int[]> _groupingSets;
   private final Map<ExpressionContext, Integer> _groupByExpressionIndexMap;
   private final DataSchema _dataSchema;
   private final ValueExtractor[] _valueExtractors;
@@ -72,6 +77,7 @@ public class PostAggregationHandler implements ValueExtractorFactory {
     }
     _numKeyColumns = _numGroupByExpressions + queryContext.getNumExtraGroupByKeyColumns();
     _groupingIdColumnIndex = queryContext.isGroupingSets() ? _numGroupByExpressions : -1;
+    _groupingSets = queryContext.getGroupingSets();
 
     // NOTE: The data schema will always have group-by expressions in the front, followed by aggregation functions of
     //       the same order as in the query context. This is handled in AggregationGroupByOrderByOperator.
@@ -201,26 +207,30 @@ public class PostAggregationHandler implements ValueExtractorFactory {
     }
   }
 
-  /// Value extractor for {@code GROUPING(col, ...)} / {@code GROUPING_ID(col, ...)}. Computes the bitmask
-  /// from the synthetic {@code $groupingId} discriminator column: a bit is set (1) when the corresponding
-  /// argument column is rolled up (aggregated away) in the row's grouping set, following PostgreSQL
-  /// semantics with the first argument as the most significant bit. Returns 0 for every argument when the
-  /// query has no grouping sets (no column is rolled up).
+  /// Value extractor for {@code GROUPING(col, ...)} / {@code GROUPING_ID(col, ...)}. The value is fully
+  /// determined by the grouping set a row belongs to, so it is precomputed per grouping-set ordinal at
+  /// construction (a bit is 1 when the corresponding argument column is rolled up / aggregated away in that
+  /// set, PostgreSQL semantics, first argument = most significant bit); extraction is a single lookup on the
+  /// synthetic {@code $groupingId} ordinal column. Returns 0 for every argument when the query has no
+  /// grouping sets (no column is rolled up).
   private class GroupingValueExtractor implements ValueExtractor {
     private final FunctionContext _function;
-    private final int[] _unionColumnIndexes;
+    @Nullable
+    private final int[] _valuesByOrdinal;
 
     GroupingValueExtractor(FunctionContext function) {
       _function = function;
       List<ExpressionContext> arguments = function.getArguments();
       Preconditions.checkState(!arguments.isEmpty(), "GROUPING requires at least one argument");
-      _unionColumnIndexes = new int[arguments.size()];
+      int[] argUnionIndexes = new int[arguments.size()];
       for (int i = 0; i < arguments.size(); i++) {
         ExpressionContext argument = arguments.get(i);
         Integer index = _groupByExpressionIndexMap != null ? _groupByExpressionIndexMap.get(argument) : null;
         Preconditions.checkState(index != null, "GROUPING argument must be a grouping column, got: %s", argument);
-        _unionColumnIndexes[i] = index;
+        argUnionIndexes[i] = index;
       }
+      _valuesByOrdinal =
+          _groupingSets != null ? GroupingSets.groupingValuesByOrdinal(_groupingSets, argUnionIndexes) : null;
     }
 
     @Override
@@ -236,11 +246,11 @@ public class PostAggregationHandler implements ValueExtractorFactory {
     @Override
     public Object extract(Object[] row) {
       /// Without grouping sets no column is rolled up, so GROUPING is always 0.
-      if (_groupingIdColumnIndex < 0) {
+      if (_groupingIdColumnIndex < 0 || _valuesByOrdinal == null) {
         return 0;
       }
-      int groupingId = ((Number) row[_groupingIdColumnIndex]).intValue();
-      return GroupingSets.groupingValue(groupingId, _unionColumnIndexes);
+      int ordinal = ((Number) row[_groupingIdColumnIndex]).intValue();
+      return _valuesByOrdinal[ordinal];
     }
   }
 }

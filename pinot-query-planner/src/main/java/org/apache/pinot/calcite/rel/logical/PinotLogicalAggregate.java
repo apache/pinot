@@ -28,7 +28,9 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.hint.RelHint;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.pinot.calcite.rel.rules.GroupingSetsPlanUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 
 
@@ -90,6 +92,22 @@ public class PinotLogicalAggregate extends Aggregate {
       @Nullable List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
     return new PinotLogicalAggregate(getCluster(), traitSet, hints, input, groupSet, groupSets, aggCalls, _aggType,
         _leafReturnFinalResult, _collations, _limit);
+  }
+
+  /// Whether this LEAF aggregate must synthesize the {@code $groupingId} discriminator column. Only a LEAF
+  /// grouping-set aggregate does: it is converted to a single-stage query that expands each row across the
+  /// grouping sets and appends {@code $groupingId}; the multi-stage final stage then groups on it.
+  public boolean emitsGroupingId() {
+    return _aggType == AggType.LEAF && getGroupType() != Group.SIMPLE;
+  }
+
+  @Override
+  protected RelDataType deriveRowType() {
+    RelDataType rowType = super.deriveRowType();
+    if (!emitsGroupingId()) {
+      return rowType;
+    }
+    return GroupingSetsPlanUtils.appendGroupingIdColumn(getCluster().getTypeFactory(), rowType, getGroupCount());
   }
 
   @Override

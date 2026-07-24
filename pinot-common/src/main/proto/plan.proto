@@ -67,6 +67,13 @@ enum AggType {
   FINAL = 3;
 }
 
+// One grouping set of a GROUP BY GROUPING SETS / ROLLUP / CUBE aggregate: the indexes into
+// AggregateNode.groupKeys (the union of all grouping columns) that participate in (are grouped by) the set.
+// An empty list is the grand-total set ().
+message GroupingSet {
+  repeated int32 groupKeyIndexes = 1;
+}
+
 message AggregateNode {
   repeated FunctionCall aggCalls = 1;
   repeated int32 filterArgs = 2;
@@ -75,6 +82,15 @@ message AggregateNode {
   bool leafReturnFinalResult = 5;
   repeated Collation collations = 6;
   int32 limit = 7;
+  // GROUP BY GROUPING SETS / ROLLUP / CUBE: one entry per grouping set, in plan order; a set's position in
+  // this list is its ordinal, carried as the synthetic $groupingId discriminator, so the number of grouping
+  // columns is unlimited (mirroring Calcite's per-set column bitset). Empty for a plain GROUP BY.
+  // Rolling upgrade: a server that predates this field ignores it and runs a plain GROUP BY, returning results
+  // without the $groupingId column the final stage expects. The leaf-to-final reconciliation is positional (by
+  // column type, not name), so this is NOT rejected cleanly — it surfaces as an opaque error or as silently
+  // collapsed/wrong results (missing subtotal/grand-total rows). Upgrade all servers before issuing grouping-set
+  // queries.
+  repeated GroupingSet groupingSets = 8;
 }
 
 message FilterNode {

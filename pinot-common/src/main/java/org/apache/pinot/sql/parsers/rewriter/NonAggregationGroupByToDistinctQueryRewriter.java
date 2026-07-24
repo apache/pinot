@@ -54,7 +54,7 @@ public class NonAggregationGroupByToDistinctQueryRewriter implements QueryRewrit
     // The DISTINCT rewrite is only valid for a plain GROUP BY: a GROUPING SETS / ROLLUP / CUBE query produces
     // one row per group per grouping set, which DISTINCT over the union of grouping columns cannot represent.
     // Such queries are rejected by CalciteSqlParser.validateGroupByClause() when they have no aggregation.
-    if (pinotQuery.getGroupingSetMasks() != null) {
+    if (pinotQuery.getGroupingSets() != null) {
       return pinotQuery;
     }
     for (Expression select : pinotQuery.getSelectList()) {
