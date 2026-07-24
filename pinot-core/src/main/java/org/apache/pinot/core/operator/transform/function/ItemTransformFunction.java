@@ -24,11 +24,15 @@ import java.util.Map;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.local.segment.index.map.NullDataSource;
+import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructNullDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -58,9 +62,21 @@ public class ItemTransformFunction extends BaseTransformFunction {
     _keyPath = new String[]{column, key};
 
     DataSource dataSource = columnContextMap.get(column).getDataSource();
-    Preconditions.checkState(dataSource instanceof MapDataSource, "Column: %s must be a MAP column", column);
-    MapDataSource mapDataSource = (MapDataSource) dataSource;
-    DataSource valueDataSource = mapDataSource.getDataSource(key);
+    Preconditions.checkState(dataSource instanceof MapDataSource || dataSource instanceof OpenStructDataSource,
+        "Column: %s must be a MAP or OPEN_STRUCT column", column);
+    DataSource valueDataSource;
+    if (dataSource instanceof MapDataSource) {
+      valueDataSource = ((MapDataSource) dataSource).getDataSource(key);
+      if (valueDataSource == null) {
+        valueDataSource = new NullDataSource(key);
+      }
+    } else {
+      OpenStructDataSource osDs = (OpenStructDataSource) dataSource;
+      valueDataSource = osDs.getDataSource(key);
+      if (valueDataSource == null) {
+        valueDataSource = OpenStructNullDataSource.forAbsentKey(osDs, key);
+      }
+    }
     // Only expose the dictionary when the forward index is dict-encoded. A column can have a dictionary alongside
     // a RAW forward index (e.g. dict + inverted/range), in which case transformToDictIdsSV would fail because
     // BlockValueSet.getDictionaryIdsSV requires a dict-encoded forward index.
@@ -85,6 +101,11 @@ public class ItemTransformFunction extends BaseTransformFunction {
   @Override
   public Dictionary getDictionary() {
     return _dictionary;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getNullBitmap();
   }
 
   @Override
