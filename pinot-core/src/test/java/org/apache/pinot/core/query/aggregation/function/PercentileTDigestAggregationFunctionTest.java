@@ -186,6 +186,23 @@ public class PercentileTDigestAggregationFunctionTest {
   }
 
   @Test
+  public void testReverseMergeDoesNotTreatSignedZeroAsSameSign() {
+    PercentileTDigestAccumulator accumulator = new PercentileTDigestAccumulator(10);
+    accumulator.add(-0.0);
+    accumulator.compress();
+    accumulator.add(0.0);
+    accumulator.add(Double.MIN_VALUE);
+    accumulator.add(Double.MAX_VALUE, 9);
+    accumulator.compress();
+
+    List<Centroid> centroids = new ArrayList<>(accumulator.centroids());
+    Assert.assertEquals(centroids.size(), 3);
+    Assert.assertEquals(centroids.get(1).count(), 2);
+    Assert.assertEquals(Double.doubleToRawLongBits(centroids.get(1).mean()),
+        Double.doubleToRawLongBits(0.0));
+  }
+
+  @Test
   public void testDuplicateInfiniteValuesAcrossRawAndSerializedReduction() {
     int repetitions = 1_000;
     double[] values = new double[3 * repetitions];
@@ -629,6 +646,26 @@ public class PercentileTDigestAggregationFunctionTest {
     Assert.assertNull(rawValuesField.get(
         PercentileTDigestAccumulator.forSerializedTDigestWithMergeBuffers(serializedDigest)));
     Assert.assertNotNull(rawValuesField.get(new PercentileTDigestAccumulator(100)));
+  }
+
+  @Test
+  public void testDirectMergeAtConfiguredCompressionIsNotRepeated()
+      throws ReflectiveOperationException {
+    byte[][] serializedDigests = createSerializedDigests(2, 100, 100.0, ignored -> false);
+    PercentileTDigestAccumulator accumulator =
+        PercentileTDigestAccumulator.forSerializedTDigestWithMergeBuffers(serializedDigests[0]);
+    PercentileTDigestAccumulator.SerializedTDigestInput input =
+        new PercentileTDigestAccumulator.SerializedTDigestInput();
+    for (byte[] serializedDigest : serializedDigests) {
+      input.reset(serializedDigest);
+      accumulator.addSerializedTDigestDirect(input);
+    }
+
+    int mergeCount = (int) getAccumulatorField(accumulator, "_mergeCount");
+    Assert.assertTrue((boolean) getAccumulatorField(accumulator, "_publiclyCompressed"));
+    accumulator.compress();
+    Assert.assertEquals(getAccumulatorField(accumulator, "_mergeCount"), mergeCount);
+    Assert.assertEquals(accumulator.size(), 200L);
   }
 
   @Test
@@ -1077,6 +1114,38 @@ public class PercentileTDigestAggregationFunctionTest {
         "Pinot accumulator diverges from t-digest 3.3 K1 at compression " + compression);
   }
 
+  @Test
+  public void testRawAndDirectLowCompressionHeavyTailAccuracy() {
+    int numDigests = 32;
+    int valuesPerDigest = 512;
+    int compression = 20;
+    int numValues = numDigests * valuesPerDigest;
+    double[] values = new double[numValues];
+    byte[][] serializedDigests = new byte[numDigests][];
+    for (int digestIndex = 0; digestIndex < numDigests; digestIndex++) {
+      TDigest digest = TDigestUtils.createMergingDigest(compression);
+      SplittableRandom random = new SplittableRandom(0x5EEDL + digestIndex);
+      for (int valueIndex = 0; valueIndex < valuesPerDigest; valueIndex++) {
+        double value = ReducerDistribution.HEAVY_TAIL.value(random.nextDouble());
+        values[digestIndex * valuesPerDigest + valueIndex] = value;
+        digest.add(value);
+      }
+      serializedDigests[digestIndex] = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(digest);
+    }
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, compression, false);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(values.length, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, values)));
+    TDigest rawResult = function.extractAggregationResult(resultHolder);
+    TDigest directResult = aggregateSerialized(serializedDigests, null, false);
+
+    Arrays.sort(values);
+    assertValidReducerResult(rawResult, values, "raw/20/heavy-tail", 0.06);
+    assertValidReducerResult(directResult, values, "direct/20/heavy-tail", 0.06);
+  }
+
   @Test(expectedExceptions = IllegalArgumentException.class,
       expectedExceptionsMessageRegExp = "Cannot add NaN to t-digest")
   public void testNaNRejected() {
@@ -1395,6 +1464,13 @@ public class PercentileTDigestAggregationFunctionTest {
     Field field = PercentileTDigestAccumulator.class.getDeclaredField(name);
     field.setAccessible(true);
     field.set(accumulator, value);
+  }
+
+  private static Object getAccumulatorField(PercentileTDigestAccumulator accumulator, String name)
+      throws ReflectiveOperationException {
+    Field field = PercentileTDigestAccumulator.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(accumulator);
   }
 
   private enum MergeOrder {

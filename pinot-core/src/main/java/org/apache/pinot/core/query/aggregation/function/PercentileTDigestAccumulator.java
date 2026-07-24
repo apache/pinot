@@ -57,6 +57,7 @@ final class PercentileTDigestAccumulator extends TDigest {
   private static final int DEFAULT_CENTROID_CAPACITY_PADDING = 10;
   private static final int LOW_COMPRESSION_CAPACITY_PADDING = 30;
   private static final int TWO_LEVEL_COMPRESSION_MULTIPLIER = 2;
+  private static final int MIN_INCREMENTAL_COMPRESSION = 50;
   private static final int VERBOSE_ENCODING = 1;
   private static final int SMALL_ENCODING = 2;
   private static final int VERBOSE_HEADER_SIZE = 32;
@@ -311,7 +312,8 @@ final class PercentileTDigestAccumulator extends TDigest {
     } else {
       flush();
       boolean runBackwards = (_mergeCount++ & 1) != 0;
-      if (mergeSorted(input._means, input._weights, input._numCentroids, input._totalWeight, _workingCompression,
+      if (mergeSorted(input._means, input._weights, input._numCentroids, input._totalWeight,
+          getIncrementalCompression(),
           runBackwards)) {
         _min = Math.min(_min, input._min);
         _max = Math.max(_max, input._max);
@@ -781,7 +783,16 @@ final class PercentileTDigestAccumulator extends TDigest {
   }
 
   private void flush() {
-    flush(_workingCompression);
+    // Raw aggregation and the serialized direct path already merge incrementally. Keeping twice as many centroids
+    // for every small flush increases their hot-path cost without avoiding a later merge, so use the configured
+    // compression there. Buffered reducer inputs retain the two-level merge for its accuracy benefit.
+    flush(_numIncomingCentroids == 0 ? getIncrementalCompression() : _workingCompression);
+  }
+
+  private double getIncrementalCompression() {
+    // Very low compression leaves too little centroid headroom for incremental public-compression merges to retain
+    // t-digest 3.3's accuracy. Keep the two-level strategy for those uncommon configurations.
+    return _compression >= MIN_INCREMENTAL_COMPRESSION ? _compression : _workingCompression;
   }
 
   private void flush(double compression) {
@@ -810,6 +821,12 @@ final class PercentileTDigestAccumulator extends TDigest {
     int inputIndex = 0;
     int numOutputCentroids = 0;
     double weightSoFar = 0.0;
+    double firstInputMean = _numCentroids == 0 ? _rawValues[0]
+        : Math.min(_rawValues[0], _centroidMeans[0]);
+    double lastInputMean = _numCentroids == 0 ? _rawValues[_numRawValues - 1]
+        : Math.max(_rawValues[_numRawValues - 1], _centroidMeans[_numCentroids - 1]);
+    boolean allFiniteMeans = Double.isFinite(firstInputMean) && Double.isFinite(lastInputMean);
+    boolean sameSignMeans = firstInputMean > 0.0 || lastInputMean < 0.0;
 
     while (rawIndex != rawLimit || centroidIndex != centroidLimit) {
       double mean;
@@ -837,7 +854,7 @@ final class PercentileTDigestAccumulator extends TDigest {
         double q2 = (weightSoFar + proposedWeight) * totalWeightNormalizer;
         double normalizedWeight = proposedWeight * weightNormalizer;
         double normalizedWeightSquared = normalizedWeight * normalizedWeight;
-        boolean canMerge = canMergeMeans(_outputMeans[currentIndex], mean)
+        boolean canMerge = (allFiniteMeans || canMergeMeans(_outputMeans[currentIndex], mean))
             && normalizedWeightSquared <= q0 * (1.0 - q0)
             && normalizedWeightSquared <= q2 * (1.0 - q2);
         if (inputIndex == 1 || inputIndex == numInputs - 1) {
@@ -845,8 +862,9 @@ final class PercentileTDigestAccumulator extends TDigest {
         }
         if (canMerge) {
           _outputWeights[currentIndex] = proposedWeight;
-          _outputMeans[currentIndex] = mergeMeans(_outputMeans[currentIndex], proposedWeight - weight, mean, weight,
-              proposedWeight);
+          _outputMeans[currentIndex] =
+              mergeMeans(_outputMeans[currentIndex], proposedWeight - weight, mean, weight, proposedWeight,
+                  sameSignMeans);
         } else {
           weightSoFar += _outputWeights[currentIndex];
           ensureOutputCapacity(Math.max(preferredOutputCapacity, numOutputCentroids + 1));
@@ -863,7 +881,7 @@ final class PercentileTDigestAccumulator extends TDigest {
     }
     double rawMin = _rawValues[0];
     double rawMax = _rawValues[_numRawValues - 1];
-    finishMerge(numOutputCentroids, newTotalWeight);
+    finishMerge(numOutputCentroids, newTotalWeight, compression);
     _numRawValues = 0;
     _min = Math.min(_min, rawMin);
     _max = Math.max(_max, rawMax);
@@ -936,6 +954,12 @@ final class PercentileTDigestAccumulator extends TDigest {
     int inputIndex = 0;
     int numOutputCentroids = 0;
     double weightSoFar = 0.0;
+    double firstInputMean = _numCentroids == 0 ? incomingMeans[0]
+        : Math.min(incomingMeans[0], _centroidMeans[0]);
+    double lastInputMean = _numCentroids == 0 ? incomingMeans[incomingCount - 1]
+        : Math.max(incomingMeans[incomingCount - 1], _centroidMeans[_numCentroids - 1]);
+    boolean allFiniteMeans = Double.isFinite(firstInputMean) && Double.isFinite(lastInputMean);
+    boolean sameSignMeans = firstInputMean > 0.0 || lastInputMean < 0.0;
     while (incomingIndex != incomingLimit || centroidIndex != centroidLimit) {
       double mean;
       double weight;
@@ -962,7 +986,7 @@ final class PercentileTDigestAccumulator extends TDigest {
         double q2 = (weightSoFar + proposedWeight) * totalWeightNormalizer;
         double normalizedWeight = proposedWeight * weightNormalizer;
         double normalizedWeightSquared = normalizedWeight * normalizedWeight;
-        boolean canMerge = canMergeMeans(_outputMeans[currentIndex], mean)
+        boolean canMerge = (allFiniteMeans || canMergeMeans(_outputMeans[currentIndex], mean))
             && normalizedWeightSquared <= q0 * (1.0 - q0)
             && normalizedWeightSquared <= q2 * (1.0 - q2);
         if (inputIndex == 1 || inputIndex == numInputs - 1) {
@@ -970,8 +994,9 @@ final class PercentileTDigestAccumulator extends TDigest {
         }
         if (canMerge) {
           _outputWeights[currentIndex] = proposedWeight;
-          _outputMeans[currentIndex] = mergeMeans(_outputMeans[currentIndex], proposedWeight - weight, mean, weight,
-              proposedWeight);
+          _outputMeans[currentIndex] =
+              mergeMeans(_outputMeans[currentIndex], proposedWeight - weight, mean, weight, proposedWeight,
+                  sameSignMeans);
         } else {
           weightSoFar += _outputWeights[currentIndex];
           ensureOutputCapacity(Math.max(preferredOutputCapacity, numOutputCentroids + 1));
@@ -986,11 +1011,11 @@ final class PercentileTDigestAccumulator extends TDigest {
       reverse(_outputMeans, numOutputCentroids);
       reverse(_outputWeights, numOutputCentroids);
     }
-    finishMerge(numOutputCentroids, newTotalWeight);
+    finishMerge(numOutputCentroids, newTotalWeight, compression);
     return true;
   }
 
-  private void finishMerge(int numOutputCentroids, double totalWeight) {
+  private void finishMerge(int numOutputCentroids, double totalWeight, double compression) {
     double[] temporary = _centroidMeans;
     _centroidMeans = _outputMeans;
     _outputMeans = temporary;
@@ -999,7 +1024,7 @@ final class PercentileTDigestAccumulator extends TDigest {
     _outputWeights = temporary;
     _numCentroids = numOutputCentroids;
     _totalWeight = totalWeight;
-    _publiclyCompressed = false;
+    _publiclyCompressed = compression == _compression;
   }
 
   private void ensureIncomingCapacity(int capacity) {
@@ -1296,11 +1321,11 @@ final class PercentileTDigestAccumulator extends TDigest {
   }
 
   private static double mergeMeans(double firstMean, double firstWeight, double secondMean, double secondWeight,
-      double totalWeight) {
+      double totalWeight, boolean sameSignMeans) {
     if (firstMean == secondMean) {
       return firstMean;
     }
-    if (Math.copySign(1.0, firstMean) == Math.copySign(1.0, secondMean)) {
+    if (sameSignMeans || Math.copySign(1.0, firstMean) == Math.copySign(1.0, secondMean)) {
       return firstMean + (secondMean - firstMean) * secondWeight / totalWeight;
     }
     return firstMean * (firstWeight / totalWeight) + secondMean * (secondWeight / totalWeight);

@@ -21,9 +21,9 @@
 
 # TDigest 3.2 to 3.3 Upgrade: Compatibility and Performance
 
-- Date: 2026-07-19
-- Baseline: `fae8080bc7`, t-digest 3.2
-- Candidate: t-digest 3.3 with Pinot compatibility and accumulator changes
+- Date: 2026-07-23
+- Follow-up baseline: `706b772334e`, t-digest 3.2
+- Follow-up candidate: PR #19015 rebased onto the baseline, plus the path-aware accumulator optimization below
 - Host: Apple M4 Pro (14 cores, 24 GiB), macOS 26.5.2 aarch64
 - Runtime: OpenJDK 25, JMH 1.37
 
@@ -39,11 +39,16 @@ the middle-quantile accuracy regression measured with the new default. Pinot als
 serialization, repairs legacy weighted boundary centroids, and uses a primitive accumulator for serialized and
 reducer paths.
 
-The performance result is mixed and should be considered during rollout. Raw query aggregation is 5.2% slower, and
-the measured StarTree query kernels are 21.7-22.6% slower. Raw segment construction is 7.9% faster, serialized
-leaf-to-parent construction is 62.8% faster, and the production-shaped reducer path is 83.9-84.3% faster while
-allocating about half as much. The reducer and construction gains come from avoiding repeated digest
-materialization, sorting, and serialization; they are not claims that every t-digest 3.3 operation is faster.
+The follow-up removes the query-path regressions measured in the original PR. Raw query aggregation is 1.3% faster.
+With dependency-native stored digests, the StarTree query kernels are 35.5-43.4% faster. The group-by improvement also
+reduces allocation by 34.8%. Raw and direct serialized aggregation now merge incrementally at the configured public
+compression when it is at least 50, avoiding a redundant final recompression. Buffered reducer inputs and compression
+below 50 retain the two-level working compression for accuracy.
+
+This does not establish that every synthetic operation is always faster. With byte-for-byte fixed verbose inputs, the
+non-grouped StarTree kernel is 6.4% faster, while the 1,000-group kernel is 1.3% slower and allocates 8.6% less. That
+small residual control-case regression is reported rather than hidden; every measured production-shaped `NATIVE`
+query path is faster.
 
 ## User and rollout guide
 
@@ -104,20 +109,26 @@ network transfer.
 
 ## Methodology
 
-Each comparison used independently built runtime packages containing exactly one t-digest JAR. The baseline and
-candidate used matched benchmark logic, deterministic input, parameters, JVM, and JMH settings. T-digest 3.3 and
-the 3.2 control both use K1 in the benchmark helper. Reducer sources are immutable so one invocation cannot mutate the
-next invocation's input.
+Each follow-up comparison used independently built runtime packages containing exactly one t-digest JAR. The baseline
+and candidate used matched benchmark bytecode, deterministic input, parameters, JVM, and JMH settings. T-digest 3.3
+and the 3.2 control both use K1 in the benchmark helper. Reducer sources are immutable so one invocation cannot mutate
+the next invocation's input.
 
-Unless stated otherwise, JMH ran two forks, two one-second warmup iterations, five one-second measurement iterations,
-one thread, an 8 GiB maximum heap, and the GC profiler. Scores therefore contain ten measured iterations. Dataset and
+The affected query paths were run in `3.2, 3.3, 3.3, 3.2` order to reduce machine-drift bias. Each run used one fork,
+two one-second warmup iterations, five one-second measurement iterations, one thread, an 8 GiB maximum heap, and the
+GC profiler. Each displayed score is therefore the mean of two runs and ten measured iterations. Dataset and
 exact-oracle creation occurs outside the timed methods.
 
 The raw aggregation and construction workloads process 100 million deterministic values. The StarTree query workload
 merges 10,000 stored digests representing 100 million source rows. Its group-by case distributes them across 1,000
-groups. The leaf-to-parent construction benchmark merges ten serialized leaves into each parent. The reducer control
-uses 32 fixed verbose inputs at compression 100; the accuracy workload uses 128 native immutable inputs in randomized
-order.
+groups. `NATIVE` includes each dependency version's production serialization and centroid layout. `FIXED_VERBOSE`
+uses the same deterministic bytes, including singleton endpoint centroids, with both versions to isolate query-time
+merging from source-layout differences. The leaf-to-parent construction benchmark merges ten serialized leaves into
+each parent. The reducer control uses 32 fixed verbose inputs at compression 100. The accuracy sweep uses 128 native
+immutable inputs and 32 independent deterministic source orders for randomized-order cases.
+
+The segment-construction and reducer-throughput tables are the original PR characterization against `fae8080bc7`.
+They are retained as context and were not used to decide whether the follow-up fixed the affected query paths.
 
 ## Results
 
@@ -126,16 +137,20 @@ operation.
 
 ### Raw and StarTree query aggregation
 
-| Workload | 3.2 (ms/op) | 3.3 (ms/op) | Latency delta | 3.2 allocation | 3.3 allocation | Allocation delta |
-|---|---:|---:|---:|---:|---:|---:|
-| Raw aggregation plus P75, 100M rows | 2,682.977 ± 15.698 | 2,823.342 ± 24.426 | +5.2% | 15,960 | 16,024 | +0.4% |
-| StarTree merge plus P75, 10K stored digests | 7.383 ± 0.062 | 9.051 ± 0.164 | +22.6% | 10,487 | 11,605 | +10.7% |
-| StarTree group-by, 1,000 groups | 10.582 ± 0.862 | 12.880 ± 0.381 | +21.7% | 13,168,776 | 15,155,464 | +15.1% |
+| Workload | Source layout | 3.2 (ms/op) | 3.3 (ms/op) | Latency delta | 3.2 allocation | 3.3 allocation | Allocation delta |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Raw aggregation plus P75, 100M rows | N/A | 3,377.903 | 3,334.669 | -1.3% | 15,954 | 16,018 | +0.4% |
+| StarTree merge plus P75, 10K stored digests | Native | 10.763 | 6.947 | -35.5% | 10,524 | 11,573 | +10.0% |
+| StarTree group-by, 1,000 groups | Native | 15.395 | 8.711 | -43.4% | 13,168,809 | 8,590,700 | -34.8% |
+| StarTree merge plus P75, 10K stored digests | Fixed verbose | 11.200 | 10.479 | -6.4% | 10,528 | 11,488 | +9.1% |
+| StarTree group-by, 1,000 groups | Fixed verbose | 14.674 | 14.860 | +1.3% | 13,124,164 | 11,990,374 | -8.6% |
 
-These paths expose a measurable t-digest 3.3 cost even after retaining K1. The allocation increase is small for raw
-aggregation but material for stored-digest group-by.
+The native rows represent the end-to-end production layout and improve materially because 3.3 emits fewer source
+centroids and the accumulator merges them without a redundant public recompression. The fixed rows are an attribution
+control. They show a query-kernel improvement without group-by and a near-parity group-by latency result with lower
+allocation.
 
-### Segment construction
+### Earlier segment-construction characterization
 
 | Workload | 3.2 (ms/op) | 3.3 (ms/op) | Latency delta | 3.2 allocation | 3.3 allocation | Allocation delta |
 |---|---:|---:|---:|---:|---:|---:|
@@ -145,7 +160,7 @@ aggregation but material for stored-digest group-by.
 Both workloads use 100 million source rows and 1,000 rows per leaf group. The pre-aggregated case merges ten serialized
 leaves into each parent and validates total size and a finite median. Accuracy is measured separately below.
 
-### Server-local and distributed reduction
+### Earlier server-local and distributed-reduction characterization
 
 This table compares the 3.2 production-style pairwise merge with the 3.3 serialized accumulator used by the updated
 reducer. All inputs use the same fixed verbose centroid layout.
@@ -163,16 +178,22 @@ to distinguish library changes from the production implementation change.
 ### Reducer accuracy
 
 The accuracy counters report mean absolute quantile-value error in parts per billion against fully sorted raw-value
-oracles. Duplicate-heavy input is exact at the displayed precision. The candidate reduces the number of resulting
-centroids for the skewed distribution; P75 and P99 errors increase, while P95 improves. All displayed candidate errors
-remain below 147,000 ppb (`0.000147` absolute value error for values in `[0, 1]`).
+oracles. The randomized-order sweep now uses 32 independent deterministic source orders instead of repeating one
+order, which exposes the merge-order sensitivity hidden by the earlier table. JMH event counters are normalized over
+measurement iterations and forks. Duplicate-heavy input is exact or within floating-point noise. The largest
+candidate P99 error observed across the 32 source orders was 1,870,494 ppb (`0.001870494` absolute value error for
+values in `[0, 1]`).
 
 | Distribution | Implementation | P75 error (ppb) | P95 error (ppb) | P99 error (ppb) | Mean centroids |
 |---|---|---:|---:|---:|---:|
-| Skewed | 3.2 pairwise | 43,245 | 54,095 | 103,181 | 12.7 |
-| Skewed | 3.3 accumulator | 130,164 | 4,309 | 146,550 | 6.6 |
-| Duplicate-heavy | 3.2 pairwise | 0 | 0 | approximately 0 | 14.0 |
-| Duplicate-heavy | 3.3 accumulator | 0 | 0 | 0 | 7.2 |
+| Uniform | 3.2 pairwise | 84,669 | 190,823 | 152,434 | 125 |
+| Uniform | 3.3 accumulator | 192,884 | 255,414 | 210,463 | 65 |
+| Skewed | 3.2 pairwise | 459,832 | 591,766 | 979,104 | 127 |
+| Skewed | 3.3 accumulator | 1,095,175 | 277,086 | 1,262,052 | 64 |
+| Bimodal | 3.2 pairwise | 23,796 | 18,924 | 61,153 | 124 |
+| Bimodal | 3.3 accumulator | 27,069 | 84,881 | 170,251 | 66 |
+| Duplicate-heavy | 3.2 pairwise | 0 | 0 | 0 | 141 |
+| Duplicate-heavy | 3.3 accumulator | 0 | 117 | 0 | 71 |
 
 Every measured result retained exact total weight, positive centroid weights, sorted finite centroid means, and
 monotonic P0/P50/P75/P95/P99/P100. Unit tests separately cover standard wire round-trips, compression 20, 100, and
@@ -202,7 +223,7 @@ Run the stored StarTree query paths:
 java -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
   org.openjdk.jmh.Main \
   'org.apache.pinot.perf.aggregation.BenchmarkPercentileTDigestStarTreeAggregation.*' \
-  -p _numGroups=1000 \
+  -p _numGroups=1000 -p _sourceLayout=NATIVE,FIXED_VERBOSE \
   -wi 2 -i 5 -f 2 -w 1s -r 1s -t 1 -to 30m -gc true -foe true -prof gc
 ```
 
