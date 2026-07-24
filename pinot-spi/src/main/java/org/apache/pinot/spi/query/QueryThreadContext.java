@@ -20,6 +20,7 @@ package org.apache.pinot.spi.query;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -225,6 +226,29 @@ public class QueryThreadContext implements AutoCloseable {
   @Nullable
   public static QueryThreadContext getIfAvailable() {
     return THREAD_LOCAL.get();
+  }
+
+  /// Registers a generic response-metadata entry (arbitrary JSON value) on the current query's
+  /// [QueryExecutionContext], to be surfaced in the query response by the broker (see
+  /// [QueryExecutionContext#getResponseMetadata()]). This is the entry point for code — including
+  /// product extensions — that wants to attach an informational note to the response without a
+  /// dedicated typed field or knowledge of the response object.
+  ///
+  /// No-op when no [QueryThreadContext] is active on the current thread (e.g. tests or planning paths
+  /// that run outside a query context), so callers never need a null check.
+  public static void addResponseMetadata(String key, JsonNode value) {
+    QueryThreadContext threadContext = getIfAvailable();
+    if (threadContext != null) {
+      threadContext.getExecutionContext().addResponseMetadata(key, value);
+    }
+  }
+
+  /// String convenience for [#addResponseMetadata(String, JsonNode)] — the common case.
+  public static void addResponseMetadata(String key, String value) {
+    QueryThreadContext threadContext = getIfAvailable();
+    if (threadContext != null) {
+      threadContext.getExecutionContext().addResponseMetadata(key, value);
+    }
   }
 
   /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
