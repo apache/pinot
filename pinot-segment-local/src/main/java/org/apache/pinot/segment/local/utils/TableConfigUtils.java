@@ -2067,6 +2067,10 @@ public final class TableConfigUtils {
   }
 
   // enum of all the skip-able validation types.
+  // ACTIVE_TASKS is retained for backward compatibility: it is still accepted as a validationTypesToSkip value so
+  // existing clients do not break, but it is no longer consumed by any production path. Active-task validation runs
+  // only on the create/update path (see PinotTableRestletResource.tableTasksValidation, gated by ignoreActiveTasks),
+  // not on the validate/tune preflight endpoints, so passing ACTIVE_TASKS there is a no-op.
   public enum ValidationType {
     ALL, TASK, UPSERT, TENANT, MINION_INSTANCES, ACTIVE_TASKS
   }

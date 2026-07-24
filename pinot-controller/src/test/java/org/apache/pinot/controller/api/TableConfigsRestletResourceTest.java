@@ -797,14 +797,16 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
         adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), "MINION_INSTANCES");
     Assert.assertNotNull(responseWithMinionSkip);
 
-    // Test validation with ACTIVE_TASKS skip type - should pass even with potential task conflicts
+    // ACTIVE_TASKS is still accepted as a skip type for backward compatibility, but the validate/tune preflight
+    // endpoints no longer run active-task validation (it applies only on the create/update path), so passing it is a
+    // no-op here.
     String responseWithTasksSkip =
         adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), "ACTIVE_TASKS");
     Assert.assertNotNull(responseWithTasksSkip);
 
     // Test validation with multiple skip types
     String responseWithMultipleSkips = adminClient.getTableClient()
-        .validateTableConfigs(tableConfigs.toPrettyJsonString(), "TENANT,MINION_INSTANCES,ACTIVE_TASKS");
+        .validateTableConfigs(tableConfigs.toPrettyJsonString(), "TENANT,MINION_INSTANCES");
     Assert.assertNotNull(responseWithMultipleSkips);
 
     // Test validation with ALL skip type - should skip all validations
