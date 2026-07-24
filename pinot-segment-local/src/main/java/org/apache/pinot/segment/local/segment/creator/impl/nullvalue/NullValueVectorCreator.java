@@ -43,6 +43,7 @@ import org.roaringbitmap.RoaringBitmapWriter;
 public class NullValueVectorCreator implements IndexCreator {
   private final RoaringBitmapWriter<RoaringBitmap> _bitmapWriter;
   private final File _nullValueVectorFile;
+  private boolean _hasNulls;
 
   @Override
   public void add(Object value, int dictId)
@@ -63,15 +64,20 @@ public class NullValueVectorCreator implements IndexCreator {
 
   public void setNull(int docId) {
     _bitmapWriter.add(docId);
+    _hasNulls = true;
+  }
+
+  /// Returns `true` when no doc has been marked null, i.e. [#seal] writes no bitmap file.
+  public boolean isNonNull() {
+    return !_hasNulls;
   }
 
   public void seal()
       throws IOException {
-    // Create null value vector file only if the bitmap is not empty
-    RoaringBitmap nullBitmap = _bitmapWriter.get();
-    if (!nullBitmap.isEmpty()) {
+    // Create null value vector file only if at least one doc was marked null
+    if (_hasNulls) {
       try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_nullValueVectorFile))) {
-        nullBitmap.serialize(outputStream);
+        _bitmapWriter.get().serialize(outputStream);
       }
     }
   }
