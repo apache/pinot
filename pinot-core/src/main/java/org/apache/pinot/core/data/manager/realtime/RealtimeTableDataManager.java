@@ -816,8 +816,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     File indexDir = new File(_indexDir, segmentName);
     // Get a new index loading config with latest table config and schema to load the segment
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-    ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
+    boolean needPreprocess = ImmutableSegmentLoader.needPreprocess(indexDir, indexLoadingConfig, zkMetadata);
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, needPreprocess,
+        _segmentOperationsThrottlerSet, zkMetadata);
 
     addSegment(immutableSegment, zkMetadata);
     _ingestionDelayTracker.markPartitionForVerification(segmentName);
