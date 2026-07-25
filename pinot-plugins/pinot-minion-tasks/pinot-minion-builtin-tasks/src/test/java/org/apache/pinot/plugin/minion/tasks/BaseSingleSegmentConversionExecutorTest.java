@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -102,6 +103,33 @@ public class BaseSingleSegmentConversionExecutorTest {
     MinionContext.getInstance().setDataDir(DATA_DIR);
     // executeTask resolves the event observer from the registry by task id; register one so it is non-null.
     MinionEventObservers.getInstance().addMinionEventObserver(TASK_ID, MinionTaskTestUtils.getMinionProgressObserver());
+  }
+
+  @Test
+  public void testExecuteTaskSkipsWhenZkCrcChanged()
+      throws Exception {
+    MinionMetrics metrics = Mockito.mock(MinionMetrics.class);
+    // Swap process-global metrics so the CRC_SKIP_ZK_CHANGED meter is observable.
+    java.lang.reflect.Field field = MinionMetrics.class.getDeclaredField("MINION_METRICS_INSTANCE");
+    field.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    java.util.concurrent.atomic.AtomicReference<MinionMetrics> ref =
+        (java.util.concurrent.atomic.AtomicReference<MinionMetrics>) field.get(null);
+    MinionMetrics previous = ref.getAndSet(metrics);
+    try {
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor() {
+        @Override
+        protected long getSegmentCrc(String tableNameWithType, String segmentName) {
+          return SEGMENT_CRC + 1;
+        }
+      };
+      SegmentConversionResult result = executor.executeTask(createTaskConfig());
+      Assert.assertNull(result.getFile());
+      Assert.assertEquals(result.getSegmentName(), SEGMENT_NAME);
+      Mockito.verify(metrics).addMeteredTableValue(TABLE_NAME_WITH_TYPE, MinionMeter.CRC_SKIP_ZK_CHANGED, 1L);
+    } finally {
+      ref.set(previous);
+    }
   }
 
   @Test
