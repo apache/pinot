@@ -331,6 +331,35 @@ public class SchemaUtilsTest {
     checkValidationFails(pinotSchema, true);
   }
 
+  /**
+   * Case-only column collisions (e.g. memberId / MemberID) are rejected when case-insensitive mode is on.
+   * Cluster default is enable.case.insensitive=true, so new schemas on default clusters are already protected.
+   * When case-insensitive mode is off, collisions are allowed (always-on rejection needs validation levels #6645).
+   */
+  @Test
+  public void testValidateCaseOnlyColumnCollision() {
+    Schema collidingSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("memberId", DataType.STRING)
+        .addSingleValueDimension("MemberID", DataType.STRING)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    // Default cluster path: enable.case.insensitive=true rejects case-only collisions
+    checkValidationFails(collidingSchema, true);
+
+    // Case-sensitive mode still allows collisions (compat; do not force always-on without #6645)
+    SchemaUtils.validate(collidingSchema, false);
+
+    // Distinct after lowercasing is fine even when case-insensitive
+    Schema distinctSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("memberId", DataType.STRING)
+        .addSingleValueDimension("memberName", DataType.STRING)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    SchemaUtils.validate(distinctSchema, true);
+    SchemaUtils.validate(distinctSchema, false);
+  }
+
   @Test
   public void testValidatePrimaryKeyColumns() {
     Schema pinotSchema;
