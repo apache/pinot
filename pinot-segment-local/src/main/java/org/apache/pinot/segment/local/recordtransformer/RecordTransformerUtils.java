@@ -26,12 +26,19 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
@@ -53,7 +60,8 @@ public class RecordTransformerUtils {
   /// - (Optional) [ComplexTypeTransformer] to flatten map/unnest list.
   /// - (Optional) Custom [RecordTransformer]s
   /// - (Optional) [DataTypeTransformer] to fix the data types of the source fields configured with
-  /// `preComplexTypeTransform = false` in `IngestionConfig#getSourceFieldConfigs()`. It precedes the post-complex-type
+  /// `preComplexTypeTransform = false` in `IngestionConfig#getSourceFieldConfigs()`, plus aggregation source columns
+  /// that are not in the schema (see [#addAggregationSourceDataTypes]). It precedes the post-complex-type
   /// [RecordEnricher]s and [ExpressionTransformer] so that they consume the source fields with the corrected types.
   /// - (Optional) [RecordEnricher]s to enrich the records before other transformations.
   /// - (Optional) [ExpressionTransformer] to evaluate expressions and fill the values.
@@ -74,7 +82,7 @@ public class RecordTransformerUtils {
       boolean skipPostComplexTypeTransformers, boolean skipFilterTransformer) {
     List<RecordTransformer> transformers = new ArrayList<>();
     if (!skipPreComplexTypeTransformers) {
-      addSourceFieldDataTypeTransformer(tableConfig, transformers, true);
+      addSourceFieldDataTypeTransformer(tableConfig, null, transformers, true);
       addRecordEnricherTransformers(tableConfig, transformers, true);
     }
     if (!skipComplexTypeTransformer) {
@@ -85,7 +93,7 @@ public class RecordTransformerUtils {
     }
     Preconditions.checkState(schema != null,
         "Schema must be provided when post complex type transformers are requested");
-    addSourceFieldDataTypeTransformer(tableConfig, transformers, false);
+    addSourceFieldDataTypeTransformer(tableConfig, schema, transformers, false);
     addRecordEnricherTransformers(tableConfig, transformers, false);
     addIfNotNoOp(transformers, new ExpressionTransformer(tableConfig, schema));
     if (!skipFilterTransformer) {
@@ -144,26 +152,132 @@ public class RecordTransformerUtils {
     }
   }
 
-  private static void addSourceFieldDataTypeTransformer(TableConfig tableConfig, List<RecordTransformer> transformers,
-      boolean preComplexTypeTransform) {
+  private static void addSourceFieldDataTypeTransformer(TableConfig tableConfig, @Nullable Schema schema,
+      List<RecordTransformer> transformers, boolean preComplexTypeTransform) {
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null) {
+      List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
+      if (CollectionUtils.isNotEmpty(sourceFieldConfigs)) {
+        for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
+          // If pre-ComplexType transformers are requested, add only pre-ComplexType source fields. Similarly, if
+          // non pre-ComplexType transformers are requested, add only non pre-ComplexType source fields.
+          if (sourceFieldConfig.isPreComplexTypeTransform() == preComplexTypeTransform) {
+            dataTypes.put(sourceFieldConfig.getName(), sourceFieldConfig.getDataType());
+          }
+        }
+      }
+    }
+    // Auto-register aggregation source columns not in the schema so mistyped JSON/Avro string numbers are converted
+    // before MutableSegmentImpl indexes them. Explicit SourceFieldConfig wins (already in dataTypes). Only runs in the
+    // post-complex-type phase so flattened/unnested fields are available.
+    if (!preComplexTypeTransform && schema != null) {
+      addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+    }
+    if (!dataTypes.isEmpty()) {
+      transformers.add(new DataTypeTransformer(tableConfig, dataTypes));
+    }
+  }
+
+  /// Derives [PinotDataType]s for ingestion-aggregation source columns that are absent from the schema (and not already
+  /// covered by an explicit [SourceFieldConfig]). Types are inferred from the aggregation function and destination
+  /// metric. Sketch/HLL/COUNT sources are left unconverted so offering semantics (e.g. hashing a string vs a number)
+  /// are preserved. [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety net.
+  static void addAggregationSourceDataTypes(TableConfig tableConfig, Schema schema,
+      Map<String, PinotDataType> dataTypes) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig == null) {
       return;
     }
-    List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
-    if (CollectionUtils.isEmpty(sourceFieldConfigs)) {
+    List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
+    if (CollectionUtils.isEmpty(aggregationConfigs)) {
       return;
     }
-    Map<String, PinotDataType> dataTypes = new HashMap<>();
-    for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
-      // If pre-ComplexType transformers are requested, add only pre-ComplexType source fields. Similarly, if
-      // non pre-ComplexType transformers are requested, add only non pre-ComplexType source fields.
-      if (sourceFieldConfig.isPreComplexTypeTransform() == preComplexTypeTransform) {
-        dataTypes.put(sourceFieldConfig.getName(), sourceFieldConfig.getDataType());
+    for (AggregationConfig aggregationConfig : aggregationConfigs) {
+      String destColumn = aggregationConfig.getColumnName();
+      String aggregationFunction = aggregationConfig.getAggregationFunction();
+      if (destColumn == null || aggregationFunction == null) {
+        continue;
+      }
+      ExpressionContext expressionContext;
+      try {
+        expressionContext = RequestContextUtils.getExpression(aggregationFunction);
+      } catch (Exception e) {
+        // Invalid configs are rejected at table-create validation time; skip here to keep transformer build resilient.
+        continue;
+      }
+      if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
+        continue;
+      }
+      FunctionContext functionContext = expressionContext.getFunction();
+      AggregationFunctionType functionType;
+      try {
+        functionType = AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+      } catch (Exception e) {
+        continue;
+      }
+      List<ExpressionContext> arguments = functionContext.getArguments();
+      if (arguments.isEmpty()) {
+        continue;
+      }
+      ExpressionContext firstArgument = arguments.get(0);
+      if (firstArgument.getType() != ExpressionContext.Type.IDENTIFIER) {
+        continue;
+      }
+      String sourceColumn = firstArgument.getIdentifier();
+      if (AggregationFunctionColumnPair.STAR.equals(sourceColumn) || schema.hasColumn(sourceColumn)
+          || dataTypes.containsKey(sourceColumn)) {
+        // Explicit SourceFieldConfig or schema column already covers conversion; COUNT(*) has no source value.
+        continue;
+      }
+      FieldSpec destFieldSpec = schema.getFieldSpecFor(destColumn);
+      PinotDataType inferredType = inferAggregationSourceDataType(functionType, destFieldSpec);
+      if (inferredType != null) {
+        dataTypes.put(sourceColumn, inferredType);
       }
     }
-    if (!dataTypes.isEmpty()) {
-      transformers.add(new DataTypeTransformer(tableConfig, dataTypes));
+  }
+
+  /// Returns the target type for converting an aggregation source column, or {@code null} when no conversion should be
+  /// applied (COUNT, HLL, sketches — keep raw offering values).
+  @Nullable
+  static PinotDataType inferAggregationSourceDataType(AggregationFunctionType functionType,
+      @Nullable FieldSpec destFieldSpec) {
+    switch (functionType) {
+      case SUM:
+      case SUMMV:
+      case MIN:
+      case MAX:
+        if (destFieldSpec != null) {
+          switch (destFieldSpec.getDataType().getStoredType()) {
+            case INT:
+              return PinotDataType.INT;
+            case LONG:
+              return PinotDataType.LONG;
+            case FLOAT:
+              return PinotDataType.FLOAT;
+            case DOUBLE:
+              return PinotDataType.DOUBLE;
+            case BIG_DECIMAL:
+              return PinotDataType.BIG_DECIMAL;
+            default:
+              return PinotDataType.DOUBLE;
+          }
+        }
+        return PinotDataType.DOUBLE;
+      case AVG:
+      case AVGMV:
+      case MINMAXRANGE:
+      case PERCENTILEEST:
+      case PERCENTILERAWEST:
+      case PERCENTILETDIGEST:
+      case PERCENTILERAWTDIGEST:
+        return PinotDataType.DOUBLE;
+      case SUMPRECISION:
+        return PinotDataType.BIG_DECIMAL;
+      default:
+        // COUNT / HLL / sketches: do not auto-convert (preserves string hashing etc.)
+        return null;
     }
   }
 

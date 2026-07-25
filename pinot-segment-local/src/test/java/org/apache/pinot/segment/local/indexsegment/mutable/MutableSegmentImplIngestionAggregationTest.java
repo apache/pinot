@@ -28,18 +28,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -360,7 +364,10 @@ public class MutableSegmentImplIngestionAggregationTest {
   }
 
   @Test
-  public void testBigDecimalTooBig() {
+  public void testBigDecimalTooBigIsFailSoft()
+      throws Exception {
+    // Oversized SUM_PRECISION input used to throw mid-row and leave a half-written doc. Fail-soft (#16316) completes
+    // the row with the aggregator's null/default initial value so the segment stays sealable.
     String m1 = "sumPrecision1";
     Schema schema = getSchemaBuilder().addMetric(m1, DataType.BIG_DECIMAL).build();
 
@@ -371,14 +378,96 @@ public class MutableSegmentImplIngestionAggregationTest {
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
             List.of(new AggregationConfig(m1, "SUM_PRECISION(metric, 3)")));
 
-    // Make a big decimal larger than 3 precision and try to index it
     BigDecimal large = BigDecimalUtils.generateMaximumNumberWithPrecision(5);
     GenericRow row = getRow(random, 1);
-
     row.putValue("metric", large);
-    assertThrows(IllegalArgumentException.class, () -> {
-      mutableSegmentImpl.index(row, METADATA);
-    });
+    mutableSegmentImpl.index(row, METADATA);
+
+    assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+    GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+    // Default initial aggregated value for null/failed SUM_PRECISION is BigDecimal.ZERO
+    assertEquals(result.getValue(m1), BigDecimal.ZERO);
+
+    mutableSegmentImpl.destroy();
+  }
+
+  @Test
+  public void testStringSourceNotInSchemaThroughTransformPipeline()
+      throws Exception {
+    // End-to-end: JSON-style string numbers for a source column absent from the schema are converted by the transform
+    // pipeline and correctly summed (issue #16317).
+    String m1 = "sum1";
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.DOUBLE).build();
+    List<AggregationConfig> aggregationConfigs = List.of(new AggregationConfig(m1, "SUM(metric)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testSchema")
+        .setTimeColumnName(TIME_COLUMN1)
+        .setNoDictionaryColumns(List.of(m1))
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            aggregationConfigs);
+
+    GenericRow row1 = new GenericRow();
+    row1.putValue(DIMENSION_1, 0);
+    row1.putValue(DIMENSION_2, "aa");
+    row1.putValue(TIME_COLUMN1, 1);
+    row1.putValue(TIME_COLUMN2, 1);
+    row1.putValue(METRIC, "10");
+    GenericRow transformed1 = pipeline.processRow(row1).getTransformedRows().get(0);
+    assertEquals(transformed1.getValue(METRIC), 10.0);
+    mutableSegmentImpl.index(transformed1, METADATA);
+
+    GenericRow row2 = new GenericRow();
+    row2.putValue(DIMENSION_1, 0);
+    row2.putValue(DIMENSION_2, "aa");
+    row2.putValue(TIME_COLUMN1, 1);
+    row2.putValue(TIME_COLUMN2, 1);
+    row2.putValue(METRIC, "32.5");
+    GenericRow transformed2 = pipeline.processRow(row2).getTransformedRows().get(0);
+    assertEquals(transformed2.getValue(METRIC), 32.5);
+    mutableSegmentImpl.index(transformed2, METADATA);
+
+    assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+    GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+    assertEquals(result.getValue(m1), 42.5);
+
+    mutableSegmentImpl.destroy();
+  }
+
+  @Test
+  public void testNullAggregationSourceThroughTransformPipeline()
+      throws Exception {
+    String m1 = "sum1";
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.DOUBLE).build();
+    List<AggregationConfig> aggregationConfigs = List.of(new AggregationConfig(m1, "SUM(metric)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testSchema")
+        .setTimeColumnName(TIME_COLUMN1)
+        .setNoDictionaryColumns(List.of(m1))
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            aggregationConfigs);
+
+    GenericRow row = new GenericRow();
+    row.putValue(DIMENSION_1, 0);
+    row.putValue(DIMENSION_2, "aa");
+    row.putValue(TIME_COLUMN1, 1);
+    row.putValue(TIME_COLUMN2, 1);
+    row.putValue(METRIC, null);
+    GenericRow transformed = pipeline.processRow(row).getTransformedRows().get(0);
+    mutableSegmentImpl.index(transformed, METADATA);
+
+    assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+    GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+    assertEquals(result.getValue(m1), 0.0);
 
     mutableSegmentImpl.destroy();
   }
