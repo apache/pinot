@@ -75,7 +75,9 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-segmentDir"}, required = true, description = "Path to segment directory.")
   private String _segmentDir = null;
 
-  @CommandLine.Option(names = {"-tableName"}, required = false, description = "Table name to upload")
+  @CommandLine.Option(names = {"-tableName"}, required = false,
+      description = "Table name to upload into. Overrides segment.table.name baked into the segment metadata "
+          + "(build once, push to staging or prod). When omitted, falls back to the name in segment metadata.")
   private String _tableName = null;
 
   @CommandLine.Option(names = {"-tableType"}, required = false,
