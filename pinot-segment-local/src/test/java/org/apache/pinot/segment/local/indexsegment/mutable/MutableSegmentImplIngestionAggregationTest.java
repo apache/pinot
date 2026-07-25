@@ -44,6 +44,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -364,10 +365,9 @@ public class MutableSegmentImplIngestionAggregationTest {
   }
 
   @Test
-  public void testBigDecimalTooBigIsFailSoft()
-      throws Exception {
-    // Oversized SUM_PRECISION input used to throw mid-row and leave a half-written doc. Fail-soft (#16316) completes
-    // the row with the aggregator's null/default initial value so the segment stays sealable.
+  public void testBigDecimalTooBig() {
+    // Without fail-soft (#16316), oversized SUM_PRECISION still throws during index.
+    // Type conversion (#16317) does not change this contract.
     String m1 = "sumPrecision1";
     Schema schema = getSchemaBuilder().addMetric(m1, DataType.BIG_DECIMAL).build();
 
@@ -381,12 +381,7 @@ public class MutableSegmentImplIngestionAggregationTest {
     BigDecimal large = BigDecimalUtils.generateMaximumNumberWithPrecision(5);
     GenericRow row = getRow(random, 1);
     row.putValue("metric", large);
-    mutableSegmentImpl.index(row, METADATA);
-
-    assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
-    GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
-    // Default initial aggregated value for null/failed SUM_PRECISION is BigDecimal.ZERO
-    assertEquals(result.getValue(m1), BigDecimal.ZERO);
+    assertThrows(IllegalArgumentException.class, () -> mutableSegmentImpl.index(row, METADATA));
 
     mutableSegmentImpl.destroy();
   }
