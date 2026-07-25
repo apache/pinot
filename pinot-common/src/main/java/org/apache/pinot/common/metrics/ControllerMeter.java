@@ -43,6 +43,10 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_ZOOKEEPER_FETCH_FAILURES("failures", false),
   LLC_ZOOKEEPER_UPDATE_FAILURES("failures", false),
   LLC_STREAM_DATA_LOSS("dataLoss", false),
+  // Auto force-commit on partial OFFLINE consuming replicas (issue #15897)
+  LLC_AUTO_FORCE_COMMIT_SUCCESS("llcAutoForceCommit", false),
+  LLC_AUTO_FORCE_COMMIT_FAILED("llcAutoForceCommitFailed", false),
+  LLC_AUTO_FORCE_COMMIT_SKIPPED("llcAutoForceCommitSkipped", false),
   CONTROLLER_PERIODIC_TASK_RUN("periodicTaskRun", false),
   CONTROLLER_PERIODIC_TASK_ERROR("periodicTaskError", false),
   CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR("TableSegmentUploadError", false),
