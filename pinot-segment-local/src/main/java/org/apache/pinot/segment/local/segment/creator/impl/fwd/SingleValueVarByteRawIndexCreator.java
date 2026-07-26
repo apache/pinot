@@ -72,6 +72,29 @@ public class SingleValueVarByteRawIndexCreator implements CompressionStatsTracki
       int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion,
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, deriveNumDocsPerChunk, writerVersion,
+        targetMaxChunkSizeBytes, targetDocsPerChunk, ForwardIndexConfig.getDefaultEnforceTargetDocsPerChunk());
+  }
+
+  /// Create a var-byte raw index creator for the given column
+  /// @param baseIndexDir Index directory
+  /// @param compressionType Type of compression to use
+  /// @param column Name of column to index
+  /// @param totalDocs Total number of documents to index
+  /// @param valueType Type of the values
+  /// @param maxLength length of longest entry (in bytes)
+  /// @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
+  /// @param writerVersion writer format version
+  /// @param targetMaxChunkSizeBytes target max chunk size in bytes, applicable only for V4 or when
+  ///                                deriveNumDocsPerChunk is true
+  /// @param targetDocsPerChunk target number of docs per chunk
+  /// @param enforceTargetDocsPerChunk true to cap each chunk at exactly targetDocsPerChunk docs instead of only
+  ///                                  deriving the chunk byte size from it; supported by writer version 6 only
+  /// @throws IOException
+  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
+      int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion,
+      int targetMaxChunkSizeBytes, int targetDocsPerChunk, boolean enforceTargetDocsPerChunk)
+      throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
       int numDocsPerChunk =
@@ -81,7 +104,8 @@ public class SingleValueVarByteRawIndexCreator implements CompressionStatsTracki
     } else if (writerVersion == VarByteChunkForwardIndexWriterV6.VERSION) {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(maxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-      _indexWriter = new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize);
+      _indexWriter = new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize,
+          ForwardIndexUtils.getDocsPerChunkCap(targetDocsPerChunk, enforceTargetDocsPerChunk));
     } else {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(maxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);

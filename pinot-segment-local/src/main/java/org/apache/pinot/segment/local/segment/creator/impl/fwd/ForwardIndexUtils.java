@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
+
 public class ForwardIndexUtils {
   private static final int TARGET_MIN_CHUNK_SIZE = 4 * 1024;
 
@@ -36,5 +38,21 @@ public class ForwardIndexUtils {
       return Math.max(targetMaxChunkSizeBytes, TARGET_MIN_CHUNK_SIZE);
     }
     return Math.max(Math.min(maxLength * targetDocsPerChunk, targetMaxChunkSizeBytes), TARGET_MIN_CHUNK_SIZE);
+  }
+
+  /// Get the hard per-chunk document cap to pass to [VarByteChunkForwardIndexWriterV6].
+  ///
+  /// [#getDynamicTargetChunkSize] only bounds a chunk by bytes, and it derives that bound from the column's
+  /// longest value. When the max length far exceeds the average length the derived size clamps to
+  /// targetMaxChunkSizeBytes and each chunk ends up holding far more documents than targetDocsPerChunk requested.
+  /// Enabling enforcement makes the writer additionally close a chunk at exactly targetDocsPerChunk documents.
+  ///
+  /// @param targetDocsPerChunk target number of documents to store per chunk
+  /// @param enforceTargetDocsPerChunk true to turn targetDocsPerChunk into a hard cap
+  /// @return targetDocsPerChunk when enforced and positive, otherwise
+  ///         [VarByteChunkForwardIndexWriterV6#DISABLE_DOCS_PER_CHUNK]
+  public static int getDocsPerChunkCap(int targetDocsPerChunk, boolean enforceTargetDocsPerChunk) {
+    return enforceTargetDocsPerChunk && targetDocsPerChunk > 0 ? targetDocsPerChunk
+        : VarByteChunkForwardIndexWriterV6.DISABLE_DOCS_PER_CHUNK;
   }
 }
