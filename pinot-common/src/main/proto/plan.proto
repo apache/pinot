@@ -44,6 +44,7 @@ message PlanNode {
     // serialized by an older-version broker can still be deserialized. No current broker sets this field.
     EnrichedJoinNode enrichedJoinNode = 17 [deprecated = true];
     UnnestNode unnestNode = 18;
+    RuntimeFilterNode runtimeFilterNode = 19;
   }
 }
 
@@ -230,6 +231,18 @@ message LiteralRow {
 
 message ValueNode {
   repeated LiteralRow literalRows = 1;
+}
+
+enum RuntimeFilterType {
+  IN = 0;
+  BLOOM = 1;
+  AUTO = 2;
+}
+
+message RuntimeFilterNode {
+  repeated int32 probeKeys = 1;
+  repeated int32 buildKeys = 2;
+  RuntimeFilterType filterType = 3;
 }
 
 message UnnestNode {

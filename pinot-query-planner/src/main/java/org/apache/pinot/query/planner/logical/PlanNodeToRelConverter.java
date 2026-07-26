@@ -64,6 +64,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -207,6 +208,17 @@ public final class PlanNodeToRelConverter {
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
 
+      return null;
+    }
+
+    @Override
+    public Void visitRuntimeFilter(RuntimeFilterNode node, Void context) {
+      visitChildren(node);
+
+      List<RelNode> inputs = readAlreadyPushedChildren(node);
+      PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(),
+          "RuntimeFilter", Map.of(), node.getDataSchema(), inputs);
+      _builder.push(explained);
       return null;
     }
 

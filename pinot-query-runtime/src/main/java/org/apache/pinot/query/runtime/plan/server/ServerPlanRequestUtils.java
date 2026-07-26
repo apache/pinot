@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.plan.server;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,6 +31,7 @@ import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -45,8 +47,11 @@ import org.apache.pinot.core.data.manager.LogicalTableContext;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.utils.idset.IdSet;
+import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
@@ -306,6 +311,338 @@ public class ServerPlanRequestUtils {
       pinotQuery.setFilterExpression(andFilterExpression);
     } else {
       pinotQuery.setFilterExpression(timeFilterExpression);
+    }
+  }
+
+  /**
+   * Attach an additive INNER-join probe-side runtime filter to the given leaf {@link PinotQuery}.
+   *
+   * <p>{@code probeKeys} index the leaf select list (which equals the probe pipeline's output row type),
+   * {@code buildKeys} index {@code dataSchema} (the build-side join keys). The reducer never
+   * introduces false negatives, so the real hash join in the intermediate stage remains the source of
+   * truth and the filter can be omitted at any time without affecting correctness.
+   *
+   * <p>Tiering (the bloom tier is single-key only):
+   * <ul>
+   *   <li>{@code IN} — always an exact {@code IN} list (index-accelerated, drives segment pruning).</li>
+   *   <li>{@code BLOOM} — a serialized bloom ({@code IN_ID_SET}) plus a {@code BETWEEN(min, max)}
+   *       range predicate (for numeric keys) to enable cheap range-based segment pruning.</li>
+   *   <li>{@code AUTO} — exact {@code IN} at/below {@code maxInSize} build-key rows, else bloom.</li>
+   * </ul>
+   * Build sides larger than {@code maxBuildRows}, or any predicate (bloom or exact {@code IN}) whose
+   * estimated serialized size exceeds {@code maxBytes}, are abandoned (no filter), which is always correct.
+   * An exact {@code IN} over a FLOAT/DOUBLE key that contains {@code NaN} is likewise abandoned: its
+   * literals canonicalize NaN, which the leaf's raw-bit membership test cannot match faithfully, whereas
+   * the bloom tier reduces NaN keys correctly.
+   */
+  static void attachRuntimeFilter(PinotQuery pinotQuery, List<Integer> probeKeys, List<Integer> buildKeys,
+      List<Object[]> dataContainer, DataSchema dataSchema, RuntimeFilterNode.Type type) {
+    attachRuntimeFilter(pinotQuery, probeKeys, buildKeys, dataContainer, dataSchema, type,
+        CommonConstants.Broker.DEFAULT_RUNTIME_FILTER_MAX_IN_SIZE, CommonConstants.Broker.DEFAULT_RUNTIME_FILTER_FPP,
+        CommonConstants.Broker.DEFAULT_RUNTIME_FILTER_MAX_BYTES,
+        CommonConstants.Broker.DEFAULT_RUNTIME_FILTER_MAX_BUILD_ROWS);
+  }
+
+  /**
+   * Sizing-parameterized variant (package-private for testing). {@code maxBuildRows} MUST equal the value
+   * the planner used for its leaf fetch cap (both use
+   * {@link CommonConstants.Broker#DEFAULT_RUNTIME_FILTER_MAX_BUILD_ROWS}); see the truncation note below.
+   */
+  static void attachRuntimeFilter(PinotQuery pinotQuery, List<Integer> probeKeys, List<Integer> buildKeys,
+      List<Object[]> dataContainer, DataSchema dataSchema, RuntimeFilterNode.Type type, int maxInSize, double fpp,
+      int maxBytes, int maxBuildRows) {
+    // CORRECTNESS: the planner caps the build-key stage at maxBuildRows + 1, which TRUNCATES the key set.
+    // If the cap was hit (rawCount > maxBuildRows) the set is incomplete, so a reducer built from it could
+    // drop probe rows that should join (false negative). Abandon the filter — the join is still correct.
+    // This threshold MUST match the planner's fetch cap.
+    if (dataContainer.size() > maxBuildRows) {
+      return;
+    }
+    // Drop build rows with any null join key: a null key never matches an INNER equi-join, so excluding
+    // it is sound (no false negatives), and it keeps the leaf builders (which cast unconditionally)
+    // null-safe regardless of how the planner's IS NOT NULL filter behaved under null handling.
+    List<Object[]> rows = retainNonNullKeyRows(dataContainer, buildKeys);
+    int rowCount = rows.size();
+
+    // Empty (or all-null) build side: nothing can match -> a constant-false predicate prunes the probe.
+    if (rowCount == 0) {
+      attachDynamicFilter(pinotQuery, probeKeys, buildKeys, rows, dataSchema);
+      return;
+    }
+
+    // Decide the tier. The bloom tier is single-key only; BIG_DECIMAL is not supported by IdSet.
+    boolean useBloom;
+    switch (type) {
+      case IN:
+        useBloom = false;
+        break;
+      case BLOOM:
+        useBloom = buildKeys.size() == 1;
+        break;
+      case AUTO:
+      default:
+        useBloom = buildKeys.size() == 1 && rowCount > maxInSize;
+        break;
+    }
+    if (useBloom) {
+      FieldSpec.DataType storedType = dataSchema.getColumnDataType(buildKeys.get(0)).getStoredType().toDataType();
+      if (storedType == FieldSpec.DataType.BIG_DECIMAL) {
+        useBloom = false;
+      }
+    }
+
+    if (!useBloom) {
+      // A FLOAT/DOUBLE exact IN cannot faithfully reduce a NaN key. The IN literals canonicalize NaN (the
+      // value round-trips through "NaN" as a string), while the leaf set compares probe values by raw
+      // bits; and the hash join's key equality matches neither (multi-key canonicalizes NaN, single-key
+      // compares raw bits). A NaN build key could therefore drop a joinable probe row (false negative), so
+      // abandon exact IN when one is present. The bloom tier (single-key) keeps NaN faithfully -> only the
+      // exact-IN path needs this guard.
+      if (hasNaNFloatOrDoubleKey(rows, buildKeys, dataSchema)) {
+        return;
+      }
+      // Apply the same footprint ceiling the bloom tier honors. The exact-IN path (IN mode, or any
+      // multi-key, or AUTO below the threshold) emits up to maxBuildRows literals per key, AND'd across
+      // keys, which can be multi-MB. Abandon if the estimated serialized size exceeds maxBytes so there is
+      // one consistent ceiling regardless of tier; dropping the filter keeps the join correct.
+      if (estimateExactInBytes(rows, buildKeys, dataSchema) > maxBytes) {
+        return;
+      }
+      attachDynamicFilter(pinotQuery, probeKeys, buildKeys, rows, dataSchema);
+      return;
+    }
+
+    Expression bloomPredicate =
+        buildBloomPredicate(pinotQuery.getSelectList().get(probeKeys.get(0)), buildKeys.get(0), rows, dataSchema,
+            rowCount, fpp, maxBytes);
+    if (bloomPredicate != null) {
+      andIntoFilter(pinotQuery, bloomPredicate);
+    }
+    // else: bloom exceeded maxBytes -> abandon (no filter); the join remains the source of truth.
+  }
+
+  /**
+   * Returns the build rows whose every join-key column is non-null. A null key cannot match an INNER
+   * equi-join, so dropping such rows is sound and keeps the leaf filter builders null-safe.
+   */
+  private static List<Object[]> retainNonNullKeyRows(List<Object[]> dataContainer, List<Integer> buildKeys) {
+    List<Object[]> result = new ArrayList<>(dataContainer.size());
+    for (Object[] row : dataContainer) {
+      boolean allNonNull = true;
+      for (int buildKey : buildKeys) {
+        if (row[buildKey] == null) {
+          allNonNull = false;
+          break;
+        }
+      }
+      if (allNonNull) {
+        result.add(row);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Returns true if any FLOAT or DOUBLE join-key column holds a {@code NaN} value. Such a key cannot be
+   * reduced by an exact {@code IN} without risking a false negative against the hash join (see the caller),
+   * so the exact-IN tier is abandoned when this is true.
+   */
+  private static boolean hasNaNFloatOrDoubleKey(List<Object[]> rows, List<Integer> buildKeys,
+      DataSchema dataSchema) {
+    for (int buildKey : buildKeys) {
+      FieldSpec.DataType storedType = dataSchema.getColumnDataType(buildKey).getStoredType().toDataType();
+      if (storedType == FieldSpec.DataType.FLOAT) {
+        for (Object[] row : rows) {
+          if (Float.isNaN((float) row[buildKey])) {
+            return true;
+          }
+        }
+      } else if (storedType == FieldSpec.DataType.DOUBLE) {
+        for (Object[] row : rows) {
+          if (Double.isNaN((double) row[buildKey])) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Rough per-literal overhead (proto Expression + Literal wrapping) used by {@link #estimateExactInBytes}. */
+  private static final int IN_LITERAL_OVERHEAD_BYTES = 8;
+
+  /**
+   * Estimates the serialized footprint (in bytes) of the exact-IN predicate this build set would produce:
+   * one IN list per key over all rows. Used to abandon the exact-IN tier when it would exceed the same
+   * {@code maxBytes} ceiling the bloom tier honors. Fixed-width types are O(1); STRING/BYTES sum lengths.
+   */
+  private static long estimateExactInBytes(List<Object[]> rows, List<Integer> buildKeys, DataSchema dataSchema) {
+    int numRows = rows.size();
+    long bytes = 0;
+    for (int buildKey : buildKeys) {
+      FieldSpec.DataType storedType = dataSchema.getColumnDataType(buildKey).getStoredType().toDataType();
+      switch (storedType) {
+        case INT:
+        case FLOAT:
+          bytes += (long) numRows * (IN_LITERAL_OVERHEAD_BYTES + 4);
+          break;
+        case LONG:
+        case DOUBLE:
+          bytes += (long) numRows * (IN_LITERAL_OVERHEAD_BYTES + 8);
+          break;
+        case STRING:
+          for (Object[] row : rows) {
+            bytes += IN_LITERAL_OVERHEAD_BYTES + ((String) row[buildKey]).length();
+          }
+          break;
+        case BYTES:
+          for (Object[] row : rows) {
+            bytes += IN_LITERAL_OVERHEAD_BYTES + ((ByteArray) row[buildKey]).length();
+          }
+          break;
+        case BIG_DECIMAL:
+          // Variable-length: approximate the serialized form as the unscaled magnitude bytes plus scale.
+          for (Object[] row : rows) {
+            bytes += IN_LITERAL_OVERHEAD_BYTES + 4 + (((BigDecimal) row[buildKey]).unscaledValue().bitLength() / 8 + 1);
+          }
+          break;
+        default:
+          bytes += (long) numRows * (IN_LITERAL_OVERHEAD_BYTES + 16);
+          break;
+      }
+    }
+    return bytes;
+  }
+
+  /**
+   * Builds a single-key bloom predicate: {@code IN_ID_SET(probeCol, '<base64>') = 1}, AND'd (for numeric
+   * keys) with {@code BETWEEN(probeCol, min, max)} to enable range-based segment pruning. Returns
+   * {@code null} if the serialized bloom would exceed {@code maxBytes} (caller abandons the filter).
+   */
+  @Nullable
+  private static Expression buildBloomPredicate(Expression probeColExpr, int buildKey, List<Object[]> dataContainer,
+      DataSchema dataSchema, int rowCount, double fpp, int maxBytes) {
+    FieldSpec.DataType storedType = dataSchema.getColumnDataType(buildKey).getStoredType().toDataType();
+    int expectedInsertions = Math.max(1, rowCount);
+    IdSet idSet = IdSets.create(storedType, -1, expectedInsertions, fpp);
+    Expression rangePredicate = null;
+    switch (storedType) {
+      case INT: {
+        int min = Integer.MAX_VALUE;
+        int max = Integer.MIN_VALUE;
+        for (Object[] row : dataContainer) {
+          int value = (int) row[buildKey];
+          idSet.add(value);
+          min = Math.min(min, value);
+          max = Math.max(max, value);
+        }
+        rangePredicate = betweenPredicate(probeColExpr, RequestUtils.getLiteralExpression(min),
+            RequestUtils.getLiteralExpression(max));
+        break;
+      }
+      case LONG: {
+        long min = Long.MAX_VALUE;
+        long max = Long.MIN_VALUE;
+        for (Object[] row : dataContainer) {
+          long value = (long) row[buildKey];
+          idSet.add(value);
+          min = Math.min(min, value);
+          max = Math.max(max, value);
+        }
+        rangePredicate = betweenPredicate(probeColExpr, RequestUtils.getLiteralExpression(min),
+            RequestUtils.getLiteralExpression(max));
+        break;
+      }
+      case FLOAT: {
+        float min = Float.POSITIVE_INFINITY;
+        float max = Float.NEGATIVE_INFINITY;
+        boolean hasNaN = false;
+        for (Object[] row : dataContainer) {
+          float value = (float) row[buildKey];
+          idSet.add(value);
+          // NaN must NOT poison the range bounds: a finite BETWEEN(min, max) would drop probe NaN rows
+          // that should match a build NaN (false negative), and BETWEEN(NaN, NaN) drops everything. Keep
+          // NaN in the bloom (membership), but skip the range predicate entirely if any NaN is present.
+          if (Float.isNaN(value)) {
+            hasNaN = true;
+          } else {
+            min = Math.min(min, value);
+            max = Math.max(max, value);
+          }
+        }
+        if (!hasNaN) {
+          rangePredicate = betweenPredicate(probeColExpr, RequestUtils.getLiteralExpression(min),
+              RequestUtils.getLiteralExpression(max));
+        }
+        break;
+      }
+      case DOUBLE: {
+        double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
+        boolean hasNaN = false;
+        for (Object[] row : dataContainer) {
+          double value = (double) row[buildKey];
+          idSet.add(value);
+          if (Double.isNaN(value)) {
+            hasNaN = true;
+          } else {
+            min = Math.min(min, value);
+            max = Math.max(max, value);
+          }
+        }
+        if (!hasNaN) {
+          rangePredicate = betweenPredicate(probeColExpr, RequestUtils.getLiteralExpression(min),
+              RequestUtils.getLiteralExpression(max));
+        }
+        break;
+      }
+      case STRING:
+        for (Object[] row : dataContainer) {
+          idSet.add((String) row[buildKey]);
+        }
+        break;
+      case BYTES:
+        for (Object[] row : dataContainer) {
+          idSet.add(((ByteArray) row[buildKey]).getBytes());
+        }
+        break;
+      default:
+        // Unsupported stored type for bloom (e.g. BIG_DECIMAL is filtered earlier) — abandon.
+        return null;
+    }
+    if (idSet.getSerializedSizeInBytes() > maxBytes) {
+      return null;
+    }
+    String base64IdSet;
+    try {
+      base64IdSet = idSet.toBase64String();
+    } catch (IOException e) {
+      // Serialization failed — abandon the filter (the join remains the source of truth).
+      return null;
+    }
+    Expression inIdSet = RequestUtils.getFunctionExpression(TransformFunctionType.IN_ID_SET.getName(), probeColExpr,
+        RequestUtils.getLiteralExpression(base64IdSet));
+    Expression bloomEq =
+        RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), inIdSet, RequestUtils.getLiteralExpression(1));
+    if (rangePredicate == null) {
+      return bloomEq;
+    }
+    return RequestUtils.getFunctionExpression(FilterKind.AND.name(), bloomEq, rangePredicate);
+  }
+
+  private static Expression betweenPredicate(Expression column, Expression min, Expression max) {
+    return RequestUtils.getFunctionExpression(FilterKind.BETWEEN.name(), column, min, max);
+  }
+
+  /**
+   * ANDs the given predicate into the query's existing filter (or sets it if there is none).
+   */
+  private static void andIntoFilter(PinotQuery pinotQuery, Expression predicate) {
+    Expression existing = pinotQuery.getFilterExpression();
+    if (existing != null) {
+      pinotQuery.setFilterExpression(RequestUtils.getFunctionExpression(FilterKind.AND.name(), existing, predicate));
+    } else {
+      pinotQuery.setFilterExpression(predicate);
     }
   }
 

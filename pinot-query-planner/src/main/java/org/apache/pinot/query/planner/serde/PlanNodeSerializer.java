@@ -42,6 +42,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -283,6 +284,17 @@ public class PlanNodeSerializer {
     }
 
     @Override
+    public Void visitRuntimeFilter(RuntimeFilterNode node, Plan.PlanNode.Builder builder) {
+      Plan.RuntimeFilterNode runtimeFilterNode = Plan.RuntimeFilterNode.newBuilder()
+          .addAllProbeKeys(node.getProbeKeys())
+          .addAllBuildKeys(node.getBuildKeys())
+          .setFilterType(convertRuntimeFilterType(node.getType()))
+          .build();
+      builder.setRuntimeFilterNode(runtimeFilterNode);
+      return null;
+    }
+
+    @Override
     public Void visitUnnest(UnnestNode node, Plan.PlanNode.Builder builder) {
       UnnestNode.TableFunctionContext context = node.getTableFunctionContext();
       Plan.UnnestNode.Builder unnestNodeBuilder = Plan.UnnestNode.newBuilder()
@@ -469,6 +481,19 @@ public class PlanNodeSerializer {
         protoLiteralRows.add(convertLiteralRow(literalRow));
       }
       return protoLiteralRows;
+    }
+
+    private static Plan.RuntimeFilterType convertRuntimeFilterType(RuntimeFilterNode.Type type) {
+      switch (type) {
+        case IN:
+          return Plan.RuntimeFilterType.IN;
+        case BLOOM:
+          return Plan.RuntimeFilterType.BLOOM;
+        case AUTO:
+          return Plan.RuntimeFilterType.AUTO;
+        default:
+          throw new IllegalStateException("Unsupported RuntimeFilterNode.Type: " + type);
+      }
     }
 
     private static Plan.WindowFrameType convertWindowFrameType(WindowNode.WindowFrameType windowFrameType) {

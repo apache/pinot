@@ -42,6 +42,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RuntimeFilterNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -245,6 +246,36 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       }
     }
 
+    return null;
+  }
+
+  @Override
+  public Void visitRuntimeFilter(RuntimeFilterNode node, ServerPlanRequestContext context) {
+    // Additive INNER-join probe-side runtime filter. input[0] is the probe pipeline (which builds the
+    // leaf PinotQuery), input[1] is the PIPELINE_BREAKER receive carrying the build-side join
+    // keys. Mirrors the SEMI dynamic-broadcast path in visitJoin, except the inner join itself stays in
+    // its intermediate stage; here we only AND a no-false-negative reducer onto the probe leaf scan.
+    List<PlanNode> inputs = node.getInputs();
+    PlanNode probe = inputs.get(0);
+    PlanNode buildKeyReceive = inputs.get(1);
+    Preconditions.checkState(buildKeyReceive instanceof MailboxReceiveNode
+            && ((MailboxReceiveNode) buildKeyReceive).getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER,
+        "RuntimeFilterNode second input must be a PIPELINE_BREAKER MailboxReceiveNode");
+    if (visit(probe, context)) {
+      PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
+      int resultMapId = pipelineBreakerResult.getNodeIdMap().get(buildKeyReceive);
+      List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, List.of());
+      List<Object[]> resultDataContainer = new ArrayList<>();
+      DataSchema dataSchema = buildKeyReceive.getDataSchema();
+      for (MseBlock block : blocks) {
+        if (block.isData()) {
+          resultDataContainer.addAll(((MseBlock.Data) block).asRowHeap().getRows());
+        }
+      }
+      // TODO: we should keep query stats here as well
+      ServerPlanRequestUtils.attachRuntimeFilter(context.getPinotQuery(), node.getProbeKeys(), node.getBuildKeys(),
+          resultDataContainer, dataSchema, node.getType());
+    }
     return null;
   }
 

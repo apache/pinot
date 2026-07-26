@@ -130,6 +130,32 @@ public class PinotRuleUtils {
     }
   }
 
+  /**
+   * Determines whether an additive INNER-join probe-side runtime filter can be pushed onto the probe
+   * leaf scan rooted at {@code relNode}.
+   *
+   * <p>Unlike {@link #canPushDynamicBroadcastToLeaf(RelNode)} (used for SEMI joins), this does NOT
+   * recurse into a nested {@link Join}: a reducer is only sound when the probe subtree represents a
+   * single relation whose row representation is unchanged (TableScan, optionally with single-in
+   * single-out Project/Filter). A nested join would introduce a second relation and could let the
+   * reducer drop rows that should survive, so it is rejected. This implements the long-standing
+   * INNER-join TODO #4 on {@link #canPushDynamicBroadcastToLeaf(RelNode)} by construction: the
+   * pipeline-breaker edge is a sibling, never threaded through the probe pipeline, and only probe-side
+   * columns are ever referenced by the pushed predicate.
+   */
+  public static boolean canPushRuntimeFilterToLeaf(RelNode relNode) {
+    relNode = PinotRuleUtils.unboxRel(relNode);
+    if (relNode instanceof TableScan) {
+      return true;
+    } else if (relNode instanceof Project || relNode instanceof Filter) {
+      return canPushRuntimeFilterToLeaf(relNode.getInput(0));
+    } else {
+      // Reject Join/Aggregate/Window/Sort/SetOp/etc. — they change cardinality or introduce a second
+      // relation, so a probe-side reducer there could drop matching rows.
+      return false;
+    }
+  }
+
   public static String extractFunctionName(RexCall function) {
     SqlKind funcSqlKind = function.getOperator().getKind();
     return funcSqlKind == SqlKind.OTHER_FUNCTION ? function.getOperator().getName() : funcSqlKind.name();
