@@ -94,6 +94,48 @@ public class ForwardIndexConfigTest {
   }
 
   @Test
+  public void enforceTargetDocsPerChunkDefaultsToFalse()
+      throws JsonProcessingException {
+    ForwardIndexConfig config = JsonUtils.stringToObject("{\"targetDocsPerChunk\": \"250\"}", ForwardIndexConfig.class);
+
+    assertFalse(config.isEnforceTargetDocsPerChunk(), "Unexpected enforceTargetDocsPerChunk");
+  }
+
+  @Test
+  public void withEnforceTargetDocsPerChunk()
+      throws JsonProcessingException {
+    String confStr = "{\"targetDocsPerChunk\": \"250\", \"enforceTargetDocsPerChunk\": true}";
+    ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
+
+    assertTrue(config.isEnforceTargetDocsPerChunk(), "Unexpected enforceTargetDocsPerChunk");
+    assertEquals(config.getTargetDocsPerChunk(), 250, "Unexpected targetDocsPerChunk");
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void enforceTargetDocsPerChunkRejectsNonPositiveTarget() {
+    new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW).withTargetDocsPerChunk(-1)
+        .withEnforceTargetDocsPerChunk(true).build();
+  }
+
+  @Test
+  public void enforceTargetDocsPerChunkRejectsNonPositiveTargetFromJson() {
+    // Jackson wraps the constructor's IllegalArgumentException, so just assert the deserialization fails.
+    assertThrows(Exception.class,
+        () -> JsonUtils.stringToObject("{\"targetDocsPerChunk\": \"-1\", \"enforceTargetDocsPerChunk\": true}",
+            ForwardIndexConfig.class));
+  }
+
+  @Test
+  public void enforceTargetDocsPerChunkSurvivesBuilderCopy() {
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW).withTargetDocsPerChunk(250)
+        .withEnforceTargetDocsPerChunk(true).build();
+    ForwardIndexConfig copy = new ForwardIndexConfig.Builder(config).build();
+
+    assertTrue(copy.isEnforceTargetDocsPerChunk(), "Unexpected enforceTargetDocsPerChunk");
+    assertEquals(copy, config, "Copy should equal the original");
+  }
+
+  @Test
   public void withSomeData()
       throws JsonProcessingException {
     String confStr = "{\n"

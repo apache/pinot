@@ -40,6 +40,7 @@ public class ForwardIndexConfig extends IndexConfig {
   private static String _defaultTargetMaxChunkSize = "1MB";
   private static int _defaultTargetMaxChunkSizeBytes = 1024 * 1024;
   private static int _defaultTargetDocsPerChunk = 1000;
+  private static boolean _defaultEnforceTargetDocsPerChunk = false;
 
   public static int getDefaultRawWriterVersion() {
     return _defaultRawIndexWriterVersion;
@@ -70,6 +71,14 @@ public class ForwardIndexConfig extends IndexConfig {
     _defaultTargetDocsPerChunk = defaultTargetDocsPerChunk;
   }
 
+  public static boolean getDefaultEnforceTargetDocsPerChunk() {
+    return _defaultEnforceTargetDocsPerChunk;
+  }
+
+  public static void setDefaultEnforceTargetDocsPerChunk(boolean defaultEnforceTargetDocsPerChunk) {
+    _defaultEnforceTargetDocsPerChunk = defaultEnforceTargetDocsPerChunk;
+  }
+
   public static ForwardIndexConfig getDefault(EncodingType encodingType) {
     return new Builder(encodingType).build();
   }
@@ -86,6 +95,7 @@ public class ForwardIndexConfig extends IndexConfig {
   private final String _targetMaxChunkSize;
   private final int _targetMaxChunkSizeBytes;
   private final int _targetDocsPerChunk;
+  private final boolean _enforceTargetDocsPerChunk;
 
   @Nullable
   private final ChunkCompressionType _chunkCompressionType;
@@ -104,6 +114,7 @@ public class ForwardIndexConfig extends IndexConfig {
       @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion,
       @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
       @JsonProperty("targetDocsPerChunk") @Nullable Integer targetDocsPerChunk,
+      @JsonProperty("enforceTargetDocsPerChunk") @Nullable Boolean enforceTargetDocsPerChunk,
       @JsonProperty("configs") @Nullable Map<String, Object> configs) {
     super(disabled);
     // Backward-compat for legacy JSON that lacks `encodingType`: default to DICTIONARY (matches the historical
@@ -117,6 +128,10 @@ public class ForwardIndexConfig extends IndexConfig {
     _targetMaxChunkSizeBytes =
         targetMaxChunkSize == null ? _defaultTargetMaxChunkSizeBytes : (int) DataSizeUtils.toBytes(targetMaxChunkSize);
     _targetDocsPerChunk = targetDocsPerChunk == null ? _defaultTargetDocsPerChunk : targetDocsPerChunk;
+    _enforceTargetDocsPerChunk =
+        enforceTargetDocsPerChunk == null ? _defaultEnforceTargetDocsPerChunk : enforceTargetDocsPerChunk;
+    Preconditions.checkArgument(!_enforceTargetDocsPerChunk || _targetDocsPerChunk > 0,
+        "targetDocsPerChunk must be positive when enforceTargetDocsPerChunk is set, got: %s", _targetDocsPerChunk);
     _configs = configs != null ? configs : new HashMap<>();
     if (_compressionCodec != null) {
       switch (_compressionCodec) {
@@ -223,6 +238,19 @@ public class ForwardIndexConfig extends IndexConfig {
     return _targetDocsPerChunk;
   }
 
+  /// Whether [#getTargetDocsPerChunk()] is a hard per-chunk document cap rather than only an input to the
+  /// chunk byte-size derivation.
+  ///
+  /// By default `targetDocsPerChunk` only sizes the chunk buffer, via
+  /// `max(min(maxLength * targetDocsPerChunk, targetMaxChunkSizeBytes), 4KB)`. Because that derivation keys off
+  /// the column's *longest* value, a column whose max length far exceeds its average length clamps to
+  /// `targetMaxChunkSizeBytes` and ends up with far more documents per chunk than requested. Setting this flag
+  /// makes the writer close a chunk once it holds exactly `targetDocsPerChunk` documents, regardless of value
+  /// length. Only supported by raw index writer version 6.
+  public boolean isEnforceTargetDocsPerChunk() {
+    return _enforceTargetDocsPerChunk;
+  }
+
   @JsonIgnore
   public int getTargetMaxChunkSizeBytes() {
     return _targetMaxChunkSizeBytes;
@@ -265,13 +293,13 @@ public class ForwardIndexConfig extends IndexConfig {
     return _compressionCodec == that._compressionCodec && _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
         && _rawIndexWriterVersion == that._rawIndexWriterVersion && Objects.equals(_targetMaxChunkSize,
         that._targetMaxChunkSize) && _targetDocsPerChunk == that._targetDocsPerChunk
-        && _encodingType == that._encodingType;
+        && _enforceTargetDocsPerChunk == that._enforceTargetDocsPerChunk && _encodingType == that._encodingType;
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _compressionCodec, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
-        _targetMaxChunkSize, _targetDocsPerChunk, _encodingType);
+        _targetMaxChunkSize, _targetDocsPerChunk, _enforceTargetDocsPerChunk, _encodingType);
   }
 
   public static class Builder {
@@ -283,6 +311,7 @@ public class ForwardIndexConfig extends IndexConfig {
     private int _rawIndexWriterVersion = _defaultRawIndexWriterVersion;
     private String _targetMaxChunkSize = _defaultTargetMaxChunkSize;
     private int _targetDocsPerChunk = _defaultTargetDocsPerChunk;
+    private boolean _enforceTargetDocsPerChunk = _defaultEnforceTargetDocsPerChunk;
     private Map<String, Object> _configs = new HashMap<>();
 
     /// Constructs a builder with the given forward-index encoding. Callers should pass `FieldConfig.getEncodingType()`
@@ -306,6 +335,7 @@ public class ForwardIndexConfig extends IndexConfig {
       _rawIndexWriterVersion = other._rawIndexWriterVersion;
       _targetMaxChunkSize = other._targetMaxChunkSize;
       _targetDocsPerChunk = other._targetDocsPerChunk;
+      _enforceTargetDocsPerChunk = other._enforceTargetDocsPerChunk;
       _configs = other._configs;
     }
 
@@ -336,6 +366,11 @@ public class ForwardIndexConfig extends IndexConfig {
 
     public Builder withTargetDocsPerChunk(int targetDocsPerChunk) {
       _targetDocsPerChunk = targetDocsPerChunk;
+      return this;
+    }
+
+    public Builder withEnforceTargetDocsPerChunk(boolean enforceTargetDocsPerChunk) {
+      _enforceTargetDocsPerChunk = enforceTargetDocsPerChunk;
       return this;
     }
 
@@ -399,7 +434,7 @@ public class ForwardIndexConfig extends IndexConfig {
 
     public ForwardIndexConfig build() {
       return new ForwardIndexConfig(_disabled, _encodingType, _compressionCodec, null, null, _deriveNumDocsPerChunk,
-          _rawIndexWriterVersion, _targetMaxChunkSize, _targetDocsPerChunk, _configs);
+          _rawIndexWriterVersion, _targetMaxChunkSize, _targetDocsPerChunk, _enforceTargetDocsPerChunk, _configs);
     }
   }
 }
