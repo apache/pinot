@@ -48,10 +48,11 @@ import org.roaringbitmap.RoaringBitmap;
 /// ```
 ///
 /// where a column `c_i` that does NOT participate in `S` (rolled up) is pinned to the NULL sentinel, and the
-/// trailing `groupingId` is a bitmask over the union with bit `i` set iff column `i` is rolled up in `S`
-/// (PostgreSQL `GROUPING` semantics: 1 = aggregated away). The `groupingId` is appended as a synthetic key
-/// column so that rows from different grouping sets never collide -- e.g. set `{a}` with `b` rolled up to
-/// NULL stays distinct from set `{a, b}` where `b` is genuinely NULL, even though both render `(a, NULL)`.
+/// trailing `groupingId` is the ordinal of `S` (its index in the query's grouping-set list). The ordinal is
+/// appended as a synthetic key column so that rows from different grouping sets never collide -- e.g. set
+/// `{a}` with `b` rolled up to NULL stays distinct from set `{a, b}` where `b` is genuinely NULL, even though
+/// both render `(a, NULL)` -- and it identifies the producing set for GROUPING() / GROUPING_ID(). Because the
+/// ordinal is not a per-column bitmask, the number of grouping columns is unlimited.
 ///
 /// This generator always emits multiple keys per row, so it is only used via the multi-value
 /// ({@code int[][]}) executor path. The union columns are resolved through per-column on-the-fly
@@ -75,11 +76,10 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
   private final boolean _nullHandlingEnabled;
   private final int _numGroupsLimit;
 
-  /// Per grouping set: membership over the union columns, and the grouping-id bitmask (bit i set iff column i
-  /// is rolled up / excluded from the set). The bitmask is also the value stored in the synthetic
-  /// $groupingId key column and consumed by GROUPING() / GROUPING_ID().
+  /// Per grouping set: membership over the union columns. The set's ordinal (its index in the query's
+  /// grouping-set list) is the value stored in the synthetic $groupingId key column, keeping rows from
+  /// different sets distinct and identifying the set for GROUPING() / GROUPING_ID().
   private final boolean[][] _setContains;
-  private final int[] _setBitmasks;
   private final int _numSets;
 
   private final Object2IntOpenHashMap<FixedIntArray> _groupKeyMap;
@@ -110,18 +110,10 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
 
     _numSets = groupingSets.size();
     _setContains = new boolean[_numSets][_numGroupByExpressions];
-    _setBitmasks = new int[_numSets];
     for (int s = 0; s < _numSets; s++) {
       for (int columnIndex : groupingSets.get(s)) {
         _setContains[s][columnIndex] = true;
       }
-      int bitmask = 0;
-      for (int i = 0; i < _numGroupByExpressions; i++) {
-        if (!_setContains[s][i]) {
-          bitmask |= 1 << i;
-        }
-      }
-      _setBitmasks[s] = bitmask;
     }
 
     _groupKeyMap = new Object2IntOpenHashMap<>();
@@ -164,7 +156,7 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
         for (int col = 0; col < _numGroupByExpressions; col++) {
           keyValues[col] = _setContains[s][col] ? columnIds[col][row] : ID_FOR_NULL;
         }
-        keyValues[_numGroupByExpressions] = _setBitmasks[s];
+        keyValues[_numGroupByExpressions] = s;
         int groupId = getGroupIdForKey(flyweightKey);
         if (groupId == numGroups) {
           /// A new group was inserted, so the map now retains this buffer; allocate a fresh one to reuse.
@@ -188,15 +180,15 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
       columnValueIds[col] = resolveColumnValueIds(valueBlock, col, numDocs);
     }
     int[][] keyComponents = new int[_numGroupByExpressions + 1][];
-    int[] bitmaskComponent = new int[1];
-    keyComponents[_numGroupByExpressions] = bitmaskComponent;
+    int[] ordinalComponent = new int[1];
+    keyComponents[_numGroupByExpressions] = ordinalComponent;
     for (int row = 0; row < numDocs; row++) {
       IntArrayList rowGroupIds = new IntArrayList(_numSets);
       for (int s = 0; s < _numSets; s++) {
         for (int col = 0; col < _numGroupByExpressions; col++) {
           keyComponents[col] = _setContains[s][col] ? columnValueIds[col][row] : _nullComponent;
         }
-        bitmaskComponent[0] = _setBitmasks[s];
+        ordinalComponent[0] = s;
         expandGroupIds(keyComponents, new int[_numGroupByExpressions + 1], 0, rowGroupIds);
       }
       groupKeys[row] = rowGroupIds.toIntArray();
@@ -381,14 +373,14 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   /// Reconstructs the output row for a composite key: the union column values (NULL where rolled up) followed
-  /// by the integer grouping-id discriminator.
+  /// by the integer grouping-set-ordinal discriminator.
   private Object[] buildKeysFromIds(FixedIntArray keyList) {
     int[] ids = keyList.elements();
     Object[] keys = new Object[_numGroupByExpressions + 1];
     for (int i = 0; i < _numGroupByExpressions; i++) {
       keys[i] = ids[i] == ID_FOR_NULL ? null : _onTheFlyDictionaries[i].get(ids[i]);
     }
-    /// The trailing slot stores the grouping-id bitmask directly (not a dictionary id).
+    /// The trailing slot stores the grouping-set ordinal directly (not a dictionary id).
     keys[_numGroupByExpressions] = ids[_numGroupByExpressions];
     return keys;
   }

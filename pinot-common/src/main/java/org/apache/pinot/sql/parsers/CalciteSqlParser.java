@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -65,6 +66,7 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Join;
 import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -97,11 +99,9 @@ public class CalciteSqlParser {
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   // TODO: Add the ability to configure the parser's maximum identifier length via configuration if needed in the future
   public static final int CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH = 1024;
-  /// The grouping-set discriminator is encoded as a 32-bit INT bitmask over the union group-by columns, so a
-  /// GROUPING SETS / ROLLUP / CUBE query may reference at most 31 distinct grouping columns.
-  public static final int MAX_GROUPING_SETS_COLUMNS = 31;
-  /// Upper bound on the number of grouping sets a single query may expand to (guards against CUBE blow-up).
-  public static final int MAX_GROUPING_SETS = 4096;
+  /// Upper bound on the number of grouping sets a single query may expand to (guards against CUBE blow-up);
+  /// shared with the multi-stage plan conversion.
+  public static final int MAX_GROUPING_SETS = GroupingSets.MAX_GROUPING_SETS;
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
@@ -256,10 +256,46 @@ public class CalciteSqlParser {
     // sets. Note that GROUPING() / GROUPING_ID() are not aggregation functions. (Plain non-aggregation GROUP BY
     // queries are rewritten to DISTINCT by NonAggregationGroupByToDistinctQueryRewriter, but that rewrite cannot
     // represent multiple grouping sets.)
-    if (pinotQuery.getGroupingSetMasks() != null && aggregateExprCount == 0 && !hasAggregationOutsideSelect(
+    if (pinotQuery.getGroupingSets() != null && aggregateExprCount == 0 && !hasAggregationOutsideSelect(
         pinotQuery)) {
       throw new SqlCompilationException(
           "GROUP BY GROUPING SETS / ROLLUP / CUBE requires at least one aggregation function in the query");
+    }
+    // GROUPING()/GROUPING_ID() pack one bit per argument into an INT, so a single call accepts at most 31
+    // arguments (a per-call limit — the number of grouping columns is unlimited). Reject at compile time so the
+    // user gets a clear error instead of a mid-execution failure from the shared value computation.
+    if (pinotQuery.getGroupingSets() != null) {
+      for (Expression selectExpression : pinotQuery.getSelectList()) {
+        validateGroupingFunctionArgs(selectExpression);
+      }
+      if (pinotQuery.getHavingExpression() != null) {
+        validateGroupingFunctionArgs(pinotQuery.getHavingExpression());
+      }
+      if (pinotQuery.getOrderByList() != null) {
+        for (Expression orderBy : pinotQuery.getOrderByList()) {
+          validateGroupingFunctionArgs(orderBy);
+        }
+      }
+    }
+  }
+
+  /// Recursively rejects GROUPING() / GROUPING_ID() calls with more than
+  /// {@link GroupingSets#MAX_GROUPING_FUNCTION_ARGS} arguments (the packed INT bit width).
+  private static void validateGroupingFunctionArgs(Expression expression) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    if (GroupingSets.isGroupingFunction(function.getOperator())
+        && function.getOperandsSize() > GroupingSets.MAX_GROUPING_FUNCTION_ARGS) {
+      throw new SqlCompilationException(
+          "GROUPING / GROUPING_ID supports at most " + GroupingSets.MAX_GROUPING_FUNCTION_ARGS + " arguments, got "
+              + function.getOperandsSize());
+    }
+    if (function.getOperands() != null) {
+      for (Expression operand : function.getOperands()) {
+        validateGroupingFunctionArgs(operand);
+      }
     }
   }
 
@@ -725,16 +761,16 @@ public class CalciteSqlParser {
   }
 
   /// Converts the GROUP BY clause into {@link PinotQuery#groupByList} and (when grouping constructs are
-  /// present) {@link PinotQuery#groupingSetMasks}.
+  /// present) {@link PinotQuery#groupingSets}.
   ///
   /// For a plain GROUP BY (no ROLLUP / CUBE / GROUPING SETS) this behaves exactly like
-  /// {@link #convertSelectList} and leaves {@code groupingSetMasks} unset, so non-grouping-set queries are
+  /// {@link #convertSelectList} and leaves {@code groupingSets} unset, so non-grouping-set queries are
   /// unchanged. When grouping constructs are present, the grouping elements are cross-multiplied into the
   /// canonical, de-duplicated list of grouping sets (standard SQL semantics, e.g.
   /// {@code GROUP BY a, ROLLUP(b, c)} produces {@code {a,b,c}, {a,b}, {a}}); the ordered, de-duplicated
   /// union of all participating columns is stored as {@code groupByList}, and each grouping set is stored
-  /// as a membership bitmask over that union — bit {@code i} set iff union column {@code i} participates,
-  /// a mask of {@code 0} being the grand-total set {@code ()}.
+  /// as the sorted list of its participating union-column indexes, an empty list being the grand-total set
+  /// {@code ()}.
   private static void setGroupByListAndGroupingSets(PinotQuery pinotQuery, SqlNodeList groupByNodeList) {
     boolean hasGroupingConstruct = false;
     for (SqlNode node : groupByNodeList) {
@@ -776,28 +812,25 @@ public class CalciteSqlParser {
         unionIndex.computeIfAbsent(expr, k -> unionIndex.size());
       }
     }
-    if (unionIndex.size() > MAX_GROUPING_SETS_COLUMNS) {
-      throw new SqlCompilationException(
-          "GROUPING SETS / ROLLUP / CUBE support at most " + MAX_GROUPING_SETS_COLUMNS
-              + " distinct grouping columns, got " + unionIndex.size());
-    }
     pinotQuery.setGroupByList(new ArrayList<>(unionIndex.keySet()));
 
-    /// Encode each grouping set as a membership bitmask over the union columns (bit i set iff union column i
-    /// participates), de-duplicating overlapping sets produced by CUBE/ROLLUP. A mask of 0 is the grand-total
-    /// set (). The union is capped at MAX_GROUPING_SETS_COLUMNS (31) above, so a 32-bit mask never overflows.
-    Set<Integer> seen = new HashSet<>();
-    List<Integer> groupingSetMasks = new ArrayList<>();
+    /// Encode each grouping set as the sorted list of its participating union-column indexes (mirroring
+    /// Calcite's per-set column bitset, so the number of grouping columns is unlimited), de-duplicating
+    /// overlapping sets produced by CUBE/ROLLUP. An empty list is the grand-total set (). A set's position in
+    /// the list is its ordinal — the value the engine carries in the synthetic $groupingId discriminator.
+    Set<List<Integer>> seen = new HashSet<>();
+    List<List<Integer>> groupingSets = new ArrayList<>();
     for (LinkedHashSet<Expression> set : combinedSets) {
-      int mask = 0;
+      List<Integer> columnIndexes = new ArrayList<>(set.size());
       for (Expression expr : set) {
-        mask |= 1 << unionIndex.get(expr);
+        columnIndexes.add(unionIndex.get(expr));
       }
-      if (seen.add(mask)) {
-        groupingSetMasks.add(mask);
+      Collections.sort(columnIndexes);
+      if (seen.add(columnIndexes)) {
+        groupingSets.add(columnIndexes);
       }
     }
-    pinotQuery.setGroupingSetMasks(groupingSetMasks);
+    pinotQuery.setGroupingSets(groupingSets);
   }
 
   private static boolean isGroupingConstruct(SqlKind kind) {

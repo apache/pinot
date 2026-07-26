@@ -25,6 +25,8 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.GroupingSets;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -50,6 +52,7 @@ import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.RepeatOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
@@ -220,12 +223,70 @@ public class PlanNodeToOpChain {
       try {
         PlanNode input = node.getInputs().get(0);
         child = visit(input, context);
+        /// GROUP BY GROUPING SETS / ROLLUP / CUBE in the multi-stage runtime: expand each input row across the
+        /// grouping sets via a RepeatOperator — appending per-set group-key copies (NULL where rolled up) and the
+        /// $groupingId ordinal while leaving the original input columns untouched (aggregation arguments may
+        /// reference a grouping column) — then hand the factory an ordinary GROUP BY over the appended key copies
+        /// plus $groupingId. Wrapping here — rather than inside a specific AggregateOperator implementation — means
+        /// every AggregateOperatorFactory receives already-expanded input and needs no grouping-set awareness. This
+        /// path handles grouping sets over any input (e.g. above a JOIN); when the aggregate sits directly on a
+        /// table scan the whole expansion is pushed down to the single-stage leaf instead and the plan reaching here
+        /// has no grouping sets.
+        if (node.isGroupingSets()) {
+          child = new RepeatOperator(context, child, groupKeyIds(node.getGroupKeys()), node.getGroupingSets(),
+              repeatResultSchema(input.getDataSchema(), node.getGroupKeys()));
+          node = asPlainGroupByOverExpandedInput(node, input.getDataSchema().size());
+        }
         AggregateOperatorFactory aggregateOperatorFactory =
             context.getQueryOperatorFactoryProvider().getAggregateOperatorFactory();
         return aggregateOperatorFactory.createAggregateOperator(context, child, input, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
+    }
+
+    /// Output schema of the {@link RepeatOperator} that feeds a grouping-set aggregate: the aggregate input schema
+    /// with one group-key copy column per union group-by column and the synthetic {@code $groupingId} INT
+    /// discriminator column appended.
+    private static DataSchema repeatResultSchema(DataSchema inputSchema, List<Integer> unionGroupKeyIds) {
+      int numInputColumns = inputSchema.size();
+      int numUnionKeys = unionGroupKeyIds.size();
+      String[] columnNames = new String[numInputColumns + numUnionKeys + 1];
+      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numInputColumns + numUnionKeys + 1];
+      for (int i = 0; i < numInputColumns; i++) {
+        columnNames[i] = inputSchema.getColumnName(i);
+        columnDataTypes[i] = inputSchema.getColumnDataType(i);
+      }
+      for (int i = 0; i < numUnionKeys; i++) {
+        columnNames[numInputColumns + i] = GroupingSets.GROUPING_SET_KEY_COLUMN_PREFIX + i;
+        columnDataTypes[numInputColumns + i] = inputSchema.getColumnDataType(unionGroupKeyIds.get(i));
+      }
+      columnNames[numInputColumns + numUnionKeys] = GroupingSets.GROUPING_ID_COLUMN;
+      columnDataTypes[numInputColumns + numUnionKeys] = DataSchema.ColumnDataType.INT;
+      return new DataSchema(columnNames, columnDataTypes);
+    }
+
+    /// The equivalent plain GROUP BY over the RepeatOperator-expanded input: the group keys are the appended
+    /// group-key copies plus the $groupingId column (the original input columns are left untouched for aggregation
+    /// arguments), and the grouping sets are cleared.
+    private static AggregateNode asPlainGroupByOverExpandedInput(AggregateNode node, int numInputColumns) {
+      int numUnionKeys = node.getGroupKeys().size();
+      List<Integer> groupKeys = new ArrayList<>(numUnionKeys + 1);
+      for (int i = 0; i <= numUnionKeys; i++) {
+        groupKeys.add(numInputColumns + i);
+      }
+      return new AggregateNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), node.getInputs(),
+          node.getAggCalls(), node.getFilterArgs(), groupKeys, node.getAggType(), node.isLeafReturnFinalResult(),
+          node.getCollations(), node.getLimit());
+    }
+
+    private static int[] groupKeyIds(List<Integer> groupKeys) {
+      int numKeys = groupKeys.size();
+      int[] groupKeyIds = new int[numKeys];
+      for (int i = 0; i < numKeys; i++) {
+        groupKeyIds[i] = groupKeys.get(i);
+      }
+      return groupKeyIds;
     }
 
     @Override
