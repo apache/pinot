@@ -92,6 +92,12 @@ public class HybridQuickstart extends Quickstart {
     printStatus(Color.GREEN, "***************************************************");
   }
 
+  /** A single server, as this quickstart demos hybrid table routing rather than distributed query execution. */
+  @Override
+  protected int getNumQuickstartRunnerServers() {
+    return 1;
+  }
+
   @Override
   protected String[] getDefaultBatchTableDirectories() {
     return new String[]{"examples/batch/airlineStats"};

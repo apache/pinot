@@ -21,19 +21,11 @@ package org.apache.pinot.tools.admin.command;
 import java.lang.reflect.InvocationTargetException;
 import org.apache.pinot.tools.EmptyQuickstart;
 import org.apache.pinot.tools.HybridQuickstart;
-import org.apache.pinot.tools.JoinQuickStart;
-import org.apache.pinot.tools.JsonIndexQuickStart;
 import org.apache.pinot.tools.MultiClusterQuickstart;
-import org.apache.pinot.tools.OfflineComplexTypeHandlingQuickStart;
 import org.apache.pinot.tools.QuickStartBase;
 import org.apache.pinot.tools.Quickstart;
-import org.apache.pinot.tools.RealtimeComplexTypeHandlingQuickStart;
-import org.apache.pinot.tools.RealtimeJsonIndexQuickStart;
 import org.apache.pinot.tools.RealtimeQuickStart;
 import org.apache.pinot.tools.RealtimeQuickStartWithMinion;
-import org.apache.pinot.tools.TimestampIndexQuickstart;
-import org.apache.pinot.tools.UpsertJsonQuickStart;
-import org.apache.pinot.tools.UpsertQuickStart;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -71,51 +63,59 @@ public class TestQuickStartCommand {
     Assert.assertEquals(quickStartClassFor("REALTIME-MINION"), RealtimeQuickStartWithMinion.class);
 
     Assert.assertEquals(quickStartClassFor("REALTIME"), RealtimeQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("STREAM"), RealtimeQuickStart.class);
 
     Assert.assertEquals(quickStartClassFor("HYBRID"), HybridQuickstart.class);
-
-    Assert.assertEquals(quickStartClassFor("JOIN"), JoinQuickStart.class);
-
-    Assert.assertEquals(quickStartClassFor("UPSERT"), UpsertQuickStart.class);
-
-    Assert.assertEquals(quickStartClassFor("OFFLINE_JSON_INDEX"), JsonIndexQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("OFFLINE-JSON-INDEX"), JsonIndexQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("BATCH_JSON_INDEX"), JsonIndexQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("BATCH-JSON-INDEX"), JsonIndexQuickStart.class);
-
-    Assert.assertEquals(quickStartClassFor("REALTIME_JSON_INDEX"), RealtimeJsonIndexQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("REALTIME-JSON-INDEX"), RealtimeJsonIndexQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("STREAM_JSON_INDEX"), RealtimeJsonIndexQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("STREAM-JSON-INDEX"), RealtimeJsonIndexQuickStart.class);
-
-    Assert.assertEquals(quickStartClassFor("UPSERT_JSON_INDEX"), UpsertJsonQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("UPSERT-JSON-INDEX"), UpsertJsonQuickStart.class);
-
-    Assert.assertEquals(quickStartClassFor("OFFLINE_COMPLEX_TYPE"),
-        OfflineComplexTypeHandlingQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("OFFLINE-COMPLEX-TYPE"),
-        OfflineComplexTypeHandlingQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("BATCH_COMPLEX_TYPE"),
-        OfflineComplexTypeHandlingQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("BATCH-COMPLEX-TYPE"),
-        OfflineComplexTypeHandlingQuickStart.class);
-
-    Assert.assertEquals(quickStartClassFor("REALTIME_COMPLEX_TYPE"),
-        RealtimeComplexTypeHandlingQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("REALTIME-COMPLEX-TYPE"),
-        RealtimeComplexTypeHandlingQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("STREAM_COMPLEX_TYPE"),
-        RealtimeComplexTypeHandlingQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("STREAM-COMPLEX-TYPE"),
-        RealtimeComplexTypeHandlingQuickStart.class);
-
-    Assert.assertEquals(quickStartClassFor("TIMESTAMP"),
-        TimestampIndexQuickstart.class);
 
     Assert.assertEquals(quickStartClassFor("MULTI_CLUSTER"),
         MultiClusterQuickstart.class);
     Assert.assertEquals(quickStartClassFor("MULTICLUSTER"),
         MultiClusterQuickstart.class);
+  }
+
+  /**
+   * The batch-side quickstarts that only differed by their sample queries were merged into {@link Quickstart}; their
+   * types must keep resolving so that existing docs and scripts do not break.
+   */
+  @Test
+  public void testDeprecatedBatchTypesResolveToQuickstart()
+      throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    for (String type : new String[]{
+        "MULTI_STAGE", "JOIN", "TIMESTAMP", "OFFLINE_JSON_INDEX", "OFFLINE-JSON-INDEX", "BATCH_JSON_INDEX",
+        "BATCH-JSON-INDEX", "OFFLINE_COMPLEX_TYPE", "OFFLINE-COMPLEX-TYPE", "BATCH_COMPLEX_TYPE", "BATCH-COMPLEX-TYPE"
+    }) {
+      Assert.assertEquals(quickStartClassFor(type), Quickstart.class, type);
+      Assert.assertTrue(new Quickstart().deprecatedTypes().contains(type), type);
+    }
+  }
+
+  /**
+   * The stream-side quickstarts that only differed by their sample queries were merged into
+   * {@link RealtimeQuickStart}; their types must keep resolving so that existing docs and scripts do not break.
+   */
+  @Test
+  public void testDeprecatedStreamTypesResolveToRealtimeQuickStart()
+      throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    for (String type : new String[]{
+        "UPSERT", "UPSERT_JSON_INDEX", "UPSERT-JSON-INDEX", "PARTIAL_UPSERT", "PARTIAL-UPSERT", "REALTIME_JSON_INDEX",
+        "REALTIME-JSON-INDEX", "STREAM_JSON_INDEX", "STREAM-JSON-INDEX", "REALTIME_COMPLEX_TYPE",
+        "REALTIME-COMPLEX-TYPE", "STREAM_COMPLEX_TYPE", "STREAM-COMPLEX-TYPE"
+    }) {
+      Assert.assertEquals(quickStartClassFor(type), RealtimeQuickStart.class, type);
+      Assert.assertTrue(new RealtimeQuickStart().deprecatedTypes().contains(type), type);
+    }
+  }
+
+  /**
+   * Every deprecated alias must resolve to the quickstart that declares it, and must not collide with the canonical
+   * types or with another quickstart's alias.
+   */
+  @Test
+  public void testDeprecatedTypesAreASubsetOfTypes() {
+    Assert.assertTrue(new Quickstart().types().containsAll(new Quickstart().deprecatedTypes()));
+    Assert.assertTrue(new RealtimeQuickStart().types().containsAll(new RealtimeQuickStart().deprecatedTypes()));
+    Assert.assertFalse(new Quickstart().deprecatedTypes().contains("BATCH"));
+    Assert.assertFalse(new RealtimeQuickStart().deprecatedTypes().contains("REALTIME"));
   }
 
   private Class<? extends QuickStartBase> quickStartClassFor(String type)

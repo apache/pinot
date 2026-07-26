@@ -63,6 +63,15 @@ public class MultiDirQuickstart extends Quickstart {
     return new String[]{"examples/batch/airlineStats"};
   }
 
+  /**
+   * A single server, because the tier {@code dataDir}s configured above are fixed absolute paths that every server
+   * instance would otherwise share.
+   */
+  @Override
+  protected int getNumQuickstartRunnerServers() {
+    return 1;
+  }
+
   @Override
   public void runSampleQueries(QuickstartRunner runner)
       throws Exception {
