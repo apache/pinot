@@ -620,7 +620,10 @@ public class FastJsonPathExtractorTest {
     }
     Object[] batch = new Object[paths.length];
     FastJsonPathExtractor.extract(json, compiled, batch, false, false);
+    Object[] bytesBatch = new Object[paths.length];
+    FastJsonPathExtractor.extract(json.getBytes(StandardCharsets.UTF_8), compiled, bytesBatch, false, false);
     for (int i = 0; i < paths.length; i++) {
+      assertEquals(bytesBatch[i], batch[i], paths[i]);
       assertEquals(batch[i], FastJsonPathExtractor.extract(json, compiled[i], false, false), paths[i]);
       assertEquals(batch[i], PLAIN_CONTEXT.parse(json).read(paths[i], NO_PREDICATES), paths[i]);
     }

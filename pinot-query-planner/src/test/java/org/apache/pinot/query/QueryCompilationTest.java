@@ -30,6 +30,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
@@ -68,6 +69,73 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryPlanWithoutException(String query) {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
     assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testFastJsonExtractScalarTypeInference() {
+    RelDataType rowType = _queryEnvironment.compile(
+            "SELECT JSON_EXTRACT_SCALAR_FAST(hexToBytes(col1), '$.foo', 'BIG_DECIMAL'), "
+                + "JSON_EXTRACT_SCALAR(col1, '$.foo', 'LONG', -1), "
+                + "JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'BOOLEAN', FALSE), "
+                + "JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'LONG', -1), "
+                + "JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'DOUBLE_ARRAY'), "
+                + "JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'BIG_DECIMAL_ARRAY'), "
+                + "JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'BOOLEAN_ARRAY'), "
+                + "JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'TIMESTAMP_ARRAY'), "
+                + "JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'JSON') FROM a")
+        .getRelRoot().validatedRowType;
+    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.DECIMAL);
+    assertEquals(rowType.getFieldList().get(1).getType().getSqlTypeName(), SqlTypeName.BIGINT);
+    assertEquals(rowType.getFieldList().get(2).getType().getSqlTypeName(), SqlTypeName.BOOLEAN);
+    assertEquals(rowType.getFieldList().get(3).getType().getSqlTypeName(), SqlTypeName.BIGINT);
+    RelDataType arrayType = rowType.getFieldList().get(4).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.DOUBLE);
+    arrayType = rowType.getFieldList().get(5).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.DECIMAL);
+    arrayType = rowType.getFieldList().get(6).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.BOOLEAN);
+    arrayType = rowType.getFieldList().get(7).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.TIMESTAMP);
+    assertEquals(rowType.getFieldList().get(8).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
+
+    // A non-literal resultsType or defaultValue is rejected during validation. jsonPath is deliberately not in this
+    // list -- see testJsonExtractScalarAcceptsFoldableJsonPath.
+    List<String> invalidQueries = List.of(
+        "SELECT JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'LONG', col3) FROM a",
+        "SELECT JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', col2, -1) FROM a");
+    for (String invalidQuery : invalidQueries) {
+      Throwable invalidOperand = expectThrows(RuntimeException.class, () -> _queryEnvironment.compile(invalidQuery));
+      assertTrue(Throwables.getStackTraceAsString(invalidOperand).contains("Cannot apply 'JSONEXTRACTSCALAR"),
+          "Unexpected failure for " + invalidQuery + ": " + Throwables.getStackTraceAsString(invalidOperand));
+    }
+  }
+
+  /// `jsonPath` must resolve to a literal, but the operand type checker deliberately does not demand a literal
+  /// `SqlNode` in that position: operand checking runs before `PinotEvaluateLiteralRule` folds constant
+  /// expressions, so an argument such as `CONCAT('$.', 'foo')` folds to a literal and plans and executes
+  /// correctly. Requiring [org.apache.calcite.sql.type.OperandTypes#LITERAL] there would reject these queries,
+  /// which plan and execute successfully on master. Regression guard for all three JSON scalar transforms, which
+  /// share one operand checker; `QueryRunnerTest#provideTestSqlWithExecutionException` covers the end-to-end half,
+  /// asserting that a folded path is actually applied on the leaf stage.
+  ///
+  /// `resultsType` is checked separately in [#testFastJsonExtractScalarTypeInference], since it must stay a literal
+  /// for return-type inference to see it.
+  @Test
+  public void testJsonExtractScalarAcceptsFoldableJsonPath() {
+    List<String> functions =
+        List.of("JSON_EXTRACT_SCALAR", "JSON_EXTRACT_SCALAR_FAST", "JSON_EXTRACT_SCALAR_FIRST_MATCH");
+    for (String function : functions) {
+      for (String path : List.of("CONCAT('$.', 'foo')", "CAST('$.foo' AS VARCHAR)", "UPPER('$.foo')")) {
+        String query = "SELECT " + function + "(col1, " + path + ", 'INT') FROM a";
+        // The return type must still come from the literal resultsType rather than falling back to VARCHAR.
+        assertEquals(_queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType()
+            .getSqlTypeName(), SqlTypeName.INTEGER, query);
+      }
+    }
   }
 
   @Test
