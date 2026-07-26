@@ -559,6 +559,14 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
           columnIndexCreators.getIndexConfigs().getConfig(StandardIndexes.forward());
       addColumnMetadataInfo(properties, column, columnStatistics, _totalDocs, _schema.getFieldSpecFor(column),
           hasDictionary, dictionaryElementSize, fwdConfig.getEncodingType(), false);
+      // When null handling is enabled for a column but it has no null values, NullValueVectorCreator.seal() writes no
+      // bitmap file. Record a metadata flag for that case so such a column is distinguishable from one that never had
+      // null handling (both lack a bitmap file), which is what the reload-time backfill relies on. Columns that do
+      // have null values are identified by the bitmap file itself and need no flag.
+      NullValueVectorCreator nullValueVectorCreator = columnIndexCreators.getNullValueVectorCreator();
+      if (nullValueVectorCreator != null && nullValueVectorCreator.isNonNull()) {
+        properties.setProperty(getKeyFor(column, IS_NON_NULL), String.valueOf(true));
+      }
     }
 
     if (_config.isCompressionStatsEnabled()) {

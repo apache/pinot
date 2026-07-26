@@ -1692,6 +1692,10 @@ public final class TableConfigUtils {
       }
     }
 
+    // Null value vector backfill on the time column needs the whole table config (for the time column name), so it
+    // cannot be validated by NullValueIndexType.validate which only sees one field at a time.
+    validateNullValueVectorBackfillForTimeColumn(tableConfig, schema, indexConfigsMap);
+
     validateMultiColumnTextIndex(indexingConfig.getMultiColumnTextIndexConfig());
 
     // OPEN_STRUCT materialized child columns use a reserved separator '$' in their name. When any
@@ -1756,6 +1760,32 @@ public final class TableConfigUtils {
         }
       }
     }
+  }
+
+  /// Rejects a null value vector backfill opt-in on the time column when its default null value is outside the valid
+  /// time range.
+  ///
+  /// In that case ingestion substitutes the ingestion-time current time for null rows (see
+  /// [NullValueTransformerUtils#isDefaultTimeValueInValidRange]) while the segment metadata records the field spec's
+  /// default null value. A backfill scan compares against the recorded default, so it would never match: the column
+  /// would silently keep its nulls unmarked and be recorded as containing no nulls. A time column with an explicit
+  /// in-range default null value is stored as-is and is therefore allowed.
+  private static void validateNullValueVectorBackfillForTimeColumn(TableConfig tableConfig, Schema schema,
+      Map<String, FieldIndexConfigs> indexConfigsMap) {
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    if (StringUtils.isEmpty(timeColumnName)) {
+      return;
+    }
+    FieldIndexConfigs indexConfigs = indexConfigsMap.get(timeColumnName);
+    if (indexConfigs == null || !indexConfigs.getConfig(StandardIndexes.nullValueVector()).isBackfill()) {
+      return;
+    }
+    DateTimeFieldSpec timeColumnSpec = schema.getSpecForTimeColumn(timeColumnName);
+    Preconditions.checkState(timeColumnSpec != null, "Failed to find time column: %s in schema", timeColumnName);
+    Preconditions.checkState(NullValueTransformerUtils.isDefaultTimeValueInValidRange(timeColumnSpec),
+        "Null value vector backfill is not supported for time column: %s with default null value: %s outside the valid "
+            + "time range, because ingestion stores the current time for null values instead of the default null value",
+        timeColumnName, timeColumnSpec.getDefaultNullValueString());
   }
 
   private static void validateMultiColumnTextIndex(MultiColumnTextIndexConfig multiColTextIndex) {
