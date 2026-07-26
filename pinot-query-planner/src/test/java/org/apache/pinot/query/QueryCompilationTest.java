@@ -102,14 +102,39 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.TIMESTAMP);
     assertEquals(rowType.getFieldList().get(8).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
 
+    // A non-literal resultsType or defaultValue is rejected during validation. jsonPath is deliberately not in this
+    // list -- see testJsonExtractScalarAcceptsFoldableJsonPath.
     List<String> invalidQueries = List.of(
         "SELECT JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'LONG', col3) FROM a",
-        "SELECT JSON_EXTRACT_SCALAR_FAST(col1, col2, 'LONG', -1) FROM a",
         "SELECT JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', col2, -1) FROM a");
     for (String invalidQuery : invalidQueries) {
-      Throwable invalidOperand =
-          expectThrows(RuntimeException.class, () -> _queryEnvironment.compile(invalidQuery));
-      assertTrue(Throwables.getStackTraceAsString(invalidOperand).contains("Cannot apply 'JSONEXTRACTSCALAR"));
+      Throwable invalidOperand = expectThrows(RuntimeException.class, () -> _queryEnvironment.compile(invalidQuery));
+      assertTrue(Throwables.getStackTraceAsString(invalidOperand).contains("Cannot apply 'JSONEXTRACTSCALAR"),
+          "Unexpected failure for " + invalidQuery + ": " + Throwables.getStackTraceAsString(invalidOperand));
+    }
+  }
+
+  /// `jsonPath` must resolve to a literal, but the operand type checker deliberately does not demand a literal
+  /// `SqlNode` in that position: operand checking runs before `PinotEvaluateLiteralRule` folds constant
+  /// expressions, so an argument such as `CONCAT('$.', 'foo')` folds to a literal and plans and executes
+  /// correctly. Requiring [org.apache.calcite.sql.type.OperandTypes#LITERAL] there would reject these queries,
+  /// which plan and execute successfully on master. Regression guard for all three JSON scalar transforms, which
+  /// share one operand checker; `QueryRunnerTest#provideTestSqlWithExecutionException` covers the end-to-end half,
+  /// asserting that a folded path is actually applied on the leaf stage.
+  ///
+  /// `resultsType` is checked separately in [#testFastJsonExtractScalarTypeInference], since it must stay a literal
+  /// for return-type inference to see it.
+  @Test
+  public void testJsonExtractScalarAcceptsFoldableJsonPath() {
+    List<String> functions =
+        List.of("JSON_EXTRACT_SCALAR", "JSON_EXTRACT_SCALAR_FAST", "JSON_EXTRACT_SCALAR_FIRST_MATCH");
+    for (String function : functions) {
+      for (String path : List.of("CONCAT('$.', 'foo')", "CAST('$.foo' AS VARCHAR)", "UPPER('$.foo')")) {
+        String query = "SELECT " + function + "(col1, " + path + ", 'INT') FROM a";
+        // The return type must still come from the literal resultsType rather than falling back to VARCHAR.
+        assertEquals(_queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType()
+            .getSqlTypeName(), SqlTypeName.INTEGER, query);
+      }
     }
   }
 

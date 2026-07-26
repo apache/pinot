@@ -337,21 +337,30 @@ public enum TransformFunctionType {
     return positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR);
   }
 
+  /// Operand checker shared by `jsonExtractScalar` and its `Fast` / `FirstMatch` variants.
+  ///
+  /// `jsonPath` deliberately does **not** require [OperandTypes#LITERAL]. Operand checking runs on the raw
+  /// `SqlNode` tree, before `PinotEvaluateLiteralRule` folds constant expressions, so demanding a literal here
+  /// would reject `jsonExtractScalar(col, CONCAT('$.', 'foo'), 'INT')` and other constant-foldable paths that fold
+  /// to a literal and run correctly. A genuinely non-literal `jsonPath` is rejected later, when the leaf stage
+  /// converts the folded call back into a Pinot expression.
+  ///
+  /// `resultsType` **does** require a literal, because [#jsonExtractScalarReturnTypeInference] reads it during
+  /// validation — also before folding — to derive the return type. Accepting a foldable `resultsType` there would
+  /// silently infer `VARCHAR` while the leaf stage extracts the real type, producing a plan whose schema disagrees
+  /// with its data.
   private static SqlOperandTypeChecker jsonExtractScalarOperandTypeChecker() {
-    SqlSingleOperandTypeChecker jsonInputTypeChecker =
-        OperandTypes.or(OperandTypes.CHARACTER, OperandTypes.BINARY);
-    SqlSingleOperandTypeChecker characterLiteralTypeChecker =
-        OperandTypes.and(OperandTypes.CHARACTER, OperandTypes.LITERAL);
+    SqlSingleOperandTypeChecker jsonInputTypeChecker = OperandTypes.or(OperandTypes.CHARACTER, OperandTypes.BINARY);
+    SqlSingleOperandTypeChecker resultsTypeChecker = OperandTypes.and(OperandTypes.CHARACTER, OperandTypes.LITERAL);
     return OperandTypes.or(
         OperandTypes.sequence(
             (operator, ignored) -> "'" + operator.getName()
-                + "(<CHARACTER_OR_BINARY>, <CHARACTER_LITERAL>, <CHARACTER_LITERAL>)'",
-            jsonInputTypeChecker, characterLiteralTypeChecker, characterLiteralTypeChecker),
+                + "(<CHARACTER_OR_BINARY>, <CHARACTER>, <CHARACTER_LITERAL>)'",
+            jsonInputTypeChecker, OperandTypes.CHARACTER, resultsTypeChecker),
         OperandTypes.sequence(
             (operator, ignored) -> "'" + operator.getName()
-                + "(<CHARACTER_OR_BINARY>, <CHARACTER_LITERAL>, <CHARACTER_LITERAL>, <LITERAL>)'",
-            jsonInputTypeChecker, characterLiteralTypeChecker, characterLiteralTypeChecker,
-            OperandTypes.NULLABLE_LITERAL));
+                + "(<CHARACTER_OR_BINARY>, <CHARACTER>, <CHARACTER_LITERAL>, <LITERAL>)'",
+            jsonInputTypeChecker, OperandTypes.CHARACTER, resultsTypeChecker, OperandTypes.NULLABLE_LITERAL));
   }
 
   private static RelDataType componentType(SqlOperatorBinding opBinding) {
