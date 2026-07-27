@@ -1,0 +1,6 @@
+userUUID,daysSinceFirstTrip,deviceOS,totalTrips
+user-1,2,android,147
+user-2,9,ios,74
+user-1,1,macos,38
+user-2,2,windows,98
+user-3,3,ios,153
