@@ -569,6 +569,21 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Install a per-partition topic table gauge.
+   *
+   * @param tableName The table name
+   * @param partitionId The partition id
+   * @param topicName The topic name
+   * @param gauge The gauge to use
+   * @param valueSupplier The supplier function used to retrieve the value of the gauge.
+   */
+  public void setOrUpdatePartitionTopicGauge(final String tableName, final int partitionId,
+      final String topicName, final G gauge, final Supplier<Long> valueSupplier) {
+    final String fullGaugeName = composeTableTopicGaugeName(tableName, String.valueOf(partitionId), topicName, gauge);
+    setOrUpdateGauge(fullGaugeName, valueSupplier);
+  }
+
+  /**
    * @deprecated please use setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) instead.
    *
    * Adds a new gauge whose values are retrieved from a callback function.
@@ -764,6 +779,20 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Removes a table gauge given the table name, the partition id, topic name and the gauge.
+   * The add/remove is expected to work correctly in case of being invoked across multiple threads.
+   * @param tableName table name
+   * @param partitionId The partition id
+   * @param topicName The topic name
+   * @param gauge the gauge to be removed
+   */
+  public void removePartitionTopicGauge(final String tableName, final int partitionId,
+      final String topicName, final G gauge) {
+    final String fullGaugeName = composeTableTopicGaugeName(tableName, String.valueOf(partitionId), topicName, gauge);
+    removeGauge(fullGaugeName);
+  }
+
+  /**
    * Removes a table gauge given the table name, the key and the gauge.
    * The add/remove is expected to work correctly in case of being invoked across multiple threads.
    * @param tableName table name
@@ -785,6 +814,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   private String composeTableGaugeName(final String tableName, final String key, final G gauge) {
     return gauge.getGaugeName() + "." + getTableName(tableName) + "." + key;
+  }
+
+  private String composeTableTopicGaugeName(final String tableName, final String key,
+      final String topicName, final G gauge) {
+    return gauge.getGaugeName() + "." + getTableName(tableName) + "." + key + "." + topicName;
   }
 
   public String composePluginGaugeName(String pluginName, Gauge gauge) {

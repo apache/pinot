@@ -372,43 +372,52 @@ public class IngestionDelayTracker {
   @VisibleForTesting
   void createMetrics(int partitionId) {
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
+    List<StreamConfig> streamConfigs =
+        IngestionConfigUtils.getStreamConfigs(_realTimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
+    String topicName = streamConfigs.get(streamConfigIndex).getTopicName();
     StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
 
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
-          () -> getPartitionIngestionOffsetLag(partitionId));
+      _serverMetrics.setOrUpdatePartitionTopicGauge(_metricName, partitionId, topicName,
+          ServerGauge.REALTIME_INGESTION_OFFSET_LAG, () -> getPartitionIngestionOffsetLag(partitionId));
 
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
+      _serverMetrics.setOrUpdatePartitionTopicGauge(_metricName, partitionId, topicName,
           ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET, () -> getPartitionIngestionConsumingOffset(partitionId));
 
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
+      _serverMetrics.setOrUpdatePartitionTopicGauge(_metricName, partitionId, topicName,
           ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getLatestPartitionOffset(partitionId));
     }
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
-        () -> getPartitionIngestionDelayMs(partitionId));
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
+    _serverMetrics.setOrUpdatePartitionTopicGauge(_metricName, partitionId, topicName,
+        ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelayMs(partitionId));
+    _serverMetrics.setOrUpdatePartitionTopicGauge(_metricName, partitionId, topicName,
         ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> getPartitionEndToEndIngestionDelayMs(partitionId));
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
+    _serverMetrics.setOrUpdatePartitionTopicGauge(_metricName, partitionId, topicName,
         ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS, () -> getPartitionIngestionReportingStatus(partitionId));
 
     LOGGER.info("Successfully created ingestion metrics for partition id: {}", partitionId);
   }
 
-  private void removeMetrics(int partitionId) {
+  @VisibleForTesting
+  void removeMetrics(int partitionId) {
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
-    StreamMetadataProvider streamMetadataProvider =
-        _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
-    // Remove all metrics associated with this partition
+    List<StreamConfig> streamConfigs =
+        IngestionConfigUtils.getStreamConfigs(_realTimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
+    String topicName = streamConfigs.get(streamConfigIndex).getTopicName();
+    StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
+
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
-      _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
-      _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
-      _serverMetrics.removePartitionGauge(_metricName, partitionId,
+      _serverMetrics.removePartitionTopicGauge(_metricName, partitionId, topicName,
+          ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
+      _serverMetrics.removePartitionTopicGauge(_metricName, partitionId, topicName,
+          ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
+      _serverMetrics.removePartitionTopicGauge(_metricName, partitionId, topicName,
           ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
     }
-    _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
-    _serverMetrics.removePartitionGauge(_metricName, partitionId,
+    _serverMetrics.removePartitionTopicGauge(_metricName, partitionId, topicName,
+        ServerGauge.REALTIME_INGESTION_DELAY_MS);
+    _serverMetrics.removePartitionTopicGauge(_metricName, partitionId, topicName,
         ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
-    _serverMetrics.removePartitionGauge(_metricName, partitionId,
+    _serverMetrics.removePartitionTopicGauge(_metricName, partitionId, topicName,
         ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS);
 
     LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
@@ -503,26 +512,26 @@ public class IngestionDelayTracker {
     // involves network traffic and may be inefficient.
     List<Integer> partitionsToVerify = getPartitionsToBeVerified();
     if (partitionsToVerify.isEmpty()) {
-      // Don't make the call to getHostedPartitionsGroupIds() as it involves checking ideal state.
+      // Don't make the call to getHostedConsumingPartitionsGroupIds() as it involves checking ideal state.
       return;
     }
-    Set<Integer> partitionsHostedByThisServer;
+    Set<Integer> consumingPartitionsHostedByThisServer;
     try {
-      partitionsHostedByThisServer = _realTimeTableDataManager.getHostedPartitionsGroupIds();
+      consumingPartitionsHostedByThisServer = _realTimeTableDataManager.getHostedConsumingPartitionsGroupIds();
     } catch (Exception e) {
       LOGGER.error("Failed to get partitions hosted by this server, table={}, exception={}:{}", _tableNameWithType,
           e.getClass(), e.getMessage());
       return;
     }
     for (int partitionId : partitionsToVerify) {
-      if (!partitionsHostedByThisServer.contains(partitionId)) {
-        // Partition is not hosted in this server anymore, stop tracking it
+      if (!consumingPartitionsHostedByThisServer.contains(partitionId)) {
+        // Partition is not hosted in this server anymore or is not consuming anymore, stop tracking it
         removePartitionId(partitionId);
       }
     }
 
     ConcurrentHashMap<Integer, Boolean> newMap = new ConcurrentHashMap<>();
-    partitionsHostedByThisServer.forEach(p -> newMap.put(p, true));
+    consumingPartitionsHostedByThisServer.forEach(p -> newMap.put(p, true));
     _partitionsHostedByThisServer = newMap;
   }
 
