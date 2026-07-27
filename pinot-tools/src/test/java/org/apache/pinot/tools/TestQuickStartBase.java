@@ -76,18 +76,11 @@ public class TestQuickStartBase {
     Assert.assertFalse(tpchTables.contains("fineFoodReviews"), "TPCH must not report stream-only tables as present");
   }
 
-  /** Every table the merged batch sample queries guard on must actually be bootstrapped by the batch quickstart. */
-  @Test
-  public void testBatchQuickstartBootstrapsEveryTableItsSampleQueriesNeed()
-      throws Exception {
-    Set<String> tables = tableNames(new Quickstart().bootstrapOfflineTableDirectories(new File(_tmpDir, "batch")));
-    Assert.assertTrue(tables.containsAll(Set.of("baseballStats", "dimBaseballTeams", "githubEvents",
-        "githubComplexTypeEvents", "airlineStats", "fineFoodReviews", "lineorder", "customer", "dates")),
-        tables.toString());
-    Assert.assertFalse(tables.contains("meetupRsvp"), "the batch quickstart does not bootstrap stream tables");
-  }
-
-  /** Every table the merged stream sample queries guard on must actually be bootstrapped by the stream quickstart. */
+  /**
+   * Every table the merged stream sample queries guard on must actually be bootstrapped by the stream quickstart.
+   * The batch equivalent is covered by the quickstart CI job, which queries each of those tables; the streaming job
+   * only asserts on {@code meetupRsvp}, so the remaining stream tables are checked here.
+   */
   @Test
   public void testStreamQuickstartBootstrapsEveryTableItsSampleQueriesNeed()
       throws Exception {
