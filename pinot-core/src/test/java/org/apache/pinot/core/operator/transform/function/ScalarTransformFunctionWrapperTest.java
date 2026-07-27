@@ -51,6 +51,30 @@ import static org.testng.Assert.assertTrue;
 public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTest {
 
   @Test
+  public void testObjectResultScalarTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("nullIf(1, 2)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertTrue(transformFunction.getResultMetadata().isSingleValue());
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, "1");
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testObjectParameterScalarTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("nullIf(%s, '__pinot_nullif_miss__')", STRING_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertTrue(transformFunction.getResultMetadata().isSingleValue());
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+    testTransformFunction(transformFunction, _stringSVValues);
+  }
+
+  @Test
   public void testStringLowerTransformFunction() {
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("lower(%s)", STRING_ALPHANUM_SV_COLUMN));
