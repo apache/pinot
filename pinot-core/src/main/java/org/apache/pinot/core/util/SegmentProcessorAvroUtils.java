@@ -87,14 +87,13 @@ public final class SegmentProcessorAvroUtils {
       Object[] values = (Object[]) value;
       Schema elementSchema =
           fieldSchema.getType() == Schema.Type.ARRAY ? fieldSchema.getElementType() : fieldSchema;
-      // Only BOOLEAN (stored int -> Boolean) and BYTES (byte[] -> ByteBuffer) element schemas can require a
-      // per-element transform. Every other MV element type is written as-is — INT/LONG/FLOAT/DOUBLE/STRING directly,
-      // and UUID (string element, raw byte[] rendered by the registered Conversion) — so hand the writer a zero-copy
-      // view over the existing array; allocating and copying a fresh list per row would be pure overhead on the
-      // segment-write hot path. (BIG_DECIMAL has a BYTES element schema and so takes the copy path below, but its
-      // BigDecimal values still pass through convertSingleValue unchanged for the registered Conversion.)
+      // Only BOOLEAN (stored Integer -> Boolean) and plain BYTES (byte[] -> ByteBuffer) element schemas require a
+      // per-element transform. Every other MV element type is written as-is — including BIG_DECIMAL, whose logical
+      // BYTES schema is handled by the registered Conversion — so hand the writer a zero-copy view over the existing
+      // array; allocating and copying a fresh list per row would be pure overhead on the segment-write hot path.
       Schema.Type elementType = elementSchema.getType();
-      if (elementType != Schema.Type.BOOLEAN && elementType != Schema.Type.BYTES) {
+      if (elementType != Schema.Type.BOOLEAN
+          && (elementType != Schema.Type.BYTES || isBigDecimalSchema(elementSchema))) {
         return Arrays.asList(values);
       }
       List<Object> converted = new ArrayList<>(values.length);
@@ -120,16 +119,21 @@ public final class SegmentProcessorAvroUtils {
     switch (valueSchema.getType()) {
       case BOOLEAN:
         // BOOLEAN is the one Pinot logical type with no Avro logical type to carry a Conversion, so its stored int
-        // 0/1 has to be coerced here. Values that are already Boolean (e.g. from a source that never went through
-        // Pinot's stored form) pass through.
-        return value instanceof Boolean ? value : ((Number) value).intValue() != 0;
+        // 0/1 has to be coerced here. All production callers provide either a transformed row or a segment-read row,
+        // so a BOOLEAN value is always in Pinot's stored Integer form.
+        return (Integer) value != 0;
       case BYTES:
-        // A byte[] bound for a plain BYTES field must be wrapped as ByteBuffer (GenericDatumWriter requires it for
-        // the bytes type). A BigDecimal bound for bytes{big-decimal} is left alone for the registered Conversion.
-        return value instanceof byte[] ? ByteBuffer.wrap((byte[]) value) : value;
+        // A plain BYTES value is always byte[] and must be wrapped as ByteBuffer (GenericDatumWriter requires it).
+        // BIG_DECIMAL's logical BYTES value must stay untouched for its registered Conversion.
+        return isBigDecimalSchema(valueSchema) ? value : ByteBuffer.wrap((byte[]) value);
       default:
         return value;
     }
+  }
+
+  private static boolean isBigDecimalSchema(Schema schema) {
+    LogicalType logicalType = schema.getLogicalType();
+    return logicalType != null && LogicalTypes.bigDecimal().getName().equals(logicalType.getName());
   }
 
   /// Shared Avro data model with the logical-type conversions registered. Populated once at class initialization and

@@ -48,6 +48,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -76,6 +77,30 @@ public class SegmentProcessorAvroUtilsTest {
     assertTrue(record.get("uuidCol") instanceof byte[], "UUID must be left as raw byte[] for the uuid Conversion");
     assertEquals((byte[]) record.get("uuidCol"), uuidBytes);
     assertEquals(record.get("bytesCol"), ByteBuffer.wrap(rawBytes), "BYTES byte[] must be wrapped as ByteBuffer");
+  }
+
+  /// A logical BYTES array such as `bytes{logicalType:big-decimal}` is handled by its registered Conversion and must
+  /// not take the plain-BYTES per-element copy path.
+  @Test
+  public void testConvertGenericRowToAvroRecordKeepsLogicalBytesArrayZeroCopy() {
+    Schema bigDecimalSchema = LogicalTypes.bigDecimal().addToSchema(Schema.create(Schema.Type.BYTES));
+    Schema recordSchema = SchemaBuilder.record("record").fields()
+        .name("bigDecimalCol").type().array().items(bigDecimalSchema).noDefault()
+        .endRecord();
+
+    BigDecimal original = new BigDecimal("123.45");
+    BigDecimal replacement = new BigDecimal("678.90");
+    Object[] values = {original};
+    GenericRow row = new GenericRow();
+    row.putValue("bigDecimalCol", values);
+
+    GenericData.Record record = new GenericData.Record(recordSchema);
+    SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(row, record);
+
+    List<?> converted = (List<?>) record.get("bigDecimalCol");
+    assertSame(converted.get(0), original);
+    values[0] = replacement;
+    assertSame(converted.get(0), replacement, "logical BYTES arrays must retain the zero-copy array view");
   }
 
   /// End-to-end: a GenericDatumWriter built with getAvroDataModel() serializes the raw 16-byte UUID values as their
