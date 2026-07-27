@@ -48,10 +48,38 @@ public class QueryLogger {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryLogger.class);
   private static final QueryLogEntry[] QUERY_LOG_ENTRY_VALUES = QueryLogEntry.values();
 
+  private static final String FINGERPRINT_FAILED_QUERY_REDACTED = "FINGERPRINT_FAILED_QUERY_REDACTED";
+  private static final String FULLY_REDACTED = "REDACTED";
+
+  public enum SqlRedactionMode {
+    // Log the full SQL query text as-is.
+    // e.g. "SELECT name FROM users WHERE id = 42 AND status = 'active'"
+    NONE,
+    // Replace literal values with placeholders using the query fingerprint, preserving query structure.
+    // Requires query fingerprinting to be enabled (will be auto-enabled if not configured).
+    // e.g. "SELECT name FROM users WHERE id = ? AND status = ?"
+    LITERAL_VALUES,
+    // Omit the SQL text entirely from logs, replacing it with "[REDACTED]".
+    // Use when no part of the query should appear in logs.
+    FULL;
+
+    public static SqlRedactionMode fromString(String value) {
+      try {
+        return valueOf(value.toUpperCase());
+      } catch (IllegalArgumentException e) {
+        // The default config value is NONE. If the user intended to enable redaction but made a typo,
+        // it's safer to default to FULL instead of NONE to avoid accidentally logging sensitive information.
+        LOGGER.warn("Invalid SQL redaction mode '{}', defaulting to FULL", value);
+        return FULL;
+      }
+    }
+  }
+
   private final int _maxQueryLengthToLog;
   private final RateLimiter _logRateLimiter;
   private final boolean _enableIpLogging;
   private final boolean _logBeforeProcessing;
+  private final SqlRedactionMode _sqlRedactionMode;
   private final Logger _logger;
   private final RateLimiter _droppedLogRateLimiter;
   private final AtomicLong _numDroppedLogs = new AtomicLong(0L);
@@ -63,20 +91,24 @@ public class QueryLogger {
         config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
             Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING),
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_BEFORE_PROCESSING,
-            Broker.DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING), LOGGER, RateLimiter.create(1)
+            Broker.DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING),
+        SqlRedactionMode.fromString(config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_SQL_REDACTION,
+            Broker.DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION)),
+        LOGGER, RateLimiter.create(1)
         // log once a second for dropped log count
     );
   }
 
   @VisibleForTesting
   QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, boolean logBeforeProcessing,
-      Logger logger, RateLimiter droppedLogRateLimiter) {
+      SqlRedactionMode sqlRedactionMode, Logger logger, RateLimiter droppedLogRateLimiter) {
     _logRateLimiter = logRateLimiter;
     _maxQueryLengthToLog = maxQueryLengthToLog;
     _enableIpLogging = enableIpLogging;
     _logger = logger;
     _droppedLogRateLimiter = droppedLogRateLimiter;
     _logBeforeProcessing = logBeforeProcessing;
+    _sqlRedactionMode = sqlRedactionMode;
   }
 
   /**
@@ -86,15 +118,16 @@ public class QueryLogger {
    *
    * @param requestId the request ID
    * @param query the SQL query
+   * @param queryFingerprint the query fingerprint (used when redaction is enabled)
    * @return true if the rate limiter allowed this query (not rate-limited), false if rate-limited
    */
-  public boolean logQueryReceived(long requestId, String query) {
+  public boolean logQueryReceived(long requestId, String query, @Nullable QueryFingerprint queryFingerprint) {
     if (!checkRateLimiter()) {
       return false;
     }
 
     if (_logBeforeProcessing) {
-      _logger.info("SQL query for request {}: {}", requestId, query);
+      _logger.info("SQL query for request {}: {}", requestId, redactQuery(query, queryFingerprint));
     }
 
     tryLogDropped();
@@ -123,8 +156,8 @@ public class QueryLogger {
     }
 
     // always log the query last - don't add this to the QueryLogEntry enum
-    queryLogBuilder.append("query=")
-        .append(StringUtils.substring(params._requestContext.getQuery(), 0, _maxQueryLengthToLog));
+    String redacted = redactQuery(params._requestContext.getQuery(), params._requestContext.getQueryFingerprint());
+    queryLogBuilder.append("query=").append(StringUtils.substring(redacted, 0, _maxQueryLengthToLog));
     _logger.info(queryLogBuilder.toString());
 
     tryLogDropped();
@@ -156,6 +189,26 @@ public class QueryLogger {
 
   public double getLogRateLimit() {
     return _logRateLimiter.getRate();
+  }
+
+  public SqlRedactionMode getSqlRedactionMode() {
+    return _sqlRedactionMode;
+  }
+
+  public String redactQuery(String query) {
+    return redactQuery(query, null);
+  }
+
+  public String redactQuery(String query, @Nullable QueryFingerprint queryFingerprint) {
+    switch (_sqlRedactionMode) {
+      case FULL:
+        return FULLY_REDACTED;
+      case LITERAL_VALUES:
+        return queryFingerprint != null ? queryFingerprint.getFingerprint() : FINGERPRINT_FAILED_QUERY_REDACTED;
+      case NONE:
+      default:
+        return query;
+    }
   }
 
   private boolean shouldForceLog(@Nullable QueryLogParams params) {
