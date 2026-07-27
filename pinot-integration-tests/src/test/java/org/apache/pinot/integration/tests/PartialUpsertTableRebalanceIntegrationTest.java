@@ -230,7 +230,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     waitForAllDocsLoaded(600_000L, 300);
 
     // Partial-upsert tables need PROTECTED consuming segment consistency mode for reload to force-commit
-    // consuming segments; RESTRICTED (default) skips force-commit and reload never completes.
+    // consuming segments; RESTRICTED skips force-commit and reload never completes. Set explicitly here
+    // rather than relying on the default so this test doesn't depend on it.
     try {
       updateClusterConfig(
           Map.of(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE,
