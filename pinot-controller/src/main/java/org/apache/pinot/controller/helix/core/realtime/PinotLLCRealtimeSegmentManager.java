@@ -1069,6 +1069,24 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     if (!streamConfig.isEnableOffsetAutoReset() || streamConfig.isBackfillTopic()) {
       return nextOffset;
     }
+    // Skip if backfill is manually paused for this topic
+    if (streamConfig.isOffsetAutoResetPaused()) {
+      LOGGER.info("Skipping offset auto reset for table {} topic {} — backfill is paused",
+          streamConfig.getTableNameWithType(), streamConfig.getTopicName());
+      return nextOffset;
+    }
+    // Skip if the table already has too many segments (lightweight ZK child-name list, no data deserialization)
+    int maxSegments = streamConfig.getOffsetAutoResetMaxSegmentsBeforeSkip();
+    if (maxSegments > 0) {
+      int segmentCount = ZKMetadataProvider.getSegments(_propertyStore, streamConfig.getTableNameWithType()).size();
+      if (segmentCount >= maxSegments) {
+        LOGGER.info("Skipping offset auto reset for table {} topic {} — segment count {} >= maxSegmentsBeforeSkip {}",
+            streamConfig.getTableNameWithType(), streamConfig.getTopicName(), segmentCount, maxSegments);
+        _controllerMetrics.addMeteredTableValue(streamConfig.getTableNameWithType(),
+            ControllerMeter.OFFSET_AUTO_RESET_BACKFILL_SKIPPED_MAX_SEGMENTS, 1L);
+        return nextOffset;
+      }
+    }
     long timeThreshold = streamConfig.getOffsetAutoResetTimeSecThreshold();
     int offsetThreshold = streamConfig.getOffsetAutoResetOffsetThreshold();
     if (timeThreshold <= 0 && offsetThreshold <= 0) {
