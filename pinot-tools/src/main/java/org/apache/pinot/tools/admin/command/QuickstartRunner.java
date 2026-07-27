@@ -289,10 +289,8 @@ public class QuickstartRunner {
         .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
   }
 
-  /**
-   * @return names of the tables {@link #bootstrapTable()} creates, so that callers can tell which sample queries can
-   * actually be answered.
-   */
+  /// @return names of the tables [#bootstrapTable()] creates, so that callers can tell which sample queries can
+  /// actually be answered.
   public Set<String> getBootstrappedTableNames() {
     Set<String> tableNames = new HashSet<>();
     for (QuickstartTableRequest request : _tableRequests) {

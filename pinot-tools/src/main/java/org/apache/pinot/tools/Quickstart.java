@@ -34,13 +34,11 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.utils.SampleQueries;
 
 
-/**
- * The basic Batch/Offline Quickstart.
- *
- * <p>This quickstart bootstraps every batch example table and demonstrates the batch-side features that used to have
- * a dedicated quickstart each: the multi-stage engine, JSON indexes, complex type handling, timestamp indexes,
- * lookup joins and vector similarity. The types those quickstarts used to own are kept as deprecated aliases.
- */
+/// The basic Batch/Offline Quickstart.
+///
+/// This quickstart bootstraps every batch example table and demonstrates the batch-side features that used to have
+/// a dedicated quickstart each: the multi-stage engine, JSON indexes, complex type handling, timestamp indexes,
+/// lookup joins and vector similarity. The types those quickstarts used to own are kept as deprecated aliases.
 public class Quickstart extends QuickStartBase {
   protected static final Map<String, String> OPTIONS_TO_USE_MSE = Map.of("queryOptions",
       CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
@@ -146,10 +144,11 @@ public class Quickstart extends QuickStartBase {
             QuickstartRunner.DEFAULT_CONTROLLER_PORT));
   }
 
-  /**
-   * Three servers so that the multi-stage sample queries below actually exercise a cross-server exchange, which is
-   * what the merged MULTI_STAGE and JOIN quickstarts used to set up.
-   */
+  /// Three servers so that the multi-stage sample queries below actually exercise a cross-server exchange, which is
+  /// what the merged MULTI_STAGE and JOIN quickstarts used to set up.
+  ///
+  /// This is the default for every quickstart extending this class, not just `-type BATCH`. Subclasses that do not
+  /// need distributed execution can override it; [TPCHQuickStart] for instance runs on a single server.
   protected int getNumQuickstartRunnerServers() {
     return 3;
   }

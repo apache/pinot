@@ -175,30 +175,26 @@ public abstract class QuickStartBase {
 
   public abstract List<String> types();
 
-  /**
-   * @return the subset of {@link #types()} that is retained only as an alias for a quickstart it was merged into.
-   * These types keep working, but {@code QuickStartCommand} prints a notice pointing at the canonical type.
-   */
+  /// @return the subset of [#types()] that is retained only as an alias for a quickstart it was merged into. These
+  /// types keep working, but `QuickStartCommand` prints a notice pointing at the canonical type.
   public List<String> deprecatedTypes() {
     return List.of();
   }
 
-  /**
-   * @return true if the given runner bootstraps every one of the given tables.
-   * Sample queries for a feature are guarded by this so that a quickstart narrowing the set of tables it loads
-   * silently skips the queries it cannot answer instead of printing errors.
-   */
+  /// @return true if the given runner bootstraps every one of the given tables.
+  /// Sample queries for a feature are guarded by this so that a quickstart narrowing the set of tables it loads
+  /// silently skips the queries it cannot answer instead of printing errors.
   protected boolean hasTables(QuickstartRunner runner, String... tableNames) {
     return runner.getBootstrappedTableNames().containsAll(Arrays.asList(tableNames));
   }
 
-  /** Runs the given query and prints it along with its response, under the shared separator. */
+  /// Runs the given query and prints it along with its response, under the shared separator.
   protected void runAndPrintQuery(QuickstartRunner runner, String description, String query)
       throws Exception {
     runAndPrintQuery(runner, description, query, Map.of());
   }
 
-  /** Runs the given query with the given query options and prints it along with its response. */
+  /// Runs the given query with the given query options and prints it along with its response.
   protected void runAndPrintQuery(QuickstartRunner runner, String description, String query,
       Map<String, String> queryOptions)
       throws Exception {

@@ -32,13 +32,11 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-/**
- * The basic Realtime/Streaming Quickstart.
- *
- * <p>This quickstart bootstraps every stream example table and demonstrates the stream-side features that used to
- * have a dedicated quickstart each: JSON indexes, complex type handling, full upsert, partial upsert and upsert with
- * a JSON index. The types those quickstarts used to own are kept as deprecated aliases.
- */
+/// The basic Realtime/Streaming Quickstart.
+///
+/// This quickstart bootstraps every stream example table and demonstrates the stream-side features that used to
+/// have a dedicated quickstart each: JSON indexes, complex type handling, full upsert, partial upsert and upsert
+/// with a JSON index. The types those quickstarts used to own are kept as deprecated aliases.
 public class RealtimeQuickStart extends QuickStartBase {
   private static final List<String> DEPRECATED_TYPES =
       List.of("UPSERT", "UPSERT_JSON_INDEX", "UPSERT-JSON-INDEX", "PARTIAL_UPSERT", "PARTIAL-UPSERT",
@@ -168,8 +166,8 @@ public class RealtimeQuickStart extends QuickStartBase {
         "***** Nums of values in group_name fields should less than or equals to rsvp_count. Duplicate records are "
             + "not allowed. *****");
     printStatus(Color.YELLOW,
-        "***** Nums of values in renue_name fields should equals to rsvp_count. Duplicates are allowed. *****");
-    runAndPrintQuery(runner, "Event_id, group_name, venue_name, rsvp_count per per event_id in the table",
+        "***** Nums of values in venue_name fields should equals to rsvp_count. Duplicates are allowed. *****");
+    runAndPrintQuery(runner, "Event_id, group_name, venue_name, rsvp_count per event_id in the table",
         "select event_id, group_name, venue_name, rsvp_count from upsertPartialMeetupRsvp where rsvp_count > 1 order "
             + "by rsvp_count desc limit 10");
   }
