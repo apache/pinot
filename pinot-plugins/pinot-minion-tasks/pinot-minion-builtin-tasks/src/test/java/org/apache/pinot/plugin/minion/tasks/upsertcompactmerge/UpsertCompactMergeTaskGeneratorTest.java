@@ -164,6 +164,18 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Map<String, String> upsertCompactMergeTaskConfig1 = Map.of("bufferTimePeriod", "5hd");
     Assert.assertThrows(IllegalArgumentException.class,
         () -> _taskGenerator.validateTaskConfigs(validTableConfig, new Schema(), upsertCompactMergeTaskConfig1));
+
+    // metadataTTL enabled is not supported with UpsertCompactMergeTask
+    UpsertConfig ttlUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    ttlUpsertConfig.setSnapshot(Enablement.ENABLE);
+    ttlUpsertConfig.setMetadataTTL(30);
+    TableConfig metadataTtlTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setUpsertConfig(ttlUpsertConfig)
+        .setTaskConfig(
+            new TableTaskConfig(Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertCompactMergeTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> _taskGenerator.validateTaskConfigs(metadataTtlTableConfig, new Schema(), upsertCompactMergeTaskConfig));
   }
 
   @Test
