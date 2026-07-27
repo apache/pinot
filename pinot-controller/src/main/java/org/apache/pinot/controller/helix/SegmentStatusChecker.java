@@ -417,17 +417,29 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         tableCompressedSize += sizeInBytes;
       }
 
-      // NOTE: We want to skip segments that are just created/pushed to avoid false alerts because it is expected for
-      //       servers to take some time to load them. For consuming (IN_PROGRESS) segments, we use creation time from
-      //       the ZK metadata; for pushed segments, we use push time from the ZK metadata. Both of them are the time
-      //       when segment is newly created. For committed segments from real-time table, push time doesn't exist, and
-      //       creationTimeMs will be Long.MIN_VALUE, which is fine because we want to include them in the check.
+      // NOTE: We want to skip segments that are just created/pushed/committed to avoid false alerts because it is
+      //       expected for servers to take some time to load them. We derive the "newly created" timestamp per status:
+      //         - consuming (IN_PROGRESS) and pauseless committing (COMMITTING) segments: use creation time. A
+      //           COMMITTING segment has finished consuming but its immutable segment is still being built/loaded on
+      //           the replicas, so it is expected to be transiently under-replicated during that window.
+      //         - pushed/committed segments: use push time when it is set. Real-time (LLC) committed (DONE) segments
+      //           never populate push time, so we fall back to creation time (which is populated at creation and
+      //           persists) instead of leaving it at Long.MIN_VALUE, so a just-committed real-time segment still gets
+      //           the grace window while its replicas finish loading.
+      //       The grace window is _waitForPushTimeSeconds. Once a segment is older than it and still
+      //       under-replicated, it is checked normally, so genuinely stuck commits and real replica losses still alert.
       //       The comparison uses evSnapshotTimestamp instead of System.currentTimeMillis() because for large tables
       //       with many segments, the status check can take several minutes. A segment updated after
       //       the EV snapshot was taken but before this individual segment check runs could be incorrectly flagged as
       //       OFFLINE when using current time.
-      long creationTimeMs = segmentZKMetadata.getStatus() == Status.IN_PROGRESS ? segmentZKMetadata.getCreationTime()
-          : segmentZKMetadata.getPushTime();
+      Status segmentStatus = segmentZKMetadata.getStatus();
+      long creationTimeMs;
+      if (segmentStatus == Status.IN_PROGRESS || segmentStatus == Status.COMMITTING) {
+        creationTimeMs = segmentZKMetadata.getCreationTime();
+      } else {
+        long pushTimeMs = segmentZKMetadata.getPushTime();
+        creationTimeMs = pushTimeMs > 0 ? pushTimeMs : segmentZKMetadata.getCreationTime();
+      }
       if (creationTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
         continue;
       }
