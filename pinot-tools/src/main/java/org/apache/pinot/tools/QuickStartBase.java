@@ -31,6 +31,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -92,6 +93,12 @@ public abstract class QuickStartBase {
       "examples/batch/billing",
       "examples/batch/fineFoodReviews",
       "examples/batch/testUnnest",
+      // Star Schema Benchmark tables, used by the multi-stage engine sample queries.
+      "examples/batch/ssb/customer",
+      "examples/batch/ssb/dates",
+      "examples/batch/ssb/lineorder",
+      "examples/batch/ssb/part",
+      "examples/batch/ssb/supplier",
   };
 
   protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = Map.ofEntries(
@@ -167,6 +174,35 @@ public abstract class QuickStartBase {
   }
 
   public abstract List<String> types();
+
+  /// @return the subset of [#types()] that is retained only as an alias for a quickstart it was merged into. These
+  /// types keep working, but `QuickStartCommand` prints a notice pointing at the canonical type.
+  public List<String> deprecatedTypes() {
+    return List.of();
+  }
+
+  /// @return true if the given runner bootstraps every one of the given tables.
+  /// Sample queries for a feature are guarded by this so that a quickstart narrowing the set of tables it loads
+  /// silently skips the queries it cannot answer instead of printing errors.
+  protected boolean hasTables(QuickstartRunner runner, String... tableNames) {
+    return runner.getBootstrappedTableNames().containsAll(Arrays.asList(tableNames));
+  }
+
+  /// Runs the given query and prints it along with its response, under the shared separator.
+  protected void runAndPrintQuery(QuickstartRunner runner, String description, String query)
+      throws Exception {
+    runAndPrintQuery(runner, description, query, Map.of());
+  }
+
+  /// Runs the given query with the given query options and prints it along with its response.
+  protected void runAndPrintQuery(QuickstartRunner runner, String description, String query,
+      Map<String, String> queryOptions)
+      throws Exception {
+    printStatus(Quickstart.Color.YELLOW, description);
+    printStatus(Quickstart.Color.CYAN, "Query : " + query);
+    printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(query, queryOptions)));
+    printStatus(Quickstart.Color.GREEN, "***************************************************");
+  }
 
   public void runSampleQueries(QuickstartRunner runner)
       throws Exception {
