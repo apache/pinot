@@ -172,36 +172,21 @@ if $cygwin; then
 fi
 
 
-jdk_version() {
-  IFS='
-'
-  # remove \r for Cygwin
-  lines=$(java -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
-  for line in $lines; do
-    if test -z $result && echo "$line" | grep -q 'version "'
-    then
-      ver=$(echo $line | sed -e 's/.*version "\(.*\)"\(.*\)/\1/; 1q')
-      # on macOS, sed doesn't support '?'
-      if case $ver in "1."*) true;; *) false;; esac;
-      then
-        result=$(echo $ver | sed -e 's/1\.\([0-9]*\)\(.*\)/\1/; 1q')
-      else
-        result=$(echo $ver | sed -e 's/\([0-9]*\)\(.*\)/\1/; 1q')
-      fi
-    fi
-  done
-  unset IFS
-  echo "$result"
-}
-
 if [ -z "$JAVA_OPTS" ] ; then
   ALL_JAVA_OPTS="@EXTRA_JVM_ARGUMENTS@"
 else
   ALL_JAVA_OPTS=$JAVA_OPTS
 fi
 
-if [ "$(jdk_version)" -gt 11 ]; then
-  ALL_JAVA_OPTS="--add-opens=java.base/java.nio=ALL-UNNAMED \
+# Pinot is compiled with maven.compiler.release=25, so its classes cannot load on a pre-25 JRE
+# at all and these module-access flags are always required.
+#
+# NOTE: this overwrites the assignment above rather than appending to it, so the extra JVM
+# arguments substituted from the per-program jvmSettings in pinot-tools/pom.xml (heap sizes, the
+# log4j2 configuration path, -Dpinot.admin.system.exit) are discarded whenever JAVA_OPTS is
+# unset. Appending them instead would change the effective heap, logging configuration and admin
+# exit behavior of every generated script, so it needs to be a deliberate behavior change.
+ALL_JAVA_OPTS="--add-opens=java.base/java.nio=ALL-UNNAMED \
   --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
   --add-opens=java.base/java.lang=ALL-UNNAMED \
   --add-opens=java.base/java.util=ALL-UNNAMED \
@@ -210,7 +195,6 @@ if [ "$(jdk_version)" -gt 11 ]; then
   -Dio.netty.tryReflectionSetAccessible=true \
   -Dio.grpc.netty.shaded.io.netty.tryReflectionSetAccessible=true \
   $JAVA_OPTS"
-fi
 
 if [ -z "$PLUGINS_DIR" ] ; then
   PLUGINS_DIR=$BASEDIR/plugins

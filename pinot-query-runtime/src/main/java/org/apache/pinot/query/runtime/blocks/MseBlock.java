@@ -36,7 +36,7 @@ import org.apache.pinot.core.common.Block;
 /// Instead, they are used as a common sub-interface for [data][Data] and [end-of-stream][Eos] blocks,
 /// which are then subclassed to provide the actual functionality.
 /// This pattern follows the principles of sealed interfaces.
-/// Pinot now targets Java 21, so a follow-up could model these blocks with sealed interfaces and pattern matching,
+/// Pinot now targets Java 25, so a follow-up could model these blocks with sealed interfaces and pattern matching,
 /// removing the need for the [Visitor] pattern.
 ///
 /// Meanwhile, the API force callers to do some castings, but it is a trade-off to have a more robust and maintainable

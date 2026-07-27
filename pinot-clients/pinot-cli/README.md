@@ -24,7 +24,7 @@ An interactive and batch command-line client for Apache Pinot. It supports a ric
 
 ## Requirements
 
-- Java 21+ on PATH
+- Java 25+ on PATH
 
 ## Build
 

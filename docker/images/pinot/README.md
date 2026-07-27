@@ -41,7 +41,7 @@ The docker image is tagged as `[Docker Tag]`.
 
 `Kafka Version`: The Kafka version to build Pinot with. Default is `3.0`.
 
-`Java Version`: The Java build and runtime image version. Default is `21`.
+`Java Version`: The Java build and runtime image version. Default is `25`.
 
 * Example of building and tagging a snapshot:
 ```SHELL
@@ -59,13 +59,13 @@ On Apple Silicon (M1/M2) or any arm64 host, pass `--platform linux/arm64`:
 
 ```SHELL
 docker build -t pinot:latest --platform linux/arm64 --no-cache --network=host \
-  --build-arg PINOT_GIT_REF=master --build-arg JDK_VERSION=21 -f Dockerfile .
+  --build-arg PINOT_GIT_REF=master --build-arg JDK_VERSION=25 -f Dockerfile .
 ```
 
 On an x86 machine with QEMU installed, add `--platform linux/arm64` the same way:
 ```SHELL
 docker build -t pinot:latest --platform linux/arm64 --no-cache \
-  --build-arg PINOT_GIT_REF=master --build-arg JDK_VERSION=21 -f Dockerfile .
+  --build-arg PINOT_GIT_REF=master --build-arg JDK_VERSION=25 -f Dockerfile .
 ```
 
 ## How to publish a docker image
