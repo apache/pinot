@@ -20,6 +20,9 @@ package org.apache.pinot.tools;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -46,44 +49,57 @@ public class TestQuickStartBase {
   }
 
   /**
-   * {@code hasTables} must reflect what a quickstart actually bootstrapped, not the union of the batch and stream
-   * directory maps it inherits. A quickstart that narrows its batch directories still inherits the full default
-   * stream map, and must not report those stream-only tables as present.
+   * A bootstrap request built from a directory must resolve its table name the same way {@link BootstrapTableTool}
+   * does, since that is the name the table is actually created under.
    */
   @Test
-  public void testHasTablesIgnoresInheritedStreamTables()
-      throws Exception {
-    TPCHQuickStart tpch = new TPCHQuickStart();
-    Assert.assertFalse(tpch.hasTables("customer"), "nothing is bootstrapped before the bootstrap call");
+  public void testTableNameIsDerivedFromTheBootstrapDirectory() {
+    Assert.assertEquals(new QuickstartTableRequest("/tmp/quickstart/baseballStats").getTableName(), "baseballStats");
+    Assert.assertEquals(new QuickstartTableRequest("/tmp/quickstart/lineorder", "TASK").getTableName(), "lineorder");
+  }
 
-    tpch.bootstrapOfflineTableDirectories(new File(_tmpDir, "tpch"));
-    Assert.assertTrue(tpch.hasTables("customer", "lineitem"), "TPCH bootstraps its own batch tables");
-    Assert.assertFalse(tpch.hasTables("baseballStats"), "TPCH does not bootstrap the default batch tables");
+  /**
+   * The sample-query guard must reflect the tables a quickstart actually bootstraps, not the union of the batch and
+   * stream directory maps it inherits. A quickstart that narrows its batch directories still inherits the full
+   * default stream map, and must not report those stream-only tables as present.
+   */
+  @Test
+  public void testBootstrapRequestsIgnoreInheritedStreamTables()
+      throws Exception {
+    // TPCH narrows the batch directories to the TPCH tables only.
+    Set<String> tpchTables = tableNames(new TPCHQuickStart().bootstrapOfflineTableDirectories(
+        new File(_tmpDir, "tpch")));
+    Assert.assertTrue(tpchTables.containsAll(Set.of("customer", "lineitem")), tpchTables.toString());
+    Assert.assertFalse(tpchTables.contains("baseballStats"), "TPCH does not bootstrap the default batch tables");
     // githubEvents and fineFoodReviews are in the inherited default stream map, which TPCH never bootstraps.
-    Assert.assertFalse(tpch.hasTables("githubEvents"), "TPCH must not report stream-only tables as present");
-    Assert.assertFalse(tpch.hasTables("fineFoodReviews"), "TPCH must not report stream-only tables as present");
+    Assert.assertFalse(tpchTables.contains("githubEvents"), "TPCH must not report stream-only tables as present");
+    Assert.assertFalse(tpchTables.contains("fineFoodReviews"), "TPCH must not report stream-only tables as present");
   }
 
   /** Every table the merged batch sample queries guard on must actually be bootstrapped by the batch quickstart. */
   @Test
   public void testBatchQuickstartBootstrapsEveryTableItsSampleQueriesNeed()
       throws Exception {
-    Quickstart batch = new Quickstart();
-    batch.bootstrapOfflineTableDirectories(new File(_tmpDir, "batch"));
-    Assert.assertTrue(batch.hasTables("baseballStats", "dimBaseballTeams", "githubEvents", "githubComplexTypeEvents",
-        "airlineStats", "fineFoodReviews", "lineorder", "customer", "dates"));
-    Assert.assertFalse(batch.hasTables("meetupRsvp"), "the batch quickstart does not bootstrap stream tables");
+    Set<String> tables = tableNames(new Quickstart().bootstrapOfflineTableDirectories(new File(_tmpDir, "batch")));
+    Assert.assertTrue(tables.containsAll(Set.of("baseballStats", "dimBaseballTeams", "githubEvents",
+        "githubComplexTypeEvents", "airlineStats", "fineFoodReviews", "lineorder", "customer", "dates")),
+        tables.toString());
+    Assert.assertFalse(tables.contains("meetupRsvp"), "the batch quickstart does not bootstrap stream tables");
   }
 
   /** Every table the merged stream sample queries guard on must actually be bootstrapped by the stream quickstart. */
   @Test
   public void testStreamQuickstartBootstrapsEveryTableItsSampleQueriesNeed()
       throws Exception {
-    RealtimeQuickStart stream = new RealtimeQuickStart();
-    stream.bootstrapStreamTableDirectories(new File(_tmpDir, "stream"));
-    Assert.assertTrue(stream.hasTables("meetupRsvp", "meetupRsvpJson", "meetupRsvpComplexType", "upsertMeetupRsvp",
-        "upsertJsonMeetupRsvp", "upsertPartialMeetupRsvp", "fineFoodReviews", "fineFoodReviews_part_0",
-        "fineFoodReviews_part_1"));
-    Assert.assertFalse(stream.hasTables("baseballStats"), "the stream quickstart does not bootstrap batch tables");
+    Set<String> tables =
+        tableNames(new RealtimeQuickStart().bootstrapStreamTableDirectories(new File(_tmpDir, "stream")));
+    Assert.assertTrue(tables.containsAll(Set.of("meetupRsvp", "meetupRsvpJson", "meetupRsvpComplexType",
+        "upsertMeetupRsvp", "upsertJsonMeetupRsvp", "upsertPartialMeetupRsvp", "fineFoodReviews",
+        "fineFoodReviews_part_0", "fineFoodReviews_part_1")), tables.toString());
+    Assert.assertFalse(tables.contains("baseballStats"), "the stream quickstart does not bootstrap batch tables");
+  }
+
+  private static Set<String> tableNames(List<QuickstartTableRequest> requests) {
+    return requests.stream().map(QuickstartTableRequest::getTableName).collect(Collectors.toSet());
   }
 }

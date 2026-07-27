@@ -82,14 +82,14 @@ public class RealtimeQuickStart extends QuickStartBase {
     runUpsertJsonIndexQueries(runner);
     runPartialUpsertQueries(runner);
     runFineFoodReviewsQueries(runner);
-    if (hasTables("fineFoodReviews")) {
+    if (hasTables(runner, "fineFoodReviews")) {
       runVectorQueryExamples(runner);
     }
   }
 
   private void runMeetupRsvpQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("meetupRsvp")) {
+    if (!hasTables(runner, "meetupRsvp")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Meetup RSVPs *****");
@@ -103,7 +103,7 @@ public class RealtimeQuickStart extends QuickStartBase {
 
   private void runJsonIndexQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("meetupRsvpJson")) {
+    if (!hasTables(runner, "meetupRsvpJson")) {
       return;
     }
     printStatus(Color.YELLOW, "***** JSON index *****");
@@ -114,7 +114,7 @@ public class RealtimeQuickStart extends QuickStartBase {
 
   private void runComplexTypeQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("meetupRsvpComplexType")) {
+    if (!hasTables(runner, "meetupRsvpComplexType")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Complex type handling *****");
@@ -125,7 +125,7 @@ public class RealtimeQuickStart extends QuickStartBase {
 
   private void runUpsertQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("upsertMeetupRsvp")) {
+    if (!hasTables(runner, "upsertMeetupRsvp")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Upsert *****");
@@ -136,7 +136,7 @@ public class RealtimeQuickStart extends QuickStartBase {
 
   private void runUpsertJsonIndexQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("upsertJsonMeetupRsvp")) {
+    if (!hasTables(runner, "upsertJsonMeetupRsvp")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Upsert with JSON index *****");
@@ -147,7 +147,7 @@ public class RealtimeQuickStart extends QuickStartBase {
 
   private void runPartialUpsertQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("upsertPartialMeetupRsvp")) {
+    if (!hasTables(runner, "upsertPartialMeetupRsvp")) {
       return;
     }
     // The expected behavior for total number of documents per PK should be 1.
@@ -176,7 +176,7 @@ public class RealtimeQuickStart extends QuickStartBase {
 
   private void runFineFoodReviewsQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("fineFoodReviews", "fineFoodReviews_part_0", "fineFoodReviews_part_1")) {
+    if (!hasTables(runner, "fineFoodReviews", "fineFoodReviews_part_0", "fineFoodReviews_part_1")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Fine food reviews *****");

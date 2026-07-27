@@ -164,14 +164,14 @@ public class Quickstart extends QuickStartBase {
     runJsonIndexQueries(runner);
     runComplexTypeQueries(runner);
     runTimestampIndexQueries(runner);
-    if (hasTables("fineFoodReviews")) {
+    if (hasTables(runner, "fineFoodReviews")) {
       runVectorQueryExamples(runner);
     }
   }
 
   private void runBaseballQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("baseballStats")) {
+    if (!hasTables(runner, "baseballStats")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Baseball stats *****");
@@ -185,7 +185,7 @@ public class Quickstart extends QuickStartBase {
 
   private void runMultiStageEngineQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("baseballStats", "dimBaseballTeams")) {
+    if (!hasTables(runner, "baseballStats", "dimBaseballTeams")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Multi-stage engine *****");
@@ -199,7 +199,7 @@ public class Quickstart extends QuickStartBase {
 
   private void runStarSchemaBenchmarkQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("lineorder", "customer", "dates")) {
+    if (!hasTables(runner, "lineorder", "customer", "dates")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Star schema benchmark, on the multi-stage engine *****");
@@ -216,7 +216,7 @@ public class Quickstart extends QuickStartBase {
 
   private void runLookupJoinQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("baseballStats", "dimBaseballTeams")) {
+    if (!hasTables(runner, "baseballStats", "dimBaseballTeams")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Lookup join *****");
@@ -228,7 +228,7 @@ public class Quickstart extends QuickStartBase {
 
   private void runJsonIndexQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("githubEvents")) {
+    if (!hasTables(runner, "githubEvents")) {
       return;
     }
     printStatus(Color.YELLOW, "***** JSON index *****");
@@ -239,7 +239,7 @@ public class Quickstart extends QuickStartBase {
 
   private void runComplexTypeQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("githubComplexTypeEvents")) {
+    if (!hasTables(runner, "githubComplexTypeEvents")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Complex type handling *****");
@@ -250,7 +250,7 @@ public class Quickstart extends QuickStartBase {
 
   private void runTimestampIndexQueries(QuickstartRunner runner)
       throws Exception {
-    if (!hasTables("airlineStats")) {
+    if (!hasTables(runner, "airlineStats")) {
       return;
     }
     printStatus(Color.YELLOW, "***** Timestamp index *****");

@@ -32,11 +32,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -117,12 +115,6 @@ public abstract class QuickStartBase {
       Map.entry("fineFoodReviews_part_0", "examples/stream/fineFoodReviews_part_0"),
       Map.entry("fineFoodReviews_part_1", "examples/stream/fineFoodReviews_part_1"));
 
-  /**
-   * Names of the tables the bootstrap methods below actually created, used by {@link #hasTables} to decide which
-   * sample queries can be answered. Populated during single-threaded setup, before any sample query runs.
-   */
-  private final Set<String> _bootstrappedTableNames = new HashSet<>();
-
   protected File _dataDir = FileUtils.getTempDirectory();
   protected boolean _setCustomDataDir;
   protected String[] _bootstrapDataDirs;
@@ -192,13 +184,12 @@ public abstract class QuickStartBase {
   }
 
   /**
-   * @return true if every given table was actually bootstrapped by this quickstart.
+   * @return true if the given runner bootstraps every one of the given tables.
    * Sample queries for a feature are guarded by this so that a quickstart narrowing the set of tables it loads
-   * silently skips the queries it cannot answer instead of printing errors. Only meaningful after the bootstrap
-   * methods have run, which is always the case by the time {@link #runSampleQueries} is called.
+   * silently skips the queries it cannot answer instead of printing errors.
    */
-  protected boolean hasTables(String... tableNames) {
-    return _bootstrappedTableNames.containsAll(Arrays.asList(tableNames));
+  protected boolean hasTables(QuickstartRunner runner, String... tableNames) {
+    return runner.getBootstrappedTableNames().containsAll(Arrays.asList(tableNames));
   }
 
   /** Runs the given query and prints it along with its response, under the shared separator. */
@@ -250,14 +241,12 @@ public abstract class QuickStartBase {
         Preconditions.checkState(dataDir.mkdirs());
         copyResourceTableToTmpDirectory(directory, tableName, baseDir, dataDir, false);
         quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
-        _bootstrappedTableNames.add(tableName);
       }
     } else {
       String tableName = getTableName();
       File baseDir = new File(quickstartTmpDir, tableName);
       copyFilesystemTableToTmpDirectory(getBootstrapDataDir(), tableName, baseDir);
       quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
-      _bootstrappedTableNames.add(tableName);
     }
     return quickstartTableRequests;
   }
@@ -326,7 +315,6 @@ public abstract class QuickStartBase {
         copyFilesystemTableToTmpDirectory(directory, tableName, baseDir);
       }
       quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath()));
-      _bootstrappedTableNames.add(tableName);
     }
     return quickstartTableRequests;
   }
