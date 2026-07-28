@@ -48,7 +48,11 @@ import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Streaming, lazy combine operator for selection ORDER BY queries whose first order-by expression is an identifier.
@@ -106,6 +110,7 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombineOperator<SelectionResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamingSelectionOrderByCombineOperator.class);
   private static final String EXPLAIN_NAME = "COMBINE_SELECT_ORDERBY_STREAMING";
 
   private final boolean _streaming;
@@ -124,6 +129,12 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
   private boolean _done;
   // Captured from the first child block seen; all child blocks share the same schema
   private DataSchema _dataSchema;
+  // Deduplicated MERGE_RESPONSE errors for segment blocks dropped on schema mismatch; null until the first mismatch
+  @Nullable
+  private Set<String> _dataSchemaMismatchErrors;
+  // Subset of the above not yet attached to an emitted block; drained on each attach
+  @Nullable
+  private List<String> _unreportedDataSchemaMismatchErrors;
 
   public StreamingSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, boolean streaming) {
@@ -132,7 +143,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     _streaming = streaming;
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
     // Streaming mode flushes bounded blocks; single-stage mode flushes once at the end as a single block.
-    _blockSize = streaming ? queryContext.getStreamingSelectionOrderByBlockSize() : Integer.MAX_VALUE;
+    _blockSize = streaming ? queryContext.getSortedSelectionMergeBlockSize() : Integer.MAX_VALUE;
     _pruningEnabled = !queryContext.isNullHandlingEnabled();
 
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
@@ -223,7 +234,13 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
       return attachExecutionStats(new MetadataResultsBlock());
     }
     try {
+      long endTimeMs = _queryContext.getEndTimeMs();
       while (_numRowsEmitted < _numRowsToKeep) {
+        // The merge drains the heap on this thread and, for single-block cursors, may never re-enter a child operator.
+        // Without this check nothing would observe cancellation, pause, or the query deadline for up to
+        // (limit + offset) iterations -- a regression against MinMaxValueBasedSelectionOrderByCombineOperator, which
+        // this operator replaces on the same query shape.
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numRowsEmitted, EXPLAIN_NAME, endTimeMs);
         activateEligibleCursors();
         SegmentCursor cursor = _priorityQueue.poll();
         if (cursor == null) {
@@ -248,15 +265,21 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
         return flushDataBlock();
       }
       if (_streaming) {
-        return attachExecutionStats(new MetadataResultsBlock());
+        return attachDataSchemaMismatchErrors(attachExecutionStats(new MetadataResultsBlock()));
       }
       // Single-stage with no rows: still return a (single) block carrying the schema and execution stats.
-      return attachExecutionStats(
-          new SelectionResultsBlock(resolveDataSchema(), List.of(), _comparator, _queryContext));
+      return attachDataSchemaMismatchErrors(attachExecutionStats(
+          new SelectionResultsBlock(resolveDataSchema(), List.of(), _comparator, _queryContext)));
     } catch (Exception e) {
       _done = true;
       releaseAllCursors();
       return createExceptionResultsBlockAndAttachExecutionStats(e, "merging sorted selection results");
+    } catch (Throwable t) {
+      // An Error (e.g. OutOfMemoryError while accumulating output rows) must not leave segments acquired for the
+      // lifetime of the server. In single-stage mode there is no start()/stop() backstop around this operator.
+      _done = true;
+      releaseAllCursors();
+      throw t;
     }
   }
 
@@ -319,7 +342,41 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     List<Object[]> rows = _outputRows;
     _outputRows = newOutputList();
     SelectionResultsBlock block = new SelectionResultsBlock(resolveDataSchema(), rows, _comparator, _queryContext);
+    attachDataSchemaMismatchErrors(block);
     return _streaming ? block : attachExecutionStats(block);
+  }
+
+  /**
+   * Records that a segment's block was dropped because its schema disagreed with the merge schema. Deduplicated by
+   * message so a mid-reload table with many divergent segments cannot flood the response.
+   */
+  private void recordDataSchemaMismatch(@Nullable DataSchema mismatched) {
+    String errorMessage =
+        String.format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
+            _dataSchema, mismatched);
+    // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
+    LOGGER.debug(errorMessage);
+    if (_dataSchemaMismatchErrors == null) {
+      _dataSchemaMismatchErrors = new HashSet<>();
+      _unreportedDataSchemaMismatchErrors = new ArrayList<>();
+    }
+    if (_dataSchemaMismatchErrors.add(errorMessage)) {
+      _unreportedDataSchemaMismatchErrors.add(errorMessage);
+    }
+  }
+
+  /**
+   * Attaches mismatch errors recorded since the last emitted block. In streaming mode blocks are emitted many times,
+   * so errors are drained rather than re-attached, and the terminal block picks up any recorded after the last flush.
+   */
+  private <T extends BaseResultsBlock> T attachDataSchemaMismatchErrors(T block) {
+    if (_unreportedDataSchemaMismatchErrors != null && !_unreportedDataSchemaMismatchErrors.isEmpty()) {
+      for (String errorMessage : _unreportedDataSchemaMismatchErrors) {
+        block.addErrorMessage(QueryErrorMessage.safeMsg(QueryErrorCode.MERGE_RESPONSE, errorMessage));
+      }
+      _unreportedDataSchemaMismatchErrors.clear();
+    }
+    return block;
   }
 
   private List<Object[]> newOutputList() {
@@ -428,6 +485,11 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
      * Returns {@code false} when the operator is exhausted (no more rows). Streaming-backed operators emit one
      * run/block per call and {@code null} when done; single-block operators emit a single block and must not be called
      * again afterwards, so an empty/null block from a single-block child is treated as exhausted.
+     *
+     * <p>A block whose schema differs from the one already captured is dropped and reported, mirroring
+     * {@link org.apache.pinot.core.operator.combine.merger.SelectionOrderByResultsBlockMerger}. Segments on a server
+     * can disagree on schema mid-reload (a newly added column exists only in reloaded segments), and merging rows of
+     * differing width under one schema would corrupt the result rather than fail.
      */
     private boolean pullBlock() {
       while (true) {
@@ -437,6 +499,9 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
         }
         if (_dataSchema == null) {
           _dataSchema = block.getDataSchema();
+        } else if (!_dataSchema.equals(block.getDataSchema())) {
+          recordDataSchemaMismatch(block.getDataSchema());
+          return false;
         }
         List<Object[]> rows = block.getRows();
         if (rows != null && !rows.isEmpty()) {

@@ -58,7 +58,7 @@ import static org.testng.Assert.assertTrue;
  *
  * <p>The operator emits the same globally-sorted rows as the existing materialized selection ORDER BY operators, only
  * spread across many lazily-produced blocks. Each test therefore asserts <b>stream-vs-materialized parity</b>: it
- * drives the streaming operator through {@link SelectionPlanNode} with {@code streamingSelectionOrderBy=true},
+ * drives the streaming operator through {@link SelectionPlanNode} with {@code sortedSelectionMergeEnabled=true},
  * concatenates
  * every {@link Operator#nextBlock()} output until {@code null}, and asserts the concatenation equals the single block
  * the materialized operator ({@link SelectionPartiallyOrderedByLinearOperator} / {@link SelectionOrderByOperator})
@@ -342,7 +342,7 @@ public class StreamingSelectionOrderByOperatorTest {
     // Streaming path.
     QueryContext streamingContext = QueryContextConverterUtils.getQueryContext(query);
     streamingContext.setNullHandlingEnabled(nullHandling);
-    streamingContext.setStreamingSelectionOrderBy(true);
+    streamingContext.setSortedSelectionMergeEnabled(true);
     Operator<SelectionResultsBlock> streamingOperator =
         new SelectionPlanNode(new SegmentContext(segment), streamingContext).run();
     assertTrue(streamingOperator instanceof StreamingSelectionOrderByOperator,
@@ -386,7 +386,7 @@ public class StreamingSelectionOrderByOperatorTest {
       boolean nullHandling) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     queryContext.setNullHandlingEnabled(nullHandling);
-    queryContext.setStreamingSelectionOrderBy(true);
+    queryContext.setSortedSelectionMergeEnabled(true);
     Operator<SelectionResultsBlock> operator = new SelectionPlanNode(new SegmentContext(segment), queryContext).run();
     List<Object[]> rows = new ArrayList<>();
     SelectionResultsBlock block;

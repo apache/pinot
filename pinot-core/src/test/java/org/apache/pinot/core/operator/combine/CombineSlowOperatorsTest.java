@@ -42,6 +42,7 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -188,6 +189,30 @@ public class CombineSlowOperatorsTest {
     StreamingSelectionOrderByCombineOperator combineOperator =
         new StreamingSelectionOrderByCombineOperator(operators, queryContext, _executorService, true);
     testCancelCombineOperator(combineOperator, ready, operators);
+  }
+
+  /**
+   * The merge loop drains its heap on the caller thread and, for single-block cursors, may never re-enter a child
+   * operator, so it must check the query deadline itself. With an already-expired deadline the operator must surface a
+   * timeout <b>before</b> activating any child - asserted via {@code _operationInProgress}, which also keeps the test
+   * from passing vacuously if the timeout came from somewhere else.
+   */
+  @Test
+  public void testStreamingSelectionOrderByCombineOperatorHonorsDeadline() {
+    List<Operator> operators = getOperators(null, minMaxSegmentSupplier());
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY column");
+    queryContext.setEndTimeMs(System.currentTimeMillis() - 1);
+    StreamingSelectionOrderByCombineOperator combineOperator =
+        new StreamingSelectionOrderByCombineOperator(operators, queryContext, _executorService, false);
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      BaseResultsBlock resultsBlock = combineOperator.nextBlock();
+      assertTrue(resultsBlock instanceof ExceptionResultsBlock,
+          "Expired deadline must surface as an ExceptionResultsBlock, got: " + resultsBlock.getClass().getName());
+    }
+    for (Operator operator : operators) {
+      assertFalse(((SlowOperator) operator)._operationInProgress.get(),
+          "Deadline must be observed before any child operator is driven");
+    }
   }
 
   /** A segment whose first order-by column reports a non-null min/max, as required by the min/max-based operators. */

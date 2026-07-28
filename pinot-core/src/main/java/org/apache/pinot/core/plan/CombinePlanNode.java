@@ -135,9 +135,9 @@ public class CombinePlanNode implements PlanNode {
         // Use streaming operator only for non-empty selection-only query
         return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
       }
-      // Streaming selection order-by (opt-in via the streamingSelectionOrderBy hint). Selection-only already
+      // Streaming selection order-by (opt-in via the sortedSelectionMergeEnabled hint). Selection-only already
       // returned above, so reaching here with a non-empty limit and an order-by present implies selection order-by.
-      if (_queryContext.isStreamingSelectionOrderBy() && QueryContextUtils.isSelectionQuery(_queryContext)
+      if (_queryContext.isSortedSelectionMergeEnabled() && QueryContextUtils.isSelectionQuery(_queryContext)
           && _queryContext.getLimit() != 0) {
         List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
         if (orderByExpressions != null
@@ -177,7 +177,7 @@ public class CombinePlanNode implements PlanNode {
         List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
         assert orderByExpressions != null;
         if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
-          if (_queryContext.isStreamingSelectionOrderBy()) {
+          if (_queryContext.isSortedSelectionMergeEnabled()) {
             return new StreamingSelectionOrderByCombineOperator(operators, _queryContext, _executorService,
                 false /* streaming */);
           }

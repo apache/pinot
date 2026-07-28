@@ -100,7 +100,7 @@ public class SelectionPlanNode implements PlanNode {
       // lazily. Only build it when the first order-by column is an identifier (kept consistent with the combine-side
       // gate) and the forward-scan project is order-compatible; the DESC-incompatible sorted case still falls back to
       // the materialized SelectionPartiallyOrderedByDescOperation below so global order stays correct.
-      if (_queryContext.isStreamingSelectionOrderBy()
+      if (_queryContext.isSortedSelectionMergeEnabled()
           && orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
         // When there are non-order-by output expressions, only fetch the order-by expressions during the forward scan
         // (the streaming operator fetches the rest in a second pass); otherwise fetch all expressions.

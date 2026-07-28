@@ -74,9 +74,10 @@ import static org.testng.Assert.assertTrue;
  * <p>The streaming combine must return the same globally-sorted top-K rows as the default
  * {@link MinMaxValueBasedSelectionOrderByCombineOperator}, only (in streaming mode) spread across several bounded
  * blocks. Each functional test therefore asserts <b>streaming-vs-non-streaming parity</b>: it runs the identical query
- * twice over the same in-memory segments - once with {@code streamingSelectionOrderBy=true} (asserting the new operator
- * was actually selected) and once with the hint off (asserting the {@code MinMax} operator was selected) - then checks
- * the two row sets are equal as a multiset and that the streaming output is fully sorted by the order-by comparator.
+ * twice over the same in-memory segments - once with {@code sortedSelectionMergeEnabled=true} (asserting the new
+ * operator was actually selected) and once with the hint off (asserting the {@code MinMax} operator was selected) -
+ * then checks the two row sets are equal as a multiset and that the streaming output is fully sorted by the order-by
+ * comparator.
  *
  * <p>To keep the top-K boundary unambiguous (operators may legitimately disagree on which of several rows that tie on
  * every order-by key fall inside the limit) every parity query ends its ORDER BY with the globally-unique
@@ -438,9 +439,9 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     queryContext.setNullHandlingEnabled(nullHandling);
     if (hintOn) {
-      queryContext.setStreamingSelectionOrderBy(true);
+      queryContext.setSortedSelectionMergeEnabled(true);
       if (blockSize > 0) {
-        queryContext.setStreamingSelectionOrderByBlockSize(blockSize);
+        queryContext.setSortedSelectionMergeBlockSize(blockSize);
       }
     }
     queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);

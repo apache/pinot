@@ -274,11 +274,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set streaming selection order-by options (opt-in; gated on selection queries to prevent accidental routing
     // if a downstream guard is ever missed)
     if (QueryContextUtils.isSelectionQuery(queryContext)) {
-      queryContext.setStreamingSelectionOrderBy(QueryOptionsUtils.isStreamingSelectionOrderBy(queryOptions));
-      Integer streamingSelectionOrderByBlockSize =
-          QueryOptionsUtils.getStreamingSelectionOrderByBlockSize(queryOptions);
-      if (streamingSelectionOrderByBlockSize != null) {
-        queryContext.setStreamingSelectionOrderByBlockSize(streamingSelectionOrderByBlockSize);
+      queryContext.setSortedSelectionMergeEnabled(QueryOptionsUtils.isSortedSelectionMergeEnabled(queryOptions));
+      Integer sortedSelectionMergeBlockSize =
+          QueryOptionsUtils.getSortedSelectionMergeBlockSize(queryOptions);
+      if (sortedSelectionMergeBlockSize != null) {
+        queryContext.setSortedSelectionMergeBlockSize(sortedSelectionMergeBlockSize);
       }
     }
 

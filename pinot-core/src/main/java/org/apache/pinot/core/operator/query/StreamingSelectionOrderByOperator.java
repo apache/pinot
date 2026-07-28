@@ -53,6 +53,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -242,6 +243,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     }
     _numDocsScanned += numDocsFetched;
     _numEntriesScannedPostFilter += (long) numDocsFetched * _projectOperator.getNumColumnsProjected();
+    reportScanCost(numDocsFetched, (long) numDocsFetched * _projectOperator.getNumColumnsProjected());
 
     // Rows arrive sorted; we only need the first 'remaining' of them globally.
     int numRows = Math.min(numDocsFetched, remaining);
@@ -328,6 +330,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
         _currentPos = 0;
         _numDocsScanned += _currentNumDocs;
         _numEntriesScannedPostFilter += (long) _currentNumDocs * _projectOperator.getNumColumnsProjected();
+        reportScanCost(_currentNumDocs, (long) _currentNumDocs * _projectOperator.getNumColumnsProjected());
         if (_currentNumDocs == 0) {
           _currentBlock = null;
           continue;
@@ -421,6 +424,8 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
           }
         }
         _numEntriesScannedPostFilter += (long) numDocsFetched * _phase2NumColumns;
+        // Phase 2 re-reads docs already counted in phase 1, so only the extra entries are reported.
+        reportScanCost(0, (long) numDocsFetched * _phase2NumColumns);
         rowBaseId += numDocsFetched;
       }
 
@@ -503,5 +508,22 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, _numEntriesScannedPostFilter,
         numTotalDocs);
+  }
+
+  /**
+   * Reports scan cost to the shared {@link QueryScanCostContext} so scan-based query killing
+   * ({@link org.apache.pinot.core.common.Operator#nextBlock()} -> {@code checkScanBasedKilling}) can see this
+   * operator's work. Without this the killer is blind on the streaming path, unlike every other selection operator.
+   */
+  private void reportScanCost(int numDocsScanned, long numEntriesScannedPostFilter) {
+    QueryScanCostContext scanCost = getScanCostContext();
+    if (scanCost != null) {
+      if (numDocsScanned > 0) {
+        scanCost.addDocsScanned(numDocsScanned);
+      }
+      if (numEntriesScannedPostFilter > 0) {
+        scanCost.addEntriesScannedPostFilter(numEntriesScannedPostFilter);
+      }
+    }
   }
 }

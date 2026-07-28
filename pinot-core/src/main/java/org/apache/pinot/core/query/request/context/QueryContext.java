@@ -44,6 +44,7 @@ import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -144,9 +145,9 @@ public class QueryContext {
   // Flush threshold for streaming group-by (0 = disabled)
   private int _streamingGroupByFlushThreshold;
   // Opt-in: use the streaming k-way-merge selection ORDER BY combine over sorted segments
-  private boolean _streamingSelectionOrderBy;
+  private boolean _sortedSelectionMergeEnabled;
   // Output block size (rows) for the streaming selection ORDER BY combine
-  private int _streamingSelectionOrderByBlockSize = 10_000;
+  private int _sortedSelectionMergeBlockSize = Broker.DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE;
 
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
@@ -552,20 +553,20 @@ public class QueryContext {
     _streamingGroupByFlushThreshold = streamingGroupByFlushThreshold;
   }
 
-  public boolean isStreamingSelectionOrderBy() {
-    return _streamingSelectionOrderBy;
+  public boolean isSortedSelectionMergeEnabled() {
+    return _sortedSelectionMergeEnabled;
   }
 
-  public void setStreamingSelectionOrderBy(boolean streamingSelectionOrderBy) {
-    _streamingSelectionOrderBy = streamingSelectionOrderBy;
+  public void setSortedSelectionMergeEnabled(boolean sortedSelectionMergeEnabled) {
+    _sortedSelectionMergeEnabled = sortedSelectionMergeEnabled;
   }
 
-  public int getStreamingSelectionOrderByBlockSize() {
-    return _streamingSelectionOrderByBlockSize;
+  public int getSortedSelectionMergeBlockSize() {
+    return _sortedSelectionMergeBlockSize;
   }
 
-  public void setStreamingSelectionOrderByBlockSize(int streamingSelectionOrderByBlockSize) {
-    _streamingSelectionOrderByBlockSize = streamingSelectionOrderByBlockSize;
+  public void setSortedSelectionMergeBlockSize(int sortedSelectionMergeBlockSize) {
+    _sortedSelectionMergeBlockSize = sortedSelectionMergeBlockSize;
   }
 
   public boolean isNullHandlingEnabled() {
