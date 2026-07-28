@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
 /// ProjectionBlock holds a column name to Block Map.
@@ -60,7 +61,15 @@ public class ProjectionBlock implements ValueBlock {
 
   @Override
   public BlockValSet getBlockValueSet(String column) {
-    return new ProjectionBlockValSet(_dataBlockCache, column, _dataSourceMap.get(column));
+    DataSource dataSource = _dataSourceMap.get(column);
+    // An OPEN_STRUCT parent is only a handle for per-key resolution — it has no forward index, so DataFetcher does
+    // not register it and it cannot be read as a column. Reject it here rather than letting the missing
+    // ColumnValueReader surface as an NPE.
+    if (dataSource instanceof OpenStructDataSource) {
+      throw new BadQueryRequestException(
+          "OPEN_STRUCT column: " + column + " cannot be selected directly; use item(" + column + ", 'key')");
+    }
+    return new ProjectionBlockValSet(_dataBlockCache, column, dataSource);
   }
 
   @Override
