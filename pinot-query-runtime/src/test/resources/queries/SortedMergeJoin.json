@@ -1,0 +1,58 @@
+{
+  "sorted_merge_join": {
+    "comment": "End-to-end tests for the streaming sorted merge join (join_strategy='sorted'). The table is partitioned on the join key so the planner inserts a hash-distributed, sorted exchange on each join input; the SortedMergeJoinOperator then advances both inputs with a two-pointer merge instead of building a hash table. Results are validated against H2. Only the V1 (logical) path is wired for sorted-input routing today, so the V2 physical optimizer is skipped via ignoreV2Optimizer.",
+    "tables": {
+      "user_events": {
+        "schema": [
+          {"name": "correlation_id", "type": "INT"},
+          {"name": "event", "type": "STRING"}
+        ],
+        "partitionColumns": ["correlation_id"],
+        "inputs": [
+          [1, "view"],
+          [1, "checkout"],
+          [2, "view"],
+          [2, "addToCart"],
+          [2, "checkout"],
+          [3, "view"],
+          [4, "addToCart"],
+          [4, "checkout"],
+          [5, "view"],
+          [5, "checkout"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Inner sorted merge self-join on the partitioned/sorted join key (one-to-many runs per key)",
+        "sql": "SELECT /*+ joinOptions(join_strategy='sorted') */ a.correlation_id, a.event, b.event FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id",
+        "h2Sql": "SELECT a.correlation_id, a.event, b.event FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Count of joined rows via sorted merge join",
+        "sql": "SELECT /*+ joinOptions(join_strategy='sorted') */ COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id",
+        "h2Sql": "SELECT COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Funnel-style self-join: count correlation_ids that have both a checkout and an addToCart event",
+        "sql": "SELECT /*+ joinOptions(join_strategy='sorted') */ COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id WHERE a.event = 'checkout' AND b.event = 'addToCart'",
+        "h2Sql": "SELECT COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id WHERE a.event = 'checkout' AND b.event = 'addToCart'",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Left sorted merge join with a non-equi residual condition on the right side (unmatched left rows padded with null)",
+        "sql": "SELECT /*+ joinOptions(join_strategy='sorted') */ a.correlation_id, a.event, b.event FROM {user_events} a LEFT JOIN {user_events} b ON a.correlation_id = b.correlation_id AND b.event = 'checkout'",
+        "h2Sql": "SELECT a.correlation_id, a.event, b.event FROM {user_events} a LEFT JOIN {user_events} b ON a.correlation_id = b.correlation_id AND b.event = 'checkout'",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Aggregation above a sorted merge join",
+        "sql": "SELECT /*+ joinOptions(join_strategy='sorted') */ a.correlation_id, COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id GROUP BY a.correlation_id",
+        "h2Sql": "SELECT a.correlation_id, COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id GROUP BY a.correlation_id",
+        "ignoreV2Optimizer": true
+      }
+    ]
+  }
+}
