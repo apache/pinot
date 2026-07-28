@@ -19,6 +19,8 @@
 package org.apache.pinot.common.function.scalar.uuid;
 
 import java.util.UUID;
+import org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -73,6 +75,16 @@ public class UuidConversionFunctionsTest {
 
     assertEquals(UuidConversionFunctions.uuidToBytes(uuid), UuidUtils.toBytes(UUID_VALUE));
     assertEquals(UuidConversionFunctions.uuidToString(uuid), UUID_VALUE);
+  }
+
+  @Test
+  public void testUuidToStringEvaluationFromInternalBytes() {
+    GenericRow row = new GenericRow();
+    row.putValue("uuid", UuidUtils.toBytes(UUID_VALUE));
+
+    Object result = new InbuiltFunctionEvaluator("UUID_TO_STRING(uuid)").evaluate(row);
+
+    assertEquals(result, UUID_VALUE);
   }
 
   @Test

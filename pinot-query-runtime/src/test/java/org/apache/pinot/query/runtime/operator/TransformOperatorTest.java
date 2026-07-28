@@ -29,6 +29,8 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -110,6 +112,25 @@ public class TransformOperatorTest {
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2.0, 0.0});
     assertEquals(resultRows.get(1), new Object[]{5.0, -1.0});
+  }
+
+  @Test
+  public void shouldRenderUuidToStringAsCanonicalText() {
+    String uuid = "550e8400-e29b-41d4-a716-446655440000";
+    DataSchema inputSchema =
+        new DataSchema(new String[]{"uuidCol"}, new ColumnDataType[]{ColumnDataType.UUID});
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{new ByteArray(UuidUtils.toBytes(uuid))}));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"uuidString"}, new ColumnDataType[]{ColumnDataType.STRING});
+    List<RexExpression> projects = List.of(new RexExpression.FunctionCall(
+        ColumnDataType.STRING, "UUID_TO_STRING", List.of(new RexExpression.InputRef(0))));
+
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{uuid});
   }
 
   @Test
