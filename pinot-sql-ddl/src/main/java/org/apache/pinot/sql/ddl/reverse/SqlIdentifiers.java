@@ -51,7 +51,7 @@ final class SqlIdentifiers {
       // rather than an identifier and the column declaration would fail.
       "INT", "INTEGER", "SMALLINT", "TINYINT", "BIGINT", "LONG", "FLOAT", "REAL", "DOUBLE",
       "DECIMAL", "NUMERIC", "BIG_DECIMAL", "BOOLEAN", "TIMESTAMP", "VARCHAR", "CHAR", "STRING",
-      "VARBINARY", "BINARY", "BYTES", "JSON");
+      "VARBINARY", "BINARY", "BYTES", "JSON", "VARIANT");
 
   private static final Pattern BARE_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 

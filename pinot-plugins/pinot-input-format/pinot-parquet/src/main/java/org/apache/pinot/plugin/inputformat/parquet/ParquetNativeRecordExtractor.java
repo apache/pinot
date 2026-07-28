@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.parquet.example.data.Group;
@@ -60,6 +59,7 @@ import org.apache.pinot.spi.utils.UuidUtils;
 /// - `INT64` + `TIME_MICROS` / `TIME_NANOS` → `LocalTime`, or `Long` value-since-midnight in the column's
 ///   declared unit when `extractRawTimeValues` is `true`
 /// - `FIXED_LEN_BYTE_ARRAY(16)` + `UUID` → `java.util.UUID`
+/// - top-level non-repeated group + `VARIANT(1)` → Pinot VARIANT `byte[]` envelope
 ///
 /// **Complex types:**
 /// - `LIST`-annotated group (standard 3-level wrapper or legacy non-wrapper forms) → `Object[]`
@@ -68,38 +68,93 @@ import org.apache.pinot.spi.utils.UuidUtils;
 /// - field with zero repetition count → `null`
 public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
+  private static final TopLevelFieldPlan[] NO_FIELD_PLANS = new TopLevelFieldPlan[0];
+
   private boolean _extractRawTimeValues;
+  private GroupType _plannedSchema;
+  private TopLevelFieldPlan[] _fieldPlans = NO_FIELD_PLANS;
 
   @Override
   protected void initConfig(@Nullable RecordExtractorConfig config) {
+    _extractRawTimeValues = false;
+    _plannedSchema = null;
+    _fieldPlans = NO_FIELD_PLANS;
     if (config instanceof ParquetNativeRecordExtractorConfig) {
-      _extractRawTimeValues = ((ParquetNativeRecordExtractorConfig) config).isExtractRawTimeValues();
+      ParquetNativeRecordExtractorConfig parquetConfig = (ParquetNativeRecordExtractorConfig) config;
+      _extractRawTimeValues = parquetConfig.isExtractRawTimeValues();
+      GroupType parquetSchema = parquetConfig.getParquetSchema();
+      if (parquetSchema != null) {
+        initializeFieldPlans(parquetSchema);
+      }
     }
   }
 
   @Override
   public GenericRow extract(Group from, GenericRow to) {
     GroupType fromType = from.getType();
-    if (_extractAll) {
-      List<Type> fields = fromType.getFields();
-      for (Type field : fields) {
-        String fieldName = field.getName();
-        to.putValue(fieldName, extractValue(from, fromType.getFieldIndex(fieldName)));
-      }
-    } else {
-      for (String fieldName : _fields) {
-        if (fromType.containsField(fieldName)) {
-          to.putValue(fieldName, extractValue(from, fromType.getFieldIndex(fieldName)));
-        }
-      }
+    if (_plannedSchema == null || (_plannedSchema != fromType && !_plannedSchema.equals(fromType))) {
+      // Direct extractor users historically initialize without a file schema. Preserve that usage while keeping
+      // converter ownership inside extractor initialization for the normal record-reader path.
+      initializeFieldPlans(fromType);
+    } else if (_plannedSchema != fromType) {
+      // Avoid a deep schema equality check on every subsequent row when the configured and row schemas are equal
+      // but represented by distinct objects.
+      _plannedSchema = fromType;
+    }
+    for (TopLevelFieldPlan fieldPlan : _fieldPlans) {
+      to.putValue(fieldPlan._name, extractTopLevelValue(from, fieldPlan));
     }
     return to;
   }
 
+  private void initializeFieldPlans(GroupType schema) {
+    ParquetVariantConverter[] variantConverters =
+        ParquetVariantConverter.createTopLevelVariantConverters(schema);
+    int fieldCount = schema.getFieldCount();
+    int selectedFieldCount = 0;
+    for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
+      if (_extractAll || _fields.contains(schema.getType(fieldIndex).getName())) {
+        selectedFieldCount++;
+      }
+    }
+
+    TopLevelFieldPlan[] fieldPlans = new TopLevelFieldPlan[selectedFieldCount];
+    int selectedFieldIndex = 0;
+    for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
+      Type fieldType = schema.getType(fieldIndex);
+      if (_extractAll || _fields.contains(fieldType.getName())) {
+        fieldPlans[selectedFieldIndex++] =
+            new TopLevelFieldPlan(fieldType.getName(), fieldIndex, fieldType, variantConverters[fieldIndex]);
+      }
+    }
+    _plannedSchema = schema;
+    _fieldPlans = fieldPlans;
+  }
+
+  @Nullable
+  private Object extractTopLevelValue(Group from, TopLevelFieldPlan fieldPlan) {
+    if (fieldPlan._variantConverter == null) {
+      return extractValue(from, fieldPlan._fieldIndex, fieldPlan._fieldType);
+    }
+    int numValues = from.getFieldRepetitionCount(fieldPlan._fieldIndex);
+    if (numValues == 0) {
+      return null;
+    }
+    return fieldPlan._variantConverter.convert(from.getGroup(fieldPlan._fieldIndex, 0));
+  }
+
   @Nullable
   private Object extractValue(Group from, int fieldIndex) {
-    int numValues = from.getFieldRepetitionCount(fieldIndex);
     Type fieldType = from.getType().getType(fieldIndex);
+    return extractValue(from, fieldIndex, fieldType);
+  }
+
+  @Nullable
+  private Object extractValue(Group from, int fieldIndex, Type fieldType) {
+    int numValues = from.getFieldRepetitionCount(fieldIndex);
+    if (ParquetVariantConverter.isVariant(fieldType)) {
+      throw new UnsupportedOperationException("Nested Parquet VARIANT is not supported: " + fieldType.getName());
+    }
     // REPEATED fields are always multi-valued — even when 0 or 1 occurrences are present, the contract is
     // `Object[]` (matching how LIST-annotated groups surface). For OPTIONAL / REQUIRED fields, 0 → null and
     // 1 → the scalar.
@@ -312,5 +367,20 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
     }
     String repeatedFieldName = repeatedField.getName();
     return !"array".equals(repeatedFieldName) && !(parentListName + "_tuple").equals(repeatedFieldName);
+  }
+
+  private static final class TopLevelFieldPlan {
+    private final String _name;
+    private final int _fieldIndex;
+    private final Type _fieldType;
+    private final ParquetVariantConverter _variantConverter;
+
+    private TopLevelFieldPlan(String name, int fieldIndex, Type fieldType,
+        @Nullable ParquetVariantConverter variantConverter) {
+      _name = name;
+      _fieldIndex = fieldIndex;
+      _fieldType = fieldType;
+      _variantConverter = variantConverter;
+    }
   }
 }

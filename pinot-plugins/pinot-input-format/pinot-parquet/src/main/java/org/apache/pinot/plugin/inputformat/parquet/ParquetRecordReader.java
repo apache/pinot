@@ -36,28 +36,42 @@ public class ParquetRecordReader implements RecordReader {
   private static final String EXTENSION = "parquet";
 
   private RecordReader _internalParquetRecordReader;
-  private boolean _useAvroParquetRecordReader = true;
 
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, EXTENSION);
+    RecordReader nextReader;
     if (recordReaderConfig != null && ((ParquetRecordReaderConfig) recordReaderConfig).useParquetAvroRecordReader()) {
-      _internalParquetRecordReader = new ParquetAvroRecordReader();
+      nextReader = new ParquetAvroRecordReader();
     } else if (recordReaderConfig != null
         && ((ParquetRecordReaderConfig) recordReaderConfig).useParquetNativeRecordReader()) {
-      _useAvroParquetRecordReader = false;
-      _internalParquetRecordReader = new ParquetNativeRecordReader();
+      nextReader = new ParquetNativeRecordReader();
     } else {
       // No reader type specified. Determine using file metadata
       if (ParquetUtils.hasAvroSchemaInFileMetadata(new Path(parquetFile.getAbsolutePath()))) {
-        _internalParquetRecordReader = new ParquetAvroRecordReader();
+        nextReader = new ParquetAvroRecordReader();
       } else {
-        _useAvroParquetRecordReader = false;
-        _internalParquetRecordReader = new ParquetNativeRecordReader();
+        nextReader = new ParquetNativeRecordReader();
       }
     }
-    _internalParquetRecordReader.init(parquetFile, fieldsToRead, recordReaderConfig);
+    try {
+      nextReader.init(parquetFile, fieldsToRead, recordReaderConfig);
+    } catch (IOException | RuntimeException e) {
+      try {
+        nextReader.close();
+      } catch (IOException | RuntimeException closeException) {
+        e.addSuppressed(closeException);
+      }
+      throw e;
+    }
+    RecordReader previousReader = _internalParquetRecordReader;
+    // Publish only the fully initialized replacement. A previous-reader close failure must not restore a stale
+    // delegate.
+    _internalParquetRecordReader = nextReader;
+    if (previousReader != null) {
+      previousReader.close();
+    }
   }
 
   @Override
@@ -80,10 +94,14 @@ public class ParquetRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
-    _internalParquetRecordReader.close();
+    RecordReader reader = _internalParquetRecordReader;
+    _internalParquetRecordReader = null;
+    if (reader != null) {
+      reader.close();
+    }
   }
 
   public boolean useAvroParquetRecordReader() {
-    return _useAvroParquetRecordReader;
+    return _internalParquetRecordReader instanceof ParquetAvroRecordReader;
   }
 }

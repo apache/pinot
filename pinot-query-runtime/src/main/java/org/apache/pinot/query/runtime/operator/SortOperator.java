@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -73,6 +74,11 @@ public class SortOperator extends MultiStageOperator {
     // - There is no collation
     // - Input is already sorted
     List<RelFieldCollation> collations = node.getCollations();
+    for (RelFieldCollation collation : collations) {
+      Preconditions.checkArgument(
+          _dataSchema.getColumnDataType(collation.getFieldIndex()).supportsOrdering(),
+          "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first");
+    }
     if (collations.isEmpty() || input instanceof SortedMailboxReceiveOperator) {
       _priorityQueue = null;
       _rows = new ArrayList<>(Math.min(defaultHolderCapacity, _numRowsToKeep));
