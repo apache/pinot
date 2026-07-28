@@ -22,6 +22,8 @@
 # from one version to the other given 2 commit hashes. It first builds
 # Pinot in the 2 given directories and then upgrades in the following order:
 # Controller -> Broker -> Server
+# An optional old-broker-new-servers.yaml phase temporarily restores the old
+# broker after all servers are upgraded to verify the opposite wire direction.
 #
 # TODO Some ideas to explore:
 #  It will be nice to have the script take arguments about what is to be done.
@@ -496,13 +498,23 @@ setupControllerVariables
 setupBrokerVariables
 setupServerVariables
 
-export JAVA_OPTS="-DControllerPort=${CONTROLLER_PORT} -DBrokerQueryPort=${BROKER_QUERY_PORT} -DServerAdminPort=${SERVER_ADMIN_PORT}"
-
 mkdir ${PID_DIR}
 mkdir ${LOG_DIR}
 
 oldTargetDir="$workingDir"/oldTargetDir
 newTargetDir="$workingDir"/newTargetDir
+
+oldServerSupportsVariant=false
+oldExpressionsProto="${oldTargetDir}/pinot-common/src/main/proto/expressions.proto"
+if [ -f "${oldExpressionsProto}" ] \
+    && grep -Eq '^[[:space:]]*VARIANT[[:space:]]*=[[:space:]]*24[[:space:]]*;' "${oldExpressionsProto}"; then
+  oldServerSupportsVariant=true
+fi
+echo "Old server supports VARIANT query-wire type: ${oldServerSupportsVariant}"
+
+export JAVA_OPTS="-DControllerPort=${CONTROLLER_PORT} -DBrokerQueryPort=${BROKER_QUERY_PORT} \
+-DServerAdminPort=${SERVER_ADMIN_PORT} -Dpinot.compat.oldServerSupportsVariant=${oldServerSupportsVariant} \
+-Dpinot.compat.logDir=${LOG_DIR}"
 
 setupCompatTester
 
@@ -604,7 +616,30 @@ if [ -f "${SERVER_CONF_2}" ]; then
       exit 1
     fi
   fi
+fi
 
+if [ -f "$testSuiteDir/old-broker-new-servers.yaml" ]; then
+  echo "Temporarily downgrading broker to test the old broker with upgraded servers"
+  stopService broker
+  startService broker "$oldTargetDir" "$BROKER_CONF"
+  waitForBrokerReady
+
+  "$COMPAT_TESTER" "$testSuiteDir/old-broker-new-servers.yaml" "$genNum"
+  if [ $? -ne 0 ]; then
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    echo "Failed with old broker and upgraded servers"
+    exit 1
+  fi
+
+  echo "Restoring upgraded broker before server rollback"
+  stopService broker
+  startService broker "$newTargetDir" "$BROKER_CONF"
+  waitForBrokerReady
+fi
+
+if [ -f "${SERVER_CONF_2}" ]; then
   echo "Downgrading server 2"
   # Upgrade completed, now do a rollback
   stopService server2

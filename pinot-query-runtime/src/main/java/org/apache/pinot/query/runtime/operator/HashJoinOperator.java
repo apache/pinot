@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.validation.JoinKeyTypeValidator;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.join.DoubleLookupTable;
 import org.apache.pinot.query.runtime.operator.join.FloatLookupTable;
@@ -91,7 +92,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     List<Integer> leftKeys = node.getLeftKeys();
     Preconditions.checkState(!leftKeys.isEmpty(), "Hash join operator requires join keys");
     Preconditions.checkArgument(!rightSchemaRequired || rightSchema != null, "Right input schema must not be null");
-    validateVariantJoinKeys(leftKeys, node.getRightKeys(), leftSchema, rightSchema);
+    JoinKeyTypeValidator.validate(node, leftSchema, rightSchema);
     _leftKeySelector = KeySelectorFactory.getKeySelector(leftKeys);
     _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
     _rightTable = createLookupTable(leftKeys, leftSchema);
@@ -126,7 +127,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     List<Integer> leftKeys = node.getLeftKeys();
     Preconditions.checkState(!leftKeys.isEmpty(), "Hash join operator requires join keys");
     Preconditions.checkArgument(!rightSchemaRequired || rightSchema != null, "Right input schema must not be null");
-    validateVariantJoinKeys(leftKeys, node.getRightKeys(), leftSchema, rightSchema);
+    JoinKeyTypeValidator.validate(node, leftSchema, rightSchema);
     _leftKeySelector = KeySelectorFactory.getKeySelector(leftKeys);
     _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
     _rightTable = createLookupTable(leftKeys, leftSchema);
@@ -166,22 +167,6 @@ public class HashJoinOperator extends BaseJoinOperator {
         return new DoubleLookupTable();
       default:
         return new ObjectLookupTable();
-    }
-  }
-
-  private static void validateVariantJoinKeys(List<Integer> leftKeys, List<Integer> rightKeys, DataSchema leftSchema,
-      @Nullable DataSchema rightSchema) {
-    for (int leftKey : leftKeys) {
-      DataSchema.ColumnDataType dataType = leftSchema.getColumnDataType(leftKey);
-      Preconditions.checkArgument(dataType.supportsEquality() && dataType.supportsHashing(),
-          "Raw VARIANT values do not support JOIN keys; extract a typed path with variantGet first");
-    }
-    if (rightSchema != null) {
-      for (int rightKey : rightKeys) {
-        DataSchema.ColumnDataType dataType = rightSchema.getColumnDataType(rightKey);
-        Preconditions.checkArgument(dataType.supportsEquality() && dataType.supportsHashing(),
-            "Raw VARIANT values do not support JOIN keys; extract a typed path with variantGet first");
-      }
     }
   }
 
