@@ -324,6 +324,111 @@ public class SessionManagerTest {
         "All concurrent getUsername calls should succeed for a valid non-expired token");
   }
 
+  // ---------------------------------------------------------------------------
+  // rotateSession
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testRotateSessionReturnsNewToken() {
+    String oldToken = _sessionManager.createSession("henry", "Basic hhh");
+    Optional<String> newToken = _sessionManager.rotateSession(oldToken);
+    assertTrue(newToken.isPresent());
+    assertNotEquals(newToken.get(), oldToken, "Rotated token must differ from old token");
+  }
+
+  @Test
+  public void testRotateSessionOldTokenInvalidated() {
+    String oldToken = _sessionManager.createSession("henry", "Basic hhh");
+    _sessionManager.rotateSession(oldToken);
+    assertFalse(_sessionManager.getUsername(oldToken).isPresent(),
+        "Old token must be invalidated after rotation");
+  }
+
+  @Test
+  public void testRotateSessionNewTokenValid() {
+    String oldToken = _sessionManager.createSession("henry", "Basic hhh");
+    Optional<String> newToken = _sessionManager.rotateSession(oldToken);
+    assertTrue(newToken.isPresent());
+    assertTrue(_sessionManager.getUsername(newToken.get()).isPresent(),
+        "New token must be valid after rotation");
+    assertEquals(_sessionManager.getUsername(newToken.get()).get(), "henry");
+  }
+
+  @Test
+  public void testRotateSessionPreservesBasicAuthToken() {
+    String basicToken = "Basic hhh";
+    String oldToken = _sessionManager.createSession("henry", basicToken);
+    Optional<String> newToken = _sessionManager.rotateSession(oldToken);
+    assertTrue(newToken.isPresent());
+    Optional<String> storedToken = _sessionManager.getBasicAuthToken(newToken.get());
+    assertTrue(storedToken.isPresent(), "Basic auth token must be present after rotation");
+    assertEquals(storedToken.get(), basicToken);
+  }
+
+  @Test
+  public void testRotateSessionExpiredTokenReturnsEmpty() throws InterruptedException {
+    SessionManager shortTtlManager = new InMemorySessionManager(1L);
+    try {
+      String token = shortTtlManager.createSession("ivan", "Basic iii");
+      Thread.sleep(1500); // wait for TTL to expire
+      assertFalse(shortTtlManager.rotateSession(token).isPresent(),
+          "rotateSession must return empty for an expired token");
+    } finally {
+      shortTtlManager.shutdown();
+    }
+  }
+
+  @Test
+  public void testRotateSessionNullTokenReturnsEmpty() {
+    assertFalse(_sessionManager.rotateSession(null).isPresent());
+  }
+
+  @Test
+  public void testRotateSessionEmptyTokenReturnsEmpty() {
+    assertFalse(_sessionManager.rotateSession("").isPresent());
+  }
+
+  @Test
+  public void testRotateSessionUnknownTokenReturnsEmpty() {
+    assertFalse(_sessionManager.rotateSession("nonexistent-token").isPresent());
+  }
+
+  @Test
+  public void testRotateSessionConcurrentOnlyOneSucceeds() throws InterruptedException {
+    // CAS-based rotation: only one of two concurrent rotate calls wins
+    String oldToken = _sessionManager.createSession("ivan", "Basic iii");
+    int threadCount = 10;
+    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch doneLatch = new CountDownLatch(threadCount);
+    AtomicInteger successCount = new AtomicInteger(0);
+
+    for (int i = 0; i < threadCount; i++) {
+      executor.submit(() -> {
+        try {
+          startLatch.await();
+          Optional<String> result = _sessionManager.rotateSession(oldToken);
+          if (result.isPresent()) {
+            successCount.incrementAndGet();
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        } finally {
+          doneLatch.countDown();
+        }
+      });
+    }
+
+    startLatch.countDown();
+    assertTrue(doneLatch.await(10, TimeUnit.SECONDS));
+    executor.shutdown();
+
+    // Exactly one rotation should succeed due to CAS
+    assertEquals(successCount.get(), 1, "Exactly one concurrent rotation should succeed");
+    assertFalse(_sessionManager.getUsername(oldToken).isPresent(),
+        "Old token must be gone after successful rotation");
+  }
+
   @Test
   public void testConcurrentCreateAndInvalidate() throws InterruptedException {
     int count = 20;
