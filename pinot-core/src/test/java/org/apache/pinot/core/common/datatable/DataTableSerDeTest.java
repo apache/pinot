@@ -32,6 +32,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -60,6 +61,7 @@ public class DataTableSerDeTest {
   private static final String[] STRINGS = new String[NUM_ROWS];
   private static final String[] JSONS = new String[NUM_ROWS];
   private static final byte[][] BYTES = new byte[NUM_ROWS][];
+  private static final byte[][] VARIANTS = new byte[NUM_ROWS][];
   private static final byte[][] UUIDS = new byte[NUM_ROWS][];
   private static final Object[] OBJECTS = new Object[NUM_ROWS];
   private static final int[][] INT_ARRAYS = new int[NUM_ROWS][];
@@ -369,6 +371,11 @@ public class DataTableSerDeTest {
             BYTES[rowId] = isNull ? new byte[0] : RandomStringUtils.secure().next(RANDOM.nextInt(20)).getBytes();
             dataTableBuilder.setColumn(colId, new ByteArray(BYTES[rowId]));
             break;
+          case VARIANT:
+            VARIANTS[rowId] = isNull ? new byte[0]
+                : VariantUtils.parseJsonToVariant("{\"row\":" + rowId + ",\"value\":" + RANDOM.nextLong() + "}");
+            dataTableBuilder.setColumn(colId, new ByteArray(VARIANTS[rowId]));
+            break;
           case UUID:
             UUIDS[rowId] = isNull ? UuidUtils.nullUuidBytes()
                 : UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong()));
@@ -535,6 +542,10 @@ public class DataTableSerDeTest {
           case BYTES:
             Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(), isNull ? new byte[0] : BYTES[rowId],
                 ERROR_MESSAGE);
+            break;
+          case VARIANT:
+            Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(),
+                isNull ? new byte[0] : VARIANTS[rowId], ERROR_MESSAGE);
             break;
           case UUID:
             Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(),

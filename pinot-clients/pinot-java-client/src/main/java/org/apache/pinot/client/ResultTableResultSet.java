@@ -59,6 +59,12 @@ public class ResultTableResultSet extends AbstractResultSet {
   @Override
   public String getString(int rowIndex, int columnIndex) {
     JsonNode jsonValue = _rowsArray.get(rowIndex).get(columnIndex);
+    // Historically getString() exposes a JSON null as the string "null". Preserve that behavior for all established
+    // types. VARIANT needs to distinguish a SQL null (JSON null) from a Variant null (the canonical JSON string
+    // "null"), so only the new type maps a JSON null to Java null.
+    if (jsonValue.isNull() && "VARIANT".equals(getColumnDataType(columnIndex))) {
+      return null;
+    }
     if (jsonValue.isTextual()) {
       return jsonValue.textValue();
     } else {
@@ -125,7 +131,8 @@ public class ResultTableResultSet extends AbstractResultSet {
       String[] columnValues = new String[numColumns];
       for (int c = 0; c < numColumns; c++) {
         try {
-          columnValues[c] = getString(r, c);
+          String value = getString(r, c);
+          columnValues[c] = value != null ? value : "null";
         } catch (Exception e) {
           columnNames[c] = "ERROR";
         }

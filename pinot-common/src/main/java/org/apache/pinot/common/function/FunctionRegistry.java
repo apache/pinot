@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,7 +37,6 @@ import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -216,7 +216,7 @@ public class FunctionRegistry {
   }
 
   public static String canonicalize(String name) {
-    return StringUtils.remove(name, '_').toLowerCase();
+    return name.replace("_", "").toLowerCase(Locale.ROOT);
   }
 
   public static class ArgumentCountBasedScalarFunction implements PinotScalarFunction {

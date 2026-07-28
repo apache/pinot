@@ -487,6 +487,12 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     DataType dataType = config.getEnum(Column.getKeyFor(column, Column.DATA_TYPE), DataType.class);
     boolean isSingleValue = config.getBoolean(Column.getKeyFor(column, Column.IS_SINGLE_VALUED), true);
     String defaultNullValueString = config.getString(Column.getKeyFor(column, Column.DEFAULT_NULL_VALUE), null);
+    if (dataType == DataType.VARIANT && "".equals(defaultNullValueString)) {
+      // An empty byte array is VARIANT's reserved default-null sentinel. Segment metadata persists byte arrays as hex,
+      // so the sentinel is written as an empty string. Treat it as the type default instead of asking VARIANT.convert()
+      // to decode it as a PVAR value.
+      defaultNullValueString = null;
+    }
     if (defaultNullValueString != null && dataType.getStoredType() == DataType.STRING) {
       defaultNullValueString = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(defaultNullValueString);
     }

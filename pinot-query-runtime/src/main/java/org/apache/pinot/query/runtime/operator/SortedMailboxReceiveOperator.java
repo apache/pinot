@@ -56,6 +56,11 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
     Preconditions.checkState(!CollectionUtils.isEmpty(node.getCollations()), "Field collations must be set");
     _dataSchema = node.getDataSchema();
     _collations = node.getCollations();
+    for (RelFieldCollation collation : _collations) {
+      Preconditions.checkArgument(
+          _dataSchema.getColumnDataType(collation.getFieldIndex()).supportsOrdering(),
+          "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first");
+    }
   }
 
   @Override

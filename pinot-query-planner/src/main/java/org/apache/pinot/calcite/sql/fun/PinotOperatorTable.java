@@ -334,8 +334,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
   // Key is canonical name. Multiple operators can share the same name (e.g. binary "-" and unary "-").
   private final Map<String, List<SqlOperator>> _operatorMap;
   private final List<SqlOperator> _operatorList;
+  private final boolean _nullHandlingEnabled;
 
   private PinotOperatorTable(boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
     Map<String, List<SqlOperator>> operatorMap = new HashMap<>();
 
     // Register standard operators
@@ -466,6 +468,11 @@ public class PinotOperatorTable implements SqlOperatorTable {
       List<SqlOperator> operatorList, SqlNameMatcher nameMatcher) {
     if (!opName.isSimple()) {
       return;
+    }
+    if (!_nullHandlingEnabled && TransformFunctionType.requiresNullHandling(opName.getSimple())) {
+      throw new IllegalStateException(
+          "VARIANT function " + opName.getSimple()
+              + " requires query null handling to be enabled; set enableNullHandling=true");
     }
     String canonicalName = FunctionRegistry.canonicalize(opName.getSimple());
     List<SqlOperator> operators = _operatorMap.get(canonicalName);

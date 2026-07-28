@@ -785,6 +785,7 @@ public abstract class ClusterTest extends ControllerTest {
       case STRING:
       case BYTES:
       case JSON:
+      case VARIANT:
         object = jsonValue.textValue();
         break;
       case UNKNOWN:
