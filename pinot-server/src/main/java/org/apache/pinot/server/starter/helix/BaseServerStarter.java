@@ -114,6 +114,7 @@ import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.server.starter.ServerMetricsInitUtils;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
@@ -126,8 +127,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProviderFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
@@ -678,14 +677,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     LOGGER.info("Initializing server metrics");
     ServerConf serverConf = new ServerConf(_serverConf);
-    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(serverConf.getMetricsConfig());
-    _serverMetrics =
-        new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
-            serverConf.getAllowedTablesForEmittingMetrics());
-    _serverMetrics.initializeGlobalMeters();
+    _serverMetrics = ServerMetricsInitUtils.initServerMetrics(serverConf);
     _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
-    ServerMetrics.register(_serverMetrics);
-    MseMetrics.registerFromConfig(_serverConf, metricsRegistry);
+    MseMetrics.registerFromConfig(_serverConf, _serverMetrics.getMetricsRegistry());
 
     LOGGER.info("Initializing reload job status cache");
     _reloadJobStatusCache = new ServerReloadJobStatusCache(_instanceId);

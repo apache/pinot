@@ -381,6 +381,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_QUERY_LOG_BEFORE_PROCESSING =
         "pinot.broker.query.log.logBeforeProcessing";
     public static final boolean DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING = true;
+    public static final String CONFIG_OF_BROKER_QUERY_LOG_SQL_REDACTION =
+        "pinot.broker.query.log.sqlRedaction";
+    public static final String DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION = "none";
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     /**
      * When true, the broker initializes the materialized view metadata cache and query rewrite
@@ -676,11 +679,13 @@ public class CommonConstants {
     /**
      * Whether to use broker pruning by default on the logical planner (non-physical-optimizer) path.
      * This value can always be overridden by {@link Request.QueryOptionKey#USE_BROKER_PRUNING} query option.
-     * Separated from {@link #CONFIG_OF_USE_BROKER_PRUNING} so the two paths can be rolled out independently.
+     * Separated from {@link #CONFIG_OF_USE_BROKER_PRUNING} so the two paths can be rolled out independently; both
+     * default to enabled now that all logical-planner leaf paths (non-partitioned, partitioned, logical tables)
+     * support broker pruning. Actual pruning still requires segment pruners to be configured on the table.
      */
     public static final String CONFIG_OF_LOGICAL_PLANNER_USE_BROKER_PRUNING =
         "pinot.broker.multistage.logical.planner.use.broker.pruning";
-    public static final boolean DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING = false;
+    public static final boolean DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING = true;
 
     /**
      * Default server stage limit for lite mode queries.
@@ -775,6 +780,9 @@ public class CommonConstants {
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
+        /// Default `false` (queryable docs, tombstones excluded). When `true`, skips the delete/tombstone
+        /// exclusion so rows deleted via `deleteRecordColumn` are included.
+        public static final String SKIP_UPSERT_DELETE = "skipUpsertDelete";
         public static final String USE_STAR_TREE = "useStarTree";
         /**
          * When true, use index-based distinct operators when applicable. This enables both
@@ -1040,8 +1048,8 @@ public class CommonConstants {
         // Not user-settable; used by servers to detect silent truncation at execution time.
         public static final String LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT = "liteModeImplicitLeafStageLimit";
         // Used by the MSE engine to enable broker-side segment pruning during routing. The physical optimizer
-        // path defaults to DEFAULT_USE_BROKER_PRUNING (true); the logical planner path defaults to
-        // DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING (false). Both can be overridden per-query.
+        // path defaults to DEFAULT_USE_BROKER_PRUNING and the logical planner path defaults to
+        // DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING (both true). Both can be overridden per-query.
         public static final String USE_BROKER_PRUNING = "useBrokerPruning";
         // When lite mode is enabled, if this flag is set, we will run all the non-leaf stage operators within the
         // broker itself. That way, the MSE queries will model the scatter gather pattern used by the V1 Engine.
@@ -1154,6 +1162,10 @@ public class CommonConstants {
       public static final String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
       public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
       public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
+      /// @deprecated Enriched joins have been removed. This rule name is retained so that queries which still
+      /// request it (via {@code usePlannerRules}) are silently ignored rather than failing. It stays in
+      /// DEFAULT_DISABLED_RULES and is no longer wired to any rule.
+      @Deprecated(forRemoval = true, since = "1.6.0")
       public static final String JOIN_TO_ENRICHED_JOIN = "JoinToEnrichedJoin";
       public static final String AGGREGATE_PROJECT_PULL_UP_CONSTANTS = "AggregateProjectPullUpConstants";
       public static final String LIMIT_MERGE = "LimitMerge";
@@ -1767,6 +1779,8 @@ public class CommonConstants {
     // Predownload related configs
     public static final String CONFIG_OF_PREDOWNLOAD_PARALLELISM = "pinot.server.predownload.parallelism";
     public static final int DEFAULT_PREDOWNLOAD_PARALLELISM = -1; // Use numProcessors * 3 as default
+    public static final String CONFIG_OF_PEER_DOWNLOAD_ENABLED = "pinot.server.peer.download.enabled";
+    public static final boolean DEFAULT_PEER_DOWNLOAD_ENABLED = false;
 
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
 

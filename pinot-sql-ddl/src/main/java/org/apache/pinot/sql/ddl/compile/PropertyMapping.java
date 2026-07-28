@@ -116,6 +116,7 @@ public final class PropertyMapping {
     keys.add("deletedsegmentsretentionperiod");
     keys.add("segmentversion");
     keys.add("aggregatemetrics");
+    keys.add("compressionstatsenabled");
     keys.add("description");
     keys.add("tags");
     keys.add("replicasperpartition");
@@ -349,6 +350,9 @@ public final class PropertyMapping {
         return true;
       case "aggregatemetrics":
         builder.setAggregateMetrics(parseBool(lowerKey, value));
+        return true;
+      case "compressionstatsenabled":
+        builder.setCompressionStatsEnabled(parseBool(lowerKey, value));
         return true;
       case "description":
         builder.setDescription(value);

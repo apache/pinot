@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
+import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -28,9 +29,8 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.datasketches.common.ArrayOfStringsSerDe;
 import org.apache.datasketches.frequencies.ErrorType;
-import org.apache.datasketches.frequencies.ItemsSketch;
-import org.apache.datasketches.frequencies.LongsSketch;
-import org.apache.datasketches.memory.Memory;
+import org.apache.datasketches.frequencies.FrequentItemsSketch;
+import org.apache.datasketches.frequencies.FrequentLongsSketch;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
@@ -123,11 +123,11 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
       row.putValue(LONG_COLUMN, longValues[i]);
       row.putValue(STRING_COLUMN, strValues[i]);
 
-      LongsSketch longSketch = new LongsSketch(MAX_MAP_SIZE);
+      FrequentLongsSketch longSketch = new FrequentLongsSketch(MAX_MAP_SIZE);
       longSketch.update(longValues[i]);
       row.putValue(LONG_SKETCH_COLUMN, longSketch.toByteArray());
 
-      ItemsSketch<String> strSketch = new ItemsSketch<>(MAX_MAP_SIZE);
+      FrequentItemsSketch<String> strSketch = new FrequentItemsSketch<>(MAX_MAP_SIZE);
       strSketch.update(strValues[i]);
       row.putValue(STRING_SKETCH_COLUMN, strSketch.toByteArray(new ArrayOfStringsSerDe()));
 
@@ -170,7 +170,7 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
 
     // Fetch the exact list by count/group-by and compare
     String[] exactOrdered = getExactOrderedStrings();
-    assertStringsSketch((ItemsSketch<String>) aggregationResult.get(0), exactOrdered);
+    assertStringsSketch((FrequentItemsSketch<String>) aggregationResult.get(0), exactOrdered);
   }
 
   @Test
@@ -187,7 +187,7 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
 
     // Fetch the exact list by count/group-by and compare
     Long[] exactOrdered = getExactOrderedLongs();
-    assertLongsSketch((LongsSketch) aggregationResult.get(0), exactOrdered);
+    assertLongsSketch((FrequentLongsSketch) aggregationResult.get(0), exactOrdered);
   }
 
   @Test
@@ -204,8 +204,8 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
     assertEquals(aggregationResult.size(), 2);
 
     // Assert the sketches are equivalent
-    ItemsSketch<String> sketch1 = (ItemsSketch<String>) aggregationResult.get(0);
-    ItemsSketch<String> sketch2 = (ItemsSketch<String>) aggregationResult.get(1);
+    FrequentItemsSketch<String> sketch1 = (FrequentItemsSketch<String>) aggregationResult.get(0);
+    FrequentItemsSketch<String> sketch2 = (FrequentItemsSketch<String>) aggregationResult.get(1);
     assertEquals(
         sketch1.getFrequentItems(ErrorType.NO_FALSE_NEGATIVES),
         sketch2.getFrequentItems(ErrorType.NO_FALSE_NEGATIVES));
@@ -225,8 +225,8 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
     assertEquals(aggregationResult.size(), 2);
 
     // Assert the sketches are equivalent
-    LongsSketch sketch1 = (LongsSketch) aggregationResult.get(0);
-    LongsSketch sketch2 = (LongsSketch) aggregationResult.get(1);
+    FrequentLongsSketch sketch1 = (FrequentLongsSketch) aggregationResult.get(0);
+    FrequentLongsSketch sketch2 = (FrequentLongsSketch) aggregationResult.get(1);
     assertEquals(
         sketch1.getFrequentItems(ErrorType.NO_FALSE_NEGATIVES),
         sketch2.getFrequentItems(ErrorType.NO_FALSE_NEGATIVES));
@@ -249,7 +249,7 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
     Map<String, ArrayList<String>> exactOrdered = getExactOrderedStringGroups();
     for (Object[] row: rows) {
       String group = (String) row[0];
-      ItemsSketch<String> sketch = decodeStringsSketch((String) row[1]);
+      FrequentItemsSketch<String> sketch = decodeStringsSketch((String) row[1]);
       List<String> exactOrder = exactOrdered.get(group);
       assertStringsSketch(sketch, exactOrder);
     }
@@ -272,7 +272,7 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
     Map<String, ArrayList<Long>> exactOrdered = getExactOrderedLongGroups();
     for (Object[] row: rows) {
       String group = (String) row[0];
-      LongsSketch sketch = decodeLongsSketch((String) row[1]);
+      FrequentLongsSketch sketch = decodeLongsSketch((String) row[1]);
       List<Long> exactOrder = exactOrdered.get(group);
       assertLongsSketch(sketch, exactOrder);
     }
@@ -341,42 +341,42 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
     return order;
   }
 
-  private void assertStringsSketch(ItemsSketch<String> sketch, List<String> exact) {
+  private void assertStringsSketch(FrequentItemsSketch<String> sketch, List<String> exact) {
     String[] arr = new String[exact.size()];
     exact.toArray(arr);
     assertStringsSketch(sketch, arr);
   }
 
-  private void assertStringsSketch(ItemsSketch<String> sketch, String[] exact) {
-    ItemsSketch.Row[] items = sketch.getFrequentItems(ErrorType.NO_FALSE_NEGATIVES);
+  private void assertStringsSketch(FrequentItemsSketch<String> sketch, String[] exact) {
+    FrequentItemsSketch.Row[] items = sketch.getFrequentItems(ErrorType.NO_FALSE_NEGATIVES);
     assertEquals(exact.length, items.length);
     for (int i = 0; i < exact.length; i++) {
       assertEquals((String) items[i].getItem(), exact[i]);
     }
   }
 
-  private void assertLongsSketch(LongsSketch sketch, List<Long> exact) {
+  private void assertLongsSketch(FrequentLongsSketch sketch, List<Long> exact) {
     Long[] arr = new Long[exact.size()];
     exact.toArray(arr);
     assertLongsSketch(sketch, arr);
   }
 
-  private void assertLongsSketch(LongsSketch sketch, Long[] exact) {
-    LongsSketch.Row[] items = sketch.getFrequentItems(ErrorType.NO_FALSE_NEGATIVES);
+  private void assertLongsSketch(FrequentLongsSketch sketch, Long[] exact) {
+    FrequentLongsSketch.Row[] items = sketch.getFrequentItems(ErrorType.NO_FALSE_NEGATIVES);
     assertEquals(exact.length, items.length);
     for (int i = 0; i < exact.length; i++) {
       assertEquals((Long) items[i].getItem(), exact[i]);
     }
   }
 
-  private ItemsSketch<String> decodeStringsSketch(String encodedSketch) {
+  private FrequentItemsSketch<String> decodeStringsSketch(String encodedSketch) {
     byte[] byteArr = Base64.getDecoder().decode(encodedSketch);
-    return ItemsSketch.getInstance(Memory.wrap(byteArr), new ArrayOfStringsSerDe());
+    return FrequentItemsSketch.getInstance(MemorySegment.ofArray(byteArr), new ArrayOfStringsSerDe());
   }
 
-  private LongsSketch decodeLongsSketch(String encodedSketch) {
+  private FrequentLongsSketch decodeLongsSketch(String encodedSketch) {
     byte[] byteArr = Base64.getDecoder().decode(encodedSketch);
-    return LongsSketch.getInstance(Memory.wrap(byteArr));
+    return FrequentLongsSketch.getInstance(MemorySegment.ofArray(byteArr));
   }
 
   @AfterClass

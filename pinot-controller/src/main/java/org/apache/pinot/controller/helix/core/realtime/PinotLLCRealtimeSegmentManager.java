@@ -379,10 +379,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * Sets up the initial segments for a new LLC real-time table.
-   * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
-   */
+  /// Sets up the initial segments for a new real-time table.
   public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
     List<StreamMetadata> streamMetadataList =
@@ -390,12 +387,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     setUpNewTable(tableConfig, idealState, streamMetadataList);
   }
 
-  /**
-   * Sets up the initial segments for a new LLC real-time table.
-   * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
-   */
-  public void setUpNewTable(TableConfig tableConfig, IdealState idealState,
-      List<StreamMetadata> streamMetadataList) {
+  /// Sets up the initial segments for a new real-time table.
+  public void setUpNewTable(TableConfig tableConfig, IdealState idealState, List<StreamMetadata> streamMetadataList) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();

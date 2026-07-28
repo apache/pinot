@@ -231,6 +231,7 @@ class PlanNodeMerger {
       return node.withInputs(children);
     }
 
+    @Deprecated(forRemoval = true, since = "1.6.0")
     @Nullable
     @Override
     public PlanNode visitEnrichedJoin(EnrichedJoinNode node, PlanNode context) {
@@ -433,6 +434,9 @@ class PlanNodeMerger {
         return null;
       }
       if (node.getUpperBound() != otherNode.getUpperBound()) {
+        return null;
+      }
+      if (node.getExclude() != otherNode.getExclude()) {
         return null;
       }
       if (!node.getConstants().equals(otherNode.getConstants())) {

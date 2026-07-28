@@ -347,6 +347,8 @@ public class TableSizeReaderTest {
   public void testGetTableSubTypeSizeAllErrors() throws InvalidConfigException {
     final String[] servers = {"server2", "server5"};
     String table = "offline";
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER, 123L);
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
     TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails._offlineSegments;
     assertNotNull(offlineSizes);
@@ -355,7 +357,6 @@ public class TableSizeReaderTest {
     assertEquals(offlineSizes._reportedSizeInBytes, TableSizeReader.DEFAULT_SIZE_WHEN_MISSING_OR_ERROR);
     assertEquals(tableSizeDetails._estimatedSizeInBytes, TableSizeReader.DEFAULT_SIZE_WHEN_MISSING_OR_ERROR);
     assertEquals(tableSizeDetails._reportedSizePerReplicaInBytes, TableSizeReader.DEFAULT_SIZE_WHEN_MISSING_OR_ERROR);
-    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
         ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 100);
     assertEquals(MetricValueUtils

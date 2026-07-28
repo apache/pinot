@@ -26,19 +26,26 @@ import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.*;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class RealtimeConsumptionRateManagerTest {
@@ -260,7 +267,7 @@ public class RealtimeConsumptionRateManagerTest {
   @Test
   public void testAsyncMetricEmitter()
       throws InterruptedException {
-    AsyncMetricEmitter emitter = new AsyncMetricEmitter(mock(ServerMetrics.class), "testMetric", 10.0);
+    AsyncMetricEmitter emitter = new AsyncMetricEmitter(mock(ServerMetrics.class), 10.0);
     try {
       emitter.start(0, 1);
       Thread.sleep(1500); // Let emitter run at-least once
@@ -276,7 +283,7 @@ public class RealtimeConsumptionRateManagerTest {
       emitter.close();
     }
 
-    AsyncMetricEmitter emitter1 = new AsyncMetricEmitter(mock(ServerMetrics.class), "testMetric", 10.0);
+    AsyncMetricEmitter emitter1 = new AsyncMetricEmitter(mock(ServerMetrics.class), 10.0);
     try {
       emitter1.start(10, 10);
       for (int i = 0; i < 20; i++) {
@@ -288,7 +295,157 @@ public class RealtimeConsumptionRateManagerTest {
           "Expected messageCount to be greater than zero because messageCount will reset post initial delay (first "
               + "run).");
     } finally {
+      emitter1.close();
+    }
+  }
+
+  @Test
+  public void testAsyncMetricEmitterByteOverflow()
+      throws InterruptedException {
+    // emit() previously cast the per-minute LongAdder sum to int; in byte mode the sum can exceed Integer.MAX_VALUE
+    // and would overflow to a negative aggregate. This exercises the fixed emit() path end to end.
+    AsyncMetricEmitter emitter = new AsyncMetricEmitter(mock(ServerMetrics.class), 100_000_000.0);
+    try {
+      emitter.record(2_000_000_000);
+      emitter.record(2_000_000_000); // total 4e9, exceeds Integer.MAX_VALUE
+      emitter.start(0, 3600); // fire emit() once, ~immediately
+      TestUtils.waitForCondition(
+          aVoid -> emitter.getMessageCount().sum() == 0 && emitter.getTracker().getAggregateUnits() == 4_000_000_000L,
+          5000, "emit() must read the LongAdder sum as long without int truncation");
+    } finally {
       emitter.close();
+    }
+  }
+
+  @Test
+  public void testQuotaUtilizationTrackerByteOverflow() {
+    // In byte-throttling mode the per-minute aggregate counts bytes and can exceed Integer.MAX_VALUE. This is a
+    // regression for a (int) overflow that previously turned high byte rates into a negative utilization.
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    QuotaUtilizationTracker tracker = new QuotaUtilizationTracker(serverMetrics); // server-level
+    double byteRateLimit = 100_000_000; // 100 MB/s
+    Instant now = Clock.fixed(Instant.parse("2022-08-10T12:00:02Z"), ZoneOffset.UTC).instant();
+    assertEquals(tracker.update(2_000_000_000, byteRateLimit, now), 0); // first minute, no emit
+    now = Clock.fixed(Instant.parse("2022-08-10T12:00:40Z"), ZoneOffset.UTC).instant();
+    assertEquals(tracker.update(4_000_000_000L, byteRateLimit, now), 0); // same minute: aggregate = 6e9 (> 2^32)
+    assertEquals(tracker.getAggregateUnits(), 6_000_000_000L); // long: not overflowed to a negative int
+    // next minute: 6e9 bytes / 60s = 100 MB/s == limit -> 100% (pre-fix the overflow produced a negative ratio)
+    now = Clock.fixed(Instant.parse("2022-08-10T12:01:02Z"), ZoneOffset.UTC).instant();
+    assertEquals(tracker.update(0, byteRateLimit, now), 100);
+  }
+
+  @Test
+  public void testQuotaUtilizationTrackerServerVsPartitionGauge() {
+    Instant firstMinute = Clock.fixed(Instant.parse("2022-08-10T12:00:02Z"), ZoneOffset.UTC).instant();
+    Instant secondMinute = Clock.fixed(Instant.parse("2022-08-10T12:01:02Z"), ZoneOffset.UTC).instant();
+
+    // Server-level tracker emits the server-wide (global) gauge, never the per-table gauge.
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    QuotaUtilizationTracker serverTracker = new QuotaUtilizationTracker(serverMetrics);
+    serverTracker.update(3000, 50, firstMinute);
+    serverTracker.update(0, 50, secondMinute);
+    verify(serverMetrics).setValueOfGlobalGauge(eq(ServerGauge.SERVER_CONSUMPTION_QUOTA_UTILIZATION), anyLong());
+    verify(serverMetrics, never()).setValueOfTableGauge(anyString(),
+        eq(ServerGauge.CONSUMPTION_QUOTA_UTILIZATION), anyLong());
+
+    // Partition-level tracker emits the per-table/partition gauge, never the server-wide gauge.
+    ServerMetrics partitionMetrics = mock(ServerMetrics.class);
+    QuotaUtilizationTracker partitionTracker =
+        new QuotaUtilizationTracker(partitionMetrics, "tableA_REALTIME-topicA-0");
+    partitionTracker.update(3000, 50, firstMinute);
+    partitionTracker.update(0, 50, secondMinute);
+    verify(partitionMetrics).setValueOfTableGauge(eq("tableA_REALTIME-topicA-0"),
+        eq(ServerGauge.CONSUMPTION_QUOTA_UTILIZATION), anyLong());
+    verify(partitionMetrics, never()).setValueOfGlobalGauge(
+        eq(ServerGauge.SERVER_CONSUMPTION_QUOTA_UTILIZATION), anyLong());
+  }
+
+  @Test
+  public void testServerRateLimitGaugeEmitted() {
+    RealtimeConsumptionRateManager manager = new RealtimeConsumptionRateManager(mock(LoadingCache.class));
+
+    // Byte rate limit configured -> gauge exposes the configured cap.
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    PinotConfiguration config = mock(PinotConfiguration.class);
+    when(config.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(0.0);
+    when(config.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(112_000_000.0);
+    ServerRateLimiter limiter = (ServerRateLimiter) manager.createServerRateLimiter(config, metrics);
+    try {
+      verify(metrics).setValueOfGlobalGauge(ServerGauge.SERVER_CONSUMPTION_RATE_LIMIT, 112_000_000L);
+    } finally {
+      limiter.close();
+    }
+
+    // Disabled -> gauge is set to -1 so operators can still see rate limiting is off.
+    ServerMetrics disabledMetrics = mock(ServerMetrics.class);
+    PinotConfiguration disabledConfig = mock(PinotConfiguration.class);
+    when(disabledConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(0.0);
+    when(disabledConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(0.0);
+    manager.createServerRateLimiter(disabledConfig, disabledMetrics);
+    verify(disabledMetrics).setValueOfGlobalGauge(ServerGauge.SERVER_CONSUMPTION_RATE_LIMIT, -1L);
+  }
+
+  @Test
+  public void testPartitionRateLimitGaugeEmitted() {
+    // Topic-derived: STREAM_CONFIG_A topic rate limit 50 over 10 partitions -> per-partition rate limit 5.
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_A, TABLE_NAME, metrics, "tableA_REALTIME-topicA-0");
+    verify(metrics).setValueOfTableGauge("tableA_REALTIME-topicA-0", ServerGauge.CONSUMPTION_RATE_LIMIT, 5L);
+
+    // Direct partition rate limit: STREAM_CONFIG_D specifies 4.0 per partition, used as-is.
+    ServerMetrics directMetrics = mock(ServerMetrics.class);
+    CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_D, TABLE_NAME, directMetrics, "tableD_REALTIME-topicD-0");
+    verify(directMetrics).setValueOfTableGauge("tableD_REALTIME-topicD-0", ServerGauge.CONSUMPTION_RATE_LIMIT, 4L);
+
+    // No rate limit configured (STREAM_CONFIG_C) -> NOOP limiter, no gauge emitted, and any gauges left behind by a
+    // previously configured (since removed) limit are cleaned up so they do not linger as stale series.
+    ServerMetrics noneMetrics = mock(ServerMetrics.class);
+    ConsumptionRateLimiter limiter =
+        CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME, noneMetrics, "keyC");
+    assertEquals(limiter, NOOP_RATE_LIMITER);
+    verify(noneMetrics, never()).setValueOfTableGauge(anyString(), eq(ServerGauge.CONSUMPTION_RATE_LIMIT), anyLong());
+    verify(noneMetrics).removeTableGauge("keyC", ServerGauge.CONSUMPTION_RATE_LIMIT);
+    verify(noneMetrics).removeTableGauge("keyC", ServerGauge.CONSUMPTION_QUOTA_UTILIZATION);
+  }
+
+  @Test
+  public void testPartitionRateLimitGaugeLifecycle() {
+    // set -> removed -> set again across consuming segments, against a real metrics registry to verify the gauge is
+    // registered, removed and cleanly re-registered as each new consumer picks up the current config.
+    ServerMetrics metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    String key = "tableL_REALTIME-topicL-3";
+    String capGaugeName = ServerGauge.CONSUMPTION_RATE_LIMIT.getGaugeName() + "." + key;
+
+    // Limit set (STREAM_CONFIG_D: direct partition limit 4): cap gauge registered with the configured value.
+    CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_D, TABLE_NAME, metrics, key);
+    assertEquals(metrics.getGaugeValue(capGaugeName), Long.valueOf(4));
+
+    // Limit removed (STREAM_CONFIG_C: no limit): the next consumer creation removes the series.
+    CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME, metrics, key);
+    assertNull(metrics.getGaugeValue(capGaugeName));
+
+    // Limit set again (STREAM_CONFIG_A: topic limit 50 over 10 partitions): gauge re-registers with the new value.
+    CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_A, TABLE_NAME, metrics, key);
+    assertEquals(metrics.getGaugeValue(capGaugeName), Long.valueOf(5));
+  }
+
+  @Test
+  public void testServerRateLimitGaugeEmittedOnUpdate() {
+    RealtimeConsumptionRateManager manager = new RealtimeConsumptionRateManager(mock(LoadingCache.class));
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    // Create an active server limiter, then update its cap -> gauge re-emitted with the new value.
+    manager.updateServerRateLimiter(
+        new ServerRateLimitConfig(100_000_000, ByteCountThrottlingStrategy.INSTANCE), metrics);
+    try {
+      manager.updateServerRateLimiter(
+          new ServerRateLimitConfig(200_000_000, ByteCountThrottlingStrategy.INSTANCE), metrics);
+      verify(metrics).setValueOfGlobalGauge(ServerGauge.SERVER_CONSUMPTION_RATE_LIMIT, 200_000_000L);
+    } finally {
+      ((ServerRateLimiter) manager.getServerRateLimiter()).close();
     }
   }
 

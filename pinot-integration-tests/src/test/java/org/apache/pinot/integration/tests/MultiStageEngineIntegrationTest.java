@@ -273,6 +273,51 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testAllLeafStagesEmptyBrokerResponsesWithPhysicalOptimizer()
+      throws Exception {
+    // Same short-circuit behavior must hold under the multi-stage physical optimizer, which previously failed with
+    // "No routing entry for offline or realtime type" when a leaf stage had no routable segments.
+    String table = "mytable";
+    String prefix = "SET useBrokerPruning = 'true'; SET usePhysicalOptimizer = 'true'; ";
+    assertAllLeafStagesEmptyRows(prefix, "SELECT AirlineID, Carrier FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(), "LONG", "STRING");
+    assertAllLeafStagesEmptyRows(prefix, "SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(List.<Object>of(0)), "LONG");
+    assertAllLeafStagesEmptyRows(prefix, "SELECT SUM(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(Arrays.asList((Object) null)), "LONG");
+    assertAllLeafStagesEmptyRows(prefix, "SELECT COUNT(*) + 1 FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(List.<Object>of(1)), "LONG");
+    assertAllLeafStagesEmptyRows(prefix,
+        "SELECT AirlineID, COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
+        List.of(), "LONG", "LONG");
+  }
+
+  @Test
+  public void testPartiallyEmptyWithPhysicalOptimizerFailsFast()
+      throws Exception {
+    // Combining an empty/fully-pruned table with a non-empty table is not yet supported by the physical optimizer.
+    // It must fail fast with a clear, actionable error rather than silently drop rows.
+    String table = "mytable";
+    String expectedError = "combine an empty or fully-pruned table with a non-empty table";
+    // The empty branch (all segments pruned) contributes zero rows, so the union counts only the non-empty branch.
+    String unionQuery = "SELECT COUNT(*) FROM (SELECT AirlineID FROM " + table + " WHERE DaysSinceEpoch < 0 "
+        + "UNION ALL SELECT AirlineID FROM " + table + ") u";
+
+    JsonNode overUnion = postQuery("SET useBrokerPruning = 'true'; SET usePhysicalOptimizer = 'true'; " + unionQuery);
+    assertFalse(overUnion.get("exceptions").isEmpty(), "Expected a partially-empty error: " + overUnion);
+    assertTrue(overUnion.get("exceptions").toString().contains(expectedError),
+        "Expected a clear partially-empty error, got: " + overUnion.get("exceptions"));
+
+    // The suggested fallback (legacy engine) must answer the same query correctly: the empty branch adds nothing, so
+    // the union count equals the total row count of the non-empty table.
+    long total = postQuery("SELECT COUNT(*) FROM " + table).get("resultTable").get("rows").get(0).get(0).asLong();
+    assertTrue(total > 0, "Sanity: mytable should be non-empty");
+    JsonNode fallback = postQuery("SET useBrokerPruning = 'true'; SET usePhysicalOptimizer = 'false'; " + unionQuery);
+    assertTrue(fallback.get("exceptions").isEmpty(), "Fallback should not error: " + fallback);
+    assertEquals(fallback.get("resultTable").get("rows").get(0).get(0).asLong(), total);
+  }
+
+  @Test
   public void testReplicatedLeavesThatCanProduceRowsDoNotShortCircuit()
       throws Exception {
     assertDoesNotShortCircuitRows("SELECT d.dayId FROM " + DIM_TABLE
@@ -296,7 +341,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
   private JsonNode assertAllLeafStagesEmptyRows(String query, List<List<Object>> expectedRows, String... expectedTypes)
       throws Exception {
-    JsonNode response = postQuery("SET useBrokerPruning = 'true'; " + query);
+    return assertAllLeafStagesEmptyRows("SET useBrokerPruning = 'true'; ", query, expectedRows, expectedTypes);
+  }
+
+  private JsonNode assertAllLeafStagesEmptyRows(String setPrefix, String query, List<List<Object>> expectedRows,
+      String... expectedTypes)
+      throws Exception {
+    JsonNode response = postQuery(setPrefix + query);
     assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
     assertEquals(response.get("numServersQueried").asInt(), 0, "Query should not dispatch to servers: " + query);
     assertEquals(response.get("numServersResponded").asInt(), 0, "Query should not dispatch to servers: " + query);

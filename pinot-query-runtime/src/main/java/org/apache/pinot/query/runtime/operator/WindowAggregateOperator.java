@@ -123,7 +123,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
     for (int i = 0; i < numKeys; i++) {
       _keys[i] = keys.get(i);
     }
-    WindowFrame windowFrame = new WindowFrame(node.getWindowFrameType(), node.getLowerBound(), node.getUpperBound());
+    WindowFrame windowFrame =
+        new WindowFrame(node.getWindowFrameType(), node.getLowerBound(), node.getUpperBound(), node.getExclude());
     Preconditions.checkState(
         windowFrame.isRowType() || ((windowFrame.isUnboundedPreceding() || windowFrame.isLowerBoundCurrentRow()) && (
             windowFrame.isUnboundedFollowing() || windowFrame.isUpperBoundCurrentRow())),

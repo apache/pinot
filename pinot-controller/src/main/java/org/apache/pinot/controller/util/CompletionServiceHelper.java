@@ -24,14 +24,16 @@ import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.pinot.common.http.MultiHttpRequest;
-import org.apache.pinot.common.http.MultiHttpRequestResponse;
+import org.apache.pinot.common.http.MultiHttpRequestBufferedResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,11 +82,20 @@ public class CompletionServiceHelper {
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
       boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs,
       @Nullable String useCase) {
-    // TODO: use some service other than completion service so that we know which server encounters the error
-    CompletionService<MultiHttpRequestResponse> completionService =
-        new MultiHttpRequest(_executor, _httpConnectionManager).executeGet(serverURLs, requestHeaders, timeoutMs);
+    MultiHttpRequest.BufferedRequestExecution execution =
+        new MultiHttpRequest(_executor, _httpConnectionManager).executeGetBuffered(serverURLs, requestHeaders,
+            timeoutMs);
+    return collectBufferedResponse(tableNameWithType, serverURLs.size(), execution, multiRequestPerServer, useCase);
+  }
 
-    return collectResponse(tableNameWithType, serverURLs.size(), completionService, multiRequestPerServer, useCase);
+  /// Makes buffered, cancellable GET requests and returns once all complete or the deadline from the
+  /// [System#nanoTime()] clock is reached.
+  public CompletionServiceResponse doMultiGetRequestUntil(List<String> serverURLs, String tableNameWithType,
+      boolean multiRequestPerServer, int timeoutMs, long nanoTimeDeadline, @Nullable String useCase) {
+    MultiHttpRequest.BufferedRequestExecution execution =
+        new MultiHttpRequest(_executor, _httpConnectionManager).executeGetBuffered(serverURLs, null, timeoutMs);
+    return collectBufferedResponseUntil(tableNameWithType, serverURLs.size(), execution, multiRequestPerServer, useCase,
+        nanoTimeDeadline);
   }
 
   /**
@@ -105,59 +116,100 @@ public class CompletionServiceHelper {
   public CompletionServiceResponse doMultiPostRequest(List<Pair<String, String>> serverURLsAndRequestBodies,
       String tableNameWithType, boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders,
       int timeoutMs, @Nullable String useCase) {
-
-    CompletionService<MultiHttpRequestResponse> completionService =
-        new MultiHttpRequest(_executor, _httpConnectionManager).executePost(serverURLsAndRequestBodies, requestHeaders,
-            timeoutMs);
-
-    return collectResponse(tableNameWithType, serverURLsAndRequestBodies.size(), completionService,
+    MultiHttpRequest.BufferedRequestExecution execution =
+        new MultiHttpRequest(_executor, _httpConnectionManager).createBufferedExecution(timeoutMs);
+    try {
+      for (Pair<String, String> requestAndBody : serverURLsAndRequestBodies) {
+        HttpPost request = new HttpPost(requestAndBody.getLeft());
+        request.setEntity(new StringEntity(requestAndBody.getRight()));
+        if (requestHeaders != null) {
+          requestHeaders.forEach(request::setHeader);
+        }
+        execution.submit(request);
+      }
+    } catch (RuntimeException | Error e) {
+      execution.close();
+      throw e;
+    }
+    return collectBufferedResponse(tableNameWithType, serverURLsAndRequestBodies.size(), execution,
         multiRequestPerServer, useCase);
   }
 
-  private CompletionServiceResponse collectResponse(String tableNameWithType, int size,
-      CompletionService<MultiHttpRequestResponse> completionService, boolean multiRequestPerServer,
-      @Nullable String useCase) {
-    CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
+  private CompletionServiceResponse collectBufferedResponse(String tableNameWithType, int size,
+      MultiHttpRequest.BufferedRequestExecution execution, boolean multiRequestPerServer, @Nullable String useCase) {
+    return collectBufferedResponse(tableNameWithType, size, execution, multiRequestPerServer, useCase, 0, false);
+  }
 
-    for (int i = 0; i < size; i++) {
-      MultiHttpRequestResponse multiHttpRequestResponse = null;
-      try {
-        multiHttpRequestResponse = completionService.take().get();
-        URI uri = multiHttpRequestResponse.getURI();
-        String instance =
-            _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
-        int statusCode = multiHttpRequestResponse.getResponse().getCode();
-        if (statusCode >= 300) {
-          String reason = multiHttpRequestResponse.getResponse().getReasonPhrase();
-          LOGGER.error("Server: {} returned error: {}, reason: {} for uri: {}", instance, statusCode, reason, uri);
-          completionServiceResponse._failedResponseCount++;
-          continue;
-        }
-        String responseString = EntityUtils.toString(multiHttpRequestResponse.getResponse().getEntity());
-        String key = multiRequestPerServer ? uri.toString() : instance;
-        // If there are multiple requests to the same server with the same URI but different payloads,
-        // we append a count value to the key to ensure each response is uniquely identified.
-        // Otherwise, the map will store only the last response, overwriting previous ones.
-        if (multiRequestPerServer) {
-          int count = completionServiceResponse._instanceToRequestCount.compute(key, (k, v) -> v == null ? 1 : v + 1);
-          key = key + "__" + count;
-        }
-        completionServiceResponse._httpResponses.put(key, responseString);
-      } catch (Exception e) {
-        String reason = useCase == null ? "" : String.format(" in '%s'", useCase);
-        LOGGER.error("Connection error {}. Details: {}", reason, e.getMessage());
-        completionServiceResponse._failedResponseCount++;
-      } finally {
-        if (multiHttpRequestResponse != null) {
-          try {
-            multiHttpRequestResponse.close();
-          } catch (Exception e) {
-            LOGGER.error("Connection close error. Details: {}", e.getMessage());
+  private CompletionServiceResponse collectBufferedResponseUntil(String tableNameWithType, int size,
+      MultiHttpRequest.BufferedRequestExecution execution, boolean multiRequestPerServer, @Nullable String useCase,
+      long nanoTimeDeadline) {
+    return collectBufferedResponse(tableNameWithType, size, execution, multiRequestPerServer, useCase, nanoTimeDeadline,
+        true);
+  }
+
+  private CompletionServiceResponse collectBufferedResponse(String tableNameWithType, int size,
+      MultiHttpRequest.BufferedRequestExecution execution, boolean multiRequestPerServer, @Nullable String useCase,
+      long nanoTimeDeadline, boolean enforceDeadline) {
+    CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
+    try (execution) {
+      for (int i = 0; i < size; i++) {
+        try {
+          Future<MultiHttpRequestBufferedResponse> completedFuture;
+          if (enforceDeadline) {
+            long remainingNanos = nanoTimeDeadline - System.nanoTime();
+            if (remainingNanos <= 0) {
+              completionServiceResponse._failedResponseCount += size - i;
+              break;
+            }
+            completedFuture = execution.poll(remainingNanos, TimeUnit.NANOSECONDS);
+            if (completedFuture == null) {
+              completionServiceResponse._failedResponseCount += size - i;
+              break;
+            }
+          } else {
+            completedFuture = execution.take();
           }
+          MultiHttpRequestBufferedResponse response = completedFuture.get();
+          addResponse(completionServiceResponse, response.getURI(), response.getStatusCode(),
+              response.getReasonPhrase(), response.getResponseBody(), multiRequestPerServer);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          completionServiceResponse._failedResponseCount += size - i;
+          break;
+        } catch (Exception e) {
+          recordConnectionError(completionServiceResponse, useCase, e);
         }
       }
     }
+    return finishResponse(tableNameWithType, size, completionServiceResponse);
+  }
 
+  private void addResponse(CompletionServiceResponse response, URI uri, int statusCode,
+      @Nullable String reasonPhrase, @Nullable String responseBody, boolean multiRequestPerServer) {
+    String instance =
+        _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
+    if (statusCode >= 300) {
+      LOGGER.error("Server: {} returned error: {}, reason: {} for uri: {}", instance, statusCode, reasonPhrase, uri);
+      response._failedResponseCount++;
+      return;
+    }
+    String key = multiRequestPerServer ? uri.toString() : instance;
+    // Multiple requests can use the same URI with different POST bodies, so preserve every response with a suffix.
+    if (multiRequestPerServer) {
+      int count = response._instanceToRequestCount.compute(key, (k, v) -> v == null ? 1 : v + 1);
+      key = key + "__" + count;
+    }
+    response._httpResponses.put(key, responseBody != null ? responseBody : "");
+  }
+
+  private static void recordConnectionError(CompletionServiceResponse response, @Nullable String useCase, Exception e) {
+    String reason = useCase == null ? "" : String.format(" in '%s'", useCase);
+    LOGGER.error("Connection error {}. Details: {}", reason, e.getMessage());
+    response._failedResponseCount++;
+  }
+
+  private static CompletionServiceResponse finishResponse(String tableNameWithType, int size,
+      CompletionServiceResponse completionServiceResponse) {
     int numServerRequestsResponded = completionServiceResponse._httpResponses.size();
     if (numServerRequestsResponded != size) {
       LOGGER.warn("Finished reading information for table: {} with {}/{} server-request responses", tableNameWithType,

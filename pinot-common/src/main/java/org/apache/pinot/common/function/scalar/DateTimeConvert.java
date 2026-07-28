@@ -86,11 +86,14 @@ public class DateTimeConvert {
   }
 
   /// Converts the input time value to millis since epoch:
-  /// - `EPOCH` / `TIMESTAMP` input is treated as a `LONG`.
-  /// - `SIMPLE_DATE_FORMAT` input is treated as a `STRING`.
+  /// - `SIMPLE_DATE_FORMAT` input, and any value that arrives as a `String`, are parsed via
+  ///   [DateTimeFormatSpec#fromFormatToMillis(String)], which tolerates decimal and scientific-notation numeric
+  ///   epoch strings (e.g. `"1.4988924E12"`) rather than requiring a strict integer literal.
+  /// - Other `EPOCH` / `TIMESTAMP` input types (numeric and date/time logical types) are read as a `LONG`.
   private long fromInputFormatToMillis(Object timeValue) {
     PinotDataType argumentType = FunctionUtils.getArgumentType(timeValue);
-    if (_inputFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT) {
+    if (argumentType == PinotDataType.STRING
+        || _inputFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT) {
       return _inputFormatSpec.fromFormatToMillis((String) PinotDataType.STRING.convert(timeValue, argumentType));
     }
     return _inputFormatSpec.fromFormatToMillis((Long) PinotDataType.LONG.convert(timeValue, argumentType));

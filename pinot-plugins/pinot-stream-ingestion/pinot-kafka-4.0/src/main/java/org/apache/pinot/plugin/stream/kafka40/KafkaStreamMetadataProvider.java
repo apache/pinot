@@ -235,17 +235,21 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       // Compute records-lag
       StreamPartitionMsgOffset currentOffset = partitionState.getCurrentOffset();
       StreamPartitionMsgOffset upstreamLatest = partitionState.getUpstreamLatestOffset();
-      String offsetLagString = "UNKNOWN";
+      String offsetLagString = PartitionLagState.NOT_CALCULATED;
 
       if (currentOffset instanceof LongMsgOffset && upstreamLatest instanceof LongMsgOffset) {
         long offsetLag = ((LongMsgOffset) upstreamLatest).getOffset() - ((LongMsgOffset) currentOffset).getOffset();
         offsetLagString = String.valueOf(offsetLag);
       }
 
-      // Compute record-availability
-      String availabilityLagMs = "UNKNOWN";
+      // Compute record-availability. Only when both the last-processed wall-clock time and the record's upstream
+      // ingestion time are valid; otherwise a missing/invalid ingestion time (e.g. records without a Kafka
+      // timestamp) would turn the subtraction into an epoch-sized value that leaks to the metric and UI. Keep the
+      // NOT_CALCULATED sentinel in that case so the lag is reported as not-calculated rather than a bogus number.
+      String availabilityLagMs = PartitionLagState.NOT_CALCULATED;
       StreamMessageMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
-      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
+      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0
+          && lastProcessedMessageMetadata.getRecordIngestionTimeMs() > 0) {
         long availabilityLag =
             partitionState.getLastProcessedTimeMs() - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
         availabilityLagMs = String.valueOf(availabilityLag);

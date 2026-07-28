@@ -21,8 +21,8 @@ package org.apache.pinot.core.segment.processing.aggregator;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.UpdateSketch;
+import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.UpdatableThetaSketch;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.testng.annotations.BeforeMethod;
@@ -41,23 +41,23 @@ public class DistinctCountThetaSketchAggregatorTest {
 
   @Test
   public void testAggregateWithDefaultBehaviour() {
-    Sketch firstSketch = createThetaSketch(64);
-    Sketch secondSketch = createThetaSketch(32);
+    ThetaSketch firstSketch = createThetaSketch(64);
+    ThetaSketch secondSketch = createThetaSketch(32);
     byte[] value1 = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(firstSketch);
     byte[] value2 = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(secondSketch);
     Map<String, String> functionParameters = new HashMap<>();
 
     byte[] result = (byte[]) _thetaSketchAggregator.aggregate(value1, value2, functionParameters);
 
-    Sketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(result);
+    ThetaSketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(result);
     assertNotNull(resultSketch);
     assertEquals(resultSketch.getRetainedEntries(), 64);
   }
 
   @Test
   public void testAggregateWithNominalEntries() {
-    Sketch firstSketch = createThetaSketch(64);
-    Sketch secondSketch = createThetaSketch(32);
+    ThetaSketch firstSketch = createThetaSketch(64);
+    ThetaSketch secondSketch = createThetaSketch(32);
     byte[] value1 = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(firstSketch);
     byte[] value2 = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(secondSketch);
 
@@ -66,15 +66,15 @@ public class DistinctCountThetaSketchAggregatorTest {
 
     byte[] result = (byte[]) _thetaSketchAggregator.aggregate(value1, value2, functionParameters);
 
-    Sketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(result);
+    ThetaSketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(result);
     assertNotNull(resultSketch);
     assertEquals(resultSketch.getRetainedEntries(), 32);
   }
 
   @Test
   public void testAggregateWithSamplingProbability() {
-    Sketch firstSketch = createThetaSketch(64);
-    Sketch secondSketch = createThetaSketch(32);
+    ThetaSketch firstSketch = createThetaSketch(64);
+    ThetaSketch secondSketch = createThetaSketch(32);
     byte[] value1 = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(firstSketch);
     byte[] value2 = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(secondSketch);
 
@@ -83,13 +83,13 @@ public class DistinctCountThetaSketchAggregatorTest {
 
     byte[] result = (byte[]) _thetaSketchAggregator.aggregate(value1, value2, functionParameters);
 
-    Sketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(result);
+    ThetaSketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(result);
     assertNotNull(resultSketch);
     assertTrue(resultSketch.getRetainedEntries() < 64);
   }
 
-  private Sketch createThetaSketch(int nominalEntries) {
-    UpdateSketch updateSketch = UpdateSketch.builder().setNominalEntries(nominalEntries).build();
+  private ThetaSketch createThetaSketch(int nominalEntries) {
+    UpdatableThetaSketch updateSketch = UpdatableThetaSketch.builder().setNominalEntries(nominalEntries).build();
     for (int i = 0; i < nominalEntries; i++) {
       updateSketch.update(i);
     }

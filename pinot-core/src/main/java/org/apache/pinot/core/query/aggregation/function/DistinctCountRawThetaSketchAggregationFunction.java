@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.theta.ThetaSketch;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
@@ -56,7 +56,7 @@ public class DistinctCountRawThetaSketchAggregationFunction extends DistinctCoun
       return null;
     }
     int numAccumulators = accumulators.size();
-    List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
+    List<ThetaSketch> mergedSketches = new ArrayList<>(numAccumulators);
 
     for (Object object : accumulators) {
       ThetaSketchAccumulator accumulator = convertSketchAccumulator(object);
@@ -65,7 +65,7 @@ public class DistinctCountRawThetaSketchAggregationFunction extends DistinctCoun
       mergedSketches.add(accumulator.getResult());
     }
 
-    Sketch sketch = evaluatePostAggregationExpression(mergedSketches);
+    ThetaSketch sketch = evaluatePostAggregationExpression(mergedSketches);
     return Base64.getEncoder().encodeToString(sketch.toByteArray());
   }
 }

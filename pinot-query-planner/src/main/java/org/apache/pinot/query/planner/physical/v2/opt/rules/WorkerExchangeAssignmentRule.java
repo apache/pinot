@@ -322,7 +322,11 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
           _physicalPlannerContext.getDefaultHashFunction());
     }
     if (distributionConstraint.getType() == RelDistribution.Type.SINGLETON) {
-      List<String> newWorkers = currentNodeDistribution.getWorkers().subList(0, 1);
+      // Pick a single worker to gather the data on. When the input has no workers (e.g. an empty leaf stage whose
+      // table has no routable segments), keep the singleton empty; the empty leaf is short-circuited to an empty
+      // result on the broker later (see PinotDispatchPlanner#finalizeDispatchableSubPlan).
+      List<String> currentWorkers = currentNodeDistribution.getWorkers();
+      List<String> newWorkers = currentWorkers.isEmpty() ? currentWorkers : currentWorkers.subList(0, 1);
       PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
           newWorkers, newWorkers.hashCode(), null, null);
       return new PhysicalExchange(nodeId(), currentNode, pinotDataDistribution, List.of(),

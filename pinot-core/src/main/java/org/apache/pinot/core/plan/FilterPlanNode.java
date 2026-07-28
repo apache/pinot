@@ -97,20 +97,20 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public BaseFilterOperator run() {
-    MutableRoaringBitmap queryableDocIdsSnapshot = _segmentContext.getQueryableDocIdsSnapshot();
+    MutableRoaringBitmap docIdsSnapshot = _segmentContext.getDocIdsSnapshot();
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
 
     if (_filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
-      if (queryableDocIdsSnapshot != null) {
-        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
+      if (docIdsSnapshot != null) {
+        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(docIdsSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
             numDocs);
       } else {
         return filterOperator;
       }
-    } else if (queryableDocIdsSnapshot != null) {
-      return new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
+    } else if (docIdsSnapshot != null) {
+      return new BitmapBasedFilterOperator(docIdsSnapshot, false, numDocs);
     } else {
       return new MatchAllFilterOperator(numDocs);
     }

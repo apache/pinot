@@ -21,11 +21,16 @@ package org.apache.pinot.controller.recommender.data.writer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -93,10 +98,12 @@ public class AvroWriter implements Writer {
 class AvroRecordAppender implements Closeable {
   private final DataFileWriter<GenericData.Record> _recordWriter;
   private final org.apache.avro.Schema _avroSchema;
+  private final Set<String> _booleanColumns;
 
   public AvroRecordAppender(File file, org.apache.avro.Schema avroSchema)
       throws IOException {
     _avroSchema = avroSchema;
+    _booleanColumns = booleanColumns(avroSchema);
     _recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
     _recordWriter.create(_avroSchema, file);
   }
@@ -104,10 +111,42 @@ class AvroRecordAppender implements Closeable {
   public void append(Map<String, Object> record)
       throws IOException {
     GenericData.Record nextRecord = new GenericData.Record(_avroSchema);
-    record.forEach((column, value) -> {
-      nextRecord.put(column, record.get(column));
-    });
+    record.forEach((column, value) -> nextRecord.put(column, coerce(_booleanColumns.contains(column), value)));
     _recordWriter.append(nextRecord);
+  }
+
+  /// The data generator emits Pinot's stored representation (an int `0`/`1` for BOOLEAN), while the Avro schema now
+  /// declares the logical `boolean` type. Coerce those stored ints to `Boolean` so they serialize; other values pass
+  /// through unchanged.
+  @VisibleForTesting
+  static Object coerce(boolean booleanColumn, Object value) {
+    if (booleanColumn && value instanceof Number) {
+      return ((Number) value).intValue() != 0;
+    }
+    return value;
+  }
+
+  private static Set<String> booleanColumns(org.apache.avro.Schema avroSchema) {
+    Set<String> booleanColumns = new HashSet<>();
+    for (Field field : avroSchema.getFields()) {
+      if (nonNullBranch(field.schema()).getType() == Type.BOOLEAN) {
+        booleanColumns.add(field.name());
+      }
+    }
+    return booleanColumns;
+  }
+
+  /// Returns the non-null branch of a nullable union `["null", <type>]`, or the schema itself if it is not a union.
+  @VisibleForTesting
+  static org.apache.avro.Schema nonNullBranch(org.apache.avro.Schema schema) {
+    if (schema.getType() == Type.UNION) {
+      for (org.apache.avro.Schema member : schema.getTypes()) {
+        if (member.getType() != Type.NULL) {
+          return member;
+        }
+      }
+    }
+    return schema;
   }
 
   @Override

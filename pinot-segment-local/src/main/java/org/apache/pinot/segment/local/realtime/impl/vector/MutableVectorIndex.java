@@ -91,21 +91,42 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex, Vect
     _commitDocs = Long.parseLong(
         vectorIndexConfig.getProperties().getOrDefault("commitDocs", String.valueOf(DEFAULT_COMMIT_DOCS)));
     _vectorSimilarityFunction = VectorIndexUtils.toSimilarityFunction(vectorIndexConfig.getVectorDistanceFunction());
+    // Use local variables so that resources opened before a failure can be closed before rethrowing,
+    // preventing file-descriptor and temp-directory leaks.
+    File indexDir = new File(FileUtils.getTempDirectory(), segmentName);
+    FSDirectory indexDirectory = null;
+    IndexWriter indexWriter = null;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
-      _indexDir = new File(FileUtils.getTempDirectory(), segmentName);
-      _indexDirectory = FSDirectory.open(
-          new File(_indexDir, _vectorColumn + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).toPath());
+      indexDirectory = FSDirectory.open(
+          new File(indexDir, _vectorColumn + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).toPath());
       LOGGER.info("Creating mutable HNSW index for segment: {}, column: {} at path: {} with {}", segmentName,
-          vectorColumn, _indexDir.getAbsolutePath(), vectorIndexConfig.getProperties());
-      _indexWriter = new IndexWriter(_indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
-      _indexWriter.commit();
+          vectorColumn, indexDir.getAbsolutePath(), vectorIndexConfig.getProperties());
+      indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
+      indexWriter.commit();
       _lastCommitTime = System.currentTimeMillis();
     } catch (Exception e) {
+      if (indexWriter != null) {
+        try {
+          indexWriter.close();
+        } catch (IOException closeEx) {
+          e.addSuppressed(closeEx);
+        }
+      } else if (indexDirectory != null) {
+        try {
+          indexDirectory.close();
+        } catch (IOException closeEx) {
+          e.addSuppressed(closeEx);
+        }
+      }
+      FileUtils.deleteQuietly(indexDir);
       throw new RuntimeException(
           "Caught exception while instantiating the LuceneTextIndexCreator for column: " + vectorColumn, e);
     }
+    _indexDir = indexDir;
+    _indexDirectory = indexDirectory;
+    _indexWriter = indexWriter;
   }
 
   @Override

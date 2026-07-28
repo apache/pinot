@@ -18,17 +18,24 @@
  */
 package org.apache.pinot.segment.spi.index.metadata;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /**
@@ -130,6 +137,84 @@ public class ColumnMetadataImplTest {
 
     assertEquals(metadata.getParentColumn(), "metrics");
     assertTrue(metadata.isMaterializedChild());
+  }
+
+  @Test
+  public void compressionStatsPersistedAndLoaded() {
+    PropertiesConfiguration config = baseConfig("rawCol");
+    config.setProperty(Column.getKeyFor("rawCol", Column.HAS_DICTIONARY), false);
+    config.setProperty(Column.getKeyFor("rawCol", Column.FORWARD_INDEX_RAW_UNCOMPRESSED_VALUE_SIZE_IN_BYTES), 4096L);
+    config.setProperty(Column.getKeyFor("rawCol", Column.FORWARD_INDEX_RAW_CHUNK_COMPRESSION_TYPE), "LZ4");
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "rawCol");
+
+    assertEquals(metadata.getRawForwardIndexUncompressedValueSizeInBytes(), 4096L);
+    assertEquals(metadata.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.LZ4);
+  }
+
+  @Test
+  public void compressionStatsDefaultToUnavailableOnOldSegment() {
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.HAS_DICTIONARY), false);
+    // Neither FORWARD_INDEX_RAW_UNCOMPRESSED_VALUE_SIZE_IN_BYTES nor FORWARD_INDEX_RAW_CHUNK_COMPRESSION_TYPE set
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertEquals(metadata.getRawForwardIndexUncompressedValueSizeInBytes(), ColumnMetadata.UNAVAILABLE,
+        "Old segments without compression stats should return UNAVAILABLE");
+    assertNull(metadata.getRawForwardIndexChunkCompressionType(),
+        "Old segments without a chunk compression type should return null");
+  }
+
+  @Test
+  public void invalidCompressionTypeIncludesColumnContext() {
+    PropertiesConfiguration config = baseConfig("badColumn");
+    config.setProperty(Column.getKeyFor("badColumn", Column.FORWARD_INDEX_RAW_CHUNK_COMPRESSION_TYPE), "NOT_A_CODEC");
+
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "badColumn"));
+    assertTrue(exception.getMessage().contains("badColumn"));
+    assertTrue(exception.getMessage().contains("NOT_A_CODEC"));
+  }
+
+  @Test
+  public void compressionStatsParticipateInValueObjectMethods() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.STRING, true);
+    ColumnMetadataImpl first = ColumnMetadataImpl.builder()
+        .setFieldSpec(fieldSpec)
+        .setRawForwardIndexUncompressedValueSizeInBytes(100)
+        .setRawForwardIndexChunkCompressionType(ChunkCompressionType.LZ4)
+        .build();
+    ColumnMetadataImpl same = ColumnMetadataImpl.builder()
+        .setFieldSpec(fieldSpec)
+        .setRawForwardIndexUncompressedValueSizeInBytes(100)
+        .setRawForwardIndexChunkCompressionType(ChunkCompressionType.LZ4)
+        .build();
+    ColumnMetadataImpl different = ColumnMetadataImpl.builder()
+        .setFieldSpec(fieldSpec)
+        .setRawForwardIndexUncompressedValueSizeInBytes(101)
+        .setRawForwardIndexChunkCompressionType(ChunkCompressionType.LZ4)
+        .build();
+
+    assertEquals(first, same);
+    assertEquals(first.hashCode(), same.hashCode());
+    assertNotEquals(first, different);
+    assertTrue(first.toString().contains("_compressionMetadata=CompressionMetadata{"));
+  }
+
+  @Test
+  public void compressionStatsDoNotExpandExistingColumnMetadataJson() {
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.STRING, true))
+        .setRawForwardIndexUncompressedValueSizeInBytes(100)
+        .setRawForwardIndexChunkCompressionType(ChunkCompressionType.LZ4)
+        .setDictionaryEncodedUncompressedValueSizeInBytes(200)
+        .build();
+
+    JsonNode json = JsonUtils.objectToJsonNode(metadata);
+    assertFalse(json.has("uncompressedValueSizeInBytes"));
+    assertFalse(json.has("forwardIndexChunkCompressionType"));
+    assertFalse(json.has("dictionaryUncompressedValueSizeInBytes"));
   }
 
   private static PropertiesConfiguration baseConfig(String column) {

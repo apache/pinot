@@ -277,6 +277,94 @@ public class ArrowColumnarBuildIntegrationTest {
   }
 
   /**
+   * Type-mismatch fallback: the Arrow source stores {@code intCol} as a 64-bit integer (INT64) while the Pinot
+   * schema declares it {@code INT} (32-bit). On the column-major build the typed fast path must decline this
+   * column ({@code ColumnReader.isInt()} is false for a 64-bit reader) WITHOUT advancing the reader, so the shared
+   * Object path re-reads it from the start and coerces INT64 -&gt; INT exactly as the row-major
+   * {@code DataTypeTransformer} does. This exercises the {@code indexSingleValuePrimitive} per-case guard
+   * ({@code if (!columnReader.isInt()) return false;}), which is otherwise unexercised because every other
+   * column-major test pairs a numeric column with a matching-width source. {@code longCol} (INT64 -&gt; LONG) is a
+   * matching-width control that stays on the fast path. Asserts per-doc equivalence with the row-major segment
+   * built from the same file.
+   */
+  @Test
+  public void testSourceSchemaTypeMismatchInt64ToIntEquivalence()
+      throws Exception {
+    File arrowFile = writeInt64SourceArrowFileFixture("type-mismatch-int64.arrow");
+    org.apache.pinot.spi.data.Schema schema = int64SourceIntSchema();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+
+    File rowMajorDir = _tempDir.resolve("rm-mismatch").toFile();
+    try (ArrowRecordReader reader = new ArrowRecordReader()) {
+      reader.init(arrowFile, null, null);
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+      config.setOutDir(rowMajorDir.getAbsolutePath());
+      config.setSegmentName("rmMismatch");
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, reader);
+      driver.build();
+    }
+
+    File columnarDir = _tempDir.resolve("col-mismatch").toFile();
+    try (ArrowFileColumnReaderFactory factory = new ArrowFileColumnReaderFactory(arrowFile)) {
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+      config.setOutDir(columnarDir.getAbsolutePath());
+      config.setSegmentName("colMismatch");
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, factory);
+      driver.build();
+    }
+
+    File rowMajorSeg = new File(rowMajorDir, "rmMismatch");
+    File columnarSeg = new File(columnarDir, "colMismatch");
+    assertSegmentMetadataEquivalence(rowMajorSeg, columnarSeg);
+    assertPerDocRecordEquivalence(rowMajorSeg, columnarSeg, new String[]{"intCol", "longCol"});
+  }
+
+  private org.apache.pinot.spi.data.Schema int64SourceIntSchema() {
+    org.apache.pinot.spi.data.Schema schema = new org.apache.pinot.spi.data.Schema();
+    schema.setSchemaName(TABLE_NAME);
+    // intCol is stored as INT64 in Arrow but declared INT here, forcing the typed fast path to decline and fall
+    // back to the coercing Object path. longCol stays INT64 -> LONG as a matching-width control column.
+    schema.addField(new DimensionFieldSpec("intCol", DataType.INT, true));
+    schema.addField(new DimensionFieldSpec("longCol", DataType.LONG, true));
+    return schema;
+  }
+
+  private File writeInt64SourceArrowFileFixture(String fileName)
+      throws IOException {
+    Field intField = new Field("intCol", FieldType.nullable(new ArrowType.Int(64, true)), null);
+    Field longField = new Field("longCol", FieldType.nullable(new ArrowType.Int(64, true)), null);
+    Schema arrowSchema = new Schema(Arrays.asList(intField, longField));
+
+    File out = _tempDir.resolve(fileName).toFile();
+    try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+        VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, allocator);
+        FileOutputStream fos = new FileOutputStream(out);
+        FileChannel channel = fos.getChannel();
+        ArrowFileWriter writer = new ArrowFileWriter(root, null, channel)) {
+      BigIntVector intVec = (BigIntVector) root.getVector("intCol");
+      BigIntVector longVec = (BigIntVector) root.getVector("longCol");
+
+      intVec.allocateNew(ROW_COUNT);
+      longVec.allocateNew(ROW_COUNT);
+
+      for (int i = 0; i < ROW_COUNT; i++) {
+        intVec.set(i, i); // small values that fit in INT after INT64 -> INT coercion
+        longVec.set(i, 1_000_000_000_000L + i);
+      }
+      intVec.setValueCount(ROW_COUNT);
+      longVec.setValueCount(ROW_COUNT);
+      root.setRowCount(ROW_COUNT);
+
+      writer.start();
+      writer.writeBatch();
+      writer.end();
+    }
+    return out;
+  }
+
+  /**
    * Guardrail for any change that processes the Arrow source one record batch at a time: a segment
    * built from a multi-batch file must be byte-identical (same-path data CRC) and per-docId equal to
    * one built from a single-batch file carrying the same logical rows, and the naturally-ascending

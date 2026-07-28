@@ -131,6 +131,7 @@ public class ExplainNodeSimplifier {
       return defaultNode(node);
     }
 
+    @Deprecated(forRemoval = true, since = "1.6.0")
     @Override
     public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Void context) {
       return defaultNode(node);

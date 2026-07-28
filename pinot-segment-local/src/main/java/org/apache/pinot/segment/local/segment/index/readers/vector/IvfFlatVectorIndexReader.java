@@ -20,24 +20,22 @@ package org.apache.pinot.segment.local.segment.index.readers.vector;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.vector.VectorQuantizationUtils;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 import org.apache.pinot.segment.spi.index.reader.ApproximateRadiusVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
 import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.memory.DataBufferPinotInputStream;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -68,6 +66,10 @@ public class IvfFlatVectorIndexReader
   /** Default nprobe value when not explicitly set. */
   static final int DEFAULT_NPROBE = 4;
 
+  // Backing buffer. Closed by this reader only when {@code _ownsBuffer} is true. Contents are
+  // heap-loaded at construction, so it is safe for the caller to retain ownership of the buffer.
+  private final PinotDataBuffer _buffer;
+  private final boolean _ownsBuffer;
   // Index data loaded from file
   private final int _dimension;
   private final int _numVectors;
@@ -86,27 +88,42 @@ public class IvfFlatVectorIndexReader
   private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
 
   /**
-   * Opens and loads an IVF_FLAT index from disk.
-   *
-   * @param column    the column name
-   * @param indexDir  the segment index directory
-   * @param config    the vector index configuration
-   * @throws RuntimeException if the index file cannot be read or is corrupt
+   * Opens and loads an IVF_FLAT index from the given buffer. The reader takes ownership of the
+   * buffer and closes it in {@link #close()}; use the four-arg overload to pass a borrowed
+   * buffer (e.g. one owned by the segment directory).
    */
-  public IvfFlatVectorIndexReader(String column, File indexDir, VectorIndexConfig config) {
+  public IvfFlatVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
+    this(column, buffer, config, /* ownsBuffer */ true);
+  }
+
+  /**
+   * Opens and loads an IVF_FLAT index from the given buffer.
+   *
+   * <p>The buffer holds the full IVF_FLAT file contents. The reader heap-loads centroids and
+   * inverted lists at construction time, so the buffer can be released once the constructor
+   * returns.</p>
+   *
+   * @param column      the column name
+   * @param buffer      the IVF_FLAT index buffer (mapped or in-memory)
+   * @param config      the vector index configuration
+   * @param ownsBuffer  when {@code true}, the reader closes the buffer in {@link #close()} (or
+   *                    on constructor failure). Pass {@code false} when the buffer is owned by
+   *                    the segment directory (typed entry inside {@code columns.psf}).
+   * @throws RuntimeException if the index buffer cannot be read or is corrupt
+   */
+  public IvfFlatVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config,
+      boolean ownsBuffer) {
     _column = column;
+    _buffer = buffer;
+    _ownsBuffer = ownsBuffer;
 
     // Initialize nprobe to the default; query-time tuning should use NprobeAware#setNprobe.
     int configuredNprobe = DEFAULT_NPROBE;
 
-    File indexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, column, config);
-    if (indexFile == null || !indexFile.exists()) {
-      throw new IllegalStateException(
-          "Failed to find IVF_FLAT index file for column: " + column + " in dir: " + indexDir
-              + ". Expected file: " + column + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
-    }
-
-    try (DataInputStream in = new DataInputStream(new FileInputStream(indexFile))) {
+    // The reader takes ownership of the buffer. If construction throws (header decode failure,
+    // bad magic, EOF, etc.), release the buffer here so the mmap doesn't leak — the caller never
+    // sees a reader instance to close.
+    try (DataBufferPinotInputStream in = new DataBufferPinotInputStream(buffer)) {
       // --- Header ---
       int magic = in.readInt();
       Preconditions.checkState(magic == IvfFlatVectorIndexCreator.MAGIC,
@@ -180,9 +197,17 @@ public class IvfFlatVectorIndexReader
               + "formatVersion={}, quantizer={}",
           column, _numVectors, _nlist, _dimension, getNprobe(), _distanceFunction, _indexFormatVersion,
           _quantizerType);
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to load IVF_FLAT index for column: " + column + " from file: " + indexFile, e);
+    } catch (Exception e) {
+      // Close the buffer to avoid leaking the mmap when the caller never receives a reader to
+      // close — but only if we own it. Borrowed buffers (segment-directory owned) are released
+      // by their owner.
+      if (_ownsBuffer) {
+        IvfCombinedBuffers.closeQuietly(_buffer);
+      }
+      if (e instanceof RuntimeException) {
+        throw (RuntimeException) e;
+      }
+      throw new RuntimeException("Failed to load IVF_FLAT index for column: " + column, e);
     }
   }
 
@@ -344,6 +369,9 @@ public class IvfFlatVectorIndexReader
   public void close()
       throws IOException {
     clearNprobe();
+    if (_ownsBuffer && _buffer != null) {
+      _buffer.close();
+    }
   }
 
   // -----------------------------------------------------------------------

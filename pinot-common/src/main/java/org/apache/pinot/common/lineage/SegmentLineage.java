@@ -191,14 +191,17 @@ public class SegmentLineage {
 
   /**
    * Returns a json representation of the segment lineage.
-   * Segment lineage entries are sorted in chronological order by default.
+   * Segment lineage entries are sorted by timestamp, with the entry id as a tiebreaker so that entries
+   * sharing the same millisecond are still ordered deterministically (instead of by HashMap iteration).
    */
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("tableNameWithType", _tableNameWithType);
     LinkedHashMap<String, LineageEntry> sortedLineageEntries = new LinkedHashMap<>();
     _lineageEntries.entrySet().stream()
-        .sorted(Map.Entry.comparingByValue(Comparator.comparingLong(LineageEntry::getTimestamp)))
+        .sorted(Map.Entry.<String, LineageEntry>comparingByValue(
+                Comparator.comparingLong(LineageEntry::getTimestamp))
+            .thenComparing(Map.Entry.comparingByKey()))
         .forEachOrdered(x -> sortedLineageEntries.put(x.getKey(), x.getValue()));
     jsonObject.set("lineageEntries", JsonUtils.objectToJsonNode(sortedLineageEntries));
     if (_customMap != null) {

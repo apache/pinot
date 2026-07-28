@@ -333,6 +333,7 @@ public class RoundTripTest {
         .setRangeIndexColumns(Arrays.asList("amount"))
         .setNullHandlingEnabled(true)
         .setAggregateMetrics(true)
+        .setCompressionStatsEnabled(true)
         .setPeerSegmentDownloadScheme("https")
         .setCrypterClassName("org.apache.pinot.crypter.NoOpCrypter")
         .setSegmentVersion("v3")

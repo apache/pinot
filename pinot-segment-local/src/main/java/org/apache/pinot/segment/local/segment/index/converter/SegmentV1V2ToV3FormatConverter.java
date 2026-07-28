@@ -30,6 +30,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -147,16 +148,39 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
           SegmentDirectory.Writer v3DataWriter = v3Segment.createWriter()) {
         for (String column : v2Metadata.getAllColumns()) {
           for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
-            //If Text index files are combined merge into columns.psf else no-op
+            // Text index: skip the standard copy when a legacy Lucene directory is present
+            // ({@code copyLuceneTextIndexIfExists} below handles that as a sibling copy).
+            // Combined .text.index files fall through to the standard path and get packed.
             if (indexType == StandardIndexes.text()) {
               if (!TextIndexUtils.hasTextIndex(v2Directory, column)) {
                 copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
               }
-            } else {
-              if (indexType != StandardIndexes.vector()) {
+              continue;
+            }
+            // Vector index mirrors text: skip the standard copy when a legacy IVF sidecar (or
+            // HNSW directory) is present ({@code copyVectorIndexIfExists} handles those as
+            // sibling copies). Combined .vector.ivfflat.combined.index / .ivfpq.combined.index
+            // files fall through to the standard path and get packed into columns.psf.
+            // Mixed state: if both legacy and combined exist (e.g. operator toggled the flag
+            // and rebuilt without cleaning the old file), combined normally wins — pack it and let
+            // copyVectorIndexIfExists drop the legacy sibling so the operator gets exactly one
+            // copy of the bytes in the V3 segment. The one exception is a legacy HNSW Lucene
+            // *directory*: getIndexFor() resolves to it before the combined file (see
+            // findHnswVectorIndexFile), and a directory cannot be mapped as a columns.psf buffer.
+            // For that case we defer entirely to the sibling copy (which preserves the Lucene
+            // directory); the transient combined file is dropped and re-absorbed later by
+            // VectorIndexHandler if storeInSegmentFile stays on. IVF legacy+combined still packs
+            // because the legacy sidecar is a regular file sharing the same on-disk format.
+            if (indexType == StandardIndexes.vector()) {
+              boolean hasCombined = VectorIndexUtils.hasCombinedFormVectorIndex(v2Directory, column);
+              File resolved = SegmentDirectoryPaths.findVectorIndexIndexFile(v2Directory, column);
+              boolean resolvesToDirectory = resolved != null && resolved.isDirectory();
+              if ((hasCombined && !resolvesToDirectory) || !VectorIndexUtils.hasVectorIndex(v2Directory, column)) {
                 copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
               }
+              continue;
             }
+            copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
           }
         }
         v3DataWriter.save();
@@ -275,19 +299,35 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       }
     }
 
-    // Copy IVF_FLAT index files (single flat files, not directories)
+    // Copy IVF_FLAT index files (single flat files, not directories). Skip legacy sidecars whose
+    // matching combined-form file also exists — the combined file was already packed into
+    // columns.psf by the main loop, and copying the legacy sibling would leave two copies.
     String ivfFlatSuffix = V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
-    File[] ivfFlatIndexFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(ivfFlatSuffix));
+    String ivfFlatCombinedSuffix = V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION;
+    File[] ivfFlatIndexFiles = segmentDirectory.listFiles(
+        (dir, name) -> name.endsWith(ivfFlatSuffix) && !name.endsWith(ivfFlatCombinedSuffix));
     if (ivfFlatIndexFiles != null) {
       for (File ivfFlatFile : ivfFlatIndexFiles) {
+        String column = ivfFlatFile.getName().substring(0,
+            ivfFlatFile.getName().length() - ivfFlatSuffix.length());
+        if (new File(segmentDirectory, column + ivfFlatCombinedSuffix).exists()) {
+          continue;
+        }
         Files.copy(ivfFlatFile.toPath(), new File(v3Dir, ivfFlatFile.getName()).toPath());
       }
     }
 
     String ivfPqSuffix = V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION;
-    File[] ivfPqIndexFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(ivfPqSuffix));
+    String ivfPqCombinedSuffix = V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION;
+    File[] ivfPqIndexFiles = segmentDirectory.listFiles(
+        (dir, name) -> name.endsWith(ivfPqSuffix) && !name.endsWith(ivfPqCombinedSuffix));
     if (ivfPqIndexFiles != null) {
       for (File ivfPqFile : ivfPqIndexFiles) {
+        String column = ivfPqFile.getName().substring(0,
+            ivfPqFile.getName().length() - ivfPqSuffix.length());
+        if (new File(segmentDirectory, column + ivfPqCombinedSuffix).exists()) {
+          continue;
+        }
         Files.copy(ivfPqFile.toPath(), new File(v3Dir, ivfPqFile.getName()).toPath());
       }
     }

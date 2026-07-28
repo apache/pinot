@@ -169,6 +169,7 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     return context._builder;
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public StringBuilder visitEnrichedJoin(EnrichedJoinNode node, Context context) {
     appendInfo(node, context).append('\n');

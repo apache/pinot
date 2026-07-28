@@ -19,12 +19,12 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.lang.foreign.MemorySegment;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.cpc.CpcSketch;
-import org.apache.datasketches.memory.Memory;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -614,7 +614,7 @@ public class DistinctCountCPCSketchAggregationFunction
     CpcSketch[] sketches = new CpcSketch[length];
     for (int i = 0; i < length; i++) {
       byte[] bytes = serializedSketches[i];
-      sketches[i] = bytes.length > 0 ? CpcSketch.heapify(Memory.wrap(bytes)) : null;
+      sketches[i] = bytes.length > 0 ? CpcSketch.heapify(MemorySegment.ofArray(bytes)) : null;
     }
     return sketches;
   }

@@ -48,6 +48,7 @@ repo. It is intentionally short and focused on day-to-day work.
   - pinot-arrow: Apache Arrow input format support.
   - pinot-avro: Avro input format support.
   - pinot-avro-base: shared Avro utilities and base classes.
+  - pinot-bson: MongoDB BSON input format support.
   - pinot-clp-log: CLP log input format support.
   - pinot-confluent-avro: Confluent Schema Registry Avro input support.
   - pinot-confluent-json: Confluent Schema Registry JSON input support.

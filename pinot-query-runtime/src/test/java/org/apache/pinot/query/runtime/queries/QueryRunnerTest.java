@@ -331,6 +331,23 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.
     testCases.add(
         new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
+    //    - a constant-foldable jsonPath must be folded by PinotEvaluateLiteralRule and then applied like a literal.
+    //      Reaching "Cannot resolve JSON path" (rather than ParserUtils' "single-quoted literal values") is what
+    //      proves the fold happened, so this pins the reason jsonPath does not require a literal in
+    //      TransformFunctionType#jsonExtractScalarOperandTypeChecker.
+    testCases.add(new Object[]{
+        "SELECT CAST(jsonExtractScalar(col1, CONCAT('pa', 'th'), 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
+    //    - the flip side: a jsonPath that cannot fold to a literal is still rejected, on the leaf stage rather than
+    //      during validation. Covers all three variants, which share the operand type checker.
+    for (String jsonExtractScalar : new String[]{
+        "jsonExtractScalar", "jsonExtractScalarFast", "jsonExtractScalarFirstMatch"
+    }) {
+      testCases.add(new Object[]{
+          "SELECT " + jsonExtractScalar + "(col1, col2, 'INT') FROM a",
+          "Expect the 2nd and 3rd arguments of transform function: " + jsonExtractScalar
+              + "(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be single-quoted literal values"
+      });
+    }
     //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
     testCases.add(new Object[]{
         "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",

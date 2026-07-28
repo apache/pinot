@@ -87,26 +87,35 @@ public class NullValueTransformerUtils {
     Preconditions.checkState(timeColumnSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName,
         schema.getSchemaName());
 
-    String defaultTimeString = timeColumnSpec.getDefaultNullValueString();
-    DateTimeFormatSpec dateTimeFormatSpec = timeColumnSpec.getFormatSpec();
-
-    // Try to use the default time from the field spec if it's valid
-    try {
-      long defaultTimeMs = dateTimeFormatSpec.fromFormatToMillis(defaultTimeString);
-      if (TimeUtils.timeValueInValidRange(defaultTimeMs)) {
-        return timeColumnSpec.getDefaultNullValue();
-      }
-    } catch (Exception e) {
-      // Ignore and fall through to use current time
+    // Use the default time from the field spec if it's valid
+    if (isDefaultTimeValueInValidRange(timeColumnSpec)) {
+      return timeColumnSpec.getDefaultNullValue();
     }
 
     // Use current time if default time is not valid
+    DateTimeFormatSpec dateTimeFormatSpec = timeColumnSpec.getFormatSpec();
     String currentTimeString = dateTimeFormatSpec.fromMillisToFormat(System.currentTimeMillis());
     Object currentTime = timeColumnSpec.getDataType().convert(currentTimeString);
     LOGGER.info(
         "Default time: {} does not comply with format: {}, using current time: {} as the default time for table: {}",
-        defaultTimeString, timeColumnSpec.getFormat(), currentTime, tableConfig.getTableName());
+        timeColumnSpec.getDefaultNullValueString(), timeColumnSpec.getFormat(), currentTime,
+        tableConfig.getTableName());
     return currentTime;
+  }
+
+  /// Returns `true` when the time column's default null value is within the valid time range, i.e. ingestion stores it
+  /// as-is for null rows instead of substituting the current time.
+  ///
+  /// Callers that need to reason about what was actually written for a null time value must consult this: when it
+  /// returns `false`, the stored value is the ingestion-time current time, which does not match the default null value
+  /// recorded in the segment metadata.
+  public static boolean isDefaultTimeValueInValidRange(DateTimeFieldSpec timeColumnSpec) {
+    try {
+      return TimeUtils.timeValueInValidRange(
+          timeColumnSpec.getFormatSpec().fromFormatToMillis(timeColumnSpec.getDefaultNullValueString()));
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   /**

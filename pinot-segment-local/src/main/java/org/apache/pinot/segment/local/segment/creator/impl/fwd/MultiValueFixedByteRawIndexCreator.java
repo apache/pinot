@@ -28,7 +28,6 @@ import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
-import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -36,10 +35,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * Raw (non-dictionary-encoded) forward index creator for multi-value column of fixed length data type (INT, LONG,
  * FLOAT, DOUBLE).
  */
-public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
+public class MultiValueFixedByteRawIndexCreator implements CompressionStatsTrackingForwardIndexCreator {
 
   private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
+  private final ChunkCompressionType _chunkCompressionType;
 
   /**
    * Create a var-byte raw index creator for the given column
@@ -105,6 +105,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
       }
     }
     _valueType = valueType;
+    _chunkCompressionType = compressionType;
   }
 
   @Override
@@ -146,5 +147,20 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void close()
       throws IOException {
     _indexWriter.close();
+  }
+
+  @Override
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    return _indexWriter.getRawForwardIndexUncompressedValueSizeInBytes();
+  }
+
+  @Override
+  public ChunkCompressionType getRawForwardIndexChunkCompressionType() {
+    return _chunkCompressionType;
+  }
+
+  @Override
+  public void enableRawForwardIndexUncompressedValueSizeTracking() {
+    _indexWriter.enableRawForwardIndexUncompressedValueSizeTracking();
   }
 }

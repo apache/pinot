@@ -132,7 +132,6 @@ public class ControllerTest {
   // Default ControllerTest instance settings
   public static final int DEFAULT_MIN_NUM_REPLICAS = 2;
   public static final int DEFAULT_NUM_BROKER_INSTANCES = 3;
-  // NOTE: To add HLC realtime table, number of Server instances must be multiple of replicas
   public static final int DEFAULT_NUM_SERVER_INSTANCES = 4;
   public static final int DEFAULT_NUM_MINION_INSTANCES = 2;
 

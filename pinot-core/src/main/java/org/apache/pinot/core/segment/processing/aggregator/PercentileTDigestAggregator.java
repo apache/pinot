@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.processing.aggregator;
 
 import com.tdunning.math.stats.TDigest;
 import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.segment.spi.Constants;
@@ -47,10 +48,10 @@ public class PercentileTDigestAggregator implements ValueAggregator {
     int compression = getCompression(functionParameters);
     TDigest first = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes1);
     TDigest second = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes2);
-    TDigest merged = TDigest.createMergingDigest(compression);
-    merged.add(first);
-    merged.add(second);
-    return ObjectSerDeUtils.TDIGEST_SER_DE.serialize(merged);
+    PercentileTDigestAggregationFunction function = new PercentileTDigestAggregationFunction(
+        ExpressionContext.forIdentifier("tdigest"), 50.0, compression, false);
+    TDigest merged = function.mergeWithConfiguredCompression(first, second);
+    return function.serializeIntermediateResult(merged).getBytes();
   }
 
   private int getCompression(Map<String, String> functionParameters) {

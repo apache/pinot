@@ -50,6 +50,7 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -924,6 +925,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       return MOCK_FALLBACK_BASE_OFFSET + docId;
     });
     when(primaryKeyDataSource.getForwardIndex()).thenReturn(primaryKeyForwardIndex);
+    DataSourceMetadata primaryKeyDataSourceMetadata = mock(DataSourceMetadata.class);
+    when(primaryKeyDataSourceMetadata.getFieldSpec()).thenReturn(
+        new DimensionFieldSpec(PRIMARY_KEY_COLUMNS.get(0), DataType.INT, true));
+    when(primaryKeyDataSource.getDataSourceMetadata()).thenReturn(primaryKeyDataSourceMetadata);
 
     // Mock comparison column data source
     DataSource comparisonDataSource = mock(DataSource.class);
@@ -940,6 +945,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       return MOCK_FALLBACK_BASE_OFFSET + (docId * 100);
     });
     when(comparisonDataSource.getForwardIndex()).thenReturn(comparisonForwardIndex);
+    DataSourceMetadata comparisonDataSourceMetadata = mock(DataSourceMetadata.class);
+    when(comparisonDataSourceMetadata.getFieldSpec()).thenReturn(
+        new DimensionFieldSpec(COMPARISON_COLUMNS.get(0), DataType.INT, true));
+    when(comparisonDataSource.getDataSourceMetadata()).thenReturn(comparisonDataSourceMetadata);
 
     // Set up data source mapping - IMPORTANT: anyString() must be registered FIRST,
     // then specific matchers override it (Mockito uses last matching stub)
@@ -1037,6 +1046,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     when(forwardIndex.getInt(anyInt(), any())).thenAnswer(
         invocation -> primaryKeys.get(invocation.getArgument(0)).getValues()[0]);
     when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
+    DataSourceMetadata uploadedDataSourceMetadata = mock(DataSourceMetadata.class);
+    when(uploadedDataSourceMetadata.getFieldSpec()).thenReturn(
+        new DimensionFieldSpec(PRIMARY_KEY_COLUMNS.get(0), DataType.INT, true));
+    when(dataSource.getDataSourceMetadata()).thenReturn(uploadedDataSourceMetadata);
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(creationTimeMs);
     when(segmentMetadata.getZkCreationTime()).thenReturn(creationTimeMs);
@@ -1108,6 +1121,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       return docId;
     });
     when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
+    DataSourceMetadata mutableDataSourceMetadata = mock(DataSourceMetadata.class);
+    when(mutableDataSourceMetadata.getFieldSpec()).thenReturn(
+        new DimensionFieldSpec(PRIMARY_KEY_COLUMNS.get(0), DataType.INT, true));
+    when(dataSource.getDataSourceMetadata()).thenReturn(mutableDataSourceMetadata);
 
     when(segment.getDataSource(anyString())).thenReturn(dataSource);
     when(segment.getDataSource(PRIMARY_KEY_COLUMNS.get(0))).thenReturn(dataSource);

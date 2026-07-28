@@ -93,6 +93,15 @@ public class MockRoutingManagerFactory {
         .add(serverInstance);
   }
 
+  /**
+   * Registers a routing entry for a table that has no routable segments (e.g. an empty table, or one whose segments
+   * were all pruned). This mirrors {@code BaseBrokerRoutingManager}, which returns a non-null {@link RoutingTable}
+   * with an empty server-to-segments map for such a table (as opposed to {@code null} when no routing entry exists).
+   */
+  public void registerEmptyTable(String tableNameWithType) {
+    _tableSegmentServersMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>());
+  }
+
   public void disableTable(String tableNameWithType) {
     _disabledTables.add(tableNameWithType);
   }

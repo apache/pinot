@@ -43,10 +43,12 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.rules.GroupingSetsPlanUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
@@ -188,7 +190,8 @@ public class PRelToPlanNodeConverter {
     }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         new ArrayList<>(), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
-        aggCalls, windowFrameType, lowerBound, upperBound, constants);
+        aggCalls, windowFrameType, lowerBound, upperBound,
+        RelToPlanNodeConverter.fromRexWindowExclusion(windowGroup.exclude), constants);
   }
 
   public static SortNode convertSort(Sort node) {
@@ -199,6 +202,8 @@ public class PRelToPlanNodeConverter {
   }
 
   public static AggregateNode convertAggregate(PhysicalAggregate node) {
+    /// GROUP BY GROUPING SETS / ROLLUP / CUBE is split by AggregatePushdownRule (LEAF carrying the grouping sets +
+    /// $groupingId, FINAL grouping on $groupingId); the grouping sets below carry to the runtime RepeatOperator.
     List<AggregateCall> aggregateCalls = node.getAggCallList();
     int numAggregates = aggregateCalls.size();
     List<RexExpression.FunctionCall> functionCalls = new ArrayList<>(numAggregates);
@@ -209,7 +214,8 @@ public class PRelToPlanNodeConverter {
     }
     return new AggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         new ArrayList<>(), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
-        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit());
+        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(),
+        GroupingSetsPlanUtils.computeGroupingSets(node));
   }
 
   public static ProjectNode convertProject(Project node) {

@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -33,6 +34,7 @@ import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
@@ -111,6 +113,21 @@ public class ServerRateLimitConfigChangeListenerTest {
     if (errorRef.get() != null) {
       throw new RuntimeException("Throttle call failed: " + errorRef.get().getMessage());
     }
+  }
+
+  @Test
+  public void testRateLimitConfigChangeUpdatesGauge() {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    ServerRateLimitConfigChangeListener listener = new ServerRateLimitConfigChangeListener(metrics);
+    String byteKey = CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES;
+
+    // Enabling/updating the limit via cluster config re-emits the configured-cap gauge with the new value.
+    listener.onChange(new HashSet<>(List.of(byteKey)), Map.of(byteKey, "150000000"));
+    verify(metrics).setValueOfGlobalGauge(ServerGauge.SERVER_CONSUMPTION_RATE_LIMIT, 150_000_000L);
+
+    // Disabling via cluster config resets the gauge to -1.
+    listener.onChange(new HashSet<>(List.of(byteKey)), Map.of(byteKey, "0"));
+    verify(metrics).setValueOfGlobalGauge(ServerGauge.SERVER_CONSUMPTION_RATE_LIMIT, -1L);
   }
 
   private void simulateThrottling(AtomicReference<Throwable> errorRef) {

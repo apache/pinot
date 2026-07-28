@@ -29,9 +29,11 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.arrow.vector.complex.MapVector;
+import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
@@ -57,6 +59,40 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 public final class ArrowToPinotTypeConverter {
 
   private ArrowToPinotTypeConverter() {
+  }
+
+  /// Returns the [PinotDataType] that a column with the given Arrow element [Types.MinorType] can be read as through a
+  /// type-specific `ColumnReader` accessor, or `null` when it has no dedicated accessor and must be read through
+  /// `ColumnReader.getValue(int)`. `singleValue` selects the scalar vs `_ARRAY` variant.
+  ///
+  /// The `MinorType` already encodes every distinction the accessors care about, so a plain switch suffices: only
+  /// signed 32/64-bit ints (`INT` / `BIGINT`), single/double floats, 128-bit `DECIMAL`, `VARCHAR`, and `VARBINARY`
+  /// have accessors. Everything else — unsigned/narrow ints, half floats, `DECIMAL256`, `LARGEVARCHAR` /
+  /// `LARGEVARBINARY` / fixed-size binary, `BIT` (boolean), temporal, and complex types — is a distinct `MinorType`
+  /// that falls through to `null` and is read via `getValue(int)`.
+  ///
+  /// @param minorType the element vector's Arrow minor type (for a list column, its element type)
+  /// @param singleValue `true` for a single-value column, `false` for the `_ARRAY` variant
+  @Nullable
+  public static PinotDataType toValueType(Types.MinorType minorType, boolean singleValue) {
+    switch (minorType) {
+      case INT:
+        return singleValue ? PinotDataType.INT : PinotDataType.INT_ARRAY;
+      case BIGINT:
+        return singleValue ? PinotDataType.LONG : PinotDataType.LONG_ARRAY;
+      case FLOAT4:
+        return singleValue ? PinotDataType.FLOAT : PinotDataType.FLOAT_ARRAY;
+      case FLOAT8:
+        return singleValue ? PinotDataType.DOUBLE : PinotDataType.DOUBLE_ARRAY;
+      case DECIMAL:
+        return singleValue ? PinotDataType.BIG_DECIMAL : PinotDataType.BIG_DECIMAL_ARRAY;
+      case VARCHAR:
+        return singleValue ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
+      case VARBINARY:
+        return singleValue ? PinotDataType.BYTES : PinotDataType.BYTES_ARRAY;
+      default:
+        return null;
+    }
   }
 
   /**
@@ -104,6 +140,10 @@ public final class ArrowToPinotTypeConverter {
         if (value instanceof Character) {
           return (int) (Character) value;
         }
+        // TODO: Widen large unsigned 32/64-bit ints to preserve their value.
+        //   UInt4Vector / UInt8Vector surface the raw bits here (Integer / Long), so values above
+        //   Integer.MAX_VALUE / Long.MAX_VALUE wrap negative. Return a widening long / BigInteger for those instead
+        //   of passing the raw signed box through.
         return value;
       // Null — NullVector.getObject always returns null; callers should short-circuit on null,
       // so this branch is unreachable in practice. Defensive return.

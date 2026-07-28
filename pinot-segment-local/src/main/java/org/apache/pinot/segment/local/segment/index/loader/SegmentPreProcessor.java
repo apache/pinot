@@ -125,6 +125,11 @@ public class SegmentPreProcessor implements AutoCloseable {
       defaultColumnHandler.updateDefaultColumns();
       _segmentDirectory.reloadMetadata();
 
+      // Resolve per-key index configs for OPEN_STRUCT child columns so index handlers don't strip
+      // inverted/range indexes that the OpenStructColumnSplitter wrote during segment creation.
+      _indexLoadingConfig.addOpenStructChildConfigs(
+          (SegmentMetadataImpl) _segmentDirectory.getSegmentMetadata());
+
       // Update single-column indices, like inverted index, json index etc.
       List<IndexHandler> indexHandlers = new ArrayList<>();
 

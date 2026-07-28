@@ -80,7 +80,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       Assert.assertEquals(reader.getDimension(), dimension);
       Assert.assertEquals(reader.getNumVectors(), vectors.length);
       Assert.assertEquals(reader.getNlist(), nlist);
@@ -111,7 +112,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       Assert.assertEquals(reader.getNumVectors(), 0);
       Assert.assertEquals(reader.getNlist(), 0);
       Assert.assertEquals(((MutableRoaringBitmap) reader.getDocIds(new float[]{1.0f, 2.0f, 3.0f, 4.0f}, 5))
@@ -147,7 +149,8 @@ public class IvfPqVectorIndexTest {
         vectors[115]
     };
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       double recallAtOneProbe = 0.0;
       double recallAtAllProbes = 0.0;
       for (float[] query : queries) {
@@ -189,7 +192,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       reader.setNprobe(nlist);
       MutableRoaringBitmap result = (MutableRoaringBitmap) reader.getDocIds(vectors[7], 5);
       Assert.assertTrue(result.contains(7), "The exact stored vector should remain in the top-K set");
@@ -217,7 +221,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       reader.setNprobe(nlist);
       MutableRoaringBitmap result = (MutableRoaringBitmap) reader.getDocIds(vectors[7], 5);
       Assert.assertTrue(result.contains(7), "The normalized stored vector should remain in the cosine top-K set");
@@ -243,7 +248,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       Assert.assertEquals(reader.getDistanceFunction(), VectorIndexConfig.VectorDistanceFunction.DOT_PRODUCT);
       reader.setNprobe(nlist);
       MutableRoaringBitmap result = (MutableRoaringBitmap) reader.getDocIds(vectors[0], topK);
@@ -277,7 +283,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       float[] query = vectors[0];
 
       reader.setNprobe(1);
@@ -311,7 +318,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       reader.setNprobe(100);
       Assert.assertEquals(reader.getNprobe(), nlist);
     }
@@ -335,7 +343,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       reader.setNprobe(nlist);
       ImmutableRoaringBitmap result =
           reader.getDocIdsWithinApproximateRadius(vectors[0], Float.POSITIVE_INFINITY, 5);
@@ -370,7 +379,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       int defaultNprobe = reader.getNprobe();
       reader.setNprobe(1);
       Assert.assertEquals(reader.getNprobe(), 1);
@@ -402,7 +412,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       reader.setNprobe(1);
       reader.getDocIds(vectors[0], 5);
       Assert.assertEquals(reader.getNprobe(), 1);
@@ -428,7 +439,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       int defaultNprobe = reader.getNprobe();
       reader.setNprobe(1);
       Assert.assertEquals(reader.getNprobe(), 1);
@@ -522,7 +534,8 @@ public class IvfPqVectorIndexTest {
 
     Assert.assertFalse(spillFile.exists(), "Spill file should be cleaned up");
     // Verify the index was created successfully
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       Assert.assertEquals(reader.getNumVectors(), 2);
     }
   }
@@ -552,7 +565,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       Assert.assertEquals(reader.getNumVectors(), vectors.length);
       Assert.assertEquals(reader.getNlist(), vectors.length);
       reader.setNprobe(nlist);
@@ -585,7 +599,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       Map<String, Object> info = reader.getIndexDebugInfo();
       Assert.assertEquals(info.get("backend"), "IVF_PQ");
       Assert.assertEquals(info.get("column"), COLUMN_NAME);
@@ -633,7 +648,8 @@ public class IvfPqVectorIndexTest {
       creator.seal();
     }
 
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       int defaultNprobe = (int) reader.getIndexDebugInfo().get("effectiveNprobe");
       reader.setNprobe(1);
       Assert.assertEquals(reader.getIndexDebugInfo().get("effectiveNprobe"), 1);
@@ -681,7 +697,8 @@ public class IvfPqVectorIndexTest {
     creator.close();
 
     // Open reader after creator is fully closed
-    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       Assert.assertEquals(reader.getNumVectors(), vectors.length);
       MutableRoaringBitmap result = (MutableRoaringBitmap) reader.getDocIds(vectors[0], 5);
       Assert.assertTrue(result.getCardinality() > 0);
@@ -706,8 +723,10 @@ public class IvfPqVectorIndexTest {
     }
 
     // Open two readers on the same index concurrently
-    try (IvfPqVectorIndexReader reader1 = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config);
-        IvfPqVectorIndexReader reader2 = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfPqVectorIndexReader reader1 = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config);
+        IvfPqVectorIndexReader reader2 = new IvfPqVectorIndexReader(COLUMN_NAME,
+            IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       reader1.setNprobe(1);
       reader2.setNprobe(nlist);
 
@@ -755,7 +774,8 @@ public class IvfPqVectorIndexTest {
         creator.seal();
       }
 
-      try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(column, indexDir, config)) {
+      try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(column,
+          IvfCombinedBuffers.mapCombined(indexDir, column, config, "test-vector"), config)) {
         reader.setNprobe(nlist);
         MutableRoaringBitmap result = (MutableRoaringBitmap) reader.getDocIds(vectors[0], 5);
         Assert.assertEquals(reader.getPqNbits(), pqNbits);

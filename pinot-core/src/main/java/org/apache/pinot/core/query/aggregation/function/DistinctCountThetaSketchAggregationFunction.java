@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,14 +27,13 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.datasketches.memory.Memory;
-import org.apache.datasketches.theta.AnotB;
-import org.apache.datasketches.theta.Intersection;
-import org.apache.datasketches.theta.SetOperationBuilder;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.Union;
-import org.apache.datasketches.theta.UpdateSketch;
-import org.apache.datasketches.theta.UpdateSketchBuilder;
+import org.apache.datasketches.theta.ThetaAnotB;
+import org.apache.datasketches.theta.ThetaIntersection;
+import org.apache.datasketches.theta.ThetaSetOperationBuilder;
+import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.ThetaUnion;
+import org.apache.datasketches.theta.UpdatableThetaSketch;
+import org.apache.datasketches.theta.UpdatableThetaSketchBuilder;
 import org.apache.datasketches.thetacommon.ThetaUtil;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.Expression;
@@ -96,15 +96,15 @@ public class DistinctCountThetaSketchAggregationFunction
   private final boolean _includeDefaultSketch;
   private final List<FilterEvaluator> _filterEvaluators;
   private final ExpressionContext _postAggregationExpression;
-  private final UpdateSketchBuilder _updateSketchBuilder = new UpdateSketchBuilder();
+  private final UpdatableThetaSketchBuilder _updateSketchBuilder = new UpdatableThetaSketchBuilder();
   private int _nominalEntries = ThetaUtil.DEFAULT_NOMINAL_ENTRIES;
-  protected final SetOperationBuilder _setOperationBuilder = new SetOperationBuilder();
+  protected final ThetaSetOperationBuilder _setOperationBuilder = new ThetaSetOperationBuilder();
   protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
 
   public DistinctCountThetaSketchAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
 
-    // Initialize the UpdateSketchBuilder and SetOperationBuilder with the parameters
+    // Initialize the UpdatableThetaSketchBuilder and ThetaSetOperationBuilder with the parameters
     int numArguments = arguments.size();
     if (numArguments > 1) {
       ExpressionContext paramsExpression = arguments.get(1);
@@ -200,20 +200,20 @@ public class DistinctCountThetaSketchAggregationFunction
 
     // Main expression is always index 0
     if (valueTypes[0] != DataType.BYTES) {
-      List<UpdateSketch> updateSketches = getUpdateSketches(aggregationResultHolder);
+      List<UpdatableThetaSketch> updateSketches = getUpdateSketches(aggregationResultHolder);
       if (singleValues[0]) {
         switch (valueTypes[0]) {
           case INT:
             int[] intValues = (int[]) valueArrays[0];
             if (_includeDefaultSketch) {
-              UpdateSketch defaultSketch = updateSketches.get(0);
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
                 defaultSketch.update(intValues[i]);
               }
             }
             for (int i = 0; i < numFilters; i++) {
               FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-              UpdateSketch updateSketch = updateSketches.get(i + 1);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   updateSketch.update(intValues[j]);
@@ -224,14 +224,14 @@ public class DistinctCountThetaSketchAggregationFunction
           case LONG:
             long[] longValues = (long[]) valueArrays[0];
             if (_includeDefaultSketch) {
-              UpdateSketch defaultSketch = updateSketches.get(0);
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
                 defaultSketch.update(longValues[i]);
               }
             }
             for (int i = 0; i < numFilters; i++) {
               FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-              UpdateSketch updateSketch = updateSketches.get(i + 1);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   updateSketch.update(longValues[j]);
@@ -242,14 +242,14 @@ public class DistinctCountThetaSketchAggregationFunction
           case FLOAT:
             float[] floatValues = (float[]) valueArrays[0];
             if (_includeDefaultSketch) {
-              UpdateSketch defaultSketch = updateSketches.get(0);
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
                 defaultSketch.update(floatValues[i]);
               }
             }
             for (int i = 0; i < numFilters; i++) {
               FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-              UpdateSketch updateSketch = updateSketches.get(i + 1);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   updateSketch.update(floatValues[j]);
@@ -260,14 +260,14 @@ public class DistinctCountThetaSketchAggregationFunction
           case DOUBLE:
             double[] doubleValues = (double[]) valueArrays[0];
             if (_includeDefaultSketch) {
-              UpdateSketch defaultSketch = updateSketches.get(0);
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
                 defaultSketch.update(doubleValues[i]);
               }
             }
             for (int i = 0; i < numFilters; i++) {
               FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-              UpdateSketch updateSketch = updateSketches.get(i + 1);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   updateSketch.update(doubleValues[j]);
@@ -278,14 +278,14 @@ public class DistinctCountThetaSketchAggregationFunction
           case STRING:
             String[] stringValues = (String[]) valueArrays[0];
             if (_includeDefaultSketch) {
-              UpdateSketch defaultSketch = updateSketches.get(0);
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
                 defaultSketch.update(stringValues[i]);
               }
             }
             for (int i = 0; i < numFilters; i++) {
               FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-              UpdateSketch updateSketch = updateSketches.get(i + 1);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   updateSketch.update(stringValues[j]);
@@ -303,7 +303,7 @@ public class DistinctCountThetaSketchAggregationFunction
           case INT:
             int[][] intValues = (int[][]) valueArrays[0];
             if (_includeDefaultSketch) {
-              UpdateSketch defaultSketch = updateSketches.get(0);
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
                 for (int value : intValues[i]) {
                   defaultSketch.update(value);
@@ -312,7 +312,7 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             for (int i = 0; i < numFilters; i++) {
               FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-              UpdateSketch updateSketch = updateSketches.get(i + 1);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (int value : intValues[j]) {
@@ -325,7 +325,7 @@ public class DistinctCountThetaSketchAggregationFunction
           case LONG:
             long[][] longValues = (long[][]) valueArrays[0];
             if (_includeDefaultSketch) {
-              UpdateSketch defaultSketch = updateSketches.get(0);
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
                 for (long value : longValues[i]) {
                   defaultSketch.update(value);
@@ -334,7 +334,7 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             for (int i = 0; i < numFilters; i++) {
               FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-              UpdateSketch updateSketch = updateSketches.get(i + 1);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (long value : longValues[j]) {
@@ -347,7 +347,7 @@ public class DistinctCountThetaSketchAggregationFunction
           case FLOAT:
             float[][] floatValues = (float[][]) valueArrays[0];
             if (_includeDefaultSketch) {
-              UpdateSketch defaultSketch = updateSketches.get(0);
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
                 for (float value : floatValues[i]) {
                   defaultSketch.update(value);
@@ -356,7 +356,7 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             for (int i = 0; i < numFilters; i++) {
               FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-              UpdateSketch updateSketch = updateSketches.get(i + 1);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (float value : floatValues[j]) {
@@ -369,7 +369,7 @@ public class DistinctCountThetaSketchAggregationFunction
           case DOUBLE:
             double[][] doubleValues = (double[][]) valueArrays[0];
             if (_includeDefaultSketch) {
-              UpdateSketch defaultSketch = updateSketches.get(0);
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
                 for (double value : doubleValues[i]) {
                   defaultSketch.update(value);
@@ -378,7 +378,7 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             for (int i = 0; i < numFilters; i++) {
               FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-              UpdateSketch updateSketch = updateSketches.get(i + 1);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (double value : doubleValues[j]) {
@@ -391,7 +391,7 @@ public class DistinctCountThetaSketchAggregationFunction
           case STRING:
             String[][] stringValues = (String[][]) valueArrays[0];
             if (_includeDefaultSketch) {
-              UpdateSketch defaultSketch = updateSketches.get(0);
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
                 for (String value : stringValues[i]) {
                   defaultSketch.update(value);
@@ -400,7 +400,7 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             for (int i = 0; i < numFilters; i++) {
               FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-              UpdateSketch updateSketch = updateSketches.get(i + 1);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (String value : stringValues[j]) {
@@ -418,10 +418,10 @@ public class DistinctCountThetaSketchAggregationFunction
     } else {
       // Serialized sketch
       List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(aggregationResultHolder);
-      Sketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
+      ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
         ThetaSketchAccumulator defaultThetaAccumulator = thetaSketchAccumulators.get(0);
-        for (Sketch sketch : sketches) {
+        for (ThetaSketch sketch : sketches) {
           defaultThetaAccumulator.apply(sketch);
         }
       }
@@ -454,7 +454,7 @@ public class DistinctCountThetaSketchAggregationFunction
           case INT:
             int[] intValues = (int[]) valueArrays[0];
             for (int i = 0; i < length; i++) {
-              List<UpdateSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               int value = intValues[i];
               if (_includeDefaultSketch) {
                 updateSketches.get(0).update(value);
@@ -469,7 +469,7 @@ public class DistinctCountThetaSketchAggregationFunction
           case LONG:
             long[] longValues = (long[]) valueArrays[0];
             for (int i = 0; i < length; i++) {
-              List<UpdateSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               long value = longValues[i];
               if (_includeDefaultSketch) {
                 updateSketches.get(0).update(value);
@@ -484,7 +484,7 @@ public class DistinctCountThetaSketchAggregationFunction
           case FLOAT:
             float[] floatValues = (float[]) valueArrays[0];
             for (int i = 0; i < length; i++) {
-              List<UpdateSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               float value = floatValues[i];
               if (_includeDefaultSketch) {
                 updateSketches.get(0).update(value);
@@ -499,7 +499,7 @@ public class DistinctCountThetaSketchAggregationFunction
           case DOUBLE:
             double[] doubleValues = (double[]) valueArrays[0];
             for (int i = 0; i < length; i++) {
-              List<UpdateSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               double value = doubleValues[i];
               if (_includeDefaultSketch) {
                 updateSketches.get(0).update(value);
@@ -514,7 +514,7 @@ public class DistinctCountThetaSketchAggregationFunction
           case STRING:
             String[] stringValues = (String[]) valueArrays[0];
             for (int i = 0; i < length; i++) {
-              List<UpdateSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               String value = stringValues[i];
               if (_includeDefaultSketch) {
                 updateSketches.get(0).update(value);
@@ -536,17 +536,17 @@ public class DistinctCountThetaSketchAggregationFunction
           case INT:
             int[][] intValues = (int[][]) valueArrays[0];
             for (int i = 0; i < length; i++) {
-              List<UpdateSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               int[] values = intValues[i];
               if (_includeDefaultSketch) {
-                UpdateSketch defaultSketch = updateSketches.get(0);
+                UpdatableThetaSketch defaultSketch = updateSketches.get(0);
                 for (int value : values) {
                   defaultSketch.update(value);
                 }
               }
               for (int j = 0; j < numFilters; j++) {
                 if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
-                  UpdateSketch updateSketch = updateSketches.get(j + 1);
+                  UpdatableThetaSketch updateSketch = updateSketches.get(j + 1);
                   for (int value : values) {
                     updateSketch.update(value);
                   }
@@ -557,17 +557,17 @@ public class DistinctCountThetaSketchAggregationFunction
           case LONG:
             long[][] longValues = (long[][]) valueArrays[0];
             for (int i = 0; i < length; i++) {
-              List<UpdateSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               long[] values = longValues[i];
               if (_includeDefaultSketch) {
-                UpdateSketch defaultSketch = updateSketches.get(0);
+                UpdatableThetaSketch defaultSketch = updateSketches.get(0);
                 for (long value : values) {
                   defaultSketch.update(value);
                 }
               }
               for (int j = 0; j < numFilters; j++) {
                 if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
-                  UpdateSketch updateSketch = updateSketches.get(j + 1);
+                  UpdatableThetaSketch updateSketch = updateSketches.get(j + 1);
                   for (long value : values) {
                     updateSketch.update(value);
                   }
@@ -578,17 +578,17 @@ public class DistinctCountThetaSketchAggregationFunction
           case FLOAT:
             float[][] floatValues = (float[][]) valueArrays[0];
             for (int i = 0; i < length; i++) {
-              List<UpdateSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               float[] values = floatValues[i];
               if (_includeDefaultSketch) {
-                UpdateSketch defaultSketch = updateSketches.get(0);
+                UpdatableThetaSketch defaultSketch = updateSketches.get(0);
                 for (float value : values) {
                   defaultSketch.update(value);
                 }
               }
               for (int j = 0; j < numFilters; j++) {
                 if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
-                  UpdateSketch updateSketch = updateSketches.get(j + 1);
+                  UpdatableThetaSketch updateSketch = updateSketches.get(j + 1);
                   for (float value : values) {
                     updateSketch.update(value);
                   }
@@ -599,17 +599,17 @@ public class DistinctCountThetaSketchAggregationFunction
           case DOUBLE:
             double[][] doubleValues = (double[][]) valueArrays[0];
             for (int i = 0; i < length; i++) {
-              List<UpdateSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               double[] values = doubleValues[i];
               if (_includeDefaultSketch) {
-                UpdateSketch defaultSketch = updateSketches.get(0);
+                UpdatableThetaSketch defaultSketch = updateSketches.get(0);
                 for (double value : values) {
                   defaultSketch.update(value);
                 }
               }
               for (int j = 0; j < numFilters; j++) {
                 if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
-                  UpdateSketch updateSketch = updateSketches.get(j + 1);
+                  UpdatableThetaSketch updateSketch = updateSketches.get(j + 1);
                   for (double value : values) {
                     updateSketch.update(value);
                   }
@@ -620,17 +620,17 @@ public class DistinctCountThetaSketchAggregationFunction
           case STRING:
             String[][] stringValues = (String[][]) valueArrays[0];
             for (int i = 0; i < length; i++) {
-              List<UpdateSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               String[] values = stringValues[i];
               if (_includeDefaultSketch) {
-                UpdateSketch defaultSketch = updateSketches.get(0);
+                UpdatableThetaSketch defaultSketch = updateSketches.get(0);
                 for (String value : values) {
                   defaultSketch.update(value);
                 }
               }
               for (int j = 0; j < numFilters; j++) {
                 if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
-                  UpdateSketch updateSketch = updateSketches.get(j + 1);
+                  UpdatableThetaSketch updateSketch = updateSketches.get(j + 1);
                   for (String value : values) {
                     updateSketch.update(value);
                   }
@@ -645,10 +645,10 @@ public class DistinctCountThetaSketchAggregationFunction
       }
     } else {
       // Serialized sketch
-      Sketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
+      ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       for (int i = 0; i < length; i++) {
         List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(groupByResultHolder, groupKeyArray[i]);
-        Sketch sketch = sketches[i];
+        ThetaSketch sketch = sketches[i];
         if (_includeDefaultSketch) {
           thetaSketchAccumulators.get(0).apply(sketch);
         }
@@ -787,7 +787,7 @@ public class DistinctCountThetaSketchAggregationFunction
             if (_includeDefaultSketch) {
               for (int i = 0; i < length; i++) {
                 for (int groupKey : groupKeysArray[i]) {
-                  UpdateSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
+                  UpdatableThetaSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
                   for (int value : intValues[i]) {
                     defaultSketch.update(value);
                   }
@@ -799,7 +799,7 @@ public class DistinctCountThetaSketchAggregationFunction
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (int groupKey : groupKeysArray[i]) {
-                    UpdateSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
+                    UpdatableThetaSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
                     for (int value : intValues[i]) {
                       updateSketch.update(value);
                     }
@@ -813,7 +813,7 @@ public class DistinctCountThetaSketchAggregationFunction
             if (_includeDefaultSketch) {
               for (int i = 0; i < length; i++) {
                 for (int groupKey : groupKeysArray[i]) {
-                  UpdateSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
+                  UpdatableThetaSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
                   for (long value : longValues[i]) {
                     defaultSketch.update(value);
                   }
@@ -825,7 +825,7 @@ public class DistinctCountThetaSketchAggregationFunction
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (int groupKey : groupKeysArray[i]) {
-                    UpdateSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
+                    UpdatableThetaSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
                     for (long value : longValues[i]) {
                       updateSketch.update(value);
                     }
@@ -839,7 +839,7 @@ public class DistinctCountThetaSketchAggregationFunction
             if (_includeDefaultSketch) {
               for (int i = 0; i < length; i++) {
                 for (int groupKey : groupKeysArray[i]) {
-                  UpdateSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
+                  UpdatableThetaSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
                   for (float value : floatValues[i]) {
                     defaultSketch.update(value);
                   }
@@ -851,7 +851,7 @@ public class DistinctCountThetaSketchAggregationFunction
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (int groupKey : groupKeysArray[i]) {
-                    UpdateSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
+                    UpdatableThetaSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
                     for (float value : floatValues[i]) {
                       updateSketch.update(value);
                     }
@@ -865,7 +865,7 @@ public class DistinctCountThetaSketchAggregationFunction
             if (_includeDefaultSketch) {
               for (int i = 0; i < length; i++) {
                 for (int groupKey : groupKeysArray[i]) {
-                  UpdateSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
+                  UpdatableThetaSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
                   for (double value : doubleValues[i]) {
                     defaultSketch.update(value);
                   }
@@ -877,7 +877,7 @@ public class DistinctCountThetaSketchAggregationFunction
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (int groupKey : groupKeysArray[i]) {
-                    UpdateSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
+                    UpdatableThetaSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
                     for (double value : doubleValues[i]) {
                       updateSketch.update(value);
                     }
@@ -891,7 +891,7 @@ public class DistinctCountThetaSketchAggregationFunction
             if (_includeDefaultSketch) {
               for (int i = 0; i < length; i++) {
                 for (int groupKey : groupKeysArray[i]) {
-                  UpdateSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
+                  UpdatableThetaSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
                   for (String value : stringValues[i]) {
                     defaultSketch.update(value);
                   }
@@ -903,7 +903,7 @@ public class DistinctCountThetaSketchAggregationFunction
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (int groupKey : groupKeysArray[i]) {
-                    UpdateSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
+                    UpdatableThetaSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
                     for (String value : stringValues[i]) {
                       updateSketch.update(value);
                     }
@@ -919,7 +919,7 @@ public class DistinctCountThetaSketchAggregationFunction
       }
     } else {
       // Serialized sketch
-      Sketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
+      ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
@@ -952,7 +952,7 @@ public class DistinctCountThetaSketchAggregationFunction
       return sketches;
     }
 
-    if (result.get(0) instanceof Sketch) {
+    if (result.get(0) instanceof ThetaSketch) {
       ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(result.size());
       for (Object o : result) {
         ThetaSketchAccumulator thetaSketchAccumulator = convertSketchAccumulator(o);
@@ -976,7 +976,7 @@ public class DistinctCountThetaSketchAggregationFunction
       return thetaSketchAccumulators;
     }
 
-    if (result.get(0) instanceof Sketch) {
+    if (result.get(0) instanceof ThetaSketch) {
       ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(result.size());
       for (Object o : result) {
         ThetaSketchAccumulator thetaSketchAccumulator = convertSketchAccumulator(o);
@@ -1084,7 +1084,7 @@ public class DistinctCountThetaSketchAggregationFunction
       return 0L;
     }
     int numAccumulators = accumulators.size();
-    List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
+    List<ThetaSketch> mergedSketches = new ArrayList<>(numAccumulators);
 
     for (Object accumulatorObject : accumulators) {
       ThetaSketchAccumulator accumulator = convertSketchAccumulator(accumulatorObject);
@@ -1126,8 +1126,8 @@ public class DistinctCountThetaSketchAggregationFunction
   // types might still be incompatible at runtime due to type erasure.
   // Due to performance overheads of redundant casts, this should be removed at some future point.
   protected ThetaSketchAccumulator convertSketchAccumulator(Object result) {
-    if (result instanceof Sketch) {
-      Sketch sketch = (Sketch) result;
+    if (result instanceof ThetaSketch) {
+      ThetaSketch sketch = (ThetaSketch) result;
       ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold);
       accumulator.apply(sketch);
       return accumulator;
@@ -1300,10 +1300,10 @@ public class DistinctCountThetaSketchAggregationFunction
   }
 
   /**
-   * Returns the UpdateSketch list from the result holder or creates a new one if it does not exist.
+   * Returns the UpdatableThetaSketch list from the result holder or creates a new one if it does not exist.
    */
-  private List<UpdateSketch> getUpdateSketches(AggregationResultHolder aggregationResultHolder) {
-    List<UpdateSketch> updateSketches = aggregationResultHolder.getResult();
+  private List<UpdatableThetaSketch> getUpdateSketches(AggregationResultHolder aggregationResultHolder) {
+    List<UpdatableThetaSketch> updateSketches = aggregationResultHolder.getResult();
     if (updateSketches == null) {
       updateSketches = buildUpdateSketches();
       aggregationResultHolder.setValue(updateSketches);
@@ -1312,7 +1312,7 @@ public class DistinctCountThetaSketchAggregationFunction
   }
 
   /**
-   * Returns the Union list from the result holder or creates a new one if it does not exist.
+   * Returns the ThetaSketchAccumulator list from the result holder or creates a new one if it does not exist.
    */
   private List<ThetaSketchAccumulator> getUnions(AggregationResultHolder aggregationResultHolder) {
     List<ThetaSketchAccumulator> unions = aggregationResultHolder.getResult();
@@ -1324,10 +1324,10 @@ public class DistinctCountThetaSketchAggregationFunction
   }
 
   /**
-   * Returns the UpdateSketch list for the given group key or creates a new one if it does not exist.
+   * Returns the UpdatableThetaSketch list for the given group key or creates a new one if it does not exist.
    */
-  private List<UpdateSketch> getUpdateSketches(GroupByResultHolder groupByResultHolder, int groupKey) {
-    List<UpdateSketch> updateSketches = groupByResultHolder.getResult(groupKey);
+  private List<UpdatableThetaSketch> getUpdateSketches(GroupByResultHolder groupByResultHolder, int groupKey) {
+    List<UpdatableThetaSketch> updateSketches = groupByResultHolder.getResult(groupKey);
     if (updateSketches == null) {
       updateSketches = buildUpdateSketches();
       groupByResultHolder.setValueForKey(groupKey, updateSketches);
@@ -1336,7 +1336,7 @@ public class DistinctCountThetaSketchAggregationFunction
   }
 
   /**
-   * Returns the Union list for the given group key or creates a new one if it does not exist.
+   * Returns the ThetaSketchAccumulator list for the given group key or creates a new one if it does not exist.
    */
   private List<ThetaSketchAccumulator> getUnions(GroupByResultHolder groupByResultHolder, int groupKey) {
     List<ThetaSketchAccumulator> unions = groupByResultHolder.getResult(groupKey);
@@ -1348,11 +1348,11 @@ public class DistinctCountThetaSketchAggregationFunction
   }
 
   /**
-   * Builds the UpdateSketch list.
+   * Builds the UpdatableThetaSketch list.
    */
-  private List<UpdateSketch> buildUpdateSketches() {
+  private List<UpdatableThetaSketch> buildUpdateSketches() {
     int numSketches = _filterEvaluators.size() + 1;
-    List<UpdateSketch> updateSketches = new ArrayList<>(numSketches);
+    List<UpdatableThetaSketch> updateSketches = new ArrayList<>(numSketches);
     for (int i = 0; i < numSketches; i++) {
       updateSketches.add(_updateSketchBuilder.build());
     }
@@ -1360,7 +1360,7 @@ public class DistinctCountThetaSketchAggregationFunction
   }
 
   /**
-   * Builds the Union list.
+   * Builds the ThetaSketchAccumulator list.
    */
   private List<ThetaSketchAccumulator> buildUnions() {
     int numUnions = _filterEvaluators.size() + 1;
@@ -1376,10 +1376,10 @@ public class DistinctCountThetaSketchAggregationFunction
   /**
    * Deserializes the sketches from the bytes.
    */
-  private Sketch[] deserializeSketches(byte[][] serializedSketches, int length) {
-    Sketch[] sketches = new Sketch[length];
+  private ThetaSketch[] deserializeSketches(byte[][] serializedSketches, int length) {
+    ThetaSketch[] sketches = new ThetaSketch[length];
     for (int i = 0; i < length; i++) {
-      sketches[i] = Sketch.wrap(Memory.wrap(serializedSketches[i]));
+      sketches[i] = ThetaSketch.wrap(MemorySegment.ofArray(serializedSketches[i]).asReadOnly());
     }
     return sketches;
   }
@@ -1387,14 +1387,14 @@ public class DistinctCountThetaSketchAggregationFunction
   /**
    * Evaluates the post-aggregation expression.
    */
-  protected Sketch evaluatePostAggregationExpression(List<Sketch> sketches) {
+  protected ThetaSketch evaluatePostAggregationExpression(List<ThetaSketch> sketches) {
     return evaluatePostAggregationExpression(_postAggregationExpression, sketches);
   }
 
   /**
    * Evaluates the post-aggregation expression.
    */
-  private Sketch evaluatePostAggregationExpression(ExpressionContext expression, List<Sketch> sketches) {
+  private ThetaSketch evaluatePostAggregationExpression(ExpressionContext expression, List<ThetaSketch> sketches) {
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       return sketches.get(extractSketchId(expression.getIdentifier()));
     }
@@ -1404,19 +1404,19 @@ public class DistinctCountThetaSketchAggregationFunction
     List<ExpressionContext> arguments = function.getArguments();
     switch (functionName) {
       case SET_UNION:
-        Union union = _setOperationBuilder.buildUnion();
+        ThetaUnion union = _setOperationBuilder.buildUnion();
         for (ExpressionContext argument : arguments) {
           union.union(evaluatePostAggregationExpression(argument, sketches));
         }
         return union.getResult(false, null);
       case SET_INTERSECT:
-        Intersection intersection = _setOperationBuilder.buildIntersection();
+        ThetaIntersection intersection = _setOperationBuilder.buildIntersection();
         for (ExpressionContext argument : arguments) {
           intersection.intersect(evaluatePostAggregationExpression(argument, sketches));
         }
         return intersection.getResult(false, null);
       case SET_DIFF:
-        AnotB diff = _setOperationBuilder.buildANotB();
+        ThetaAnotB diff = _setOperationBuilder.buildANotB();
         diff.setA(evaluatePostAggregationExpression(arguments.get(0), sketches));
         diff.notB(evaluatePostAggregationExpression(arguments.get(1), sketches));
         return diff.getResult(false, null, false);

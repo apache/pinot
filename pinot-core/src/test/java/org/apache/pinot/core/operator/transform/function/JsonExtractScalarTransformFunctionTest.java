@@ -22,12 +22,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -37,6 +39,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -49,16 +52,22 @@ import org.testng.annotations.Test;
 
 
 public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctionTest {
+  private static final String[] JSON_EXTRACT_SCALAR_FUNCTIONS = {
+      JsonExtractScalarTransformFunction.FUNCTION_NAME,
+      JsonExtractScalarTransformFunction.FAST_FUNCTION_NAME,
+      JsonExtractScalarTransformFunction.FIRST_MATCH_FUNCTION_NAME
+  };
 
   protected File _baseDir;
 
   @Test(dataProvider = "testJsonPathTransformFunction")
-  public void testJsonPathTransformFunction(String expressionStr, DataType resultsDataType, boolean isSingleValue) {
+  public void testJsonPathTransformFunction(String functionName, String expressionStr, DataType resultsDataType,
+      boolean isSingleValue) {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
 
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
+    Assert.assertEquals(transformFunction.getName(), functionName);
 
     Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), resultsDataType);
     Assert.assertEquals(transformFunction.getResultMetadata().isSingleValue(), isSingleValue);
@@ -170,52 +179,53 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
     // Test operating on both column and output of another transform (trim) to avoid passing the evaluation down to the
     // storage in order to test transformTransformedValuesToXXXValuesSV() methods.
-    for (String input : new String[]{JSON_COLUMN, String.format("trim(%s)", JSON_COLUMN)}) {
-      // Without default value
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.intSV','INT')", input), DataType.INT, true});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.intMV','INT_ARRAY')", input), DataType.INT, false});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.longSV','LONG')", input), DataType.LONG, true});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.floatSV','FLOAT')", input), DataType.FLOAT, true});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.doubleSV','DOUBLE')", input), DataType.DOUBLE, true});
-      testArguments.add(new Object[]{
-          String.format("jsonExtractScalar(%s,'$.bigDecimalSV','BIG_DECIMAL')", input), DataType.BIG_DECIMAL, true
-      });
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.stringSV','STRING')", input), DataType.STRING, true});
+    for (String functionName : JSON_EXTRACT_SCALAR_FUNCTIONS) {
+      for (String input : new String[]{JSON_COLUMN, String.format("trim(%s)", JSON_COLUMN)}) {
+        // Without default value
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.intSV','INT')", functionName, input), DataType.INT, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.intMV','INT_ARRAY')", functionName, input), DataType.INT, false});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.longSV','LONG')", functionName, input), DataType.LONG, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.floatSV','FLOAT')", functionName, input), DataType.FLOAT, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.doubleSV','DOUBLE')", functionName, input), DataType.DOUBLE, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.bigDecimalSV','BIG_DECIMAL')", functionName, input), DataType.BIG_DECIMAL, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.stringSV','STRING')", functionName, input), DataType.STRING, true});
 
-      // With default value
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.intSV','INT',0)", input), DataType.INT, true});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.intMV','INT_ARRAY',0)", input), DataType.INT, false});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.longSV','LONG',0)", input), DataType.LONG, true});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.floatSV','FLOAT',0)", input), DataType.FLOAT, true});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.doubleSV','DOUBLE',0)", input), DataType.DOUBLE, true});
-      testArguments.add(new Object[]{
-          String.format("jsonExtractScalar(%s,'$.bigDecimalSV','BIG_DECIMAL',0)", input), DataType.BIG_DECIMAL, true
-      });
-      testArguments.add(new Object[]{
-          String.format("jsonExtractScalar(%s,'$.stringSV','STRING','null')", input), DataType.STRING, true
-      });
+        // With default value
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.intSV','INT',0)", functionName, input), DataType.INT, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.intMV','INT_ARRAY',0)", functionName, input), DataType.INT, false});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.longSV','LONG',0)", functionName, input), DataType.LONG, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.floatSV','FLOAT',0)", functionName, input), DataType.FLOAT, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.doubleSV','DOUBLE',0)", functionName, input), DataType.DOUBLE, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.bigDecimalSV','BIG_DECIMAL',0)", functionName, input), DataType.BIG_DECIMAL,
+            true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.stringSV','STRING','null')", functionName, input), DataType.STRING, true});
+      }
     }
 
     return testArguments.toArray(new Object[0][]);
   }
 
   @Test(dataProvider = "testDefaultValue")
-  public void testDefaultValue(String expressionStr, DataType resultsDataType, boolean isSingleValue) {
+  public void testDefaultValue(String functionName, String expressionStr, DataType resultsDataType,
+      boolean isSingleValue) {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
+    Assert.assertEquals(transformFunction.getName(), functionName);
 
     Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), resultsDataType);
     Assert.assertEquals(transformFunction.getResultMetadata().isSingleValue(), isSingleValue);
@@ -280,23 +290,24 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
     // Test operating on both column and output of another transform (trim) to avoid passing the evaluation down to the
     // storage in order to test transformTransformedValuesToXXXValuesSV() methods.
-    for (String input : new String[]{DEFAULT_JSON_COLUMN, String.format("trim(%s)", DEFAULT_JSON_COLUMN)}) {
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.intSV','INT',0)", input), DataType.INT, true});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.intMV','INT_ARRAY',0)", input), DataType.INT, false});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.longSV','LONG',0)", input), DataType.LONG, true});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.floatSV','FLOAT',0)", input), DataType.FLOAT, true});
-      testArguments.add(
-          new Object[]{String.format("jsonExtractScalar(%s,'$.doubleSV','DOUBLE',0)", input), DataType.DOUBLE, true});
-      testArguments.add(new Object[]{
-          String.format("jsonExtractScalar(%s,'$.bigDecimalSV','BIG_DECIMAL',0)", input), DataType.BIG_DECIMAL, true
-      });
-      testArguments.add(new Object[]{
-          String.format("jsonExtractScalar(%s,'$.stringSV','STRING','null')", input), DataType.STRING, true
-      });
+    for (String functionName : JSON_EXTRACT_SCALAR_FUNCTIONS) {
+      for (String input : new String[]{DEFAULT_JSON_COLUMN, String.format("trim(%s)", DEFAULT_JSON_COLUMN)}) {
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.intSV','INT',0)", functionName, input), DataType.INT, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.intMV','INT_ARRAY',0)", functionName, input), DataType.INT, false});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.longSV','LONG',0)", functionName, input), DataType.LONG, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.floatSV','FLOAT',0)", functionName, input), DataType.FLOAT, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.doubleSV','DOUBLE',0)", functionName, input), DataType.DOUBLE, true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.bigDecimalSV','BIG_DECIMAL',0)", functionName, input), DataType.BIG_DECIMAL,
+            true});
+        testArguments.add(new Object[]{functionName,
+            String.format("%s(%s,'$.stringSV','STRING','null')", functionName, input), DataType.STRING, true});
+      }
     }
 
     return testArguments.toArray(new Object[0][]);
@@ -304,38 +315,40 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test
   public void testJsonPathTransformFunctionWithPredicate() {
-    String jsonPathExpressionStr =
-        String.format("jsonExtractScalar(json,'[?($.stringSV==''%s'')]','STRING')", _stringSVValues[0]);
-    ExpressionContext expression = RequestContextUtils.getExpression(jsonPathExpressionStr);
-    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
-    // Note: transformToStringValuesSV() calls IdentifierTransformFunction.transformToStringValuesSV() which in turns
-    //  call DataFetcher.readStringValues() which calls DefaultJsonPathEvaluator.evaluateBlock() that parses String w/o
-    //  support for exact BigDecimal. Therefore, testing string parsing of BigDecimal is disabled.
-    String[] resultValues = transformFunction.transformToStringValuesSV(_projectionBlock);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      if (_stringSVValues[i].equals(_stringSVValues[0])) {
-        try {
-          final List<HashMap<String, Object>> resultMap = JsonUtils.stringToObject(resultValues[i], List.class);
-          Assert.assertEquals(_intSVValues[i], resultMap.get(0).get("intSV"));
-          for (int j = 0; j < _intMVValues[i].length; j++) {
-            Assert.assertEquals(_intMVValues[i][j], ((List) resultMap.get(0).get("intMV")).get(j));
+    for (String functionName : JSON_EXTRACT_SCALAR_FUNCTIONS) {
+      String jsonPathExpressionStr =
+          String.format("%s(json,'[?($.stringSV==''%s'')]','STRING')", functionName, _stringSVValues[0]);
+      ExpressionContext expression = RequestContextUtils.getExpression(jsonPathExpressionStr);
+      TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+      Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+      Assert.assertEquals(transformFunction.getName(), functionName);
+      // Note: transformToStringValuesSV() calls IdentifierTransformFunction.transformToStringValuesSV(), which calls
+      // DataFetcher.readStringValues() and DefaultJsonPathEvaluator.evaluateBlock(). The evaluator parses String values
+      // without exact BigDecimal support, so testing string parsing of BigDecimal is disabled.
+      String[] resultValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+      for (int i = 0; i < NUM_ROWS; i++) {
+        if (_stringSVValues[i].equals(_stringSVValues[0])) {
+          try {
+            final List<HashMap<String, Object>> resultMap = JsonUtils.stringToObject(resultValues[i], List.class);
+            Assert.assertEquals(_intSVValues[i], resultMap.get(0).get("intSV"));
+            for (int j = 0; j < _intMVValues[i].length; j++) {
+              Assert.assertEquals(_intMVValues[i][j], ((List) resultMap.get(0).get("intMV")).get(j));
+            }
+            Assert.assertEquals(_longSVValues[i], resultMap.get(0).get("longSV"));
+            // Notes: since we use currently a mapper that parses exact big decimals, doubles may get parsed as
+            // big decimals. Confirm this is a backward compatible change?
+            Assert.assertEquals(
+                Float.compare(_floatSVValues[i], ((Number) resultMap.get(0).get("floatSV")).floatValue()), 0);
+            Assert.assertEquals(_doubleSVValues[i], resultMap.get(0).get("doubleSV"));
+            // Disabled:
+            // Assert.assertEquals(_bigDecimalSVValues[i], (BigDecimal) resultMap.get(0).get("bigDecimalSV"));
+            Assert.assertEquals(_stringSVValues[i], resultMap.get(0).get("stringSV"));
+          } catch (IOException e) {
+            throw new RuntimeException();
           }
-          Assert.assertEquals(_longSVValues[i], resultMap.get(0).get("longSV"));
-          // Notes: since we use currently a mapper that parses exact big decimals, doubles may get parsed as
-          // big decimals. Confirm this is a backward compatible change?
-          Assert.assertEquals(Float.compare(_floatSVValues[i], ((Number) resultMap.get(0).get("floatSV")).floatValue()),
-              0);
-          Assert.assertEquals(_doubleSVValues[i], resultMap.get(0).get("doubleSV"));
-          // Disabled:
-          // Assert.assertEquals(_bigDecimalSVValues[i], (BigDecimal) resultMap.get(0).get("bigDecimalSV"));
-          Assert.assertEquals(_stringSVValues[i], resultMap.get(0).get("stringSV"));
-        } catch (IOException e) {
-          throw new RuntimeException();
+        } else {
+          Assert.assertEquals(resultValues[i], "[]");
         }
-      } else {
-        Assert.assertEquals(resultValues[i], "[]");
       }
     }
   }
@@ -527,6 +540,10 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         new Object[]{String.format("jsonExtractScalar(%s, \"$.store.book[0].author\", 'String')", JSON_COLUMN)},
         new Object[]{String.format("jsonExtractScalar(%s, '$.store.book[0].author', \"String\")", JSON_COLUMN)},
         new Object[]{String.format("json_extract_scalar(%s, \"$.store.book[0].author\", 'String','abc')", JSON_COLUMN)},
+        new Object[]{String.format("jsonExtractScalarFast(%s)", JSON_COLUMN)},
+        new Object[]{String.format("jsonExtractScalarFast(%s, \"$.store.book[0].author\", 'String')", JSON_COLUMN)},
+        new Object[]{String.format("jsonExtractScalarFirstMatch(%s, '$.store.book[0].author', \"String\")",
+            JSON_COLUMN)},
         new Object[]{String.format("jsonExtractKey(%s, \"$.*\")", JSON_COLUMN)},
         new Object[]{String.format("json_extract_key(%s, \"$.*\")", JSON_COLUMN)}};
     //@formatter:on
@@ -660,14 +677,20 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   // -- Single-value (SV) tests --
 
-  /// Runs `SELECT jsonExtractScalar(json, '$.v', resultsType) FROM testTable` against a single-row table
-  /// containing the given JSON document, and asserts the result for the (always-duplicated) two
-  /// expected rows.
+  /// Runs each JSON scalar extraction variant against a single-row table containing the given JSON document, and
+  /// asserts the result for the (always-duplicated) two expected rows.
   private void assertJsonExtractScalar(String json, String resultsType, Object expectedValue) {
+    for (String functionName : JSON_EXTRACT_SCALAR_FUNCTIONS) {
+      assertJsonExtractScalar(functionName, json, DataType.JSON, resultsType, null, expectedValue);
+    }
+  }
+
+  private void assertJsonExtractScalar(String functionName, Object json, DataType inputType, String resultsType,
+      @Nullable String defaultValueSql, Object expectedValue) {
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("testTable")
         .setEnableColumnBasedNullHandling(true)
-        .addDimensionField("json", DataType.JSON)
+        .addDimensionField("json", inputType)
         .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("testTable")
@@ -677,8 +700,40 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         .withNullHandling(false)
         .givenTable(schema, tableConfig)
         .onFirstInstance(new Object[]{json})
-        .whenQuery("SELECT jsonExtractScalar(json, '$.v', '" + resultsType + "') FROM testTable")
+        .whenQuery("SELECT " + functionName + "(json, '$.v', '" + resultsType + "'"
+            + (defaultValueSql != null ? ", " + defaultValueSql : "") + ") FROM testTable")
         .thenResultIs(expectedRow, expectedRow);
+  }
+
+  @Test
+  public void testFastExtractionModes() {
+    String duplicateKeys = "{\"v\": 1, \"v\": 2}";
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FUNCTION_NAME, duplicateKeys, DataType.STRING, "INT",
+        null, 2);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FAST_FUNCTION_NAME, duplicateKeys, DataType.STRING,
+        "INT", null, 2);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FIRST_MATCH_FUNCTION_NAME, duplicateKeys,
+        DataType.STRING, "INT", null, 1);
+
+    String malformedTail = "{\"v\": 1, \"broken\": [}";
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FUNCTION_NAME, malformedTail, DataType.STRING, "INT",
+        "-1", -1);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FAST_FUNCTION_NAME, malformedTail, DataType.STRING,
+        "INT", "-1", -1);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FIRST_MATCH_FUNCTION_NAME, malformedTail,
+        DataType.STRING, "INT", "-1", 1);
+  }
+
+  @Test
+  public void testFastExtractionFromBytesWithBigDecimal() {
+    byte[] json = "{\"label\":\"crème brûlée\",\"v\":12345678901234567890.123456789}"
+        .getBytes(StandardCharsets.UTF_8);
+    String expected = "12345678901234567890.123456789";
+    String hexEncodedJson = BytesUtils.toHexString(json);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FAST_FUNCTION_NAME, hexEncodedJson, DataType.BYTES,
+        "BIG_DECIMAL", null, expected);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FIRST_MATCH_FUNCTION_NAME, hexEncodedJson,
+        DataType.BYTES, "BIG_DECIMAL", null, expected);
   }
 
   @Test
@@ -807,10 +862,15 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         "12345678901234567890.123456789");
   }
 
+  @Test
+  public void testExtractBytes() {
+    assertJsonExtractScalar("{\"v\": \"AAGl/w==\"}", "BYTES", "0001a5ff");
+  }
+
   // -- Multi-value (MV) tests --
 
-  /// Asserts that `SELECT jsonExtractScalar(json, '$.v', resultsType)` over a single-row table with the
-  /// given JSON document produces the given primitive-array result.
+  /// Asserts that each JSON scalar extraction variant produces the given primitive-array result for the supplied
+  /// single-row JSON document.
   private void assertJsonExtractMv(String json, String resultsType, Object expectedArray) {
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("testTable")
@@ -821,12 +881,14 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         .setTableName("testTable")
         .build();
     Object[] expectedRow = new Object[]{expectedArray};
-    FluentQueryTest.withBaseDir(_baseDir)
-        .withNullHandling(false)
-        .givenTable(schema, tableConfig)
-        .onFirstInstance(new Object[]{json})
-        .whenQuery("SELECT jsonExtractScalar(json, '$.v', '" + resultsType + "') FROM testTable")
-        .thenResultIs(expectedRow, expectedRow);
+    for (String functionName : JSON_EXTRACT_SCALAR_FUNCTIONS) {
+      FluentQueryTest.withBaseDir(_baseDir)
+          .withNullHandling(false)
+          .givenTable(schema, tableConfig)
+          .onFirstInstance(new Object[]{json})
+          .whenQuery("SELECT " + functionName + "(json, '$.v', '" + resultsType + "') FROM testTable")
+          .thenResultIs(expectedRow, expectedRow);
+    }
   }
 
   @Test

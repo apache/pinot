@@ -30,8 +30,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/// The `DataTypeColumnTransformer` is the column-major counterpart of the row-major `DataTypeTransformer`. It converts
+/// the values read from a [ColumnReader] to a target [PinotDataType]. It has two usages:
+/// - Schema columns: constructed from a [FieldSpec], it converts the values to the data type defined for the column in
+///   the [org.apache.pinot.spi.data.Schema].
+/// - Source fields: constructed from an explicit [PinotDataType] (see `IngestionConfig.sourceFieldConfigs`), it fixes
+///   the data type of a source field before other transformers (such as the expression transformer) consume it.
 public class DataTypeColumnTransformer implements ColumnTransformer {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTypeColumnTransformer.class);
 
   private final PinotDataType _destDataType;
@@ -39,12 +44,17 @@ public class DataTypeColumnTransformer implements ColumnTransformer {
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
 
-  /**
-   * @param fieldSpec - The field spec for the column being created in Pinot.
-   * @param columnReader - The column reader to read the source data.
-   */
+  /// Creates a transformer that converts the values read from `columnReader` to the data type defined for the column
+  /// in the [org.apache.pinot.spi.data.Schema] (derived from the given [FieldSpec]).
   public DataTypeColumnTransformer(TableConfig tableConfig, FieldSpec fieldSpec, ColumnReader columnReader) {
-    _destDataType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
+    this(tableConfig, PinotDataType.getPinotDataTypeForIngestion(fieldSpec), columnReader);
+  }
+
+  /// Creates a transformer that converts the values read from `columnReader` to the given [PinotDataType]. This is
+  /// useful for fixing the data type of a source field before other transformers (such as the expression transformer)
+  /// consume it.
+  public DataTypeColumnTransformer(TableConfig tableConfig, PinotDataType destDataType, ColumnReader columnReader) {
+    _destDataType = destDataType;
     _columnReader = columnReader;
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
@@ -53,40 +63,9 @@ public class DataTypeColumnTransformer implements ColumnTransformer {
 
   @Override
   public boolean isNoOp() {
-    // If source and destination data types are primitive types and the same, no transformation is needed.
-    if (_columnReader.isSingleValue()) {
-      if (_columnReader.isInt()) {
-        return _destDataType == PinotDataType.INT;
-      } else if (_columnReader.isLong()) {
-        return _destDataType == PinotDataType.LONG;
-      } else if (_columnReader.isFloat()) {
-        return _destDataType == PinotDataType.FLOAT;
-      } else if (_columnReader.isDouble()) {
-        return _destDataType == PinotDataType.DOUBLE;
-      } else if (_columnReader.isBigDecimal()) {
-        return _destDataType == PinotDataType.BIG_DECIMAL;
-      } else if (_columnReader.isString()) {
-        return _destDataType == PinotDataType.STRING;
-      } else if (_columnReader.isBytes()) {
-        return _destDataType == PinotDataType.BYTES;
-      }
-    } else {
-      if (_columnReader.isInt()) {
-        return _destDataType == PinotDataType.INT_ARRAY;
-      } else if (_columnReader.isLong()) {
-        return _destDataType == PinotDataType.LONG_ARRAY;
-      } else if (_columnReader.isFloat()) {
-        return _destDataType == PinotDataType.FLOAT_ARRAY;
-      } else if (_columnReader.isDouble()) {
-        return _destDataType == PinotDataType.DOUBLE_ARRAY;
-      } else if (_columnReader.isString()) {
-        return _destDataType == PinotDataType.STRING_ARRAY;
-      } else if (_columnReader.isBytes()) {
-        return _destDataType == PinotDataType.BYTES_ARRAY;
-      }
-    }
-    // For other types, because there is no overhead to cast to Object, always call transform() which handles all cases
-    return false;
+    // No transformation is needed when the source can be read directly as the destination type. For source types that
+    // cannot be read directly (getValueType() returns null), always transform().
+    return _columnReader.getValueType() == _destDataType;
   }
 
   @Override

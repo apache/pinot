@@ -257,7 +257,6 @@ public class RealtimeOffsetAutoResetManagerTest {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", "kafka");
     streamConfigMap.put("stream.kafka.topic.name", TOPIC_NAME);
-    streamConfigMap.put("stream.kafka.consumer.type", "simple");
     streamConfigMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
     streamConfigMap.put("stream.kafka.decoder.class.name", "testDecoder");
     StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigMap));
@@ -274,7 +273,6 @@ public class RealtimeOffsetAutoResetManagerTest {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", "kafka");
     streamConfigMap.put("stream.kafka.topic.name", TOPIC_NAME);
-    streamConfigMap.put("stream.kafka.consumer.type", "simple");
     streamConfigMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
     streamConfigMap.put("stream.kafka.decoder.class.name", "testDecoder");
     StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigMap));
@@ -292,7 +290,6 @@ public class RealtimeOffsetAutoResetManagerTest {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", "kafka");
     streamConfigMap.put("stream.kafka.topic.name", TOPIC_NAME);
-    streamConfigMap.put("stream.kafka.consumer.type", "simple");
     streamConfigMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
     streamConfigMap.put("stream.kafka.decoder.class.name", "testDecoder");
 
@@ -326,7 +323,6 @@ public class RealtimeOffsetAutoResetManagerTest {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", "kafka");
     streamConfigMap.put("stream.kafka.topic.name", TOPIC_NAME);
-    streamConfigMap.put("stream.kafka.consumer.type", "simple");
     streamConfigMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
     streamConfigMap.put("stream.kafka.decoder.class.name", "testDecoder");
     StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigMap));

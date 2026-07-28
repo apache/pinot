@@ -87,13 +87,15 @@ public class TableSize {
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("verbose") boolean verbose,
       @ApiParam(value = "Include replaced segments") @DefaultValue("true")
       @QueryParam("includeReplacedSegments") boolean includeReplacedSegments,
+      @ApiParam(value = "Include per-column compression stats in response (default false to avoid large responses)")
+      @DefaultValue("false") @QueryParam("includeColumnCompressionStats") boolean includeColumnCompressionStats,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;
     try {
       tableSizeDetails =
           _tableSizeReader.getTableSizeDetails(tableName, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000,
-              includeReplacedSegments);
+              includeReplacedSegments, includeColumnCompressionStats);
       if (!verbose) {
         if (tableSizeDetails._offlineSegments != null) {
           tableSizeDetails._offlineSegments._segments = new HashMap<>();

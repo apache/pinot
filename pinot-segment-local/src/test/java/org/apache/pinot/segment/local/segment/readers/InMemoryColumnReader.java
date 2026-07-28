@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /**
@@ -33,7 +36,6 @@ public class InMemoryColumnReader implements ColumnReader {
   private final boolean[] _isNull;
   private final boolean _isSingleValue;
   private final Class<?> _dataType;
-  private int _currentIndex = 0;
 
   public InMemoryColumnReader(String columnName, Object[] values, boolean[] isNull, boolean isSingleValue,
       Class<?> dataType) {
@@ -45,151 +47,32 @@ public class InMemoryColumnReader implements ColumnReader {
   }
 
   @Override
-  public boolean hasNext() {
-    return _currentIndex < _values.length;
+  public String getColumnName() {
+    return _columnName;
   }
 
   @Nullable
   @Override
-  public Object next() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values");
+  public PinotDataType getValueType() {
+    DataType dataType;
+    if (_dataType == Integer.class) {
+      dataType = DataType.INT;
+    } else if (_dataType == Long.class) {
+      dataType = DataType.LONG;
+    } else if (_dataType == Float.class) {
+      dataType = DataType.FLOAT;
+    } else if (_dataType == Double.class) {
+      dataType = DataType.DOUBLE;
+    } else if (_dataType == BigDecimal.class) {
+      dataType = DataType.BIG_DECIMAL;
+    } else if (_dataType == String.class) {
+      dataType = DataType.STRING;
+    } else if (_dataType == byte[].class) {
+      dataType = DataType.BYTES;
+    } else {
+      return null;
     }
-    Object value = _values[_currentIndex];
-    _currentIndex++;
-    return value;
-  }
-
-  @Override
-  public boolean isNextNull() {
-    return hasNext() && _isNull[_currentIndex];
-  }
-
-  @Override
-  public void skipNext() {
-    if (hasNext()) {
-      _currentIndex++;
-    }
-  }
-
-  @Override
-  public boolean isSingleValue() {
-    return _isSingleValue;
-  }
-
-  @Override
-  public boolean isInt() {
-    return _dataType == Integer.class;
-  }
-
-  @Override
-  public boolean isLong() {
-    return _dataType == Long.class;
-  }
-
-  @Override
-  public boolean isFloat() {
-    return _dataType == Float.class;
-  }
-
-  @Override
-  public boolean isDouble() {
-    return _dataType == Double.class;
-  }
-
-  @Override
-  public boolean isBigDecimal() {
-    return _dataType == BigDecimal.class;
-  }
-
-  @Override
-  public boolean isString() {
-    return _dataType == String.class;
-  }
-
-  @Override
-  public boolean isBytes() {
-    return _dataType == byte[].class;
-  }
-
-  @Override
-  public int nextInt() {
-    return (Integer) next();
-  }
-
-  @Override
-  public long nextLong() {
-    return (Long) next();
-  }
-
-  @Override
-  public float nextFloat() {
-    return (Float) next();
-  }
-
-  @Override
-  public double nextDouble() {
-    return (Double) next();
-  }
-
-  @Override
-  public BigDecimal nextBigDecimal() {
-    return (BigDecimal) next();
-  }
-
-  @Override
-  public String nextString() {
-    return (String) next();
-  }
-
-  @Override
-  public byte[] nextBytes() {
-    return (byte[]) next();
-  }
-
-  @Override
-  public MultiValueResult<int[]> nextIntMV() {
-    return MultiValueResult.of((int[]) next(), null);
-  }
-
-  @Override
-  public MultiValueResult<long[]> nextLongMV() {
-    return MultiValueResult.of((long[]) next(), null);
-  }
-
-  @Override
-  public MultiValueResult<float[]> nextFloatMV() {
-    return MultiValueResult.of((float[]) next(), null);
-  }
-
-  @Override
-  public MultiValueResult<double[]> nextDoubleMV() {
-    return MultiValueResult.of((double[]) next(), null);
-  }
-
-  @Override
-  public BigDecimal[] nextBigDecimalMV() {
-    return (BigDecimal[]) next();
-  }
-
-  @Override
-  public String[] nextStringMV() {
-    return (String[]) next();
-  }
-
-  @Override
-  public byte[][] nextBytesMV() {
-    return (byte[][]) next();
-  }
-
-  @Override
-  public void rewind() {
-    _currentIndex = 0;
-  }
-
-  @Override
-  public String getColumnName() {
-    return _columnName;
+    return ColumnReader.toValueType(dataType, _isSingleValue);
   }
 
   @Override
@@ -200,6 +83,22 @@ public class InMemoryColumnReader implements ColumnReader {
   @Override
   public boolean isNull(int docId) {
     return _isNull[docId];
+  }
+
+  @Override
+  public Object getValue(int docId) {
+    Object value = _values[docId];
+    if (_isSingleValue || value == null || value instanceof Object[]) {
+      return value;
+    }
+    // A multi-value column returns an Object[] per the ColumnReader contract; box primitive MV arrays (int[], long[],
+    // ...) so getValue() matches the interface instead of leaking the raw primitive array.
+    int length = Array.getLength(value);
+    Object[] boxed = new Object[length];
+    for (int i = 0; i < length; i++) {
+      boxed[i] = Array.get(value, i);
+    }
+    return boxed;
   }
 
   @Override
@@ -235,11 +134,6 @@ public class InMemoryColumnReader implements ColumnReader {
   @Override
   public byte[] getBytes(int docId) {
     return (byte[]) _values[docId];
-  }
-
-  @Override
-  public Object getValue(int docId) {
-    return _values[docId];
   }
 
   @Override

@@ -83,6 +83,7 @@ public class ServerChannels {
   private final EventLoopGroup _eventLoopGroup;
   private final Class<? extends SocketChannel> _channelClass;
   private final ThreadAccountant _threadAccountant;
+  private final PooledByteBufAllocator _bufAllocatorWithLimits;
 
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
@@ -126,6 +127,17 @@ public class ServerChannels {
     _queryRouter = queryRouter;
     _tlsConfig = tlsConfig;
     _threadAccountant = threadAccountant;
+
+    _bufAllocatorWithLimits = PooledByteBufAllocatorWithLimits.getSharedBufferAllocatorWithLimits();
+    PooledByteBufAllocatorMetric metric = _bufAllocatorWithLimits.metric();
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_HEAP, metric::numHeapArenas);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_SMALL, metric::smallCacheSize);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
   }
 
   public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
@@ -165,22 +177,8 @@ public class ServerChannels {
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
-      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
-      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
-      PooledByteBufAllocator bufAllocatorWithLimits =
-          PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric);
-      metric = bufAllocatorWithLimits.metric();
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_HEAP, metric::numHeapArenas);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_SMALL, metric::smallCacheSize);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
-
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
-          .option(ChannelOption.ALLOCATOR, bufAllocatorWithLimits).group(_eventLoopGroup).channel(_channelClass)
+          .option(ChannelOption.ALLOCATOR, _bufAllocatorWithLimits).group(_eventLoopGroup).channel(_channelClass)
           .option(ChannelOption.SO_KEEPALIVE, true).handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {

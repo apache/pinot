@@ -155,7 +155,11 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
         }
       }
       if (isPartitionEnabled()) {
-        updatePartition(comparable.toString());
+        // See BytesColumnPreIndexStatsCollector: UUID columns must use DataType.toString to produce the
+        // canonical dashed form that matches the runtime MutableSegmentImpl partition path and
+        // UuidPartitionFunction expectation. comparable.toString() for UUID would yield the bare hex
+        // (ByteArray.toString) which breaks both Murmur (different partition value) and Uuid (rejected).
+        updatePartition(_fieldSpec.getDataType().toString(entry));
       }
       _totalNumberOfEntries++;
     }

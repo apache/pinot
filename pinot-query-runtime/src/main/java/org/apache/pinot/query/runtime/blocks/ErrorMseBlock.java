@@ -131,6 +131,12 @@ public class ErrorMseBlock implements MseBlock.Eos {
     try {
       ObjectNode root = JsonUtils.newObjectNode();
       root.put("type", "error");
+      // Provenance of the error: the stage, worker and server where the error originated. This is mostly useful when
+      // the block reaches downstream logs (e.g. the broker or an intermediate stage), so operators can quickly find
+      // where the failure actually happened. -1 / null means the origin could not be determined (see #fromMap).
+      root.put("stageId", _stageId);
+      root.put("workerId", _workerId);
+      root.put("serverId", _serverId);
       root.set("errorMessages", JsonUtils.objectToJsonNode(_errorMessages));
       return JsonUtils.objectToString(root);
     } catch (JsonProcessingException e) {

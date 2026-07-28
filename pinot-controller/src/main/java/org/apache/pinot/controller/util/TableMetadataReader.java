@@ -254,13 +254,18 @@ public class TableMetadataReader {
     return JsonUtils.objectToJsonNode(new HashMap<String, String>());
   }
 
-  /**
-   * This method retrieves the aggregated segment metadata for a given table.
-   * Currently supports only OFFLINE tables.
-   * @return a map of segmentName to its metadata
-   */
-  public JsonNode getAggregateTableMetadata(String tableNameWithType, List<String> columns, int numReplica,
+  /// Retrieves aggregated segment metadata for an offline table without compression statistics.
+  public JsonNode getAggregateTableMetadata(String tableNameWithType, @Nullable List<String> columns, int numReplica,
       int timeoutMs)
+      throws InvalidConfigException {
+    return getAggregateTableMetadata(tableNameWithType, columns, numReplica, timeoutMs, false, false);
+  }
+
+  /// Retrieves aggregated segment metadata for an offline table with explicit compression-statistics controls.
+  ///
+  /// @return aggregate metadata as JSON
+  public JsonNode getAggregateTableMetadata(String tableNameWithType, @Nullable List<String> columns, int numReplica,
+      int timeoutMs, boolean compressionStatsEnabled, boolean includeColumnCompressionStats)
       throws InvalidConfigException {
     final Map<String, List<String>> serverToSegments =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
@@ -271,7 +276,7 @@ public class TableMetadataReader {
 
     TableMetadataInfo aggregateTableMetadataInfo =
         serverSegmentMetadataReader.getAggregatedTableMetadataFromServer(tableNameWithType, endpoints, columns,
-            numReplica, timeoutMs);
+            numReplica, timeoutMs, compressionStatsEnabled, includeColumnCompressionStats, serverToSegments);
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
 

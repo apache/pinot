@@ -28,7 +28,9 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -41,7 +43,12 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.compression.ColumnCompressionStatsAccumulator;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsContribution;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
+import org.apache.pinot.common.restlet.resources.SegmentCompressionStatsContribution;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -51,6 +58,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -86,6 +94,12 @@ public class TableSizeResource {
   public String getTableSize(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed,
+      @ApiParam(value = "Include segment compression statistics when detailed=true and the table enables "
+          + "tableIndexConfig.compressionStatsEnabled")
+      @DefaultValue("false") @QueryParam("includeCompressionStats") boolean includeCompressionStats,
+      @ApiParam(value = "Include per-column compression statistics when detailed=true and the table enables "
+          + "tableIndexConfig.compressionStatsEnabled; this also populates segment summary fields")
+      @DefaultValue("false") @QueryParam("includeColumnCompressionStats") boolean includeColumnCompressionStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -100,22 +114,73 @@ public class TableSizeResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
+    Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
+    boolean compressionStatsEnabled = detailed && (includeCompressionStats || includeColumnCompressionStats)
+        && cachedPair != null && cachedPair.getLeft() != null
+        && cachedPair.getLeft().getIndexingConfig() != null
+        && cachedPair.getLeft().getIndexingConfig().isCompressionStatsEnabled();
+
     long tableSizeInBytes = 0L;
+    int columnContributions = 0;
     List<SegmentSizeInfo> segmentSizeInfos = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         long segmentSizeBytes = 0L;
         boolean hasImmutable = false;
+        boolean compressionStatsComplete = true;
+        long uncompressedValueSizeInBytes = 0;
+        long compressionForwardIndexAndDictionaryStorageSizeInBytes = 0;
+        Map<String, ColumnCompressionStatsAccumulator> columnAccumulators =
+            compressionStatsEnabled && includeColumnCompressionStats ? new HashMap<>() : null;
         for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
           if (segment instanceof ImmutableSegment immutableSegment) {
             segmentSizeBytes += immutableSegment.getSegmentSizeBytes();
+            if (compressionStatsEnabled) {
+              if (includeColumnCompressionStats) {
+                columnContributions = TablesResource.addColumnContributions(columnContributions, immutableSegment,
+                    null);
+              }
+              SegmentCompressionStatsContribution contribution =
+                  SegmentCompressionStatsReader.read(immutableSegment.getSegmentMetadata(),
+                      includeColumnCompressionStats);
+              if (contribution.isComplete()) {
+                uncompressedValueSizeInBytes += contribution.getUncompressedValueSizeInBytes();
+                compressionForwardIndexAndDictionaryStorageSizeInBytes +=
+                    contribution.getForwardIndexAndDictionaryStorageSizeInBytes();
+              } else {
+                compressionStatsComplete = false;
+              }
+              if (columnAccumulators != null && contribution.getColumnCompressionStats() != null) {
+                for (Map.Entry<String, ColumnCompressionStatsContribution> entry
+                    : contribution.getColumnCompressionStats().entrySet()) {
+                  columnAccumulators.computeIfAbsent(entry.getKey(), ignored ->
+                          new ColumnCompressionStatsAccumulator())
+                      .add(entry.getValue());
+                }
+              }
+            }
             hasImmutable = true;
           }
         }
         if (hasImmutable) {
           if (detailed) {
-            segmentSizeInfos.add(new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes));
+            if (compressionStatsEnabled) {
+              Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
+              if (columnAccumulators != null && !columnAccumulators.isEmpty()) {
+                columnCompressionStats = new HashMap<>();
+                for (Map.Entry<String, ColumnCompressionStatsAccumulator> entry : columnAccumulators.entrySet()) {
+                  columnCompressionStats.put(entry.getKey(),
+                      entry.getValue().toColumnCompressionStatsInfo(entry.getKey()));
+                }
+              }
+              segmentSizeInfos.add(new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes,
+                  compressionStatsComplete ? uncompressedValueSizeInBytes : -1,
+                  compressionStatsComplete ? compressionForwardIndexAndDictionaryStorageSizeInBytes : -1,
+                  columnCompressionStats));
+            } else {
+              segmentSizeInfos.add(new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes));
+            }
           }
           tableSizeInBytes += segmentSizeBytes;
         }
@@ -129,8 +194,8 @@ public class TableSizeResource {
       }
     }
 
-    TableSizeInfo tableSizeInfo =
-        new TableSizeInfo(tableDataManager.getTableName(), tableSizeInBytes, segmentSizeInfos);
+    TableSizeInfo tableSizeInfo = new TableSizeInfo(tableDataManager.getTableName(), tableSizeInBytes,
+        segmentSizeInfos, TableSizeInfo.CURRENT_METADATA_VERSION);
     //invalid to use the segmentDataManagers below
     return ResourceUtils.convertToJsonString(tableSizeInfo);
   }
@@ -150,8 +215,14 @@ public class TableSizeResource {
   public String getTableSizeOld(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed,
+      @ApiParam(value = "Include segment compression statistics when detailed=true and the table enables "
+          + "tableIndexConfig.compressionStatsEnabled")
+      @DefaultValue("false") @QueryParam("includeCompressionStats") boolean includeCompressionStats,
+      @ApiParam(value = "Include per-column compression statistics when detailed=true and the table enables "
+          + "tableIndexConfig.compressionStatsEnabled; this also populates segment summary fields")
+      @DefaultValue("false") @QueryParam("includeColumnCompressionStats") boolean includeColumnCompressionStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
-    return this.getTableSize(tableName, detailed, headers);
+    return this.getTableSize(tableName, detailed, includeCompressionStats, includeColumnCompressionStats, headers);
   }
 }

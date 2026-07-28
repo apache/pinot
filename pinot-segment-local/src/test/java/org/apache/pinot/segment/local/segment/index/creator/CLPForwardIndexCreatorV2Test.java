@@ -24,6 +24,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
@@ -172,5 +173,49 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
 
     File indexFile = new File(TEMP_DIR, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     return indexFile.length();
+  }
+
+  @Test
+  public void testGetUncompressedValueSizeAfterWriting()
+      throws IOException {
+    try (CLPMutableForwardIndexV2 mutable = new CLPMutableForwardIndexV2(COLUMN_NAME, _memoryManager)) {
+      for (int i = 0; i < _logMessages.size(); i++) {
+        mutable.setString(i, _logMessages.get(i));
+      }
+      TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
+      CLPForwardIndexCreatorV2 creator =
+          new CLPForwardIndexCreatorV2(TEMP_DIR, mutable, ChunkCompressionType.ZSTANDARD);
+      creator.enableRawForwardIndexUncompressedValueSizeTracking();
+      for (int i = 0; i < _logMessages.size(); i++) {
+        creator.putString(mutable.getString(i));
+      }
+      creator.seal();
+      creator.close();
+      long expectedRawBytes = _logMessages.stream()
+          .mapToLong(message -> message.getBytes(StandardCharsets.UTF_8).length)
+          .sum();
+      Assert.assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), expectedRawBytes,
+          "CLP V2 should report original UTF-8 message bytes");
+    }
+  }
+
+  @Test
+  public void testGetUncompressedValueSizeDisabledReturnsUnavailable()
+      throws IOException {
+    try (CLPMutableForwardIndexV2 mutable = new CLPMutableForwardIndexV2(COLUMN_NAME, _memoryManager)) {
+      for (int i = 0; i < _logMessages.size(); i++) {
+        mutable.setString(i, _logMessages.get(i));
+      }
+      TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
+      CLPForwardIndexCreatorV2 creator =
+          new CLPForwardIndexCreatorV2(TEMP_DIR, mutable, ChunkCompressionType.ZSTANDARD);
+      for (int i = 0; i < _logMessages.size(); i++) {
+        creator.putString(mutable.getString(i));
+      }
+      creator.seal();
+      creator.close();
+      Assert.assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L,
+          "getRawForwardIndexUncompressedValueSizeInBytes() should be unavailable when tracking is disabled");
+    }
   }
 }

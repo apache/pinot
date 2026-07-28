@@ -45,12 +45,12 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -72,8 +72,7 @@ public class ArrowColumnReaderFactoryTest {
 
       try (ArrowStreamReader streamReader = new ArrowStreamReader(
           Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
+          ArrowColumnReaderFactory factory = new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
 
         factory.init(newSchema());
 
@@ -115,8 +114,7 @@ public class ArrowColumnReaderFactoryTest {
 
       try (ArrowStreamReader streamReader = new ArrowStreamReader(
           Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
+          ArrowColumnReaderFactory factory = new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
 
         factory.init(newSchema());
 
@@ -137,8 +135,7 @@ public class ArrowColumnReaderFactoryTest {
 
       try (ArrowStreamReader streamReader = new ArrowStreamReader(
           Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
+          ArrowColumnReaderFactory factory = new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
 
         factory.init(newSchema(), Set.of("intCol"));
 
@@ -166,8 +163,7 @@ public class ArrowColumnReaderFactoryTest {
 
       try (ArrowStreamReader streamReader = new ArrowStreamReader(
           Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
+          ArrowColumnReaderFactory factory = new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
 
         factory.init(newSchema());
         // Second init() over the same (now-drained) reader: it allocates a fresh accumulator set and
@@ -183,39 +179,6 @@ public class ArrowColumnReaderFactoryTest {
         probe.set(0, 1);
         probe.setValueCount(1);
         assertEquals(probe.get(0), 1);
-      }
-    }
-  }
-
-  /**
-   * After the reader is drained, the sequential accessors ({@code next}, the typed {@code nextXxx},
-   * {@code isNextNull}, {@code skipNext}) must throw {@link IllegalStateException} rather than read out
-   * of bounds — matching the {@code DefaultValueColumnReader} / {@code PinotSegmentColumnReaderImpl}
-   * SPI contract ("No more values available").
-   */
-  @Test
-  public void testSequentialAccessorsThrowPastEnd()
-      throws Exception {
-    try (RootAllocator callerAllocator = new RootAllocator(Long.MAX_VALUE)) {
-      byte[] ipcBytes = writeArrowStreamFixture(callerAllocator);
-
-      try (ArrowStreamReader streamReader = new ArrowStreamReader(
-          Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
-
-        factory.init(newSchema());
-
-        try (ColumnReader intCol = factory.getColumnReader("intCol")) {
-          while (intCol.hasNext()) {
-            intCol.next();
-          }
-          assertFalse(intCol.hasNext());
-          assertThrows(IllegalStateException.class, intCol::next);
-          assertThrows(IllegalStateException.class, intCol::nextInt);
-          assertThrows(IllegalStateException.class, intCol::isNextNull);
-          assertThrows(IllegalStateException.class, intCol::skipNext);
-        }
       }
     }
   }
@@ -240,16 +203,14 @@ public class ArrowColumnReaderFactoryTest {
 
       try (ArrowStreamReader streamReader = new ArrowStreamReader(
           Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
-
+          ArrowColumnReaderFactory factory = new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
         factory.init(dictColumnSchema());
 
         try (ColumnReader colorCol = factory.getColumnReader("color")) {
           assertNotNull(colorCol);
           assertEquals(colorCol.getTotalDocs(), rows.length);
           // Must report the DECODED logical type (STRING), not the Int32 index type.
-          assertTrue(colorCol.isString());
+          assertEquals(colorCol.getValueType(), PinotDataType.STRING);
           for (int i = 0; i < rows.length; i++) {
             assertEquals(colorCol.getString(i), rows[i], "decoded getString mismatch at doc " + i);
             assertEquals(colorCol.getValue(i), rows[i], "decoded getValue mismatch at doc " + i);

@@ -20,21 +20,20 @@ package org.apache.pinot.segment.local.segment.index.readers.vector;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
 import org.apache.pinot.segment.local.segment.index.vector.IvfPqIndexFormat;
-import org.apache.pinot.segment.local.segment.index.vector.IvfPqVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.vector.ProductQuantizer;
 import org.apache.pinot.segment.local.segment.index.vector.VectorQuantizationUtils;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ApproximateRadiusVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -74,26 +73,41 @@ public class IvfPqVectorIndexReader
   private final String _column;
   private final int _defaultNprobe;
   private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
+  // Backing buffer. Closed by this reader only when {@code _ownsBuffer} is true. Contents are
+  // heap-loaded at construction, so it is safe for the caller to retain ownership.
+  private final PinotDataBuffer _buffer;
+  private final boolean _ownsBuffer;
 
   /**
-   * Opens and loads an IVF_PQ index from disk.
-   *
-   * @param column the column name
-   * @param indexDir the segment index directory
-   * @param config vector index configuration
+   * Opens and loads an IVF_PQ index from the given buffer. The reader takes ownership of the
+   * buffer and closes it in {@link #close()}; use the four-arg overload to pass a borrowed
+   * buffer (e.g. one owned by the segment directory).
    */
-  public IvfPqVectorIndexReader(String column, File indexDir, VectorIndexConfig config) {
+  public IvfPqVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
+    this(column, buffer, config, /* ownsBuffer */ true);
+  }
+
+  /**
+   * Opens and loads an IVF_PQ index from the given buffer.
+   *
+   * @param column      the column name
+   * @param buffer      the IVF_PQ index buffer (mapped or in-memory)
+   * @param config      vector index configuration
+   * @param ownsBuffer  when {@code true}, the reader closes the buffer in {@link #close()} (or
+   *                    on constructor failure). Pass {@code false} when the buffer is owned by
+   *                    the segment directory (typed entry inside {@code columns.psf}).
+   */
+  public IvfPqVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config,
+      boolean ownsBuffer) {
     _column = column;
+    _buffer = buffer;
+    _ownsBuffer = ownsBuffer;
 
-    File indexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, column, config);
-    if (indexFile == null || !indexFile.exists()) {
-      throw new IllegalStateException(
-          "Failed to find IVF_PQ index file for column: " + column + " in dir: " + indexDir
-              + ". Expected file: " + column + IvfPqVectorIndexCreator.INDEX_FILE_EXTENSION);
-    }
-
+    // The reader takes ownership of the buffer. If construction throws (bad magic, EOF,
+    // unsupported format version, etc.), release the buffer here so the mmap doesn't leak —
+    // the caller never sees a reader instance to close.
     try {
-      IvfPqIndexFormat.IndexData indexData = IvfPqIndexFormat.read(indexFile);
+      IvfPqIndexFormat.IndexData indexData = IvfPqIndexFormat.read(buffer);
       _dimension = indexData.getDimension();
       _numVectors = indexData.getNumVectors();
       _nlist = indexData.getNlist();
@@ -135,8 +149,17 @@ public class IvfPqVectorIndexReader
       LOGGER.info("Loaded IVF_PQ index for column: {}: {} vectors, {} centroids, dim={}, pqM={}, pqNbits={}, "
               + "nprobe={}, distance={}", column, _numVectors, _nlist, _dimension, _pqM, _pqNbits, _defaultNprobe,
           _distanceFunction);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to load IVF_PQ index for column: " + column + " from file: " + indexFile, e);
+    } catch (Exception e) {
+      // Close the buffer to avoid leaking the mmap when the caller never receives a reader to
+      // close — but only if we own it. Borrowed buffers (segment-directory owned) are released
+      // by their owner.
+      if (_ownsBuffer) {
+        IvfCombinedBuffers.closeQuietly(_buffer);
+      }
+      if (e instanceof RuntimeException) {
+        throw (RuntimeException) e;
+      }
+      throw new RuntimeException("Failed to load IVF_PQ index for column: " + column, e);
     }
   }
 
@@ -358,6 +381,9 @@ public class IvfPqVectorIndexReader
   public void close()
       throws IOException {
     clearNprobe();
+    if (_ownsBuffer && _buffer != null) {
+      _buffer.close();
+    }
   }
 
   private int[] findClosestCentroids(float[] query, int n) {

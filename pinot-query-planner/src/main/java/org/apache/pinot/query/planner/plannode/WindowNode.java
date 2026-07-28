@@ -35,11 +35,12 @@ public class WindowNode extends BasePlanNode {
   // Integer.MAX_VALUE represents UNBOUNDED FOLLOWING which is only allowed for the upper bound (ensured by Calcite).
   private final int _lowerBound;
   private final int _upperBound;
+  private final WindowExclusion _exclude;
   private final List<RexExpression.Literal> _constants;
 
   public WindowNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, List<Integer> keys,
       List<RelFieldCollation> collations, List<RexExpression.FunctionCall> aggCalls, WindowFrameType windowFrameType,
-      int lowerBound, int upperBound, List<RexExpression.Literal> constants) {
+      int lowerBound, int upperBound, WindowExclusion exclude, List<RexExpression.Literal> constants) {
     super(stageId, dataSchema, nodeHint, inputs);
     _keys = keys;
     _collations = collations;
@@ -47,6 +48,7 @@ public class WindowNode extends BasePlanNode {
     _windowFrameType = windowFrameType;
     _lowerBound = lowerBound;
     _upperBound = upperBound;
+    _exclude = exclude;
     _constants = constants;
   }
 
@@ -74,6 +76,10 @@ public class WindowNode extends BasePlanNode {
     return _upperBound;
   }
 
+  public WindowExclusion getExclude() {
+    return _exclude;
+  }
+
   public List<RexExpression.Literal> getConstants() {
     return _constants;
   }
@@ -91,7 +97,7 @@ public class WindowNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new WindowNode(_stageId, _dataSchema, _nodeHint, inputs, _keys, _collations, _aggCalls, _windowFrameType,
-        _lowerBound, _upperBound, _constants);
+        _lowerBound, _upperBound, _exclude, _constants);
   }
 
   @Override
@@ -108,13 +114,14 @@ public class WindowNode extends BasePlanNode {
     WindowNode that = (WindowNode) o;
     return _lowerBound == that._lowerBound && _upperBound == that._upperBound && Objects.equals(_aggCalls,
         that._aggCalls) && Objects.equals(_keys, that._keys) && Objects.equals(_collations, that._collations)
-        && _windowFrameType == that._windowFrameType && Objects.equals(_constants, that._constants);
+        && _windowFrameType == that._windowFrameType && _exclude == that._exclude
+        && Objects.equals(_constants, that._constants);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _aggCalls, _keys, _collations, _windowFrameType, _lowerBound, _upperBound,
-        _constants);
+        _exclude, _constants);
   }
 
   /**
@@ -124,5 +131,19 @@ public class WindowNode extends BasePlanNode {
    */
   public enum WindowFrameType {
     ROWS, RANGE
+  }
+
+  /**
+   * Enum to denote the frame exclusion option (SQL standard {@code EXCLUDE} clause).
+   * {@link #NO_OTHERS} is the default and means no rows are excluded.
+   * {@link #CURRENT_ROW} excludes only the current row from the frame.
+   * {@link #GROUP} excludes the current row and all its ordering peers.
+   * {@link #TIES} excludes the ordering peers of the current row but keeps the current row.
+   *
+   * <p>The constant names are part of the wire protocol via {@code Plan.WindowExclusion} and must remain stable across
+   * mixed-version brokers and servers.
+   */
+  public enum WindowExclusion {
+    NO_OTHERS, CURRENT_ROW, GROUP, TIES
   }
 }

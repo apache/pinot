@@ -19,8 +19,8 @@
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
 import java.util.List;
-import org.apache.datasketches.theta.UpdateSketch;
-import org.apache.datasketches.theta.UpdateSketchBuilder;
+import org.apache.datasketches.theta.UpdatableThetaSketch;
+import org.apache.datasketches.theta.UpdatableThetaSketchBuilder;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
@@ -28,18 +28,18 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 /**
  * Aggregation strategy leveraging theta sketch algebra (unions/intersections).
  */
-class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdateSketch[]> {
-  final UpdateSketchBuilder _updateSketchBuilder;
+class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdatableThetaSketch[]> {
+  final UpdatableThetaSketchBuilder _updateSketchBuilder;
 
   public ThetaSketchAggregationStrategy(List<ExpressionContext> stepExpressions,
       List<ExpressionContext> correlateByExpressions, int nominalEntries) {
     super(stepExpressions, correlateByExpressions);
-    _updateSketchBuilder = new UpdateSketchBuilder().setNominalEntries(nominalEntries);
+    _updateSketchBuilder = new UpdatableThetaSketchBuilder().setNominalEntries(nominalEntries);
   }
 
   @Override
-  public UpdateSketch[] createAggregationResult(Dictionary dictionary) {
-    final UpdateSketch[] stepsSketches = new UpdateSketch[_numSteps];
+  public UpdatableThetaSketch[] createAggregationResult(Dictionary dictionary) {
+    final UpdatableThetaSketch[] stepsSketches = new UpdatableThetaSketch[_numSteps];
     for (int n = 0; n < _numSteps; n++) {
       stepsSketches[n] = _updateSketchBuilder.build();
     }
@@ -47,8 +47,8 @@ class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdateSketch[]>
   }
 
   @Override
-  public UpdateSketch[] createAggregationResultMultiKey(Dictionary[] dictionaries) {
-    final UpdateSketch[] stepsSketches = new UpdateSketch[_numSteps];
+  public UpdatableThetaSketch[] createAggregationResultMultiKey(Dictionary[] dictionaries) {
+    final UpdatableThetaSketch[] stepsSketches = new UpdatableThetaSketch[_numSteps];
     for (int n = 0; n < _numSteps; n++) {
       stepsSketches[n] = _updateSketchBuilder.build();
     }
@@ -56,8 +56,8 @@ class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdateSketch[]>
   }
 
   @Override
-  void add(Dictionary dictionary, UpdateSketch[] stepsSketches, int step, int correlationId) {
-    final UpdateSketch sketch = stepsSketches[step];
+  void add(Dictionary dictionary, UpdatableThetaSketch[] stepsSketches, int step, int correlationId) {
+    final UpdatableThetaSketch sketch = stepsSketches[step];
     switch (dictionary.getValueType()) {
       case INT:
         sketch.update(dictionary.getIntValue(correlationId));
@@ -82,7 +82,8 @@ class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdateSketch[]>
   }
 
   @Override
-  void addMultiKey(UpdateSketch[] stepsSketches, int step, Dictionary[] dictionaries, int[] correlationDictIds) {
+  void addMultiKey(UpdatableThetaSketch[] stepsSketches, int step, Dictionary[] dictionaries,
+      int[] correlationDictIds) {
     stepsSketches[step].update(DictIdsWrapper.toCompositeString(dictionaries, correlationDictIds));
   }
 }

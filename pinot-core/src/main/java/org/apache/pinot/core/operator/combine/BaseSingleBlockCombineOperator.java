@@ -60,13 +60,33 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   @Override
   protected BaseResultsBlock getNextBlock() {
     try {
-      startProcess();
-      return checkTerminateExceptionAndAttachExecutionStats(mergeResults());
+      return mergeResultsAndAttachExecutionStats();
     } catch (Exception e) {
-      return createExceptionResultsBlockAndAttachExecutionStats(e, "merging results blocks");
+      LOGGER.error("Caught exception while attaching execution stats (query: {})", _queryContext, e);
+      QueryErrorMessage errMsg =
+          QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL, "Caught exception while attaching execution stats");
+      return new ExceptionResultsBlock(errMsg);
+    }
+  }
+
+  /// Merges the results and waits for all worker threads to finish before attaching execution statistics.
+  private BaseResultsBlock mergeResultsAndAttachExecutionStats() {
+    BaseResultsBlock mergedBlock = null;
+    Exception mergeException = null;
+    try {
+      startProcess();
+      mergedBlock = mergeResults();
+    } catch (Exception e) {
+      mergeException = e;
     } finally {
+      // Wait for all worker threads to finish before reading execution stats. This ensures that no worker thread is
+      // still mutating operator state (e.g. _numDocsScanned) when attachExecutionStats() iterates over operators.
       stopProcess();
     }
+    if (mergeException != null) {
+      return createExceptionResultsBlockAndAttachExecutionStats(mergeException, "merging results blocks");
+    }
+    return checkTerminateExceptionAndAttachExecutionStats(mergedBlock);
   }
 
   @Override

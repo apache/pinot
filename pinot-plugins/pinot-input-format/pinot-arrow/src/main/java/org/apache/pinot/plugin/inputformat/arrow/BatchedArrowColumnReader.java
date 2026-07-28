@@ -22,43 +22,34 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.types.FloatingPointPrecision;
+import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * A {@link ColumnReader} over one column of a {@link BatchedArrowFileSource}. Reads are served by
- * delegating to a per-batch {@link ArrowColumnReader} over the current record batch's column vector;
- * the source loads at most one batch at a time, so peak resident memory is one batch (see
- * {@link BatchedArrowFileSource}).
- *
- * <p>Random access ({@code getXxx(docId)}) seeks to the owning batch and reads it; sequential access
- * ({@code next} / typed {@code nextXxx}) is built on it. Type predicates are derived from the column's
- * (decoded) Arrow {@link Field}, so they need no batch load. The column-major segment build consumes
- * each column to completion sequentially (rewind + next), one column at a time.
- *
- * <p>The per-batch delegate is invalidated when the shared source moves to another batch (whether
- * this reader advanced it or a different one did); {@link #delegate(int)} documents why and rebuilds
- * it. Interleaving readers therefore stays correct (it just re-loads batches); the build never
- * interleaves.
- *
- * <p>This class is not thread-safe. {@code @SuppressWarnings("serial")}: {@link ColumnReader} is
- * {@link java.io.Serializable} by SPI contract, but this reader holds non-serializable Arrow state
- * and is never serialized.
- */
-@SuppressWarnings("serial")
+/// A [ColumnReader] over one column of a [BatchedArrowFileSource]. Reads are served by delegating to a per-batch
+/// [ArrowColumnReader] over the current record batch's column vector; the source loads at most one batch at a time, so
+/// peak resident memory is one batch (see [BatchedArrowFileSource]).
+///
+/// Random access (`getXxx(docId)`) seeks to the owning batch and reads it. The value type is derived from the column's
+/// (decoded) Arrow [Field], so it needs no batch load. The column-major segment build consumes each column to
+/// completion (by ascending docId), one column at a time.
+///
+/// The per-batch delegate is invalidated when the shared source moves to another batch (whether this reader advanced
+/// it or a different one did); [#delegate(int)] documents why and rebuilds it. Interleaving readers therefore stays
+/// correct (it just re-loads batches); the build never interleaves.
+///
+/// This class is not thread-safe.
 public class BatchedArrowColumnReader implements ColumnReader {
-
   private final BatchedArrowFileSource _source;
   private final String _columnName;
   private final boolean _extractRawTimeValues;
   private final int _totalDocs;
   private final Field _effectiveField;
 
-  private int _nextDocId;
   private int _delegateBatchIdx = -1;
   private ArrowColumnReader _delegate;
 
@@ -70,173 +61,25 @@ public class BatchedArrowColumnReader implements ColumnReader {
     _effectiveField = source.effectiveField(columnName);
   }
 
-  // ---- sequential iteration (advance _nextDocId only after a successful read) ----
-
   @Override
-  public boolean hasNext() {
-    return _nextDocId < _totalDocs;
+  public String getColumnName() {
+    return _columnName;
   }
 
   @Override
   @Nullable
-  public Object next()
-      throws IOException {
-    requireHasNext();
-    Object value = getValue(_nextDocId);
-    _nextDocId++;
-    return value;
+  public PinotDataType getValueType() {
+    // Map the element type to the value type, mirroring ArrowColumnReader; the per-batch delegate serves the reads.
+    return ArrowToPinotTypeConverter.toValueType(Types.getMinorTypeForArrowType(elementType()),
+        !isList(_effectiveField.getType()));
   }
 
   @Override
-  public boolean isNextNull()
-      throws IOException {
-    requireHasNext();
-    // Peek; does not advance.
-    return isNull(_nextDocId);
+  public int getTotalDocs() {
+    return _totalDocs;
   }
 
-  @Override
-  public void skipNext()
-      throws IOException {
-    requireHasNext();
-    _nextDocId++;
-  }
-
-  @Override
-  public int nextInt()
-      throws IOException {
-    requireHasNext();
-    int value = getInt(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public long nextLong()
-      throws IOException {
-    requireHasNext();
-    long value = getLong(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public float nextFloat()
-      throws IOException {
-    requireHasNext();
-    float value = getFloat(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public double nextDouble()
-      throws IOException {
-    requireHasNext();
-    double value = getDouble(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public BigDecimal nextBigDecimal()
-      throws IOException {
-    requireHasNext();
-    BigDecimal value = getBigDecimal(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public String nextString()
-      throws IOException {
-    requireHasNext();
-    String value = getString(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public byte[] nextBytes()
-      throws IOException {
-    requireHasNext();
-    byte[] value = getBytes(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public MultiValueResult<int[]> nextIntMV()
-      throws IOException {
-    requireHasNext();
-    MultiValueResult<int[]> value = getIntMV(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public MultiValueResult<long[]> nextLongMV()
-      throws IOException {
-    requireHasNext();
-    MultiValueResult<long[]> value = getLongMV(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public MultiValueResult<float[]> nextFloatMV()
-      throws IOException {
-    requireHasNext();
-    MultiValueResult<float[]> value = getFloatMV(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public MultiValueResult<double[]> nextDoubleMV()
-      throws IOException {
-    requireHasNext();
-    MultiValueResult<double[]> value = getDoubleMV(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public BigDecimal[] nextBigDecimalMV()
-      throws IOException {
-    requireHasNext();
-    BigDecimal[] value = getBigDecimalMV(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public String[] nextStringMV()
-      throws IOException {
-    requireHasNext();
-    String[] value = getStringMV(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public byte[][] nextBytesMV()
-      throws IOException {
-    requireHasNext();
-    byte[][] value = getBytesMV(_nextDocId);
-    _nextDocId++;
-    return value;
-  }
-
-  @Override
-  public void rewind() {
-    _nextDocId = 0;
-    _delegateBatchIdx = -1;
-    _delegate = null;
-  }
-
-  // ---- random access (seeks to the owning batch) ----
-
+  // Random access seeks to the owning batch and reads it.
   @Override
   public boolean isNull(int docId) {
     checkBounds(docId);
@@ -247,6 +90,17 @@ public class BatchedArrowColumnReader implements ColumnReader {
       throw new RuntimeException("Failed reading column " + _columnName + " at doc " + docId, e);
     }
   }
+
+  @Override
+  @Nullable
+  public Object getValue(int docId)
+      throws IOException {
+    checkBounds(docId);
+    int batchIdx = _source.batchIndexForDoc(docId);
+    return delegate(batchIdx).getValue(localRow(docId, batchIdx));
+  }
+
+  // Single-value accessors
 
   @Override
   public int getInt(int docId)
@@ -304,14 +158,7 @@ public class BatchedArrowColumnReader implements ColumnReader {
     return delegate(batchIdx).getBytes(localRow(docId, batchIdx));
   }
 
-  @Override
-  @Nullable
-  public Object getValue(int docId)
-      throws IOException {
-    checkBounds(docId);
-    int batchIdx = _source.batchIndexForDoc(docId);
-    return delegate(batchIdx).getValue(localRow(docId, batchIdx));
-  }
+  // Multi-value accessors
 
   @Override
   public MultiValueResult<int[]> getIntMV(int docId)
@@ -369,73 +216,6 @@ public class BatchedArrowColumnReader implements ColumnReader {
     return delegate(batchIdx).getBytesMV(localRow(docId, batchIdx));
   }
 
-  // ---- metadata / type predicates (derived from the schema field, no batch load) ----
-
-  @Override
-  public String getColumnName() {
-    return _columnName;
-  }
-
-  @Override
-  public int getTotalDocs() {
-    return _totalDocs;
-  }
-
-  @Override
-  public boolean isSingleValue() {
-    return !isList(_effectiveField.getType());
-  }
-
-  @Override
-  public boolean isInt() {
-    ArrowType type = elementType();
-    return (type instanceof ArrowType.Int && ((ArrowType.Int) type).getBitWidth() == 32)
-        || type instanceof ArrowType.Bool;
-  }
-
-  @Override
-  public boolean isLong() {
-    ArrowType type = elementType();
-    return type instanceof ArrowType.Int && ((ArrowType.Int) type).getBitWidth() == 64;
-  }
-
-  @Override
-  public boolean isFloat() {
-    ArrowType type = elementType();
-    return type instanceof ArrowType.FloatingPoint
-        && ((ArrowType.FloatingPoint) type).getPrecision() == FloatingPointPrecision.SINGLE;
-  }
-
-  @Override
-  public boolean isDouble() {
-    ArrowType type = elementType();
-    return type instanceof ArrowType.FloatingPoint
-        && ((ArrowType.FloatingPoint) type).getPrecision() == FloatingPointPrecision.DOUBLE;
-  }
-
-  @Override
-  public boolean isBigDecimal() {
-    return elementType() instanceof ArrowType.Decimal;
-  }
-
-  @Override
-  public boolean isString() {
-    return elementType() instanceof ArrowType.Utf8;
-  }
-
-  @Override
-  public boolean isBytes() {
-    return elementType() instanceof ArrowType.Binary;
-  }
-
-  @Override
-  public void close() {
-    // The shared BatchedArrowFileSource owns the file, reader, and allocator; the owning factory
-    // closes it. Closing one column reader must not tear down the source the others still use.
-  }
-
-  // ---- helpers ----
-
   private ArrowColumnReader delegate(int batchIdx)
       throws IOException {
     // Rebuild the per-batch delegate when this reader advances to a new batch, OR when the shared
@@ -461,12 +241,6 @@ public class BatchedArrowColumnReader implements ColumnReader {
     }
   }
 
-  private void requireHasNext() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-  }
-
   private ArrowType elementType() {
     Field field = _effectiveField;
     if (isList(field.getType())) {
@@ -478,5 +252,11 @@ public class BatchedArrowColumnReader implements ColumnReader {
   private static boolean isList(ArrowType type) {
     return type instanceof ArrowType.List || type instanceof ArrowType.LargeList
         || type instanceof ArrowType.FixedSizeList;
+  }
+
+  @Override
+  public void close() {
+    // The shared BatchedArrowFileSource owns the file, reader, and allocator; the owning factory
+    // closes it. Closing one column reader must not tear down the source the others still use.
   }
 }

@@ -20,6 +20,8 @@ package org.apache.pinot.segment.spi;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
@@ -36,6 +38,15 @@ public interface ColumnMetadata extends ColumnShape {
 
   /// Returns the forward-index encoding for this column.
   EncodingType getForwardIndexEncoding();
+
+  /// Returns `true` when this column is known to contain no null values: null handling is enabled and no nulls were
+  /// found, so no null value vector bitmap file is written. This is the only signal that distinguishes such a column
+  /// from one that was never null-handled (both lack a bitmap file). A column that does have null values carries a
+  /// bitmap file instead and is not flagged. Defaults to `false` for segments created before this flag was introduced
+  /// (`false` therefore does not assert the presence of nulls).
+  default boolean isNonNull() {
+    return false;
+  }
 
   /// Returns `true` when both min and max value are invalid, and there is no need to regenerate them.
   boolean isMinMaxValueInvalid();
@@ -63,5 +74,24 @@ public interface ColumnMetadata extends ColumnShape {
   @Deprecated(since = "1.6.0", forRemoval = true)
   default int getColumnMaxLength() {
     return getLengthOfLongestElement();
+  }
+
+  /// Returns serialized value bytes presented to the raw forward-index chunk compressor, or [#UNAVAILABLE].
+  @JsonIgnore
+  default long getRawForwardIndexUncompressedValueSizeInBytes() {
+    return UNAVAILABLE;
+  }
+
+  /// Returns the chunk compression type used by this column's raw forward index, or null when unavailable.
+  @JsonIgnore
+  @Nullable
+  default ChunkCompressionType getRawForwardIndexChunkCompressionType() {
+    return null;
+  }
+
+  /// Uncompressed serialized column-value bytes for dictionary encoding. Returns [#UNAVAILABLE] if absent.
+  @JsonIgnore
+  default long getDictionaryEncodedUncompressedValueSizeInBytes() {
+    return UNAVAILABLE;
   }
 }

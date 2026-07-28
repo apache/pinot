@@ -40,7 +40,9 @@ message PlanNode {
     ValueNode valueNode = 14;
     WindowNode windowNode = 15;
     ExplainNode explainNode = 16;
-    EnrichedJoinNode enrichedJoinNode = 17;
+    // Deprecated: enriched joins have been removed. Field 17 is retained (never reused) so that plans
+    // serialized by an older-version broker can still be deserialized. No current broker sets this field.
+    EnrichedJoinNode enrichedJoinNode = 17 [deprecated = true];
     UnnestNode unnestNode = 18;
   }
 }
@@ -65,6 +67,13 @@ enum AggType {
   FINAL = 3;
 }
 
+// One grouping set of a GROUP BY GROUPING SETS / ROLLUP / CUBE aggregate: the indexes into
+// AggregateNode.groupKeys (the union of all grouping columns) that participate in (are grouped by) the set.
+// An empty list is the grand-total set ().
+message GroupingSet {
+  repeated int32 groupKeyIndexes = 1;
+}
+
 message AggregateNode {
   repeated FunctionCall aggCalls = 1;
   repeated int32 filterArgs = 2;
@@ -73,6 +82,15 @@ message AggregateNode {
   bool leafReturnFinalResult = 5;
   repeated Collation collations = 6;
   int32 limit = 7;
+  // GROUP BY GROUPING SETS / ROLLUP / CUBE: one entry per grouping set, in plan order; a set's position in
+  // this list is its ordinal, carried as the synthetic $groupingId discriminator, so the number of grouping
+  // columns is unlimited (mirroring Calcite's per-set column bitset). Empty for a plain GROUP BY.
+  // Rolling upgrade: a server that predates this field ignores it and runs a plain GROUP BY, returning results
+  // without the $groupingId column the final stage expects. The leaf-to-final reconciliation is positional (by
+  // column type, not name), so this is NOT rejected cleanly — it surfaces as an opaque error or as silently
+  // collapsed/wrong results (missing subtotal/grand-total rows). Upgrade all servers before issuing grouping-set
+  // queries.
+  repeated GroupingSet groupingSets = 8;
 }
 
 message FilterNode {
@@ -121,7 +139,10 @@ message FilterProjectRex {
   optional ProjectAndResultSchema projectAndResultSchema = 3;
 }
 
+// Deprecated: enriched joins have been removed. Retained only so plans from an older-version broker
+// can still be deserialized. No current broker produces this message.
 message EnrichedJoinNode {
+  option deprecated = true;
   JoinType joinType = 1;
   repeated int32 leftKeys = 2;
   repeated int32 rightKeys = 3;
@@ -248,6 +269,15 @@ enum WindowFrameType {
   RANGE = 1;
 }
 
+// SQL standard `<window exclusion>` clause. Names are wire-stable; renumbering breaks mixed-version brokers/servers.
+// `EXCLUDE_NO_OTHERS = 0` so that nodes serialized before this field existed deserialize to the default behavior.
+enum WindowExclusion {
+  EXCLUDE_NO_OTHERS = 0;
+  EXCLUDE_CURRENT_ROW = 1;
+  EXCLUDE_GROUP = 2;
+  EXCLUDE_TIES = 3;
+}
+
 message WindowNode {
   repeated int32 keys = 1;
   repeated Collation collations = 2;
@@ -256,6 +286,7 @@ message WindowNode {
   int32 lowerBound = 5;
   int32 upperBound = 6;
   repeated Literal constants = 7;
+  WindowExclusion exclude = 8;
 }
 
 // A node that doesn't carry semantic information.

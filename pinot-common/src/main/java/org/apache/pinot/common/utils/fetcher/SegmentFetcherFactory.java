@@ -196,4 +196,14 @@ public class SegmentFetcherFactory {
       crypter.decrypt(tempDownloadedFile, dest);
     }
   }
+
+  /**
+   * Fetches a segment from any uri in the given supplier's list, and untars it to local in a streamed manner.
+   */
+  public static File fetchAndStreamUntarToLocal(String segmentName, String scheme, Supplier<List<URI>> uriSupplier,
+      File dest, long maxStreamRateInByte)
+      throws Exception {
+    return getSegmentFetcher(scheme).fetchUntarSegmentToLocalStreamed(segmentName, uriSupplier, dest,
+        maxStreamRateInByte);
+  }
 }

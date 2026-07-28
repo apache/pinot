@@ -58,15 +58,10 @@ public class StreamConfigProperties {
    * @deprecated because the property key is confusing (says size but is actually rows). Use
    * {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS}
    *
-   * Row count flush threshold for realtime segments. This behaves in a similar way for HLC and LLC. For HLC,
-   * since there is only one consumer per server, this size is used as the size of the consumption buffer and
-   * determines after how many rows we flush to disk. For example, if this threshold is set to two million rows,
-   * then a high level consumer would have a buffer size of two million.
-   *
-   * For LLC, this size is divided across all the segments assigned to a given server and is set on a per segment
-   * basis. Assuming a low level consumer server is assigned four stream partitions to consume from and a flush
-   * size of two million, then each consuming segment would have a flush size of five hundred thousand rows, for a
-   * total of two million rows in memory.
+   * Row count flush threshold for realtime segments. This size is divided across all the segments assigned to a given
+   * server and is set on a per segment basis. Assuming a server is assigned four stream partitions to consume from and
+   * a flush size of two million, then each consuming segment would have a flush size of five hundred thousand rows, for
+   * a total of two million rows in memory.
    *
    * Keep in mind that this NOT a hard threshold, as other tables can also be assigned to this server, and that in
    * certain conditions (eg. if the number of servers, replicas of partitions changes) where partition

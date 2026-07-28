@@ -73,6 +73,24 @@ public class V1Constants {
     public static final String VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".vector.hnsw.mapping";
     public static final String VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION = ".vector.ivfflat.index";
     public static final String VECTOR_IVF_PQ_INDEX_FILE_EXTENSION = ".vector.ivfpq.index";
+    /**
+     * Combined-form IVF file extensions. Written by the IVF creators when
+     * {@code VectorIndexConfig.storeInSegmentFile} is {@code true}; consumed (and removed) by the
+     * V2→V3 format converter, which packs the bytes into {@code columns.psf} as a typed entry via
+     * the standard {@code copyIndexIfExists} loop. Mirrors the text-index {@code .text.index}
+     * extension that signals "ready to be consolidated into the combined segment file."
+     */
+    public static final String VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION = ".vector.ivfflat.combined.index";
+    public static final String VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION = ".vector.ivfpq.combined.index";
+    /**
+     * Combined-form HNSW file — packs the Lucene HNSW directory's files (and the optional docId
+     * mapping file) into a single file using the same LUCENE_V2 layout the text index uses.
+     * Build-time transient: the V2→V3 converter packs it into {@code columns.psf} and removes the
+     * sibling. At read time the bytes are exposed as a Lucene {@code Directory} backed by a
+     * {@code PinotDataBuffer} slice, so {@code KnnVectorsReader} works against the consolidated
+     * entry without re-extracting to disk.
+     */
+    public static final String VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION = ".vector.hnsw.combined.index";
   }
 
   public static class MetadataKeys {
@@ -143,6 +161,12 @@ public class V1Constants {
       public static final String FORWARD_INDEX_ENCODING = "forwardIndexEncoding";
       // Mandatory, treated as `false` when missing for backward compatibility
       public static final String IS_SORTED = "isSorted";
+      // Optional, treated as `false` when missing for backward compatibility. Set to `true` only when null handling is
+      // enabled for the column but it has no null values, so the null value vector bitmap file is skipped. This
+      // distinguishes "null handling applied, no nulls" (flag set, no bitmap file) from "null handling never applied"
+      // (no flag, no bitmap file) — which absence of the bitmap file alone cannot. Columns that do have null values
+      // are identified by the presence of the bitmap file and are not flagged.
+      public static final String IS_NON_NULL = "isNonNull";
       // Optional
       public static final String MIN_VALUE = "minValue";
       // Optional
@@ -197,6 +221,14 @@ public class V1Constants {
       public static final String TOTAL_DOCS = "totalDocs";
 
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
+      /// Optional uncompressed serialized column-value bytes for a raw forward index.
+      public static final String FORWARD_INDEX_RAW_UNCOMPRESSED_VALUE_SIZE_IN_BYTES =
+          "forwardIndex.rawUncompressedValueSizeInBytes";
+      public static final String FORWARD_INDEX_RAW_CHUNK_COMPRESSION_TYPE =
+          "forwardIndex.rawChunkCompressionType";
+      /// Uncompressed serialized column-value bytes for dictionary encoding, written at seal time.
+      public static final String FORWARD_INDEX_DICTIONARY_ENCODED_UNCOMPRESSED_VALUE_SIZE_IN_BYTES =
+          "forwardIndex.dictionaryEncodedUncompressedValueSizeInBytes";
 
       public static String getKeyFor(String column, String key) {
         return COLUMN_PROPS_KEY_PREFIX + column + "." + key;

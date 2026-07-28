@@ -3062,7 +3062,7 @@ public class WindowAggregateOperatorTest {
       MultiStageOperator input) {
     return new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), input, inputSchema,
         new WindowNode(-1, resultSchema, nodeHint, List.of(), keys, collations, aggCalls, windowFrameType, lowerBound,
-            upperBound, List.of()));
+            upperBound, WindowNode.WindowExclusion.NO_OTHERS, List.of()));
   }
 
   private WindowAggregateOperator getOperator(DataSchema inputSchema, DataSchema resultSchema, List<Integer> keys,

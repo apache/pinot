@@ -21,10 +21,16 @@ package org.apache.pinot.common.function;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.jayway.jsonpath.InvalidJsonException;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
@@ -453,6 +459,40 @@ public class JsonFunctionsTest {
       throws JsonProcessingException {
     String value = JsonFunctions.jsonPathString(JsonUtils.objectToString(map), path, expected);
     assertEquals(value, expected);
+  }
+
+  @Test
+  public void testJsonPathStringOnExtractedValues()
+      throws JsonProcessingException {
+    // A value resolved from an already-parsed record tree (not a JSON string) keeps its runtime Java type.
+    // UUID / LocalDate / LocalTime are non-JSON-native scalars a record extractor can materialize; they render
+    // as their natural unquoted string, never wrapped in JSON string quotes.
+    UUID uuid = UUID.fromString("657ae8f8-b702-3cf4-9a05-300348c1623e");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", uuid), "$.v"), "657ae8f8-b702-3cf4-9a05-300348c1623e");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", uuid), "$.v", "default"),
+        "657ae8f8-b702-3cf4-9a05-300348c1623e");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", LocalDate.of(2026, 7, 20)), "$.v"), "2026-07-20");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", LocalTime.of(19, 54, 37)), "$.v"), "19:54:37");
+
+    // The fast-path variants share the same rendering helper and must produce identical results.
+    assertEquals(JsonFunctions.jsonPathStringFast(Map.of("v", uuid), "$.v", "default"),
+        "657ae8f8-b702-3cf4-9a05-300348c1623e");
+    assertEquals(JsonFunctions.jsonPathStringFirstMatch(Map.of("v", LocalDate.of(2026, 7, 20)), "$.v", "default"),
+        "2026-07-20");
+
+    // Numbers, Boolean, and Map / List / Set containers follow the json-path-to-string behavior of
+    // jsonExtractScalar (i.e. JsonUtils.objectToString), so a scalar number is unquoted and a container is JSON.
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", 42), "$.v"), "42");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", 1.5d), "$.v"), "1.5");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", new BigDecimal("123.45")), "$.v"), "123.45");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", true), "$.v"), "true");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", Map.of("k", "w")), "$.v"), "{\"k\":\"w\"}");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", List.of(1, 2, 3)), "$.v"), "[1,2,3]");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", Set.of("x")), "$.v"), "[\"x\"]");
+
+    // Timestamp follows objectToString (portable epoch millis), not its timezone-dependent JDBC toString form.
+    Timestamp timestamp = new Timestamp(1000L);
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", timestamp), "$.v"), JsonUtils.objectToString(timestamp));
   }
 
   @DataProvider

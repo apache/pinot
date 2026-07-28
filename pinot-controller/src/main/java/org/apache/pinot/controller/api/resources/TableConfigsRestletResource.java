@@ -455,7 +455,7 @@ public class TableConfigsRestletResource {
   @ManualAuthorization // performed after parsing TableConfigs
   public String validateConfig(String tableConfigsStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
-          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
+          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
@@ -479,7 +479,7 @@ public class TableConfigsRestletResource {
   @ManualAuthorization // performed after parsing TableConfigs
   public String tuneConfig(String tableConfigsStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
-          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
+          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
@@ -515,8 +515,10 @@ public class TableConfigsRestletResource {
     tableConfigs.setTableName(rawTableName);
 
     // Cluster-aware validations are exclusive to the validate/tune pre-flight endpoints so that users get fail-fast
-    // feedback on tenant/minion/active-task issues without re-running them in the create/update paths (which already
-    // perform the equivalent checks inline or via PinotHelixResourceManager).
+    // feedback on tenant/minion issues without re-running them in the create/update paths (which already perform the
+    // equivalent checks inline or via PinotHelixResourceManager). Active-task validation is intentionally excluded
+    // here: it applies only on the create/update path (gated by the ignoreActiveTasks flag) so that validate/tune of an
+    // existing table with running tasks is not blocked.
     Set<TableConfigUtils.ValidationType> skipTypes = TableConfigUtils.parseTypesToSkipString(typesToSkip);
     try {
       if (tableConfigs.getOffline() != null) {
@@ -552,9 +554,6 @@ public class TableConfigsRestletResource {
     }
     if (!skipTypes.contains(TableConfigUtils.ValidationType.MINION_INSTANCES)) {
       _pinotHelixResourceManager.validateTableTaskMinionInstanceTagConfig(tableConfig);
-    }
-    if (!skipTypes.contains(TableConfigUtils.ValidationType.ACTIVE_TASKS)) {
-      PinotTableRestletResource.tableTasksValidation(tableConfig, _pinotHelixTaskResourceManager);
     }
   }
 
