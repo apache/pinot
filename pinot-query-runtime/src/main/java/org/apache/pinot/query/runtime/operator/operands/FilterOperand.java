@@ -196,9 +196,10 @@ public abstract class FilterOperand implements TransformOperand {
 
       ColumnDataType lhsType = _lhs.getResultType();
       ColumnDataType rhsType = _rhs.getResultType();
-      Preconditions.checkArgument(lhsType.supportsOrdering() && rhsType.supportsOrdering(),
+      Preconditions.checkArgument((lhsType == ColumnDataType.UNKNOWN || lhsType.supportsOrdering())
+              && (rhsType == ColumnDataType.UNKNOWN || rhsType.supportsOrdering()),
           "Raw VARIANT values do not support comparison; extract a typed path with variantGet first");
-      if (lhsType == rhsType) {
+      if (lhsType == ColumnDataType.UNKNOWN || rhsType == ColumnDataType.UNKNOWN || lhsType == rhsType) {
         _requireCasting = false;
         _commonCastType = null;
       } else {
