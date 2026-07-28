@@ -19,20 +19,26 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistributions;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.LogicalAsofJoin;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 
 
 /**
@@ -79,6 +85,17 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       Preconditions.checkArgument(rightDistributionType == null,
           "Right distribution type hint is not supported for lookup join");
       newRight = right;
+    } else if (PinotHintOptions.JoinHintOptions.useSortedMergeJoinStrategy(join)) {
+      Preconditions.checkArgument(!joinInfo.leftKeys.isEmpty(), "Sorted merge join requires equi-join keys");
+      // The merge join needs both inputs hash-distributed on the join keys so that matching keys meet on the same
+      // worker. A distribution type hint would silently break that (broadcast in particular), so reject it rather
+      // than ignore it, mirroring how the lookup join branch rejects a right distribution type hint.
+      Preconditions.checkArgument(leftDistributionType == null && rightDistributionType == null,
+          "Distribution type hints are not supported for sorted merge join");
+      // Force pre-partitioned exchange when colocated join hint is provided
+      Boolean prePartitioned = PinotHintOptions.JoinHintOptions.isColocatedByJoinKeys(join);
+      newLeft = createSortExchangeForMergeJoin(joinInfo.leftKeys, left, prePartitioned);
+      newRight = createSortExchangeForMergeJoin(joinInfo.rightKeys, right, prePartitioned);
     } else if (joinInfo.leftKeys.isEmpty() && join.getJoinType() == JoinRelType.FULL
         && leftDistributionType == null && rightDistributionType == null) {
       // FULL OUTER JOIN with no equi keys: use hash with empty key to explicitly route all data to one destination.
@@ -174,5 +191,18 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       default:
         throw new IllegalArgumentException("Unsupported distribution type: " + distributionType + " for hash join");
     }
+  }
+
+  private static RelNode createSortExchangeForMergeJoin(List<Integer> joinKeys, RelNode input,
+      @Nullable Boolean prePartitioned) {
+    List<RelFieldCollation> fieldCollations = new ArrayList<>(joinKeys.size());
+    for (int key : joinKeys) {
+      fieldCollations.add(new RelFieldCollation(key, RelFieldCollation.Direction.ASCENDING,
+          RelFieldCollation.NullDirection.LAST));
+    }
+    RelCollation collation = RelCollations.of(fieldCollations);
+    RelNode sortedInput = LogicalSort.create(input, collation, null, null);
+    return PinotLogicalSortExchange.create(sortedInput, RelDistributions.hash(joinKeys), collation, true, false,
+        prePartitioned);
   }
 }
