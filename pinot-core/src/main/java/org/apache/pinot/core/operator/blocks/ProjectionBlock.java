@@ -67,7 +67,7 @@ public class ProjectionBlock implements ValueBlock {
     // ColumnValueReader surface as an NPE.
     if (dataSource instanceof OpenStructDataSource) {
       throw new BadQueryRequestException(
-          "OPEN_STRUCT column: " + column + " cannot be selected directly; use item(" + column + ", 'key')");
+          "OPEN_STRUCT column: " + column + " cannot be selected directly; use " + column + "['key']");
     }
     return new ProjectionBlockValSet(_dataBlockCache, column, dataSource);
   }

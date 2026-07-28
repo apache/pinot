@@ -71,7 +71,7 @@ public class ProjectionBlockOpenStructTest {
 
   /**
    * Regression: registering the OPEN_STRUCT parent with the DataFetcher tripped its forward-index precondition, so
-   * every {@code SELECT item(metrics, 'key')} failed at ProjectionOperator construction with
+   * every {@code SELECT metrics['key']} failed at ProjectionOperator construction with
    * "Forward index disabled for column: metrics, cannot create DataFetcher!".
    */
   @Test
@@ -132,8 +132,8 @@ public class ProjectionBlockOpenStructTest {
   }
 
   /**
-   * Selecting the parent column itself is not supported. It must fail as a bad request naming the column rather than
-   * an NPE from the reader the DataFetcher never registered.
+   * Selecting the parent column itself is not supported. It must fail as a bad request pointing at the per-key syntax
+   * rather than an NPE from the reader the DataFetcher never registered.
    */
   @Test
   public void testSelectingOpenStructParentFailsWithClearMessage() {
@@ -144,6 +144,6 @@ public class ProjectionBlockOpenStructTest {
 
     BadQueryRequestException e =
         expectThrows(BadQueryRequestException.class, () -> projectionBlock.getBlockValueSet(OPEN_STRUCT_COLUMN));
-    assertTrue(e.getMessage().contains(OPEN_STRUCT_COLUMN), e.getMessage());
+    assertTrue(e.getMessage().contains(OPEN_STRUCT_COLUMN + "['key']"), e.getMessage());
   }
 }
