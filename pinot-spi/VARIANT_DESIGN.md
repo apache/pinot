@@ -281,6 +281,10 @@ preserve the distinction among SQL null, Variant null, and the Variant string `"
 
 There is no type negotiation or safe downgrade to `BYTES`. An old node can read
 existing non-Variant traffic, but it cannot plan or execute an active Variant query.
+The rolling-upgrade compatibility suite exercises both directions: a new broker proves
+legacy plans still work against old servers and observes the deterministic
+`UNRECOGNIZED` error for a leaf plan containing `VARIANT`, while an old broker
+continues sending legacy plans to upgraded servers.
 
 ## 9. Deployment and rollback
 
@@ -308,12 +312,14 @@ to activate. The review dependency order is:
 2. schema/table/index validation and Parquet ingestion;
 3. function semantics plus single-stage and multi-stage guards;
 4. DDL, response, Java, JDBC, gRPC, JSON, and Arrow propagation; and
-5. quickstart, integration tests, compatibility tests, and benchmarks.
+5. quickstart, integration tests, and compatibility tests.
 
 The initial implementation is presented as one end-to-end draft so reviewers can
-evaluate one activation contract and run one acceptance test. It is not merge-ready
-until SPI/wire, Parquet, both query engines, and client/response owners approve their
-areas. If maintainers prefer independent rollback units, the five groups above form a
+evaluate one activation contract and run one acceptance test. Performance benchmarks
+are intentionally kept in a follow-up change so they do not couple the activation
+contract to optional tooling. This change is not merge-ready until SPI/wire, Parquet,
+both query engines, and client/response owners approve their areas. If maintainers
+prefer additional independent rollback units, the five groups above form a
 dependency-ordered PR stack; every intermediate PR must compile, keep Variant
 unactivatable until the safety guards land, and preserve the permanent wire allocation.
 

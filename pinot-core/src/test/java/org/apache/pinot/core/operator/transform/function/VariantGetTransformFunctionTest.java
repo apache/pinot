@@ -36,6 +36,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.VariantEnvelope;
 import org.roaringbitmap.RoaringBitmap;
@@ -198,6 +199,40 @@ public class VariantGetTransformFunctionTest {
   }
 
   @Test
+  public void testMissingPathUsesTypedNullPlaceholders() {
+    byte[] variant = VariantUtils.parseJsonToVariant("{}");
+    ValueBlock block = valueBlock(1);
+
+    VariantGetTransformFunction function = typedFunction(variant, "$.missing", "INT");
+    assertEquals(function.transformToIntValuesSV(block)[0], NullValuePlaceHolder.INT);
+    assertEquals(function.getNullBitmap(block), RoaringBitmap.bitmapOf(0));
+
+    function = typedFunction(variant, "$.missing", "LONG");
+    assertEquals(function.transformToLongValuesSV(block)[0], NullValuePlaceHolder.LONG);
+    assertEquals(function.getNullBitmap(block), RoaringBitmap.bitmapOf(0));
+
+    function = typedFunction(variant, "$.missing", "FLOAT");
+    assertEquals(function.transformToFloatValuesSV(block)[0], NullValuePlaceHolder.FLOAT);
+    assertEquals(function.getNullBitmap(block), RoaringBitmap.bitmapOf(0));
+
+    function = typedFunction(variant, "$.missing", "DOUBLE");
+    assertEquals(function.transformToDoubleValuesSV(block)[0], NullValuePlaceHolder.DOUBLE);
+    assertEquals(function.getNullBitmap(block), RoaringBitmap.bitmapOf(0));
+
+    function = typedFunction(variant, "$.missing", "BIG_DECIMAL");
+    assertEquals(function.transformToBigDecimalValuesSV(block)[0], NullValuePlaceHolder.BIG_DECIMAL);
+    assertEquals(function.getNullBitmap(block), RoaringBitmap.bitmapOf(0));
+
+    function = typedFunction(variant, "$.missing", "STRING");
+    assertEquals(function.transformToStringValuesSV(block)[0], NullValuePlaceHolder.STRING);
+    assertEquals(function.getNullBitmap(block), RoaringBitmap.bitmapOf(0));
+
+    function = typedFunction(variant, "$.missing", "BYTES");
+    assertEquals(function.transformToBytesValuesSV(block)[0], NullValuePlaceHolder.BYTES);
+    assertEquals(function.getNullBitmap(block), RoaringBitmap.bitmapOf(0));
+  }
+
+  @Test
   public void testVariantExtractionIsCachedPerBlock() {
     byte[] variant = VariantUtils.parseJsonToVariant("{\"eventType\":\"click\"}");
     BytesTransformFunction input = new BytesTransformFunction(new byte[][]{variant}, null);
@@ -353,8 +388,12 @@ public class VariantGetTransformFunctionTest {
   }
 
   private static VariantGetTransformFunction typedFunction(byte[] variant, String targetType) {
+    return typedFunction(variant, "$", targetType);
+  }
+
+  private static VariantGetTransformFunction typedFunction(byte[] variant, String path, String targetType) {
     VariantGetTransformFunction function = new VariantGetTransformFunction();
-    function.init(arguments(new BytesTransformFunction(new byte[][]{variant}, null), "$", targetType), Map.of(), true);
+    function.init(arguments(new BytesTransformFunction(new byte[][]{variant}, null), path, targetType), Map.of(), true);
     return function;
   }
 

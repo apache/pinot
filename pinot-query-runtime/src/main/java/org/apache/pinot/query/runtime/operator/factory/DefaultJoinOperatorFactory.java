@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.query.runtime.operator.factory;
 
-import com.google.common.base.Preconditions;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.validation.JoinKeyTypeValidator;
 import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LookupJoinOperator;
@@ -40,7 +39,7 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
     JoinNode.JoinStrategy joinStrategy = joinNode.getJoinStrategy();
     DataSchema leftSchema = leftPlanNode.getDataSchema();
     DataSchema rightSchema = rightPlanNode.getDataSchema();
-    validateJoinKeys(joinNode, leftSchema, rightSchema);
+    JoinKeyTypeValidator.validate(joinNode, leftSchema, rightSchema);
     switch (joinStrategy) {
       case HASH:
         if (joinNode.getLeftKeys().isEmpty()) {
@@ -55,28 +54,6 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
         return new AsofJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
       default:
         throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
-    }
-  }
-
-  private static void validateJoinKeys(JoinNode joinNode, DataSchema leftSchema, DataSchema rightSchema) {
-    for (int leftKey : joinNode.getLeftKeys()) {
-      DataSchema.ColumnDataType dataType = leftSchema.getColumnDataType(leftKey);
-      Preconditions.checkArgument(dataType.supportsEquality() && dataType.supportsHashing(),
-          "Raw VARIANT values do not support JOIN keys; extract a typed path with variantGet first");
-    }
-    for (int rightKey : joinNode.getRightKeys()) {
-      DataSchema.ColumnDataType dataType = rightSchema.getColumnDataType(rightKey);
-      Preconditions.checkArgument(dataType.supportsEquality() && dataType.supportsHashing(),
-          "Raw VARIANT values do not support JOIN keys; extract a typed path with variantGet first");
-    }
-    if (joinNode.getJoinStrategy() == JoinNode.JoinStrategy.ASOF) {
-      RexExpression.FunctionCall matchCondition = (RexExpression.FunctionCall) joinNode.getMatchCondition();
-      int leftMatchKey = ((RexExpression.InputRef) matchCondition.getFunctionOperands().get(0)).getIndex();
-      int rightMatchKey =
-          ((RexExpression.InputRef) matchCondition.getFunctionOperands().get(1)).getIndex() - leftSchema.size();
-      Preconditions.checkArgument(leftSchema.getColumnDataType(leftMatchKey).supportsOrdering()
-              && rightSchema.getColumnDataType(rightMatchKey).supportsOrdering(),
-          "Raw VARIANT values do not support ASOF JOIN match keys; extract a typed path with variantGet first");
     }
   }
 
