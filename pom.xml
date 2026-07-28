@@ -59,6 +59,7 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
+    <module>pinot-java11-client-verifier</module>
     <module>pinot-query-planner-spi</module>
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
