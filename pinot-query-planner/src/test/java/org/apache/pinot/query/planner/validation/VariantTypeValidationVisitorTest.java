@@ -95,7 +95,7 @@ public class VariantTypeValidationVisitorTest {
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
     QueryException exception = Assert.expectThrows(QueryException.class,
         () -> asofJoin(leftVariant, rightTyped).visit(VariantTypeValidationVisitor.INSTANCE, null));
-    Assert.assertTrue(exception.getMessage().contains("ASOF JOIN MATCH_CONDITION"));
+    Assert.assertTrue(exception.getMessage().contains("Raw VARIANT values do not support ASOF JOIN match keys"));
 
     DataSchema leftTyped = new DataSchema(new String[]{"key", "match"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
@@ -103,7 +103,7 @@ public class VariantTypeValidationVisitorTest {
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.VARIANT});
     exception = Assert.expectThrows(QueryException.class,
         () -> asofJoin(leftTyped, rightVariant).visit(VariantTypeValidationVisitor.INSTANCE, null));
-    Assert.assertTrue(exception.getMessage().contains("ASOF JOIN MATCH_CONDITION"));
+    Assert.assertTrue(exception.getMessage().contains("Raw VARIANT values do not support ASOF JOIN match keys"));
   }
 
   @Test
