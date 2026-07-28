@@ -27,10 +27,32 @@ import org.testng.annotations.Test;
 
 
 public class FilterOperandTest {
+  private static final DataSchema INT_SCHEMA =
+      new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.INT});
   private static final DataSchema VARIANT_SCHEMA =
       new DataSchema(new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.VARIANT});
+  private static final RexExpression NULL_LITERAL = new RexExpression.Literal(ColumnDataType.UNKNOWN, null);
   private static final List<RexExpression> VARIANT_OPERANDS =
       List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(0));
+
+  @Test
+  public void testComparisonWithNullLiteral() {
+    FilterOperand.Predicate leftNull = new FilterOperand.Predicate(
+        List.of(NULL_LITERAL, new RexExpression.InputRef(0)), INT_SCHEMA, value -> value == 0);
+    Assert.assertNull(leftNull.apply(List.of(1)));
+
+    FilterOperand.Predicate rightNull = new FilterOperand.Predicate(
+        List.of(new RexExpression.InputRef(0), NULL_LITERAL), INT_SCHEMA, value -> value == 0);
+    Assert.assertNull(rightNull.apply(List.of(1)));
+  }
+
+  @Test
+  public void testRawVariantComparisonIsRejected() {
+    IllegalArgumentException exception =
+        Assert.expectThrows(IllegalArgumentException.class,
+            () -> new FilterOperand.Predicate(VARIANT_OPERANDS, VARIANT_SCHEMA, value -> value == 0));
+    Assert.assertTrue(exception.getMessage().contains("Raw VARIANT values do not support comparison"));
+  }
 
   @Test
   public void testRawVariantInIsRejected() {
