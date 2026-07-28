@@ -109,7 +109,12 @@ public class OperatorTestUtil {
 
   public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, long deadlineMs,
       StageMetadata stageMetadata) {
-    return new OpChainExecutionContext(mailboxService, 0, "cid", deadlineMs, deadlineMs, "brokerId", Map.of(),
+    return getOpChainContext(mailboxService, deadlineMs, stageMetadata, Map.of());
+  }
+
+  public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, long deadlineMs,
+      StageMetadata stageMetadata, Map<String, String> opChainMetadata) {
+    return new OpChainExecutionContext(mailboxService, 0, "cid", deadlineMs, deadlineMs, "brokerId", opChainMetadata,
         stageMetadata, stageMetadata.getWorkerMetadataList().get(0), null, true, true);
   }
 
