@@ -38,7 +38,7 @@ import static org.testng.Assert.fail;
 public class QueryOptionsUtilsTest {
   private static final List<String> POSITIVE_INT_KEYS =
       List.of(NUM_REPLICA_GROUPS_TO_QUERY, MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW);
+          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW, STREAMING_SELECTION_ORDER_BY_BLOCK_SIZE);
   private static final List<String> NON_NEGATIVE_INT_KEYS = List.of(MULTI_STAGE_LEAF_LIMIT);
   private static final List<String> UNBOUNDED_INT_KEYS =
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
@@ -320,6 +320,8 @@ public class QueryOptionsUtilsTest {
         return QueryOptionsUtils.getMaxRowsInJoin(map);
       case MAX_ROWS_IN_WINDOW:
         return QueryOptionsUtils.getMaxRowsInWindow(map);
+      case STREAMING_SELECTION_ORDER_BY_BLOCK_SIZE:
+        return QueryOptionsUtils.getStreamingSelectionOrderByBlockSize(map);
       // Non-negative ints
       case MULTI_STAGE_LEAF_LIMIT:
         return QueryOptionsUtils.getMultiStageLeafLimit(map);

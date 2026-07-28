@@ -819,6 +819,11 @@ public class CommonConstants {
         /// Flush threshold for streaming group-by on MSE leaf stages.
         public static final String STREAMING_GROUP_BY_FLUSH_THRESHOLD = "streamingGroupByFlushThreshold";
 
+        /// Opt-in: use the streaming k-way-merge selection ORDER BY combine over sorted segments.
+        public static final String STREAMING_SELECTION_ORDER_BY = "streamingSelectionOrderBy";
+        /// Output block size (rows) for the streaming selection ORDER BY combine; defaults to 10000.
+        public static final String STREAMING_SELECTION_ORDER_BY_BLOCK_SIZE = "streamingSelectionOrderByBlockSize";
+
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";

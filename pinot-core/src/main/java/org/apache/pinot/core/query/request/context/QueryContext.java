@@ -143,6 +143,11 @@ public class QueryContext {
   private int _effectiveSegmentGroupTrimSize;
   // Flush threshold for streaming group-by (0 = disabled)
   private int _streamingGroupByFlushThreshold;
+  // Opt-in: use the streaming k-way-merge selection ORDER BY combine over sorted segments
+  private boolean _streamingSelectionOrderBy;
+  // Output block size (rows) for the streaming selection ORDER BY combine
+  private int _streamingSelectionOrderByBlockSize = 10_000;
+
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -545,6 +550,22 @@ public class QueryContext {
 
   public void setStreamingGroupByFlushThreshold(int streamingGroupByFlushThreshold) {
     _streamingGroupByFlushThreshold = streamingGroupByFlushThreshold;
+  }
+
+  public boolean isStreamingSelectionOrderBy() {
+    return _streamingSelectionOrderBy;
+  }
+
+  public void setStreamingSelectionOrderBy(boolean streamingSelectionOrderBy) {
+    _streamingSelectionOrderBy = streamingSelectionOrderBy;
+  }
+
+  public int getStreamingSelectionOrderByBlockSize() {
+    return _streamingSelectionOrderByBlockSize;
+  }
+
+  public void setStreamingSelectionOrderByBlockSize(int streamingSelectionOrderByBlockSize) {
+    _streamingSelectionOrderByBlockSize = streamingSelectionOrderByBlockSize;
   }
 
   public boolean isNullHandlingEnabled() {

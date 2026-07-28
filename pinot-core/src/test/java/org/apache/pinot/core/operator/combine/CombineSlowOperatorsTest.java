@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -54,6 +55,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -133,16 +135,7 @@ public class CombineSlowOperatorsTest {
   @Test
   public void testCancelMinMaxValueBasedSelectionOrderByCombineOperator() {
     CountDownLatch ready = new CountDownLatch(1);
-    List<Operator> operators = getOperators(ready, () -> {
-      IndexSegment seg = mock(IndexSegment.class);
-      DataSource ds = mock(DataSource.class);
-      DataSourceMetadata dsmd = mock(DataSourceMetadata.class);
-      when(dsmd.getMinValue()).thenReturn(100L);
-      when(dsmd.getMaxValue()).thenReturn(200L);
-      when(seg.getDataSource(anyString(), any())).thenReturn(ds);
-      when(ds.getDataSourceMetadata()).thenReturn(dsmd);
-      return seg;
-    });
+    List<Operator> operators = getOperators(ready, minMaxSegmentSupplier());
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY column");
     queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
     MinMaxValueBasedSelectionOrderByCombineOperator combineOperator =
@@ -172,13 +165,65 @@ public class CombineSlowOperatorsTest {
     testCancelCombineOperator(combineOperator, ready);
   }
 
+  @Test
+  public void testCancelStreamingSelectionOrderByCombineOperator() {
+    CountDownLatch ready = new CountDownLatch(1);
+    List<Operator> operators = getOperators(ready, minMaxSegmentSupplier());
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY column");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
+    // Single-stage mode: nextBlock() drives the whole merge synchronously on the (cancellable) caller thread.
+    StreamingSelectionOrderByCombineOperator combineOperator =
+        new StreamingSelectionOrderByCombineOperator(operators, queryContext, _executorService, false);
+    testCancelCombineOperator(combineOperator, ready, operators);
+  }
+
+  @Test
+  public void testCancelStreamingSelectionOrderByCombineOperatorStreamingMode() {
+    CountDownLatch ready = new CountDownLatch(1);
+    List<Operator> operators = getOperators(ready, minMaxSegmentSupplier());
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY column");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
+    // Streaming (MSE-leaf) mode: the first getNextBlock() still drives the merge on the caller thread, so the same
+    // interrupt-on-cancel path applies and must surface an ExceptionResultsBlock.
+    StreamingSelectionOrderByCombineOperator combineOperator =
+        new StreamingSelectionOrderByCombineOperator(operators, queryContext, _executorService, true);
+    testCancelCombineOperator(combineOperator, ready, operators);
+  }
+
+  /** A segment whose first order-by column reports a non-null min/max, as required by the min/max-based operators. */
+  private static Supplier<IndexSegment> minMaxSegmentSupplier() {
+    return () -> {
+      IndexSegment seg = mock(IndexSegment.class);
+      DataSource ds = mock(DataSource.class);
+      DataSourceMetadata dsmd = mock(DataSourceMetadata.class);
+      when(dsmd.getMinValue()).thenReturn(100L);
+      when(dsmd.getMaxValue()).thenReturn(200L);
+      when(seg.getDataSource(anyString(), any())).thenReturn(ds);
+      when(ds.getDataSourceMetadata()).thenReturn(dsmd);
+      return seg;
+    };
+  }
+
   private void testCancelCombineOperator(BaseCombineOperator<?> combineOperator, CountDownLatch ready) {
+    testCancelCombineOperator(combineOperator, ready, List.of());
+  }
+
+  /**
+   * Submits the combine operator on a separate thread, waits for a child operator to start, cancels the future, and
+   * asserts the operator surfaces an {@link ExceptionResultsBlock}. When {@code operatorsToVerify} is non-empty (the
+   * single-threaded streaming combine, whose merge runs the children on the caller thread), it additionally asserts the
+   * cancellation was genuine - a child actually started and none completed normally - so the test cannot pass vacuously
+   * on an unrelated failure or by never exercising the cancel path.
+   */
+  private void testCancelCombineOperator(BaseCombineOperator<?> combineOperator, CountDownLatch ready,
+      List<Operator> operatorsToVerify) {
     AtomicReference<BaseResultsBlock> resultsBlock = new AtomicReference<>();
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
     ExecutorService combineExecutor = Executors.newFixedThreadPool(1);
     try {
       Future<?> future = combineExecutor.submit(() -> resultsBlock.set(combineOperator.nextBlock()));
-      ready.await();
+      // Bound the wait so a regression where no child operator ever starts fails fast here instead of hanging.
+      assertTrue(ready.await(10, TimeUnit.SECONDS), "Expected a child operator to start before cancellation");
       // At this point, the combineOperator is or will be waiting on future.get() for all sub operators, and the
       // waiting can be cancelled as below.
       future.cancel(true);
@@ -189,6 +234,12 @@ public class CombineSlowOperatorsTest {
     }
     TestUtils.waitForCondition((aVoid) -> resultsBlock.get() instanceof ExceptionResultsBlock, 10_000,
         "Should have been cancelled");
+    // Genuine-cancellation check: no child ran to normal completion (each was interrupted or never started), so the
+    // ExceptionResultsBlock above is the cancellation outcome rather than an unrelated error.
+    for (Operator operator : operatorsToVerify) {
+      assertFalse(((SlowOperator) operator)._notInterrupted.get(),
+          "No operator should have completed normally after cancellation");
+    }
   }
 
   /**

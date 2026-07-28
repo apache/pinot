@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SequentialSortedGroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.SortedGroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.StreamingSelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingGroupByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
@@ -134,6 +135,17 @@ public class CombinePlanNode implements PlanNode {
         // Use streaming operator only for non-empty selection-only query
         return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
       }
+      // Streaming selection order-by (opt-in via the streamingSelectionOrderBy hint). Selection-only already
+      // returned above, so reaching here with a non-empty limit and an order-by present implies selection order-by.
+      if (_queryContext.isStreamingSelectionOrderBy() && QueryContextUtils.isSelectionQuery(_queryContext)
+          && _queryContext.getLimit() != 0) {
+        List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
+        if (orderByExpressions != null
+            && orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+          return new StreamingSelectionOrderByCombineOperator(operators, _queryContext, _executorService,
+              true /* streaming */);
+        }
+      }
       int flushThreshold = _queryContext.getStreamingGroupByFlushThreshold();
       if (flushThreshold > 0 && QueryContextUtils.isAggregationQuery(_queryContext)
           && _queryContext.getGroupByExpressions() != null) {
@@ -165,6 +177,10 @@ public class CombinePlanNode implements PlanNode {
         List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
         assert orderByExpressions != null;
         if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+          if (_queryContext.isStreamingSelectionOrderBy()) {
+            return new StreamingSelectionOrderByCombineOperator(operators, _queryContext, _executorService,
+                false /* streaming */);
+          }
           return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
         } else {
           return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
