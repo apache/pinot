@@ -314,6 +314,42 @@ public class SqliteStatsStoreTest {
     assertFalse(result.isPresent());
   }
 
+  @Test
+  public void testEstimateRowsEmptyOptionalWhenOnlyConsumingSegments()
+      throws Exception {
+    _store.upsertSegmentStats(TABLE_A, Collections.singletonList(
+        seg("s1", 1L, 1000L, 0L, 0L, 100L, true)
+    ));
+
+    // Consuming segments are excluded from time-range estimates; with no committed segments the
+    // result must be empty ("no stats"), never of(0) ("provably zero rows in range").
+    OptionalLong result = _store.estimateRowsInTimeRange(TABLE_A, 0L, 100L);
+    assertFalse(result.isPresent());
+  }
+
+  @Test
+  public void testEstimateRowsBoundaryAdjacency()
+      throws Exception {
+    _store.upsertSegmentStats(TABLE_A, Collections.singletonList(
+        seg("s1", 1L, 1000L, 0L, 100L, 200L, false)   // [100, 200)
+    ));
+
+    // Segment ending exactly at the range start → no overlap (half-open semantics)
+    OptionalLong before = _store.estimateRowsInTimeRange(TABLE_A, 200L, 300L);
+    assertTrue(before.isPresent());
+    assertEquals(before.getAsLong(), 0L);
+
+    // Segment starting exactly at the range end → no overlap
+    OptionalLong after = _store.estimateRowsInTimeRange(TABLE_A, 0L, 100L);
+    assertTrue(after.isPresent());
+    assertEquals(after.getAsLong(), 0L);
+
+    // Touching on both sides at once: range exactly equal to the segment → full overlap
+    OptionalLong exact = _store.estimateRowsInTimeRange(TABLE_A, 100L, 200L);
+    assertTrue(exact.isPresent());
+    assertEquals(exact.getAsLong(), 1000L);
+  }
+
   // ---------------------------------------------------------------------------
   // Persistence across reopen
   // ---------------------------------------------------------------------------

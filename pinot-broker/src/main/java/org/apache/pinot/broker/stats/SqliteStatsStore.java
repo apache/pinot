@@ -100,9 +100,22 @@ public class SqliteStatsStore implements StatsStore {
           + "JOIN segment_stats s ON s.table_name=c.table_name AND s.segment_name=c.segment_name "
           + "WHERE c.table_name=? AND c.column_name=? AND s.consuming=0";
 
+  // The overlap predicate mirrors the Java-side check in estimateRowsInTimeRange: it prunes
+  // segments that cannot overlap [startMs, endMs) inside SQLite instead of materializing them
+  // over JDBC only to be skipped. Segments with unknown times (-1 sentinels) must be retained —
+  // they are included conservatively by the Java logic.
+  //
+  // The UNION ALL arm emits a sentinel row (start_time_ms = -2, an otherwise impossible value)
+  // whenever the table has any committed stats at all. It lets the caller distinguish "no segment
+  // overlaps the range" (a real estimate of 0) from "no stats for this table" (empty) within a
+  // SINGLE statement — i.e. a single consistent snapshot; splitting this into a second existence
+  // query would race with concurrent stats writes.
   private static final String SQL_TIME_RANGE =
       "SELECT total_docs,start_time_ms,end_time_ms "
-          + "FROM segment_stats WHERE table_name=? AND consuming=0";
+          + "FROM segment_stats WHERE table_name=? AND consuming=0 "
+          + "AND (start_time_ms=-1 OR end_time_ms=-1 OR (end_time_ms>? AND start_time_ms<?)) "
+          + "UNION ALL SELECT -1,-2,-2 WHERE EXISTS("
+          + "SELECT 1 FROM segment_stats WHERE table_name=? AND consuming=0)";
 
   private static final String SQL_HAS_CONSUMING =
       "SELECT 1 FROM segment_stats WHERE table_name=? AND consuming=1 LIMIT 1";
@@ -562,6 +575,9 @@ public class SqliteStatsStore implements StatsStore {
 
       try (PreparedStatement ps = conn.prepareStatement(SQL_TIME_RANGE)) {
         ps.setString(1, tableNameWithType);
+        ps.setLong(2, startMs);
+        ps.setLong(3, endMs);
+        ps.setString(4, tableNameWithType);
         try (ResultSet rs = ps.executeQuery()) {
           while (rs.next()) {
             long docs = rs.getLong(1);
@@ -570,13 +586,19 @@ public class SqliteStatsStore implements StatsStore {
 
             hasAnyRow = true;
 
+            // Existence sentinel (see SQL_TIME_RANGE): committed stats exist, contributes 0 rows
+            if (segStart == -2) {
+              continue;
+            }
+
             // Unknown times (-1) → conservative: include all docs
             if (segStart == -1 || segEnd == -1) {
               totalRows += docs;
               continue;
             }
 
-            // Check overlap with [startMs, endMs)
+            // Check overlap with [startMs, endMs). The SQL predicate already prunes
+            // non-overlapping segments; this is a safety net that also documents the semantics.
             if (segEnd <= startMs || segStart >= endMs) {
               // No overlap
               continue;
