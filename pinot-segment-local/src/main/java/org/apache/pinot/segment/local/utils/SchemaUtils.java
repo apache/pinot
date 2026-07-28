@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
@@ -121,9 +122,10 @@ public class SchemaUtils {
     if (isIgnoreCase) {
       Set<String> lowerCaseColumnNames = new HashSet<>();
       for (String column : schema.getColumnNames()) {
-        Preconditions.checkState(lowerCaseColumnNames.add(column.toLowerCase()),
-            "When enable case insensitive, you can't use the same lowercase column name: %s",
-            column.toLowerCase());
+        // Locale.ROOT avoids locale-dependent lowercasing (e.g. Turkish dotted/dotless I)
+        String lowerCaseColumn = column.toLowerCase(Locale.ROOT);
+        Preconditions.checkState(lowerCaseColumnNames.add(lowerCaseColumn),
+            "When enable case insensitive, you can't use the same lowercase column name: %s", lowerCaseColumn);
       }
     }
     Set<String> transformedColumns = new HashSet<>();
