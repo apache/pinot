@@ -146,7 +146,7 @@ MSE intermediate stage (with null handling):
   '(arg0: big_decimal) -> big_decimal':
     entries:
       negative value_big_decimal:
-        actualResult: "3.0"
+        actualResult: "3"
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 3.0
@@ -156,12 +156,12 @@ MSE intermediate stage (with null handling):
         error: null
         expectedResult: null
       positive value_big_decimal:
-        actualResult: "5.0"
+        actualResult: "5"
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 5.0
       zero_big_decimal:
-        actualResult: "0.0"
+        actualResult: "0"
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 0.0
@@ -267,22 +267,22 @@ MSE intermediate stage (without null handling):
   '(arg0: big_decimal) -> big_decimal':
     entries:
       negative value_big_decimal:
-        actualResult: "3.0"
+        actualResult: "3"
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 3.0
       null input_big_decimal:
-        actualResult: "0.0"
+        actualResult: "0"
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 0.0
       positive value_big_decimal:
-        actualResult: "5.0"
+        actualResult: "5"
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 5.0
       zero_big_decimal:
-        actualResult: "0.0"
+        actualResult: "0"
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 0.0
