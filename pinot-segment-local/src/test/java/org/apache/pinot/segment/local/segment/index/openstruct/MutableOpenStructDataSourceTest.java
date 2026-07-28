@@ -25,6 +25,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -33,6 +34,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -88,6 +90,68 @@ public class MutableOpenStructDataSourceTest {
       idx.index(0, Map.of("clicks", 5L, "country", "US"));
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
       assertEquals(ds.getDataSources().size(), 2);
+    }
+  }
+
+  /// ProjectionBlock re-resolves the key on every block, so repeated lookups must not rebuild the source.
+  @Test
+  public void testGetDataSourceIsMemoisedPerKey()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("clicks", 5L));
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
+      assertSame(ds.getDataSource("clicks"), ds.getDataSource("clicks"));
+    }
+  }
+
+  /// The memo must not serve a stale source. Ingest past the snapshot boundary — including a type-conflicting value,
+  /// which would reallocate the column if the never-replaced invariant regressed — and the cached source must still
+  /// report on the snapshotted window only.
+  @Test
+  public void testMemoisedDataSourceStaysCorrectAsIngestionContinues()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("clicks", 5L));
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
+      DataSource first = ds.getDataSource("clicks");
+      assertNotNull(first);
+      assertTrue(first.getNullValueVector().getNullBitmap().isEmpty());
+
+      idx.index(1, Map.of("clicks", 7L));
+      idx.index(2, Map.of("clicks", "not-a-long"));
+
+      assertSame(ds.getDataSource("clicks"), first);
+      assertTrue(first.getNullValueVector().getNullBitmap().isEmpty());
+    }
+  }
+
+  /// Exercises a non-empty null bitmap through the memo: the key is absent on doc 0.
+  @Test
+  public void testMemoisedNullBitmapReportsAbsentDocs()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("country", "US"));
+      idx.index(1, Map.of("clicks", 5L));
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 2);
+      ImmutableRoaringBitmap nulls = ds.getDataSource("clicks").getNullValueVector().getNullBitmap();
+      assertTrue(nulls.contains(0));
+      assertFalse(nulls.contains(1));
+    }
+  }
+
+  /// An absent key must not be memoised: ingestion can create it after the first lookup.
+  @Test
+  public void testKeyCreatedAfterFirstLookupIsPickedUp()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
+      assertNull(ds.getDataSource("clicks"));
+      idx.index(0, Map.of("clicks", 5L));
+      assertNotNull(ds.getDataSource("clicks"));
     }
   }
 }

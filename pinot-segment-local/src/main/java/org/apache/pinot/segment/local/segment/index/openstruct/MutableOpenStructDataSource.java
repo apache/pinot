@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
@@ -40,12 +41,17 @@ import org.apache.pinot.spi.data.FieldSpec;
 /// Per-key [DataSource] accessor for mutable (consuming) segments with an OPEN_STRUCT column.
 ///
 /// Always columnar — no blob branch. Per-key DataSources are synthesized on demand from the
-/// underlying [MutableOpenStructIndex]; mutable mode always holds every observed key, so
+/// underlying [MutableOpenStructIndex] and memoised; mutable mode always holds every observed key, so
 /// [#isFullyMaterialized()] is unconditionally `true`.
 public class MutableOpenStructDataSource extends BaseDataSource implements OpenStructDataSource {
   private final ComplexFieldSpec _fieldSpec;
   private final MutableOpenStructIndex _index;
   private final int _numDocs;
+  /// Memoised per-key sources: `ProjectionBlock` re-resolves the key on every block, so without this each block
+  /// rebuilds the index map, metadata and null vector. Safe for this object's lifetime — it is built fresh per
+  /// `getDataSourceNullable` lookup with {@link #_numDocs} already snapshotted, and a key's {@link MutableKeyColumn}
+  /// is never replaced once allocated. Absent keys are deliberately not memoised.
+  private final Map<String, DataSource> _perKeyDataSourceCache = new ConcurrentHashMap<>();
 
   public MutableOpenStructDataSource(ComplexFieldSpec fieldSpec, MutableOpenStructIndex index, int numDocs) {
     super(new MutableOpenStructDataSourceMetadata(fieldSpec, numDocs),
@@ -63,16 +69,19 @@ public class MutableOpenStructDataSource extends BaseDataSource implements OpenS
   @Override
   @Nullable
   public DataSource getDataSource(String key) {
+    // Live lookup, outside the memo: a key not yet observed may still be created by the ingestion thread.
     MutableKeyColumn col = _index.getKeyColumn(key);
     if (col == null) {
       return null;
     }
-    Map<IndexType, IndexReader> indexes = new HashMap<>(_index.getIndexes(key));
-    indexes.put(StandardIndexes.nullValueVector(),
-        new PresenceBasedNullValueVector(col.getPresenceBitmap(), _numDocs));
-    ColumnMetadata metadata = _index.getColumnMetadata(key);
-    return new ImmutableDataSource(metadata,
-        new ColumnIndexContainer.FromMap.Builder().withAll(indexes).build());
+    return _perKeyDataSourceCache.computeIfAbsent(key, k -> {
+      Map<IndexType, IndexReader> indexes = new HashMap<>(_index.getIndexes(k));
+      indexes.put(StandardIndexes.nullValueVector(),
+          new PresenceBasedNullValueVector(col.getPresenceBitmap(), _numDocs));
+      ColumnMetadata metadata = _index.getColumnMetadata(k);
+      return new ImmutableDataSource(metadata,
+          new ColumnIndexContainer.FromMap.Builder().withAll(indexes).build());
+    });
   }
 
   @Override
