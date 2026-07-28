@@ -337,8 +337,8 @@ public class DataSchema {
         return typeFactory.createSqlType(SqlTypeName.VARIANT);
       }
     },
-    // UUID is a logical type backed by BYTES; keep it directly after BYTES. ColumnDataType is serialized by name (not
-    // ordinal) via name()/valueOf(), so enum order does not affect wire compatibility.
+    // UUID is a logical type backed by BYTES. ColumnDataType is serialized by name (not ordinal) via name()/valueOf(),
+    // so enum order does not affect wire compatibility.
     UUID(BYTES, null) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {

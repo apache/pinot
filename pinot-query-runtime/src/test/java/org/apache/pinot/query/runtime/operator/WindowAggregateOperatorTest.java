@@ -137,17 +137,35 @@ public class WindowAggregateOperatorTest {
 
   @Test
   public void testAllowsWindowKeysOverTypedVariantExtraction() {
-    DataSchema inputSchema = new DataSchema(new String[]{"typedPayload"}, new ColumnDataType[]{STRING});
+    DataSchema inputSchema =
+        new DataSchema(new String[]{"eventType", "eventId"}, new ColumnDataType[]{STRING, STRING});
     DataSchema resultSchema =
-        new DataSchema(new String[]{"typedPayload", "count"}, new ColumnDataType[]{STRING, LONG});
-    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema).buildWithEos();
-    List<RexExpression.FunctionCall> aggCalls = List.of(getCount(new RexExpression.InputRef(0)));
+        new DataSchema(new String[]{"eventType", "eventId", "count"}, new ColumnDataType[]{STRING, STRING, LONG});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(new Object[]{"checkout", "evt-001"})
+        .addBlock(new Object[]{"view", "evt-002"})
+        .addBlock(new Object[]{"checkout", "evt-003"})
+        // Both an encoded Variant null and a SQL null extract to SQL null before reaching the window operator.
+        .addBlock(new Object[]{null, "evt-004"})
+        .addBlock(new Object[]{null, "evt-005"})
+        .buildWithEos();
+    List<RexExpression.FunctionCall> aggCalls = List.of(getCountStar());
 
     WindowAggregateOperator operator =
-        getOperator(inputSchema, resultSchema, List.of(0), List.of(new RelFieldCollation(0)), aggCalls, ROWS,
+        getOperator(inputSchema, resultSchema, List.of(0), List.of(), aggCalls, RANGE,
             Integer.MIN_VALUE, Integer.MAX_VALUE, input);
 
-    assertTrue(operator.nextBlock().isSuccess());
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    Map<Object, List<Object[]>> expectedRows = new HashMap<>();
+    expectedRows.put("checkout", List.of(
+        new Object[]{"checkout", "evt-001", 2L},
+        new Object[]{"checkout", "evt-003", 2L}));
+    expectedRows.put("view", List.<Object[]>of(new Object[]{"view", "evt-002", 1L}));
+    expectedRows.put(null, List.of(
+        new Object[]{null, "evt-004", 2L},
+        new Object[]{null, "evt-005", 2L}));
+    verifyResultRows(resultRows, List.of(0), expectedRows);
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -3561,6 +3579,10 @@ public class WindowAggregateOperatorTest {
 
   private static RexExpression.FunctionCall getCount(RexExpression arg) {
     return new RexExpression.FunctionCall(ColumnDataType.LONG, SqlKind.COUNT.name(), List.of(arg));
+  }
+
+  private static RexExpression.FunctionCall getCountStar() {
+    return new RexExpression.FunctionCall(ColumnDataType.LONG, SqlKind.COUNT.name(), List.of());
   }
 
   private static RexExpression.FunctionCall getMin(RexExpression arg) {

@@ -35,9 +35,9 @@ import org.apache.pinot.spi.exception.QueryException;
 
 /**
  * Rejects operations that would otherwise assign physical byte ordering, equality, or hashing semantics to a raw
- * VARIANT value.
+ * VARIANT value. The visitor has no mutable state and is thread-safe, so callers may share {@link #INSTANCE}.
  */
-public class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFirstVisitor<Void, Void> {
+public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFirstVisitor<Void, Void> {
   public static final VariantTypeValidationVisitor INSTANCE = new VariantTypeValidationVisitor();
 
   private VariantTypeValidationVisitor() {
@@ -123,27 +123,10 @@ public class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFirstVisi
    * {@code HashJoinOperator}.
    */
   public static void validateJoinInputs(JoinNode node, DataSchema leftSchema, DataSchema rightSchema) {
-    for (int leftKey : node.getLeftKeys()) {
-      DataSchema.ColumnDataType dataType = leftSchema.getColumnDataType(leftKey);
-      if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
-        throw unsupported("JOIN keys");
-      }
-    }
-    for (int rightKey : node.getRightKeys()) {
-      DataSchema.ColumnDataType dataType = rightSchema.getColumnDataType(rightKey);
-      if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
-        throw unsupported("JOIN keys");
-      }
-    }
-    if (node.getJoinStrategy() == JoinNode.JoinStrategy.ASOF) {
-      RexExpression.FunctionCall matchCondition = (RexExpression.FunctionCall) node.getMatchCondition();
-      List<RexExpression> matchKeys = matchCondition.getFunctionOperands();
-      int leftMatchKey = ((RexExpression.InputRef) matchKeys.get(0)).getIndex();
-      int rightMatchKey = ((RexExpression.InputRef) matchKeys.get(1)).getIndex() - leftSchema.size();
-      if (!leftSchema.getColumnDataType(leftMatchKey).supportsOrdering()
-          || !rightSchema.getColumnDataType(rightMatchKey).supportsOrdering()) {
-        throw unsupported("ASOF JOIN MATCH_CONDITION");
-      }
+    try {
+      JoinKeyTypeValidator.validate(node, leftSchema, rightSchema);
+    } catch (IllegalArgumentException e) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING, e.getMessage(), e);
     }
   }
 
