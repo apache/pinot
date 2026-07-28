@@ -512,8 +512,10 @@ public class QueryEnvironment {
   /// optionally generate new nodes.
   ///
   /// The result of the method is an optimized tree of nodes that is semantically equivalent to the input tree, but
-  /// may be more efficient to execute. This doesn't mean that the query is ready to use. In fact, in fact it can be
-  /// further optimized by applying Pinot specific. But this is the further we can go with Calcite.
+  /// may be more efficient to execute. This doesn't mean the query is ready to run: it can be further optimized with
+  /// Pinot-specific rules. Within this method, the optional cost-based join reorder is applied after the standard
+  /// rule programs and before trait resolution — but this is the furthest we can go with Calcite's standard rule
+  /// sets.
   private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {
     // TODO: add support for cost factory
     try {
