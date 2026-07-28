@@ -37,11 +37,13 @@ import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructNullDataSource;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -110,17 +112,76 @@ public class MapFilterOperator extends BaseFilterOperator {
       return buildPerKeyFilterOperator(keyDs, queryContext, numDocs);
     }
 
-    // Key not materialized
+    // Key not materialized but the segment is fully materialized — definitive absence.
     if (osDs.isFullyMaterialized()) {
-      // Fully materialized but key absent — definitive answer
-      if (_predicate.getType() == Predicate.Type.IS_NULL) {
-        return new MatchAllFilterOperator(numDocs);
-      }
-      return EmptyFilterOperator.getInstance();
+      return buildAbsentKeyFilterOperator(osDs, queryContext, numDocs);
     }
 
     // Sparse — can't be sure, fall through to JSON/expression
     return null;
+  }
+
+  /// Builds the filter for a key that is definitively absent from a fully materialized segment.
+  /// Every document answers the predicate identically, so it is folded to a match-all / match-none
+  /// once instead of scanning an all-null column.
+  ///
+  /// With null handling on, three-valued logic makes every value predicate UNKNOWN and nothing
+  /// matches. With it off the key reads as its type's default null value, so the predicate is
+  /// evaluated against that single value — notably NOT_EQ / NOT_IN then match every document.
+  ///
+  /// The value comes from {@link OpenStructNullDataSource#forAbsentKey}, the same source the
+  /// projection path feeds to `item()`, so filter and projection cannot disagree. For a key with no
+  /// declared child spec that factory falls back to STRING, which means a numeric range over an
+  /// undeclared key compares lexicographically — the same answer `item()` yields for it.
+  @Nullable
+  private BaseFilterOperator buildAbsentKeyFilterOperator(OpenStructDataSource osDs, QueryContext queryContext,
+      int numDocs) {
+    Predicate.Type type = _predicate.getType();
+    if (type == Predicate.Type.IS_NULL) {
+      return new MatchAllFilterOperator(numDocs);
+    }
+    if (type == Predicate.Type.IS_NOT_NULL) {
+      return EmptyFilterOperator.getInstance();
+    }
+    Predicate rewritten = rewritePredicateForKey(_predicate);
+    if (rewritten == null) {
+      return null;
+    }
+    if (queryContext.isNullHandlingEnabled()) {
+      return EmptyFilterOperator.getInstance();
+    }
+    DataSource keyDs = OpenStructNullDataSource.forAbsentKey(osDs, _keyName);
+    PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(rewritten, keyDs, queryContext);
+    Boolean matches = matchesDefaultNullValue(evaluator, keyDs.getForwardIndex());
+    if (matches == null) {
+      return null;
+    }
+    return matches ? new MatchAllFilterOperator(numDocs) : EmptyFilterOperator.getInstance();
+  }
+
+  /// Applies the evaluator to the default null value every document of an absent key reads as.
+  /// Returns `null` for a stored type the all-null forward index cannot serve, so the caller falls
+  /// through to the expression path rather than failing the query.
+  @Nullable
+  private static Boolean matchesDefaultNullValue(PredicateEvaluator evaluator, ForwardIndexReader<?> forwardIndex) {
+    switch (forwardIndex.getStoredType()) {
+      case INT:
+        return evaluator.applySV(forwardIndex.getInt(0, null));
+      case LONG:
+        return evaluator.applySV(forwardIndex.getLong(0, null));
+      case FLOAT:
+        return evaluator.applySV(forwardIndex.getFloat(0, null));
+      case DOUBLE:
+        return evaluator.applySV(forwardIndex.getDouble(0, null));
+      case BIG_DECIMAL:
+        return evaluator.applySV(forwardIndex.getBigDecimal(0, null));
+      case STRING:
+        return evaluator.applySV(forwardIndex.getString(0, null));
+      case BYTES:
+        return evaluator.applySV(forwardIndex.getBytes(0, null));
+      default:
+        return null;
+    }
   }
 
   @Nullable

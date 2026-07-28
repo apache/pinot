@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -28,11 +29,16 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 /// A document is null for a key when the key was never set on that document, i.e. when the
 /// document is absent from the presence bitmap. The null bitmap is computed on demand (not cached)
 /// because the presence bitmap is mutable during real-time consumption.
+///
+/// Reads the live presence bitmap rather than a snapshot: the bitmap is a
+/// {@link ThreadSafeMutableRoaringBitmap} and ingestion only ever appends docIds >= the numDocs
+/// captured by the enclosing DataSource, so the [0, numDocs) range this vector reports on is
+/// already frozen.
 public class PresenceBasedNullValueVector implements NullValueVectorReader {
-  private final ImmutableRoaringBitmap _presenceBitmap;
+  private final ThreadSafeMutableRoaringBitmap _presenceBitmap;
   private final int _numDocs;
 
-  public PresenceBasedNullValueVector(ImmutableRoaringBitmap presenceBitmap, int numDocs) {
+  public PresenceBasedNullValueVector(ThreadSafeMutableRoaringBitmap presenceBitmap, int numDocs) {
     _presenceBitmap = presenceBitmap;
     _numDocs = numDocs;
   }
@@ -48,9 +54,9 @@ public class PresenceBasedNullValueVector implements NullValueVectorReader {
     if (_numDocs > 0) {
       nullBitmap.add(0L, _numDocs);
     }
-    // Clone the presence bitmap before the full-bitmap iteration — the ingestion thread may
-    // concurrently mutate the live bitmap via MutableKeyColumn.setValue().
-    nullBitmap.andNot(_presenceBitmap.clone());
+    // getMutableRoaringBitmap() clones under the wrapper's monitor, so the andNot below iterates a
+    // private copy that the ingestion thread cannot mutate mid-walk.
+    nullBitmap.andNot(_presenceBitmap.getMutableRoaringBitmap());
     return nullBitmap;
   }
 }

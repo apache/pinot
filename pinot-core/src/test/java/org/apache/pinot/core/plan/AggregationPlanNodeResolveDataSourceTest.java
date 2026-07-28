@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
+import org.apache.pinot.segment.local.segment.index.map.NullDataSource;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
@@ -62,6 +63,18 @@ public class AggregationPlanNodeResolveDataSourceTest {
 
     ExpressionContext expr = itemExpr("mapCol", "myKey");
     assertSame(AggregationPlanNode.resolveDataSource(expr, segment, null), keyDs);
+  }
+
+  @Test
+  public void testItemFunctionWithAbsentMapKeyReturnsNull() {
+    IndexSegment segment = mock(IndexSegment.class);
+    MapDataSource mapDs = mock(MapDataSource.class);
+    when(segment.getDataSource("mapCol", null)).thenReturn(mapDs);
+    // An absent MAP key resolves to a NullDataSource, which must not reach the non-scan path.
+    when(mapDs.getDataSource("absentKey")).thenReturn(new NullDataSource("absentKey"));
+
+    ExpressionContext expr = itemExpr("mapCol", "absentKey");
+    assertNull(AggregationPlanNode.resolveDataSource(expr, segment, null));
   }
 
   @Test

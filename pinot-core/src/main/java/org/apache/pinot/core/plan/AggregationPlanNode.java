@@ -36,6 +36,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.segment.index.map.NullDataSource;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -303,7 +304,12 @@ public class AggregationPlanNode implements PlanNode {
     String key = args.get(1).getLiteral().getStringValue();
     DataSource columnDs = segment.getDataSource(columnName, schema);
     if (columnDs instanceof MapDataSource) {
-      return ((MapDataSource) columnDs).getDataSource(key);
+      DataSource keyDs = ((MapDataSource) columnDs).getDataSource(key);
+      // An absent MAP key yields a NullDataSource whose metadata reports non-null min/max (the INT
+      // default) and which carries no null vector, so it would wrongly satisfy the metadata-based
+      // non-scan check and report hasNullValues=false. Fall back to a scan, mirroring the
+      // OPEN_STRUCT guard below.
+      return keyDs instanceof NullDataSource ? null : keyDs;
     }
     if (columnDs instanceof OpenStructDataSource) {
       OpenStructDataSource osDs = (OpenStructDataSource) columnDs;

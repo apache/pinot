@@ -75,6 +75,11 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
   // Matches OpenStructIndexType.INDEX_DISPLAY_NAME (kept as a literal to avoid a creator-side import).
   private static final String OPEN_STRUCT_INDEX_NAME = "open_struct";
   protected static final int NUM_DOCS = 1000;
+  /// `errors` is set on every ERRORS_FILL_MODULUS-th row, giving a dense key that is present in
+  /// only some docs — the case the sealed-side null vector has to cover.
+  private static final int ERRORS_FILL_MODULUS = 3;
+  private static final int NUM_ERRORS_PRESENT = (NUM_DOCS + ERRORS_FILL_MODULUS - 1) / ERRORS_FILL_MODULUS;
+  private static final int NUM_ERRORS_ABSENT = NUM_DOCS - NUM_ERRORS_PRESENT;
 
   @Override
   protected long getCountStarResult() {
@@ -90,6 +95,7 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
     children.put("views", new DimensionFieldSpec("views", FieldSpec.DataType.LONG, true));
     children.put("cpu", new DimensionFieldSpec("cpu", FieldSpec.DataType.DOUBLE, true));
     children.put("host", new DimensionFieldSpec("host", FieldSpec.DataType.STRING, true));
+    children.put("errors", new DimensionFieldSpec("errors", FieldSpec.DataType.LONG, true));
     children.put("region", new DimensionFieldSpec("region", FieldSpec.DataType.STRING, true));
     children.put("latencyMs", new DimensionFieldSpec("latencyMs", FieldSpec.DataType.LONG, true));
     ComplexFieldSpec metricsSpec = new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true, children);
@@ -103,8 +109,13 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
   ///   views  -> inverted (=> dictionary + forward + inverted)
   ///   cpu    -> DICTIONARY encoding (=> dictionary + forward, no inverted)
   ///   host   -> RAW encoding (=> raw forward only, no dict, no inverted)
-  /// region + latencyMs have no per-key config and are not in denseKeys, so the maxDenseKeys=3
-  /// budget (filled by views/cpu/host) forces them into the sparse column.
+  ///   errors -> no per-key config, present on only ~1/3 of rows; dense purely because it is listed
+  ///             in denseKeys. `classify()` admits configured dense keys ahead of the fill-rate
+  ///             loop, so a 1/3 fill still beats the 0.5 minimum — without the explicit listing it
+  ///             would silently fall into the sparse column and the null-vector coverage below
+  ///             would test nothing.
+  /// region + latencyMs have no per-key config and are not in denseKeys, so the maxDenseKeys=4
+  /// budget (filled by views/cpu/host/errors) forces them into the sparse column.
   @Override
   protected List<FieldConfig> getFieldConfigs() {
     FieldConfig viewsCfg = new FieldConfig.Builder("views")
@@ -117,8 +128,8 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
         .withEncodingType(FieldConfig.EncodingType.RAW)
         .build();
     // First arg is `disabled` — false => enabled.
-    OpenStructIndexConfig osConfig = new OpenStructIndexConfig(false, null, 3,
-        Set.of("views", "cpu", "host"), 0.5, List.of(viewsCfg, cpuCfg, hostCfg));
+    OpenStructIndexConfig osConfig = new OpenStructIndexConfig(false, null, 4,
+        Set.of("views", "cpu", "host", "errors"), 0.5, List.of(viewsCfg, cpuCfg, hostCfg));
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set(OPEN_STRUCT_INDEX_NAME, JsonUtils.objectToJsonNode(osConfig));
     FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
@@ -156,6 +167,9 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
         metrics.put("host", "host-" + (i % 5));              // STRING, small set (raw forward)
         metrics.put("region", "region-" + (i % 4));          // sparse
         metrics.put("latencyMs", String.valueOf(i % 100));   // sparse
+        if (i % ERRORS_FILL_MODULUS == 0) {
+          metrics.put("errors", String.valueOf(i));          // dense but only partially present
+        }
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(METRICS, metrics);
         record.put(TIMESTAMP_FIELD_NAME, tsBase + i);
@@ -193,6 +207,7 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
     String views = OpenStructNaming.materializedColumnName(METRICS, "views");
     String cpu = OpenStructNaming.materializedColumnName(METRICS, "cpu");
     String host = OpenStructNaming.materializedColumnName(METRICS, "host");
+    String errors = OpenStructNaming.materializedColumnName(METRICS, "errors");
     String region = OpenStructNaming.materializedColumnName(METRICS, "region");
     String latencyMs = OpenStructNaming.materializedColumnName(METRICS, "latencyMs");
     String sparse = OpenStructNaming.sparseColumnName(METRICS);
@@ -203,9 +218,11 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
     assertTrue(cols.containsKey(views), "dense child metrics$views missing");
     assertTrue(cols.containsKey(cpu), "dense child metrics$cpu missing");
     assertTrue(cols.containsKey(host), "dense child metrics$host missing");
+    assertTrue(cols.containsKey(errors), "dense child metrics$errors missing");
     assertEquals(cols.get(views).getDataType(), FieldSpec.DataType.LONG);
     assertEquals(cols.get(cpu).getDataType(), FieldSpec.DataType.DOUBLE);
     assertEquals(cols.get(host).getDataType(), FieldSpec.DataType.STRING);
+    assertEquals(cols.get(errors).getDataType(), FieldSpec.DataType.LONG);
 
     // Dense/sparse split: region + latencyMs are NOT materialized; the single sparse column exists.
     assertFalse(cols.containsKey(region), "metrics$region must NOT be materialized (forced sparse)");
@@ -231,6 +248,9 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
       // sparse: raw forward, no dict, no inverted
       assertTrue(reader.hasIndexFor(sparse, StandardIndexes.forward()), "sparse column must have forward");
       assertFalse(reader.hasIndexFor(sparse, StandardIndexes.dictionary()), "sparse column must NOT have dictionary");
+      // errors: partially present, so the seal must have written a null vector for the absent docs
+      assertTrue(reader.hasIndexFor(errors, StandardIndexes.nullValueVector()),
+          "partially-present dense child metrics$errors must have a null value vector");
     }
 
     // Parent/child relationship + sparse flag from raw metadata.properties.
@@ -242,6 +262,35 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
         views, V1Constants.MetadataKeys.Column.PARENT_COLUMN)), METRICS);
     assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(
         sparse, V1Constants.MetadataKeys.Column.PARENT_COLUMN)), METRICS);
+  }
+
+  /// A dense key present on only some docs must read back as NULL — not as the type default — on
+  /// the sealed segment. Guards the null vector `OpenStructColumnSplitter` writes at seal time; if
+  /// that write is ever made conditional and the predicate is wrong, the absent docs silently
+  /// start returning 0 for this LONG key.
+  @Test
+  public void testPartiallyPresentDenseKeyNullSemantics()
+      throws Exception {
+    JsonNode nullCount = postQuery(
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE item(" + METRICS + ", 'errors') IS NULL");
+    assertEquals(nullCount.get("exceptions").size(), 0);
+    assertEquals(nullCount.get("resultTable").get("rows").get(0).get(0).asLong(), NUM_ERRORS_ABSENT);
+
+    JsonNode notNullCount = postQuery(
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE item(" + METRICS + ", 'errors') IS NOT NULL");
+    assertEquals(notNullCount.get("exceptions").size(), 0);
+    assertEquals(notNullCount.get("resultTable").get("rows").get(0).get(0).asLong(), NUM_ERRORS_PRESENT);
+
+    // The assertion that actually bites: projecting the key on an absent row must yield null rather
+    // than the LONG default. Row i=1 is absent (1 % 3 != 0) but has errors=... on i=0 and i=3.
+    JsonNode projection = postQuery("SET enableNullHandling=true; SELECT item(" + METRICS + ", 'errors') FROM "
+        + getTableName() + " WHERE item(" + METRICS + ", 'errors') IS NULL LIMIT 5");
+    assertEquals(projection.get("exceptions").size(), 0);
+    JsonNode rows = projection.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "expected at least one absent-key row");
+    for (JsonNode row : rows) {
+      assertTrue(row.get(0).isNull(), "absent dense key must project as null, got: " + row.get(0));
+    }
   }
 
   /// Scans both server data dirs (the custom suite starts 2 servers) for a committed immutable

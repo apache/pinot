@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -42,6 +43,7 @@ public class ItemTransformFunction extends BaseTransformFunction {
   private String[] _keyPath;
   private Dictionary _dictionary;
   private TransformResultMetadata _resultMetadata;
+  private boolean _perKeyNullsAvailable;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
@@ -68,12 +70,14 @@ public class ItemTransformFunction extends BaseTransformFunction {
       if (valueDataSource == null) {
         valueDataSource = new NullDataSource(key);
       }
+      _perKeyNullsAvailable = false;
     } else {
       OpenStructDataSource osDs = (OpenStructDataSource) dataSource;
       valueDataSource = osDs.getDataSource(key);
       if (valueDataSource == null) {
         valueDataSource = OpenStructNullDataSource.forAbsentKey(osDs, key);
       }
+      _perKeyNullsAvailable = true;
     }
     // Only expose the dictionary when the forward index is dict-encoded. A column can have a dictionary alongside
     // a RAW forward index (e.g. dict + inverted/range), in which case transformToDictIdsSV would fail because
@@ -101,9 +105,21 @@ public class ItemTransformFunction extends BaseTransformFunction {
     return _dictionary;
   }
 
+  /// Null semantics differ between the two backing column types:
+  ///
+  /// - OPEN_STRUCT keeps a per-key presence bitmap (materialized into a
+  ///   {@link org.apache.pinot.segment.spi.index.reader.NullValueVectorReader} on both the mutable and sealed paths),
+  ///   so the per-key value set knows exactly which docs lack the key. Use it.
+  /// - MAP has no per-key null information — an absent key resolves to a
+  ///   {@link NullDataSource} that carries only a forward index, so the per-key value set would report "no nulls" for
+  ///   a key that is missing from every doc. Fall back to {@link BaseTransformFunction#getNullBitmap} which ORs the
+  ///   argument bitmaps, yielding the MAP column's own null bitmap: a conservative over-estimate that downstream
+  ///   null handling narrows further.
+  @Nullable
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    return valueBlock.getBlockValueSet(_keyPath).getNullBitmap();
+    return _perKeyNullsAvailable ? valueBlock.getBlockValueSet(_keyPath).getNullBitmap()
+        : super.getNullBitmap(valueBlock);
   }
 
   @Override

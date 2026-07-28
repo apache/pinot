@@ -26,17 +26,17 @@ import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableFo
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeInvertedIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /// A single key's mutable column for an OPEN_STRUCT column: forward index (dictionary-encoded)
 /// + presence bitmap tracking which docIds had this key set.
 ///
-/// Single-writer during ingestion; presence bitmap and forward index are not thread-safe for
-/// concurrent writes.
+/// Single-writer during ingestion. The presence bitmap is a {@link ThreadSafeMutableRoaringBitmap},
+/// so queries may read it concurrently with ingestion; the forward index, dictionary and inverted
+/// index carry the same single-writer/multiple-readers contract.
 public class MutableKeyColumn implements Closeable {
   private static final int DEFAULT_AVG_STRING_LENGTH = 32;
   private static final int DEFAULT_ROWS_PER_CHUNK = 1000;
@@ -44,7 +44,7 @@ public class MutableKeyColumn implements Closeable {
   private final String _key;
   private final DataType _storedType;
   private final MutableForwardIndex _forwardIndex;
-  private final MutableRoaringBitmap _presenceBitmap;
+  private final ThreadSafeMutableRoaringBitmap _presenceBitmap;
   private final MutableDictionary _dictionary;
   private final RealtimeInvertedIndex _invertedIndex;
 
@@ -56,7 +56,7 @@ public class MutableKeyColumn implements Closeable {
       String allocationContext) {
     _key = key;
     _storedType = storedType;
-    _presenceBitmap = new MutableRoaringBitmap();
+    _presenceBitmap = new ThreadSafeMutableRoaringBitmap();
     _invertedIndex = new RealtimeInvertedIndex();
 
     int estimatedCardinality = Math.max(capacity / 100, 16);
@@ -82,7 +82,7 @@ public class MutableKeyColumn implements Closeable {
   }
 
   /// Bitmap of docIds where this key was present (non-null).
-  public ImmutableRoaringBitmap getPresenceBitmap() {
+  public ThreadSafeMutableRoaringBitmap getPresenceBitmap() {
     return _presenceBitmap;
   }
 

@@ -38,18 +38,22 @@ import org.apache.pinot.spi.data.FieldSpec;
 /// Always columnar — there is no blob branch. Every key that was dense enough during segment
 /// creation gets its own materialized [DataSource] (forward index + optional inverted index /
 /// dictionary). Keys that did not meet the density threshold are stored in an optional sparse
-/// column; the sparse [DataSource] is returned for any unmaterialized key lookup.
+/// column. [#getDataSource(String)] returns `null` for any unmaterialized key — the sparse
+/// {@link DataSource} is never returned from it; sparse keys are read via the JSON/expression
+/// fallback path in the query layer.
 ///
 /// Use [#isMaterialized(String)] and [#isFullyMaterialized()] together to choose
 /// the query execution path:
 /// - Materialized key → fast path via per-key DataSource (inverted/dictionary index available).
-/// - Not materialized + not fully materialized → fall back to the sparse DataSource.
+/// - Not materialized + not fully materialized → key may be in the sparse blob; fall through to
+///   the JSON/expression path (see `MapFilterOperator.tryPerKeyIndex`).
 /// - Not materialized + fully materialized → key is definitively absent; short-circuit.
 ///
 /// Thread-safety: immutable after construction; safe for concurrent reads.
 public class ImmutableOpenStructDataSource extends BaseDataSource implements OpenStructDataSource {
   private final ComplexFieldSpec _fieldSpec;
   private final Map<String, DataSource> _perKeyDataSources;
+  /// Held only as a presence flag for [#isFullyMaterialized()] — nothing reads it as a DataSource.
   @Nullable
   private final DataSource _sparseDataSource;
 

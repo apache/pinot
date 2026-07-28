@@ -34,13 +34,21 @@ public interface OpenStructDataSource extends DataSource {
 
   /// Returns the DataSource for the given key's values. The DataSource's value type is the
   /// per-key declared type (from `childFieldSpecs`) when present, otherwise auto-derived.
+  ///
+  /// Returns `null` when the key has no materialized per-key DataSource in this segment. A `null`
+  /// return does not mean the key is absent from the data — when [#isFullyMaterialized()] is
+  /// `false` the key may still live in the sparse blob. Callers that need a readable source for an
+  /// absent key should synthesize a typed all-null source rather than reading the sparse column.
+  @Nullable
   DataSource getDataSource(String key);
 
   /// Returns whether the given key has a materialized per-key index in this segment. Exact,
   /// O(1) lookup into the materialized key set.
   ///
   /// Query operators use this to choose between the fast path (per-key inverted/dictionary
-  /// index) and the fallback (expression scan over the sparse blob).
+  /// index) and the fallback (expression scan). Note the fallback does not read the sparse blob:
+  /// a non-materialized key resolves to a typed all-null source, so the scan sees NULL at every
+  /// document.
   ///
   /// A `false` return is only a definitive "absent" when [#isFullyMaterialized()] is also
   /// `true`; otherwise the key may still exist in the sparse blob.
@@ -50,17 +58,22 @@ public interface OpenStructDataSource extends DataSource {
   /// blob and the materialized key set is exhaustive.
   ///
   /// When `true`, a `false` return from [#isMaterialized(String)] is a definitive "absent"
-  /// and callers can short-circuit (e.g. a filter operator returns `EmptyFilterOperator`
-  /// for value predicates and `MatchAllFilterOperator` for IS_NULL).
+  /// and callers can treat the key as present-but-all-null — e.g. evaluate predicates against a
+  /// typed all-null DataSource, which yields the correct answer under both null-handling modes
+  /// (an absent key reads as its type default with null handling off, and as NULL with it on).
   boolean isFullyMaterialized();
 
   /// Returns DataSources for all keys present in this segment.
   Map<String, DataSource> getDataSources();
 
-  /// Returns the DataSourceMetadata for the given key's values.
+  /// Returns the DataSourceMetadata for the given key's values, or `null` when the key has no
+  /// materialized per-key DataSource in this segment. See [#getDataSource(String)].
+  @Nullable
   DataSourceMetadata getDataSourceMetadata(String key);
 
-  /// Returns the ColumnIndexContainer for the given key's values.
+  /// Returns the ColumnIndexContainer for the given key's values, or `null` when the key has no
+  /// materialized per-key DataSource in this segment. See [#getDataSource(String)].
+  @Nullable
   ColumnIndexContainer getIndexContainer(String key);
 
   /// Reconstructs the full OPEN_STRUCT value for `docId` as a `Map<String, Object>`, or
