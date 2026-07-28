@@ -348,10 +348,30 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
     }
 
     JsonNode response = postVariantQuery(
-        "SELECT " + EVENT_ID + ", COUNT(*) OVER (PARTITION BY variant_get(" + PAYLOAD
+        "SELECT " + EVENT_ID + ", variant_get(" + PAYLOAD + ", '$.eventType', 'STRING'), "
+            + "COUNT(*) OVER (PARTITION BY variant_get(" + PAYLOAD
             + ", '$.eventType', 'STRING')) FROM " + TABLE_NAME + " ORDER BY " + EVENT_ID);
     assertNoExceptions(response);
-    Assert.assertEquals(response.get("resultTable").get("rows").size(), NUM_DOCS);
+    Assert.assertEquals(
+        response.get("resultTable").get("dataSchema").get("columnDataTypes").toString(),
+        "[\"STRING\",\"STRING\",\"LONG\"]");
+    JsonNode rows = response.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), NUM_DOCS);
+    Assert.assertEquals(rows.get(0).get(0).asText(), "evt-001");
+    Assert.assertEquals(rows.get(0).get(1).asText(), "checkout");
+    Assert.assertEquals(rows.get(0).get(2).asLong(), 2L);
+    Assert.assertEquals(rows.get(1).get(0).asText(), "evt-002");
+    Assert.assertEquals(rows.get(1).get(1).asText(), "view");
+    Assert.assertEquals(rows.get(1).get(2).asLong(), 1L);
+    Assert.assertEquals(rows.get(2).get(0).asText(), "evt-003");
+    Assert.assertEquals(rows.get(2).get(1).asText(), "checkout");
+    Assert.assertEquals(rows.get(2).get(2).asLong(), 2L);
+    Assert.assertEquals(rows.get(3).get(0).asText(), "evt-004");
+    Assert.assertTrue(rows.get(3).get(1).isNull(), "Variant null must extract to the SQL-null partition");
+    Assert.assertEquals(rows.get(3).get(2).asLong(), 2L);
+    Assert.assertEquals(rows.get(4).get(0).asText(), "evt-005");
+    Assert.assertTrue(rows.get(4).get(1).isNull(), "SQL null must remain in the SQL-null partition");
+    Assert.assertEquals(rows.get(4).get(2).asLong(), 2L);
   }
 
   @Test
