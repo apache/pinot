@@ -157,7 +157,10 @@ public final class VariantUtils {
    * Reusable, unboxed destination for vectorized Variant extraction.
    *
    * <p>Only the getter corresponding to the requested {@link ResultType} is defined after a successful extraction.
-   * The instance is mutable and not thread-safe; callers should retain one per transform-function instance.
+   * The instance is mutable and not thread-safe; callers should retain one per transform-function instance. Every
+   * extraction may replace its state. Each successful byte-valued extraction installs a newly materialized array.
+   * Values returned as {@code byte[]} or as a {@link ByteArray} may be retained after this result is reused, but they
+   * are read-only by contract and must be copied before mutation.
    */
   public static final class ReusableResult {
     private final Cursor _cursor = new Cursor();
@@ -195,6 +198,9 @@ public final class VariantUtils {
 
     /**
      * Returns the extracted BYTES, VARIANT, or direct 16-byte UUID representation.
+     *
+     * <p>The returned array is replaced, but not mutated, by the next byte-valued extraction. It may be retained after
+     * this result is reused, but must be treated as immutable and copied before mutation.
      */
     public byte[] getBytesValue() {
       return _bytesValue;
@@ -206,6 +212,9 @@ public final class VariantUtils {
 
     /**
      * Materializes the extracted value in the external representation used by scalar functions and ingestion.
+     *
+     * <p>For BYTES and VARIANT, the returned {@code byte[]} may be retained after this result is reused. It must be
+     * treated as immutable and copied before mutation.
      */
     public Object getExternalValue(ResultType resultType) {
       switch (resultType) {
@@ -240,7 +249,9 @@ public final class VariantUtils {
      * Materializes the extracted value in {@link DataSchema}'s internal representation.
      *
      * <p>TIMESTAMP remains epoch milliseconds and UUID wraps the directly copied 16-byte value, avoiding an
-     * external-object round trip in the multi-stage engine.
+     * external-object round trip in the multi-stage engine. For BYTES, UUID, and VARIANT, the returned
+     * {@link ByteArray} wraps a newly materialized array that may be retained after this result is reused. Neither the
+     * wrapper nor its array may be mutated; callers must copy the array before mutation.
      */
     public Object getInternalValue(ResultType resultType) {
       switch (resultType) {
