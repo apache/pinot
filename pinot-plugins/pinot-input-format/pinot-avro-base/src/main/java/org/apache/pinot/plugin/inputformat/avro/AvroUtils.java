@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
-import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
@@ -151,73 +150,22 @@ public class AvroUtils {
     }
   }
 
-  /**
-   * Helper method to build Avro schema from Pinot schema.
-   *
-   * @param pinotSchema Pinot schema.
-   * @return Avro schema.
-   */
+  /// Builds an Avro schema from a Pinot schema, one non-nullable field per [FieldSpec] in schema order.
+  ///
+  /// Field types come from [AvroSchemaUtil#toAvroSchema(FieldSpec)], which maps the **original (logical)** Pinot data
+  /// type — so BOOLEAN becomes Avro `boolean`, TIMESTAMP a `timestamp-millis` long, BIG_DECIMAL a `big-decimal`
+  /// bytes and UUID a `uuid` string, instead of all four collapsing to their physical storage type. See that method
+  /// for the full mapping table and for the value representation each Avro type expects.
+  ///
+  /// Rows are written into this schema by `SegmentProcessorAvroUtils.convertGenericRowToAvroRecord` using the data
+  /// model returned by `SegmentProcessorAvroUtils.getAvroDataModel()`, which registers the matching logical-type
+  /// conversions; the two must stay in sync.
   public static org.apache.avro.Schema getAvroSchemaFromPinotSchema(Schema pinotSchema) {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
-
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
-      if (fieldSpec.getDataType() == DataType.UUID) {
-        org.apache.avro.Schema uuidSchema = LogicalTypes.uuid().addToSchema(org.apache.avro.Schema.create(
-            org.apache.avro.Schema.Type.STRING));
-        if (fieldSpec.isSingleValueField()) {
-          fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type(uuidSchema).noDefault();
-        } else {
-          fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items(uuidSchema).noDefault();
-        }
-        continue;
-      }
-      DataType storedType = fieldSpec.getDataType().getStoredType();
-      if (fieldSpec.isSingleValueField()) {
-        switch (storedType) {
-          case INT:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().intType().noDefault();
-            break;
-          case LONG:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().longType().noDefault();
-            break;
-          case FLOAT:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().floatType().noDefault();
-            break;
-          case DOUBLE:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().doubleType().noDefault();
-            break;
-          case STRING:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().stringType().noDefault();
-            break;
-          case BYTES:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().bytesType().noDefault();
-            break;
-          default:
-            throw new RuntimeException("Unsupported data type: " + storedType);
-        }
-      } else {
-        switch (storedType) {
-          case INT:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().intType().noDefault();
-            break;
-          case LONG:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().longType().noDefault();
-            break;
-          case FLOAT:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().floatType().noDefault();
-            break;
-          case DOUBLE:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().doubleType().noDefault();
-            break;
-          case STRING:
-            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().stringType().noDefault();
-            break;
-          default:
-            throw new RuntimeException("Unsupported data type: " + storedType);
-        }
-      }
+      fieldAssembler =
+          fieldAssembler.name(fieldSpec.getName()).type(AvroSchemaUtil.toAvroSchema(fieldSpec)).noDefault();
     }
-
     return fieldAssembler.endRecord();
   }
 

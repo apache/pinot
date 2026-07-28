@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -32,6 +34,8 @@ import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class AvroUtilsTest {
@@ -158,6 +162,86 @@ public class AvroUtilsTest {
 
     assertEquals(fieldSchema.getType(), org.apache.avro.Schema.Type.STRING);
     assertEquals(fieldSchema.getLogicalType().getName(), "uuid");
+  }
+
+  /// The generated Avro schema must describe the *logical* Pinot type. Switching on the stored type instead emitted
+  /// `int` for BOOLEAN, a bare `long` for TIMESTAMP, and rejected BIG_DECIMAL outright.
+  @Test
+  public void testGetAvroSchemaFromPinotSchemaUsesLogicalTypes() {
+    Schema pinotSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("intCol", DataType.INT)
+        .addSingleValueDimension("longCol", DataType.LONG)
+        .addSingleValueDimension("floatCol", DataType.FLOAT)
+        .addSingleValueDimension("doubleCol", DataType.DOUBLE)
+        .addSingleValueDimension("boolCol", DataType.BOOLEAN)
+        .addSingleValueDimension("tsCol", DataType.TIMESTAMP)
+        .addSingleValueDimension("bigDecimalCol", DataType.BIG_DECIMAL)
+        .addSingleValueDimension("stringCol", DataType.STRING)
+        .addSingleValueDimension("jsonCol", DataType.JSON)
+        .addSingleValueDimension("bytesCol", DataType.BYTES)
+        .addSingleValueDimension("uuidCol", DataType.UUID)
+        .build();
+
+    org.apache.avro.Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema);
+
+    assertFieldType(avroSchema, "intCol", org.apache.avro.Schema.Type.INT, null);
+    assertFieldType(avroSchema, "longCol", org.apache.avro.Schema.Type.LONG, null);
+    assertFieldType(avroSchema, "floatCol", org.apache.avro.Schema.Type.FLOAT, null);
+    assertFieldType(avroSchema, "doubleCol", org.apache.avro.Schema.Type.DOUBLE, null);
+    assertFieldType(avroSchema, "boolCol", org.apache.avro.Schema.Type.BOOLEAN, null);
+    assertFieldType(avroSchema, "tsCol", org.apache.avro.Schema.Type.LONG, "timestamp-millis");
+    assertFieldType(avroSchema, "bigDecimalCol", org.apache.avro.Schema.Type.BYTES, "big-decimal");
+    assertFieldType(avroSchema, "stringCol", org.apache.avro.Schema.Type.STRING, null);
+    assertFieldType(avroSchema, "jsonCol", org.apache.avro.Schema.Type.STRING, null);
+    assertFieldType(avroSchema, "bytesCol", org.apache.avro.Schema.Type.BYTES, null);
+    assertFieldType(avroSchema, "uuidCol", org.apache.avro.Schema.Type.STRING, "uuid");
+  }
+
+  /// Multi-value columns become arrays of the same value schema. Before the fix the MV switch only covered
+  /// INT/LONG/FLOAT/DOUBLE/STRING, so MV BYTES, BIG_DECIMAL, BOOLEAN and TIMESTAMP all threw or lost their type.
+  @Test
+  public void testGetAvroSchemaFromPinotSchemaForMultiValueColumns() {
+    Schema pinotSchema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("intCol", DataType.INT)
+        .addMultiValueDimension("boolCol", DataType.BOOLEAN)
+        .addMultiValueDimension("tsCol", DataType.TIMESTAMP)
+        .addMultiValueDimension("bigDecimalCol", DataType.BIG_DECIMAL)
+        .addMultiValueDimension("bytesCol", DataType.BYTES)
+        .addMultiValueDimension("uuidCol", DataType.UUID)
+        .build();
+
+    org.apache.avro.Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema);
+
+    assertElementType(avroSchema, "intCol", org.apache.avro.Schema.Type.INT, null);
+    assertElementType(avroSchema, "boolCol", org.apache.avro.Schema.Type.BOOLEAN, null);
+    assertElementType(avroSchema, "tsCol", org.apache.avro.Schema.Type.LONG, "timestamp-millis");
+    assertElementType(avroSchema, "bigDecimalCol", org.apache.avro.Schema.Type.BYTES, "big-decimal");
+    assertElementType(avroSchema, "bytesCol", org.apache.avro.Schema.Type.BYTES, null);
+    assertElementType(avroSchema, "uuidCol", org.apache.avro.Schema.Type.STRING, "uuid");
+  }
+
+  private static void assertFieldType(org.apache.avro.Schema avroSchema, String field,
+      org.apache.avro.Schema.Type expectedType, @Nullable String expectedLogicalType) {
+    assertAvroType(avroSchema.getField(field).schema(), field, expectedType, expectedLogicalType);
+  }
+
+  private static void assertElementType(org.apache.avro.Schema avroSchema, String field,
+      org.apache.avro.Schema.Type expectedType, @Nullable String expectedLogicalType) {
+    org.apache.avro.Schema fieldSchema = avroSchema.getField(field).schema();
+    assertEquals(fieldSchema.getType(), org.apache.avro.Schema.Type.ARRAY, field + " must be an array");
+    assertAvroType(fieldSchema.getElementType(), field, expectedType, expectedLogicalType);
+  }
+
+  private static void assertAvroType(org.apache.avro.Schema schema, String field,
+      org.apache.avro.Schema.Type expectedType, @Nullable String expectedLogicalType) {
+    assertEquals(schema.getType(), expectedType, "unexpected Avro type for " + field);
+    LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(schema);
+    if (expectedLogicalType == null) {
+      assertNull(logicalType, field + " must carry no logical type");
+    } else {
+      assertNotNull(logicalType, field + " must carry the " + expectedLogicalType + " logical type");
+      assertEquals(logicalType.getName(), expectedLogicalType, "unexpected logical type for " + field);
+    }
   }
 
   @Test
