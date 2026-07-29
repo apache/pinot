@@ -400,7 +400,8 @@ public class TableRebalancer {
         try {
           RebalancePreChecker.PreCheckContext preCheckContext =
               new RebalancePreChecker.PreCheckContext(rebalanceJobId, tableNameWithType, tableConfig, currentAssignment,
-                  targetAssignment, tableSubTypeSizeDetails, rebalanceConfig, summaryResult);
+                  targetAssignment, tableSubTypeSizeDetails, rebalanceConfig, summaryResult,
+                  providedTierToSegmentsMap);
           preChecksResult = _rebalancePreChecker.check(preCheckContext);
         } catch (Exception e) {
           tableRebalanceLogger.warn("Caught exception while trying to run the rebalance pre-checks, skipping", e);

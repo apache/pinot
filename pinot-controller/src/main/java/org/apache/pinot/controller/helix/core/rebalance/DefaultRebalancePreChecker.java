@@ -109,12 +109,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
     // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
     preCheckResult.put(DISK_UTILIZATION_DURING_REBALANCE,
-        checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
-            preCheckContext.getTableSubTypeSizeDetails(), diskUtilizationThreshold, true));
+        checkDiskUtilization(preCheckContext, diskUtilizationThreshold, true));
     // Check if all servers involved in the rebalance will have enough disk space after the rebalance.
     preCheckResult.put(DISK_UTILIZATION_AFTER_REBALANCE,
-        checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
-            preCheckContext.getTableSubTypeSizeDetails(), diskUtilizationThreshold, false));
+        checkDiskUtilization(preCheckContext, diskUtilizationThreshold, false));
 
     preCheckResult.put(REBALANCE_CONFIG_OPTIONS, checkRebalanceConfig(rebalanceConfig, tableConfig,
         preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
@@ -274,9 +272,18 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     return RebalancePreCheckerResult.error("Got exception when fetching instance assignment, check manually");
   }
 
-  private RebalancePreCheckerResult checkDiskUtilization(Map<String, Map<String, String>> currentAssignment,
-      Map<String, Map<String, String>> targetAssignment,
-      TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, double threshold, boolean worstCase) {
+  /**
+   * Estimates whether the servers of the target assignment stay within the disk utilization threshold, based on the
+   * average segment size and the number of segments added to (and, unless checking for the worst case, removed from)
+   * each server. Every segment is assumed to take up disk space on each server it is assigned to. Downstream projects
+   * where that does not hold (e.g. because a segment can be stored outside of the server, as indicated by
+   * {@link TierConfig#getTierBackend()}) can override this.
+   */
+  protected RebalancePreCheckerResult checkDiskUtilization(PreCheckContext preCheckContext, double threshold,
+      boolean worstCase) {
+    Map<String, Map<String, String>> currentAssignment = preCheckContext.getCurrentAssignment();
+    Map<String, Map<String, String>> targetAssignment = preCheckContext.getTargetAssignment();
+    TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails = preCheckContext.getTableSubTypeSizeDetails();
     boolean isDiskUtilSafe = true;
     StringBuilder message =
         new StringBuilder("UNSAFE. Servers with unsafe disk utilization (>" + (short) (threshold * 100) + "%): ");
