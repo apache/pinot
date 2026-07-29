@@ -218,10 +218,15 @@ public class LoaderTest {
 
   private void testBuiltInVirtualColumns(IndexSegment indexSegment) {
     assertTrue(indexSegment.getColumnNames().containsAll(
-        Arrays.asList(BuiltInVirtualColumn.DOCID, BuiltInVirtualColumn.HOSTNAME, BuiltInVirtualColumn.SEGMENTNAME)));
+        Arrays.asList(BuiltInVirtualColumn.DOCID, BuiltInVirtualColumn.HOSTNAME, BuiltInVirtualColumn.SEGMENTNAME,
+            BuiltInVirtualColumn.CREATIONTIME)));
     assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.DOCID));
     assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.HOSTNAME));
     assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.SEGMENTNAME));
+    assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.CREATIONTIME));
+    assertFalse(indexSegment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
+    assertEquals(indexSegment.getValue(0, BuiltInVirtualColumn.CREATIONTIME),
+        indexSegment.getSegmentMetadata().getIndexCreationTime());
   }
 
   /// Tests loading default string column with empty ("") default null value.

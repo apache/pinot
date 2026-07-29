@@ -2246,7 +2246,9 @@ public class CommonConstants {
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
       public static final String PARTITIONID = "$partitionId";
-      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID);
+      public static final String CREATIONTIME = "$creationTime";
+      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS =
+          Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID, CREATIONTIME);
     }
   }
 

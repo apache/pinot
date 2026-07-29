@@ -27,9 +27,11 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.CommonConstants.Server.Upsert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,8 +66,9 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       if (timeColumnName != null) {
         comparisonColumns = List.of(timeColumnName);
       } else {
-        // No comparison column and no time column: use segment creation time for comparison
-        comparisonColumns = List.of();
+        // No comparison column and no time column: use segment creation time for OFFLINE upsert comparison.
+        comparisonColumns = tableConfig.getTableType() == TableType.OFFLINE
+            ? List.of(BuiltInVirtualColumn.CREATIONTIME) : List.of();
       }
     }
 

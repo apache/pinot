@@ -149,7 +149,8 @@ public class MutableSegmentImplTest {
         assertEquals(actualDictionary.length(), expectedDictionary.length());
 
         // Allow the segment name to be different
-        if (column.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
+        if (column.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)
+            || column.equals(CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME)) {
           continue;
         }
 

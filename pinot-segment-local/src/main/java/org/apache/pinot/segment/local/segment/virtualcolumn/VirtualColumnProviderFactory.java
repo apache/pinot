@@ -61,5 +61,10 @@ public class VirtualColumnProviderFactory {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.PARTITIONID, FieldSpec.DataType.STRING, false,
           PartitionIdVirtualColumnProvider.class));
     }
+
+    if (!schema.hasColumn(BuiltInVirtualColumn.CREATIONTIME)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.CREATIONTIME, FieldSpec.DataType.LONG, true,
+          CreationTimeVirtualColumnProvider.class));
+    }
   }
 }

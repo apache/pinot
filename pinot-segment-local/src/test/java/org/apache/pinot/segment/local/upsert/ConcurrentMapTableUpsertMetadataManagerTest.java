@@ -37,8 +37,10 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 
@@ -79,6 +81,24 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     when(segment.getQueryableDocIds()).thenReturn(queryableBitmap);
     when(segment.getSegmentName()).thenReturn("seg1");
     return segment;
+  }
+
+  @Test
+  public void testOfflineWithoutComparisonUsesCreationTimeVirtualColumn()
+      throws Exception {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .build();
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(new File(RAW_TABLE_NAME));
+
+    try (TableUpsertMetadataManager manager = TableUpsertMetadataManagerFactory.create(new PinotConfiguration(),
+        tableConfig, SCHEMA, tableDataManager, null)) {
+      UpsertContext context = manager.getContext();
+      assertEquals(context.getComparisonColumns(), List.of(CREATIONTIME));
+    }
   }
 
   @Test
