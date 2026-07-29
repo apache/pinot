@@ -32,6 +32,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -48,6 +49,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,10 +119,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
       // Get all segment metadata for completed segments (DONE/UPLOADED status).
       List<SegmentZKMetadata> completedSegmentsZKMetadata = new ArrayList<>();
-      Map<Integer, String> partitionToLatestLLCSegmentName = new HashMap<>();
-      Set<Integer> allPartitions = new HashSet<>();
-      getCompletedSegmentsInfo(realtimeTableName, completedSegmentsZKMetadata, partitionToLatestLLCSegmentName,
-          allPartitions);
+      Map<TopicPartitionId, String> partitionToLatestLLCSegmentName = new HashMap<>();
+      Set<TopicPartitionId> allPartitions = new HashSet<>();
+      getCompletedSegmentsInfo(realtimeTableName, tableConfig, completedSegmentsZKMetadata,
+          partitionToLatestLLCSegmentName, allPartitions);
       if (completedSegmentsZKMetadata.isEmpty()) {
         LOGGER.info("No realtime-completed segments found for table: {}, skipping task generation: {}",
             realtimeTableName, taskType);
@@ -245,22 +247,25 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
    * Fetch completed (DONE/UPLOADED) segment and partition information
    *
    * @param realtimeTableName the realtime table name
+   * @param tableConfig the table config for multi-stream context
    * @param completedSegmentsZKMetadata list for collecting the completed (DONE/UPLOADED) segments ZK metadata
    * @param partitionToLatestLLCSegmentName map for collecting the partitionId to the latest LLC segment name
    * @param allPartitions set for collecting all partition ids
    */
-  private void getCompletedSegmentsInfo(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
-      Map<Integer, String> partitionToLatestLLCSegmentName, Set<Integer> allPartitions) {
+  private void getCompletedSegmentsInfo(String realtimeTableName, TableConfig tableConfig,
+      List<SegmentZKMetadata> completedSegmentsZKMetadata,
+      Map<TopicPartitionId, String> partitionToLatestLLCSegmentName, Set<TopicPartitionId> allPartitions) {
+    boolean hasMultipleStreams = IngestionConfigUtils.hasMultipleStreams(tableConfig);
     List<SegmentZKMetadata> segmentsZKMetadata = getNonConsumingSegmentsZKMetadataForRealtimeTable(realtimeTableName);
 
-    Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
+    Map<TopicPartitionId, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       completedSegmentsZKMetadata.add(segmentZKMetadata);
 
       // Skip UPLOADED segments that don't conform to the LLC segment name
-      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName());
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName(), hasMultipleStreams);
       if (llcSegmentName != null) {
-        int partitionId = llcSegmentName.getPartitionGroupId();
+        TopicPartitionId partitionId = llcSegmentName.getTopicPartitionId();
         allPartitions.add(partitionId);
         latestLLCSegmentNameMap.compute(partitionId, (k, latestLLCSegmentName) -> {
           if (latestLLCSegmentName == null
@@ -273,7 +278,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       }
     }
 
-    for (Map.Entry<Integer, LLCSegmentName> entry : latestLLCSegmentNameMap.entrySet()) {
+    for (Map.Entry<TopicPartitionId, LLCSegmentName> entry : latestLLCSegmentNameMap.entrySet()) {
       partitionToLatestLLCSegmentName.put(entry.getKey(), entry.getValue().getSegmentName());
     }
   }

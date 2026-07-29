@@ -225,7 +225,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
       case UPLOADED_SEGMENT_3:
         return 1;
       default:
-        return new LLCSegmentName(segmentName).getPartitionGroupId();
+        return new LLCSegmentName(segmentName).getTopicPartitionId().toMultiTopicPinotPartitionId();
     }
   }
 }

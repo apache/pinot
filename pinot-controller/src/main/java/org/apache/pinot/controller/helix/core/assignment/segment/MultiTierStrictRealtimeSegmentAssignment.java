@@ -32,6 +32,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -72,7 +73,9 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
       } else {
         // Reassign CONSUMING and COMPLETED segments
         List<String> instancesAssigned =
-            assignConsumingSegment(getPartitionIdUsingCache(segmentName), instancePartitions);
+            assignConsumingSegment(
+                getPartitionIdUsingCache(segmentName),
+                instancePartitions);
         String state = instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)
             ? CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING
             : CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
@@ -96,7 +99,8 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
    */
   @Nullable
   @Override
-  protected Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {
+  protected Set<String> getExistingAssignment(TopicPartitionId partitionId,
+      Map<String, Map<String, String>> currentAssignment) {
     LLCSegmentName latestLLCSegmentName = null;
     Set<String> latestAssignment = null;
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
@@ -107,7 +111,8 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
       if (llcSegmentName == null) {
         continue;
       }
-      if (llcSegmentName.getPartitionGroupId() == partitionId && (latestLLCSegmentName == null
+      if (llcSegmentName.getTopicPartitionId().equals(partitionId)
+          && (latestLLCSegmentName == null
           || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber())) {
         latestLLCSegmentName = llcSegmentName;
         latestAssignment = entry.getValue().keySet();

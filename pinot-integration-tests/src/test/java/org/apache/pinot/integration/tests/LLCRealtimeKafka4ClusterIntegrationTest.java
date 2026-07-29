@@ -111,7 +111,7 @@ public class LLCRealtimeKafka4ClusterIntegrationTest extends LLCRealtimeClusterI
           if (is.getInstanceStateMap(segmentNameStr).values().contains(
               CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
             LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-            if (segmentName.getPartitionGroupId() == partition) {
+            if (segmentName.getTopicPartitionId().toMultiTopicPinotPartitionId() == partition) {
               seqNum.set(segmentName.getSequenceNumber());
             }
           }

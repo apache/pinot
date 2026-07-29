@@ -39,7 +39,7 @@ public class LLCSegmentNameTest {
     assertEquals(segmentName, "myTable__0__1__20160609T2142Z");
     assertTrue(LLCSegmentName.isLLCSegment(segmentName));
     assertEquals(llcSegmentName.getTableName(), "myTable");
-    assertEquals(llcSegmentName.getPartitionGroupId(), 0);
+    assertEquals(llcSegmentName.getTopicPartitionId().getPartitionId(), 0);
     assertEquals(llcSegmentName.getSequenceNumber(), 1);
 
     // Invalid segment name
@@ -58,7 +58,7 @@ public class LLCSegmentNameTest {
 
     LLCSegmentName segName1 = new LLCSegmentName(tableName, partitionGroupId, sequenceNumber, msSinceEpoch);
     Assert.assertEquals(segName1.getSegmentName(), segmentName);
-    Assert.assertEquals(segName1.getPartitionGroupId(), partitionGroupId);
+    Assert.assertEquals(segName1.getTopicPartitionId().getPartitionId(), partitionGroupId);
     Assert.assertEquals(segName1.getCreationTime(), creationTime);
     Assert.assertEquals(segName1.getCreationTimeMs(), creationTimeInMs);
     Assert.assertEquals(segName1.getSequenceNumber(), sequenceNumber);
@@ -66,7 +66,7 @@ public class LLCSegmentNameTest {
 
     LLCSegmentName segName2 = new LLCSegmentName(segmentName);
     Assert.assertEquals(segName2.getSegmentName(), segmentName);
-    Assert.assertEquals(segName2.getPartitionGroupId(), partitionGroupId);
+    Assert.assertEquals(segName2.getTopicPartitionId().getPartitionId(), partitionGroupId);
     Assert.assertEquals(segName2.getCreationTime(), creationTime);
     Assert.assertEquals(segName2.getCreationTimeMs(), creationTimeInMs);
     Assert.assertEquals(segName2.getSequenceNumber(), sequenceNumber);
@@ -94,5 +94,23 @@ public class LLCSegmentNameTest {
     LLCSegmentName[] testSorted = new LLCSegmentName[]{segName3, segName1, segName4, segName5, segName6};
     Arrays.sort(testSorted);
     Assert.assertEquals(testSorted, new LLCSegmentName[]{segName5, segName1, segName6, segName3, segName4});
+  }
+
+  @Test
+  public void testContextAwareParsing() {
+    // Old format with hasMultipleStreams=true decomposes composite
+    LLCSegmentName withContext = new LLCSegmentName("myTable__10003__5__20250101T0000Z", true);
+    assertEquals(withContext.getTopicPartitionId().getTopicId(), 1);
+    assertEquals(withContext.getTopicPartitionId().getPartitionId(), 3);
+
+    // Old format with hasMultipleStreams=false keeps raw partition
+    LLCSegmentName withoutContext = new LLCSegmentName("myTable__10003__5__20250101T0000Z", false);
+    assertEquals(withoutContext.getTopicPartitionId().getTopicId(), 0);
+    assertEquals(withoutContext.getTopicPartitionId().getPartitionId(), 10003);
+
+    // Small partition ID stays unchanged even with hasMultipleStreams=true
+    LLCSegmentName small = new LLCSegmentName("myTable__5__3__20250101T0000Z", true);
+    assertEquals(small.getTopicPartitionId().getTopicId(), 0);
+    assertEquals(small.getTopicPartitionId().getPartitionId(), 5);
   }
 }

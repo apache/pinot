@@ -19,8 +19,8 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,8 +29,10 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 /**
@@ -66,7 +68,7 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
   //    Replacing a segment with a segment from a different partition should not be allowed for upsert/dedup table
   //    because it will cause the segment being served by the wrong servers. If this happens during the table
   //    rebalance, another rebalance might be needed to fix the assignment.
-  private final Object2IntOpenHashMap<String> _segmentPartitionIdMap = new Object2IntOpenHashMap<>();
+  private final Map<String, TopicPartitionId> _segmentPartitionIdMap = new HashMap<>();
 
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
@@ -78,8 +80,9 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
     _logger.info("Assigning segment: {} with instance partitions: {} for table: {}", segmentName, instancePartitions,
         _tableNameWithType);
 
-    int partitionId = getPartitionId(segmentName);
-    List<String> instancesAssigned = assignConsumingSegment(partitionId, instancePartitions);
+    TopicPartitionId partitionId = getPartitionId(segmentName);
+    List<String> instancesAssigned = assignConsumingSegment(
+        partitionId, instancePartitions);
     Set<String> existingAssignment = getExistingAssignment(partitionId, currentAssignment);
     // Check if the candidate assignment is consistent with existing assignment. Use existing assignment if not.
     if (existingAssignment == null) {
@@ -103,7 +106,8 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
    * partition. We try to derive the partition id from segment name to avoid ZK reads.
    */
   @Nullable
-  protected Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {
+  protected Set<String> getExistingAssignment(TopicPartitionId partitionId,
+      Map<String, Map<String, String>> currentAssignment) {
     List<String> uploadedSegments = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       // Skip OFFLINE segments as they are not rebalanced, so their assignment in idealState can be stale.
@@ -115,13 +119,13 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
         uploadedSegments.add(entry.getKey());
         continue;
       }
-      if (llcSegmentName.getPartitionGroupId() == partitionId) {
+      if (llcSegmentName.getTopicPartitionId().equals(partitionId)) {
         return entry.getValue().keySet();
       }
     }
     // Check ZK metadata for uploaded segments to look for a segment that's in the same partition
     for (String uploadedSegment : uploadedSegments) {
-      if (getPartitionId(uploadedSegment) == partitionId) {
+      if (getPartitionId(uploadedSegment).equals(partitionId)) {
         return currentAssignment.get(uploadedSegment).keySet();
       }
     }
@@ -139,12 +143,15 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
   /**
    * Returns the partition id of the given segment.
    */
-  private int getPartitionId(String segmentName) {
+  private TopicPartitionId getPartitionId(String segmentName) {
     Integer partitionId =
         SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
     Preconditions.checkState(partitionId != null, "Failed to find partition id for segment: %s of table: %s",
         segmentName, _tableNameWithType);
-    return partitionId;
+    boolean hasMultipleStreams =
+        IngestionConfigUtils.hasMultipleStreams(_tableConfig);
+    return TopicPartitionId.fromPartitionGroupMetadata(
+        partitionId, hasMultipleStreams);
   }
 
   /**
@@ -157,7 +164,8 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
   /**
    * Returns the partition id of the given segment, using cached partition id if exists.
    */
-  protected int getPartitionIdUsingCache(String segmentName) {
-    return _segmentPartitionIdMap.computeIntIfAbsent(segmentName, this::getPartitionId);
+  protected TopicPartitionId getPartitionIdUsingCache(String segmentName) {
+    return _segmentPartitionIdMap.computeIfAbsent(segmentName,
+        this::getPartitionId);
   }
 }

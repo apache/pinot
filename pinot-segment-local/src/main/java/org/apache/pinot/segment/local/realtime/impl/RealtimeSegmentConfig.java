@@ -72,6 +72,7 @@ public class RealtimeSegmentConfig {
   @Nullable
   private final MultiColumnTextIndexConfig _multiColIndexConfig;
   private final boolean _dropRecordOnPartitionMismatch;
+  private final boolean _hasMultipleStreams;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
 
@@ -101,7 +102,8 @@ public class RealtimeSegmentConfig {
       @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager,
       String consumerDir,
       @Nullable MultiColumnTextIndexConfig textIndexConfig,
-      boolean dropRecordOnPartitionMismatch) {
+      boolean dropRecordOnPartitionMismatch,
+      boolean hasMultipleStreams) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -125,6 +127,7 @@ public class RealtimeSegmentConfig {
     _consumerDir = consumerDir;
     _multiColIndexConfig = textIndexConfig;
     _dropRecordOnPartitionMismatch = dropRecordOnPartitionMismatch;
+    _hasMultipleStreams = hasMultipleStreams;
   }
 
   public String getTableNameWithType() {
@@ -224,6 +227,10 @@ public class RealtimeSegmentConfig {
     return _dropRecordOnPartitionMismatch;
   }
 
+  public boolean hasMultipleStreams() {
+    return _hasMultipleStreams;
+  }
+
   public static class Builder {
     private String _tableNameWithType;
     private String _segmentName;
@@ -252,6 +259,7 @@ public class RealtimeSegmentConfig {
     private String _consumerDir;
     private MultiColumnTextIndexConfig _textIndexConfig;
     private boolean _dropRecordOnPartitionMismatch;
+    private boolean _hasMultipleStreams;
 
     public Builder() {
       _indexConfigByCol = new HashMap<>();
@@ -429,6 +437,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setHasMultipleStreams(boolean hasMultipleStreams) {
+      _hasMultipleStreams = hasMultipleStreams;
+      return this;
+    }
+
     public RealtimeSegmentConfig build() {
       Map<String, FieldIndexConfigs> indexConfigByCol = Maps.newHashMapWithExpectedSize(_indexConfigByCol.size());
       for (Map.Entry<String, FieldIndexConfigs.Builder> entry : _indexConfigByCol.entrySet()) {
@@ -439,7 +452,8 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, Collections.unmodifiableMap(indexConfigByCol), _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _ingestionAggregationConfigs, _defaultNullHandlingEnabled, _partitionUpsertMetadataManager,
-          _partitionDedupMetadataManager, _consumerDir, _textIndexConfig, _dropRecordOnPartitionMismatch);
+          _partitionDedupMetadataManager, _consumerDir, _textIndexConfig, _dropRecordOnPartitionMismatch,
+          _hasMultipleStreams);
     }
   }
 }

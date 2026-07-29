@@ -33,6 +33,7 @@ import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.TopicPartitionId;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
@@ -112,14 +113,15 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
   private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
     int segmentPartitionId =
         SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
-    return assignConsumingSegment(segmentPartitionId, instancePartitions);
+    boolean hasMultipleStreams = IngestionConfigUtils.hasMultipleStreams(_tableConfig);
+    TopicPartitionId topicPartitionId =
+        TopicPartitionId.fromPartitionGroupMetadata(segmentPartitionId, hasMultipleStreams);
+    return assignConsumingSegment(topicPartitionId, instancePartitions);
   }
 
-  protected List<String> assignConsumingSegment(int segmentPartitionId, InstancePartitions instancePartitions) {
-    // For multi-stream tables, Pinot partition IDs are encoded as (streamIndex * 10000 + streamPartitionId).
-    // Extract the stream-level partition id before computing the instance index to avoid incorrect slot mapping.
-    segmentPartitionId =
-        IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_tableConfig, segmentPartitionId);
+  protected List<String> assignConsumingSegment(TopicPartitionId topicPartitionId,
+      InstancePartitions instancePartitions) {
+    int segmentPartitionId = topicPartitionId.getPartitionId();
 
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     int numPartitions = instancePartitions.getNumPartitions();
