@@ -44,7 +44,6 @@ import java.util.UUID;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -57,14 +56,27 @@ import org.apache.pinot.spi.utils.UuidUtils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * The <code>DataSchema</code> class describes the schema of {@link DataTable}.
- */
+/// Describes the schema of a [org.apache.pinot.common.datatable.DataTable].
+///
+/// Fields are never reassigned after construction, but [#getColumnNames] and [#getColumnDataTypes] hand out the
+/// internal arrays without copying, so instances are not immutable: `BaseGapfillProcessor` rewrites column names in
+/// place.
+///
+/// Read-only sharing across threads is common and must stay safe: in the multi-stage engine a stage plan is
+/// deserialized once per stage and then handed to every worker of that stage, so the `DataSchema` of each plan node is
+/// read concurrently by all worker threads on the server.
 @JsonPropertyOrder({"columnNames", "columnDataTypes"})
 public class DataSchema {
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
-  private ColumnDataType[] _storedColumnDataTypes;
+
+  /// Lazily computed cache of [#getStoredColumnDataTypes].
+  ///
+  /// `volatile` is required, not just for the null check in [#getStoredColumnDataTypes]: without it the array
+  /// contents are published unsafely, and a racing thread can read the non-null array reference while still seeing
+  /// `null` for its elements. Downstream code (e.g. `TypeUtils.convert`, `DataBlockExtractUtils.extractValue`) then
+  /// switches on a `null` stored type and fails with a `NullPointerException`.
+  private volatile ColumnDataType[] _storedColumnDataTypes;
 
   /**
    * Used by both Broker and Server to generate results for EXPLAIN PLAN queries.
@@ -101,9 +113,11 @@ public class DataSchema {
     return _columnDataTypes;
   }
 
-  /**
-   * Lazy compute the _storeColumnDataTypes field.
-   */
+  /// Returns the stored type of each column, lazily computing and caching it on first access.
+  ///
+  /// Uses the racy-single-check idiom: two threads may each compute the array, but both compute the same values, so
+  /// the duplicate work is harmless. Correctness relies on `_storedColumnDataTypes` being `volatile`; see the field
+  /// for why.
   @JsonIgnore
   public ColumnDataType[] getStoredColumnDataTypes() {
     ColumnDataType[] storedColumnDataTypes = _storedColumnDataTypes;
