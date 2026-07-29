@@ -245,6 +245,32 @@ public class ExpressionTransformerTest {
     Assert.assertFalse(row.isNullValue("payload"));
   }
 
+  @Test
+  public void testLegacyNonDeterministicTransformFunctionRemainsRuntimeCompatible() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("eventTimeMs", FieldSpec.DataType.LONG)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("eventTimeMs", "now()")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testNonDeterministicTransformFunctionStillRunsAtRuntime")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    long lowerBound = System.currentTimeMillis();
+    expressionTransformer.transform(row);
+    long upperBound = System.currentTimeMillis();
+
+    Object value = row.getValue("eventTimeMs");
+    Assert.assertTrue(value instanceof Long, "Expected now() transform to produce a LONG value");
+    long eventTimeMs = (Long) value;
+    long toleranceMs = 1000;
+    Assert.assertTrue(eventTimeMs >= lowerBound - toleranceMs);
+    Assert.assertTrue(eventTimeMs <= upperBound + toleranceMs);
+  }
+
   /**
    * If destination field already exists in the row, do not execute transform function
    */

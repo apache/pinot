@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -187,6 +188,53 @@ public class SchemaUtilsTest {
             .build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+  }
+
+  @Test
+  public void testCompatibilityGrandfathersExistingNonDeterministicTransform() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("eventTimeMs", DataType.LONG).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("eventTimeMs", "now()")));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
+
+    // A new table using this transform is still rejected.
+    Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, schema));
+
+    // Schema validation checks an already-associated, unchanged table config, so the legacy transform is
+    // grandfathered while the rest of table/schema compatibility validation continues to run.
+    SchemaUtils.validate(schema, List.of(tableConfig));
+  }
+
+  @Test
+  public void testSchemaTransformVolatility()
+      throws Exception {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("eventTimeMs", DataType.LONG).build();
+    schema.getFieldSpecFor("eventTimeMs").setTransformFunction("now()");
+
+    // Runtime validation remains permissive so a legacy schema already stored in ZK can still be loaded.
+    SchemaUtils.validate(schema);
+
+    IllegalStateException nonDeterministicError = Assert.expectThrows(IllegalStateException.class,
+        () -> SchemaUtils.validate(schema, List.of()));
+    Assert.assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"),
+        nonDeterministicError.getMessage());
+
+    Schema existingSchema = Schema.fromString(schema.toString());
+    Schema unchangedTransform = Schema.fromString(schema.toString());
+    unchangedTransform.addField(new DimensionFieldSpec("newColumn", DataType.STRING, true));
+    SchemaUtils.validate(unchangedTransform, List.of(), false, existingSchema);
+
+    unchangedTransform.getFieldSpecFor("eventTimeMs").setTransformFunction("plus(now(), 1)");
+    nonDeterministicError = Assert.expectThrows(IllegalStateException.class,
+        () -> SchemaUtils.validate(unchangedTransform, List.of(), false, existingSchema));
+    Assert.assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"),
+        nonDeterministicError.getMessage());
+
+    unchangedTransform.getFieldSpecFor("eventTimeMs").setTransformFunction("rand(123)");
+    SchemaUtils.validate(unchangedTransform, List.of(), false, existingSchema);
   }
 
   private Map<String, String> getStreamConfigs() {

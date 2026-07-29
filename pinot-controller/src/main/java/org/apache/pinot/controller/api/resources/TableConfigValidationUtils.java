@@ -59,8 +59,15 @@ public final class TableConfigValidationUtils {
   public static void validateTableConfig(TableConfig tableConfig, Schema schema,
       @Nullable String typesToSkip, PinotHelixResourceManager resourceManager,
       ControllerConf controllerConf, @Nullable PinotTaskManager taskManager) {
+    validateTableConfig(tableConfig, schema, typesToSkip, resourceManager, controllerConf, taskManager, null);
+  }
+
+  public static void validateTableConfig(TableConfig tableConfig, Schema schema,
+      @Nullable String typesToSkip, PinotHelixResourceManager resourceManager,
+      ControllerConf controllerConf, @Nullable PinotTaskManager taskManager,
+      @Nullable TableConfig existingTableConfig) {
     validateEnvironmentVariables(tableConfig);
-    TableConfigUtils.validate(tableConfig, schema, typesToSkip);
+    TableConfigUtils.validate(tableConfig, schema, typesToSkip, existingTableConfig);
     TableConfigUtils.validateTableName(tableConfig);
     TableConfigUtils.ensureMinReplicas(tableConfig, controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, controllerConf.getDimTableMaxSize());
