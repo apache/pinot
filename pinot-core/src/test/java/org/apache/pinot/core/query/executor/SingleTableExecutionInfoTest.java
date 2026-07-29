@@ -81,7 +81,34 @@ public class SingleTableExecutionInfoTest {
 
     // Acquired segment data managers list still tracks the duo once (one reference to release)
     assertEquals(info.getSegmentDataManagers().size(), 2);
+    // numSegmentsQueried counts the queried unit per manager: a duo reports 1 (it is one logical segment
+    // mid-commit), so single(1) + duo(1) == 2 even though three index segments are scanned.
     assertEquals(info.getNumSegmentsAcquired(), 2);
+  }
+
+  /**
+   * {@code numSegmentsQueried} (via {@link SingleTableExecutionInfo#getNumSegmentsAcquired()}) sums the
+   * {@link SegmentDataManager#getNumQueriedSegments()} of each acquired manager rather than counting managers, so a
+   * manager that folds multiple independently addressable segments under one map entry is reflected in the metric.
+   */
+  @Test
+  public void testGetNumSegmentsAcquiredSumsQueriedSegmentsPerManager()
+      throws TableNotFoundException {
+    SegmentDataManager single = mockImmutableSegmentDataManager("seg00");
+    // Simulate a manager that folds multiple segments under one map entry; no current SegmentDataManager
+    // reports more than 1, so the count is stubbed to exercise the summation.
+    SegmentDataManager multi = mockImmutableSegmentDataManager("multiSegmentMgr");
+    when(multi.getNumQueriedSegments()).thenReturn(5);
+
+    InstanceDataManager instanceDataManager =
+        mockInstanceDataManager(Arrays.asList(single, multi), /*isUpsertEnabled=*/ false);
+
+    SingleTableExecutionInfo info = SingleTableExecutionInfo.create(instanceDataManager, TABLE_NAME_WITH_TYPE,
+        Arrays.asList("seg00", "multiSegmentMgr"), null, mock(QueryContext.class));
+
+    // Two managers acquired, but they contribute 1 + 5 == 6 queried segments.
+    assertEquals(info.getSegmentDataManagers().size(), 2);
+    assertEquals(info.getNumSegmentsAcquired(), 6);
   }
 
   /**
@@ -167,6 +194,7 @@ public class SingleTableExecutionInfoTest {
     when(sdm.getSegmentName()).thenReturn(segmentName);
     when(sdm.getSegment()).thenReturn(segment);
     when(sdm.getReferenceCount()).thenReturn(1);
+    when(sdm.getNumQueriedSegments()).thenReturn(1);
     return sdm;
   }
 
@@ -176,6 +204,7 @@ public class SingleTableExecutionInfoTest {
     when(sdm.getSegmentName()).thenReturn(segmentName);
     when(sdm.getSegment()).thenReturn(segment);
     when(sdm.getReferenceCount()).thenReturn(1);
+    when(sdm.getNumQueriedSegments()).thenReturn(1);
     return sdm;
   }
 }

@@ -210,7 +210,13 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
 
   @Override
   public int getNumSegmentsAcquired() {
-    return _segmentDataManagers.size();
+    // Count the physical segments each manager contributes, not the number of managers, so that a manager wrapping
+    // multiple segments (e.g. a group folded under one map entry) is reflected in numSegmentsQueried.
+    int numSegmentsAcquired = 0;
+    for (SegmentDataManager segmentDataManager : _segmentDataManagers) {
+      numSegmentsAcquired += segmentDataManager.getNumQueriedSegments();
+    }
+    return numSegmentsAcquired;
   }
 
   @Override

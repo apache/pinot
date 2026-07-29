@@ -102,6 +102,20 @@ public abstract class SegmentDataManager {
   }
 
   /**
+   * Number of physical segments this manager contributes to the per-query {@code numSegmentsQueried} metric.
+   * Defaults to 1 — a manager is one logical queried unit. A manager that folds multiple independently addressable
+   * segments under a single map entry overrides this to its member count, so the reported query cost stays
+   * comparable to querying the same segments unwrapped.
+   *
+   * <p>This is intentionally distinct from {@link #getSegments()}: a multi-segment manager that represents a single
+   * logical segment mid-transition (a still-consuming segment together with its committed immutable counterpart)
+   * keeps the default of 1.
+   */
+  public int getNumQueriedSegments() {
+    return 1;
+  }
+
+  /**
    * Offloads the segment from the metadata management (e.g. upsert metadata), but not releases the resources yet
    * because there might be queries still accessing the segment.
    */
