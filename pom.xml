@@ -59,6 +59,7 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
+    <module>pinot-java11-client-verifier</module>
     <module>pinot-query-planner-spi</module>
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
@@ -198,7 +199,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.0</stax2-api.version>
-    <aws.sdk.version>2.49.3</aws.sdk.version>
+    <aws.sdk.version>2.49.4</aws.sdk.version>
     <azure.sdk.version>1.3.7</azure.sdk.version>
     <azure.msal4j.version>1.25.1</azure.msal4j.version>
     <joda-time.version>2.14.3</joda-time.version>
@@ -2246,7 +2247,7 @@
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
-          <version>5.0.0</version>
+          <version>5.1.1</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -2433,7 +2434,7 @@
         <plugin>
           <groupId>org.eclipse.sisu</groupId>
           <artifactId>sisu-maven-plugin</artifactId>
-          <version>1.0.1</version>
+          <version>1.1.0</version>
           <executions>
             <execution>
               <goals>

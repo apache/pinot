@@ -39,6 +39,8 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -57,6 +59,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -172,15 +175,20 @@ public final class TableConfigUtils {
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
   public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
+    validate(tableConfig, schema, typesToSkip, null);
+  }
+
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
+      @Nullable TableConfig existingTableConfig) {
     Preconditions.checkArgument(schema != null, "Schema should not be null for table: %s", tableConfig.getTableName());
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
-    validateEffectiveTableConfig(tableConfig, schema, skipTypes);
+    validateEffectiveTableConfig(tableConfig, schema, skipTypes, existingTableConfig);
     if (skipTypes.contains(ValidationType.ALL) || !hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
       return;
     }
     try {
       TableConfig consumingTableConfig = overwriteTableConfigForConsumingSegmentTier(tableConfig);
-      validateEffectiveTableConfig(consumingTableConfig, schema, skipTypes);
+      validateEffectiveTableConfig(consumingTableConfig, schema, skipTypes, existingTableConfig);
     } catch (RuntimeException e) {
       throw new IllegalStateException(
           "tierOverwrites.consuming produces an invalid table config: " + e.getMessage(), e);
@@ -188,7 +196,7 @@ public final class TableConfigUtils {
   }
 
   private static void validateEffectiveTableConfig(TableConfig tableConfig, Schema schema,
-      Set<ValidationType> skipTypes) {
+      Set<ValidationType> skipTypes, @Nullable TableConfig existingTableConfig) {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
@@ -196,9 +204,18 @@ public final class TableConfigUtils {
       return;
     }
 
+    // Schema-level transforms are active only when the table config does not override the same destination. A
+    // non-immutable transform is grandfathered only when it was already active for this table; removing an existing
+    // override must not silently activate it.
+    Set<String> overriddenColumns = getTransformColumns(tableConfig);
+    Set<String> existingOverriddenColumns = getTransformColumns(existingTableConfig);
+    Schema existingSchema = existingTableConfig != null ? schema : null;
+    SchemaUtils.validateIngestionTransformVolatility(schema, existingSchema, overriddenColumns,
+        existingOverriddenColumns);
+
     validateValidationConfig(tableConfig, schema);
     validateSegmentAssignmentConfig(tableConfig);
-    validateIngestionConfig(tableConfig, schema);
+    validateIngestionConfig(tableConfig, schema, existingTableConfig);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       validateStreamConfigMaps(tableConfig);
     }
@@ -209,7 +226,7 @@ public final class TableConfigUtils {
     validateInstanceAssignmentConfigs(tableConfig);
 
     if (!skipTypes.contains(ValidationType.UPSERT)) {
-      validateUpsertAndDedupConfig(tableConfig, schema);
+      validateUpsertAndDedupConfig(tableConfig, schema, existingTableConfig);
     }
 
     validateTaskConfig(tableConfig);
@@ -459,6 +476,12 @@ public final class TableConfigUtils {
   /// - Schema-conforming transformer config.
   @VisibleForTesting
   public static void validateIngestionConfig(TableConfig tableConfig, Schema schema) {
+    validateIngestionConfig(tableConfig, schema, null);
+  }
+
+  @VisibleForTesting
+  static void validateIngestionConfig(TableConfig tableConfig, Schema schema,
+      @Nullable TableConfig existingTableConfig) {
     // All metrics-aggregation validation lives here; it returns the columns referenced as aggregation sources, which
     // a transform config is allowed to target as its destination (see the transform validation below).
     Set<String> aggregationSourceColumns = validateMetricsAggregation(tableConfig, schema);
@@ -566,6 +589,7 @@ public final class TableConfigUtils {
     // Transform configs
     List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
     if (transformConfigs != null) {
+      List<TransformConfig> existingTransformConfigs = getTransformConfigs(existingTableConfig);
       // Pre-pass: collect every column referenced as a transform-function argument. A transform whose destination
       // is not in the schema is still valid when another transform consumes it as an input - i.e. it is an
       // intermediate ("derived") column. This enables chained / parse-once transforms, e.g.
@@ -611,6 +635,7 @@ public final class TableConfigUtils {
                   + columnName + "'");
         }
         try {
+          validateIngestionTransformFunctionVolatility(transformConfig, existingTransformConfigs);
           expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
         } catch (Exception e) {
           throw new IllegalStateException(
@@ -646,6 +671,77 @@ public final class TableConfigUtils {
         ingestionConfig.getSchemaConformingTransformerConfig();
     if (schemaConformingTransformerConfig != null) {
       SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
+    }
+  }
+
+  @Nullable
+  private static List<TransformConfig> getTransformConfigs(@Nullable TableConfig tableConfig) {
+    IngestionConfig ingestionConfig = tableConfig != null ? tableConfig.getIngestionConfig() : null;
+    return ingestionConfig != null ? ingestionConfig.getTransformConfigs() : null;
+  }
+
+  private static Set<String> getTransformColumns(@Nullable TableConfig tableConfig) {
+    List<TransformConfig> transformConfigs = getTransformConfigs(tableConfig);
+    return transformConfigs != null
+        ? transformConfigs.stream().map(TransformConfig::getColumnName).filter(Objects::nonNull)
+            .collect(Collectors.toSet())
+        : Set.of();
+  }
+
+  @Nullable
+  private static List<TransformConfig> getPostPartialUpsertTransformConfigs(@Nullable TableConfig tableConfig) {
+    UpsertConfig upsertConfig = tableConfig != null ? tableConfig.getUpsertConfig() : null;
+    return upsertConfig != null ? upsertConfig.getPostPartialUpsertTransformConfigs() : null;
+  }
+
+  private static void validateIngestionTransformFunctionVolatility(TransformConfig transformConfig,
+      @Nullable List<TransformConfig> existingTransformConfigs) {
+    if (hasSameTransformConfig(existingTransformConfigs, transformConfig)) {
+      return;
+    }
+    validateIngestionTransformFunctionVolatility(transformConfig.getTransformFunction());
+  }
+
+  static void validateIngestionTransformFunctionVolatility(String transformFunction) {
+    if (FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+      return;
+    }
+    validateIngestionTransformVolatility(RequestContextUtils.getExpression(transformFunction),
+        transformFunction);
+  }
+
+  private static boolean hasSameTransformConfig(@Nullable List<TransformConfig> existingTransformConfigs,
+      TransformConfig transformConfig) {
+    if (existingTransformConfigs == null) {
+      return false;
+    }
+    for (TransformConfig existingTransformConfig : existingTransformConfigs) {
+      if (Objects.equals(existingTransformConfig.getColumnName(), transformConfig.getColumnName())
+          && Objects.equals(existingTransformConfig.getTransformFunction(), transformConfig.getTransformFunction())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static void validateIngestionTransformVolatility(ExpressionContext expression,
+      String transformFunction) {
+    if (expression.getType() != ExpressionContext.Type.FUNCTION) {
+      return;
+    }
+    FunctionContext function = expression.getFunction();
+    List<ExpressionContext> arguments = function.getArguments();
+    for (ExpressionContext argument : arguments) {
+      validateIngestionTransformVolatility(argument, transformFunction);
+    }
+    String functionName = function.getFunctionName();
+    String canonicalName = FunctionRegistry.canonicalize(functionName);
+    FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, arguments.size());
+    if (functionInfo != null && functionInfo.getVolatility() != FunctionVolatility.IMMUTABLE) {
+      throw new IllegalStateException(
+          String.format("Function '%s' has %s volatility and is not allowed in ingestion transform function: %s; "
+                  + "only IMMUTABLE functions are allowed", functionName, functionInfo.getVolatility(),
+              transformFunction));
     }
   }
 
@@ -912,6 +1008,11 @@ public final class TableConfigUtils {
   /// - Dedup: delegates to [#validateTTLForDedupConfig]; rejects MD5 when disabled.
   @VisibleForTesting
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
+    validateUpsertAndDedupConfig(tableConfig, schema, null);
+  }
+
+  static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema,
+      @Nullable TableConfig existingTableConfig) {
     boolean upsertEnabled = tableConfig.isUpsertEnabled();
     boolean dedupEnabled = tableConfig.isDedupEnabled();
     if (!upsertEnabled && !dedupEnabled) {
@@ -1039,6 +1140,8 @@ public final class TableConfigUtils {
       List<TransformConfig> postPartialUpsertTransformConfigs =
           upsertConfig.getPostPartialUpsertTransformConfigs();
       if (postPartialUpsertTransformConfigs != null) {
+        List<TransformConfig> existingPostPartialUpsertTransformConfigs =
+            getPostPartialUpsertTransformConfigs(existingTableConfig);
         Preconditions.checkState(upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
             "postPartialUpsertTransformConfigs can only be configured for PARTIAL upsert tables");
         Set<String> primaryKeyColumns = new HashSet<>(schema.getPrimaryKeyColumns());
@@ -1072,6 +1175,8 @@ public final class TableConfigUtils {
                     + columnName + "' in postPartialUpsertTransformConfigs");
           }
           try {
+            validateIngestionTransformFunctionVolatility(transformConfig,
+                existingPostPartialUpsertTransformConfigs);
             FunctionEvaluator expressionEvaluator =
                 FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
             List<String> arguments = expressionEvaluator.getArguments();

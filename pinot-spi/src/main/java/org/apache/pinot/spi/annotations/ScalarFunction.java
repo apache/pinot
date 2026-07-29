@@ -62,10 +62,20 @@ public @interface ScalarFunction {
    */
   boolean isVarArg() default false;
 
-  /**
-   * Whether the scalar function should be treated as deterministic (eligible for compile-time evaluation).
-   */
+  /// Whether the scalar function is eligible for compile-time query evaluation.
+  ///
+  /// This is independent of [#volatility()] so that wall-clock functions can retain their existing once-per-query
+  /// evaluation behavior. For backward compatibility, `false` is also treated as [FunctionVolatility#VOLATILE].
   boolean isDeterministic() default true;
+
+  /// Returns the semantic volatility category used by context-specific policies.
+  ///
+  /// Persisted ingestion transforms require [FunctionVolatility#IMMUTABLE] functions. Unlike PostgreSQL, Pinot
+  /// defaults this category to `IMMUTABLE` for compatibility with existing UDFs, so function authors must explicitly
+  /// classify functions that read mutable or external state. This compatibility default does not imply that every
+  /// existing function has been audited for environment-sensitive behavior. When class-level and method-level
+  /// declarations coexist, the most volatile category wins.
+  FunctionVolatility volatility() default FunctionVolatility.IMMUTABLE;
 
   @Deprecated boolean isPlaceholder() default false;
 }

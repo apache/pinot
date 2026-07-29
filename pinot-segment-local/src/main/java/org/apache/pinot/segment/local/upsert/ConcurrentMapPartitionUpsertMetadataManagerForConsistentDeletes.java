@@ -304,14 +304,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             oldSegment, validDocIdsForOldSegment);
       }
       if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-        if (_context.isTableTypeInconsistentDuringConsumption()) {
-          if (shouldRevertMetadataOnInconsistency(oldSegment)) {
-            revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
-            return;
-          } else {
-            logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
-          }
+        if (shouldRevertMetadataOnInconsistency(oldSegment)) {
+          revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
+          return;
         }
+        _logger.warn("Found {} primary keys not replaced for segment: {}",
+            validDocIdsForOldSegment.getCardinality(), segmentName);
+        updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
       }
       // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
       // this is to account for the removal of primary-key in the to-be-removed segment and reduce

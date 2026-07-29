@@ -693,16 +693,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     }
     if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-      if (_context.isTableTypeInconsistentDuringConsumption()) {
-        if (shouldRevertMetadataOnInconsistency(oldSegment)) {
-          // If there are still valid docs in the old segment, validate and revert the metadata of the
-          // consuming segment in place
-          revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
-          return;
-        } else {
-          logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
-        }
+      if (shouldRevertMetadataOnInconsistency(oldSegment)) {
+        // If there are still valid docs in the old segment, validate and revert the metadata of the
+        // consuming segment in place
+        revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
+        return;
       }
+      _logger.warn("Found {} primary keys not replaced for segment: {}",
+          validDocIdsForOldSegment.getCardinality(), segmentName);
+      updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
       removeSegment(oldSegment, validDocIdsForOldSegment);
     }
   }
@@ -737,22 +736,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     int numKeysStillNotReplaced = getPrevKeyToRecordLocationSize();
     if (numKeysStillNotReplaced > 0) {
-      logInconsistentResults(segmentName, numKeysStillNotReplaced);
+      _logger.warn("Found {} primary keys not replaced for segment: {} after revert attempt",
+          numKeysStillNotReplaced, segmentName);
+      updateInconsistentRowsMetric(segmentName, numKeysStillNotReplaced);
       // Clear the map when inconsistencies still exist for the consuming segments
       clearPrevKeyToRecordLocation();
     }
   }
 
-  protected void logInconsistentResults(String segmentName, int numKeysStillNotReplaced) {
-    _logger.error("Found {} primary keys not replaced for segment: {}. "
-            + "Proceeding with current state which may cause inconsistency. To correct this behaviour from now, set "
-            + "cluster config: `pinot.server.consuming.segment.consistency.mode` to `PROTECTED`",
-        numKeysStillNotReplaced, segmentName);
-    if (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null) {
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
-          numKeysStillNotReplaced);
-    } else if (_partialUpsertHandler != null) {
+  protected void updateInconsistentRowsMetric(String segmentName, int numKeysStillNotReplaced) {
+    if (_partialUpsertHandler != null) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
+          numKeysStillNotReplaced);
+    } else {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
           numKeysStillNotReplaced);
     }
   }

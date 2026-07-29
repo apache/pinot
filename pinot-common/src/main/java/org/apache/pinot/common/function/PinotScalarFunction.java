@@ -96,7 +96,11 @@ public interface PinotScalarFunction {
   static PinotScalarFunction fromMethod(Method method, boolean isVarArg, boolean supportNullArgs,
       @Nullable String... names) {
     int numArguments = isVarArg ? FunctionRegistry.VAR_ARG_KEY : method.getParameterCount();
-    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), supportNullArgs);
+    FunctionInfo annotationFunctionInfo = FunctionInfo.fromMethod(method);
+    // Preserve the historical dynamic UDF compile-time policy while propagating volatility independently.
+    FunctionInfo functionInfo =
+        new FunctionInfo(method, method.getDeclaringClass(), supportNullArgs, true,
+            annotationFunctionInfo.getVolatility());
     Map<Integer, FunctionInfo> functionInfoMap = Map.of(numArguments, functionInfo);
 
     List<String> nameList = names != null && names.length > 0

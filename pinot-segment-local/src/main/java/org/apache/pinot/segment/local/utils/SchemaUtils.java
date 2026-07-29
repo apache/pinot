@@ -23,8 +23,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -70,19 +73,53 @@ public class SchemaUtils {
    * @param tableConfigs table configs associated with this schema (table configs with raw name = schema name)
    */
   public static void validate(Schema schema, List<TableConfig> tableConfigs) {
-    validate(schema, tableConfigs, false);
+    validate(schema, tableConfigs, false, null);
   }
 
   public static void validate(Schema schema, List<TableConfig> tableConfigs, boolean isIgnoreCase) {
+    validate(schema, tableConfigs, isIgnoreCase, null);
+  }
+
+  public static void validate(Schema schema, List<TableConfig> tableConfigs, boolean isIgnoreCase,
+      @Nullable Schema existingSchema) {
     // The deprecation reject is intentionally placed only in this REST-driven overload (not in the single-arg
     // `validate(Schema)` that server-side table loading uses), so existing legacy schemas in ZK keep
     // loading. New / updated schemas submitted via the controller REST API are blocked.
     // See https://github.com/apache/pinot/issues/2756 for the TimeFieldSpec deprecation plan.
     rejectDeprecatedTimeFieldSpec(schema);
+    validateIngestionTransformVolatility(schema, existingSchema);
     for (TableConfig tableConfig : tableConfigs) {
       validateCompatibilityWithTableConfig(schema, tableConfig);
     }
     validate(schema, isIgnoreCase);
+  }
+
+  /**
+   * Validates that new or changed legacy schema-level transform functions are immutable. An exact transform on the
+   * same column in the stored schema is grandfathered so unrelated updates do not strand existing schemas.
+   */
+  public static void validateIngestionTransformVolatility(Schema schema, @Nullable Schema existingSchema) {
+    validateIngestionTransformVolatility(schema, existingSchema, Set.of(), Set.of());
+  }
+
+  static void validateIngestionTransformVolatility(Schema schema, @Nullable Schema existingSchema,
+      Set<String> overriddenColumns, Set<String> existingOverriddenColumns) {
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (fieldSpec.isVirtualColumn() || overriddenColumns.contains(fieldSpec.getName())) {
+        continue;
+      }
+      String transformFunction = fieldSpec.getTransformFunction();
+      if (transformFunction == null) {
+        continue;
+      }
+      FieldSpec existingFieldSpec =
+          existingSchema != null ? existingSchema.getFieldSpecFor(fieldSpec.getName()) : null;
+      if (!existingOverriddenColumns.contains(fieldSpec.getName()) && existingFieldSpec != null
+          && Objects.equals(transformFunction, existingFieldSpec.getTransformFunction())) {
+        continue;
+      }
+      TableConfigUtils.validateIngestionTransformFunctionVolatility(transformFunction);
+    }
   }
 
   @SuppressWarnings("deprecation")
@@ -121,9 +158,10 @@ public class SchemaUtils {
     if (isIgnoreCase) {
       Set<String> lowerCaseColumnNames = new HashSet<>();
       for (String column : schema.getColumnNames()) {
-        Preconditions.checkState(lowerCaseColumnNames.add(column.toLowerCase()),
-            "When enable case insensitive, you can't use the same lowercase column name: %s",
-            column.toLowerCase());
+        // Locale.ROOT avoids locale-dependent lowercasing (e.g. Turkish dotted/dotless I)
+        String lowerCaseColumn = column.toLowerCase(Locale.ROOT);
+        Preconditions.checkState(lowerCaseColumnNames.add(lowerCaseColumn),
+            "When enable case insensitive, you can't use the same lowercase column name: %s", lowerCaseColumn);
       }
     }
     Set<String> transformedColumns = new HashSet<>();
@@ -195,7 +233,10 @@ public class SchemaUtils {
    */
   private static void validateCompatibilityWithTableConfig(Schema schema, TableConfig tableConfig) {
     try {
-      TableConfigUtils.validate(tableConfig, schema);
+      // The associated table config already exists and is not being changed by schema validation. Pass it as the
+      // existing config so unchanged legacy transforms remain grandfathered while all schema-dependent validation
+      // still runs against the proposed schema.
+      TableConfigUtils.validate(tableConfig, schema, null, tableConfig);
     } catch (Exception e) {
       throw new IllegalStateException(
           "Schema is incompatible with tableConfig with name: " + tableConfig.getTableName() + " and type: "

@@ -58,6 +58,8 @@ import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -528,6 +530,67 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     } catch (Exception e) {
       assertTrue(e instanceof IOException);
     }
+  }
+
+  @Test
+  public void testNonDeterministicTransformCreateAndLegacyUpdate()
+      throws Exception {
+    String tableName = "legacyNonDeterministicTransform";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", "now()")));
+    TableConfig legacyTableConfig = getOfflineTableBuilder(tableName)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    IOException createError =
+        expectThrows(IOException.class, () -> createTable(legacyTableConfig.toJsonString()));
+    assertHasStatus(createError, 400);
+    assertTrue(createError.getMessage().contains("Function 'now' has VOLATILE volatility"), createError.getMessage());
+
+    // Seed the config below the REST validation layer to model a table persisted before this validation existed.
+    DEFAULT_INSTANCE.getHelixResourceManager().addTable(legacyTableConfig);
+
+    TableConfig update = getTableConfig(tableName, "OFFLINE");
+    update.getValidationConfig().setRetentionTimeValue("10");
+    JsonNode validationResponse = JsonUtils.stringToJsonNode(tableClient().validateTableConfig(update.toJsonString()));
+    assertTrue(validationResponse.has("OFFLINE"));
+
+    JsonNode response = JsonUtils.stringToJsonNode(updateTable(tableName, update.toJsonString()));
+    assertTrue(response.has("status"));
+
+    TableConfig stored = getTableConfig(tableName, "OFFLINE");
+    assertEquals(stored.getValidationConfig().getRetentionTimeValue(), "10");
+    assertEquals(stored.getIngestionConfig().getTransformConfigs().get(0).getTransformFunction(), "now()");
+
+    IngestionConfig changedIngestionConfig = new IngestionConfig();
+    changedIngestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", "plus(now(), 1)")));
+    update.setIngestionConfig(changedIngestionConfig);
+    PinotAdminException validationError =
+        expectThrows(PinotAdminException.class, () -> tableClient().validateTableConfig(update.toJsonString()));
+    assertTrue(validationError.getMessage().contains("Function 'now' has VOLATILE volatility"),
+        validationError.getMessage());
+
+    IOException updateError = expectThrows(IOException.class, () -> updateTable(tableName, update.toJsonString()));
+    assertHasStatus(updateError, 400);
+    assertTrue(updateError.getMessage().contains("Function 'now' has VOLATILE volatility"), updateError.getMessage());
+  }
+
+  @Test
+  public void testCreateTableRejectsNonDeterministicSchemaTransform()
+      throws Exception {
+    String tableName = "nonDeterministicSchemaTransform";
+    Schema schema = DEFAULT_INSTANCE.createDummySchema(tableName);
+    schema.getFieldSpecFor("dimA").setTransformFunction("now()");
+
+    // Seed below the schema REST validation layer to model a schema persisted before this validation existed.
+    DEFAULT_INSTANCE.getHelixResourceManager().addSchema(schema, false, false);
+
+    TableConfig tableConfig = getOfflineTableBuilder(tableName).build();
+    IOException createError = expectThrows(IOException.class, () -> createTable(tableConfig.toJsonString()));
+    assertHasStatus(createError, 400);
+    assertTrue(createError.getMessage().contains("Function 'now' has VOLATILE volatility"), createError.getMessage());
   }
 
   private void deleteAllTables()

@@ -386,6 +386,60 @@ public class TableConfigUtilsTest {
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "reverse(anotherCol)")));
     TableConfigUtils.validate(tableConfig, schema);
 
+    Schema transformSchema = schema;
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "now()")));
+    IllegalStateException nonDeterministicError =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+
+    IngestionConfig existingIngestionConfig = new IngestionConfig();
+    existingIngestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "now()")));
+    TableConfig existingTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(existingIngestionConfig)
+        .build();
+    TableConfigUtils.validate(tableConfig, schema, null, existingTableConfig);
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "plus(now(), 1)")));
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(tableConfig, transformSchema, null, existingTableConfig));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "rand()")));
+    nonDeterministicError =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'rand' has VOLATILE volatility"));
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "reqId('unused')")));
+    nonDeterministicError =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'reqid' has STABLE volatility"),
+        nonDeterministicError.getMessage());
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "rand(123)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // Legacy schema-level transforms are also part of the ingestion pipeline. A new table must reject them, while
+    // validation of an existing table stays permissive so unrelated config updates are not stranded.
+    ingestionConfig.setTransformConfigs(List.of());
+    schema.getFieldSpecFor("myCol").setTransformFunction("now()");
+    nonDeterministicError =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+    TableConfigUtils.validate(tableConfig, schema, null, tableConfig);
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "rand(123)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    IngestionConfig noOverrideIngestionConfig = new IngestionConfig();
+    noOverrideIngestionConfig.setTransformConfigs(List.of());
+    TableConfig noOverrideTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(noOverrideIngestionConfig)
+        .build();
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(noOverrideTableConfig, transformSchema, null, tableConfig));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+
+    schema.getFieldSpecFor("myCol").setTransformFunction(null);
+
     // valid transform configs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", DataType.STRING)
@@ -4315,6 +4369,52 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains("out-of-order record column"));
     }
+  }
+
+  @Test
+  public void testPostPartialUpsertTransformVolatility() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("pk", DataType.STRING)
+        .addMetric("total", DataType.DOUBLE)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(List.of("pk"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+
+    TableConfig nonDeterministicConfig = buildPostPartialUpsertTransformTableConfig(streamConfigs, "now()");
+    IllegalStateException nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(nonDeterministicConfig, schema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+
+    TableConfig existingConfig = buildPostPartialUpsertTransformTableConfig(streamConfigs, "now()");
+    TableConfigUtils.validateUpsertAndDedupConfig(nonDeterministicConfig, schema, existingConfig);
+
+    TableConfig changedConfig = buildPostPartialUpsertTransformTableConfig(streamConfigs, "plus(now(), 1)");
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(changedConfig, schema, existingConfig));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+
+    TableConfig randomConfig = buildPostPartialUpsertTransformTableConfig(streamConfigs, "rand()");
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(randomConfig, schema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'rand' has VOLATILE volatility"));
+
+    TableConfig seededRandomConfig = buildPostPartialUpsertTransformTableConfig(streamConfigs, "rand(123)");
+    TableConfigUtils.validateUpsertAndDedupConfig(seededRandomConfig, schema);
+  }
+
+  private static TableConfig buildPostPartialUpsertTransformTableConfig(Map<String, String> streamConfigs,
+      String transformFunction) {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", transformFunction)));
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(upsertConfig)
+        .setNullHandlingEnabled(true)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
   }
 
   @Test
