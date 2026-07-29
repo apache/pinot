@@ -98,6 +98,7 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
         .setHashFunction(dedupConfig.getHashFunction())
         .setMetadataTTL(metadataTTL)
         .setDedupTimeColumn(dedupTimeColumn)
+        .setRealtimeTTLCleanupIntervalSeconds(dedupConfig.getRealtimeTTLCleanupIntervalSeconds())
         .setEnablePreload(enablePreload)
         .setIgnoreNonDefaultTiers(ignoreNonDefaultTiers)
         .setMetadataManagerConfigs(dedupConfig.getMetadataManagerConfigs())
@@ -116,7 +117,13 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
 
   @Override
   public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, this::createPartitionDedupMetadataManager);
+    PartitionDedupMetadataManager partitionMetadataManager =
+        _partitionMetadataManagerMap.computeIfAbsent(partitionId, id -> {
+          PartitionDedupMetadataManager manager = createPartitionDedupMetadataManager(id);
+          manager.start();
+          return manager;
+        });
+    return partitionMetadataManager;
   }
 
   /**
