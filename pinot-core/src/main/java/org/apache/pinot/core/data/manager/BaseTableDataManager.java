@@ -1249,10 +1249,39 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
     _recentlyDeletedSegments.invalidate(segmentName);
     // Fire the post-registration lifecycle hook now that the segment is swapped into the serving set
-    for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
-      segment.onSegmentAdded();
-    }
+    fireOnSegmentAdded(segmentName, segmentDataManager);
     return oldSegmentDataManager;
+  }
+
+  /**
+   * Fires the post-registration lifecycle hook on the segments exposed by a newly registered segment data manager.
+   * <p>
+   * The hook runs after the segment is swapped into the serving set, so a reference is held while it runs: without it
+   * a concurrent {@link #replaceSegment} / {@link #unregisterSegment} could drop the reference count to 0 and destroy
+   * the segment (closing its {@link org.apache.pinot.segment.spi.store.SegmentDirectory}) while the hook is still
+   * using it. A manager that is already destroyed cannot take a reference and has nothing left to notify, so it is
+   * skipped.
+   * <p>
+   * Failures are contained here: the segment is already serving, so a failing hook must not fail the registration or
+   * the enclosing Helix state transition. This also keeps a manager that exposes a null segment (possible for a
+   * custom implementation, as the default {@link SegmentDataManager#getReportableSegments()} wraps
+   * {@link SegmentDataManager#getSegment()}) from aborting registration.
+   */
+  private void fireOnSegmentAdded(String segmentName, SegmentDataManager segmentDataManager) {
+    if (!segmentDataManager.increaseReferenceCount()) {
+      return;
+    }
+    try {
+      for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+        if (segment != null) {
+          segment.onSegmentAdded();
+        }
+      }
+    } catch (Exception e) {
+      _logger.warn("Caught exception while firing onSegmentAdded for segment: {}", segmentName, e);
+    } finally {
+      releaseSegment(segmentDataManager);
+    }
   }
 
   /**

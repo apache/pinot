@@ -24,6 +24,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,6 +64,26 @@ public class EmptyIndexSegmentTest {
 
     // Must not throw.
     segment.onSegmentAdded();
+  }
+
+  /**
+   * The hook must reach the directory at most once per segment instance: the same segment can be registered more than
+   * once (e.g. an upsert replacement with a consistency mode other than NONE registers it through a
+   * DuoSegmentDataManager and then directly), and implementations are not required to be idempotent.
+   */
+  @Test
+  public void testOnSegmentAddedNotifiesDirectoryAtMostOnce()
+      throws Exception {
+    SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
+    when(metadata.getName()).thenReturn("seg");
+    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
+    EmptyIndexSegment segment = new EmptyIndexSegment(metadata, segmentDirectory);
+
+    segment.onSegmentAdded();
+    segment.onSegmentAdded();
+    segment.onSegmentAdded();
+
+    verify(segmentDirectory, times(1)).onSegmentAdded();
   }
 
   /**

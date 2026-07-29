@@ -153,8 +153,16 @@ public abstract class SegmentDirectory implements Closeable {
 
   /**
    * Lifecycle callback invoked after the segment backed by this directory has been successfully added to the serving
-   * set (registered and swapped in). Default is a no-op; Must be best-effort: it fires after the segment is already
-   * serving, so failures cannot roll back the registration and should be handled internally.
+   * set (registered and swapped in). Default is a no-op, invoked at most once per segment instance backed by this
+   * directory.
+   * <p>
+   * Must be best-effort: it fires after the segment is already serving, so failures cannot roll back the registration
+   * and should be handled internally.
+   * <p>
+   * Must also return promptly: this runs inline on the segment registration thread, which is the Helix
+   * state-transition thread for the ONLINE transition, so blocking or unbounded work here stalls the state transition.
+   * Bound any remote I/O (e.g. with a request timeout) or perform it asynchronously, keeping in mind that the segment
+   * and this directory are only guaranteed to be alive for the duration of this call.
    */
   public void onSegmentAdded()
       throws Exception {

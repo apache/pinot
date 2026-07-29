@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -77,6 +78,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final StarTreeIndexContainer _starTreeIndexContainer;
   private final TextIndexReader _multiColumnTextIndex;
   private final Map<String, DataSource> _dataSources;
+  // Guards the post-registration hook so it reaches the directory at most once per segment instance, even when the
+  // same segment is registered more than once (e.g. an upsert replacement with a consistency mode other than NONE
+  // registers the new segment through a DuoSegmentDataManager and then directly).
+  private final AtomicBoolean _segmentAdded = new AtomicBoolean();
 
   // Dedupe
   private PartitionDedupMetadataManager _partitionDedupMetadataManager;
@@ -287,6 +292,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public void onSegmentAdded() {
+    if (!_segmentAdded.compareAndSet(false, true)) {
+      // Already notified for this segment instance; a repeated registration must not notify the directory again.
+      return;
+    }
     // Best-effort: this fires after the segment is already serving, so a failure cannot roll back the registration.
     try {
       _segmentDirectory.onSegmentAdded();

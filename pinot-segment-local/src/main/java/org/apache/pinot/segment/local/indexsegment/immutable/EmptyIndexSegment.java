@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.EmptyDataSource;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -56,6 +57,10 @@ public class EmptyIndexSegment implements ImmutableSegment {
   // ImmutableSegmentImpl. Null when loaded without a directory.
   @Nullable
   private final SegmentDirectory _segmentDirectory;
+  // Guards the post-registration hook so it reaches the directory at most once per segment instance, even when the
+  // same segment is registered more than once (e.g. an upsert replacement with a consistency mode other than NONE
+  // registers the new segment through a DuoSegmentDataManager and then directly).
+  private final AtomicBoolean _segmentAdded = new AtomicBoolean();
 
   public EmptyIndexSegment(SegmentMetadataImpl segmentMetadata) {
     this(segmentMetadata, null);
@@ -90,6 +95,10 @@ public class EmptyIndexSegment implements ImmutableSegment {
   public void onSegmentAdded() {
     // Best-effort: this fires after the segment is already serving, so a failure cannot roll back the registration.
     if (_segmentDirectory == null) {
+      return;
+    }
+    if (!_segmentAdded.compareAndSet(false, true)) {
+      // Already notified for this segment instance; a repeated registration must not notify the directory again.
       return;
     }
     try {
