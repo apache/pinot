@@ -2022,7 +2022,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // Test partial upserts with old and new segments having same number of docs
     // This test verifies that when all keys are present, no reversion occurs
     PartialUpsertHandler mockPartialUpsertHandler = mock(PartialUpsertHandler.class);
-    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandler(mockPartialUpsertHandler)
+    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandlerSupplier(() -> mockPartialUpsertHandler)
         .setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).build();
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
@@ -2085,7 +2085,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // Test partial upserts with consuming (mutable) segment being sealed - revert should be triggered
     // Note: Revert logic only applies when sealing a consuming segment, not for immutable segment replacement
     PartialUpsertHandler mockPartialUpsertHandler = mock(PartialUpsertHandler.class);
-    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandler(mockPartialUpsertHandler)
+    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandlerSupplier(() -> mockPartialUpsertHandler)
         .setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).build();
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
@@ -2133,7 +2133,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   public void testPartialUpsertOldSegmentLesserDocs() throws IOException {
     // Test partial upserts with old segment having fewer docs than new segment
     PartialUpsertHandler mockPartialUpsertHandler = mock(PartialUpsertHandler.class);
-    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandler(mockPartialUpsertHandler)
+    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandlerSupplier(() -> mockPartialUpsertHandler)
         .setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).build();
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =

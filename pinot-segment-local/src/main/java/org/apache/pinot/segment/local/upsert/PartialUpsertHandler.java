@@ -42,6 +42,9 @@ import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 ///
 /// It is also possible to define a custom logic for merging rows by implementing [PartialUpsertMerger].
 /// If a merger for row is defined then it takes precedence and ignores column mergers.
+///
+/// NOTE: This class is not thread safe. The post partial upsert transformers keep reusable evaluation state, so a
+/// handler belongs to exactly one partition and must be used by one thread at a time.
 public class PartialUpsertHandler {
   private final List<String> _primaryKeyColumns;
   private final List<String> _comparisonColumns;

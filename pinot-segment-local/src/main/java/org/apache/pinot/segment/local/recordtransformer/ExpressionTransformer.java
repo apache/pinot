@@ -47,6 +47,9 @@ import org.slf4j.LoggerFactory;
 ///
 /// NOTE: should put this before the [DataTypeTransformer]. After this, transformed column can be treated as
 /// regular column for other record transformers.
+///
+/// NOTE: This class is not thread safe. It holds [FunctionEvaluator] instances that keep reusable evaluation
+/// state, so each thread needs its own instance.
 /// TODO: Merge this and CustomFunctionEnricher
 public class ExpressionTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExpressionTransformer.class);
