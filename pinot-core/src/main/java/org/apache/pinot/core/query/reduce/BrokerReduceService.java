@@ -73,7 +73,7 @@ public class BrokerReduceService extends BaseReduceService {
     boolean enableTrace =
         queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
 
-    ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(enableTrace);
+    ExecutionStatsAggregator aggregator = ExecutionStatsAggregatorFactory.createAggregator(enableTrace);
     BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
 
     // Process server response metadata, drop empty/null-schema/conflicting-schema data tables, and pick
@@ -221,7 +221,7 @@ public class BrokerReduceService extends BaseReduceService {
     boolean enableTrace =
         queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
     // Aggregate stats while filtering so we can write them back onto the merged DataTable's metadata.
-    ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(enableTrace);
+    ExecutionStatsAggregator aggregator = ExecutionStatsAggregatorFactory.createAggregator(enableTrace);
     List<ServerRoutingInstance> conflictingServers = new ArrayList<>();
     DataSchema cachedDataSchema = filterDataTablesAndPickSchema(dataTableMap, aggregator, conflictingServers);
     if (cachedDataSchema == null) {

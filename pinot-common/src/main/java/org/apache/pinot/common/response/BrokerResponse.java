@@ -130,6 +130,24 @@ public interface BrokerResponse {
    */
   List<QueryProcessingException> getExceptions();
 
+  /**
+   * Returns generic, additive per-query statistics keyed by an opaque string, or an empty map if
+   * none were recorded. This is an extension point for downstream projects to surface
+   * project-specific per-query counters in the response without adding typed response fields; keys
+   * and their meaning are owned by the producing code.
+   */
+  default Map<String, String> getCustomStats() {
+    return Map.of();
+  }
+
+  /**
+   * Records a generic per-query statistic. Implementations that do not support custom stats may
+   * throw {@link UnsupportedOperationException}.
+   */
+  default void putCustomStat(String key, String value) {
+    throw new UnsupportedOperationException();
+  }
+
   @Deprecated
   @JsonIgnore
   default List<QueryProcessingException> getProcessingExceptions() {

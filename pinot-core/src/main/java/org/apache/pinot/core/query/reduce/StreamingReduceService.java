@@ -78,7 +78,7 @@ public class StreamingReduceService extends BaseReduceService {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     // initialize empty response.
-    ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(enableTrace);
+    ExecutionStatsAggregator aggregator = ExecutionStatsAggregatorFactory.createAggregator(enableTrace);
 
     Integer minGroupTrimSizeQueryOption = null;
     Integer groupTrimThresholdQueryOption = null;

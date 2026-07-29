@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,7 +54,8 @@ import org.apache.pinot.common.response.ProcessingException;
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
     "pools", "rlsFiltersApplied", "groupsTrimmed",
-    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied"
+    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied",
+    "customStats"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -99,6 +101,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private Integer _mseLiteLeafStageEffectiveLimit;
   @Nullable
   private Boolean _mseLiteFanOutAdjustedLimitApplied;
+
+  /// Generic, additive per-query statistics keyed by an opaque string; omitted from JSON when
+  /// empty. Keys and their meaning are owned by the producing code.
+  @Nullable
+  private Map<String, String> _customStats;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
@@ -511,6 +518,26 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean getRLSFiltersApplied() {
     return _rlsFiltersApplied;
+  }
+
+  @JsonProperty("customStats")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Override
+  public Map<String, String> getCustomStats() {
+    return _customStats == null ? Map.of() : _customStats;
+  }
+
+  @JsonProperty("customStats")
+  public void setCustomStats(@Nullable Map<String, String> customStats) {
+    _customStats = customStats;
+  }
+
+  @Override
+  public void putCustomStat(String key, String value) {
+    if (_customStats == null) {
+      _customStats = new HashMap<>();
+    }
+    _customStats.put(key, value);
   }
 
   public void addBrokerStats(StatMap<StatKey> brokerStats) {
