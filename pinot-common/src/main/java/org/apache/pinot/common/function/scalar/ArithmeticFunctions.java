@@ -21,6 +21,7 @@ package org.apache.pinot.common.function.scalar;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -155,7 +156,7 @@ public class ArithmeticFunctions {
     return Math.signum(a) * Math.floor(Math.abs(a));
   }
 
-  @ScalarFunction(isDeterministic = false)
+  @ScalarFunction(isDeterministic = false, volatility = FunctionVolatility.VOLATILE)
   public static double rand() {
     return ThreadLocalRandom.current().nextDouble();
   }

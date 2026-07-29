@@ -128,9 +128,7 @@ public class FunctionRegistry {
       }
       ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
       if (scalarFunction.enabled()) {
-        FunctionInfo functionInfo =
-            new FunctionInfo(method, method.getDeclaringClass(), scalarFunction.nullableParameters(),
-                scalarFunction.isDeterministic());
+        FunctionInfo functionInfo = FunctionInfo.fromMethod(method);
         int numArguments = scalarFunction.isVarArg() ? VAR_ARG_KEY : method.getParameterCount();
         String[] names = scalarFunction.names();
         if (names.length == 0) {

@@ -27,6 +27,7 @@ import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTime;
@@ -573,12 +574,12 @@ public class DateTimeFunctions {
    * Return current time as epoch millis
    * TODO: Consider changing the return type to Timestamp
    */
-  @ScalarFunction
+  @ScalarFunction(volatility = FunctionVolatility.VOLATILE)
   public static long now() {
     return System.currentTimeMillis();
   }
 
-  @ScalarFunction
+  @ScalarFunction(volatility = FunctionVolatility.VOLATILE)
   public static long sleep(long millis) {
     try {
       if (FunctionUtils.isAssertEnabled()) {
@@ -603,13 +604,13 @@ public class DateTimeFunctions {
    *           "-P6H3M"    -- parses as "-6 hours and -3 minutes"
    *           "-P-6H+3M"  -- parses as "+6 hours and -3 minutes"
    */
-  @ScalarFunction
+  @ScalarFunction(volatility = FunctionVolatility.VOLATILE)
   public static long ago(String periodString) {
     Duration period = Duration.parse(periodString);
     return System.currentTimeMillis() - period.toMillis();
   }
 
-  @ScalarFunction
+  @ScalarFunction(volatility = FunctionVolatility.VOLATILE)
   public static long[] agoMV(String[] periodString) {
     long[] results = new long[periodString.length];
     for (int i = 0; i < periodString.length; i++) {
