@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,8 +51,6 @@ import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConsumerFactory;
-import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -140,18 +139,35 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       partitionIds = _partitionIdSubset;
     }
 
-    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    // Partitions already covered by a consumption status reuse its offset; the remaining partitions have their
+    // offsets fetched from the stream in a single batched call. Kafka's beginningOffsets/endOffsets/offsetsForTimes
+    // accept a collection of partitions and resolve them in one broker round-trip, so we avoid creating a fresh
+    // consumer per partition (previously hundreds of serial ~1s consumer creations on high-partition tables, all
+    // executed inside the controller's ideal-state update lock).
+    List<Integer> partitionIdsToFetch = new ArrayList<>(partitionIds.size());
+    for (Integer partitionId : partitionIds) {
+      if (!partitionIdToEndOffset.containsKey(partitionId)) {
+        partitionIdsToFetch.add(partitionId);
+      }
+    }
+    Map<Integer, StreamPartitionMsgOffset> fetchedOffsets =
+        fetchOffsetsForPartitions(partitionIdsToFetch, streamConfig.getOffsetCriteria(), timeoutMillis);
+
     List<PartitionGroupMetadata> result = new ArrayList<>(partitionIds.size());
     for (Integer partitionId : partitionIds) {
       if (partitionIdToEndOffset.containsKey(partitionId)) {
         result.add(new PartitionGroupMetadata(partitionId, partitionIdToEndOffset.get(partitionId)));
       } else {
-        try (StreamMetadataProvider partitionMetadataProvider =
-            streamConsumerFactory.createPartitionMetadataProvider(
-                StreamConsumerFactory.getUniqueClientId(clientId), partitionId)) {
-          StreamPartitionMsgOffset startOffset = partitionMetadataProvider.fetchStreamPartitionOffset(
-              streamConfig.getOffsetCriteria(), timeoutMillis);
+        StreamPartitionMsgOffset startOffset = fetchedOffsets.get(partitionId);
+        if (startOffset != null) {
           result.add(new PartitionGroupMetadata(partitionId, startOffset));
+        } else {
+          // The stream returned no offset for this partition (it does not exist or has no data). Skip it gracefully
+          // so the remaining partitions are still processed; it is retried on the next validation run. Note this is
+          // a new, more resilient behavior: the previous per-partition implementation would fail the entire fetch
+          // here instead of dropping a single partition.
+          LOGGER.warn("No offset returned for topic: {} partition: {}; skipping it in partition group metadata",
+              _topic, partitionId);
         }
       }
     }
@@ -183,44 +199,75 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
-    long offset;
+    StreamPartitionMsgOffset offset =
+        fetchOffsetsForPartitions(List.of(_partition), offsetCriteria, timeoutMillis).get(_partition);
+    if (offset == null) {
+      throw new TransientConsumerException(new RuntimeException(
+          "Failed to fetch offset for topic: " + _topic + " partition: " + _partition));
+    }
+    return offset;
+  }
+
+  /**
+   * Fetches the offset matching {@code offsetCriteria} for the given partitions in a single batched call to the
+   * stream. Kafka's {@code beginningOffsets}/{@code endOffsets}/{@code offsetsForTimes} all accept a collection of
+   * partitions, so this issues one broker round-trip regardless of the number of partitions (these calls do not
+   * require the consumer to be assigned to the partitions). A partition that the stream does not return an offset
+   * for is omitted from the result map.
+   */
+  private Map<Integer, StreamPartitionMsgOffset> fetchOffsetsForPartitions(Collection<Integer> partitionIds,
+      OffsetCriteria offsetCriteria, long timeoutMillis) {
+    Preconditions.checkNotNull(offsetCriteria);
+    if (partitionIds.isEmpty()) {
+      return Map.of();
+    }
+    List<TopicPartition> topicPartitions = new ArrayList<>(partitionIds.size());
+    for (Integer partitionId : partitionIds) {
+      topicPartitions.add(new TopicPartition(_topic, partitionId));
+    }
+    Duration timeout = Duration.ofMillis(timeoutMillis);
     try {
+      Map<TopicPartition, Long> topicPartitionToOffset;
       if (offsetCriteria.isLargest()) {
-        offset = _consumer.endOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
-            .get(_topicPartition);
+        topicPartitionToOffset = _consumer.endOffsets(topicPartitions, timeout);
       } else if (offsetCriteria.isSmallest()) {
-        offset =
-            _consumer.beginningOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
-                .get(_topicPartition);
-      } else if (offsetCriteria.isPeriod()) {
-        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Map.of(_topicPartition,
-                Clock.systemUTC().millis() - TimeUtils.convertPeriodToMillis(offsetCriteria.getOffsetString())))
-            .get(_topicPartition);
-        if (offsetAndTimestamp == null) {
-          offset = _consumer.endOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
-              .get(_topicPartition);
-          LOGGER.warn(
-              "initial offset type is period and its value evaluates to null hence proceeding with offset {} for "
-                  + "topic {} partition {}", offset, _topicPartition.topic(), _topicPartition.partition());
-        } else {
-          offset = offsetAndTimestamp.offset();
+        topicPartitionToOffset = _consumer.beginningOffsets(topicPartitions, timeout);
+      } else if (offsetCriteria.isPeriod() || offsetCriteria.isTimestamp()) {
+        long timestampMillis = offsetCriteria.isPeriod()
+            ? Clock.systemUTC().millis() - TimeUtils.convertPeriodToMillis(offsetCriteria.getOffsetString())
+            : TimeUtils.convertTimestampToMillis(offsetCriteria.getOffsetString());
+        Map<TopicPartition, Long> timestampToSearch = new HashMap<>(topicPartitions.size());
+        for (TopicPartition topicPartition : topicPartitions) {
+          timestampToSearch.put(topicPartition, timestampMillis);
         }
-      } else if (offsetCriteria.isTimestamp()) {
-        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Map.of(_topicPartition,
-            TimeUtils.convertTimestampToMillis(offsetCriteria.getOffsetString()))).get(_topicPartition);
-        if (offsetAndTimestamp == null) {
-          offset = _consumer.endOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
-              .get(_topicPartition);
-          LOGGER.warn(
-              "initial offset type is timestamp and its value evaluates to null hence proceeding with offset {} for "
-                  + "topic {} partition {}", offset, _topicPartition.topic(), _topicPartition.partition());
-        } else {
-          offset = offsetAndTimestamp.offset();
+        Map<TopicPartition, OffsetAndTimestamp> offsetsForTimes = _consumer.offsetsForTimes(timestampToSearch, timeout);
+        topicPartitionToOffset = new HashMap<>(topicPartitions.size());
+        // Partitions with no message at/after the requested time return a null offset; fall back to their end
+        // offset in a single batched call, preserving the per-partition fallback behavior.
+        List<TopicPartition> fallbackPartitions = new ArrayList<>();
+        for (TopicPartition topicPartition : topicPartitions) {
+          OffsetAndTimestamp offsetAndTimestamp = offsetsForTimes.get(topicPartition);
+          if (offsetAndTimestamp != null) {
+            topicPartitionToOffset.put(topicPartition, offsetAndTimestamp.offset());
+          } else {
+            fallbackPartitions.add(topicPartition);
+          }
+        }
+        if (!fallbackPartitions.isEmpty()) {
+          topicPartitionToOffset.putAll(_consumer.endOffsets(fallbackPartitions, timeout));
+          LOGGER.warn("Initial offset type is {} and evaluated to null for topic: {} partitions: {}; proceeding "
+              + "with their end offsets", offsetCriteria, _topic, fallbackPartitions);
         }
       } else {
         throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
       }
-      return new LongMsgOffset(offset);
+      Map<Integer, StreamPartitionMsgOffset> result = new HashMap<>(topicPartitionToOffset.size());
+      for (Map.Entry<TopicPartition, Long> entry : topicPartitionToOffset.entrySet()) {
+        if (entry.getValue() != null) {
+          result.put(entry.getKey().partition(), new LongMsgOffset(entry.getValue()));
+        }
+      }
+      return result;
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
