@@ -166,6 +166,25 @@ public interface IndexSegment {
   }
 
   /**
+   * Lifecycle callback invoked after this segment has been successfully added to the serving set (i.e. registered and
+   * swapped in so queries can reach it). Default is a no-op; implementations may override to run post-registration
+   * work. It is invoked only on the success path, and at most once per segment instance even if the same segment is
+   * registered more than once.
+   * <p>
+   * Implementations must be best-effort: this fires after the segment is already serving, so a failure here cannot
+   * roll back the registration and should be handled internally rather than propagated.
+   * <p>
+   * Implementations must also return promptly. This runs inline on the segment registration thread, which is the
+   * Helix state-transition thread for the ONLINE transition, so a blocking or unbounded call here stalls the state
+   * transition itself; the caller applies no timeout. Any unbounded work (in particular remote I/O) must be bounded
+   * by the implementation or performed asynchronously by it. An implementation that goes asynchronous must not assume
+   * the segment is still alive once this method has returned, since the caller only keeps the segment referenced for
+   * the duration of the call.
+   */
+  default void onSegmentAdded() {
+  }
+
+  /**
    * Offloads the segment from the metadata management (e.g. upsert metadata), but not releases the resources yet
    * because there might be queries still accessing the segment.
    */

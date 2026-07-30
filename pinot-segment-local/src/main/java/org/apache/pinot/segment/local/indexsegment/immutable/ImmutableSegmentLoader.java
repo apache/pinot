@@ -206,7 +206,9 @@ public class ImmutableSegmentLoader {
       throws Exception {
     SegmentMetadataImpl segmentMetadata = segmentDirectory.getSegmentMetadata();
     if (segmentMetadata.getTotalDocs() == 0) {
-      return new EmptyIndexSegment(segmentMetadata);
+      // Hand the directory to the empty segment so it can run post-registration work and own closing the directory,
+      // mirroring the non-empty ImmutableSegmentImpl path.
+      return new EmptyIndexSegment(segmentMetadata, segmentDirectory);
     }
 
     // Remove columns not in schema from the metadata
