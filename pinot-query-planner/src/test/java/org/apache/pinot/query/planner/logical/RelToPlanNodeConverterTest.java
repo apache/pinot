@@ -106,6 +106,9 @@ public class RelToPlanNodeConverterTest {
             new ObjectSqlType(SqlTypeName.VARBINARY, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.BYTES);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.UUID, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.UUID);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ObjectSqlType(SqlTypeName.OTHER, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.OBJECT);
   }
@@ -174,6 +177,9 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.VARBINARY, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.BYTES_ARRAY);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.UUID, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.UUID_ARRAY);
   }
 
   @Test

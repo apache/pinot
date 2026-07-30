@@ -61,4 +61,14 @@ public class PRelToPlanNodeConverterTest {
     Assert.assertThrows(IllegalArgumentException.class, () -> PRelToPlanNodeConverter.convertToColumnDataType(
         new ArraySqlType(new ObjectSqlType(SqlTypeName.UBIGINT, SqlIdentifier.STAR, true, null, null), true)));
   }
+
+  @Test
+  public void testConvertUuidTypes() {
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.UUID, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.UUID);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.UUID, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.UUID_ARRAY);
+  }
 }

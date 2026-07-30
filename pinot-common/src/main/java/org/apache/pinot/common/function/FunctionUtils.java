@@ -23,6 +23,7 @@ import java.sql.Timestamp;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -51,6 +52,7 @@ public class FunctionUtils {
       put(Timestamp.class, PinotDataType.TIMESTAMP);
       put(String.class, PinotDataType.STRING);
       put(byte[].class, PinotDataType.BYTES);
+      put(UUID.class, PinotDataType.UUID);
       put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
       put(long[].class, PinotDataType.PRIMITIVE_LONG_ARRAY);
       put(float[].class, PinotDataType.PRIMITIVE_FLOAT_ARRAY);
@@ -79,6 +81,7 @@ public class FunctionUtils {
       put(Timestamp.class, ColumnDataType.TIMESTAMP);
       put(String.class, ColumnDataType.STRING);
       put(byte[].class, ColumnDataType.BYTES);
+      put(UUID.class, ColumnDataType.UUID);
       put(int[].class, ColumnDataType.INT_ARRAY);
       put(long[].class, ColumnDataType.LONG_ARRAY);
       put(float[].class, ColumnDataType.FLOAT_ARRAY);
@@ -184,6 +187,8 @@ public class FunctionUtils {
       case STRING:
       case JSON:
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      case UUID:
+        return typeFactory.createSqlType(SqlTypeName.UUID);
       case BYTES:
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
       case INT_ARRAY:
