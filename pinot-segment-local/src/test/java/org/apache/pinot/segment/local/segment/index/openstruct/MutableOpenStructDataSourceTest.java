@@ -169,6 +169,11 @@ public class MutableOpenStructDataSourceTest {
       // docs as the default, matching sealed segments which fold the default at build time.
       assertEquals(clicks.getDictionary().get(0), Long.MIN_VALUE);
       assertEquals(clicks.getDictionary().get(1), 5L);
+      // The inverted index mirrors the dictionary reservation: slot 0 exists but stays empty
+      // (no doc explicitly wrote the default), slot 1 holds the doc that wrote the real value.
+      MutableKeyColumn col = idx.getKeyColumn("clicks");
+      assertTrue(col.getInvertedIndex().getDocIds(0).isEmpty());
+      assertTrue(col.getInvertedIndex().getDocIds(1).contains(0));
     }
   }
 

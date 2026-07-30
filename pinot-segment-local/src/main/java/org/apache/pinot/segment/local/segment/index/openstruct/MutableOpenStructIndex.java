@@ -172,12 +172,12 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   /// publishes it via volatile copy-on-write.
   private MutableKeyColumn allocateKeyColumn(String key, DataType storedType) {
     String allocationContext = _openStructColumn + "$" + key;
-    FieldSpec childSpec = _childFieldSpecs.get(key);
-    // The child spec's default is already in internal (stored-type) representation; keys without
-    // a child spec use the standard dimension default for the resolved stored type — the same
-    // default the sealed build path uses for absent docs.
-    Object defaultNullValue = childSpec != null ? childSpec.getDefaultNullValue()
-        : FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
+    // Use the standard dimension default for the resolved stored type, regardless of any child
+    // spec's own default: OpenStructColumnSplitter#writeDenseKeyColumn (the sealed build path)
+    // always derives the absent-doc default from a throwaway DimensionFieldSpec(key, storedType,
+    // true) rather than the real child spec, so mirroring that exactly is what keeps a doc's
+    // resolved value identical before and after seal.
+    Object defaultNullValue = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
     MutableKeyColumn newCol =
         new MutableKeyColumn(key, storedType, defaultNullValue, _memoryManager, _capacity, allocationContext);
     Map<String, MutableKeyColumn> updated = new HashMap<>(_keyColumns);
