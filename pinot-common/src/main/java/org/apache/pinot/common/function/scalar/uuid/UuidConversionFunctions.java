@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function.scalar.uuid;
 
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.UuidUtils;
 
@@ -30,17 +31,10 @@ public final class UuidConversionFunctions {
   private UuidConversionFunctions() {
   }
 
-  public static byte[] uuidToBytes(UUID uuid) {
-    return uuid != null ? UuidUtils.toBytes(uuid) : null;
-  }
-
   @ScalarFunction(names = {"BYTES_TO_UUID"})
-  public static UUID bytesToUuid(byte[] bytes) {
+  @Nullable
+  public static UUID bytesToUuid(@Nullable byte[] bytes) {
     return bytes != null ? UuidUtils.toUUID(bytes) : null;
-  }
-
-  public static String uuidToString(UUID uuid) {
-    return uuid != null ? UuidUtils.toString(uuid) : null;
   }
 
   /// Generates a fresh random RFC 4122 version-4 UUID. Each invocation produces a new value, so this function
@@ -58,16 +52,5 @@ public final class UuidConversionFunctions {
   @ScalarFunction(names = {"UUID_V7"}, isDeterministic = false)
   public static UUID uuidV7() {
     return UuidUtils.randomV7();
-  }
-
-  /// Returns the 4-bit version field (0-15) of the given UUID. Common values: 1, 3, 4, 5, 6, 7, 8.
-  public static Integer uuidVersion(UUID uuid) {
-    return uuid != null ? UuidUtils.getVersion(uuid) : null;
-  }
-
-  /// Returns the embedded Unix-millisecond timestamp from a time-based UUID (version 1, 6, or 7). Throws
-  /// for non-time-based versions.
-  public static Long uuidTimestamp(UUID uuid) {
-    return uuid != null ? UuidUtils.getTimestampMillis(uuid) : null;
   }
 }

@@ -26,8 +26,12 @@ import org.apache.pinot.common.function.scalar.uuid.ToUuidScalarFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
+/// Multi-stage wrapper for normalizing STRING, BYTES, or UUID values to Pinot's logical UUID type.
+///
+/// This implementation is stateless and thread-safe.
 @AutoService(Udf.class)
 public class ToUuidUdf extends Udf {
   private static final ToUuidScalarFunction SCALAR_FUNCTION = new ToUuidScalarFunction();
@@ -49,7 +53,15 @@ public class ToUuidUdf extends Udf {
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
-    return Map.of();
+    return UuidUdfExamples.builder(FieldSpec.DataType.STRING, FieldSpec.DataType.UUID)
+        .addExample("canonical string", UuidUdfExamples.UUID_V4, UuidUdfExamples.UUID_V4)
+        .and(UuidUdfExamples.builder(FieldSpec.DataType.BYTES, FieldSpec.DataType.UUID)
+            .addExample("canonical bytes", UuidUdfExamples.bytes(UuidUdfExamples.UUID_V4), UuidUdfExamples.UUID_V4)
+            .build())
+        .and(UuidUdfExamples.builder(FieldSpec.DataType.UUID, FieldSpec.DataType.UUID)
+            .addExample("logical uuid", UuidUdfExamples.UUID_V4, UuidUdfExamples.UUID_V4)
+            .build())
+        .generateExamples();
   }
 
   @Override

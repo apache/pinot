@@ -26,8 +26,12 @@ import org.apache.pinot.common.function.scalar.uuid.UuidTimestampScalarFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
+/// Multi-stage wrapper for extracting Unix milliseconds from time-based STRING, BYTES, or UUID values.
+///
+/// This implementation is stateless and thread-safe.
 @AutoService(Udf.class)
 public class UuidTimestampUdf extends Udf {
   private static final UuidTimestampScalarFunction SCALAR_FUNCTION = new UuidTimestampScalarFunction();
@@ -50,7 +54,16 @@ public class UuidTimestampUdf extends Udf {
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
-    return Map.of();
+    return UuidUdfExamples.builder(FieldSpec.DataType.STRING, FieldSpec.DataType.LONG)
+        .addExample("version 7 string", UuidUdfExamples.UUID_V7, UuidUdfExamples.UUID_V7_TIMESTAMP)
+        .and(UuidUdfExamples.builder(FieldSpec.DataType.BYTES, FieldSpec.DataType.LONG)
+            .addExample("version 7 bytes", UuidUdfExamples.bytes(UuidUdfExamples.UUID_V7),
+                UuidUdfExamples.UUID_V7_TIMESTAMP)
+            .build())
+        .and(UuidUdfExamples.builder(FieldSpec.DataType.UUID, FieldSpec.DataType.LONG)
+            .addExample("version 7 uuid", UuidUdfExamples.UUID_V7, UuidUdfExamples.UUID_V7_TIMESTAMP)
+            .build())
+        .generateExamples();
   }
 
   @Override

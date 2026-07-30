@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function.scalar.uuid;
 
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.UuidUtils;
@@ -33,15 +34,18 @@ public class UuidTimestampScalarFunction extends AbstractUuidInputFunction {
     super(UuidTimestampScalarFunction.class, "UUID_TIMESTAMP", "uuidTimestamp", SqlTypeName.BIGINT);
   }
 
-  public static Long uuidTimestamp(String value) {
-    return value != null ? UuidUtils.getTimestampMillis(UuidUtils.toUUID(value)) : null;
+  @Nullable
+  public static Long uuidTimestamp(@Nullable String value) {
+    return value != null ? UuidUtils.getTimestampMillis(UuidUtils.toBytes(value)) : null;
   }
 
-  public static Long uuidTimestamp(byte[] value) {
-    return value != null ? UuidUtils.getTimestampMillis(UuidUtils.toUUID(value)) : null;
+  @Nullable
+  public static Long uuidTimestamp(@Nullable byte[] value) {
+    return value != null ? UuidUtils.getTimestampMillis(value) : null;
   }
 
-  public static Long uuidTimestamp(UUID value) {
+  @Nullable
+  public static Long uuidTimestamp(@Nullable UUID value) {
     return value != null ? UuidUtils.getTimestampMillis(value) : null;
   }
 }

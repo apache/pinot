@@ -25,8 +25,12 @@ import org.apache.pinot.common.function.scalar.uuid.UuidConversionFunctions;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
+/// Multi-stage wrapper for converting a 16-byte value to Pinot's logical UUID type.
+///
+/// This implementation is stateless and thread-safe.
 @AutoService(Udf.class)
 public class BytesToUuidUdf extends Udf.FromAnnotatedMethod {
   public BytesToUuidUdf()
@@ -41,6 +45,9 @@ public class BytesToUuidUdf extends Udf.FromAnnotatedMethod {
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
-    return Map.of();
+    return UuidUdfExamples.builder(FieldSpec.DataType.BYTES, FieldSpec.DataType.UUID)
+        .addExample("canonical bytes", UuidUdfExamples.bytes(UuidUdfExamples.UUID_V4), UuidUdfExamples.UUID_V4)
+        .build()
+        .generateExamples();
   }
 }

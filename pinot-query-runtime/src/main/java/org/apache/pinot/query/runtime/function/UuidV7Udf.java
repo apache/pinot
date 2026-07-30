@@ -27,6 +27,10 @@ import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
 
 
+/// Multi-stage wrapper for generating Unix-time-based RFC 9562 version-7 UUID values.
+///
+/// This implementation is stateless and thread-safe. Examples are intentionally empty because the result is
+/// non-deterministic; generator behavior is covered by focused unit and operator tests.
 @AutoService(Udf.class)
 public class UuidV7Udf extends Udf.FromAnnotatedMethod {
   public UuidV7Udf()

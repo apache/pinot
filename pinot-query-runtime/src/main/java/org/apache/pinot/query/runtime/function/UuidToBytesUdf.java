@@ -26,8 +26,12 @@ import org.apache.pinot.common.function.scalar.uuid.UuidToBytesScalarFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
+/// Multi-stage wrapper for converting STRING, BYTES, or UUID values to canonical UUID bytes.
+///
+/// This implementation is stateless and thread-safe.
 @AutoService(Udf.class)
 public class UuidToBytesUdf extends Udf {
   private static final UuidToBytesScalarFunction SCALAR_FUNCTION = new UuidToBytesScalarFunction();
@@ -49,7 +53,16 @@ public class UuidToBytesUdf extends Udf {
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
-    return Map.of();
+    byte[] bytes = UuidUdfExamples.bytes(UuidUdfExamples.UUID_V4);
+    return UuidUdfExamples.builder(FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES)
+        .addExample("canonical string", UuidUdfExamples.UUID_V4, bytes)
+        .and(UuidUdfExamples.builder(FieldSpec.DataType.BYTES, FieldSpec.DataType.BYTES)
+            .addExample("canonical bytes", bytes, bytes)
+            .build())
+        .and(UuidUdfExamples.builder(FieldSpec.DataType.UUID, FieldSpec.DataType.BYTES)
+            .addExample("logical uuid", UuidUdfExamples.UUID_V4, bytes)
+            .build())
+        .generateExamples();
   }
 
   @Override

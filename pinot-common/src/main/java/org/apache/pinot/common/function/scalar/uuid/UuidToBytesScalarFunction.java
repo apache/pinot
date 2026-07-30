@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function.scalar.uuid;
 
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.UuidUtils;
@@ -33,15 +34,18 @@ public class UuidToBytesScalarFunction extends AbstractUuidInputFunction {
     super(UuidToBytesScalarFunction.class, "UUID_TO_BYTES", "uuidToBytes", SqlTypeName.VARBINARY);
   }
 
-  public static byte[] uuidToBytes(String value) {
-    return value != null ? UuidUtils.toBytes(UuidUtils.toUUID(value)) : null;
+  @Nullable
+  public static byte[] uuidToBytes(@Nullable String value) {
+    return value != null ? UuidUtils.toBytes(value) : null;
   }
 
-  public static byte[] uuidToBytes(byte[] value) {
-    return value != null ? UuidUtils.toBytes(UuidUtils.toUUID(value)) : null;
+  @Nullable
+  public static byte[] uuidToBytes(@Nullable byte[] value) {
+    return value != null ? UuidUtils.toBytes(value) : null;
   }
 
-  public static byte[] uuidToBytes(UUID value) {
+  @Nullable
+  public static byte[] uuidToBytes(@Nullable UUID value) {
     return value != null ? UuidUtils.toBytes(value) : null;
   }
 }

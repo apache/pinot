@@ -1095,6 +1095,8 @@ public final class RelToPlanNodeConverter {
       case BINARY:
       case VARBINARY:
         return isArray ? ColumnDataType.BYTES_ARRAY : ColumnDataType.BYTES;
+      case UUID:
+        return isArray ? ColumnDataType.UUID_ARRAY : ColumnDataType.UUID;
       case MAP:
         return ColumnDataType.MAP;
       case OTHER:

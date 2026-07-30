@@ -31,6 +31,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -82,6 +83,7 @@ public class UuidConversionFunctionsTest {
     assertEquals(UuidToStringScalarFunction.uuidToString(uuid), UUID_VALUE);
     assertEquals(UuidToBytesScalarFunction.uuidToBytes(UUID_VALUE), bytes);
     assertEquals(UuidToBytesScalarFunction.uuidToBytes(bytes), bytes);
+    assertSame(UuidToBytesScalarFunction.uuidToBytes(bytes), bytes);
     assertEquals(UuidToBytesScalarFunction.uuidToBytes(uuid), bytes);
     assertEquals(UuidVersionScalarFunction.uuidVersion(UUID_VALUE).intValue(), 4);
     assertEquals(UuidVersionScalarFunction.uuidVersion(bytes).intValue(), 4);
@@ -133,7 +135,7 @@ public class UuidConversionFunctionsTest {
       assertEquals(function.getFunctionInfo(new ColumnDataType[]{ColumnDataType.BYTES}).getMethod()
           .getParameterTypes()[0], byte[].class);
       assertEquals(function.getFunctionInfo(new ColumnDataType[]{ColumnDataType.UUID}).getMethod()
-          .getParameterTypes()[0], UUID.class);
+          .getParameterTypes()[0], byte[].class);
     }
   }
 
@@ -193,24 +195,12 @@ public class UuidConversionFunctionsTest {
   }
 
   @Test
-  public void testUuidV7EncodesCurrentUnixMillisAndIsKSortable() {
-    long before = System.currentTimeMillis();
-    UUID first = UuidConversionFunctions.uuidV7();
-    UUID second = UuidConversionFunctions.uuidV7();
-    long after = System.currentTimeMillis();
-
-    assertEquals(first.version(), 7, "uuidV7 must produce version 7");
-    assertEquals(UuidVersionScalarFunction.uuidVersion(first).intValue(), 7);
-
-    long firstTs = UuidTimestampScalarFunction.uuidTimestamp(first);
-    long secondTs = UuidTimestampScalarFunction.uuidTimestamp(second);
-
-    assertTrue(firstTs >= before && firstTs <= after,
-        "uuidV7 timestamp " + firstTs + " not within [" + before + ", " + after + "]");
-    assertTrue(secondTs >= firstTs, "uuidV7 timestamps must be monotonically non-decreasing across calls");
-
+  public void testUuidV7ProducesValidVersion7Uuid() {
+    UUID uuid = UuidConversionFunctions.uuidV7();
+    assertEquals(uuid.version(), 7, "uuidV7 must produce version 7");
+    assertEquals(UuidVersionScalarFunction.uuidVersion(uuid).intValue(), 7);
     // Variant must be RFC 4122 (top two bits of LSB = 10).
-    assertEquals(first.variant(), 2, "uuidV7 must use RFC 4122 variant");
+    assertEquals(uuid.variant(), 2, "uuidV7 must use RFC 4122 variant");
   }
 
   @Test

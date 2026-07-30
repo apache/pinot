@@ -31,6 +31,9 @@ import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
+/// Multi-stage wrapper for validating STRING, BYTES, or UUID values.
+///
+/// This implementation is stateless and thread-safe.
 @AutoService(Udf.class)
 public class IsUuidUdf extends Udf {
   private static final IsUuidScalarFunction SCALAR_FUNCTION = new IsUuidScalarFunction();
@@ -81,6 +84,11 @@ public class IsUuidUdf extends Udf {
             // With null handling disabled the column falls back to the default null value for BYTES
             // (zero-length), which is not 16 bytes wide.
             .addExample(UdfExample.create("null input", null, null).withoutNull(false))
+            .build())
+        .and(UuidUdfExamples.builder(FieldSpec.DataType.UUID, FieldSpec.DataType.BOOLEAN)
+            .addExample("logical uuid", UuidUdfExamples.UUID_V4, true)
+            // With null handling disabled, UUID uses the nil UUID as its default value, which remains valid.
+            .addExample(UdfExample.create("null input", null, null).withoutNull(true))
             .build())
         .generateExamples();
   }

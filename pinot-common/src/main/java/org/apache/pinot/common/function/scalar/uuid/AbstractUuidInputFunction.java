@@ -85,7 +85,9 @@ abstract class AbstractUuidInputFunction implements PinotScalarFunction {
       case BYTES:
         return _bytesFunctionInfo;
       case UUID:
-        return _uuidFunctionInfo;
+        // UUID columns are stored as fixed-width BYTES. Keep them byte-backed on the query path so scalar
+        // evaluation does not materialize one java.util.UUID object per row.
+        return _bytesFunctionInfo;
       default:
         return null;
     }

@@ -26,8 +26,12 @@ import org.apache.pinot.common.function.scalar.uuid.UuidVersionScalarFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
+/// Multi-stage wrapper for extracting the version field from STRING, BYTES, or UUID values.
+///
+/// This implementation is stateless and thread-safe.
 @AutoService(Udf.class)
 public class UuidVersionUdf extends Udf {
   private static final UuidVersionScalarFunction SCALAR_FUNCTION = new UuidVersionScalarFunction();
@@ -50,7 +54,15 @@ public class UuidVersionUdf extends Udf {
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
-    return Map.of();
+    return UuidUdfExamples.builder(FieldSpec.DataType.STRING, FieldSpec.DataType.INT)
+        .addExample("version 4 string", UuidUdfExamples.UUID_V4, 4)
+        .and(UuidUdfExamples.builder(FieldSpec.DataType.BYTES, FieldSpec.DataType.INT)
+            .addExample("version 4 bytes", UuidUdfExamples.bytes(UuidUdfExamples.UUID_V4), 4)
+            .build())
+        .and(UuidUdfExamples.builder(FieldSpec.DataType.UUID, FieldSpec.DataType.INT)
+            .addExample("version 4 uuid", UuidUdfExamples.UUID_V4, 4)
+            .build())
+        .generateExamples();
   }
 
   @Override
