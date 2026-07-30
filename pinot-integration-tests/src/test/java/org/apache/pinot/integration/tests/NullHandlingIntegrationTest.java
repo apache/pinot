@@ -37,10 +37,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
- * The data pushed to Kafka includes null values.
- */
+/// Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
+/// The data pushed to Kafka includes null values.
 public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     implements ExplainIntegrationTestTrait {
 

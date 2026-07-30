@@ -28,10 +28,8 @@ import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 
 
-/**
- * ProjectionBlock holds a column name to Block Map.
- * It provides DocIdSetBlock for a given column.
- */
+/// ProjectionBlock holds a column name to Block Map.
+/// It provides DocIdSetBlock for a given column.
 public class ProjectionBlock implements ValueBlock {
   private final Map<String, DataSource> _dataSourceMap;
   private final DataBlockCache _dataBlockCache;

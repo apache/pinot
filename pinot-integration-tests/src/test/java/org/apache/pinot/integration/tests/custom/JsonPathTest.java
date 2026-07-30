@@ -680,10 +680,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
 
   // --- JsonIndexDistinctOperator tests (useIndexBasedDistinctOperator) ---
 
-  /**
-   * Without useIndexBasedDistinctOperator (disabled by default), SELECT DISTINCT jsonExtractIndex(...) uses
-   * default DistinctOperator and returns correct results.
-   */
+  /// Without useIndexBasedDistinctOperator (disabled by default), SELECT DISTINCT jsonExtractIndex(...) uses
+  /// default DistinctOperator and returns correct results.
   @Test(dataProvider = "useBothQueryEngines")
   public void testJsonIndexDistinctOperatorDisabledByDefault(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -699,12 +697,10 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
             : "SSE"));
   }
 
-  /**
-   * With useIndexBasedDistinctOperator, JsonIndexDistinctOperator produces same results as baseline.
-   * Compares ordered rows (not just sets) to verify ORDER BY semantics. The numEntriesScannedPostFilter assertion
-   * pins the operator's per-value iteration: one increment per entry in the value-to-docs map, so the expected
-   * count is NUM_DISTINCT_K1 * getNumAvroFiles().
-   */
+  /// With useIndexBasedDistinctOperator, JsonIndexDistinctOperator produces same results as baseline.
+  /// Compares ordered rows (not just sets) to verify ORDER BY semantics. The numEntriesScannedPostFilter assertion
+  /// pins the operator's per-value iteration: one increment per entry in the value-to-docs map, so the expected
+  /// count is NUM_DISTINCT_K1 \* getNumAvroFiles().
   @Test(dataProvider = "useBothQueryEngines")
   public void testJsonIndexDistinctOperatorWithPinotJsonIndex(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -728,12 +724,10 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asInt(), NUM_DISTINCT_K1 * getNumAvroFiles());
   }
 
-  /**
-   * JsonIndexDistinctOperator with a WHERE filter on a different path produces the same ordered results as the
-   * baseline. The operator still iterates every entry in the $.k1 value-to-docs map (the WHERE filter is applied
-   * via per-entry bitmap intersection, not by shrinking the map), so numEntriesScannedPostFilter is
-   * NUM_DISTINCT_K1 * getNumAvroFiles() — same as the no-filter case.
-   */
+  /// JsonIndexDistinctOperator with a WHERE filter on a different path produces the same ordered results as the
+  /// baseline. The operator still iterates every entry in the $.k1 value-to-docs map (the WHERE filter is applied
+  /// via per-entry bitmap intersection, not by shrinking the map), so numEntriesScannedPostFilter is
+  /// NUM_DISTINCT_K1 \* getNumAvroFiles() — same as the no-filter case.
   @Test(dataProvider = "useBothQueryEngines")
   public void testJsonIndexDistinctOperatorWithFilter(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -758,10 +752,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asInt(), NUM_DISTINCT_K1 * getNumAvroFiles());
   }
 
-  /**
-   * Verifies that JsonIndexDistinctOperator correctly materializes the defaultValue for docs WHERE the JSON path
-   * is absent, matching baseline JsonExtractIndexTransformFunction behavior.
-   */
+  /// Verifies that JsonIndexDistinctOperator correctly materializes the defaultValue for docs WHERE the JSON path
+  /// is absent, matching baseline JsonExtractIndexTransformFunction behavior.
   @Test(dataProvider = "useBothQueryEngines")
   public void testJsonIndexDistinctOperatorWithDefaultValue(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -789,11 +781,9 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asInt(), 0);
   }
 
-  /**
-   * Verifies that JsonIndexDistinctOperator throws when the JSON path is absent for some docs and no defaultValue
-   * is provided (matching baseline JsonExtractIndexTransformFunction behavior which throws "Illegal Json Path").
-   * Only tested on SSE because MSE may handle errors differently.
-   */
+  /// Verifies that JsonIndexDistinctOperator throws when the JSON path is absent for some docs and no defaultValue
+  /// is provided (matching baseline JsonExtractIndexTransformFunction behavior which throws "Illegal Json Path").
+  /// Only tested on SSE because MSE may handle errors differently.
   @Test(dataProvider = "useV1QueryEngine")
   public void testJsonIndexDistinctOperatorMissingPathNoDefault(boolean useMultiStageQueryEngine)
       throws Exception {

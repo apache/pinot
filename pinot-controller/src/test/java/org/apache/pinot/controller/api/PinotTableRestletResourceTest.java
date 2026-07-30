@@ -86,9 +86,7 @@ import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
-/**
- * Test for table creation
- */
+/// Test for table creation
 public class PinotTableRestletResourceTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = "testOfflineTable";
   private static final String REALTIME_TABLE_NAME = "testRealtimeTable";
@@ -985,24 +983,22 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         "unrecognizedProperties\":{\"/illegalKey1\":1," + "\"/illegalKey2/illegalKey3\":2}}"));
   }
 
-  /**
-   * Validates the behavior of the system when creating or updating tables with invalid replication factors.
-   * This method tests both REALTIME and OFFLINE table configurations.
-   *
-   * The method performs the following steps:
-   * 1. Attempts to create a REALTIME table with an invalid replication factor of 5, which exceeds the number of
-   *  available instances. The creation is expected to fail, and the test verifies that the exception message
-   *  contains the expected error.
-   * 2. Attempts to create an OFFLINE table with the same invalid replication factor. The creation is expected to
-   *  fail, and the test verifies that the exception message contains the expected error.
-   * 3. Creates REALTIME and OFFLINE tables with a valid replication factor of 1 to establish a baseline for further
-   * testing. These creations are expected to succeed.
-   * 4. Attempts to update the replication factor of the previously created REALTIME and OFFLINE tables to the
-   * invalid value of 5. These updates are expected to fail, and the test verifies that the appropriate error
-   * messages are returned.
-   *
-   * @throws Exception if any error occurs during the validation process
-   */
+  /// Validates the behavior of the system when creating or updating tables with invalid replication factors.
+  /// This method tests both REALTIME and OFFLINE table configurations.
+  ///
+  /// The method performs the following steps:
+  /// 1. Attempts to create a REALTIME table with an invalid replication factor of 5, which exceeds the number of
+  ///  available instances. The creation is expected to fail, and the test verifies that the exception message
+  ///  contains the expected error.
+  /// 2. Attempts to create an OFFLINE table with the same invalid replication factor. The creation is expected to
+  ///  fail, and the test verifies that the exception message contains the expected error.
+  /// 3. Creates REALTIME and OFFLINE tables with a valid replication factor of 1 to establish a baseline for further
+  /// testing. These creations are expected to succeed.
+  /// 4. Attempts to update the replication factor of the previously created REALTIME and OFFLINE tables to the
+  /// invalid value of 5. These updates are expected to fail, and the test verifies that the appropriate error
+  /// messages are returned.
+  ///
+  /// @throws Exception if any error occurs during the validation process
   @Test
   public void validateInvalidTableReplication()
       throws Exception {
@@ -1018,20 +1014,18 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     validateTableUpdateReplicationToInvalidValue(rawTableName, TableType.OFFLINE);
   }
 
-  /**
-   * Validates the behavior of the system when creating or updating tables with invalid replica group configurations.
-   * This method tests the REALTIME table configuration.
-   *
-   * The method performs the following steps:
-   * 1. Attempts to create a REALTIME table with an invalid replica group configuration. The creation is expected to
-   * fail, and the test verifies that the exception message contains the expected error.
-   * 2. Creates a new REALTIME table with a valid replica group configuration to establish a baseline for further
-   * testing. This creation is expected to succeed.
-   * 3. Attempts to update the replica group configuration of the previously created REALTIME table to an invalid
-   * value. The update is expected to fail, and the test verifies that the appropriate error message is returned.
-   *
-   * @throws Exception if any error occurs during the validation process
-   */
+  /// Validates the behavior of the system when creating or updating tables with invalid replica group configurations.
+  /// This method tests the REALTIME table configuration.
+  ///
+  /// The method performs the following steps:
+  /// 1. Attempts to create a REALTIME table with an invalid replica group configuration. The creation is expected to
+  /// fail, and the test verifies that the exception message contains the expected error.
+  /// 2. Creates a new REALTIME table with a valid replica group configuration to establish a baseline for further
+  /// testing. This creation is expected to succeed.
+  /// 3. Attempts to update the replica group configuration of the previously created REALTIME table to an invalid
+  /// value. The update is expected to fail, and the test verifies that the appropriate error message is returned.
+  ///
+  /// @throws Exception if any error occurs during the validation process
   @Test
   public void validateInvalidReplicaGroupConfig()
       throws Exception {
@@ -1143,9 +1137,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     assertTrue(msg.contains("Table nonExistentTable_REALTIME does not exist"), msg);
   }
 
-  /**
-   * Updating existing REALTIME table with invalid replication factor should throw exception.
-   */
+  /// Updating existing REALTIME table with invalid replication factor should throw exception.
   private void validateTableUpdateReplicationToInvalidValue(String rawTableName, TableType tableType) {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
     TableConfig tableConfig = (tableType == TableType.REALTIME
@@ -1177,9 +1169,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
   }
 
-  /**
-   * When table is created with invalid replication factor, it should throw exception.
-   */
+  /// When table is created with invalid replication factor, it should throw exception.
   private void validateTableCreationWithInvalidReplication(String rawTableName, TableType tableType)
       throws IOException {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);

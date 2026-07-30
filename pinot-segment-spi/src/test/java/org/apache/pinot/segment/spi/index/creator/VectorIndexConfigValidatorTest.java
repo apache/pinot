@@ -26,12 +26,10 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Tests for {@link VectorIndexConfigValidator}.
- *
- * <p>Covers validation of HNSW and IVF_FLAT configs, cross-backend property rejection,
- * default values, and backward compatibility scenarios.</p>
- */
+/// Tests for [VectorIndexConfigValidator].
+///
+/// Covers validation of HNSW and IVF_FLAT configs, cross-backend property rejection,
+/// default values, and backward compatibility scenarios.
 public class VectorIndexConfigValidatorTest {
 
   // ============================================================

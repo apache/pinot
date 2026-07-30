@@ -32,9 +32,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-/**
- * Unit test for the static table cache functionality in PinotQueryResource.
- */
+/// Unit test for the static table cache functionality in PinotQueryResource.
 public class PinotQueryResourceStaticValidationTest {
 
   private ObjectMapper _objectMapper;

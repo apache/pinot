@@ -44,17 +44,13 @@ public class MultiColumnDistinctTable extends DistinctTable {
 
   private ObjectHeapPriorityQueue<Record> _priorityQueue;
 
-  /**
-   * Constructor for distinct table without data table (on the server side).
-   */
+  /// Constructor for distinct table without data table (on the server side).
   public MultiColumnDistinctTable(DataSchema dataSchema, int limit, boolean nullHandlingEnabled,
       @Nullable List<OrderByExpressionContext> orderByExpressions) {
     this(dataSchema, limit, nullHandlingEnabled, orderByExpressions, Math.min(limit, MAX_INITIAL_CAPACITY));
   }
 
-  /**
-   * Constructor for distinct table with initial set size (on the server side).
-   */
+  /// Constructor for distinct table with initial set size (on the server side).
   public MultiColumnDistinctTable(DataSchema dataSchema, int limit, boolean nullHandlingEnabled,
       @Nullable List<OrderByExpressionContext> orderByExpressions, int initialSetSize) {
     super(dataSchema, limit, nullHandlingEnabled);
@@ -63,9 +59,7 @@ public class MultiColumnDistinctTable extends DistinctTable {
     _orderByExpressions = orderByExpressions;
   }
 
-  /**
-   * Constructor for distinct table with data table (on the broker side).
-   */
+  /// Constructor for distinct table with data table (on the broker side).
   public MultiColumnDistinctTable(DataSchema dataSchema, int limit, boolean nullHandlingEnabled,
       @Nullable List<OrderByExpressionContext> orderByExpressions, DataTable dataTable) {
     super(dataSchema, limit, nullHandlingEnabled);

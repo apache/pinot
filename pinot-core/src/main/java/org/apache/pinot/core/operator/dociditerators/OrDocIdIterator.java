@@ -23,9 +23,7 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 
 
-/**
- * The {@code OrDocIdIterator} is the iterator for OrDocIdSet to perform OR on all child BlockDocIdIterators.
- */
+/// The `OrDocIdIterator` is the iterator for OrDocIdSet to perform OR on all child BlockDocIdIterators.
 public final class OrDocIdIterator implements BlockDocIdIterator {
   private final BlockDocIdIterator[] _docIdIterators;
   private final int[] _nextDocIds;
@@ -41,12 +39,13 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     _numNotExhaustedIterators = numDocIdIterators;
   }
 
-  /**
-   * Loop over the document id array and pick the smallest one so that the document ids returned are in ascending order.
-   * <p>For each child iterator, fetch the next document id when its current document id is the same as document id
-   * previous returned so that each document id is only returned once.
-   * <p>{@inheritDoc}
-   */
+  /// Loop over the document id array and pick the smallest one so that the document ids returned are in ascending
+  /// order.
+  ///
+  /// For each child iterator, fetch the next document id when its current document id is the same as document id
+  /// previous returned so that each document id is only returned once.
+  ///
+  /// {@inheritDoc}
   @Override
   public int next() {
     int nextDocId = Integer.MAX_VALUE;
@@ -74,13 +73,13 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     }
   }
 
-  /**
-   * Loop over the document id array and pick the smallest one that is equal or grater than the given target document id
-   * so that the document ids returned are in ascending order.
-   * <p>For each child iterator, advance to the target document id when its current document id is smaller than the
-   * target document id so that each document id is only returned once.
-   * <p>{@inheritDoc}
-   */
+  /// Loop over the document id array and pick the smallest one that is equal or grater than the given target
+  /// document id so that the document ids returned are in ascending order.
+  ///
+  /// For each child iterator, advance to the target document id when its current document id is smaller than the
+  /// target document id so that each document id is only returned once.
+  ///
+  /// {@inheritDoc}
   @Override
   public int advance(int targetDocId) {
     int nextDocId = Integer.MAX_VALUE;
@@ -108,11 +107,10 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     }
   }
 
-  /**
-   * Helper method to remove exhausted iterators.
-   * <p>Whenever we find an exhausted iterator, we replace it with the last one, and update number of not exhausted
-   * iterators until the first number of not exhausted iterators in the array are not exhausted.
-   */
+  /// Helper method to remove exhausted iterators.
+  ///
+  /// Whenever we find an exhausted iterator, we replace it with the last one, and update number of not exhausted
+  /// iterators until the first number of not exhausted iterators in the array are not exhausted.
   private void removeExhaustedIterators() {
     int i = 0;
     while (i < _numNotExhaustedIterators) {

@@ -28,9 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Factory class to create and sort {@link Tier}
- */
+/// Factory class to create and sort [Tier]
 public final class TierFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(TierFactory.class);
   public static final String TIME_SEGMENT_SELECTOR_TYPE = "time";
@@ -40,9 +38,7 @@ public final class TierFactory {
   private TierFactory() {
   }
 
-  /**
-   * Constructs a {@link Tier} from the {@link TierConfig} in the table config
-   */
+  /// Constructs a [Tier] from the [TierConfig] in the table config
   public static Tier getTier(TierConfig tierConfig) {
     return getTier(tierConfig, null);
   }

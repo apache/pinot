@@ -26,27 +26,25 @@ import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.random.Well19937c;
 
 
-/**
- * PatternSeasonalGenerator generates sinus wave patterns with a linear trend, gaussian noise, and cyclically repeating
- * scaling factors. These patterns are typical for di-urnal usage patterns such as clicks and impressions of a website.
- *
- * Generator example:
- * <pre>
- *     mean = 10
- *     sigma = 1
- *     wavelength = 4
- *     amplitude = 10
- *     scaling factors = [ 0.5, 1.0, 1.0, 1.0, 1.0, 0.5 ] // e.g. high weekdays, low week ends
- *
- *     returns [ 5, 10, 12, 7, 11, 18, 21, 6, 2, 7, 12, 20, 21, 13, ... ]
- * </pre>
- *
- * Configuration examples:
- * <ul>
- *     <li>./pinot-tools/src/main/resources/generator/simpleWebsite_generator.json</li>
- *     <li>./pinot-tools/src/main/resources/generator/complexWebsite_generator.json</li>
- * </ul>
- */
+/// PatternSeasonalGenerator generates sinus wave patterns with a linear trend, gaussian noise, and cyclically repeating
+/// scaling factors. These patterns are typical for di-urnal usage patterns such as clicks and impressions of a website.
+///
+/// Generator example:
+///
+/// ```
+/// mean = 10
+/// sigma = 1
+/// wavelength = 4
+/// amplitude = 10
+/// scaling factors = [ 0.5, 1.0, 1.0, 1.0, 1.0, 0.5 ] // e.g. high weekdays, low week ends
+///
+/// returns [ 5, 10, 12, 7, 11, 18, 21, 6, 2, 7, 12, 20, 21, 13, ... ]
+/// ```
+///
+/// Configuration examples:
+///
+/// - ./pinot-tools/src/main/resources/generator/simpleWebsite_generator.json
+/// - ./pinot-tools/src/main/resources/generator/complexWebsite_generator.json
 public class PatternSeasonalGenerator implements Generator {
   private final double _trend;
   private final double _wavelength;

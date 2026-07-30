@@ -32,16 +32,12 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for {@link org.apache.pinot.server.api.resources.PinotServerAppConfigs} class.
- */
+/// Unit test for [org.apache.pinot.server.api.resources.PinotServerAppConfigs] class.
 public class PinotServerAppConfigsTest extends BaseResourceTest {
 
-  /**
-   * Asserts that application configs returned by the server endpoint are as expected.
-   *
-   * @throws JsonProcessingException In case an exception is encountered during JSON processing.
-   */
+  /// Asserts that application configs returned by the server endpoint are as expected.
+  ///
+  /// @throws JsonProcessingException In case an exception is encountered during JSON processing.
   @Test
   public void testAppConfigs()
       throws JsonProcessingException, SocketException, UnknownHostException {

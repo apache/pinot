@@ -38,29 +38,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base segment assignment which contains the common assignment strategies.
- * <ul>
- *   <li>
- *     Non-replica-group based assignment (1 replica-group and 1 partition in instance partitions):
- *     <p>Assign the segment to the instance with the least number of segments. In case of a tie, assign the segment to
- *     the instance with the smallest index in the list. Use Helix AutoRebalanceStrategy to rebalance the table.
- *   </li>
- *   <li>
- *     Replica-group based assignment (multiple replica-groups or partitions in instance partitions):
- *     <p>Among replica-groups, always mirror the assignment (pick the same index of the instance).
- *     <p>Within each partition, assign the segment to the instances with the least segments already assigned. In case
- *     of a tie, assign to the instance with the smallest index in the list. Do this for one replica-group and mirror
- *     the assignment to other replica-groups.
- *     <p>To rebalance a table, within each partition, first calculate the number of segments on each instance, loop
- *     over all the segments and keep the assignment if number of segments for the instance has not been reached and
- *     track the not assigned segments, then assign the left-over segments to the instances with the least segments, or
- *     the smallest index if there is a tie. Repeat the process for all the partitions in one replica-group, and mirror
- *     the assignment to other replica-groups. With this greedy algorithm, the result is deterministic and with minimum
- *     segment moves.
- *   </li>
- * </ul>
- */
+/// Base segment assignment which contains the common assignment strategies.
+///
+/// - Non-replica-group based assignment (1 replica-group and 1 partition in instance partitions):
+///
+///   Assign the segment to the instance with the least number of segments. In case of a tie, assign the segment to
+///   the instance with the smallest index in the list. Use Helix AutoRebalanceStrategy to rebalance the table.
+/// - Replica-group based assignment (multiple replica-groups or partitions in instance partitions):
+///
+///   Among replica-groups, always mirror the assignment (pick the same index of the instance).
+///
+///   Within each partition, assign the segment to the instances with the least segments already assigned. In case
+///   of a tie, assign to the instance with the smallest index in the list. Do this for one replica-group and mirror
+///   the assignment to other replica-groups.
+///
+///   To rebalance a table, within each partition, first calculate the number of segments on each instance, loop
+///   over all the segments and keep the assignment if number of segments for the instance has not been reached and
+///   track the not assigned segments, then assign the left-over segments to the instances with the least segments, or
+///   the smallest index if there is a tie. Repeat the process for all the partitions in one replica-group, and mirror
+///   the assignment to other replica-groups. With this greedy algorithm, the result is deterministic and with minimum
+///   segment moves.
 public abstract class BaseSegmentAssignment implements SegmentAssignment {
   protected final Logger _logger = LoggerFactory.getLogger(getClass());
 
@@ -102,9 +99,7 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
     }
   }
 
-  /**
-   * Rebalances tiers and returns a pair of tier assignments and non-tier assignment.
-   */
+  /// Rebalances tiers and returns a pair of tier assignments and non-tier assignment.
   protected Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> rebalanceTiers(
       Map<String, Map<String, String>> currentAssignment, @Nullable List<Tier> sortedTiers,
       @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, boolean bootstrap) {
@@ -154,9 +149,7 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
     return Pair.of(newTierAssignments, tierSegmentAssignment.getNonTierSegmentAssignment());
   }
 
-  /**
-   * Rebalances segments in the current assignment using the instancePartitions and returns new assignment
-   */
+  /// Rebalances segments in the current assignment using the instancePartitions and returns new assignment
   protected Map<String, Map<String, String>> reassignSegments(String instancePartitionType,
       Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions, boolean bootstrap,
       SegmentAssignmentStrategy segmentAssignmentStrategy) {

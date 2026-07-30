@@ -39,14 +39,14 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The {@code SegmentPartitionedDistinctCountAggregationFunction} calculates the number of distinct values for a given
- * single-value expression.
- * <p>IMPORTANT: This function relies on the expression values being partitioned for each segment, where there is no
- * common values within different segments.
- * <p>This function calculates the exact number of distinct values within the segment, then simply sums up the results
- * from different segments to get the final result.
- */
+/// The `SegmentPartitionedDistinctCountAggregationFunction` calculates the number of distinct values for a given
+/// single-value expression.
+///
+/// IMPORTANT: This function relies on the expression values being partitioned for each segment, where there is no
+/// common values within different segments.
+///
+/// This function calculates the exact number of distinct values within the segment, then simply sums up the results
+/// from different segments to get the final result.
 public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
 
   public SegmentPartitionedDistinctCountAggregationFunction(List<ExpressionContext> arguments) {
@@ -333,9 +333,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     return finalResult1 + finalResult2;
   }
 
-  /**
-   * Helper method to set an INT value for the given group key into the result holder.
-   */
+  /// Helper method to set an INT value for the given group key into the result holder.
   private static void setIntValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, int value) {
     RoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
     if (bitmap == null) {
@@ -345,9 +343,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     bitmap.add(value);
   }
 
-  /**
-   * Helper method to set an LONG value for the given group key into the result holder.
-   */
+  /// Helper method to set an LONG value for the given group key into the result holder.
   private static void setLongValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, long value) {
     LongOpenHashSet longSet = groupByResultHolder.getResult(groupKey);
     if (longSet == null) {
@@ -357,9 +353,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     longSet.add(value);
   }
 
-  /**
-   * Helper method to set an FLOAT value for the given group key into the result holder.
-   */
+  /// Helper method to set an FLOAT value for the given group key into the result holder.
   private static void setFloatValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, float value) {
     FloatOpenHashSet floatSet = groupByResultHolder.getResult(groupKey);
     if (floatSet == null) {
@@ -369,9 +363,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     floatSet.add(value);
   }
 
-  /**
-   * Helper method to set an DOUBLE value for the given group key into the result holder.
-   */
+  /// Helper method to set an DOUBLE value for the given group key into the result holder.
   private static void setDoubleValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, double value) {
     DoubleOpenHashSet doubleSet = groupByResultHolder.getResult(groupKey);
     if (doubleSet == null) {
@@ -381,9 +373,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     doubleSet.add(value);
   }
 
-  /**
-   * Helper method to set an STRING value for the given group key into the result holder.
-   */
+  /// Helper method to set an STRING value for the given group key into the result holder.
   private static void setStringValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, String value) {
     ObjectOpenHashSet<String> stringSet = groupByResultHolder.getResult(groupKey);
     if (stringSet == null) {
@@ -393,9 +383,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     stringSet.add(value);
   }
 
-  /**
-   * Helper method to set an BYTES value for the given group key into the result holder.
-   */
+  /// Helper method to set an BYTES value for the given group key into the result holder.
   private static void setBytesValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, ByteArray value) {
     ObjectOpenHashSet<ByteArray> bytesSet = groupByResultHolder.getResult(groupKey);
     if (bytesSet == null) {
@@ -405,9 +393,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     bytesSet.add(value);
   }
 
-  /**
-   * Helper method to extract segment level intermediate result from the inner segment result.
-   */
+  /// Helper method to extract segment level intermediate result from the inner segment result.
   private static long extractIntermediateResult(@Nullable Object result) {
     if (result == null) {
       return 0L;

@@ -51,9 +51,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for {@link FileBasedSegmentWriter}
- */
+/// Tests for [FileBasedSegmentWriter]
 public class FileBasedSegmentWriterTest {
 
   private static final String TABLE_NAME = "segmentWriter";
@@ -102,9 +100,7 @@ public class FileBasedSegmentWriterTest {
         .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
   }
 
-  /**
-   * Tests init on batchConfig combinations
-   */
+  /// Tests init on batchConfig combinations
   @Test
   public void testBatchConfigs()
       throws Exception {
@@ -159,9 +155,7 @@ public class FileBasedSegmentWriterTest {
     segmentWriter.close();
   }
 
-  /**
-   * Tests that {@link SegmentWriter} generates segments as expected
-   */
+  /// Tests that [SegmentWriter] generates segments as expected
   @Test
   public void testSegmentWriter()
       throws Exception {
@@ -240,9 +234,7 @@ public class FileBasedSegmentWriterTest {
     FileUtils.deleteQuietly(_outputDir);
   }
 
-  /**
-   * Tests flushing on empty collection
-   */
+  /// Tests flushing on empty collection
   @Test
   public void testEmptySegment()
       throws Exception {
@@ -269,9 +261,7 @@ public class FileBasedSegmentWriterTest {
     FileUtils.deleteQuietly(_outputDir);
   }
 
-  /**
-   * Tests various {@link org.apache.pinot.spi.ingestion.batch.BatchConfigProperties.SegmentNameGeneratorType}
-   */
+  /// Tests various [org.apache.pinot.spi.ingestion.batch.BatchConfigProperties.SegmentNameGeneratorType]
   @Test
   public void testSegmentNameGenerator()
       throws Exception {
@@ -344,9 +334,7 @@ public class FileBasedSegmentWriterTest {
     FileUtils.deleteQuietly(_outputDir);
   }
 
-  /**
-   * Tests segment overwrite config
-   */
+  /// Tests segment overwrite config
   @Test
   public void testOverwrite()
       throws Exception {

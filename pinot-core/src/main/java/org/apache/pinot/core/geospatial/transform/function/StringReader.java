@@ -24,13 +24,11 @@ import java.io.Writer;
 import java.nio.CharBuffer;
 
 
-/**
- * Re-usable string reader.
- * Note: at the moment it implements only methods required by GeoJsonReader, that is:
- * - read(char[], int, int)
- * - read()
- * - close()
- */
+/// Re-usable string reader.
+/// Note: at the moment it implements only methods required by GeoJsonReader, that is:
+/// - read(char\[\], int, int)
+/// - read()
+/// - close()
 public class StringReader extends Reader {
 
   private int _length;

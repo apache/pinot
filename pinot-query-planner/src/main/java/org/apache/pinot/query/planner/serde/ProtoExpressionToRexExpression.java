@@ -28,9 +28,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Converts Protobuf versions of RexExpression to appropriate RexExpression classes.
- */
+/// Converts Protobuf versions of RexExpression to appropriate RexExpression classes.
 public class ProtoExpressionToRexExpression {
   private ProtoExpressionToRexExpression() {
   }

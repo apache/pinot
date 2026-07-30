@@ -280,7 +280,7 @@ public class CalciteSqlParser {
   }
 
   /// Recursively rejects GROUPING() / GROUPING_ID() calls with more than
-  /// {@link GroupingSets#MAX_GROUPING_FUNCTION_ARGS} arguments (the packed INT bit width).
+  /// [GroupingSets#MAX_GROUPING_FUNCTION_ARGS] arguments (the packed INT bit width).
   private static void validateGroupingFunctionArgs(Expression expression) {
     Function function = expression.getFunctionCall();
     if (function == null) {
@@ -760,17 +760,17 @@ public class CalciteSqlParser {
     return selectExpr;
   }
 
-  /// Converts the GROUP BY clause into {@link PinotQuery#groupByList} and (when grouping constructs are
-  /// present) {@link PinotQuery#groupingSets}.
+  /// Converts the GROUP BY clause into [PinotQuery#groupByList] and (when grouping constructs are
+  /// present) [PinotQuery#groupingSets].
   ///
   /// For a plain GROUP BY (no ROLLUP / CUBE / GROUPING SETS) this behaves exactly like
-  /// {@link #convertSelectList} and leaves {@code groupingSets} unset, so non-grouping-set queries are
+  /// [#convertSelectList] and leaves `groupingSets` unset, so non-grouping-set queries are
   /// unchanged. When grouping constructs are present, the grouping elements are cross-multiplied into the
   /// canonical, de-duplicated list of grouping sets (standard SQL semantics, e.g.
-  /// {@code GROUP BY a, ROLLUP(b, c)} produces {@code {a,b,c}, {a,b}, {a}}); the ordered, de-duplicated
-  /// union of all participating columns is stored as {@code groupByList}, and each grouping set is stored
+  /// `GROUP BY a, ROLLUP(b, c)` produces `{a,b,c}, {a,b}, {a}`); the ordered, de-duplicated
+  /// union of all participating columns is stored as `groupByList`, and each grouping set is stored
   /// as the sorted list of its participating union-column indexes, an empty list being the grand-total set
-  /// {@code ()}.
+  /// `()`.
   private static void setGroupByListAndGroupingSets(PinotQuery pinotQuery, SqlNodeList groupByNodeList) {
     boolean hasGroupingConstruct = false;
     for (SqlNode node : groupByNodeList) {
@@ -839,9 +839,9 @@ public class CalciteSqlParser {
 
   /// Expands a single grouping element into the list of grouping sets it represents (each set is an ordered
   /// list of column expressions; the empty list is the grand-total set).
-  /// - {@code ROLLUP(l1, ..., ln)} -> the n+1 prefixes {@code {l1..ln}, {l1..ln-1}, ..., {l1}, {}}
-  /// - {@code CUBE(l1, ..., ln)} -> the power set of the n levels
-  /// - {@code GROUPING SETS(g1, ..., gm)} -> the concatenation of each operand's expansion (operands may be
+  /// - `ROLLUP(l1, ..., ln)` -> the n+1 prefixes `{l1..ln}, {l1..ln-1}, ..., {l1}, {}`
+  /// - `CUBE(l1, ..., ln)` -> the power set of the n levels
+  /// - `GROUPING SETS(g1, ..., gm)` -> the concatenation of each operand's expansion (operands may be
   ///   nested ROLLUP/CUBE/GROUPING SETS or ordinary sets)
   /// - an ordinary grouping element (a single column or a parenthesized list) -> a single set
   private static List<List<Expression>> parseGroupingElement(SqlNode node) {
@@ -902,7 +902,7 @@ public class CalciteSqlParser {
   }
 
   /// Parses a single grouping level/set node into its column expressions. Handles a parenthesized list
-  /// (modeled by Calcite as either a {@link SqlNodeList} or a ROW call), and a bare single column. An empty
+  /// (modeled by Calcite as either a [SqlNodeList] or a ROW call), and a bare single column. An empty
   /// parenthesized list yields an empty column list (the grand-total set).
   private static List<Expression> parseLevel(SqlNode node) {
     if (node instanceof SqlNodeList) {

@@ -43,12 +43,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code ExpressionTransformer} class will evaluate the function expressions.
- * <p>NOTE: should put this before the {@link DataTypeTransformer}. After this, transformed column can be treated as
- * regular column for other record transformers.
- * TODO: Merge this and CustomFunctionEnricher
- */
+/// The `ExpressionTransformer` class will evaluate the function expressions.
+///
+/// NOTE: should put this before the [DataTypeTransformer]. After this, transformed column can be treated as
+/// regular column for other record transformers.
+/// TODO: Merge this and CustomFunctionEnricher
 public class ExpressionTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExpressionTransformer.class);
 
@@ -58,11 +57,9 @@ public class ExpressionTransformer implements RecordTransformer {
   /// `mapField__VALUES`). When the source MAP is absent from the record, the transform for these columns is skipped
   /// to preserve backward-compatible behavior and avoid overwriting existing values with null.
   private final Set<String> _implicitMapTransformColumns = new HashSet<>();
-  /**
-   * If {@code true}, transform functions overwrite existing non-null values instead of skipping them. This is enabled
-   * for post-upsert transforms where derived columns should be recomputed on the merged row; otherwise transforms only
-   * populate missing or null-valued columns.
-   */
+  /// If `true`, transform functions overwrite existing non-null values instead of skipping them. This is enabled
+  /// for post-upsert transforms where derived columns should be recomputed on the merged row; otherwise transforms only
+  /// populate missing or null-valued columns.
   private final boolean _overwriteExistingValues;
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
@@ -99,10 +96,8 @@ public class ExpressionTransformer implements RecordTransformer {
     _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
   }
 
-  /**
-   * Creates an {@code ExpressionTransformer} for a specific set of transform configs, typically used for post-upsert
-   * transforms where derived columns should be recomputed on the merged row.
-   */
+  /// Creates an `ExpressionTransformer` for a specific set of transform configs, typically used for post-upsert
+  /// transforms where derived columns should be recomputed on the merged row.
   public ExpressionTransformer(List<TransformConfig> transformConfigs, boolean overwriteExistingValues,
       boolean continueOnError) {
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();

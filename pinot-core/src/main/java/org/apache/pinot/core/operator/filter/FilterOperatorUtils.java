@@ -45,27 +45,19 @@ public class FilterOperatorUtils {
 
   public interface Implementation {
 
-    /**
-     * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
-     */
+    /// Returns the leaf filter operator (i.e. not [AndFilterOperator] or [OrFilterOperator]).
     BaseFilterOperator getLeafFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
         DataSource dataSource, int numDocs);
 
-    /**
-     * Returns the AND filter operator or equivalent filter operator.
-     */
+    /// Returns the AND filter operator or equivalent filter operator.
     BaseFilterOperator getAndFilterOperator(QueryContext queryContext, List<BaseFilterOperator> filterOperators,
         int numDocs);
 
-    /**
-     * Returns the OR filter operator or equivalent filter operator.
-     */
+    /// Returns the OR filter operator or equivalent filter operator.
     BaseFilterOperator getOrFilterOperator(QueryContext queryContext, List<BaseFilterOperator> filterOperators,
         int numDocs);
 
-    /**
-     * Returns the NOT filter operator or equivalent filter operator.
-     */
+    /// Returns the NOT filter operator or equivalent filter operator.
     BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator, int numDocs);
   }
 
@@ -197,12 +189,11 @@ public class FilterOperatorUtils {
       return new NotFilterOperator(filterOperator, numDocs, queryContext.isNullHandlingEnabled());
     }
 
-    /**
-     * For AND filter operator, reorders its child filter operators based on their cost and puts the ones with
-     * inverted index first in order to reduce the number of documents to be processed.
-     * <p>Special filter operators such as {@link MatchAllFilterOperator} and {@link EmptyFilterOperator} should be
-     * removed from the list before calling this method.
-     */
+    /// For AND filter operator, reorders its child filter operators based on their cost and puts the ones with
+    /// inverted index first in order to reduce the number of documents to be processed.
+    ///
+    /// Special filter operators such as [MatchAllFilterOperator] and [EmptyFilterOperator] should be
+    /// removed from the list before calling this method.
     protected void reorderAndFilterChildOperators(QueryContext queryContext, List<BaseFilterOperator> filterOperators) {
       filterOperators.sort(new Comparator<BaseFilterOperator>() {
         @Override
@@ -266,33 +257,25 @@ public class FilterOperatorUtils {
     }
   }
 
-  /**
-   * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
-   */
+  /// Returns the leaf filter operator (i.e. not [AndFilterOperator] or [OrFilterOperator]).
   public static BaseFilterOperator getLeafFilterOperator(QueryContext queryContext,
       PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
     return _instance.getLeafFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
   }
 
-  /**
-   * Returns the AND filter operator or equivalent filter operator.
-   */
+  /// Returns the AND filter operator or equivalent filter operator.
   public static BaseFilterOperator getAndFilterOperator(QueryContext queryContext,
       List<BaseFilterOperator> filterOperators, int numDocs) {
     return _instance.getAndFilterOperator(queryContext, filterOperators, numDocs);
   }
 
-  /**
-   * Returns the OR filter operator or equivalent filter operator.
-   */
+  /// Returns the OR filter operator or equivalent filter operator.
   public static BaseFilterOperator getOrFilterOperator(QueryContext queryContext,
       List<BaseFilterOperator> filterOperators, int numDocs) {
     return _instance.getOrFilterOperator(queryContext, filterOperators, numDocs);
   }
 
-  /**
-   * Returns the NOT filter operator or equivalent filter operator.
-   */
+  /// Returns the NOT filter operator or equivalent filter operator.
   public static BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator,
       int numDocs) {
     return _instance.getNotFilterOperator(queryContext, filterOperator, numDocs);

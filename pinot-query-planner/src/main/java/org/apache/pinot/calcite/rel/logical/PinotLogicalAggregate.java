@@ -94,9 +94,9 @@ public class PinotLogicalAggregate extends Aggregate {
         _leafReturnFinalResult, _collations, _limit);
   }
 
-  /// Whether this LEAF aggregate must synthesize the {@code $groupingId} discriminator column. Only a LEAF
+  /// Whether this LEAF aggregate must synthesize the `$groupingId` discriminator column. Only a LEAF
   /// grouping-set aggregate does: it is converted to a single-stage query that expands each row across the
-  /// grouping sets and appends {@code $groupingId}; the multi-stage final stage then groups on it.
+  /// grouping sets and appends `$groupingId`; the multi-stage final stage then groups on it.
   public boolean emitsGroupingId() {
     return _aggType == AggType.LEAF && getGroupType() != Group.SIMPLE;
   }

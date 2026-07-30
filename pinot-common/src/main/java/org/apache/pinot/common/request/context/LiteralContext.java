@@ -33,18 +33,15 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * The {@code LiteralContext} class represents a literal in the query.
- * <p>This includes both value and type information. We translate thrift literal to this representation in server.
- */
+/// The {@code LiteralContext} class represents a literal in the query.
+///
+/// This includes both value and type information. We translate thrift literal to this representation in server.
 public class LiteralContext {
   // TODO: Support all of the types for sql.
   private final DataType _type;
   private final Object _value;
 
-  /**
-   * This is used for type conversion, and is not included in {@link #equals} and {@link #hashCode}.
-   */
+  /// This is used for type conversion, and is not included in {@link #equals} and {@link #hashCode}.
   private final PinotDataType _pinotDataType;
 
   private Boolean _booleanValue;

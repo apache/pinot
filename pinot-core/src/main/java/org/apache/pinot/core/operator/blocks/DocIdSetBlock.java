@@ -19,18 +19,16 @@
 package org.apache.pinot.core.operator.blocks;
 
 import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.operator.BaseDocIdSetOperator;
 
 
-/**
- * The {@code DocIdSetBlock} contains a block of document ids and is returned from {@link BaseDocIdSetOperator}.
- *
- * Each {@code BaseDocIdSetOperator} can return multiple {@code DocIdSetBlock}s and each block contains an array of
- * document ids.
- *
- * Do not confuse this class with {@link org.apache.pinot.core.common.BlockDocIdSet}, which is returned by
- * the filter operator and contains a set of document ids that can be iterated through.
- */
+/// The `DocIdSetBlock` contains a block of document ids and is returned from
+/// [org.apache.pinot.core.operator.BaseDocIdSetOperator].
+///
+/// Each `BaseDocIdSetOperator` can return multiple `DocIdSetBlock`s and each block contains an array of
+/// document ids.
+///
+/// Do not confuse this class with [org.apache.pinot.core.common.BlockDocIdSet], which is returned by
+/// the filter operator and contains a set of document ids that can be iterated through.
 public class DocIdSetBlock implements Block {
   private final int[] _docIds;
   private final int _length;

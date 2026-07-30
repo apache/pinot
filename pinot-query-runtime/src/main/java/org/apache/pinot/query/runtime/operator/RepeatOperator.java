@@ -32,21 +32,21 @@ import org.slf4j.LoggerFactory;
 
 /// Expands each input row across the grouping sets of a GROUP BY GROUPING SETS / ROLLUP / CUBE query — the
 /// multi-stage equivalent of the single-stage per-set row expansion. For every input row and every grouping set it
-/// emits one output row of the shape {@code [input columns..., group-key copies..., $groupingId]}: the original
+/// emits one output row of the shape `[input columns..., group-key copies..., $groupingId]`: the original
 /// input columns are carried through UNTOUCHED (aggregation arguments may reference a grouping column, so nulling
 /// in place would corrupt them — e.g. SUM(b) under ROLLUP(a, b) must still aggregate the real b values for the
 /// (a) subtotal), one appended copy per union group-by column holds the group-key value — NULL when the column is
 /// rolled up (not grouped by) in the set — and the trailing synthetic INT discriminator column
-/// {@link org.apache.pinot.common.request.context.GroupingSets#GROUPING_ID_COLUMN} carries the grouping set's
+/// [org.apache.pinot.common.request.context.GroupingSets#GROUPING_ID_COLUMN] carries the grouping set's
 /// ordinal (its index in the plan's grouping-set list, matching the single-stage convention so GROUPING() /
 /// GROUPING_ID() agree across engines). Because the ordinal is not a per-column bitmask, the number of grouping
 /// columns is unlimited. The downstream aggregate groups by the appended copies plus the ordinal.
 ///
 /// With the rows expanded and tagged, the downstream aggregate is an ordinary GROUP BY over the appended key
-/// copies plus {@code $groupingId} — no grouping-set-specific aggregation logic is needed. This lets grouping sets
+/// copies plus `$groupingId` — no grouping-set-specific aggregation logic is needed. This lets grouping sets
 /// run over any input (e.g. above a JOIN), not just a leaf table scan.
 ///
-/// The expansion is streamed one grouping set at a time: each {@link #getNextBlock()} call emits the current input
+/// The expansion is streamed one grouping set at a time: each [#getNextBlock()] call emits the current input
 /// block expanded for a single set, so the transient materialization is bounded by the input block size rather than
 /// multiplied by the set count. Not thread-safe: like all multi-stage operators, it executes on the single OpChain
 /// thread.
@@ -75,9 +75,9 @@ public class RepeatOperator extends MultiStageOperator {
 
   /// @param unionGroupKeyIds input column index of each union group-by column (in union order)
   /// @param groupingSets per grouping set (in ordinal order), the union-column indexes participating in
-  ///                     (grouped by) that set — {@code unionGroupKeyIds[i]} for member index i
+  ///                     (grouped by) that set — `unionGroupKeyIds[i]` for member index i
   /// @param resultSchema the input schema with one group-key copy column per union group-by column and the
-  ///                     {@code $groupingId} INT column appended
+  ///                     `$groupingId` INT column appended
   public RepeatOperator(OpChainExecutionContext context, MultiStageOperator input, int[] unionGroupKeyIds,
       List<List<Integer>> groupingSets, DataSchema resultSchema) {
     super(context);

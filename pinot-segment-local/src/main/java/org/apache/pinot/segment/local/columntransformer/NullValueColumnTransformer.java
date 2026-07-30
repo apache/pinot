@@ -29,11 +29,9 @@ public class NullValueColumnTransformer implements ColumnTransformer {
 
   private final Object _defaultNullValue;
 
-  /**
-   * @param tableConfig The table configuration
-   * @param fieldSpec The field specification for the column
-   * @param schema The schema (required for proper handling of time columns)
-   */
+  /// @param tableConfig The table configuration
+  /// @param fieldSpec The field specification for the column
+  /// @param schema The schema (required for proper handling of time columns)
   public NullValueColumnTransformer(TableConfig tableConfig, FieldSpec fieldSpec, Schema schema) {
     _defaultNullValue = NullValueTransformerUtils.getDefaultNullValue(fieldSpec, tableConfig, schema);
   }

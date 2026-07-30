@@ -40,9 +40,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Factory for {@link TableDataManager}.
- */
+/// Factory for [TableDataManager].
 @InterfaceAudience.Private
 public interface TableDataManagerProvider {
 
@@ -62,9 +60,7 @@ public interface TableDataManagerProvider {
       boolean enableAsyncSegmentRefresh,
       ServerReloadJobStatusCache reloadJobStatusCache);
 
-  /**
-   * This util is only used in test code. do not use in prod code.
-   */
+  /// This util is only used in test code. do not use in prod code.
   @VisibleForTesting
   default TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema) {
     return getTableDataManager(tableConfig, schema, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(),

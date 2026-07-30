@@ -54,19 +54,17 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for DefaultAggregationExecutor class.
- * - Builds a segment with random data.
- * - Uses DefaultAggregationExecutor class to perform various aggregations on the
- *   data.
- * - Also computes those aggregations itself.
- * - Asserts that the aggregation results returned by the class are the same as
- *   returned by the local computations.
- *
- * Currently tests 'sum', 'min' & 'max' functions, and can be easily extended to
- * test other functions as well.
- * Asserts that aggregation results returned by the executor are as expected.
- */
+/// Unit test for DefaultAggregationExecutor class.
+/// - Builds a segment with random data.
+/// - Uses DefaultAggregationExecutor class to perform various aggregations on the
+///   data.
+/// - Also computes those aggregations itself.
+/// - Asserts that the aggregation results returned by the class are the same as
+///   returned by the local computations.
+///
+/// Currently tests 'sum', 'min' & 'max' functions, and can be easily extended to
+/// test other functions as well.
+/// Asserts that aggregation results returned by the executor are as expected.
 @SuppressWarnings("rawtypes")
 public class DefaultAggregationExecutorTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DefaultAggregationExecutorTest");
@@ -85,13 +83,11 @@ public class DefaultAggregationExecutorTest {
   private QueryContext _queryContext;
   private double[][] _inputData;
 
-  /**
-   * Initializations prior to the test:
-   * - Build a segment with metric columns (that will be aggregated) containing
-   *  randomly generated data.
-   *
-   * @throws Exception
-   */
+  /// Initializations prior to the test:
+  /// - Build a segment with metric columns (that will be aggregated) containing
+  ///  randomly generated data.
+  ///
+  /// @throws Exception
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -114,10 +110,8 @@ public class DefaultAggregationExecutorTest {
     _queryContext = QueryContextConverterUtils.getQueryContext(queryBuilder.toString());
   }
 
-  /**
-   * Runs 'sum', 'min' & 'max' aggregation functions on the DefaultAggregationExecutor.
-   * Asserts that the aggregation results returned by the executor are as expected.
-   */
+  /// Runs 'sum', 'min' & 'max' aggregation functions on the DefaultAggregationExecutor.
+  /// Asserts that the aggregation results returned by the executor are as expected.
   @Test
   void testAggregation() {
     Map<String, DataSource> dataSourceMap = new HashMap<>();
@@ -148,14 +142,12 @@ public class DefaultAggregationExecutorTest {
     }
   }
 
-  /**
-   * Helper method to setup the index segment on which to perform aggregation tests.
-   * - Generates a segment with {@link #NUM_METRIC_COLUMNS} and {@link #NUM_ROWS}
-   * - Random 'double' data filled in the metric columns. The data is also populated
-   *   into the _inputData[], so it can be used to test the results.
-   *
-   * @throws Exception
-   */
+  /// Helper method to setup the index segment on which to perform aggregation tests.
+  /// - Generates a segment with [#NUM_METRIC_COLUMNS] and [#NUM_ROWS]
+  /// - Random 'double' data filled in the metric columns. The data is also populated
+  ///   into the \_inputData\[\], so it can be used to test the results.
+  ///
+  /// @throws Exception
   private void setupSegment()
       throws Exception {
     if (INDEX_DIR.exists()) {
@@ -187,11 +179,9 @@ public class DefaultAggregationExecutorTest {
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.heap);
   }
 
-  /**
-   * Helper method to build schema for the segment on which aggregation tests will be run.
-   *
-   * @return
-   */
+  /// Helper method to build schema for the segment on which aggregation tests will be run.
+  ///
+  /// @return
   private Schema buildSchema() {
     Schema schema = new Schema();
 
@@ -204,12 +194,10 @@ public class DefaultAggregationExecutorTest {
     return schema;
   }
 
-  /**
-   * Helper method to compute aggregation on a given array of values.
-   * @param functionName
-   * @param values
-   * @return
-   */
+  /// Helper method to compute aggregation on a given array of values.
+  /// @param functionName
+  /// @param values
+  /// @return
   private double computeAggregation(String functionName, double[] values) {
     switch (functionName.toLowerCase()) {
       case "sum":
@@ -226,11 +214,9 @@ public class DefaultAggregationExecutorTest {
     }
   }
 
-  /**
-   * Helper method to compute sum of a given array of values.
-   * @param values
-   * @return
-   */
+  /// Helper method to compute sum of a given array of values.
+  /// @param values
+  /// @return
   private double computeSum(double[] values) {
     double sum = 0.0;
     for (double value : values) {
@@ -239,11 +225,9 @@ public class DefaultAggregationExecutorTest {
     return sum;
   }
 
-  /**
-   * Helper method to compute max of a given array of values.
-   * @param values
-   * @return
-   */
+  /// Helper method to compute max of a given array of values.
+  /// @param values
+  /// @return
   private double computeMax(double[] values) {
     double max = Double.NEGATIVE_INFINITY;
     for (double value : values) {
@@ -252,11 +236,9 @@ public class DefaultAggregationExecutorTest {
     return max;
   }
 
-  /**
-   * Helper method to compute min of a given array of values.
-   * @param values
-   * @return
-   */
+  /// Helper method to compute min of a given array of values.
+  /// @param values
+  /// @return
   private double computeMin(double[] values) {
     double min = Double.POSITIVE_INFINITY;
     for (double value : values) {

@@ -34,9 +34,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
 
 
-/**
- * Base DataTableBuilder implementation.
- */
+/// Base DataTableBuilder implementation.
 public abstract class BaseDataTableBuilder implements DataTableBuilder {
   protected final DataSchema _dataSchema;
   protected final int _version;

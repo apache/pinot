@@ -59,9 +59,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests the {@link OfflineSegmentAssignment#rebalanceTable} method for table with tiers
- */
+/// Tests the [OfflineSegmentAssignment#rebalanceTable] method for table with tiers
 public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
   private static final String SEGMENT_NAME_PREFIX = "segment_";
@@ -280,12 +278,10 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
   }
 
-  /**
-   * The segment to tier resolution is computed once (single bulk ZK read) at the start of the rebalance and reused
-   * across the multiple rebalanceTable() invocations of that rebalance. A segment that appears in the current
-   * assignment only in a later invocation (e.g. after the ideal state changes during a long rebalance) is absent from
-   * the resolution map, so it is kept on the default instances rather than triggering another ZK read.
-   */
+  /// The segment to tier resolution is computed once (single bulk ZK read) at the start of the rebalance and reused
+  /// across the multiple rebalanceTable() invocations of that rebalance. A segment that appears in the current
+  /// assignment only in a later invocation (e.g. after the ideal state changes during a long rebalance) is absent from
+  /// the resolution map, so it is kept on the default instances rather than triggering another ZK read.
   @Test
   public void testSegmentAddedAfterInitialBulkReadStaysOnDefaultTier() {
     HelixManager helixManager = mock(HelixManager.class);
@@ -333,9 +329,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     Assert.assertTrue(INSTANCES.containsAll(newAssignment.get(newSegment).keySet()));
   }
 
-  /**
-   * Selects segment_50 to segment_69 i.e. 20 segments
-   */
+  /// Selects segment_50 to segment_69 i.e. 20 segments
   private static class TestSegmentSelectorA implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -349,9 +343,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
   }
 
-  /**
-   * Selects segment_70 to segment_99 i.e. 30 segments
-   */
+  /// Selects segment_70 to segment_99 i.e. 30 segments
   private static class TestSegmentSelectorB implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -365,9 +357,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
   }
 
-  /**
-   * Selects segments >= segment_120 i.e. 0 segments
-   */
+  /// Selects segments >= segment_120 i.e. 0 segments
   private static class TestSegmentSelectorC implements TierSegmentSelector {
     @Override
     public String getType() {

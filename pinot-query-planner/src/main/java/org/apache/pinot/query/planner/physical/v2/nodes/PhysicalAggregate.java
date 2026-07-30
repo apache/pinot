@@ -74,9 +74,9 @@ public class PhysicalAggregate extends Aggregate implements PRelNode {
         (PRelNode) input, _pinotDataDistribution, _leafStage, _aggType, _leafReturnFinalResult, _collations, _limit);
   }
 
-  /// Whether this LEAF aggregate must synthesize the {@code $groupingId} discriminator column — the v2 physical
-  /// counterpart of {@link org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate#emitsGroupingId()}. A LEAF
-  /// grouping-set aggregate appends {@code $groupingId} after the union group-by columns so the final stage can group
+  /// Whether this LEAF aggregate must synthesize the `$groupingId` discriminator column — the v2 physical
+  /// counterpart of [org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate#emitsGroupingId()]. A LEAF
+  /// grouping-set aggregate appends `$groupingId` after the union group-by columns so the final stage can group
   /// on it (the per-set row expansion itself happens at runtime in the RepeatOperator).
   public boolean emitsGroupingId() {
     return _aggType == AggregateNode.AggType.LEAF && getGroupType() != Group.SIMPLE;

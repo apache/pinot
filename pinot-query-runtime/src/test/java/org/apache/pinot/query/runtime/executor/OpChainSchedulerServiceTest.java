@@ -318,11 +318,9 @@ public class OpChainSchedulerServiceTest {
     }
   }
 
-  /**
-   * Registers two opchains for the same request, waits for both to complete, and verifies that the per-request
-   * context map entry is removed once the last opchain finishes. Regression coverage for the TOCTOU race in
-   * decrementActiveOpChains that could leave a stale entry in _executionContextByRequest.
-   */
+  /// Registers two opchains for the same request, waits for both to complete, and verifies that the per-request
+  /// context map entry is removed once the last opchain finishes. Regression coverage for the TOCTOU race in
+  /// decrementActiveOpChains that could leave a stale entry in \_executionContextByRequest.
   @Test
   public void shouldCleanUpContextAfterAllOpChainsComplete()
       throws InterruptedException {

@@ -54,16 +54,14 @@ import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotJoinCondition
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 
 
-/**
- * Default rule sets for Pinot query.
- * Defaultly disabled rules are defined in
- * {@link org.apache.pinot.spi.utils.CommonConstants.Broker#DEFAULT_DISABLED_RULES}
- *
- * <p>TODO: Rule lists may be consolidated into
- * {@link org.apache.pinot.query.planner.rules.DefaultRuleSetCustomizer} in a future refactor once
- * the {@link org.apache.pinot.query.planner.spi.RuleSetCustomizer} SPI is the established
- * extension point for broker rule customization.
- */
+/// Default rule sets for Pinot query.
+/// Defaultly disabled rules are defined in
+/// [org.apache.pinot.spi.utils.CommonConstants.Broker#DEFAULT_DISABLED_RULES]
+///
+/// TODO: Rule lists may be consolidated into
+/// [org.apache.pinot.query.planner.rules.DefaultRuleSetCustomizer] in a future refactor once
+/// the [org.apache.pinot.query.planner.spi.RuleSetCustomizer] SPI is the established
+/// extension point for broker rule customization.
 public class PinotQueryRuleSets {
   private PinotQueryRuleSets() {
   }
@@ -262,9 +260,9 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.PRUNE_EMPTY_UNION).toRule()
   );
 
-  /// Pinot specific post-logical rules used when the physical optimizer is <b>not</b> enabled.
-  /// Includes {@link PinotSortExchangeCopyRule#SORT_EXCHANGE_COPY} with the default fetch-limit
-  /// threshold. Per-query overrides are applied by {@code QueryEnvironment.getTraitProgram},
+  /// Pinot specific post-logical rules used when the physical optimizer is **not** enabled.
+  /// Includes [PinotSortExchangeCopyRule#SORT_EXCHANGE_COPY] with the default fetch-limit
+  /// threshold. Per-query overrides are applied by `QueryEnvironment.getTraitProgram`,
   /// which swaps the configured rule on a per-query copy of this list.
   public static final List<RelOptRule> POST_LOGICAL_RULES = List.of(
       // TODO: Merge the following 2 rules into a single rule

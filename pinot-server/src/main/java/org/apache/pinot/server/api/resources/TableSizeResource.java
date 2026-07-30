@@ -64,9 +64,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * API to provide table sizes
- */
+/// API to provide table sizes
 @Api(tags = "Table", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {

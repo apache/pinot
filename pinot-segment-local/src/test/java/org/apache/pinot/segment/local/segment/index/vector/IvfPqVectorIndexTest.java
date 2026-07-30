@@ -40,9 +40,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for the IVF_PQ vector index implementation.
- */
+/// Unit tests for the IVF_PQ vector index implementation.
 public class IvfPqVectorIndexTest {
   private static final String COLUMN_NAME = "vectorCol";
   private static final long TEST_SEED = 42L;

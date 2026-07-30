@@ -574,7 +574,6 @@ public class AggregationSubsumptionStrategyTest {
   ///
   ///   - The match still succeeds (operandsMatch ignores literals).
   ///   - The rewritten query preserves the injected log2m parameter.
-  ///
   @Test
   public void testEqualGranularitySketchWithBrokerInjectedLog2m() {
     String definedSql =

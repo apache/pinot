@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.segment.spi.compression;
 
-/**
- * Compression type for dictionary-encoded forward index, where the values stored are dictionary ids.
- */
+/// Compression type for dictionary-encoded forward index, where the values stored are dictionary ids.
 public enum DictIdCompressionType {
   // Add a second level dictionary encoding for the multi-value entries
   MV_ENTRY_DICT(false, true);

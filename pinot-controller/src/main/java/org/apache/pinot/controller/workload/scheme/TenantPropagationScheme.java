@@ -28,12 +28,10 @@ import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 
 
-/**
- * TenantPropagationScheme is used to resolve instances based on the {@link NodeConfig} and {@link NodeConfig.Type}
- * It resolves the instances based on the tenants specified in the node configuration
- *
- * Please note that overrides are not supported in this scheme
- */
+/// TenantPropagationScheme is used to resolve instances based on the [NodeConfig] and [NodeConfig.Type]
+/// It resolves the instances based on the tenants specified in the node configuration
+///
+/// Please note that overrides are not supported in this scheme
 public class TenantPropagationScheme implements PropagationScheme {
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;

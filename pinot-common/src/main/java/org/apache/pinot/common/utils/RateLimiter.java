@@ -23,10 +23,8 @@ import java.util.function.LongSupplier;
 import javax.annotation.concurrent.NotThreadSafe;
 
 
-/**
- * A highly performant, non-thread-safe Token Bucket implementation.
- * It tracks its own dropped count to avoid wrapper object allocations.
- */
+/// A highly performant, non-thread-safe Token Bucket implementation.
+/// It tracks its own dropped count to avoid wrapper object allocations.
 @NotThreadSafe
 class RateLimiter {
   private final double _capacity;
@@ -51,11 +49,9 @@ class RateLimiter {
     _droppedCount = 0;
   }
 
-  /**
-   * Attempts to consume a token.
-   * Refills tokens based on elapsed time.
-   * @return true if token acquired, false if limit exceeded (and increments dropped count)
-   */
+  /// Attempts to consume a token.
+  /// Refills tokens based on elapsed time.
+  /// @return true if token acquired, false if limit exceeded (and increments dropped count)
   boolean tryAcquire() {
     long now = _nanoTimeSupplier.getAsLong();
 
@@ -78,10 +74,8 @@ class RateLimiter {
     return false;
   }
 
-  /**
-   * Returns the number of logs dropped since the last successful acquire,
-   * and resets the counter to zero.
-   */
+  /// Returns the number of logs dropped since the last successful acquire,
+  /// and resets the counter to zero.
   long getAndResetDroppedCount() {
     if (_droppedCount == 0) {
       return 0;

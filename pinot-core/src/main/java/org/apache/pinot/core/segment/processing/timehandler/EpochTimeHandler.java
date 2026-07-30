@@ -25,9 +25,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * Time handler that modifies and partitions the time value based on the epoch time.
- */
+/// Time handler that modifies and partitions the time value based on the epoch time.
 public class EpochTimeHandler implements TimeHandler {
   private final String _timeColumn;
   private final DataType _dataType;

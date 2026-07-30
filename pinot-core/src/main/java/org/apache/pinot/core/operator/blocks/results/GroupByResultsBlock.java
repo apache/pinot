@@ -41,9 +41,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Results block for group-by queries.
- */
+/// Results block for group-by queries.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByResultsBlock extends BaseResultsBlock {
   private final DataSchema _dataSchema;
@@ -58,9 +56,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   private int _numResizes;
   private long _resizeTimeMs;
 
-  /**
-   * For segment level group-by results.
-   */
+  /// For segment level group-by results.
   public GroupByResultsBlock(DataSchema dataSchema, AggregationGroupByResult aggregationGroupByResult,
       QueryContext queryContext) {
     _dataSchema = dataSchema;
@@ -70,9 +66,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _queryContext = queryContext;
   }
 
-  /**
-   * For segment level group-by results.
-   */
+  /// For segment level group-by results.
   public GroupByResultsBlock(DataSchema dataSchema, List<IntermediateRecord> intermediateRecords,
       QueryContext queryContext) {
     _dataSchema = dataSchema;
@@ -82,9 +76,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _queryContext = queryContext;
   }
 
-  /**
-   * For instance level group-by results.
-   */
+  /// For instance level group-by results.
   public GroupByResultsBlock(Table table, QueryContext queryContext) {
     _dataSchema = table.getDataSchema();
     _aggregationGroupByResult = null;
@@ -93,9 +85,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _queryContext = queryContext;
   }
 
-  /**
-   * For instance level empty group-by results.
-   */
+  /// For instance level empty group-by results.
   public GroupByResultsBlock(DataSchema dataSchema, QueryContext queryContext) {
     _dataSchema = dataSchema;
     _aggregationGroupByResult = null;

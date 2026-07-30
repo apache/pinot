@@ -31,9 +31,9 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Tests that GROUP BY GROUPING SETS / ROLLUP / CUBE are expanded by {@link CalciteSqlParser} into the union
-/// of grouping columns ({@link PinotQuery#getGroupByList()}) plus, per grouping set, the list of participating
-/// union-column indexes ({@link PinotQuery#getGroupingSets()}).
+/// Tests that GROUP BY GROUPING SETS / ROLLUP / CUBE are expanded by [CalciteSqlParser] into the union
+/// of grouping columns ([PinotQuery#getGroupByList()]) plus, per grouping set, the list of participating
+/// union-column indexes ([PinotQuery#getGroupingSets()]).
 public class GroupingSetsParserTest {
 
   /// Returns the grouping sets as a set of column-name sets, decoupled from union/set ordering.

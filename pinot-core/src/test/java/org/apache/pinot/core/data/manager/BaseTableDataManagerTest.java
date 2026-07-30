@@ -949,12 +949,10 @@ public class BaseTableDataManagerTest {
     }
   }
 
-  /**
-   * registerSegment must fire the post-registration lifecycle hook on the backing segment of a standalone manager.
-   * A standalone ImmutableSegmentDataManager exposes its segment via getReportableSegments() (default), while
-   * getSegments() defaults to empty — so iterating getSegments() here would silently skip the hook for the common
-   * single-segment case. This is a regression guard for that: it fails if registerSegment iterates getSegments().
-   */
+  /// registerSegment must fire the post-registration lifecycle hook on the backing segment of a standalone manager.
+  /// A standalone ImmutableSegmentDataManager exposes its segment via getReportableSegments() (default), while
+  /// getSegments() defaults to empty — so iterating getSegments() here would silently skip the hook for the common
+  /// single-segment case. This is a regression guard for that: it fails if registerSegment iterates getSegments().
   @Test
   public void testRegisterSegmentFiresOnSegmentAddedForStandaloneSegment() {
     BaseTableDataManager tableDataManager = createTableManager();
@@ -964,9 +962,7 @@ public class BaseTableDataManagerTest {
     verify(immutableSegment).onSegmentAdded();
   }
 
-  /**
-   * registerSegment must fire the hook once per reportable segment for a multi-segment manager
-   */
+  /// registerSegment must fire the hook once per reportable segment for a multi-segment manager
   @Test
   public void testRegisterSegmentFiresOnSegmentAddedForEachReportableSegment() {
     BaseTableDataManager tableDataManager = createTableManager();
@@ -982,11 +978,9 @@ public class BaseTableDataManagerTest {
     verify(segment2).onSegmentAdded();
   }
 
-  /**
-   * The hook fires after the segment is swapped into the serving set, so registerSegment must hold a reference while
-   * it runs. A manager that has already been destroyed (reference count 0) cannot be referenced and has nothing left
-   * to notify: firing the hook there would run it against a closed SegmentDirectory.
-   */
+  /// The hook fires after the segment is swapped into the serving set, so registerSegment must hold a reference while
+  /// it runs. A manager that has already been destroyed (reference count 0) cannot be referenced and has nothing left
+  /// to notify: firing the hook there would run it against a closed SegmentDirectory.
   @Test
   public void testRegisterSegmentSkipsOnSegmentAddedForDestroyedSegment() {
     BaseTableDataManager tableDataManager = createTableManager();
@@ -1001,10 +995,8 @@ public class BaseTableDataManagerTest {
     verify(immutableSegment, never()).onSegmentAdded();
   }
 
-  /**
-   * The hook must not leave a net reference behind: the segment stays acquirable after registration, and is not
-   * destroyed by the reference registerSegment took while firing the hook.
-   */
+  /// The hook must not leave a net reference behind: the segment stays acquirable after registration, and is not
+  /// destroyed by the reference registerSegment took while firing the hook.
   @Test
   public void testRegisterSegmentRestoresReferenceCountAfterFiringHook() {
     BaseTableDataManager tableDataManager = createTableManager();
@@ -1019,10 +1011,8 @@ public class BaseTableDataManagerTest {
     verify(immutableSegment, never()).destroy();
   }
 
-  /**
-   * A failing hook must not fail the registration: the segment is already serving by then, and propagating the
-   * failure would abort the enclosing Helix state transition for a segment that is in fact up.
-   */
+  /// A failing hook must not fail the registration: the segment is already serving by then, and propagating the
+  /// failure would abort the enclosing Helix state transition for a segment that is in fact up.
   @Test
   public void testRegisterSegmentSucceedsWhenOnSegmentAddedThrows() {
     BaseTableDataManager tableDataManager = createTableManager();
@@ -1037,10 +1027,8 @@ public class BaseTableDataManagerTest {
     assertEquals(segmentDataManager.getReferenceCount(), 1);
   }
 
-  /**
-   * The default getReportableSegments() wraps getSegment(), so a custom manager exposing a null segment must not
-   * abort registration.
-   */
+  /// The default getReportableSegments() wraps getSegment(), so a custom manager exposing a null segment must not
+  /// abort registration.
   @Test
   public void testRegisterSegmentToleratesNullReportableSegment() {
     BaseTableDataManager tableDataManager = createTableManager();
@@ -1054,12 +1042,10 @@ public class BaseTableDataManagerTest {
     assertSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
   }
 
-  /**
-   * An upsert replacement with a consistency mode other than NONE registers the same new segment twice: first through
-   * a DuoSegmentDataManager (whose default getReportableSegments() returns its primary, i.e. the new segment) and then
-   * directly. The hook must reach the underlying SegmentDirectory only once, since implementations are not required to
-   * be idempotent — a second call would e.g. upload a duplicate marker file.
-   */
+  /// An upsert replacement with a consistency mode other than NONE registers the same new segment twice: first through
+  /// a DuoSegmentDataManager (whose default getReportableSegments() returns its primary, i.e. the new segment) and then
+  /// directly. The hook must reach the underlying SegmentDirectory only once, since implementations are not required to
+  /// be idempotent — a second call would e.g. upload a duplicate marker file.
   @Test
   public void testConsistencyModeReplacementFiresOnSegmentAddedOnce()
       throws Exception {
@@ -1106,22 +1092,18 @@ public class BaseTableDataManagerTest {
     return tableDataManager;
   }
 
-  /**
-   * Returns the concrete {@link BaseTableDataManager} instance under test. Default returns a stock
-   * {@link OfflineTableDataManager}; subclasses override to test a different implementation while inheriting
-   * all test bodies.
-   */
+  /// Returns the concrete [BaseTableDataManager] instance under test. Default returns a stock
+  /// [OfflineTableDataManager]; subclasses override to test a different implementation while inheriting
+  /// all test bodies.
   protected BaseTableDataManager newTableDataManager() {
     return new OfflineTableDataManager();
   }
 
-  /**
-   * Returns the {@link HelixManager} mock wired into the TDM under test. Default returns a bare Mockito mock
-   * (no property store stubbed) — fine for the inherited test bodies which never read ZK directly. Subclasses
-   * that exercise paths reading {@code _propertyStore} (e.g. {@code fetchZKMetadata}, {@code fetchIndexLoadingConfig})
-   * override to stub {@code helixManager.getHelixPropertyStore()} with a {@code FakePropertyStore} pre-seeded
-   * with table config + schema + per-segment ZK metadata.
-   */
+  /// Returns the [HelixManager] mock wired into the TDM under test. Default returns a bare Mockito mock
+  /// (no property store stubbed) — fine for the inherited test bodies which never read ZK directly. Subclasses
+  /// that exercise paths reading `_propertyStore` (e.g. `fetchZKMetadata`, `fetchIndexLoadingConfig`)
+  /// override to stub `helixManager.getHelixPropertyStore()` with a `FakePropertyStore` pre-seeded
+  /// with table config + schema + per-segment ZK metadata.
   protected HelixManager createHelixManagerMock() {
     return mock(HelixManager.class);
   }

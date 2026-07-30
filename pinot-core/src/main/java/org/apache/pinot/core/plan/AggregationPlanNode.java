@@ -42,10 +42,8 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
 
-/**
- * The <code>AggregationPlanNode</code> class provides the execution plan for aggregation only query on a single
- * segment.
- */
+/// The `AggregationPlanNode` class provides the execution plan for aggregation only query on a single
+/// segment.
 @SuppressWarnings("rawtypes")
 public class AggregationPlanNode implements PlanNode {
   private static final EnumSet<AggregationFunctionType> DICTIONARY_BASED_FUNCTIONS =
@@ -83,20 +81,16 @@ public class AggregationPlanNode implements PlanNode {
     return _queryContext.hasFilteredAggregations() ? buildFilteredAggOperator() : buildNonFilteredAggOperator();
   }
 
-  /**
-   * Build the operator to be used for filtered aggregations
-   */
+  /// Build the operator to be used for filtered aggregations
   private FilteredAggregationOperator buildFilteredAggOperator() {
     return new FilteredAggregationOperator(_queryContext,
         AggregationFunctionUtils.buildFilteredAggregationInfos(_segmentContext, _queryContext),
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
-  /**
-   * Processing workhorse for non filtered aggregates. Note that this code path is invoked only
-   * if the query has no filtered aggregates at all. If a query has mixed aggregates, filtered
-   * aggregates code will be invoked
-   */
+  /// Processing workhorse for non filtered aggregates. Note that this code path is invoked only
+  /// if the query has no filtered aggregates at all. If a query has mixed aggregates, filtered
+  /// aggregates code will be invoked
   public Operator<AggregationResultsBlock> buildNonFilteredAggOperator() {
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
@@ -140,13 +134,11 @@ public class AggregationPlanNode implements PlanNode {
     return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
   }
 
-  /**
-   * Returns {@code true} if any of the aggregation functions have null values, {@code false} otherwise.
-   *
-   * The current implementation is pessimistic and returns {@code true} if any of the arguments to the aggregation
-   * functions is of function type. This is because we do not have a way to determine if the function will return null
-   * values without actually evaluating it.
-   */
+  /// Returns `true` if any of the aggregation functions have null values, `false` otherwise.
+  ///
+  /// The current implementation is pessimistic and returns `true` if any of the arguments to the aggregation
+  /// functions is of function type. This is because we do not have a way to determine if the function will return null
+  /// values without actually evaluating it.
   private boolean hasNullValues(AggregationFunction[] aggregationFunctions) {
     for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
       for (ExpressionContext argument : aggregationFunction.getInputExpressions()) {
@@ -172,10 +164,8 @@ public class AggregationPlanNode implements PlanNode {
     return false;
   }
 
-  /**
-   * Returns {@code true} if the given aggregations can be solved with dictionary or column metadata, {@code false}
-   * otherwise.
-   */
+  /// Returns `true` if the given aggregations can be solved with dictionary or column metadata, `false`
+  /// otherwise.
   private boolean isFitForNonScanBasedPlan() {
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;

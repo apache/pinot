@@ -43,11 +43,9 @@ import static org.testng.Assert.fail;
 
 public class MinStringAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
-  /**
-   * Helper method to create a FluentQueryTest builder for a table with a single String field.
-   * This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
-   * but fixed for the STRING data type.
-   */
+  /// Helper method to create a FluentQueryTest builder for a table with a single String field.
+  /// This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
+  /// but fixed for the STRING data type.
   protected FluentQueryTest.DeclaringTable getDeclaringTable(boolean enableColumnBasedNullHandling) {
     return FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(

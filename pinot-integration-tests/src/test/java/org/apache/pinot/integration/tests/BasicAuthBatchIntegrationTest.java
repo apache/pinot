@@ -30,8 +30,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
-import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.BootstrapTableTool;
@@ -45,10 +43,9 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER_
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
 
 
-/**
- * Integration test that provides example of {@link PinotTaskGenerator} and {@link PinotTaskExecutor} and tests simple
- * minion functionality.
- */
+/// Integration test that provides example of
+/// [org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator] and
+/// [org.apache.pinot.minion.executor.PinotTaskExecutor] and tests simple minion functionality.
 public class BasicAuthBatchIntegrationTest extends ClusterTest {
   private static final String BOOTSTRAP_DATA_DIR = "/examples/batch/baseballStats";
   private static final String SCHEMA_FILE = "baseballStats_schema.json";

@@ -28,9 +28,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.SchemaValidatorResult;
 
 
-/**
- * Schema validator to validate pinot schema and avro schema
- */
+/// Schema validator to validate pinot schema and avro schema
 public class AvroIngestionSchemaValidator implements IngestionSchemaValidator {
   private org.apache.avro.Schema _avroSchema;
   private Schema _pinotSchema;

@@ -34,9 +34,7 @@ import org.joda.time.DateTime;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * A simple random generator that fakes RSVP
- */
+/// A simple random generator that fakes RSVP
 public class RsvpSourceGenerator implements PinotSourceDataGenerator {
   private final int _nullProbability;
   private final KeyColumn _keyColumn;

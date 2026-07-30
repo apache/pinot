@@ -37,15 +37,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Driver for the instance assignment.
- * <p>Instance assignment is performed in 3 steps:
- * <ul>
- *   <li>Select instances based on the tag/pool configuration</li>
- *   <li>Apply constraints to the instances (optional, multiple constraints can be chained up)</li>
- *   <li>Select instances based on the replica-group/partition configuration</li>
- * </ul>
- */
+/// Driver for the instance assignment.
+///
+/// Instance assignment is performed in 3 steps:
+///
+/// - Select instances based on the tag/pool configuration
+/// - Apply constraints to the instances (optional, multiple constraints can be chained up)
+/// - Select instances based on the replica-group/partition configuration
 public class InstanceAssignmentDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceAssignmentDriver.class);
 

@@ -27,9 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * ResourceManager for BinaryWorkloadScheduler.
- */
+/// ResourceManager for BinaryWorkloadScheduler.
 public class BinaryWorkloadResourceManager extends ResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(BinaryWorkloadResourceManager.class);
   // Volatile to ensure visibility across query threads when the policy is replaced by onThreadPoolsResized()
@@ -45,16 +43,14 @@ public class BinaryWorkloadResourceManager extends ResourceManager {
     _secondaryWorkloadPolicy = new ResourceLimitPolicy(_config, newWorkerThreads);
   }
 
-  /**
-   * Returns an executor service that query executor can use like a dedicated
-   * service for submitting jobs for parallel execution.
-   * @param query
-   * @param accountant Accountant for a scheduler group
-   * @return UnboundedExecutorService for primary workload queries. For secondary workload queries, returns a
-   * BoundedAccountingExecutor service that limits the number of threads available for query execution. Query
-   * execution can submit tasks for parallel execution without need
-   * for limiting their parallelism.
-   */
+  /// Returns an executor service that query executor can use like a dedicated
+  /// service for submitting jobs for parallel execution.
+  /// @param query
+  /// @param accountant Accountant for a scheduler group
+  /// @return UnboundedExecutorService for primary workload queries. For secondary workload queries, returns a
+  /// BoundedAccountingExecutor service that limits the number of threads available for query execution. Query
+  /// execution can submit tasks for parallel execution without need
+  /// for limiting their parallelism.
   @Override
   public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {
     if (!QueryOptionsUtils.isSecondaryWorkload(query.getQueryContext().getQueryOptions())) {

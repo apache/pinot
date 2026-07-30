@@ -27,12 +27,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for {@link PRelToPlanNodeConverter#convertToColumnDataType}. The v2 physical-optimizer converter
- * intentionally shares the same {@code SqlTypeName -> ColumnDataType} mapping as the v1
- * {@link org.apache.pinot.query.planner.logical.RelToPlanNodeConverter}; this test mirrors the unsigned-type coverage
- * in {@code RelToPlanNodeConverterTest} so the two converters cannot silently drift out of sync.
- */
+/// Unit tests for [PRelToPlanNodeConverter#convertToColumnDataType]. The v2 physical-optimizer converter
+/// intentionally shares the same `SqlTypeName -> ColumnDataType` mapping as the v1
+/// [org.apache.pinot.query.planner.logical.RelToPlanNodeConverter]; this test mirrors the unsigned-type coverage
+/// in `RelToPlanNodeConverterTest` so the two converters cannot silently drift out of sync.
 public class PRelToPlanNodeConverterTest {
 
   @Test

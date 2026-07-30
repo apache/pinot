@@ -49,7 +49,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/// Unit tests for {@link PinotAggregateExchangeNodeInsertRule}, focused on the skip-leaf-stage
+/// Unit tests for [PinotAggregateExchangeNodeInsertRule], focused on the skip-leaf-stage
 /// direct-aggregation path.
 public class PinotAggregateExchangeNodeInsertRuleTest {
   private static final TypeFactory TYPE_FACTORY = TypeFactory.INSTANCE;

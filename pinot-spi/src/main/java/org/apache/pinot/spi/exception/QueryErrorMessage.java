@@ -27,23 +27,17 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class QueryErrorMessage {
-  /**
-   * Error code for the exception, usually obtained from {@link QueryException}.
-   */
+  /// Error code for the exception, usually obtained from [QueryException].
   private final QueryErrorCode _errCode;
-  /**
-   * User facing error message.
-   *
-   * This message is intended to be shown to the user and should not contain implementation details (including stack
-   * traces or class names).
-   */
+  /// User facing error message.
+  ///
+  /// This message is intended to be shown to the user and should not contain implementation details (including stack
+  /// traces or class names).
   private final String _usrMsg;
-  /**
-   * Log message for the exception.
-   *
-   * This message is intended to be logged and may contain implementation details (including stack traces or class
-   * names) but it must never contain any sensitive information (including user data).
-   */
+  /// Log message for the exception.
+  ///
+  /// This message is intended to be logged and may contain implementation details (including stack traces or class
+  /// names) but it must never contain any sensitive information (including user data).
   private final String _logMsg;
 
   @JsonCreator
@@ -56,11 +50,9 @@ public class QueryErrorMessage {
     _logMsg = logMsg != null ? logMsg : errCode.getDefaultMessage();
   }
 
-  /**
-   * Create a new QueryErrorMessage with the given error code and user message.
-   *
-   * Remember that the message must be safe to show to the user and should not contain any sensitive information.
-   */
+  /// Create a new QueryErrorMessage with the given error code and user message.
+  ///
+  /// Remember that the message must be safe to show to the user and should not contain any sensitive information.
   public static QueryErrorMessage safeMsg(QueryErrorCode errorCode, @Nullable String safeMessage) {
     return new QueryErrorMessage(errorCode, safeMessage, safeMessage);
   }

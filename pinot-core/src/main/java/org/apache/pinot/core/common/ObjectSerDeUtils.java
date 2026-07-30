@@ -105,9 +105,7 @@ import org.roaringbitmap.RoaringBitmap;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * The {@code ObjectSerDeUtils} class provides the utility methods to serialize/de-serialize objects.
- */
+/// The `ObjectSerDeUtils` class provides the utility methods to serialize/de-serialize objects.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ObjectSerDeUtils {
   private ObjectSerDeUtils() {
@@ -181,9 +179,7 @@ public class ObjectSerDeUtils {
       return _value;
     }
 
-    /**
-     * @deprecated Avoid using this method because it is very inefficient.
-     */
+    /// @deprecated Avoid using this method because it is very inefficient.
     @Deprecated
     public static ObjectType getObjectType(Object value) {
       if (value instanceof String) {
@@ -324,26 +320,18 @@ public class ObjectSerDeUtils {
     }
   }
 
-  /**
-   * Serializer/De-serializer for a specific type of object.
-   *
-   * @param <T> Type of the object
-   */
+  /// Serializer/De-serializer for a specific type of object.
+  ///
+  /// @param <T> Type of the object
   public interface ObjectSerDe<T> {
 
-    /**
-     * Serializes a value into a byte array.
-     */
+    /// Serializes a value into a byte array.
     byte[] serialize(T value);
 
-    /**
-     * De-serializes a value from a byte array.
-     */
+    /// De-serializes a value from a byte array.
     T deserialize(byte[] bytes);
 
-    /**
-     * De-serializes a value from a byte buffer.
-     */
+    /// De-serializes a value from a byte buffer.
     T deserialize(ByteBuffer byteBuffer);
   }
 
@@ -1944,9 +1932,7 @@ public class ObjectSerDeUtils {
   };
   //@formatter:on
 
-  /**
-   * @deprecated Use each individual SER_DE class instead.
-   */
+  /// @deprecated Use each individual SER_DE class instead.
   @Deprecated
   public static byte[] serialize(Object value, int objectTypeValue) {
     return SER_DES[objectTypeValue].serialize(value);

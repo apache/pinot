@@ -50,25 +50,23 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration tests for the concurrent task scheduling dispatch in
- * {@link PinotTaskManager#scheduleTasks(TaskSchedulingContext)}. Boots a single controller,
- * registers a custom task generator whose {@code generateTasks} method rendezvouses N callers
- * (via a {@link CountDownLatch}) before returning, and fires two parallel {@code scheduleTasks}
- * calls for two different tables:
- * <ul>
- *   <li>When both tables opt into the concurrent path via
- *       {@link TableTaskConfig#getConcurrentSchedulingEnabled()} = {@code true}, the generator
- *       observes {@code maxInFlight == 2} — both threads entered generation simultaneously,
- *       proving the controller-wide {@code synchronized(this)} was not held.</li>
- *   <li>With the cluster default ({@code false}) and no per-table override, the generator
- *       observes {@code maxInFlight == 1} — the legacy path serialized the two calls on the
- *       controller monitor.</li>
- * </ul>
- * The rendezvous has a bounded timeout so the legacy-path test still completes; it does not
- * deadlock — the first thread times out waiting for the second, exits, then the second thread
- * runs. The observation is purely on {@code maxInFlight}, not wall-clock time.
- */
+/// Integration tests for the concurrent task scheduling dispatch in
+/// [PinotTaskManager#scheduleTasks(TaskSchedulingContext)]. Boots a single controller,
+/// registers a custom task generator whose `generateTasks` method rendezvouses N callers
+/// (via a [CountDownLatch]) before returning, and fires two parallel `scheduleTasks`
+/// calls for two different tables:
+///
+/// - When both tables opt into the concurrent path via
+///      [TableTaskConfig#getConcurrentSchedulingEnabled()] = `true`, the generator
+///      observes `maxInFlight == 2` — both threads entered generation simultaneously,
+///      proving the controller-wide `synchronized(this)` was not held.
+/// - With the cluster default (`false`) and no per-table override, the generator
+///      observes `maxInFlight == 1` — the legacy path serialized the two calls on the
+///      controller monitor.
+///
+/// The rendezvous has a bounded timeout so the legacy-path test still completes; it does not
+/// deadlock — the first thread times out waiting for the second, exits, then the second thread
+/// runs. The observation is purely on `maxInFlight`, not wall-clock time.
 public class PinotTaskManagerConcurrentSchedulingIntegrationTest extends ControllerTest {
 
   private static final String RAW_TABLE_NAME_A = "concurrentTableA";
@@ -115,11 +113,9 @@ public class PinotTaskManagerConcurrentSchedulingIntegrationTest extends Control
     stopZk();
   }
 
-  /**
-   * When both target tables explicitly opt into concurrent scheduling, two parallel
-   * {@code scheduleTasks} calls must be able to run {@code generateTasks} concurrently
-   * (no controller-wide monitor held).
-   */
+  /// When both target tables explicitly opt into concurrent scheduling, two parallel
+  /// `scheduleTasks` calls must be able to run `generateTasks` concurrently
+  /// (no controller-wide monitor held).
   @Test
   public void testConcurrentPathEnabledAllowsParallelGeneration()
       throws Exception {
@@ -142,10 +138,8 @@ public class PinotTaskManagerConcurrentSchedulingIntegrationTest extends Control
     dropTables();
   }
 
-  /**
-   * With the cluster default ({@code false}) and no per-table override, two parallel
-   * {@code scheduleTasks} calls must serialize on the controller monitor.
-   */
+  /// With the cluster default (`false`) and no per-table override, two parallel
+  /// `scheduleTasks` calls must serialize on the controller monitor.
   @Test
   public void testDefaultPathSerializesGeneration()
       throws Exception {
@@ -254,13 +248,11 @@ public class PinotTaskManagerConcurrentSchedulingIntegrationTest extends Control
         "scheduleTasks workers should not throw; observed failures: " + workerFailures);
   }
 
-  /**
-   * Task generator that rendezvouses N callers inside {@code generateTasks} via a
-   * {@link CountDownLatch} countdown, then records the maximum number of callers observed
-   * concurrently. The rendezvous has a bounded timeout so a caller that enters alone (e.g.,
-   * because the controller serialized callers) proceeds after the timeout instead of blocking
-   * forever.
-   */
+  /// Task generator that rendezvouses N callers inside `generateTasks` via a
+  /// [CountDownLatch] countdown, then records the maximum number of callers observed
+  /// concurrently. The rendezvous has a bounded timeout so a caller that enters alone (e.g.,
+  /// because the controller serialized callers) proceeds after the timeout instead of blocking
+  /// forever.
   private static class RendezvousTaskGenerator implements PinotTaskGenerator {
     private final String _taskType;
     private final long _rendezvousTimeoutMs;

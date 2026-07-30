@@ -52,10 +52,8 @@ public class ControllerConfTest {
 
   private static final Random RAND = new Random();
 
-  /**
-   * When only new configs are supplied (deprecated configs have been removed), then the correct
-   * converted value is returned.
-   */
+  /// When only new configs are supplied (deprecated configs have been removed), then the correct
+  /// converted value is returned.
   @Test
   public void supplyingNewConfigsShouldReturnCorrectlyConvertedValue() {
     //setup

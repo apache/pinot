@@ -60,10 +60,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.*;
 
 
-/**
- * A class that handles sending segment completion protocol requests to the controller and getting
- * back responses
- */
+/// A class that handles sending segment completion protocol requests to the controller and getting
+/// back responses
 // TODO: Use exception based code to handle different types of exceptions.
 public class ServerSegmentCompletionProtocolHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
@@ -332,10 +330,8 @@ public class ServerSegmentCompletionProtocolHandler {
     }
   }
 
-  /**
-   * Generate a tar.gz file containing only the metadata files (metadata.properties, creation.meta)
-   * from a given Pinot segment tar.gz file.
-   */
+  /// Generate a tar.gz file containing only the metadata files (metadata.properties, creation.meta)
+  /// from a given Pinot segment tar.gz file.
   private File generateSegmentMetadataTar(File segmentTarFile)
       throws Exception {
     LOGGER.info("Generating segment metadata tar file from segment tar: {}", segmentTarFile.getAbsolutePath());

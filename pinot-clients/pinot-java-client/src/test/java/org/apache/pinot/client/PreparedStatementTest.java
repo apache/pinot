@@ -25,10 +25,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for prepared statement escaping
- *
- */
+/// Tests for prepared statement escaping
 public class PreparedStatementTest {
   private final DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
 

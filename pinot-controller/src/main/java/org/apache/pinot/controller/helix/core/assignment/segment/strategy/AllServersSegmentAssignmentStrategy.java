@@ -36,18 +36,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Segment assignment for an offline dimension table.
- * <ul>
- *   <li>
- *     This segment assignment strategy is used when {@link TableConfig#IS_DIM_TABLE_KEY} is set to "true".
- *   </li>
- *   <li>
- *     For a dimension table we assign all segments to all the servers. Thus, for this assignment strategy, we simply
- *     return all the instances under a given tag as the assigned instances for any given segment.
- *   </li>
- * </ul>
- */
+/// Segment assignment for an offline dimension table.
+///
+/// - This segment assignment strategy is used when [TableConfig#IS_DIM_TABLE_KEY] is set to "true".
+/// - For a dimension table we assign all segments to all the servers. Thus, for this assignment strategy, we simply
+///   return all the instances under a given tag as the assigned instances for any given segment.
 public class AllServersSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(AllServersSegmentAssignmentStrategy.class);
 

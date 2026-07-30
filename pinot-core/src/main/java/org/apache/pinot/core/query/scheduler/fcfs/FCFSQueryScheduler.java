@@ -31,11 +31,9 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * First Come First Served(FCFS) query scheduler. The FCFS policy applies across all tables.
- * This implementation does not throttle resource utilization. That makes it unsafe in
- * the multi-tenant clusters.
- */
+/// First Come First Served(FCFS) query scheduler. The FCFS policy applies across all tables.
+/// This implementation does not throttle resource utilization. That makes it unsafe in
+/// the multi-tenant clusters.
 public class FCFSQueryScheduler extends QueryScheduler {
 
   public FCFSQueryScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,

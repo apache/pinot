@@ -31,10 +31,8 @@ import static org.mockito.Mockito.when;
 
 public class EmptyIndexSegmentTest {
 
-  /**
-   * An empty (0-doc) segment loaded from a directory must still run the post-registration lifecycle hook and own
-   * closing the directory, mirroring the non-empty ImmutableSegmentImpl path.
-   */
+  /// An empty (0-doc) segment loaded from a directory must still run the post-registration lifecycle hook and own
+  /// closing the directory, mirroring the non-empty ImmutableSegmentImpl path.
   @Test
   public void testOnSegmentAddedDelegatesToDirectoryAndDestroyCloses()
       throws Exception {
@@ -50,9 +48,7 @@ public class EmptyIndexSegmentTest {
     verify(segmentDirectory).close();
   }
 
-  /**
-   * The hook fires after the segment is already serving, so a directory failure must not propagate out of it.
-   */
+  /// The hook fires after the segment is already serving, so a directory failure must not propagate out of it.
   @Test
   public void testOnSegmentAddedIsBestEffort()
       throws Exception {
@@ -66,11 +62,9 @@ public class EmptyIndexSegmentTest {
     segment.onSegmentAdded();
   }
 
-  /**
-   * The hook must reach the directory at most once per segment instance: the same segment can be registered more than
-   * once (e.g. an upsert replacement with a consistency mode other than NONE registers it through a
-   * DuoSegmentDataManager and then directly), and implementations are not required to be idempotent.
-   */
+  /// The hook must reach the directory at most once per segment instance: the same segment can be registered more than
+  /// once (e.g. an upsert replacement with a consistency mode other than NONE registers it through a
+  /// DuoSegmentDataManager and then directly), and implementations are not required to be idempotent.
   @Test
   public void testOnSegmentAddedNotifiesDirectoryAtMostOnce()
       throws Exception {
@@ -86,10 +80,8 @@ public class EmptyIndexSegmentTest {
     verify(segmentDirectory, times(1)).onSegmentAdded();
   }
 
-  /**
-   * An empty segment loaded without a directory (e.g. the local File path) must treat the lifecycle callbacks as safe
-   * no-ops.
-   */
+  /// An empty segment loaded without a directory (e.g. the local File path) must treat the lifecycle callbacks as safe
+  /// no-ops.
   @Test
   public void testMetadataOnlySegmentHasNoDirectorySideEffects() {
     SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);

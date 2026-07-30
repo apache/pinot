@@ -49,7 +49,6 @@ import org.slf4j.LoggerFactory;
 ///   - HAVING compatibility
 ///   - Build the rewritten query and cost
 ///
-///
 /// Concrete subclasses customize individual steps by overriding the
 /// `protected abstract` hook methods. This design allows adding new
 /// matching strategies (scan subsumption, aggregation subsumption, etc.)

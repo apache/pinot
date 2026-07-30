@@ -66,14 +66,10 @@ public interface BloomFilterCreator extends IndexCreator {
         ? UuidUtils.toString((byte[]) value)
         : UuidUtils.toString(UuidUtils.toBytes(value));
   }
-  /**
-   * Adds a value to the bloom filter.
-   */
+  /// Adds a value to the bloom filter.
   void add(String value);
 
-  /**
-   * Seals the index and flushes it to disk.
-   */
+  /// Seals the index and flushes it to disk.
   void seal()
       throws IOException;
 }

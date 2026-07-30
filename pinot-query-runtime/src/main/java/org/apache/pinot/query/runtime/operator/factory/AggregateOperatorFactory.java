@@ -25,21 +25,19 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-/**
- * Factory for aggregation related operators.
- */
+/// Factory for aggregation related operators.
 public interface AggregateOperatorFactory {
 
   /// Creates the aggregate operator. Grouping-set aggregates are normalized before this is called: the plan
-  /// visitor wraps {@code inputOperator} in a RepeatOperator that expands each input row across the grouping
-  /// sets, and passes the equivalent plain GROUP BY {@code aggregateNode} (group keys pointing at the appended
+  /// visitor wraps `inputOperator` in a RepeatOperator that expands each input row across the grouping
+  /// sets, and passes the equivalent plain GROUP BY `aggregateNode` (group keys pointing at the appended
   /// key-copy columns plus $groupingId, grouping sets cleared), so implementations need no grouping-set awareness.
   ///
-  /// IMPORTANT: for a grouping-set aggregate, {@code inputOperator} is the RepeatOperator, whose output schema is
-  /// {@code [input columns..., one NULLable group-key copy per union group-by column..., $groupingId INT]} — this
-  /// does NOT match {@code inputPlanNode.getDataSchema()}, which is the original PRE-expansion input schema.
-  /// Implementations that need the operator's actual input schema must read it from {@code inputOperator} (or
-  /// derive it from {@code aggregateNode}'s group keys), not from {@code inputPlanNode}. For a plain aggregate the
+  /// IMPORTANT: for a grouping-set aggregate, `inputOperator` is the RepeatOperator, whose output schema is
+  /// `[input columns..., one NULLable group-key copy per union group-by column..., $groupingId INT]` — this
+  /// does NOT match `inputPlanNode.getDataSchema()`, which is the original PRE-expansion input schema.
+  /// Implementations that need the operator's actual input schema must read it from `inputOperator` (or
+  /// derive it from `aggregateNode`'s group keys), not from `inputPlanNode`. For a plain aggregate the
   /// two agree as usual.
   MultiStageOperator createAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       PlanNode inputPlanNode, AggregateNode aggregateNode);

@@ -29,11 +29,9 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Function that calculates the grid distance between two H3 indexes.
- * The function takes two arguments:
- *  - gridDistance(firstH3Index, secondH3Index)
- */
+/// Function that calculates the grid distance between two H3 indexes.
+/// The function takes two arguments:
+///  - gridDistance(firstH3Index, secondH3Index)
 public class GridDistanceFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "gridDistance";
   private TransformFunction _firstArgument;

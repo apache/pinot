@@ -40,9 +40,7 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
-/**
- * The {@code ValueBasedSegmentPruner} prunes segments based on values inside the filter and segment metadata and data.
- */
+/// The `ValueBasedSegmentPruner` prunes segments based on values inside the filter and segment metadata and data.
 @SuppressWarnings({"rawtypes", "unchecked"})
 abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
@@ -62,13 +60,11 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
     return isApplicableToFilter(query.getFilter());
   }
 
-  /**
-   * 1. NOT is not applicable for segment pruning;
-   * 2. For OR, if one of the child filter is not applicable for pruning, the parent filter is not applicable;
-   * 3. For AND, if one of the child filter is applicable for pruning, the parent filter is applicable, but it
-   *    doesn't mean this child filter can prune the segment.
-   * 4. The specific pruners decide their own applicable predicate types.
-   */
+  /// 1. NOT is not applicable for segment pruning;
+  /// 2. For OR, if one of the child filter is not applicable for pruning, the parent filter is not applicable;
+  /// 3. For AND, if one of the child filter is applicable for pruning, the parent filter is applicable, but it
+  ///    doesn't mean this child filter can prune the segment.
+  /// 4. The specific pruners decide their own applicable predicate types.
   private boolean isApplicableToFilter(FilterContext filter) {
     switch (filter.getType()) {
       case AND:

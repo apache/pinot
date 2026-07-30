@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.spi.utils.retry;
 
-/**
- * Retry policy without delay between attempts.
- */
+/// Retry policy without delay between attempts.
 public class NoDelayRetryPolicy extends BaseRetryPolicy {
 
   public NoDelayRetryPolicy(int maxNumAttempts) {

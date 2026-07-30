@@ -61,10 +61,8 @@ import org.testng.annotations.Test;
 import static org.apache.avro.Schema.*;
 
 
-/**
- * Test if ComplexType (RECORD, ARRAY, MAP, UNION, ENUM, and FIXED) field from an AVRO file can be ingested into a JSON
- * column in a Pinot segment.
- */
+/// Test if ComplexType (RECORD, ARRAY, MAP, UNION, ENUM, and FIXED) field from an AVRO file can be ingested into a JSON
+/// column in a Pinot segment.
 public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonIngestionFromAvroTest");
   private static final File AVRO_DATA_FILE = new File(INDEX_DIR, "JsonIngestionFromAvroTest.avro");
@@ -120,7 +118,7 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  /** @return {@link GenericRow} representing a row in Pinot table. */
+  /// @return [GenericRow] representing a row in Pinot table.
   private static GenericRow createTableRecord(int intValue, String stringValue, List<Object> arrayValue,
       Object eventTimeValue) {
     GenericRow record = new GenericRow();
@@ -293,7 +291,7 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
     return avroRecordReader;
   }
 
-  /** Create an AVRO file and then ingest it into Pinot while creating a JsonIndex. */
+  /// Create an AVRO file and then ingest it into Pinot while creating a JsonIndex.
   @BeforeClass
   public void setUp()
       throws Exception {

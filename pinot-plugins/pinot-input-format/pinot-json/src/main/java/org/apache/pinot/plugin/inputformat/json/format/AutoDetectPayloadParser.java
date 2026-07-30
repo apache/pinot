@@ -25,7 +25,7 @@ import java.util.Map;
 /// Backs [JsonPayloadFormat#AUTO], so the decoder can always call `parse` without a null / mode check.
 class AutoDetectPayloadParser implements JsonPayloadParser {
 
-  /// Always {@code true}: this parser accepts any payload and resolves the real format at [#parse] time. It is
+  /// Always `true`: this parser accepts any payload and resolves the real format at [#parse] time. It is
   /// deliberately excluded from the detection order it drives.
   @Override
   public boolean matches(byte[] payload, int offset, int length) {

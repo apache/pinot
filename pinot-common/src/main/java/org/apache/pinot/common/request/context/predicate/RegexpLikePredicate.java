@@ -24,9 +24,7 @@ import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 
-/**
- * Predicate for REGEXP_LIKE with optional match parameters
- */
+/// Predicate for REGEXP_LIKE with optional match parameters
 public class RegexpLikePredicate extends BasePredicate {
   private final String _value;
   private final boolean _caseInsensitive;

@@ -42,9 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Record reader for Pinot segment.
- */
+/// Record reader for Pinot segment.
 public class PinotSegmentRecordReader implements RecordReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRecordReader.class);
 
@@ -68,12 +66,10 @@ public class PinotSegmentRecordReader implements RecordReader {
   public PinotSegmentRecordReader() {
   }
 
-  /**
-   * Deprecated: use empty constructor and init() instead.
-   *
-   * Read records using the segment schema
-   * @param indexDir input path for the segment index
-   */
+  /// Deprecated: use empty constructor and init() instead.
+  ///
+  /// Read records using the segment schema
+  /// @param indexDir input path for the segment index
   @Deprecated
   public PinotSegmentRecordReader(File indexDir)
       throws Exception {
@@ -85,16 +81,15 @@ public class PinotSegmentRecordReader implements RecordReader {
     }
   }
 
-  /**
-   * Deprecated: use empty constructor and init() instead.
-   *
-   * Read records using the segment schema with the given schema and sort order
-   * <p>Passed in schema must be a subset of the segment schema.
-   *
-   * @param indexDir input path for the segment index
-   * @param schema input schema that is a subset of the segment schema
-   * @param sortOrder a list of column names that represent the sorting order
-   */
+  /// Deprecated: use empty constructor and init() instead.
+  ///
+  /// Read records using the segment schema with the given schema and sort order
+  ///
+  /// Passed in schema must be a subset of the segment schema.
+  ///
+  /// @param indexDir input path for the segment index
+  /// @param schema input schema that is a subset of the segment schema
+  /// @param sortOrder a list of column names that represent the sorting order
   @Deprecated
   public PinotSegmentRecordReader(File indexDir, @Nullable Schema schema, @Nullable List<String> sortOrder)
       throws Exception {
@@ -112,29 +107,25 @@ public class PinotSegmentRecordReader implements RecordReader {
     init(indexDir, fieldsToRead, null, true);
   }
 
-  /**
-   * Initializes the record reader from an index directory.
-   *
-   * @param indexDir Index directory
-   * @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
-   * @param sortOrder List of sorted columns
-   * @param skipDefaultNullValues Whether to skip putting default null values into the record
-   */
+  /// Initializes the record reader from an index directory.
+  ///
+  /// @param indexDir Index directory
+  /// @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+  /// @param sortOrder List of sorted columns
+  /// @param skipDefaultNullValues Whether to skip putting default null values into the record
   public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
       boolean skipDefaultNullValues) {
     init(indexDir, fieldsToRead, sortOrder, skipDefaultNullValues, false);
   }
 
-  /**
-   * Initializes the record reader from an index directory with an option to skip column-level secondary indexes.
-   *
-   * @param indexDir Index directory
-   * @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
-   * @param sortOrder List of sorted columns
-   * @param skipDefaultNullValues Whether to skip putting default null values into the record
-   * @param forwardIndexOnly Whether to load only column-level forward index, dictionary, and null value vector,
-   *                         skipping other column-level secondary indexes
-   */
+  /// Initializes the record reader from an index directory with an option to skip column-level secondary indexes.
+  ///
+  /// @param indexDir Index directory
+  /// @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+  /// @param sortOrder List of sorted columns
+  /// @param skipDefaultNullValues Whether to skip putting default null values into the record
+  /// @param forwardIndexOnly Whether to load only column-level forward index, dictionary, and null value vector,
+  ///                         skipping other column-level secondary indexes
   public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
       boolean skipDefaultNullValues, boolean forwardIndexOnly) {
     IndexSegment indexSegment;
@@ -146,35 +137,29 @@ public class PinotSegmentRecordReader implements RecordReader {
     init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues);
   }
 
-  /**
-   * Initializes the record reader from a segment.
-   *
-   * @param indexSegment Index segment to read from
-   */
+  /// Initializes the record reader from a segment.
+  ///
+  /// @param indexSegment Index segment to read from
   public void init(IndexSegment indexSegment) {
     init(indexSegment, false, null, null, null, false);
   }
 
-  /**
-   * Initializes the record reader from a mutable segment with optional sorted document ids.
-   *
-   * @param mutableSegment Mutable segment
-   * @param sortedDocIds Array of sorted document ids
-   */
+  /// Initializes the record reader from a mutable segment with optional sorted document ids.
+  ///
+  /// @param mutableSegment Mutable segment
+  /// @param sortedDocIds Array of sorted document ids
   public void init(MutableSegment mutableSegment, @Nullable int[] sortedDocIds) {
     init(mutableSegment, false, null, sortedDocIds, null, false);
   }
 
-  /**
-   * Initializes the record reader.
-   *
-   * @param indexSegment Index segment to read from
-   * @param destroySegmentOnClose Whether to destroy the segment when closing the record reader
-   * @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
-   * @param sortedDocIds Array of sorted document ids
-   * @param sortOrder List of sorted columns
-   * @param skipDefaultNullValues Whether to skip putting default null values into the record
-   */
+  /// Initializes the record reader.
+  ///
+  /// @param indexSegment Index segment to read from
+  /// @param destroySegmentOnClose Whether to destroy the segment when closing the record reader
+  /// @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+  /// @param sortedDocIds Array of sorted document ids
+  /// @param sortOrder List of sorted columns
+  /// @param skipDefaultNullValues Whether to skip putting default null values into the record
   private void init(IndexSegment indexSegment, boolean destroySegmentOnClose, @Nullable Set<String> fieldsToRead,
       @Nullable int[] sortedDocIds, @Nullable List<String> sortOrder, boolean skipDefaultNullValues) {
     _indexSegment = indexSegment;
@@ -215,11 +200,9 @@ public class PinotSegmentRecordReader implements RecordReader {
     }
   }
 
-  /**
-   * Registers a reader for the given column. OPEN_STRUCT parent columns are tracked separately and
-   * reconstructed as maps at read time (they have no forward index of their own); all other columns
-   * use a {@link PinotSegmentColumnReader}.
-   */
+  /// Registers a reader for the given column. OPEN_STRUCT parent columns are tracked separately and
+  /// reconstructed as maps at read time (they have no forward index of their own); all other columns
+  /// use a [PinotSegmentColumnReader].
   private void addColumnReader(String column) {
     DataSource dataSource = _indexSegment.getDataSourceNullable(column);
     if (dataSource instanceof OpenStructDataSource) {
@@ -232,9 +215,7 @@ public class PinotSegmentRecordReader implements RecordReader {
     _columnReaders.add(reader);
   }
 
-  /**
-   * Returns the sorted document ids.
-   */
+  /// Returns the sorted document ids.
   @Nullable
   public int[] getSortedDocIds() {
     return _sortedDocIds;

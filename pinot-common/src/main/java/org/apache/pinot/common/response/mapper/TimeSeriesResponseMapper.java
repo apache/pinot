@@ -43,10 +43,8 @@ public class TimeSeriesResponseMapper {
   private TimeSeriesResponseMapper() {
   }
 
-  /**
-   * Creates a BrokerResponseNativeV2 from a TimeSeriesBlock.
-   * This method converts the time series data into a format compatible with the broker response.
-   */
+  /// Creates a BrokerResponseNativeV2 from a TimeSeriesBlock.
+  /// This method converts the time series data into a format compatible with the broker response.
   public static BrokerResponse toBrokerResponse(TimeSeriesBlock timeSeriesBlock) {
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     if (timeSeriesBlock == null) {

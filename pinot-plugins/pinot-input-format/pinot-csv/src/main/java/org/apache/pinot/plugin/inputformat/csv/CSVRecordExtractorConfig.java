@@ -22,31 +22,23 @@ import java.util.Set;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
-/**
- * Config for {@link CSVRecordExtractor}
- */
+/// Config for [CSVRecordExtractor]
 public class CSVRecordExtractorConfig implements RecordExtractorConfig {
 
   private Character _multiValueDelimiter;
   private Set<String> _columnNames;
 
-  /**
-   * Returns the CSV file's multi-value delimiter
-   */
+  /// Returns the CSV file's multi-value delimiter
   public Character getMultiValueDelimiter() {
     return _multiValueDelimiter;
   }
 
-  /**
-   * Sets the CSV file's multi-value delimiter
-   */
+  /// Sets the CSV file's multi-value delimiter
   public void setMultiValueDelimiter(Character multiValueDelimiter) {
     _multiValueDelimiter = multiValueDelimiter;
   }
 
-  /**
-   * Sets the CSV file's column names
-   */
+  /// Sets the CSV file's column names
   public Set<String> getColumnNames() {
     if (_columnNames == null) {
       throw new IllegalStateException("CSV column names must be set in " + this.getClass().getSimpleName()
@@ -55,9 +47,7 @@ public class CSVRecordExtractorConfig implements RecordExtractorConfig {
     return _columnNames;
   }
 
-  /**
-   * Returns the CSV file's column names
-   */
+  /// Returns the CSV file's column names
   public void setColumnNames(Set<String> columnNames) {
     _columnNames = columnNames;
   }

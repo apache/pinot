@@ -39,9 +39,7 @@ import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/**
- * Wrapper transform function on the annotated scalar function.
- */
+/// Wrapper transform function on the annotated scalar function.
 public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private final String _name;
   private final QueryFunctionInvoker _functionInvoker;
@@ -376,9 +374,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     return _stringValuesMV;
   }
 
-  /**
-   * Helper method to fetch values for the non-literal transform functions based on the parameter types.
-   */
+  /// Helper method to fetch values for the non-literal transform functions based on the parameter types.
   private void getNonLiteralValues(ValueBlock valueBlock) {
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
     for (int i = 0; i < _numNonLiteralArguments; i++) {

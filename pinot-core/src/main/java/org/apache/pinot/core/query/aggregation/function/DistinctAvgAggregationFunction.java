@@ -29,9 +29,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Aggregation function to compute the average of distinct values for an SV column.
- */
+/// Aggregation function to compute the average of distinct values for an SV column.
 public class DistinctAvgAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
   public DistinctAvgAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {

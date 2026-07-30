@@ -40,12 +40,12 @@ public interface JsonPayloadParser {
   /// corresponding parser is used without consulting this method.
   ///
   /// @param payload backing byte array
-  /// @param offset  start offset of the record within {@code payload}
+  /// @param offset  start offset of the record within `payload`
   /// @param length  number of bytes belonging to the record
-  /// @return {@code true} if the leading bytes match this format's magic / version signature
+  /// @return `true` if the leading bytes match this format's magic / version signature
   boolean matches(byte[] payload, int offset, int length);
 
-  /// Parses the {@code [offset, offset + length)} region of {@code payload} into a mutable
+  /// Parses the `[offset, offset + length)` region of `payload` into a mutable
   /// `Map<String, Object>` following the value contract described on this interface.
   ///
   /// @throws Exception if the region is not valid for this format

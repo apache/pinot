@@ -40,10 +40,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Implementation of PinotFS for a local filesystem. Methods in this class may throw a SecurityException at runtime
- * if access to the file is denied.
- */
+/// Implementation of PinotFS for a local filesystem. Methods in this class may throw a SecurityException at runtime
+/// if access to the file is denied.
 public class LocalPinotFS extends BasePinotFS {
 
   public static final String BACKUP = ".backup";

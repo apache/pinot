@@ -22,10 +22,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * The {@code PercentileRawEstMVAggregationFunction} returns the serialized {@code QuantileDigest} data structure of the
- * {@code PercentileEstMVAggregationFunction}.
- */
+/// The `PercentileRawEstMVAggregationFunction` returns the serialized `QuantileDigest` data structure of
+/// the `PercentileEstMVAggregationFunction`.
 public class PercentileRawEstMVAggregationFunction extends PercentileRawEstAggregationFunction {
 
   public PercentileRawEstMVAggregationFunction(ExpressionContext expressionContext, int percentile) {

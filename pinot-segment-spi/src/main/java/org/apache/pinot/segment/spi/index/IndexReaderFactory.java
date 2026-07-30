@@ -29,17 +29,15 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 public interface IndexReaderFactory<R extends IndexReader> {
 
-  /**
-   * Tries to create an index reader for the given column and segment.
-   *
-   * It may be the case that the configuration indicates that the index should be disabled but it is actually there.
-   * Also, it may be the case that the configuration says that the index should be there but it is not in the reader.
-   * In both cases the source of truth is the segment reader.
-   *
-   * @throws IndexReaderConstraintException if the constraints of the index reader are not matched. For example, some
-   * indexes may require the column to be dictionary based.
-   * @return the index reader or null if there is no index for that column
-   */
+  /// Tries to create an index reader for the given column and segment.
+  ///
+  /// It may be the case that the configuration indicates that the index should be disabled but it is actually there.
+  /// Also, it may be the case that the configuration says that the index should be there but it is not in the reader.
+  /// In both cases the source of truth is the segment reader.
+  ///
+  /// @throws IndexReaderConstraintException if the constraints of the index reader are not matched. For example, some
+  /// indexes may require the column to be dictionary based.
+  /// @return the index reader or null if there is no index for that column
   @Nullable
   R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
       ColumnMetadata metadata)

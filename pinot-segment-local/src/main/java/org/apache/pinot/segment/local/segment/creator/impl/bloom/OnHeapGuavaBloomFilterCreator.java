@@ -34,11 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * On-heap creator for guava bloom filter.
- * <p>TODO: Remove the dependency on {@link BloomFilter} and have our own implementation to prevent guava library
- *          changes that breaks the alignment between creator and reader.
- */
+/// On-heap creator for guava bloom filter.
+///
+/// TODO: Remove the dependency on [BloomFilter] and have our own implementation to prevent guava library
+///          changes that breaks the alignment between creator and reader.
 @SuppressWarnings("UnstableApiUsage")
 public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapGuavaBloomFilterCreator.class);

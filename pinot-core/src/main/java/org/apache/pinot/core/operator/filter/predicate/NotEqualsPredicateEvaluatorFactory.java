@@ -29,33 +29,27 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
-/**
- * Factory for NEQ predicate evaluators.
- */
+/// Factory for NEQ predicate evaluators.
 public class NotEqualsPredicateEvaluatorFactory {
   private NotEqualsPredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based NEQ predicate evaluator.
-   *
-   * @param notEqPredicate NOT_EQ predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @param dataType Data type for the column
-   * @return Dictionary based NOT_EQ predicate evaluator
-   */
+  /// Create a new instance of dictionary based NEQ predicate evaluator.
+  ///
+  /// @param notEqPredicate NOT_EQ predicate to evaluate
+  /// @param dictionary Dictionary for the column
+  /// @param dataType Data type for the column
+  /// @return Dictionary based NOT_EQ predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(NotEqPredicate notEqPredicate,
       Dictionary dictionary, DataType dataType) {
     return new DictionaryBasedNeqPredicateEvaluator(notEqPredicate, dictionary, dataType);
   }
 
-  /**
-   * Create a new instance of raw value based NEQ predicate evaluator.
-   *
-   * @param notEqPredicate NOT_EQ predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based NOT_EQ predicate evaluator
-   */
+  /// Create a new instance of raw value based NEQ predicate evaluator.
+  ///
+  /// @param notEqPredicate NOT_EQ predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based NOT_EQ predicate evaluator
   public static NeqRawPredicateEvaluator newRawValueBasedEvaluator(NotEqPredicate notEqPredicate, DataType dataType) {
     String value = notEqPredicate.getValue();
     switch (dataType) {

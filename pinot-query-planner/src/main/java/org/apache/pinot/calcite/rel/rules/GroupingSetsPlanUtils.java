@@ -43,21 +43,21 @@ import org.apache.pinot.common.request.context.GroupingSets;
 
 
 /// The shared planner-side logic for GROUP BY GROUPING SETS / ROLLUP / CUBE, used by both the default planner
-/// ({@link PinotAggregateExchangeNodeInsertRule}) and the v2 physical planner ({@code AggregatePushdownRule})
+/// ([PinotAggregateExchangeNodeInsertRule]) and the v2 physical planner (`AggregatePushdownRule`)
 /// so the two cannot drift on the encoding: the grouping sets of a query are the ordered, de-duplicated list
-/// produced by {@link #computeGroupingSets}, a set's position in that list is its ordinal (the value of the
-/// synthetic {@link GroupingSets#GROUPING_ID_COLUMN} discriminator), and GROUPING()/GROUPING_ID() values are
-/// derived from set membership via {@link GroupingSets#groupingValuesByOrdinal}.
+/// produced by [#computeGroupingSets], a set's position in that list is its ordinal (the value of the
+/// synthetic [GroupingSets#GROUPING_ID_COLUMN] discriminator), and GROUPING()/GROUPING_ID() values are
+/// derived from set membership via [GroupingSets#groupingValuesByOrdinal].
 public class GroupingSetsPlanUtils {
   private GroupingSetsPlanUtils() {
   }
 
   /// Encodes each grouping set as the sorted list of its participating union group-by column indexes
-  /// (positions in {@code groupSet.asList()}), in {@code getGroupSets()} order, de-duplicated (first
+  /// (positions in `groupSet.asList()`), in `getGroupSets()` order, de-duplicated (first
   /// occurrence wins, matching the single-stage parser: duplicate sets — reachable via explicit
-  /// {@code GROUPING SETS ((a), (a))} — collapse to one). A set's position in the returned list is its
+  /// `GROUPING SETS ((a), (a))` — collapse to one). A set's position in the returned list is its
   /// ordinal, the value carried as the synthetic $groupingId discriminator. Mirrors the single-stage engine's
-  /// {@code PinotQuery.groupingSets} so the per-set expansion can be pushed down to the single-stage (leaf)
+  /// `PinotQuery.groupingSets` so the per-set expansion can be pushed down to the single-stage (leaf)
   /// engine, and mirrors Calcite's per-set column bitset so the number of grouping columns is unlimited.
   /// Returns an empty list for a plain GROUP BY (SIMPLE). This is the single conversion point for both
   /// planners: every consumer of the ordinal (planner GROUPING projections, RepeatOperator, leaf pushdown)
@@ -91,9 +91,9 @@ public class GroupingSetsPlanUtils {
   }
 
   /// Returns the LEAF row type for a grouping-set aggregate: the synthetic
-  /// {@link GroupingSets#GROUPING_ID_COLUMN} INT column inserted right after the {@code groupCount} union
-  /// group-by columns, i.e. {@code [group keys..., $groupingId, aggregates...]}. Shared by
-  /// {@code PinotLogicalAggregate} and {@code PhysicalAggregate} so the two planners' {@code deriveRowType()}
+  /// [GroupingSets#GROUPING_ID_COLUMN] INT column inserted right after the `groupCount` union
+  /// group-by columns, i.e. `[group keys..., $groupingId, aggregates...]`. Shared by
+  /// `PinotLogicalAggregate` and `PhysicalAggregate` so the two planners' `deriveRowType()`
   /// overrides cannot drift.
   public static RelDataType appendGroupingIdColumn(RelDataTypeFactory typeFactory, RelDataType rowType,
       int groupCount) {
@@ -111,7 +111,7 @@ public class GroupingSetsPlanUtils {
 
   /// Splits GROUPING() / GROUPING_ID() out of the aggregate calls: they are not real aggregations (they are
   /// functions of which grouping set a row belongs to, computed from $groupingId in the final projection).
-  /// Adds the real (non-GROUPING) calls to {@code outRealAggCalls} and returns, per original call, its index
+  /// Adds the real (non-GROUPING) calls to `outRealAggCalls` and returns, per original call, its index
   /// among the real calls or -1 for a GROUPING / GROUPING_ID call.
   public static int[] splitOutGroupingCalls(List<AggregateCall> orgAggCalls, List<AggregateCall> outRealAggCalls) {
     int[] realAggIndex = new int[orgAggCalls.size()];
@@ -128,14 +128,14 @@ public class GroupingSetsPlanUtils {
   }
 
   /// Builds the projection expressions restoring the original grouping-set aggregate row type on top of the
-  /// FINAL aggregate, whose output is {@code [union keys..., $groupingId, real aggregate results...]}: the
+  /// FINAL aggregate, whose output is `[union keys..., $groupingId, real aggregate results...]`: the
   /// group keys, then per original aggregate call either the real aggregate result reference or the
-  /// GROUPING() / GROUPING_ID() value computed from $groupingId. {@code $groupingId} itself is dropped.
+  /// GROUPING() / GROUPING_ID() value computed from $groupingId. `$groupingId` itself is dropped.
   ///
   /// @param finalAggRel the FINAL aggregate node the projection reads from
   /// @param aggRel the original grouping-set aggregate (provides union order, aggregate calls, and sets)
   /// @param realAggIndex per original aggregate call, its index among the real calls or -1 for GROUPING calls
-  ///                     (from {@link #splitOutGroupingCalls})
+  ///                     (from [#splitOutGroupingCalls])
   public static List<RexNode> buildGroupingSetsProjects(RexBuilder rexBuilder, RelNode finalAggRel, Aggregate aggRel,
       int[] realAggIndex) {
     int groupCount = aggRel.getGroupCount();
@@ -173,12 +173,12 @@ public class GroupingSetsPlanUtils {
 
   /// Builds the GROUPING / GROUPING_ID value expression. The value is fully determined by the grouping set a
   /// row belongs to, so it is a plan-time constant per grouping-set ordinal: the expression is
-  /// {@code CASE WHEN $groupingId = 0 THEN v_0 WHEN $groupingId = 1 THEN v_1 ... ELSE null END}, with each
-  /// {@code v_k} packed from the argument columns' rolled-up bits in set {@code k} (first argument = most
-  /// significant bit, PostgreSQL semantics, see {@link GroupingSets#groupingValuesByOrdinal}).
+  /// `CASE WHEN $groupingId = 0 THEN v_0 WHEN $groupingId = 1 THEN v_1 ... ELSE null END`, with each
+  /// `v_k` packed from the argument columns' rolled-up bits in set `k` (first argument = most
+  /// significant bit, PostgreSQL semantics, see [GroupingSets#groupingValuesByOrdinal]).
   ///
   /// The projection evaluates the CASE per output group row, so the per-row cost is O(number of grouping
-  /// sets), bounded by {@link GroupingSets#MAX_GROUPING_SETS} (enforced in {@link #computeGroupingSets}).
+  /// sets), bounded by [GroupingSets#MAX_GROUPING_SETS] (enforced in [#computeGroupingSets]).
   /// TODO: replace the CASE with an O(1) per-ordinal lookup (an INT-array literal indexed by $groupingId,
   ///   mirroring the single-stage reduce-side precompute) once array literals are supported in the plan
   ///   expression conversion.

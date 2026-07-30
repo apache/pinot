@@ -23,9 +23,7 @@ import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Optimized regexp_like implementation that accepts variable pattern that needs compiling on each call.
- */
+/// Optimized regexp_like implementation that accepts variable pattern that needs compiling on each call.
 public class RegexpLikeVarFunctions {
 
   private RegexpLikeVarFunctions() {

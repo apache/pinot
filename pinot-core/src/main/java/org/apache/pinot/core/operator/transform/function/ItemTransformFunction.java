@@ -31,9 +31,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 
 
-/**
- * Evaluates myMap['foo']
- */
+/// Evaluates myMap\['foo'\]
 public class ItemTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "item";
 

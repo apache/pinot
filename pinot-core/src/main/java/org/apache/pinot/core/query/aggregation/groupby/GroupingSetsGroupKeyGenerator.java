@@ -37,7 +37,7 @@ import org.apache.pinot.spi.utils.FixedIntArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/// {@link GroupKeyGenerator} for GROUP BY GROUPING SETS / ROLLUP / CUBE queries in the single-stage engine.
+/// [GroupKeyGenerator] for GROUP BY GROUPING SETS / ROLLUP / CUBE queries in the single-stage engine.
 ///
 /// Given the union of all grouping columns `[c_0, ..., c_{k-1}]` and a list of grouping sets (each a subset
 /// of the union), this generator expands every input row into one group per grouping set in a single scan.
@@ -55,8 +55,8 @@ import org.roaringbitmap.RoaringBitmap;
 /// ordinal is not a per-column bitmask, the number of grouping columns is unlimited.
 ///
 /// This generator always emits multiple keys per row, so it is only used via the multi-value
-/// ({@code int[][]}) executor path. The union columns are resolved through per-column on-the-fly
-/// dictionaries (like {@link NoDictionaryMultiColumnGroupKeyGenerator}) so that NULL keys -- which grouping
+/// (`int[][]`) executor path. The union columns are resolved through per-column on-the-fly
+/// dictionaries (like [NoDictionaryMultiColumnGroupKeyGenerator]) so that NULL keys -- which grouping
 /// sets produce regardless of the query's null-handling option -- are representable and reconstructable.
 ///
 /// A multi-value union column participating in a grouping set expands the row over its values (Cartesian
@@ -196,7 +196,7 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   /// Recursively builds composite keys from the per-column id lists (Cartesian product) and resolves each to
-  /// a group id appended to {@code out}.
+  /// a group id appended to `out`.
   private void expandGroupIds(int[][] keyComponents, int[] keyValues, int level, IntArrayList out) {
     if (level == keyComponents.length) {
       out.add(getGroupIdForKey(new FixedIntArray(keyValues.clone())));
@@ -285,7 +285,7 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   /// Resolves the on-the-fly dictionary id for the given union column across all rows in the block, mapping
-  /// null values (when null handling is enabled) to {@link #ID_FOR_NULL}.
+  /// null values (when null handling is enabled) to [#ID_FOR_NULL].
   private int[] resolveColumnIds(ValueBlock valueBlock, int col, int numDocs) {
     int[] ids = new int[numDocs];
     BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpressions[col]);
@@ -347,7 +347,7 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
 
   /// Returns the group id for the given composite key, creating a new group while the per-segment group
   /// limit has not been reached. Once the limit is reached, only existing groups are returned and brand-new
-  /// keys map to {@link #INVALID_ID} (the aggregation result holders skip {@code INVALID_ID}).
+  /// keys map to [#INVALID_ID] (the aggregation result holders skip `INVALID_ID`).
   private int getGroupIdForKey(FixedIntArray keyList) {
     int numGroups = _groupKeyMap.size();
     if (numGroups < _numGroupsLimit) {

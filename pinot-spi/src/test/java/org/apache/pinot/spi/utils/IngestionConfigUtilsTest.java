@@ -36,9 +36,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for helper methods in {@link IngestionConfigUtils}
- */
+/// Tests for helper methods in [IngestionConfigUtils]
 public class IngestionConfigUtilsTest {
 
   @Test

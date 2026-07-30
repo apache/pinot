@@ -61,41 +61,38 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * SegmentGenerationAndPushTaskExecutor implements a minion task to build a single Pinot segment based on one input file
- * given task configs.
- *
- * Task configs:
- *   input.data.file.uri - Required, the location of input file
- *   inputFormat - Required, the input file format, e.g. JSON/Avro/Parquet/CSV/...
- *   input.fs.className - Optional, the class name of filesystem to read input data. Default to PinotLocalFs if not
- *   specified.
- *   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
- *
- *   output.segment.dir.uri -  Optional, the location of generated segment. Use local temp dir with push mode TAR, If
- *   not specified.
- *   output.fs.className - Optional, the class name of filesystem to write output segment. Default to PinotLocalFs if
- *   not specified.
- *   output.fs.prop.<keys> - Optional, the configs to initialize output filesystem.
- *   overwriteOutput - Optional, delete the output segment directory if set to true.
- *
- *   recordReader.className - Required, the class name of RecordReader.
- *   recordReader.configClassName - Required, the class name of RecordReaderConfig.
- *   recordReader.prop.<keys> - Optional, the configs used to initialize RecordReaderConfig.
- *
- *   schema - Required, if schemaURI is not specified. Pinot schema in Json string.
- *   schemaURI - Required, if schema is not specified. The URI to query for Pinot schema.
- *
- *   sequenceId - Optional, an option to set segment name.
- *   segmentNameGenerator.type - Required, the segment name generator to create segment name.
- *   segmentNameGenerator.configs.<keys> - Optional, configs of segment name generator.
- *
- *   push.mode - Required, push job type: TAR/URI/METADATA
- *   push.controllerUri - Required, controller uri to send push request to.
- *   push.segmentUriPrefix - Optional, segment download uri prefix, used when push.mode=uri
- *   push.segmentUriSuffix - Optional, segment download uri suffix, used when push.mode=uri
- *
- */
+/// SegmentGenerationAndPushTaskExecutor implements a minion task to build a single Pinot segment based on one input
+/// file given task configs.
+///
+/// Task configs:
+///   input.data.file.uri - Required, the location of input file
+///   inputFormat - Required, the input file format, e.g. JSON/Avro/Parquet/CSV/...
+///   input.fs.className - Optional, the class name of filesystem to read input data. Default to PinotLocalFs if not
+///   specified.
+///   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
+///
+///   output.segment.dir.uri -  Optional, the location of generated segment. Use local temp dir with push mode TAR, If
+///   not specified.
+///   output.fs.className - Optional, the class name of filesystem to write output segment. Default to PinotLocalFs if
+///   not specified.
+///   output.fs.prop.<keys> - Optional, the configs to initialize output filesystem.
+///   overwriteOutput - Optional, delete the output segment directory if set to true.
+///
+///   recordReader.className - Required, the class name of RecordReader.
+///   recordReader.configClassName - Required, the class name of RecordReaderConfig.
+///   recordReader.prop.<keys> - Optional, the configs used to initialize RecordReaderConfig.
+///
+///   schema - Required, if schemaURI is not specified. Pinot schema in Json string.
+///   schemaURI - Required, if schema is not specified. The URI to query for Pinot schema.
+///
+///   sequenceId - Optional, an option to set segment name.
+///   segmentNameGenerator.type - Required, the segment name generator to create segment name.
+///   segmentNameGenerator.configs.<keys> - Optional, configs of segment name generator.
+///
+///   push.mode - Required, push job type: TAR/URI/METADATA
+///   push.controllerUri - Required, controller uri to send push request to.
+///   push.segmentUriPrefix - Optional, segment download uri prefix, used when push.mode=uri
+///   push.segmentUriSuffix - Optional, segment download uri suffix, used when push.mode=uri
 public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationAndPushTaskExecutor.class);
 

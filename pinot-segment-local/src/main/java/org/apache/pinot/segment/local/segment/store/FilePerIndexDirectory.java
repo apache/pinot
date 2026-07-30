@@ -39,9 +39,9 @@ import org.apache.pinot.spi.utils.ReadMode;
 
 
 class FilePerIndexDirectory extends ColumnIndexDirectory {
-  /// Suffix of the {@link IllegalArgumentException} message thrown when {@code getIndexFor} resolves
+  /// Suffix of the [IllegalArgumentException] message thrown when `getIndexFor` resolves
   /// an on-disk artifact that is a directory (e.g. a legacy HNSW/text Lucene directory) rather than
-  /// a mappable regular file. {@code VectorIndexUtils#getConsolidatedVectorEntry} matches against
+  /// a mappable regular file. `VectorIndexUtils#getConsolidatedVectorEntry` matches against
   /// this constant (same package) to treat that case as "no consolidated entry" instead of failing
   /// the caller — keep the precondition message wired to it so the two sides cannot drift.
   static final String NOT_A_REGULAR_FILE_MESSAGE_SUFFIX = " must be a regular file";
@@ -51,11 +51,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   private final ReadMode _readMode;
   private final Map<IndexKey, PinotDataBuffer> _indexBuffers = new HashMap<>();
 
-  /**
-   * @param segmentDirectory File pointing to segment directory
-   * @param segmentMetadata segment metadata. Metadata must be fully initialized
-   * @param readMode mmap vs heap mode
-   */
+  /// @param segmentDirectory File pointing to segment directory
+  /// @param segmentMetadata segment metadata. Metadata must be fully initialized
+  /// @param readMode mmap vs heap mode
   protected FilePerIndexDirectory(File segmentDirectory, SegmentMetadataImpl segmentMetadata, ReadMode readMode) {
     Preconditions.checkNotNull(segmentDirectory);
     Preconditions.checkNotNull(readMode);

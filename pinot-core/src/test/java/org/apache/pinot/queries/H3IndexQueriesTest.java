@@ -49,9 +49,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Queries test for H3 index.
- */
+/// Queries test for H3 index.
 public class H3IndexQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "H3IndexQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

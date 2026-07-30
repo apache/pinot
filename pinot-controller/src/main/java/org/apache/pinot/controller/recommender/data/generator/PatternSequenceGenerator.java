@@ -22,25 +22,23 @@ import java.util.Map;
 import org.apache.commons.configuration2.convert.PropertyConverter;
 
 
-/**
- * PatternSequenceGenerator produces a series of sequentially increasing (decreasing) numbers, optionally with a fixed
- * number of repetitions per values. This pattern is typical for monotonically increasing series such as timestamps.
- *
- * Generator example:
- * <pre>
- *     start = -10
- *     stepsize = 3
- *     repetitions = 2
- *
- *     returns [ -10, -10, -7, -7, -4, -4, -1, -1, 2, 2, ... ]
- * </pre>
- *
- * Configuration examples:
- * <ul>
- *     <li>./pinot-tools/src/main/resources/generator/simpleWebsite_generator.json</li>
- *     <li>./pinot-tools/src/main/resources/generator/complexWebsite_generator.json</li>
- * </ul>
- */
+/// PatternSequenceGenerator produces a series of sequentially increasing (decreasing) numbers, optionally with a fixed
+/// number of repetitions per values. This pattern is typical for monotonically increasing series such as timestamps.
+///
+/// Generator example:
+///
+/// ```
+/// start = -10
+/// stepsize = 3
+/// repetitions = 2
+///
+/// returns [ -10, -10, -7, -7, -4, -4, -1, -1, 2, 2, ... ]
+/// ```
+///
+/// Configuration examples:
+///
+/// - ./pinot-tools/src/main/resources/generator/simpleWebsite_generator.json
+/// - ./pinot-tools/src/main/resources/generator/complexWebsite_generator.json
 public class PatternSequenceGenerator implements Generator {
   private final long _start;
   private final long _stepsize;

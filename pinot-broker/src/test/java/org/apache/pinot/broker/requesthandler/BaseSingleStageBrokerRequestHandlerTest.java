@@ -579,17 +579,16 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "(1772109900000" + Range.DELIMITER + "1772113500000]", "Realtime mixed");
   }
 
-  /**
-   * Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
-   * _queryQuotaManager.acquire(tableName) charges quota against the MV
-   * instead of the base table. A throttled base table is effectively
-   * bypassed when its quota allows no traffic but the MV has no quota entry.
-   *
-   * <p>Before fix: acquire("baseTable_OFFLINE") is never called; the MV
-   * table passes because the mock only denies the base table name.
-   * <p>After fix: the base table name is used for quota accounting and the
-   * request is correctly rate-limited.
-   */
+  /// Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
+  /// \_queryQuotaManager.acquire(tableName) charges quota against the MV
+  /// instead of the base table. A throttled base table is effectively
+  /// bypassed when its quota allows no traffic but the MV has no quota entry.
+  ///
+  /// Before fix: acquire("baseTable_OFFLINE") is never called; the MV
+  /// table passes because the mock only denies the base table name.
+  ///
+  /// After fix: the base table name is used for quota accounting and the
+  /// request is correctly rate-limited.
   @Test
   public void testMaterializedViewFullRewriteQuotaAccountedAgainstBaseTable()
       throws Exception {
@@ -701,16 +700,15 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "Expected TOO_MANY_REQUESTS error code");
   }
 
-  /**
-   * Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
-   * accessControl.getRowColFilters(requesterIdentity, tableName) fetches RLS
-   * policy for the materialized view table instead of the base table.
-   *
-   * <p>Before fix: getRowColFilters is called with the materialized view table name
-   * "mv_baseTable_OFFLINE".
-   * <p>After fix: getRowColFilters is called with the original base table
-   * name "baseTable_OFFLINE".
-   */
+  /// Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
+  /// accessControl.getRowColFilters(requesterIdentity, tableName) fetches RLS
+  /// policy for the materialized view table instead of the base table.
+  ///
+  /// Before fix: getRowColFilters is called with the materialized view table name
+  /// "mv_baseTable_OFFLINE".
+  ///
+  /// After fix: getRowColFilters is called with the original base table
+  /// name "baseTable_OFFLINE".
   @Test
   public void testMaterializedViewFullRewriteRlsLookupUsesBaseTable()
       throws Exception {
@@ -1001,13 +999,11 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "combined filter must retain the original WHERE clause, got literals: " + literalValues);
   }
 
-  /**
-   * Pins the security-style defense that a user-supplied `materializedViewRewrite=true` query
-   * option (e.g. via `SET materializedViewRewrite='true'`) is stripped at the broker entry
-   * before any compile work. Without the strip, a hostile client could stamp the
-   * broker-internal marker themselves and bypass `BrokerReduceService`'s "Nested query is not
-   * supported without gapfill" safety net on any path where `brokerRequest != serverBrokerRequest`.
-   */
+  /// Pins the security-style defense that a user-supplied `materializedViewRewrite=true` query
+  /// option (e.g. via `SET materializedViewRewrite='true'`) is stripped at the broker entry
+  /// before any compile work. Without the strip, a hostile client could stamp the
+  /// broker-internal marker themselves and bypass `BrokerReduceService`'s "Nested query is not
+  /// supported without gapfill" safety net on any path where `brokerRequest != serverBrokerRequest`.
   @Test
   public void testMaterializedViewMarkerStrippedFromUserSuppliedOptions()
       throws Exception {
@@ -1093,12 +1089,10 @@ public class BaseSingleStageBrokerRequestHandlerTest {
             + serverOptions);
   }
 
-  /**
-   * Pins the C1 fix: FULL_REWRITE is skipped at the broker layer when the base table has a
-   * REALTIME sibling, because a batch MV cannot cover newly-streamed rows. Without this guard
-   * the MV swap would silently drop all rows ingested via the realtime stream since the MV last
-   * refreshed — an invisible data-loss path.
-   */
+  /// Pins the C1 fix: FULL_REWRITE is skipped at the broker layer when the base table has a
+  /// REALTIME sibling, because a batch MV cannot cover newly-streamed rows. Without this guard
+  /// the MV swap would silently drop all rows ingested via the realtime stream since the MV last
+  /// refreshed — an invisible data-loss path.
   @Test
   public void testMaterializedViewFullRewriteSkippedForHybridBaseTable()
       throws Exception {
@@ -1217,16 +1211,14 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "FULL_REWRITE marker must not be stamped when rewrite is skipped; options: " + serverOptions);
   }
 
-  /**
-   * Pins the F1 fix: when the rewrite engine returns a FULL_REWRITE plan and no skip condition
-   * trips (base table is OFFLINE-only, schema present, etc.), the server-side query MUST actually
-   * be swapped to target the MV — not the base table.  The earlier `watermarkMs <= 0` guard in
-   * `DefaultMaterializedViewHandler.compile` was over-broad and silently dropped every
-   * FULL_REWRITE attempt while `annotateResponse` continued to stamp `materializedViewQueried`,
-   * producing a false-positive on every operator-facing metric.  This test asserts the actual
-   * dataSource table name on the server query equals the MV name AND the response's
-   * `materializedViewQueried` matches.
-   */
+  /// Pins the F1 fix: when the rewrite engine returns a FULL_REWRITE plan and no skip condition
+  /// trips (base table is OFFLINE-only, schema present, etc.), the server-side query MUST actually
+  /// be swapped to target the MV — not the base table.  The earlier `watermarkMs <= 0` guard in
+  /// `DefaultMaterializedViewHandler.compile` was over-broad and silently dropped every
+  /// FULL_REWRITE attempt while `annotateResponse` continued to stamp `materializedViewQueried`,
+  /// producing a false-positive on every operator-facing metric.  This test asserts the actual
+  /// dataSource table name on the server query equals the MV name AND the response's
+  /// `materializedViewQueried` matches.
   @Test
   public void testMaterializedViewFullRewriteActuallySwapsServerQuery()
       throws Exception {
@@ -1343,17 +1335,15 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "Response must report the MV name when the swap was committed");
   }
 
-  /**
-   * Per-query opt-out: a query carrying {@code enableMaterializedViewRewrite=false} (the option the
-   * MV minion executor injects onto its materialization query) MUST bypass the rewrite path
-   * entirely.  This is the regression guard for the circular-rewrite hazard: a materialization
-   * query reads the base table, and with broker-wide MV rewrite enabled it would otherwise be
-   * eligible to be rewritten back onto an MV over the same base table (its own MV, or a sibling).
-   * Using the identical setup to {@link #testMaterializedViewFullRewriteActuallySwapsServerQuery}
-   * (which DOES swap), this asserts the gate prevents the swap: the rewrite engine is never
-   * consulted, the server query targets the base table, no MV marker is stamped, and the response
-   * reports no MV.
-   */
+  /// Per-query opt-out: a query carrying `enableMaterializedViewRewrite=false` (the option the
+  /// MV minion executor injects onto its materialization query) MUST bypass the rewrite path
+  /// entirely.  This is the regression guard for the circular-rewrite hazard: a materialization
+  /// query reads the base table, and with broker-wide MV rewrite enabled it would otherwise be
+  /// eligible to be rewritten back onto an MV over the same base table (its own MV, or a sibling).
+  /// Using the identical setup to [#testMaterializedViewFullRewriteActuallySwapsServerQuery]
+  /// (which DOES swap), this asserts the gate prevents the swap: the rewrite engine is never
+  /// consulted, the server query targets the base table, no MV marker is stamped, and the response
+  /// reports no MV.
   @Test
   public void testMaterializedViewRewriteSkippedWhenDisabledByQueryOption()
       throws Exception {
@@ -1462,12 +1452,10 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "Response must not report a materializedViewQueried when rewrite is disabled by the query option");
   }
 
-  /**
-   * Pins the cascade-prevention guard: when the user's query already targets an MV table
-   * directly ({@code TableConfig.isMaterializedView()} is {@code true}), the broker must skip
-   * MV rewrite entirely.  Cascading MV-to-MV rewrites are not supported, and the explicit
-   * guard uses the new flag from PR #18564 as the single source of truth for MV identity.
-   */
+  /// Pins the cascade-prevention guard: when the user's query already targets an MV table
+  /// directly (`TableConfig.isMaterializedView()` is `true`), the broker must skip
+  /// MV rewrite entirely.  Cascading MV-to-MV rewrites are not supported, and the explicit
+  /// guard uses the new flag from PR #18564 as the single source of truth for MV identity.
   @Test
   public void testMaterializedViewRewriteSkippedWhenUserQueryTargetsMaterializedView()
       throws Exception {

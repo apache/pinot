@@ -31,16 +31,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
-/**
- * Tests for the post-registration lifecycle hook of {@link ImmutableSegmentImpl}.
- */
+/// Tests for the post-registration lifecycle hook of [ImmutableSegmentImpl].
 public class ImmutableSegmentImplTest {
 
-  /**
-   * The hook must reach the directory at most once per segment instance: the same segment can be registered more than
-   * once (e.g. an upsert replacement with a consistency mode other than NONE registers it through a
-   * DuoSegmentDataManager and then directly), and implementations are not required to be idempotent.
-   */
+  /// The hook must reach the directory at most once per segment instance: the same segment can be registered more than
+  /// once (e.g. an upsert replacement with a consistency mode other than NONE registers it through a
+  /// DuoSegmentDataManager and then directly), and implementations are not required to be idempotent.
   @Test
   public void testOnSegmentAddedNotifiesDirectoryAtMostOnce()
       throws Exception {
@@ -54,9 +50,7 @@ public class ImmutableSegmentImplTest {
     verify(segmentDirectory, times(1)).onSegmentAdded();
   }
 
-  /**
-   * The hook fires after the segment is already serving, so a directory failure must not propagate out of it.
-   */
+  /// The hook fires after the segment is already serving, so a directory failure must not propagate out of it.
   @Test
   public void testOnSegmentAddedIsBestEffort()
       throws Exception {
@@ -70,10 +64,8 @@ public class ImmutableSegmentImplTest {
     verify(segmentDirectory).onSegmentAdded();
   }
 
-  /**
-   * A failed attempt consumes the single notification: the directory was already told, and retry semantics are the
-   * implementation's business, not the caller's.
-   */
+  /// A failed attempt consumes the single notification: the directory was already told, and retry semantics are the
+  /// implementation's business, not the caller's.
   @Test
   public void testFailedOnSegmentAddedIsNotRetried()
       throws Exception {

@@ -27,9 +27,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
-/**
- * Base predicate for IN and NOT_IN.
- */
+/// Base predicate for IN and NOT_IN.
 public abstract class BaseInPredicate extends BasePredicate {
   protected final List<String> _values;
 

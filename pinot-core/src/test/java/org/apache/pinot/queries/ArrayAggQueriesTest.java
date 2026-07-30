@@ -52,9 +52,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Queries test for ArrayAgg queries.
- */
+/// Queries test for ArrayAgg queries.
 @SuppressWarnings("unchecked")
 public class ArrayAggQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ArrayAggQueriesTest");

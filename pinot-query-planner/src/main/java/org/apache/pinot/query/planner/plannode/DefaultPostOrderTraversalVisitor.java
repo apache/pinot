@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-/**
- * A base implementation of a visitor pattern where the children of a given node are visited first and after that the
- * node is processed (post-order traversal).
- */
+/// A base implementation of a visitor pattern where the children of a given node are visited first and after that the
+/// node is processed (post-order traversal).
 public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNodeVisitor<T, C> {
 
   public abstract T process(PlanNode planNode, C context);

@@ -64,7 +64,7 @@ public enum QueryErrorCode {
   /// Error detected at validation time. For example, type mismatch.
   QUERY_VALIDATION(700, "QueryValidationError", Response.Status.BAD_REQUEST),
   UNKNOWN_COLUMN(710, "UnknownColumnError", Response.Status.BAD_REQUEST),
-  ///  Error while planning the query. For example, trying to run a colocated join on non-colocated tables.
+  /// Error while planning the query. For example, trying to run a colocated join on non-colocated tables.
   QUERY_PLANNING(720, "QueryPlanningError", Response.Status.BAD_REQUEST),
   UNKNOWN(1000, "UnknownError", Response.Status.INTERNAL_SERVER_ERROR);
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryErrorCode.class);
@@ -125,13 +125,11 @@ public enum QueryErrorCode {
     return _httpResponseStatus;
   }
 
-  /**
-   * Returns the {@link QueryErrorCode} for the given error code.
-   *
-   * @param errorCode Error code
-   * @return {@link QueryErrorCode} for the given error code or {@link QueryErrorCode#UNKNOWN} if the error code is not
-   *        recognized
-   */
+  /// Returns the [QueryErrorCode] for the given error code.
+  ///
+  /// @param errorCode Error code
+  /// @return [QueryErrorCode] for the given error code or [QueryErrorCode#UNKNOWN] if the error code is not
+  ///        recognized
   public static QueryErrorCode fromErrorCode(int errorCode) {
     if (errorCode < 0 || errorCode >= BY_ID.length) {
       throw new IllegalArgumentException("Invalid error code: " + errorCode);
@@ -194,10 +192,8 @@ public enum QueryErrorCode {
     }
   }
 
-  /**
-   * Returns true if the error is considered critical for SLA accounting.
-   * Critical errors represent system-side failures (timeouts, internal errors, infra issues, etc.).
-   */
+  /// Returns true if the error is considered critical for SLA accounting.
+  /// Critical errors represent system-side failures (timeouts, internal errors, infra issues, etc.).
   public boolean isCriticalError() {
     return CRITICAL_ERROR_CODES.contains(this);
   }

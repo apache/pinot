@@ -18,59 +18,44 @@
  */
 package org.apache.pinot.spi.config.provider;
 
-import java.util.List;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * An interface for the provider of pinot table configs and schemas.
- */
+/// An interface for the provider of pinot table configs and schemas.
 public interface PinotConfigProvider {
 
-  /**
-   * Returns the table config for the given table name with type suffix.
-   */
+  /// Returns the table config for the given table name with type suffix.
   TableConfig getTableConfig(String tableNameWithType);
 
-  /**
-   * Registers the {@link TableConfigChangeListener} and notifies it whenever any changes (addition, update, removal)
-   * to any of the table configs are detected. If the listener is successfully registered,
-   * {@link TableConfigChangeListener#onChange(List)} will be invoked with the current table configs.
-   *
-   * @return {@code true} if the listener is successfully registered, {@code false} if the listener is already
-   *         registered.
-   */
+  /// Registers the [TableConfigChangeListener] and notifies it whenever any changes (addition, update, removal)
+  /// to any of the table configs are detected. If the listener is successfully registered,
+  /// [TableConfigChangeListener#onChange(java.util.List)] will be invoked with the current table configs.
+  ///
+  /// @return `true` if the listener is successfully registered, `false` if the listener is already
+  ///         registered.
   boolean registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener);
 
-  /**
-   * Returns the schema for the given raw table name.
-   */
+  /// Returns the schema for the given raw table name.
   Schema getSchema(String rawTableName);
 
-  /**
-   * Registers the {@link SchemaChangeListener} and notifies it whenever any changes (addition, update, removal) to any
-   * of the schemas are detected. If the listener is successfully registered,
-   * {@link SchemaChangeListener#onChange(List)} will be invoked with the current schemas.
-   *
-   * @return {@code true} if the listener is successfully registered, {@code false} if the listener is already
-   *         registered.
-   */
+  /// Registers the [SchemaChangeListener] and notifies it whenever any changes (addition, update, removal) to any
+  /// of the schemas are detected. If the listener is successfully registered,
+  /// [SchemaChangeListener#onChange(java.util.List)] will be invoked with the current schemas.
+  ///
+  /// @return `true` if the listener is successfully registered, `false` if the listener is already
+  ///         registered.
   boolean registerSchemaChangeListener(SchemaChangeListener schemaChangeListener);
 
-  /**
-   * Returns the logical table config for the given logical table name.
-   * @param logicalTableName the name of the logical table
-   * @return the logical table
-   */
+  /// Returns the logical table config for the given logical table name.
+  /// @param logicalTableName the name of the logical table
+  /// @return the logical table
   LogicalTableConfig getLogicalTableConfig(String logicalTableName);
 
-  /**
-   * Registers the {@link LogicalTableConfigChangeListener} and notifies it whenever any changes (addition, update,
-   * @param logicalTableConfigChangeListener the listener to be registered
-   * @return {@code true} if the listener is successfully registered, {@code false} if the listener is already
-   *         registered.
-   */
+  /// Registers the [LogicalTableConfigChangeListener] and notifies it whenever any changes (addition, update,
+  /// @param logicalTableConfigChangeListener the listener to be registered
+  /// @return `true` if the listener is successfully registered, `false` if the listener is already
+  ///         registered.
   boolean registerLogicalTableConfigChangeListener(LogicalTableConfigChangeListener logicalTableConfigChangeListener);
 }

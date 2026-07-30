@@ -117,9 +117,7 @@ public class AbstractResponseStoreTest {
     return response;
   }
 
-  /**
-   * Minimal in-memory ResponseStore for testing AbstractResponseStore behavior.
-   */
+  /// Minimal in-memory ResponseStore for testing AbstractResponseStore behavior.
   private static class TestResponseStore extends AbstractResponseStore {
     private final Map<String, CursorResponse> _responses = new HashMap<>();
     private final Map<String, ResultTable> _resultTables = new HashMap<>();

@@ -57,7 +57,7 @@ public class FieldIndexConfigsUtil {
         .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().build()));
   }
 
-  /// Builds a {@link FieldIndexConfigs} for a single column directly from one {@link FieldConfig}, without a
+  /// Builds a [FieldIndexConfigs] for a single column directly from one [FieldConfig], without a
   /// `TableConfig` or `Schema`. The dictionary entry is derived from `fieldConfig.getEncodingType()`
   /// (RAW => disabled, otherwise default-enabled); every other index type is read from the modern
   /// `fieldConfig.getIndexes()` JSON (keyed by index pretty name), falling back to each type's default config.
@@ -126,12 +126,10 @@ public class FieldIndexConfigsUtil {
         .collect(Collectors.toSet());
   }
 
-  /**
-   * Returns the columns on the map that whose given index type is disabled.
-   *
-   * It is recommended to use {@link #columnsWithIndexDisabled(Set, IndexType, Map)} when the map may not have an entry
-   * for all columns in the schema.
-   */
+  /// Returns the columns on the map that whose given index type is disabled.
+  ///
+  /// It is recommended to use [#columnsWithIndexDisabled(Set, IndexType, Map)] when the map may not have an entry
+  /// for all columns in the schema.
   public static Set<String> columnsWithIndexDisabled(IndexType<?, ?, ?> indexType,
       Map<String, FieldIndexConfigs> configByCol) {
     return Sets.difference(configByCol.keySet(), columnsWithIndexEnabled(indexType, configByCol));

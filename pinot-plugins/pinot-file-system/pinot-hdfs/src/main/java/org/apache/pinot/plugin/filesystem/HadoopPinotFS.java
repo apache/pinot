@@ -42,9 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Implementation of PinotFS for the Hadoop Filesystem
- */
+/// Implementation of PinotFS for the Hadoop Filesystem
 public class HadoopPinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopPinotFS.class);
 
@@ -100,10 +98,8 @@ public class HadoopPinotFS extends BasePinotFS {
     return _hadoopFS.rename(new Path(srcUri), new Path(dstUri));
   }
 
-  /**
-   * Note that this method copies within a cluster. If you want to copy outside the cluster, you will
-   * need to create a new configuration and filesystem. Keeps files if copy/move is partial.
-   */
+  /// Note that this method copies within a cluster. If you want to copy outside the cluster, you will
+  /// need to create a new configuration and filesystem. Keeps files if copy/move is partial.
   @Override
   public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {

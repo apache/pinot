@@ -44,9 +44,7 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
- */
+/// Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
 public class DistinctDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
 
@@ -85,10 +83,8 @@ public class DistinctDataTableReducer implements DataTableReducer {
     }
   }
 
-  /**
-   * Merges the per-server DataTables into a single {@link DistinctTable} (early-stopping once the
-   * distinct set is satisfied). Shared by the normal reduce path and the merge-only path.
-   */
+  /// Merges the per-server DataTables into a single [DistinctTable] (early-stopping once the
+  /// distinct set is satisfied). Shared by the normal reduce path and the merge-only path.
   private DistinctTable mergeToDistinctTable(DataSchema dataSchema, Collection<DataTable> dataTables) {
     DistinctTable distinctTable = null;
     for (DataTable dataTable : dataTables) {

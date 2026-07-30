@@ -29,11 +29,9 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * A generic class which provides the dependencies for federation routing.
- * This class is responsible for managing routing managers and providing the appropriate
- * routing manager based on query options (e.g., whether federation is enabled).
- */
+/// A generic class which provides the dependencies for federation routing.
+/// This class is responsible for managing routing managers and providing the appropriate
+/// routing manager based on query options (e.g., whether federation is enabled).
 public class MultiClusterRoutingContext {
   // Maps clusterName to TableCache. Includes the local and all remote clusters.
   private final Map<String, TableCache> _tableCacheMap;
@@ -48,13 +46,11 @@ public class MultiClusterRoutingContext {
   // Set of cluster names that failed to connect (for warning in query responses)
   private final Set<String> _unavailableClusters;
 
-  /**
-   * Constructor for FederationProvider with routing managers and unavailable clusters.
-   *
-   * @param tableCacheMap Map of cluster name to TableCache
-   * @param localRoutingManager Local routing manager for non-federated queries
-   * @param multiClusterRoutingManager Multi cluster routing manager for cross-cluster queries (can be null)
-   */
+  /// Constructor for FederationProvider with routing managers and unavailable clusters.
+  ///
+  /// @param tableCacheMap Map of cluster name to TableCache
+  /// @param localRoutingManager Local routing manager for non-federated queries
+  /// @param multiClusterRoutingManager Multi cluster routing manager for cross-cluster queries (can be null)
   public MultiClusterRoutingContext(Map<String, TableCache> tableCacheMap, RoutingManager localRoutingManager,
       @Nullable RoutingManager multiClusterRoutingManager, Set<String> unavailableClusters) {
     _tableCacheMap = tableCacheMap;
@@ -71,14 +67,12 @@ public class MultiClusterRoutingContext {
     return _tableCacheMap.get(clusterName);
   }
 
-  /**
-   * Returns the appropriate routing manager based on query options.
-   * If federation is enabled in query options and a multi cluster routing manager is available,
-   * returns the federated routing manager. Otherwise, returns the primary routing manager.
-   *
-   * @param queryOptions Query options containing federation flag
-   * @return The appropriate routing manager for the query
-   */
+  /// Returns the appropriate routing manager based on query options.
+  /// If federation is enabled in query options and a multi cluster routing manager is available,
+  /// returns the federated routing manager. Otherwise, returns the primary routing manager.
+  ///
+  /// @param queryOptions Query options containing federation flag
+  /// @return The appropriate routing manager for the query
   public RoutingManager getRoutingManager(Map<String, String> queryOptions) {
     boolean isMultiClusterRoutingEnabled = QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false);
     if (isMultiClusterRoutingEnabled && _multiClusterRoutingManager != null) {

@@ -56,7 +56,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 ///   - `6.0` — re-aggregation without residual WHERE
 ///   - `7.0` — re-aggregation with residual WHERE
 ///
-///
 /// Implementations should be stateless and thread-safe.
 public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy {
 

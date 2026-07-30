@@ -32,9 +32,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 
 
-/**
- * Helper class to reduce and set Selection results into the BrokerResponseNative
- */
+/// Helper class to reduce and set Selection results into the BrokerResponseNative
 public class SelectionDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
 
@@ -42,9 +40,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
     _queryContext = queryContext;
   }
 
-  /**
-   * Reduces data tables and sets selection results into ResultTable.
-   */
+  /// Reduces data tables and sets selection results into ResultTable.
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,

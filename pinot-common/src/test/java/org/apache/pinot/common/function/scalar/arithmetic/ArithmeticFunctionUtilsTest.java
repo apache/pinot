@@ -26,11 +26,9 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for {@link ArithmeticFunctionUtils#normalizeNumericType}, pinning that unsigned integer types
- * (CALCITE-1466, reachable under BABEL as of Calcite 1.41+) normalize to the narrowest signed integral type so the
- * polymorphic arithmetic scalar functions stay integral instead of widening to DOUBLE.
- */
+/// Unit tests for [ArithmeticFunctionUtils#normalizeNumericType], pinning that unsigned integer types
+/// (CALCITE-1466, reachable under BABEL as of Calcite 1.41+) normalize to the narrowest signed integral type so the
+/// polymorphic arithmetic scalar functions stay integral instead of widening to DOUBLE.
 public class ArithmeticFunctionUtilsTest {
   private static final RelDataTypeFactory TYPE_FACTORY = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
 

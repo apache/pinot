@@ -94,9 +94,7 @@ public class FunctionUtils {
       put(Object.class, ColumnDataType.OBJECT);
     }};
 
-  /**
-   * Returns the corresponding PinotDataType for the given parameter class, or {@code null} if there is no one matching.
-   */
+  /// Returns the corresponding PinotDataType for the given parameter class, or `null` if there is no one matching.
   @Nullable
   public static PinotDataType getParameterType(Class<?> clazz) {
     return PARAMETER_TYPE_MAP.get(clazz);
@@ -153,17 +151,13 @@ public class FunctionUtils {
     return PinotDataType.OBJECT;
   }
 
-  /**
-   * Returns the corresponding ColumnDataType for the given class, or {@code null} if there is no one matching.
-   */
+  /// Returns the corresponding ColumnDataType for the given class, or `null` if there is no one matching.
   @Nullable
   public static ColumnDataType getColumnDataType(Class<?> clazz) {
     return COLUMN_DATA_TYPE_MAP.get(clazz);
   }
 
-  /**
-   * Returns the corresponding RelDataType for the given class, or OTHER if there is no one matching.
-   */
+  /// Returns the corresponding RelDataType for the given class, or OTHER if there is no one matching.
   public static RelDataType getRelDataType(RelDataTypeFactory typeFactory, Class<?> clazz) {
     ColumnDataType columnDataType = getColumnDataType(clazz);
     if (columnDataType == null) {

@@ -47,9 +47,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
-/**
- * Unit tests for {@link MultiClusterRoutingManager}.
- */
+/// Unit tests for [MultiClusterRoutingManager].
 public class MultiClusterRoutingManagerTest {
   private static final String TEST_TABLE = "testTable_OFFLINE";
   private static final long REQUEST_ID = 12345L;

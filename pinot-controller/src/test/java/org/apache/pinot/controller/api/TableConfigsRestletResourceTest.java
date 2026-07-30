@@ -55,9 +55,7 @@ import org.testng.collections.Lists;
 import static org.testng.Assert.fail;
 
 
-/**
- * Tests for CRUD APIs of {@link TableConfigs}
- */
+/// Tests for CRUD APIs of [TableConfigs]
 public class TableConfigsRestletResourceTest extends ControllerTest {
   @BeforeClass
   public void setUp()
@@ -317,9 +315,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     adminClient.getTableClient().deleteTableConfigs(tableName3, null);
   }
 
-  /**
-   * Tests for creation of TableConfigs
-   */
+  /// Tests for creation of TableConfigs
   @Test
   public void testCreateConfig()
       throws Exception {
@@ -777,9 +773,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     adminClient.getTableClient().deleteTableConfigs(tableName, null);
   }
 
-  /**
-   * Tests get TableConfigs for backwards compatibility
-   */
+  /// Tests get TableConfigs for backwards compatibility
   @Test
   public void testGetConfigCompatibility()
       throws Exception {

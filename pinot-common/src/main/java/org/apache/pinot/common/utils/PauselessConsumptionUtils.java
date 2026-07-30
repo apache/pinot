@@ -31,14 +31,12 @@ public class PauselessConsumptionUtils {
     // Private constructor to prevent instantiation of utility class
   }
 
-  /**
-   * Checks if pauseless consumption is enabled for the given table configuration.
-   * Returns false if any configuration component is missing or if the flag is not set to true.
-   *
-   * @param tableConfig The table configuration to check. Must not be null.
-   * @return true if pauseless consumption is explicitly enabled, false otherwise
-   * @throws NullPointerException if tableConfig is null
-   */
+  /// Checks if pauseless consumption is enabled for the given table configuration.
+  /// Returns false if any configuration component is missing or if the flag is not set to true.
+  ///
+  /// @param tableConfig The table configuration to check. Must not be null.
+  /// @return true if pauseless consumption is explicitly enabled, false otherwise
+  /// @throws NullPointerException if tableConfig is null
   public static boolean isPauselessEnabled(@Nullable TableConfig tableConfig) {
     return Optional.ofNullable(tableConfig)
         .map(TableConfig::getIngestionConfig)

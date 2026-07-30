@@ -84,10 +84,10 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     assertEquals(deserialized.getPassthroughInputIndexes(), List.of());
   }
 
-  /// Enriched joins have been removed, but {@link EnrichedJoinNode}, proto field 17 and the serde are retained so a
-  /// plan produced by an older-version broker still round-trips (see {@link EnrichedJoinNode} deprecation note). The
+  /// Enriched joins have been removed, but [EnrichedJoinNode], proto field 17 and the serde are retained so a
+  /// plan produced by an older-version broker still round-trips (see [EnrichedJoinNode] deprecation note). The
   /// planner no longer produces this node, so this direct round-trip is the only guard on that wire format. Because
-  /// {@code JoinNode#equals} ignores the enriched-specific fields, assert on them explicitly rather than via equals.
+  /// `JoinNode#equals` ignores the enriched-specific fields, assert on them explicitly rather than via equals.
   @Test
   @SuppressWarnings("deprecation")
   public void testEnrichedJoinNodeSerDe() {

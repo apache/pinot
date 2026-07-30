@@ -29,39 +29,37 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * The command to bootstrap a Pinot table from a directory with table schema/config/ingestionJobSpec/raw data files.
- *
- * Sample usage:
- * {@code pinot-admin.sh BootstrapTable -dir <path-to-table-configs-directory> }
- *
- * The directory structure is based on current example conventions:
- * For offline table:
- * ```
- * <table_name>/
- * <table_name>/<table_name>_schema.json
- * <table_name>/<table_name>_offline_table_config.json
- * <table_name>/ingestionJobSpec.yaml
- * <table_name>/rawdata/...
- * ```
- *
- * For realtime table:
- * ```
- * <table_name>/
- * <table_name>/<table_name>_schema.json
- * <table_name>/<table_name>_realtime_table_config.json
- * ```
- *
- * For hybrid table:
- * ```
- * <table_name>/
- * <table_name>/<table_name>_schema.json
- * <table_name>/<table_name>_offline_table_config.json
- * <table_name>/<table_name>_realtime_table_config.json
- * <table_name>/ingestionJobSpec.yaml
- * <table_name>/rawdata/...
- * ```
- */
+/// The command to bootstrap a Pinot table from a directory with table schema/config/ingestionJobSpec/raw data files.
+///
+/// Sample usage:
+/// `pinot-admin.sh BootstrapTable -dir <path-to-table-configs-directory>`
+///
+/// The directory structure is based on current example conventions:
+/// For offline table:
+/// ```
+/// <table_name>/
+/// <table_name>/<table_name>_schema.json
+/// <table_name>/<table_name>_offline_table_config.json
+/// <table_name>/ingestionJobSpec.yaml
+/// <table_name>/rawdata/...
+/// ```
+///
+/// For realtime table:
+/// ```
+/// <table_name>/
+/// <table_name>/<table_name>_schema.json
+/// <table_name>/<table_name>_realtime_table_config.json
+/// ```
+///
+/// For hybrid table:
+/// ```
+/// <table_name>/
+/// <table_name>/<table_name>_schema.json
+/// <table_name>/<table_name>_offline_table_config.json
+/// <table_name>/<table_name>_realtime_table_config.json
+/// <table_name>/ingestionJobSpec.yaml
+/// <table_name>/rawdata/...
+/// ```
 @CommandLine.Command(name = "BootstrapTable", mixinStandardHelpOptions = true)
 public class BootstrapTableCommand extends AbstractDatabaseBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(BootstrapTableCommand.class.getName());

@@ -44,26 +44,18 @@ public class CustomSerDeUtils {
   private CustomSerDeUtils() {
   }
 
-  /**
-   * Serializer/De-serializer for a specific type of object.
-   *
-   * @param <T> Type of the object
-   */
+  /// Serializer/De-serializer for a specific type of object.
+  ///
+  /// @param <T> Type of the object
   public interface ObjectSerDe<T> {
 
-    /**
-     * Serializes a value into a byte array.
-     */
+    /// Serializes a value into a byte array.
     byte[] serialize(T value);
 
-    /**
-     * De-serializes a value from a byte array.
-     */
+    /// De-serializes a value from a byte array.
     T deserialize(byte[] bytes);
 
-    /**
-     * De-serializes a value from a byte buffer.
-     */
+    /// De-serializes a value from a byte buffer.
     T deserialize(ByteBuffer byteBuffer);
   }
 

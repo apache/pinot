@@ -61,11 +61,9 @@ public class LastValueWindowFunction extends ValueWindowFunction {
     }
   }
 
-  /**
-   * LAST_VALUE for a non-default EXCLUDE clause. Computes the last non-excluded index for each row in O(1) using the
-   * precomputed peer-group boundaries; if {@code IGNORE NULLS} is set, scans backward past null values respecting the
-   * exclude rules.
-   */
+  /// LAST_VALUE for a non-default EXCLUDE clause. Computes the last non-excluded index for each row in O(1) using the
+  /// precomputed peer-group boundaries; if `IGNORE NULLS` is set, scans backward past null values respecting the
+  /// exclude rules.
   private List<Object> processWithExclude(List<Object[]> rows) {
     int numRows = rows.size();
     WindowNode.WindowExclusion exclude = _windowFrame.getExclude();
@@ -305,10 +303,8 @@ public class LastValueWindowFunction extends ValueWindowFunction {
     }
   }
 
-  /**
-   * Both lowerBound and upperBound should be valid values for the given row set. The returned value is -1 if there is
-   * no non-null value in the window.
-   */
+  /// Both lowerBound and upperBound should be valid values for the given row set. The returned value is -1 if there is
+  /// no non-null value in the window.
   private int indexOfLastNonNullValueInWindow(List<Object[]> rows, int lowerBound, int upperBound) {
     for (int i = upperBound; i >= lowerBound; i--) {
       Object value = extractValueFromRow(rows.get(i));

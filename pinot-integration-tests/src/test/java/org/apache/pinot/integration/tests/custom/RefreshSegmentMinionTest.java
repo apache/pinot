@@ -55,10 +55,8 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for RefreshSegmentTask minion task.
- * Tests segment refresh after index configuration changes.
- */
+/// Integration test for RefreshSegmentTask minion task.
+/// Tests segment refresh after index configuration changes.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationTest {
 
