@@ -47,14 +47,20 @@ public class AsyncQueryResponse implements QueryResponse {
   private final long _maxEndTimeMs;
   private final long _timeoutMs;
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
+  private final boolean _skipUnavailableServers;
+  // Servers whose latch slot has already been released via a down-path (skipServerResponse or markServerUnavailable).
+  // A server can be reported down more than once for the same query
+  private final Set<ServerRoutingInstance> _countedDownServers = ConcurrentHashMap.newKeySet();
 
   private volatile ServerRoutingInstance _failedServer;
   private volatile Exception _exception;
 
   public AsyncQueryResponse(QueryRouter queryRouter, long requestId, Set<ServerRoutingInstance> serversQueried,
-      long startTimeMs, long timeoutMs, ServerRoutingStatsManager serverRoutingStatsManager) {
+      long startTimeMs, long timeoutMs, ServerRoutingStatsManager serverRoutingStatsManager,
+      boolean skipUnavailableServers) {
     _queryRouter = queryRouter;
     _requestId = requestId;
+    _skipUnavailableServers = skipUnavailableServers;
     int numServersQueried = serversQueried.size();
     _responseMap = new ConcurrentHashMap<>(HashUtil.getHashMapCapacity(numServersQueried));
     _serverRoutingStatsManager = serverRoutingStatsManager;
@@ -191,6 +197,7 @@ public class AsyncQueryResponse implements QueryResponse {
   void markQueryFailed(ServerRoutingInstance serverRoutingInstance, Exception exception) {
     _status.set(Status.FAILED);
     _failedServer = serverRoutingInstance;
+    _countedDownServers.add(serverRoutingInstance);
     _exception = exception;
     int count = (int) _countDownLatch.getCount();
     for (int i = 0; i < count; i++) {
@@ -199,21 +206,58 @@ public class AsyncQueryResponse implements QueryResponse {
   }
 
   /**
-   * NOTE: the server might not be hit by the query. Only fail the query if the query was sent to the server and the
-   * server hasn't responded yet.
+   * Marks a server as unavailable while the query is in flight - its Netty channel went inactive or a request write
+   * to it failed. This is a genuine server-unavailability event that is eligible for {@code skipUnavailableServers}.
+   * NOTE: the server might not have been hit by this query. Only acts if the query was sent to the server and the
+   * server has not responded yet.
    */
-  void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
-    ServerResponse serverResponse = _responseMap.get(serverRoutingInstance);
-    if (serverResponse != null && serverResponse.getDataTable() == null) {
-      markQueryFailed(serverRoutingInstance, exception);
+  boolean markServerUnavailable(ServerRoutingInstance serverRoutingInstance, Exception exception) {
+    if (!shouldActOnServerDown(serverRoutingInstance)) {
+      return false;
     }
+    if (_skipUnavailableServers) {
+      // Best-effort: degrade to partial results. Record the down server so the failure detector can quarantine it from
+      // routing, but do NOT set the query-global exception/status (no BROKER_REQUEST_SEND error, query stays
+      // COMPLETED)
+      if (_countedDownServers.add(serverRoutingInstance)) {
+        _failedServer = serverRoutingInstance;
+        _countDownLatch.countDown();
+        return true;
+      }
+      return false;
+    }
+    markQueryFailed(serverRoutingInstance, exception);
+    return false;
   }
 
   /**
-   * Wait for one less server response. This is used when the server is skipped, as
-   * query submission will have failed we do not want to wait for the response.
+   * Cancels the query because the broker is shedding it (eg. direct-memory OOM), not because a server is unavailable
    */
-  void skipServerResponse() {
-    _countDownLatch.countDown();
+  void markServerCancelled(ServerRoutingInstance serverRoutingInstance, Exception exception) {
+    if (!shouldActOnServerDown(serverRoutingInstance)) {
+      return;
+    }
+    markQueryFailed(serverRoutingInstance, exception);
+  }
+
+  /**
+   * Returns {@code true} if a server-down event should be acted on: the server was queried by this response and has not
+   * responded yet
+   */
+  private boolean shouldActOnServerDown(ServerRoutingInstance serverRoutingInstance) {
+    ServerResponse serverResponse = _responseMap.get(serverRoutingInstance);
+    return serverResponse != null && serverResponse.getDataTable() == null;
+  }
+
+  /**
+   * Releases the latch slot for a server that was skipped at request-submission time (the send failed and the query was
+   * submitted with {@code skipUnavailableServers=true}), so the query does not wait for a response that will never
+   * come.
+   */
+  void skipServerResponse(ServerRoutingInstance serverRoutingInstance) {
+    if (_countedDownServers.add(serverRoutingInstance)) {
+      _failedServer = serverRoutingInstance;
+      _countDownLatch.countDown();
+    }
   }
 }

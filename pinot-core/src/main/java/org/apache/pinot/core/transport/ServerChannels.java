@@ -259,8 +259,10 @@ public class ServerChannels {
         } else {
           LOGGER.error("Write failure to server: {} for table: {}", serverRoutingInstance, rawTableName, f.cause());
           _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_SEND_REQUEST_FAILURES, 1);
-          asyncQueryResponse.markServerDown(serverRoutingInstance,
-              new RuntimeException("Failed to send request to server: " + serverRoutingInstance, f.cause()));
+          if (asyncQueryResponse.markServerUnavailable(serverRoutingInstance,
+              new RuntimeException("Failed to send request to server: " + serverRoutingInstance, f.cause()))) {
+            _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SERVER_MARKED_DOWN_SKIPPED, 1);
+          }
           _channel.close();
         }
       });
