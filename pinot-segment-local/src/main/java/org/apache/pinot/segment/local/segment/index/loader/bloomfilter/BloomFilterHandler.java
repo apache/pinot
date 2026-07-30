@@ -56,13 +56,7 @@ import org.slf4j.LoggerFactory;
 public class BloomFilterHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
-  private static final int TYPE_VALUE_OFFSET = 0;
   private static final int VERSION_OFFSET = 4;
-  // In V1 format the Guava payload starts at byte 8. Within that payload the layout is:
-  //   [strategy (1 byte)][numHashFunctions (1 byte)][numLongs (int, 4 bytes)][bit array...]
-  // These absolute file offsets match BaseGuavaBloomFilterReader's relative offsets + 8.
-  private static final int V1_NUM_HASH_FUNCTIONS_OFFSET = 9;  // 4 (TYPE) + 4 (VERSION) + 1 (strategy); reads 1 byte
-  private static final int V1_NUM_LONGS_OFFSET = 10;          // + 1 (numHashFunctions); reads 4-byte int
 
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
@@ -103,14 +97,11 @@ public class BloomFilterHandler extends BaseIndexHandler {
   /**
    * Checks whether the effective fpp config has changed for an existing bloom filter index.
    *
-   * <p>V2 segments (VERSION_V2 = 2) store the effective fpp explicitly in the header; the comparison is exact.
-   * V2 segments were created during a short window before the format was rolled back for backward compatibility;
-   * V2 reading is retained so those segments are not permanently stuck.
+   * <p>V2 segments (VERSION_V2 = 2, current write format) store the effective fpp explicitly in the header;
+   * the comparison is exact.
    *
-   * <p>V1 segments (VERSION = 1, the current write format) do not store fpp in the header. FPP change is
-   * detected structurally: the stored {@code numHashFunctions} and {@code numLongs} in the Guava payload
-   * are compared to the values that would be produced by the configured fpp + cardinality. These two fields
-   * jointly encode the filter capacity and are stable across Guava versions.
+   * <p>V1 segments (VERSION = 1, legacy) do not store fpp in the header. Fpp change detection is skipped for
+   * these segments — they will be upgraded to V2 the next time they are rebuilt for any other reason.
    *
    * <p>Accepts both Reader and Writer since Writer extends Reader, allowing this method to be called from
    * both needUpdateIndices and updateIndices.
@@ -119,13 +110,12 @@ public class BloomFilterHandler extends BaseIndexHandler {
     try {
       PinotDataBuffer dataBuffer = segmentReader.getIndexFor(column, StandardIndexes.bloomFilter());
       int version = dataBuffer.getInt(VERSION_OFFSET);
-      BloomFilterConfig config = _bloomFilterConfigs.get(column);
-      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
 
       if (version == OnHeapGuavaBloomFilterCreator.VERSION_V2) {
-        // V2 header stores the effective fpp explicitly.
+        // V2 header stores the effective fpp explicitly — compare directly.
         double storedFpp = dataBuffer.getDouble(OnHeapGuavaBloomFilterCreator.FPP_OFFSET);
-        double expectedFpp = computeEffectiveFpp(columnMetadata, config);
+        double expectedFpp = computeEffectiveFpp(_segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column),
+            _bloomFilterConfigs.get(column));
         if (Double.compare(storedFpp, expectedFpp) != 0) {
           LOGGER.info("Bloom filter fpp config changed for segment: {}, column: {}, stored fpp: {}, "
                   + "expected fpp: {}. Index needs to be rebuilt.",
@@ -135,63 +125,24 @@ public class BloomFilterHandler extends BaseIndexHandler {
         return false;
       }
 
-      if (version != OnHeapGuavaBloomFilterCreator.VERSION) {
-        // Unrecognized version — force rebuild rather than silently reading bytes at wrong offsets.
-        LOGGER.warn("Unrecognized bloom filter version {} for segment: {}, column: {}; forcing rebuild.",
-            version, segmentName, column);
-        return true;
+      if (version == OnHeapGuavaBloomFilterCreator.VERSION) {
+        // V1 legacy segments do not embed fpp in the header; fpp change detection is not possible.
+        // The segment will be upgraded to V2 (which embeds the fpp) on the next rebuild triggered by
+        // other criteria. Log at WARN so operators are aware that an fpp config change is deferred.
+        LOGGER.warn("Cannot detect fpp change for legacy v1 bloom filter in segment: {}, column: {}. "
+                + "The segment will be upgraded to v2 format on the next rebuild.",
+            segmentName, column);
+        return false;
       }
-      // V1 format: detect fpp change via numHashFunctions + numLongs in the Guava payload.
-      // These values are at fixed offsets (see V1_NUM_HASH_FUNCTIONS_OFFSET / V1_NUM_LONGS_OFFSET).
-      int storedNumHashFunctions = dataBuffer.getByte(V1_NUM_HASH_FUNCTIONS_OFFSET) & 0xFF;
-      int storedNumLongs = dataBuffer.getInt(V1_NUM_LONGS_OFFSET);
-      int[] expected = computeExpectedNumHashFunctionsAndNumLongs(columnMetadata, config);
-      int expectedNumHashFunctions = expected[0];
-      int expectedNumLongs = expected[1];
-      if (storedNumHashFunctions != expectedNumHashFunctions || storedNumLongs != expectedNumLongs) {
-        LOGGER.info("Bloom filter fpp config changed for segment: {}, column: {}, "
-                + "stored numHashFunctions: {}, expected: {}, stored numLongs: {}, expected: {}. "
-                + "Index needs to be rebuilt.",
-            segmentName, column, storedNumHashFunctions, expectedNumHashFunctions, storedNumLongs, expectedNumLongs);
-        return true;
-      }
-      return false;
+
+      // Unrecognized version — force rebuild rather than silently reading bytes at wrong offsets.
+      LOGGER.warn("Unrecognized bloom filter version {} for segment: {}, column: {}; forcing rebuild.",
+          version, segmentName, column);
+      return true;
     } catch (Exception e) {
       LOGGER.warn("Failed to read existing bloom filter for segment: {}, column: {}", segmentName, column, e);
       return false;
     }
-  }
-
-  /**
-   * Computes the {@code numHashFunctions} and {@code numLongs} that Guava would allocate for the given
-   * fpp and cardinality, matching the formulas in Guava's {@code BloomFilter}.
-   *
-   * <p>{@code numLongs} uses {@code optimalNumOfBits(n, p) = (long)(-n * ln(p) / (ln 2)^2)}.
-   * {@code numHashFunctions} uses the direct formula {@code max(1, round(-ln(p) / ln(2)))},
-   * which is what current Guava (33+) writes. The older two-step path via {@code idealNumBits / n * ln(2)}
-   * diverges for small cardinalities due to long-cast truncation and must not be used.
-   *
-   * @return {@code int[]{numHashFunctions, numLongs}}
-   */
-  private int[] computeExpectedNumHashFunctionsAndNumLongs(ColumnMetadata columnMetadata,
-      BloomFilterConfig bloomFilterConfig) {
-    double fpp = computeEffectiveFpp(columnMetadata, bloomFilterConfig);
-    int cardinality = columnMetadata != null ? columnMetadata.getCardinality() : 1;
-    if (cardinality <= 0) {
-      cardinality = columnMetadata != null ? columnMetadata.getTotalNumberOfEntries() : 1;
-    }
-    if (cardinality <= 0) {
-      cardinality = 1;
-    }
-    // Guava: optimalNumOfBits = -n * ln(p) / (ln 2)^2, minimum 1
-    long idealNumBits = Math.max(1, (long) (-cardinality * Math.log(fpp) / (Math.log(2) * Math.log(2))));
-    // Guava: numLongs = ceil(idealNumBits / 64).
-    int numLongs = (int) ((idealNumBits + 63) / 64);
-    // Guava (33+): optimalNumOfHashFunctions(p) = max(1, round(-ln(p) / ln(2)))
-    // This is the direct formula Guava now uses; it avoids the long-cast quantization error
-    // in the old two-step path (via idealNumBits / n) that diverges for small cardinalities.
-    int numHashFunctions = Math.max(1, (int) Math.round(-Math.log(fpp) / Math.log(2)));
-    return new int[]{numHashFunctions, numLongs};
   }
 
   /**
