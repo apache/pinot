@@ -30,17 +30,15 @@ public final class UuidConversionFunctions {
   private UuidConversionFunctions() {
   }
 
-  @ScalarFunction(names = {"UUID_TO_BYTES"}, nullableParameters = true)
   public static byte[] uuidToBytes(UUID uuid) {
     return uuid != null ? UuidUtils.toBytes(uuid) : null;
   }
 
-  @ScalarFunction(names = {"BYTES_TO_UUID"}, nullableParameters = true)
+  @ScalarFunction(names = {"BYTES_TO_UUID"})
   public static UUID bytesToUuid(byte[] bytes) {
     return bytes != null ? UuidUtils.toUUID(bytes) : null;
   }
 
-  @ScalarFunction(names = {"UUID_TO_STRING"}, nullableParameters = true)
   public static String uuidToString(UUID uuid) {
     return uuid != null ? UuidUtils.toString(uuid) : null;
   }
@@ -63,14 +61,12 @@ public final class UuidConversionFunctions {
   }
 
   /// Returns the 4-bit version field (0-15) of the given UUID. Common values: 1, 3, 4, 5, 6, 7, 8.
-  @ScalarFunction(names = {"UUID_VERSION"}, nullableParameters = true)
   public static Integer uuidVersion(UUID uuid) {
     return uuid != null ? UuidUtils.getVersion(uuid) : null;
   }
 
   /// Returns the embedded Unix-millisecond timestamp from a time-based UUID (version 1, 6, or 7). Throws
   /// for non-time-based versions.
-  @ScalarFunction(names = {"UUID_TIMESTAMP"}, nullableParameters = true)
   public static Long uuidTimestamp(UUID uuid) {
     return uuid != null ? UuidUtils.getTimestampMillis(uuid) : null;
   }

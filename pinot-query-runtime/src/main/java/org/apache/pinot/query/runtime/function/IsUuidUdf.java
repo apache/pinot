@@ -47,7 +47,7 @@ public class IsUuidUdf extends Udf {
 
   @Override
   public String getDescription() {
-    return "Returns true when the input is a valid RFC 4122 UUID string or a 16-byte BYTES value.";
+    return "Returns true when the input is a valid RFC 4122 UUID STRING, 16-byte BYTES, or UUID value.";
   }
 
   @Override

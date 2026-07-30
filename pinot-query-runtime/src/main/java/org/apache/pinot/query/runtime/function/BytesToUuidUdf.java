@@ -36,7 +36,7 @@ public class BytesToUuidUdf extends Udf.FromAnnotatedMethod {
 
   @Override
   public String getDescription() {
-    return "Converts a 16-byte BYTES value into a canonical lowercase UUID string rendered as Pinot UUID.";
+    return "Converts a 16-byte BYTES value into Pinot's logical UUID type.";
   }
 
   @Override

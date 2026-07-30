@@ -115,6 +115,33 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testUuidPolymorphicInputTypeInference() {
+    String[] functions =
+        {"IS_UUID", "TO_UUID", "UUID_TO_STRING", "UUID_TO_BYTES", "UUID_VERSION", "UUID_TIMESTAMP"};
+    SqlTypeName[] returnTypes = {
+        SqlTypeName.BOOLEAN, SqlTypeName.UUID, SqlTypeName.VARCHAR, SqlTypeName.VARBINARY, SqlTypeName.INTEGER,
+        SqlTypeName.BIGINT
+    };
+    String[] inputs = {"col1", "UUID_TO_BYTES(col1)", "TO_UUID(col1)"};
+    List<String> projections = new ArrayList<>();
+    for (String function : functions) {
+      for (String input : inputs) {
+        projections.add(function + "(" + input + ")");
+      }
+    }
+
+    RelDataType rowType = _queryEnvironment.compile("SELECT " + String.join(", ", projections) + " FROM a")
+        .getRelRoot().validatedRowType;
+    for (int functionIndex = 0; functionIndex < functions.length; functionIndex++) {
+      for (int inputIndex = 0; inputIndex < inputs.length; inputIndex++) {
+        int fieldIndex = functionIndex * inputs.length + inputIndex;
+        assertEquals(rowType.getFieldList().get(fieldIndex).getType().getSqlTypeName(), returnTypes[functionIndex],
+            functions[functionIndex] + " should accept " + inputs[inputIndex]);
+      }
+    }
+  }
+
   /// `jsonPath` must resolve to a literal, but the operand type checker deliberately does not demand a literal
   /// `SqlNode` in that position: operand checking runs before `PinotEvaluateLiteralRule` folds constant
   /// expressions, so an argument such as `CONCAT('$.', 'foo')` folds to a literal and plans and executes

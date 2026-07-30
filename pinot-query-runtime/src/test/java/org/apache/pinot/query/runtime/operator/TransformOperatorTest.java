@@ -117,20 +117,26 @@ public class TransformOperatorTest {
   @Test
   public void shouldRenderUuidToStringAsCanonicalText() {
     String uuid = "550e8400-e29b-41d4-a716-446655440000";
-    DataSchema inputSchema =
-        new DataSchema(new String[]{"uuidCol"}, new ColumnDataType[]{ColumnDataType.UUID});
-    when(_input.nextBlock()).thenReturn(
-        OperatorTestUtil.block(inputSchema, new Object[]{new ByteArray(UuidUtils.toBytes(uuid))}));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"uuidString"}, new ColumnDataType[]{ColumnDataType.STRING});
-    List<RexExpression> projects = List.of(new RexExpression.FunctionCall(
-        ColumnDataType.STRING, "UUID_TO_STRING", List.of(new RexExpression.InputRef(0))));
+    ByteArray uuidBytes = new ByteArray(UuidUtils.toBytes(uuid));
+    DataSchema inputSchema = new DataSchema(new String[]{"stringCol", "bytesCol", "uuidCol"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.UUID});
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema,
+        new Object[]{uuid.toUpperCase(), uuidBytes, uuidBytes}));
+    DataSchema resultSchema = new DataSchema(new String[]{"fromString", "fromBytes", "fromUuid"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING});
+    List<RexExpression> projects = List.of(
+        new RexExpression.FunctionCall(
+            ColumnDataType.STRING, "UUID_TO_STRING", List.of(new RexExpression.InputRef(0))),
+        new RexExpression.FunctionCall(
+            ColumnDataType.STRING, "UUID_TO_STRING", List.of(new RexExpression.InputRef(1))),
+        new RexExpression.FunctionCall(
+            ColumnDataType.STRING, "UUID_TO_STRING", List.of(new RexExpression.InputRef(2))));
 
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     assertEquals(resultRows.size(), 1);
-    assertEquals(resultRows.get(0), new Object[]{uuid});
+    assertEquals(resultRows.get(0), new Object[]{uuid, uuid, uuid});
   }
 
   @Test

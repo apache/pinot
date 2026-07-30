@@ -44,7 +44,7 @@ public class ToUuidUdf extends Udf {
 
   @Override
   public String getDescription() {
-    return "Converts a canonical UUID string or a 16-byte BYTES value into Pinot's logical UUID type.";
+    return "Converts a canonical UUID STRING, 16-byte BYTES, or UUID value into Pinot's logical UUID type.";
   }
 
   @Override

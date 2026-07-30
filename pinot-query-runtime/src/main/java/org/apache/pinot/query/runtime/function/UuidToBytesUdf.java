@@ -21,27 +21,39 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import org.apache.pinot.common.function.scalar.uuid.UuidConversionFunctions;
+import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.common.function.scalar.uuid.UuidToBytesScalarFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
 
 
 @AutoService(Udf.class)
-public class UuidToBytesUdf extends Udf.FromAnnotatedMethod {
-  public UuidToBytesUdf()
-      throws NoSuchMethodException {
-    super(UuidConversionFunctions.class.getMethod("uuidToBytes", UUID.class));
+public class UuidToBytesUdf extends Udf {
+  private static final UuidToBytesScalarFunction SCALAR_FUNCTION = new UuidToBytesScalarFunction();
+
+  @Override
+  public String getMainName() {
+    return SCALAR_FUNCTION.getName();
+  }
+
+  @Override
+  public Set<String> getAllNames() {
+    return SCALAR_FUNCTION.getNames();
   }
 
   @Override
   public String getDescription() {
-    return "Converts a UUID value to its canonical 16-byte representation.";
+    return "Converts a STRING, BYTES, or UUID value to its canonical 16-byte UUID representation.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return Map.of();
+  }
+
+  @Override
+  public PinotScalarFunction getScalarFunction() {
+    return SCALAR_FUNCTION;
   }
 }

@@ -18,52 +18,21 @@
  */
 package org.apache.pinot.common.function.scalar.uuid;
 
-import java.util.List;
 import java.util.Set;
-import javax.annotation.Nullable;
-import org.apache.calcite.sql.type.OperandTypes;
-import org.apache.calcite.sql.type.ReturnTypes;
-import org.apache.calcite.sql.type.SqlTypeFamily;
+import java.util.UUID;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/// Polymorphic scalar function that validates string or bytes values as UUID inputs.
+/// Polymorphic scalar function that validates STRING, BYTES, or UUID values as UUID inputs.
 ///
 /// This implementation is stateless and thread-safe.
 @ScalarFunction(names = {"IS_UUID"})
-public class IsUuidScalarFunction extends AbstractStringOrBytesUuidFunction {
-  private static final FunctionInfo STRING_FUNCTION_INFO;
-  private static final FunctionInfo BYTES_FUNCTION_INFO;
-
-  static {
-    try {
-      STRING_FUNCTION_INFO =
-          new FunctionInfo(IsUuidScalarFunction.class.getMethod("isUuid", String.class), IsUuidScalarFunction.class,
-              true);
-      BYTES_FUNCTION_INFO =
-          new FunctionInfo(IsUuidScalarFunction.class.getMethod("isUuid", byte[].class), IsUuidScalarFunction.class,
-              true);
-    } catch (NoSuchMethodException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  protected FunctionInfo getStringFunctionInfo() {
-    return STRING_FUNCTION_INFO;
-  }
-
-  @Override
-  protected FunctionInfo getBytesFunctionInfo() {
-    return BYTES_FUNCTION_INFO;
-  }
-
-  @Override
-  public String getName() {
-    return "IS_UUID";
+public class IsUuidScalarFunction extends AbstractUuidInputFunction {
+  public IsUuidScalarFunction() {
+    super(IsUuidScalarFunction.class, "IS_UUID", "isUuid", SqlTypeName.BOOLEAN);
   }
 
   @Override
@@ -71,12 +40,10 @@ public class IsUuidScalarFunction extends AbstractStringOrBytesUuidFunction {
     return Set.of("IS_UUID", "ISUUID");
   }
 
-  @Nullable
   @Override
-  public PinotSqlFunction toPinotSqlFunction() {
-    return new PinotSqlFunction("IS_UUID", ReturnTypes.BOOLEAN,
-        OperandTypes.or(OperandTypes.family(List.of(SqlTypeFamily.CHARACTER)),
-            OperandTypes.family(List.of(SqlTypeFamily.BINARY))));
+  protected FunctionInfo getDefaultFunctionInfo() {
+    // The argument-count-only ingestion evaluator must preserve IS_UUID's false-on-invalid contract.
+    return getStringFunctionInfo();
   }
 
   public static boolean isUuid(String value) {
@@ -85,5 +52,9 @@ public class IsUuidScalarFunction extends AbstractStringOrBytesUuidFunction {
 
   public static boolean isUuid(byte[] value) {
     return UuidUtils.isUuid(value);
+  }
+
+  public static boolean isUuid(UUID value) {
+    return value != null;
   }
 }

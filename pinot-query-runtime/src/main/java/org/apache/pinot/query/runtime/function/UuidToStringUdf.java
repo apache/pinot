@@ -21,27 +21,39 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import org.apache.pinot.common.function.scalar.uuid.UuidConversionFunctions;
+import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.common.function.scalar.uuid.UuidToStringScalarFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
 
 
 @AutoService(Udf.class)
-public class UuidToStringUdf extends Udf.FromAnnotatedMethod {
-  public UuidToStringUdf()
-      throws NoSuchMethodException {
-    super(UuidConversionFunctions.class.getMethod("uuidToString", UUID.class));
+public class UuidToStringUdf extends Udf {
+  private static final UuidToStringScalarFunction SCALAR_FUNCTION = new UuidToStringScalarFunction();
+
+  @Override
+  public String getMainName() {
+    return SCALAR_FUNCTION.getName();
+  }
+
+  @Override
+  public Set<String> getAllNames() {
+    return SCALAR_FUNCTION.getNames();
   }
 
   @Override
   public String getDescription() {
-    return "Converts a UUID value to its canonical lowercase RFC 4122 string representation.";
+    return "Converts a STRING, BYTES, or UUID value to its canonical lowercase RFC 4122 string representation.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return Map.of();
+  }
+
+  @Override
+  public PinotScalarFunction getScalarFunction() {
+    return SCALAR_FUNCTION;
   }
 }

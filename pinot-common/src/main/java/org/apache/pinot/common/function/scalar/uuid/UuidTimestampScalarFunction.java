@@ -18,36 +18,30 @@
  */
 package org.apache.pinot.common.function.scalar.uuid;
 
-import java.util.Set;
 import java.util.UUID;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/// Polymorphic scalar function that converts STRING, BYTES, or UUID inputs into Pinot's logical UUID type.
+/// Returns the embedded Unix-millisecond timestamp from a time-based STRING, BYTES, or UUID input.
 ///
 /// This implementation is stateless and thread-safe.
-@ScalarFunction(names = {"TO_UUID"})
-public class ToUuidScalarFunction extends AbstractUuidInputFunction {
-  public ToUuidScalarFunction() {
-    super(ToUuidScalarFunction.class, "TO_UUID", "toUuid", SqlTypeName.UUID);
+@ScalarFunction(names = {"UUID_TIMESTAMP"})
+public class UuidTimestampScalarFunction extends AbstractUuidInputFunction {
+  public UuidTimestampScalarFunction() {
+    super(UuidTimestampScalarFunction.class, "UUID_TIMESTAMP", "uuidTimestamp", SqlTypeName.BIGINT);
   }
 
-  @Override
-  public Set<String> getNames() {
-    return Set.of("TO_UUID", "TOUUID");
+  public static Long uuidTimestamp(String value) {
+    return value != null ? UuidUtils.getTimestampMillis(UuidUtils.toUUID(value)) : null;
   }
 
-  public static UUID toUuid(String value) {
-    return value != null ? UuidUtils.toUUID(value) : null;
+  public static Long uuidTimestamp(byte[] value) {
+    return value != null ? UuidUtils.getTimestampMillis(UuidUtils.toUUID(value)) : null;
   }
 
-  public static UUID toUuid(byte[] value) {
-    return value != null ? UuidUtils.toUUID(value) : null;
-  }
-
-  public static UUID toUuid(UUID value) {
-    return value;
+  public static Long uuidTimestamp(UUID value) {
+    return value != null ? UuidUtils.getTimestampMillis(value) : null;
   }
 }

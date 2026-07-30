@@ -37,7 +37,7 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.common.function.scalar.IpAddressFunctions;
 import org.apache.pinot.common.function.scalar.StringFunctions;
-import org.apache.pinot.common.function.scalar.uuid.UuidConversionFunctions;
+import org.apache.pinot.common.function.scalar.uuid.UuidToStringScalarFunction;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -1210,22 +1210,40 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   public void testUuidToStringTransformFunction()
       throws NoSuchMethodException {
     byte[][] uuidValues = new byte[NUM_ROWS][];
+    String[] uuidStrings = new String[NUM_ROWS];
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       UUID uuid = new UUID(i, i + 1L);
       uuidValues[i] = UuidUtils.toBytes(uuid);
+      uuidStrings[i] = uuid.toString().toUpperCase();
       expectedValues[i] = uuid.toString();
     }
 
-    ScalarTransformFunctionWrapper transformFunction =
+    ScalarTransformFunctionWrapper uuidTransform =
         new ScalarTransformFunctionWrapper(FunctionInfo.fromMethod(
-            UuidConversionFunctions.class.getDeclaredMethod("uuidToString", UUID.class)));
+            UuidToStringScalarFunction.class.getDeclaredMethod("uuidToString", UUID.class)));
     StaticUuidTransformFunction uuidTransformFunction = new StaticUuidTransformFunction(uuidValues);
     uuidTransformFunction.init(List.of(), Map.of());
-    transformFunction.init(List.of(uuidTransformFunction), Map.of());
+    uuidTransform.init(List.of(uuidTransformFunction), Map.of());
 
-    assertEquals(transformFunction.getName(), "uuidToString");
-    testTransformFunction(transformFunction, expectedValues);
+    ScalarTransformFunctionWrapper bytesTransform =
+        new ScalarTransformFunctionWrapper(FunctionInfo.fromMethod(
+            UuidToStringScalarFunction.class.getDeclaredMethod("uuidToString", byte[].class)));
+    StaticBytesTransformFunction bytesTransformFunction = new StaticBytesTransformFunction(uuidValues);
+    bytesTransformFunction.init(List.of(), Map.of());
+    bytesTransform.init(List.of(bytesTransformFunction), Map.of());
+
+    ScalarTransformFunctionWrapper stringTransform =
+        new ScalarTransformFunctionWrapper(FunctionInfo.fromMethod(
+            UuidToStringScalarFunction.class.getDeclaredMethod("uuidToString", String.class)));
+    StaticStringTransformFunction stringTransformFunction = new StaticStringTransformFunction(uuidStrings);
+    stringTransformFunction.init(List.of(), Map.of());
+    stringTransform.init(List.of(stringTransformFunction), Map.of());
+
+    assertEquals(uuidTransform.getName(), "uuidToString");
+    testTransformFunction(uuidTransform, expectedValues);
+    testTransformFunction(bytesTransform, expectedValues);
+    testTransformFunction(stringTransform, expectedValues);
   }
 
   @Test
@@ -1716,6 +1734,56 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     @Override
     public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
       return _uuidValues;
+    }
+  }
+
+  private static class StaticBytesTransformFunction extends BaseTransformFunction {
+    private static final TransformResultMetadata RESULT_METADATA =
+        new TransformResultMetadata(DataType.BYTES, true, false);
+    private final byte[][] _values;
+
+    private StaticBytesTransformFunction(byte[][] values) {
+      _values = values;
+    }
+
+    @Override
+    public String getName() {
+      return "staticBytes";
+    }
+
+    @Override
+    public TransformResultMetadata getResultMetadata() {
+      return RESULT_METADATA;
+    }
+
+    @Override
+    public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+      return _values;
+    }
+  }
+
+  private static class StaticStringTransformFunction extends BaseTransformFunction {
+    private static final TransformResultMetadata RESULT_METADATA =
+        new TransformResultMetadata(DataType.STRING, true, false);
+    private final String[] _values;
+
+    private StaticStringTransformFunction(String[] values) {
+      _values = values;
+    }
+
+    @Override
+    public String getName() {
+      return "staticString";
+    }
+
+    @Override
+    public TransformResultMetadata getResultMetadata() {
+      return RESULT_METADATA;
+    }
+
+    @Override
+    public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+      return _values;
     }
   }
 }

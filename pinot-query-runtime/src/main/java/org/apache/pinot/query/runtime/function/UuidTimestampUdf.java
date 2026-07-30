@@ -21,28 +21,40 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import org.apache.pinot.common.function.scalar.uuid.UuidConversionFunctions;
+import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.common.function.scalar.uuid.UuidTimestampScalarFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
 
 
 @AutoService(Udf.class)
-public class UuidTimestampUdf extends Udf.FromAnnotatedMethod {
-  public UuidTimestampUdf()
-      throws NoSuchMethodException {
-    super(UuidConversionFunctions.class.getMethod("uuidTimestamp", UUID.class));
+public class UuidTimestampUdf extends Udf {
+  private static final UuidTimestampScalarFunction SCALAR_FUNCTION = new UuidTimestampScalarFunction();
+
+  @Override
+  public String getMainName() {
+    return SCALAR_FUNCTION.getName();
+  }
+
+  @Override
+  public Set<String> getAllNames() {
+    return SCALAR_FUNCTION.getNames();
   }
 
   @Override
   public String getDescription() {
-    return "Returns the embedded Unix-millisecond timestamp from a time-based UUID (version 1, 6, or 7). "
-        + "Throws for non-time-based versions.";
+    return "Returns the embedded Unix-millisecond timestamp from a time-based STRING, BYTES, or UUID value "
+        + "(version 1, 6, or 7). Throws for non-time-based versions.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return Map.of();
+  }
+
+  @Override
+  public PinotScalarFunction getScalarFunction() {
+    return SCALAR_FUNCTION;
   }
 }

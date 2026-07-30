@@ -21,27 +21,40 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import org.apache.pinot.common.function.scalar.uuid.UuidConversionFunctions;
+import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.common.function.scalar.uuid.UuidVersionScalarFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
 
 
 @AutoService(Udf.class)
-public class UuidVersionUdf extends Udf.FromAnnotatedMethod {
-  public UuidVersionUdf()
-      throws NoSuchMethodException {
-    super(UuidConversionFunctions.class.getMethod("uuidVersion", UUID.class));
+public class UuidVersionUdf extends Udf {
+  private static final UuidVersionScalarFunction SCALAR_FUNCTION = new UuidVersionScalarFunction();
+
+  @Override
+  public String getMainName() {
+    return SCALAR_FUNCTION.getName();
+  }
+
+  @Override
+  public Set<String> getAllNames() {
+    return SCALAR_FUNCTION.getNames();
   }
 
   @Override
   public String getDescription() {
-    return "Returns the 4-bit version field (0-15) of the given UUID. Common values: 1, 3, 4, 5, 6, 7, 8.";
+    return "Returns the 4-bit version field (0-15) of a STRING, BYTES, or UUID value. "
+        + "Common values: 1, 3, 4, 5, 6, 7, 8.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return Map.of();
+  }
+
+  @Override
+  public PinotScalarFunction getScalarFunction() {
+    return SCALAR_FUNCTION;
   }
 }

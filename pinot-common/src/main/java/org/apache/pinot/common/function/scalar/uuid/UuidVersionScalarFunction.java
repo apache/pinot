@@ -18,36 +18,30 @@
  */
 package org.apache.pinot.common.function.scalar.uuid;
 
-import java.util.Set;
 import java.util.UUID;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/// Polymorphic scalar function that converts STRING, BYTES, or UUID inputs into Pinot's logical UUID type.
+/// Returns the UUID version from STRING, BYTES, or UUID inputs.
 ///
 /// This implementation is stateless and thread-safe.
-@ScalarFunction(names = {"TO_UUID"})
-public class ToUuidScalarFunction extends AbstractUuidInputFunction {
-  public ToUuidScalarFunction() {
-    super(ToUuidScalarFunction.class, "TO_UUID", "toUuid", SqlTypeName.UUID);
+@ScalarFunction(names = {"UUID_VERSION"})
+public class UuidVersionScalarFunction extends AbstractUuidInputFunction {
+  public UuidVersionScalarFunction() {
+    super(UuidVersionScalarFunction.class, "UUID_VERSION", "uuidVersion", SqlTypeName.INTEGER);
   }
 
-  @Override
-  public Set<String> getNames() {
-    return Set.of("TO_UUID", "TOUUID");
+  public static Integer uuidVersion(String value) {
+    return value != null ? UuidUtils.getVersion(UuidUtils.toUUID(value)) : null;
   }
 
-  public static UUID toUuid(String value) {
-    return value != null ? UuidUtils.toUUID(value) : null;
+  public static Integer uuidVersion(byte[] value) {
+    return value != null ? UuidUtils.getVersion(UuidUtils.toUUID(value)) : null;
   }
 
-  public static UUID toUuid(byte[] value) {
-    return value != null ? UuidUtils.toUUID(value) : null;
-  }
-
-  public static UUID toUuid(UUID value) {
-    return value;
+  public static Integer uuidVersion(UUID value) {
+    return value != null ? UuidUtils.getVersion(value) : null;
   }
 }

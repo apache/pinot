@@ -20,6 +20,8 @@ package org.apache.pinot.common.function.scalar.uuid;
 
 import java.util.UUID;
 import org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator;
+import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
@@ -70,21 +72,69 @@ public class UuidConversionFunctionsTest {
   }
 
   @Test
-  public void testUuidToBytesAndString() {
+  public void testSemanticFunctionsAcceptStringBytesAndUuid() {
     UUID uuid = UUID.fromString(UUID_VALUE);
+    byte[] bytes = UuidUtils.toBytes(uuid);
 
-    assertEquals(UuidConversionFunctions.uuidToBytes(uuid), UuidUtils.toBytes(UUID_VALUE));
-    assertEquals(UuidConversionFunctions.uuidToString(uuid), UUID_VALUE);
+    assertEquals(ToUuidScalarFunction.toUuid(uuid), uuid);
+    assertEquals(UuidToStringScalarFunction.uuidToString(MIXED_CASE_UUID_VALUE), UUID_VALUE);
+    assertEquals(UuidToStringScalarFunction.uuidToString(bytes), UUID_VALUE);
+    assertEquals(UuidToStringScalarFunction.uuidToString(uuid), UUID_VALUE);
+    assertEquals(UuidToBytesScalarFunction.uuidToBytes(UUID_VALUE), bytes);
+    assertEquals(UuidToBytesScalarFunction.uuidToBytes(bytes), bytes);
+    assertEquals(UuidToBytesScalarFunction.uuidToBytes(uuid), bytes);
+    assertEquals(UuidVersionScalarFunction.uuidVersion(UUID_VALUE).intValue(), 4);
+    assertEquals(UuidVersionScalarFunction.uuidVersion(bytes).intValue(), 4);
+    assertEquals(UuidVersionScalarFunction.uuidVersion(uuid).intValue(), 4);
+    assertTrue(IsUuidScalarFunction.isUuid(uuid));
   }
 
   @Test
-  public void testUuidToStringEvaluationFromInternalBytes() {
+  public void testUuidToStringIngestionEvaluationForAllInputTypes() {
     GenericRow row = new GenericRow();
-    row.putValue("uuid", UuidUtils.toBytes(UUID_VALUE));
+    row.putValue("uuidString", MIXED_CASE_UUID_VALUE);
+    row.putValue("uuidBytes", UuidUtils.toBytes(UUID_VALUE));
+    row.putValue("uuid", UUID.fromString(UUID_VALUE));
 
-    Object result = new InbuiltFunctionEvaluator("UUID_TO_STRING(uuid)").evaluate(row);
+    assertEquals(new InbuiltFunctionEvaluator("UUID_TO_STRING(uuidString)").evaluate(row), UUID_VALUE);
+    assertEquals(new InbuiltFunctionEvaluator("UUID_TO_STRING(uuidBytes)").evaluate(row), UUID_VALUE);
+    assertEquals(new InbuiltFunctionEvaluator("UUID_TO_STRING(uuid)").evaluate(row), UUID_VALUE);
+    assertEquals(new InbuiltFunctionEvaluator("UUID_VERSION(uuidString)").evaluate(row), 4);
+    assertEquals(new InbuiltFunctionEvaluator("UUID_VERSION(uuidBytes)").evaluate(row), 4);
+    assertEquals(new InbuiltFunctionEvaluator("UUID_VERSION(uuid)").evaluate(row), 4);
+    assertEquals(new InbuiltFunctionEvaluator("IS_UUID(uuidString)").evaluate(row), true);
+    assertEquals(new InbuiltFunctionEvaluator("IS_UUID(uuidBytes)").evaluate(row), true);
+    assertEquals(new InbuiltFunctionEvaluator("IS_UUID(uuid)").evaluate(row), true);
+  }
 
-    assertEquals(result, UUID_VALUE);
+  @Test
+  public void testIngestionEvaluationPropagatesNull() {
+    GenericRow row = new GenericRow();
+    row.putValue("value", null);
+
+    assertNull(new InbuiltFunctionEvaluator("IS_UUID(value)").evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("TO_UUID(value)").evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("UUID_TO_STRING(value)").evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("UUID_TO_BYTES(value)").evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("UUID_VERSION(value)").evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("UUID_TIMESTAMP(value)").evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("BYTES_TO_UUID(value)").evaluate(row));
+  }
+
+  @Test
+  public void testPolymorphicFunctionInfoDispatch() {
+    PinotScalarFunction[] functions = {
+        new IsUuidScalarFunction(), new ToUuidScalarFunction(), new UuidToStringScalarFunction(),
+        new UuidToBytesScalarFunction(), new UuidVersionScalarFunction(), new UuidTimestampScalarFunction()
+    };
+    for (PinotScalarFunction function : functions) {
+      assertEquals(function.getFunctionInfo(new ColumnDataType[]{ColumnDataType.STRING}).getMethod()
+          .getParameterTypes()[0], String.class);
+      assertEquals(function.getFunctionInfo(new ColumnDataType[]{ColumnDataType.BYTES}).getMethod()
+          .getParameterTypes()[0], byte[].class);
+      assertEquals(function.getFunctionInfo(new ColumnDataType[]{ColumnDataType.UUID}).getMethod()
+          .getParameterTypes()[0], UUID.class);
+    }
   }
 
   @Test
@@ -112,20 +162,30 @@ public class UuidConversionFunctionsTest {
   public void testNullInputs() {
     assertNull(ToUuidScalarFunction.toUuid((String) null));
     assertNull(ToUuidScalarFunction.toUuid((byte[]) null));
-    assertNull(UuidConversionFunctions.uuidToBytes(null));
+    assertNull(ToUuidScalarFunction.toUuid((UUID) null));
+    assertNull(UuidToBytesScalarFunction.uuidToBytes((String) null));
+    assertNull(UuidToBytesScalarFunction.uuidToBytes((byte[]) null));
+    assertNull(UuidToBytesScalarFunction.uuidToBytes((UUID) null));
     assertNull(UuidConversionFunctions.bytesToUuid(null));
-    assertNull(UuidConversionFunctions.uuidToString(null));
-    assertNull(UuidConversionFunctions.uuidVersion(null));
-    assertNull(UuidConversionFunctions.uuidTimestamp(null));
+    assertNull(UuidToStringScalarFunction.uuidToString((String) null));
+    assertNull(UuidToStringScalarFunction.uuidToString((byte[]) null));
+    assertNull(UuidToStringScalarFunction.uuidToString((UUID) null));
+    assertNull(UuidVersionScalarFunction.uuidVersion((String) null));
+    assertNull(UuidVersionScalarFunction.uuidVersion((byte[]) null));
+    assertNull(UuidVersionScalarFunction.uuidVersion((UUID) null));
+    assertNull(UuidTimestampScalarFunction.uuidTimestamp((String) null));
+    assertNull(UuidTimestampScalarFunction.uuidTimestamp((byte[]) null));
+    assertNull(UuidTimestampScalarFunction.uuidTimestamp((UUID) null));
     assertFalse(IsUuidScalarFunction.isUuid((String) null));
     assertFalse(IsUuidScalarFunction.isUuid((byte[]) null));
+    assertFalse(IsUuidScalarFunction.isUuid((UUID) null));
   }
 
   @Test
   public void testUuidV4ProducesValidVersion4Uuid() {
     UUID uuid = UuidConversionFunctions.uuidV4();
     assertEquals(uuid.version(), 4, "uuidV4 must produce version 4");
-    assertEquals(UuidConversionFunctions.uuidVersion(uuid).intValue(), 4);
+    assertEquals(UuidVersionScalarFunction.uuidVersion(uuid).intValue(), 4);
 
     // Two successive calls should not return the same value (probability of collision is ~0).
     UUID other = UuidConversionFunctions.uuidV4();
@@ -140,10 +200,10 @@ public class UuidConversionFunctionsTest {
     long after = System.currentTimeMillis();
 
     assertEquals(first.version(), 7, "uuidV7 must produce version 7");
-    assertEquals(UuidConversionFunctions.uuidVersion(first).intValue(), 7);
+    assertEquals(UuidVersionScalarFunction.uuidVersion(first).intValue(), 7);
 
-    long firstTs = UuidConversionFunctions.uuidTimestamp(first);
-    long secondTs = UuidConversionFunctions.uuidTimestamp(second);
+    long firstTs = UuidTimestampScalarFunction.uuidTimestamp(first);
+    long secondTs = UuidTimestampScalarFunction.uuidTimestamp(second);
 
     assertTrue(firstTs >= before && firstTs <= after,
         "uuidV7 timestamp " + firstTs + " not within [" + before + ", " + after + "]");
@@ -156,20 +216,20 @@ public class UuidConversionFunctionsTest {
   @Test
   public void testUuidVersionForKnownVersions() {
     // Version 4 — random.
-    assertEquals(UuidConversionFunctions.uuidVersion(UUID.fromString("550e8400-e29b-41d4-a716-446655440000"))
+    assertEquals(UuidVersionScalarFunction.uuidVersion(UUID.fromString("550e8400-e29b-41d4-a716-446655440000"))
         .intValue(), 4);
     // Version 1 — Gregorian time-based.
-    assertEquals(UuidConversionFunctions.uuidVersion(UUID.fromString("c232ab00-9414-11ec-b3c8-9e6bdeced846"))
+    assertEquals(UuidVersionScalarFunction.uuidVersion(UUID.fromString("c232ab00-9414-11ec-b3c8-9e6bdeced846"))
         .intValue(), 1);
     // Version 7 — Unix-time-based.
-    assertEquals(UuidConversionFunctions.uuidVersion(UUID.fromString("017f22e2-79b0-7cc3-98c4-dc0c0c07398f"))
+    assertEquals(UuidVersionScalarFunction.uuidVersion(UUID.fromString("017f22e2-79b0-7cc3-98c4-dc0c0c07398f"))
         .intValue(), 7);
   }
 
   @Test
   public void testUuidTimestampRejectsNonTimeBasedVersions() {
     UUID v4 = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
-    Assert.expectThrows(IllegalArgumentException.class, () -> UuidConversionFunctions.uuidTimestamp(v4));
+    Assert.expectThrows(IllegalArgumentException.class, () -> UuidTimestampScalarFunction.uuidTimestamp(v4));
   }
 
   @Test
@@ -179,7 +239,9 @@ public class UuidConversionFunctionsTest {
     long msb = (unixMs << 16) | 0x7000L | 0x0CC3L;
     long lsb = 0x8000000000000000L | 0x18C4DC0C0C07398FL;
     UUID v7 = new UUID(msb, lsb);
-    assertEquals(UuidConversionFunctions.uuidTimestamp(v7).longValue(), unixMs);
-    assertEquals(UuidConversionFunctions.uuidVersion(v7).intValue(), 7);
+    assertEquals(UuidTimestampScalarFunction.uuidTimestamp(v7).longValue(), unixMs);
+    assertEquals(UuidTimestampScalarFunction.uuidTimestamp(UuidUtils.toBytes(v7)).longValue(), unixMs);
+    assertEquals(UuidTimestampScalarFunction.uuidTimestamp(v7.toString()).longValue(), unixMs);
+    assertEquals(UuidVersionScalarFunction.uuidVersion(v7).intValue(), 7);
   }
 }
