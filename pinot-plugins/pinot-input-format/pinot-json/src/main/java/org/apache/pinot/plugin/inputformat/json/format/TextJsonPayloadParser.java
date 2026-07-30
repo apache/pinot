@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.json.format;
 
-import com.fasterxml.jackson.core.JsonFactory;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// Parses UTF-8 text JSON, the historical [org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder]
@@ -26,7 +26,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 class TextJsonPayloadParser extends JacksonPayloadParser {
 
   TextJsonPayloadParser() {
-    super(new JsonFactory());
+    super(JsonUtils.DEFAULT_READER);
   }
 
   @Override

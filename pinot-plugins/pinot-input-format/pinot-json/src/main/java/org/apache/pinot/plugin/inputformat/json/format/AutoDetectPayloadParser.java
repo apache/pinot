@@ -42,10 +42,10 @@ class AutoDetectPayloadParser implements JsonPayloadParser {
   }
 
   @Override
-  public boolean parseTo(byte[] payload, int offset, int length, @Nullable Set<String> fields,
-      GenericRow destination)
+  public boolean parse(byte[] payload, int offset, int length, GenericRow destination,
+      @Nullable Set<String> fields)
       throws Exception {
     return JsonPayloadFormat.detectParser(payload, offset, length)
-        .parseTo(payload, offset, length, fields, destination);
+        .parse(payload, offset, length, destination, fields);
   }
 }

@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.plugin.inputformat.json.format;
 
-import com.fasterxml.jackson.core.JsonFactory;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// Parses the PostgreSQL `jsonb` binary wire format: a single version byte (currently `1`) followed by the
@@ -43,7 +43,7 @@ class PostgresJsonbPayloadParser extends JacksonPayloadParser {
   private static final byte JSONB_VERSION = 1;
 
   PostgresJsonbPayloadParser() {
-    super(new JsonFactory());
+    super(JsonUtils.DEFAULT_READER);
   }
 
   @Override
@@ -62,11 +62,11 @@ class PostgresJsonbPayloadParser extends JacksonPayloadParser {
   }
 
   @Override
-  public boolean parseTo(byte[] payload, int offset, int length, @Nullable Set<String> fields,
-      GenericRow destination)
+  public boolean parse(byte[] payload, int offset, int length, GenericRow destination,
+      @Nullable Set<String> fields)
       throws Exception {
     validate(payload, offset, length);
-    return parseToRow(payload, offset + 1, length - 1, fields, destination);
+    return super.parse(payload, offset + 1, length - 1, destination, fields);
   }
 
   private static void validate(byte[] payload, int offset, int length) {

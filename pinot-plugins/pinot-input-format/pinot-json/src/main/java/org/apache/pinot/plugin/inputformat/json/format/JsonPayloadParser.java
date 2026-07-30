@@ -55,14 +55,14 @@ public interface JsonPayloadParser {
   Map<String, Object> parse(byte[] payload, int offset, int length)
       throws Exception;
 
-  /// Parses the payload directly into {@code destination}, avoiding a top-level per-record map when the
+  /// Parses the payload directly into `destination`, avoiding a top-level per-record map when the
   /// implementation supports it.
   ///
-  /// @param fields fields to populate, or {@code null} to populate every top-level field
-  /// @return {@code true} when the payload was decoded into {@code destination}; {@code false} when the caller
+  /// @param fields fields to populate, or `null` to populate every top-level field
+  /// @return `true` when the payload was decoded into `destination`; `false` when the caller
   ///     should fall back to [#parse]
-  default boolean parseTo(byte[] payload, int offset, int length, @Nullable Set<String> fields,
-      GenericRow destination)
+  default boolean parse(byte[] payload, int offset, int length, GenericRow destination,
+      @Nullable Set<String> fields)
       throws Exception {
     return false;
   }

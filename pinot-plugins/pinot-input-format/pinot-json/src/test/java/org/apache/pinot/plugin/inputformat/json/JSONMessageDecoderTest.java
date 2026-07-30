@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -53,7 +54,7 @@ public class JSONMessageDecoderTest {
     GenericRow row = decoder.decode(payload, new GenericRow());
 
     assertEquals(row.getValue("id"), 1);
-    assertEquals(row.getValue("huge").toString(), "99999999999999999999999999");
+    assertEquals(row.getValue("huge"), new BigDecimal("99999999999999999999999999"));
     assertEquals((Object[]) ((Map<?, ?>) row.getValue("nested")).get("values"), new Object[]{1, null, 3});
     assertEquals((Object[]) row.getValue("tags"), new Object[]{"a", "b"});
   }

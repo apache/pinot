@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.json;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.plugin.inputformat.json.format.JsonPayloadFormat;
 import org.apache.pinot.plugin.inputformat.json.format.JsonPayloadParser;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -72,8 +73,9 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     }
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _jsonRecordExtractor.init(fieldsToRead, null);
-    _fieldsToRead = fieldsToRead == null || fieldsToRead.isEmpty() ? null : Set.copyOf(fieldsToRead);
-    // A configured extractor can change conversion semantics, so only bypass Pinot's exact default class.
+    _fieldsToRead = CollectionUtils.isNotEmpty(fieldsToRead) ? Set.copyOf(fieldsToRead) : null;
+    // Direct parsing implements JSONRecordExtractor's conversion contract and bypasses extract(). Require the
+    // exact default class so a configured extractor or subclass cannot lose custom extraction behavior.
     _usesDefaultRecordExtractor = _jsonRecordExtractor.getClass() == JSONRecordExtractor.class;
     _parser = JsonPayloadFormat.fromConfig(jsonFormat).getParser();
   }
@@ -86,7 +88,7 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
-      if (_usesDefaultRecordExtractor && _parser.parseTo(payload, offset, length, _fieldsToRead, destination)) {
+      if (_usesDefaultRecordExtractor && _parser.parse(payload, offset, length, destination, _fieldsToRead)) {
         return destination;
       }
       Map<String, Object> jsonMap = _parser.parse(payload, offset, length);

@@ -37,14 +37,18 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// The [ObjectReader] is immutable and thread-safe, so a single instance is shared across all decode calls.
 abstract class JacksonPayloadParser implements JsonPayloadParser {
 
-  private final ObjectMapper _mapper;
+  private final JsonFactory _factory;
   private final ObjectReader _mapReader;
   private final ObjectReader _valueReader;
 
   JacksonPayloadParser(JsonFactory factory) {
-    _mapper = new ObjectMapper(factory);
-    _mapReader = _mapper.readerFor(JsonUtils.MAP_TYPE_REFERENCE);
-    _valueReader = _mapper.readerFor(Object.class);
+    this(new ObjectMapper(factory).reader());
+  }
+
+  JacksonPayloadParser(ObjectReader reader) {
+    _factory = reader.getFactory();
+    _mapReader = reader.forType(JsonUtils.MAP_TYPE_REFERENCE);
+    _valueReader = reader.forType(Object.class);
   }
 
   @Override
@@ -58,18 +62,12 @@ abstract class JacksonPayloadParser implements JsonPayloadParser {
     return _mapReader.readValue(payload, offset, length);
   }
 
-  @Override
-  public boolean parseTo(byte[] payload, int offset, int length, @Nullable Set<String> fields,
-      GenericRow destination)
-      throws Exception {
-    return parseToRow(payload, offset, length, fields, destination);
-  }
-
   /// Streams the top-level object fields into the row. Nested selected values still use Jackson's normal
   /// materialization and are converted by [JSONRecordExtractor], but the top-level map is never allocated.
   /// Unselected containers are skipped without materializing their contents.
-  protected final boolean parseToRow(byte[] payload, int offset, int length, @Nullable Set<String> fields,
-      GenericRow destination)
+  @Override
+  public boolean parse(byte[] payload, int offset, int length, GenericRow destination,
+      @Nullable Set<String> fields)
       throws Exception {
     if (fields != null) {
       // Match JSONRecordExtractor's missing-field behavior and overwrite values left in a reused row.
@@ -77,7 +75,7 @@ abstract class JacksonPayloadParser implements JsonPayloadParser {
         destination.putValue(field, null);
       }
     }
-    try (JsonParser parser = _mapper.getFactory().createParser(payload, offset, length)) {
+    try (JsonParser parser = _factory.createParser(payload, offset, length)) {
       if (parser.nextToken() != JsonToken.START_OBJECT) {
         throw new IllegalArgumentException("Top-level JSON value must be an object");
       }
