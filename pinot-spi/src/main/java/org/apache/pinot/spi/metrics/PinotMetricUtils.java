@@ -219,6 +219,20 @@ public class PinotMetricUtils {
     return _pinotMetricsFactory.makePinotMetricName(klass, name);
   }
 
+  /// Creates a {@link PinotMetricName} with both the flat name (for legacy compat) and structured dimension tags (for
+  /// tag-first Micrometer export). Delegates to {@link org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory
+  /// #makePinotMetricName(Class, String, String, Map)}; legacy factories inherit the default which ignores
+  /// {@code baseName} and {@code tags}.
+  ///
+  /// @param klass    the metrics class
+  /// @param flatName the full dotted name with embedded dimensions (unchanged for legacy compat)
+  /// @param baseName the dimension-free name (used by the native Micrometer namer)
+  /// @param tags     structured dimension tags to attach as Prometheus labels
+  public static PinotMetricName makePinotMetricName(Class<?> klass, String flatName, String baseName,
+      Map<String, String> tags) {
+    return _pinotMetricsFactory.makePinotMetricName(klass, flatName, baseName, tags);
+  }
+
   public static <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition) {
     return _pinotMetricsFactory.makePinotGauge(condition);
   }
