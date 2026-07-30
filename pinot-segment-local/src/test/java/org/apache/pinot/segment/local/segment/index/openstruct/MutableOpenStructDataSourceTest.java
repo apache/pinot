@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -25,10 +26,14 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -234,6 +239,137 @@ public class MutableOpenStructDataSourceTest {
       assertEquals(presentDictIds[1], 0);
       assertEquals(presentDictIds[2], 0);
       assertEquals(clicks.getDictionary().get(presentDictIds[3]), 9L);
+    }
+  }
+
+  @Test
+  public void testInvertedIndexFoldsAbsentDocsIntoDefaultPostings()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      // Present in docs 0 (5L) and 3 (9L) of 6; docs 1,2,4,5 never see the key.
+      idx.index(0, Map.of("clicks", 5L));
+      idx.index(3, Map.of("clicks", 9L));
+      int numDocs = 6;
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, numDocs);
+      DataSource clicks = ds.getDataSource("clicks");
+      assertNotNull(clicks);
+
+      // Absent docs are folded into the reserved default's (dictId 0) postings, matching what a
+      // sealed segment would have built for the same rows.
+      assertEquals(clicks.getInvertedIndex().getDocIds(0), MutableRoaringBitmap.bitmapOf(1, 2, 4, 5));
+      int dictIdOfFive = clicks.getDictionary().indexOf(5L);
+      assertEquals(clicks.getInvertedIndex().getDocIds(dictIdOfFive), MutableRoaringBitmap.bitmapOf(0));
+    }
+  }
+
+  @Test
+  public void testInvertedIndexFoldsAbsentDocsWithExplicitDefaultWrite()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      // doc 0 writes a real value; doc 3 explicitly writes the LONG default itself.
+      idx.index(0, Map.of("clicks", 5L));
+      idx.index(3, Map.of("clicks", Long.MIN_VALUE));
+      int numDocs = 6;
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, numDocs);
+      DataSource clicks = ds.getDataSource("clicks");
+      assertNotNull(clicks);
+
+      // dictId 0's postings = {3} (explicit write) folded with the absent complement {1,2,4,5}.
+      assertEquals(clicks.getInvertedIndex().getDocIds(0), MutableRoaringBitmap.bitmapOf(1, 2, 3, 4, 5));
+    }
+  }
+
+  @Test
+  public void testKeyDictionaryExactWhenPartiallyPresent()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("clicks", 5L));
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 3);
+      // numDocs=3 but the key is only present on doc 0: dictId 0 is a legitimate value shared by
+      // absent docs 1 and 2, so the dictionary is exact.
+      assertTrue(ds.isKeyDictionaryExact("clicks"));
+    }
+  }
+
+  @Test
+  public void testKeyDictionaryNotExactWhenFullyPresentAndDefaultUnobserved()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("clicks", 5L));
+      idx.index(1, Map.of("clicks", 7L));
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 2);
+      // Fully present, and no doc ever wrote the reserved default: dictId 0 is a phantom entry.
+      assertFalse(ds.isKeyDictionaryExact("clicks"));
+    }
+  }
+
+  @Test
+  public void testKeyDictionaryExactWhenFullyPresentAndDefaultObserved()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("clicks", 5L));
+      idx.index(1, Map.of("clicks", Long.MIN_VALUE));
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 2);
+      // Fully present, and doc 1 explicitly wrote the reserved default: dictId 0 is real.
+      assertTrue(ds.isKeyDictionaryExact("clicks"));
+    }
+  }
+
+  /// Pins the sealed splitter's default-resolution rule (OpenStructColumnSplitter#writeDenseKeyColumn,
+  /// ~line 280): absent-doc defaults come from a throwaway generic DimensionFieldSpec(key, storedType,
+  /// true), not from the real child spec's own default. If `allocateKeyColumn` reverted to preferring
+  /// `childSpec.getDefaultNullValue()`, this test would fail because dictId 0 would hold 0L instead of
+  /// Long.MIN_VALUE.
+  @Test
+  public void testAllocationUsesGenericDefaultNotChildSpecCustomDefault()
+      throws Exception {
+    Map<String, FieldSpec> children = new HashMap<>();
+    children.put("clicks", new DimensionFieldSpec("clicks", DataType.LONG, true, 0L));
+    ComplexFieldSpec specWithCustomDefault =
+        new ComplexFieldSpec("metrics", DataType.OPEN_STRUCT, true, children);
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", specWithCustomDefault,
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("clicks", 5L));
+      MutableKeyColumn col = idx.getKeyColumn("clicks");
+      assertNotNull(col);
+      assertEquals(col.getDictionary().get(0), Long.MIN_VALUE);
+    }
+  }
+
+  @DataProvider(name = "storedTypes")
+  public Object[][] storedTypes() {
+    return new Object[][] {
+        {DataType.INT, 42},
+        {DataType.LONG, 5L},
+        {DataType.FLOAT, 1.5f},
+        {DataType.DOUBLE, 2.5d},
+        {DataType.STRING, "hello"},
+        {DataType.BYTES, new byte[] {1, 2, 3}},
+    };
+  }
+
+  /// Every inferable stored type reserves its own generic dimension default at dictId 0, not just LONG.
+  @Test(dataProvider = "storedTypes")
+  public void testDefaultReservationPerStoredType(DataType storedType, Object value)
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("k", value));
+      MutableKeyColumn col = idx.getKeyColumn("k");
+      assertNotNull(col);
+      assertEquals(col.getStoredType(), storedType);
+      Object expectedDefault = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
+      Object actualDefault = col.getDictionary().get(0);
+      if (storedType == DataType.BYTES) {
+        assertEquals((byte[]) actualDefault, (byte[]) expectedDefault);
+      } else {
+        assertEquals(actualDefault, expectedDefault);
+      }
     }
   }
 }

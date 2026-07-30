@@ -24,15 +24,10 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.segment.local.segment.index.map.NullDataSource;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
-import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
@@ -90,6 +85,9 @@ public class AggregationPlanNodeResolveDataSourceTest {
     when(segment.getDataSource("osCol", null)).thenReturn(osDs);
     when(osDs.isMaterialized("denseKey")).thenReturn(true);
     when(osDs.getDataSource("denseKey")).thenReturn(keyDs);
+    // Mockito mocks don't invoke the interface's default method, so the always-exact default
+    // (true) needs an explicit stub here.
+    when(osDs.isKeyDictionaryExact("denseKey")).thenReturn(true);
 
     ExpressionContext expr = itemExpr("osCol", "denseKey");
     assertSame(AggregationPlanNode.resolveDataSource(expr, segment, null), keyDs);
@@ -144,58 +142,29 @@ public class AggregationPlanNodeResolveDataSourceTest {
   }
 
   @Test
-  public void testItemFunctionOnMutableSegmentPartiallyPresentKeepsFastPath() {
-    MutableSegment segment = mock(MutableSegment.class);
+  public void testItemFunctionOnOpenStructKeyDictionaryExactKeepsFastPath() {
+    IndexSegment segment = mock(IndexSegment.class);
     OpenStructDataSource osDs = mock(OpenStructDataSource.class);
     DataSource keyDs = mock(DataSource.class);
-    NullValueVectorReader nullVector = mock(NullValueVectorReader.class);
     when(segment.getDataSource("metrics", null)).thenReturn(osDs);
     when(osDs.isMaterialized("views")).thenReturn(true);
     when(osDs.getDataSource("views")).thenReturn(keyDs);
-    when(keyDs.getNullValueVector()).thenReturn(nullVector);
-    // Absent docs exist: the reserved default legitimately belongs in the aggregate, matching
-    // the sealed segment's folded default — dictionary-based non-scan stays correct.
-    when(nullVector.getNullBitmap()).thenReturn(ImmutableRoaringBitmap.bitmapOf(3, 4));
+    when(osDs.isKeyDictionaryExact("views")).thenReturn(true);
 
     assertSame(AggregationPlanNode.resolveDataSource(itemExpr("metrics", "views"), segment, null), keyDs);
   }
 
   @Test
-  public void testItemFunctionOnMutableSegmentFullyPresentPhantomDefaultForcesScan() {
-    MutableSegment segment = mock(MutableSegment.class);
+  public void testItemFunctionOnOpenStructKeyDictionaryNotExactForcesScan() {
+    IndexSegment segment = mock(IndexSegment.class);
     OpenStructDataSource osDs = mock(OpenStructDataSource.class);
     DataSource keyDs = mock(DataSource.class);
-    NullValueVectorReader nullVector = mock(NullValueVectorReader.class);
-    InvertedIndexReader<ImmutableRoaringBitmap> invertedIndex = mock(InvertedIndexReader.class);
     when(segment.getDataSource("metrics", null)).thenReturn(osDs);
     when(osDs.isMaterialized("views")).thenReturn(true);
     when(osDs.getDataSource("views")).thenReturn(keyDs);
-    when(keyDs.getNullValueVector()).thenReturn(nullVector);
-    when(nullVector.getNullBitmap()).thenReturn(new MutableRoaringBitmap());
-    doReturn(invertedIndex).when(keyDs).getInvertedIndex();
-    // No doc ever wrote the default: the reserved dictId-0 entry is a phantom no row carries.
-    when(invertedIndex.getDocIds(0)).thenReturn(new MutableRoaringBitmap());
+    when(osDs.isKeyDictionaryExact("views")).thenReturn(false);
 
     assertNull(AggregationPlanNode.resolveDataSource(itemExpr("metrics", "views"), segment, null));
-  }
-
-  @Test
-  public void testItemFunctionOnMutableSegmentFullyPresentObservedDefaultKeepsFastPath() {
-    MutableSegment segment = mock(MutableSegment.class);
-    OpenStructDataSource osDs = mock(OpenStructDataSource.class);
-    DataSource keyDs = mock(DataSource.class);
-    NullValueVectorReader nullVector = mock(NullValueVectorReader.class);
-    InvertedIndexReader<ImmutableRoaringBitmap> invertedIndex = mock(InvertedIndexReader.class);
-    when(segment.getDataSource("metrics", null)).thenReturn(osDs);
-    when(osDs.isMaterialized("views")).thenReturn(true);
-    when(osDs.getDataSource("views")).thenReturn(keyDs);
-    when(keyDs.getNullValueVector()).thenReturn(nullVector);
-    when(nullVector.getNullBitmap()).thenReturn(new MutableRoaringBitmap());
-    doReturn(invertedIndex).when(keyDs).getInvertedIndex();
-    // Some doc explicitly wrote the default, so the dictionary matches sealed contents.
-    when(invertedIndex.getDocIds(0)).thenReturn(MutableRoaringBitmap.bitmapOf(7));
-
-    assertSame(AggregationPlanNode.resolveDataSource(itemExpr("metrics", "views"), segment, null), keyDs);
   }
 
   @Test

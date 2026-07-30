@@ -84,4 +84,12 @@ public interface OpenStructDataSource extends DataSource {
     throw new UnsupportedOperationException(
         "Per-doc OPEN_STRUCT map reconstruction is not supported by this implementation");
   }
+
+  /// Whether the per-key dictionary's contents correspond exactly to the values readable from
+  /// the key column (absent docs folded as the default included) — i.e. dictionary-based
+  /// MIN/MAX/DISTINCTCOUNT over it matches a full scan. Sealed segments build dictionaries
+  /// from the folded values, so they are always exact.
+  default boolean isKeyDictionaryExact(String key) {
+    return true;
+  }
 }

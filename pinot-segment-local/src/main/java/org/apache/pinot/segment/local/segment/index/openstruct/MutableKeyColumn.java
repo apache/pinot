@@ -54,6 +54,12 @@ public class MutableKeyColumn implements Closeable {
   /// the row to query threads; docIds beyond the watermark may not have allocated chunks yet.
   private volatile int _lastIndexedDocId = -1;
 
+  /// Whether any doc has explicitly written the reserved default value (dictId 0). Distinguishes
+  /// a phantom dictionary entry (default reserved but never observed) from a real one.
+  private volatile boolean _defaultObserved;
+
+  private final ForwardIndexReader<ForwardIndexReaderContext> _guardedForwardIndex = new TailGuardedReader();
+
   public MutableKeyColumn(String key, DataType storedType, Object defaultNullValue,
       PinotDataBufferMemoryManager memoryManager, int capacity) {
     this(key, storedType, defaultNullValue, memoryManager, capacity, key);
@@ -135,9 +141,18 @@ public class MutableKeyColumn implements Closeable {
   public void setValue(int docId, Object value) {
     _presenceBitmap.add(docId);
     int dictId = _dictionary.index(value);
+    if (dictId == 0) {
+      _defaultObserved = true;
+    }
     _forwardIndex.setDictId(docId, dictId);
     _invertedIndex.add(dictId, docId);
     _lastIndexedDocId = docId;
+  }
+
+  /// Whether any doc has explicitly written the reserved default value (dictId 0), as opposed to
+  /// the default being a phantom entry no doc actually carries.
+  public boolean isDefaultObserved() {
+    return _defaultObserved;
   }
 
   public Object getValue(int docId) {
@@ -168,7 +183,7 @@ public class MutableKeyColumn implements Closeable {
   /// value — matching what a sealed segment folds in at build time for absent docs. In-range
   /// holes need no guard: chunks are zero-initialized, so they already read dictId 0.
   public ForwardIndexReader<ForwardIndexReaderContext> getGuardedForwardIndex() {
-    return new TailGuardedReader();
+    return _guardedForwardIndex;
   }
 
   private final class TailGuardedReader implements ForwardIndexReader<ForwardIndexReaderContext> {
@@ -196,7 +211,10 @@ public class MutableKeyColumn implements Closeable {
     public void readDictIds(int[] docIds, int length, int[] dictIdBuffer, ForwardIndexReaderContext context) {
       int watermark = _lastIndexedDocId;
       if (length > 0 && docIds[length - 1] <= watermark) {
-        // DocIds within a block are ascending, so the last one bounds them all.
+        // Callers (block-based scan/filter) pass docIds in ascending order within a block, so the
+        // last element bounds the whole batch. This assumption is load-bearing: if it didn't hold
+        // (e.g. an unsorted batch with its max docId in the middle), a docId past the watermark
+        // could sit earlier in the array and be delegated to the raw index here without a guard.
         _forwardIndex.readDictIds(docIds, length, dictIdBuffer, null);
         return;
       }

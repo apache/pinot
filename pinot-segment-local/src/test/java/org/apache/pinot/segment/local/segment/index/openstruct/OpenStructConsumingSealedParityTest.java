@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,6 +49,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -113,6 +115,7 @@ public class OpenStructConsumingSealedParityTest {
       throws Exception {
     // --- Consuming side ---
     List<Object> consumingValues;
+    MutableRoaringBitmap consumingDefaultDocIds;
     try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, spec(),
         OpenStructIndexConfig.DEFAULT, _mm, NUM_DOCS)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
@@ -122,6 +125,7 @@ public class OpenStructConsumingSealedParityTest {
       DataSource views = ds.getDataSource(KEY);
       assertNotNull(views);
       consumingValues = readAllValues(views);
+      consumingDefaultDocIds = (MutableRoaringBitmap) views.getInvertedIndex().getDocIds(0);
     }
 
     // --- Sealed side (same rows through the offline build) ---
@@ -132,7 +136,7 @@ public class OpenStructConsumingSealedParityTest {
     OpenStructIndexConfig osConfig =
         new OpenStructIndexConfig(false, null, -1, Set.of(KEY, "host"), 0.5, List.of());
 
-    com.fasterxml.jackson.databind.node.ObjectNode indexes = JsonUtils.newObjectNode();
+    ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));
     FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
 
@@ -170,10 +174,28 @@ public class OpenStructConsumingSealedParityTest {
         assertEquals(consumingValues.get(docId), expected, "docId " + docId);
       }
 
-      // Aggregation parity with null handling off: MIN/MAX/DISTINCTCOUNT over scanned values.
-      assertEquals(min(consumingValues), min(sealedValues));
-      assertEquals(max(consumingValues), max(sealedValues));
-      assertEquals(new HashSet<>(consumingValues).size(), new HashSet<>(sealedValues).size());
+      // Aggregation parity with null handling off: MIN/MAX/DISTINCTCOUNT over scanned values,
+      // pinned to independently computed constants on both tiers rather than only asserting the
+      // tiers match each other (a bug shared by both tiers wouldn't be caught by cross-tier
+      // equality alone). Values across docs 0-9: {10,20,30,MIN_VALUE,MIN_VALUE,60,MIN_VALUE x4}.
+      assertEquals(min(consumingValues), Long.MIN_VALUE);
+      assertEquals(min(sealedValues), Long.MIN_VALUE);
+      assertEquals(max(consumingValues), 60L);
+      assertEquals(max(sealedValues), 60L);
+      assertEquals(new HashSet<>(consumingValues).size(), 5);
+      assertEquals(new HashSet<>(sealedValues).size(), 5);
+
+      // EQ/NOT_EQ parity: the consuming per-key inverted index folds absent docs into dictId 0's
+      // postings, so its docIds must exactly match the docs where the sealed segment resolved the
+      // default (derived from the already-read sealedValues, since sealed segments don't build an
+      // inverted index for OPEN_STRUCT keys in this config).
+      MutableRoaringBitmap expectedDefaultDocIds = new MutableRoaringBitmap();
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        if (sealedValues.get(docId).equals(Long.MIN_VALUE)) {
+          expectedDefaultDocIds.add(docId);
+        }
+      }
+      assertEquals(consumingDefaultDocIds, expectedDefaultDocIds);
     } finally {
       sealed.destroy();
     }

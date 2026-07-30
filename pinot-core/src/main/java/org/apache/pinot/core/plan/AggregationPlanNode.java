@@ -39,14 +39,11 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.segment.index.map.NullDataSource;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
-import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
@@ -320,33 +317,12 @@ public class AggregationPlanNode implements PlanNode {
       if (keyDs == null) {
         return null;
       }
-      if (segment instanceof MutableSegment) {
-        // Consuming key columns reserve the default null value at dictId 0 (absent docs read it),
-        // so the dictionary matches the sealed segment - which folds the same default at build
-        // time - whenever the key is partially present, or fully present with the default also
-        // observed as a real value. The one poisoned case is a fully-present key whose reserved
-        // default was never observed: the dictionary then holds a phantom entry no row carries,
-        // and dictionary-based MIN/MAX/DISTINCTCOUNT would diverge from sealed. Force the scan
-        // path there. If consuming-segment aggregation latency ever matters, a dictionary view
-        // backed by observed min/max tracked in MutableKeyColumn can lift this.
-        NullValueVectorReader nullVector = keyDs.getNullValueVector();
-        boolean fullyPresent = nullVector == null || nullVector.getNullBitmap().isEmpty();
-        if (fullyPresent && !isDefaultObserved(keyDs)) {
-          return null;
-        }
-      }
-      return keyDs;
+      // A consuming key column's dictionary can contain a phantom entry (the reserved default,
+      // never observed in any doc); dictionary-based aggregation over it would diverge from the
+      // sealed segment. The segment layer owns that invariant — force the scan path when the
+      // dictionary is not exact.
+      return osDs.isKeyDictionaryExact(key) ? keyDs : null;
     }
     return null;
-  }
-
-  // Whether any doc explicitly wrote the reserved default (dictId 0) for this consuming key.
-  private static boolean isDefaultObserved(DataSource keyDs) {
-    InvertedIndexReader<?> invertedIndex = keyDs.getInvertedIndex();
-    if (invertedIndex == null) {
-      return false;
-    }
-    Object docIds = invertedIndex.getDocIds(0);
-    return docIds instanceof ImmutableRoaringBitmap && !((ImmutableRoaringBitmap) docIds).isEmpty();
   }
 }
