@@ -57,6 +57,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -561,15 +562,20 @@ public class SegmentStatusCheckerTest {
   }
 
   // A pauseless COMMITTING segment: done consuming but its immutable segment is still being built/loaded on the
-  // replicas. Like an LLC committed (DONE) segment, it never populates push time, so the grace check must fall back
-  // to creation time.
-  private SegmentZKMetadata mockCommittingSegmentZKMetadata(long creationTimeMs) {
+  // replicas. The grace check keys off the segment znode's modification time (mtime), which the test drives via
+  // propertyStore.getStat(...); the metadata here only supplies status and size.
+  private SegmentZKMetadata mockCommittingSegmentZKMetadata() {
     SegmentZKMetadata segmentZKMetadata = mock(SegmentZKMetadata.class);
     when(segmentZKMetadata.getStatus()).thenReturn(Status.COMMITTING);
     when(segmentZKMetadata.getSizeInBytes()).thenReturn(-1L);
-    when(segmentZKMetadata.getPushTime()).thenReturn(Long.MIN_VALUE);
-    when(segmentZKMetadata.getCreationTime()).thenReturn(creationTimeMs);
     return segmentZKMetadata;
+  }
+
+  // A ZK Stat whose modification time (mtime) is set to the given epoch millis, used to drive the grace-window check.
+  private Stat mockStatWithMTime(long mTimeMs) {
+    Stat stat = new Stat();
+    stat.setMtime(mTimeMs);
+    return stat;
   }
 
   /**
@@ -603,7 +609,7 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
     when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
     when(resourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
-    SegmentZKMetadata committingSegmentZKMetadata = mockCommittingSegmentZKMetadata(System.currentTimeMillis());
+    SegmentZKMetadata committingSegmentZKMetadata = mockCommittingSegmentZKMetadata();
     when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, seg)).thenReturn(committingSegmentZKMetadata);
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
@@ -611,6 +617,8 @@ public class SegmentStatusCheckerTest {
     ZNRecord znRecord = new ZNRecord("0");
     znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
     when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+    // Just committed: znode mtime is now, within the grace window.
+    when(propertyStore.getStat(anyString(), anyInt())).thenReturn(mockStatWithMTime(System.currentTimeMillis()));
 
     // 1h grace window; the segment was just created, so it must be skipped and the table stays fully replicated.
     runSegmentStatusChecker(resourceManager, 3600);
@@ -649,9 +657,7 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
     when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
     when(resourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
-    // Created 2h ago, still under-replicated -> a stuck commit, must not be graced.
-    SegmentZKMetadata committingSegmentZKMetadata =
-        mockCommittingSegmentZKMetadata(System.currentTimeMillis() - 7200000L);
+    SegmentZKMetadata committingSegmentZKMetadata = mockCommittingSegmentZKMetadata();
     when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, seg)).thenReturn(committingSegmentZKMetadata);
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
@@ -659,6 +665,9 @@ public class SegmentStatusCheckerTest {
     ZNRecord znRecord = new ZNRecord("0");
     znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
     when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+    // Committed 2h ago (znode mtime), still under-replicated -> a stuck commit, must not be graced.
+    when(propertyStore.getStat(anyString(), anyInt()))
+        .thenReturn(mockStatWithMTime(System.currentTimeMillis() - 7200000L));
 
     // 1h grace window; the segment is 2h old and still 1/3 replicas up, so it must be flagged (33%).
     runSegmentStatusChecker(resourceManager, 3600);
