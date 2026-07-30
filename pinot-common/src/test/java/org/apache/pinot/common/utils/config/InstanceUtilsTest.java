@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils.config;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -54,7 +53,7 @@ public class InstanceUtilsTest {
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY));
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
 
-    List<String> tags = Collections.singletonList("DefaultTenant_BROKER");
+    List<String> tags = List.of("DefaultTenant_BROKER");
     instance = new Instance("localhost", 2345, InstanceType.BROKER, tags, null, 0, 0, 0, 0, false);
     instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
     assertEquals(instanceConfig.getInstanceName(), "Broker_localhost_2345");
@@ -94,7 +93,7 @@ public class InstanceUtilsTest {
         "456");
     assertEquals(znRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED), "true");
 
-    tags = Collections.singletonList("minion_untagged");
+    tags = List.of("minion_untagged");
     instance = new Instance("localhost", 4567, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
     instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
     assertEquals(instanceConfig.getInstanceName(), "Minion_localhost_4567");
@@ -119,7 +118,7 @@ public class InstanceUtilsTest {
     assertInstanceEquals(rtController, controller);
 
     // Broker — with tags
-    List<String> brokerTags = Collections.singletonList("DefaultTenant_BROKER");
+    List<String> brokerTags = List.of("DefaultTenant_BROKER");
     Instance broker = new Instance("localhost", 2345, InstanceType.BROKER, brokerTags, null, 0, 0, 0, 0, false);
     Instance rtBroker = InstanceUtils.toInstance(InstanceUtils.toHelixInstanceConfig(broker));
     assertInstanceEquals(rtBroker, broker);
@@ -135,7 +134,7 @@ public class InstanceUtilsTest {
     assertInstanceEquals(rtServer, server);
 
     // Minion — with tags, no pools
-    List<String> minionTags = Collections.singletonList("minion_untagged");
+    List<String> minionTags = List.of("minion_untagged");
     Instance minion = new Instance("localhost", 4567, InstanceType.MINION, minionTags, null, 0, 0, 0, 0, false);
     Instance rtMinion = InstanceUtils.toInstance(InstanceUtils.toHelixInstanceConfig(minion));
     assertInstanceEquals(rtMinion, minion);
@@ -167,7 +166,7 @@ public class InstanceUtilsTest {
     assertEquals(actual.getPort(), expected.getPort());
     assertEquals(actual.getType(), expected.getType());
     // toHelixInstanceConfig converts null tags to empty list
-    List<String> expectedTags = expected.getTags() != null ? expected.getTags() : Collections.emptyList();
+    List<String> expectedTags = expected.getTags() != null ? expected.getTags() : List.of();
     assertEquals(actual.getTags(), expectedTags);
     assertEquals(actual.getPools(), expected.getPools());
     // toHelixInstanceConfig strips ports <= 0, so toInstance reads them back as -1
@@ -185,7 +184,7 @@ public class InstanceUtilsTest {
   @Test
   public void testUpdateHelixInstanceConfig() {
     Instance instance =
-        new Instance("localhost", 1234, InstanceType.SERVER, Collections.singletonList("DefaultTenant_OFFLINE"), null,
+        new Instance("localhost", 1234, InstanceType.SERVER, List.of("DefaultTenant_OFFLINE"), null,
             0, 123, 234, 345, false);
     InstanceConfig instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
 
@@ -194,7 +193,7 @@ public class InstanceUtilsTest {
     znRecord.setSimpleField("customSimple", "potato");
     List<String> customList = Arrays.asList("foo", "bar");
     znRecord.setListField("customList", customList);
-    Map<String, String> customMap = Collections.singletonMap("foo", "bar");
+    Map<String, String> customMap = Map.of("foo", "bar");
     znRecord.setMapField("customMap", customMap);
 
     List<String> tags = Arrays.asList("T1_OFFLINE", "T2_REALTIME");

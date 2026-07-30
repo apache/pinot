@@ -142,26 +142,26 @@ public class ResourceUtils {
             segmentBytesDownloading);
   }
 
-    public static void emitPostSegmentDownloadMetrics(ControllerMetrics controllerMetrics, String rawTableName,
+  public static void emitPostSegmentDownloadMetrics(ControllerMetrics controllerMetrics, String rawTableName,
                                                         long startTimeMs, long segmentSizeInBytes) {
-      long readCount = _deepStoreReadOpsInProgress.decrementAndGet();
-      controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_READ_OPS_IN_PROGRESS, readCount);
-      controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_READ_OPS_IN_PROGRESS, readCount);
+    long readCount = _deepStoreReadOpsInProgress.decrementAndGet();
+    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_READ_OPS_IN_PROGRESS, readCount);
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_READ_OPS_IN_PROGRESS, readCount);
 
-      long segmentBytesDownloading = _deepStoreReadBytesInProgress.addAndGet(-segmentSizeInBytes);
-      controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_READ_BYTES_IN_PROGRESS,
+    long segmentBytesDownloading = _deepStoreReadBytesInProgress.addAndGet(-segmentSizeInBytes);
+    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_READ_BYTES_IN_PROGRESS,
               segmentBytesDownloading);
-      controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_READ_BYTES_IN_PROGRESS,
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_READ_BYTES_IN_PROGRESS,
               segmentBytesDownloading);
 
-      long durationMs = System.currentTimeMillis() - startTimeMs;
-      controllerMetrics.addTimedTableValue(rawTableName, ControllerTimer.DEEP_STORE_SEGMENT_READ_TIME_MS,
+    long durationMs = System.currentTimeMillis() - startTimeMs;
+    controllerMetrics.addTimedTableValue(rawTableName, ControllerTimer.DEEP_STORE_SEGMENT_READ_TIME_MS,
               durationMs, TimeUnit.MILLISECONDS);
-      controllerMetrics.addTimedValue(ControllerTimer.DEEP_STORE_SEGMENT_READ_TIME_MS, durationMs,
+    controllerMetrics.addTimedValue(ControllerTimer.DEEP_STORE_SEGMENT_READ_TIME_MS, durationMs,
               TimeUnit.MILLISECONDS);
 
-      controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.DEEP_STORE_READ_BYTES_COMPLETED,
+    controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.DEEP_STORE_READ_BYTES_COMPLETED,
               segmentSizeInBytes);
-      controllerMetrics.addMeteredGlobalValue(ControllerMeter.DEEP_STORE_READ_BYTES_COMPLETED, segmentSizeInBytes);
-    }
+    controllerMetrics.addMeteredGlobalValue(ControllerMeter.DEEP_STORE_READ_BYTES_COMPLETED, segmentSizeInBytes);
+  }
 }

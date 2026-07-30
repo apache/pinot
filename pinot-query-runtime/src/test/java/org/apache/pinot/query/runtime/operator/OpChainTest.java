@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -197,7 +196,7 @@ public class OpChainTest {
 
     @Override
     public List<MultiStageOperator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -64,6 +65,25 @@ public class QueryExecutionContext {
   private final List<Future<?>> _tasks = new ArrayList<>();
 
   private volatile TerminationException _terminateException;
+
+  /// Per-query scan cost accumulators for scan-based killing, tracking cumulative scan cost across all segments.
+  @Nullable
+  private volatile QueryScanCostContext _queryScanCostContext;
+
+  @Nullable
+  private volatile Object _cachedKillingStrategy;
+
+  @Nullable
+  private volatile String _tableName;
+
+  @Nullable
+  private volatile String _queryId;
+
+  @Nullable
+  private volatile Accounting.ScanKillingMode _effectiveScanKillingMode;
+
+  /// Guards single-emission of the scan-based killing dry-run log line and metric for this query
+  private final AtomicBoolean _scanKillingDryRunEmitted = new AtomicBoolean(false);
 
   public QueryExecutionContext(QueryType queryType, long requestId, String cid, String workloadName, long startTimeMs,
       long activeDeadlineMs, long passiveDeadlineMs, String brokerId, String instanceId, String queryHash) {
@@ -192,5 +212,66 @@ public class QueryExecutionContext {
   @Nullable
   public TerminationException getTerminateException() {
     return _terminateException;
+  }
+
+  @Nullable
+  public QueryScanCostContext getQueryScanCostContext() {
+    return _queryScanCostContext;
+  }
+
+  public void setQueryScanCostContext(@Nullable QueryScanCostContext queryScanCostContext) {
+    _queryScanCostContext = queryScanCostContext;
+  }
+
+  @Nullable
+  public Object getCachedKillingStrategy() {
+    return _cachedKillingStrategy;
+  }
+
+  public void setCachedKillingStrategy(@Nullable Object cachedKillingStrategy) {
+    _cachedKillingStrategy = cachedKillingStrategy;
+  }
+
+  @Nullable
+  public String getTableName() {
+    return _tableName;
+  }
+
+  public void setTableName(@Nullable String tableName) {
+    _tableName = tableName;
+  }
+
+  @Nullable
+  public String getQueryId() {
+    return _queryId;
+  }
+
+  public void setQueryId(@Nullable String queryId) {
+    _queryId = queryId;
+  }
+
+  /**
+   * Returns the per-table scan killing mode override set for this query, or {@code null} if no
+   * table-level override is configured. When {@code null}, the cluster-level mode from
+   * {@link org.apache.pinot.spi.utils.CommonConstants.Accounting} applies.
+   */
+  @Nullable
+  public Accounting.ScanKillingMode getEffectiveScanKillingMode() {
+    return _effectiveScanKillingMode;
+  }
+
+  /**
+   * Sets the per-table scan killing mode for this query. Pass {@code null} to fall back to the
+   * cluster-level mode. Called once during query initialization; thread-safe via {@code volatile}.
+   */
+  public void setEffectiveScanKillingMode(@Nullable Accounting.ScanKillingMode effectiveScanKillingMode) {
+    _effectiveScanKillingMode = effectiveScanKillingMode;
+  }
+
+  /**
+   * Atomically marks that the scan-based killing dry-run signal has been emitted for this query
+   */
+  public boolean markScanKillingDryRunEmitted() {
+    return _scanKillingDryRunEmitted.compareAndSet(false, true);
   }
 }

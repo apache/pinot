@@ -113,7 +113,7 @@ public class NodeConfig extends BaseJsonConfig {
   }
 
   public Type getNodeType() {
-      return _nodeType;
+    return _nodeType;
   }
 
   public EnforcementProfile getEnforcementProfile() {

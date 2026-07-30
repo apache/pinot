@@ -21,7 +21,6 @@ import com.google.common.collect.Lists;
 import it.unimi.dsi.fastutil.ints.IntIntPair;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -395,7 +394,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
           new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(null), false, 0, null);
       InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
           new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 0, 0, 0, false, null);
-      tableConfig.setInstanceAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+      tableConfig.setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
           new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false)));
       _helixResourceManager.updateTableConfig(tableConfig);
 
@@ -1280,7 +1279,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig.setBootstrap(false);
     rebalanceConfig.setBestEfforts(false);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setTierConfigList(Collections.singletonList(
+        .setTierConfigList(List.of(
             new TierConfig("dummyTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
                 TierFactory.PINOT_SERVER_STORAGE_TYPE,
                 TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME), null, null)))
@@ -1770,7 +1769,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
             null);
     InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
         new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 0, 0, 0, false, null);
-    tableConfig.setInstanceAssignmentConfigMap(Collections.singletonMap(TIER_A_NAME,
+    tableConfig.setInstanceAssignmentConfigMap(Map.of(TIER_A_NAME,
         new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false)));
     _helixResourceManager.updateTableConfig(tableConfig);
 
@@ -2425,14 +2424,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     tgt3.put("server2", "ONLINE");
     targetAssignment.put("segment3", tgt3);
 
-    // Segment 4: one instance is ONLINE, should not be considered
+    // Segment 4: OFFLINE (no CONSUMING replica), should not be considered
     Map<String, String> cur4 = new HashMap<>();
-    cur4.put("server1", "ONLINE");
-    cur4.put("server2", "CONSUMING");
+    cur4.put("server1", "OFFLINE");
+    cur4.put("server2", "OFFLINE");
     currentAssignment.put("segment4", cur4);
     Map<String, String> tgt4 = new HashMap<>();
-    tgt4.put("server1", "ONLINE");
-    tgt4.put("server2", "CONSUMING");
+    tgt4.put("server3", "OFFLINE");
+    tgt4.put("server4", "OFFLINE");
     targetAssignment.put("segment4", tgt4);
 
     // Segment 5: no ONLINE instance, but at least one in CONSUMING, should be considered moving

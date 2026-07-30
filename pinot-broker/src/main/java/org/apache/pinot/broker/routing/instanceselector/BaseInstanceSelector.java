@@ -21,7 +21,6 @@ package org.apache.pinot.broker.routing.instanceselector;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -281,7 +280,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
         } else {
           // Old segment
-          _oldSegmentCandidatesMap.put(segment, Collections.emptyList());
+          _oldSegmentCandidatesMap.put(segment, List.of());
         }
       } else {
         TreeSet<String> onlineInstances = getOnlineInstances(idealStateInstanceStateMap, externalViewInstanceStateMap);
@@ -461,7 +460,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   public SelectionResult select(BrokerRequest brokerRequest, List<String> segments, long requestId) {
     Map<String, String> queryOptions =
         (brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().getQueryOptions() != null)
-            ? brokerRequest.getPinotQuery().getQueryOptions() : Collections.emptyMap();
+            ? brokerRequest.getPinotQuery().getQueryOptions() : Map.of();
     int requestIdInt = (int) (requestId % MAX_REQUEST_ID);
     // Copy the volatile reference so that segmentToInstanceMap and unavailableSegments can have a consistent view of
     // the state.
@@ -471,7 +470,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
 
     if (unavailableSegments.isEmpty()) {
-      return new SelectionResult(segmentToInstanceMap, Collections.emptyList(), 0);
+      return new SelectionResult(segmentToInstanceMap, List.of(), 0);
     } else {
       List<String> unavailableSegmentsForRequest = new ArrayList<>();
       for (String segment : segments) {

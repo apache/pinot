@@ -142,7 +142,7 @@ public class BrokerRoutingManagerTest {
     // Don't set callback
 
     // Enable server
-    List<ZNRecord> instanceConfigs = Collections.singletonList(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
             anyInt(), anyInt())).thenReturn(instanceConfigs);
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
@@ -152,7 +152,7 @@ public class BrokerRoutingManagerTest {
 
     // Disable then re-enable
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
-            anyInt(), anyInt())).thenReturn(Collections.emptyList());
+            anyInt(), anyInt())).thenReturn(List.of());
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
 
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
@@ -171,7 +171,7 @@ public class BrokerRoutingManagerTest {
     _routingManager.setServerReenableCallback(_serverReenableCallback);
 
     // First, enable the server by processing instance config change
-    List<ZNRecord> instanceConfigs = Collections.singletonList(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
         anyInt(), anyInt())).thenReturn(instanceConfigs);
 
@@ -186,7 +186,7 @@ public class BrokerRoutingManagerTest {
     // Now simulate server being disabled then re-enabled (e.g., restart)
     // First, disable
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
-        anyInt(), anyInt())).thenReturn(Collections.emptyList());
+        anyInt(), anyInt())).thenReturn(List.of());
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
 
     // Then re-enable
@@ -209,7 +209,7 @@ public class BrokerRoutingManagerTest {
     _routingManager.setServerReenableCallback(_serverReenableCallback);
 
     // Enable a new server (never excluded)
-    List<ZNRecord> instanceConfigs = Collections.singletonList(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
         anyInt(), anyInt())).thenReturn(instanceConfigs);
 
@@ -227,7 +227,7 @@ public class BrokerRoutingManagerTest {
     TimeBoundaryInfo expectedTimeBoundaryInfo = new TimeBoundaryInfo("DaysSinceEpoch", "20000");
     TablePartitionInfo expectedPartitionInfo =
         new TablePartitionInfo(TEST_TABLE, "partitionCol", "Modulo", 2,
-            List.of(Collections.emptyList(), Collections.emptyList()), Collections.emptyList());
+            List.of(List.of(), List.of()), List.of());
     TablePartitionReplicatedServersInfo expectedReplicatedServersInfo = mock(TablePartitionReplicatedServersInfo.class);
     when(timeBoundaryManager.getTimeBoundaryInfo()).thenReturn(expectedTimeBoundaryInfo);
     when(partitionMetadataManager.getTablePartitionInfo()).thenReturn(expectedPartitionInfo);
@@ -266,7 +266,7 @@ public class BrokerRoutingManagerTest {
   @Test
   public void testRoutableServerInstanceMapReflectsExclusion() {
     // Enable server
-    List<ZNRecord> instanceConfigs = Collections.singletonList(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
         .thenReturn(instanceConfigs);
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);

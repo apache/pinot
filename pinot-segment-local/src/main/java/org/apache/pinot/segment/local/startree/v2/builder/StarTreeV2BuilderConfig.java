@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +68,7 @@ public class StarTreeV2BuilderConfig {
           "Can not skip star-node creation for dimensions not in the split order, dimensionsSplitOrder: %s, "
               + "skipStarNodeCreationForDimensions: %s", dimensionsSplitOrder, skipStarNodeCreationForDimensions);
     } else {
-      skipStarNodeCreationForDimensions = Collections.emptySet();
+      skipStarNodeCreationForDimensions = Set.of();
     }
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
     if (indexConfig.getFunctionColumnPairs() != null) {
@@ -183,7 +182,7 @@ public class StarTreeV2BuilderConfig {
           AggregationSpec.DEFAULT);
     }
 
-    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), aggregationSpecs,
+    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Set.of(), aggregationSpecs,
         DEFAULT_MAX_LEAF_RECORDS);
   }
 
@@ -249,7 +248,7 @@ public class StarTreeV2BuilderConfig {
           AggregationSpec.DEFAULT);
     }
 
-    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), aggregationSpecs,
+    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Set.of(), aggregationSpecs,
         DEFAULT_MAX_LEAF_RECORDS);
   }
 

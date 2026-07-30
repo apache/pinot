@@ -26,8 +26,10 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReaderFa
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.utils.ReadMode;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -56,36 +58,24 @@ public class ColumnReaderInterfaceTest extends ColumnarSegmentBuildingTestBase {
 
         // Test that all expected columns are available
         Set<String> availableColumns = factory.getAvailableColumns();
-        Assert.assertTrue(availableColumns.contains(STRING_COL_1));
-        Assert.assertTrue(availableColumns.contains(INT_COL_1));
-        Assert.assertTrue(availableColumns.contains(MV_INT_COL));
+        assertTrue(availableColumns.contains(STRING_COL_1));
+        assertTrue(availableColumns.contains(INT_COL_1));
+        assertTrue(availableColumns.contains(MV_INT_COL));
 
         // Test getting individual column readers
         ColumnReader stringReader = factory.getColumnReader(STRING_COL_1);
-        Assert.assertEquals(stringReader.getColumnName(), STRING_COL_1);
+        assertEquals(stringReader.getColumnName(), STRING_COL_1);
 
         ColumnReader mvReader = factory.getColumnReader(MV_INT_COL);
-        Assert.assertEquals(mvReader.getColumnName(), MV_INT_COL);
+        assertEquals(mvReader.getColumnName(), MV_INT_COL);
 
-        // Test reading values using iterator pattern
-        Assert.assertTrue(stringReader.hasNext());
-        Object firstStringValue = stringReader.next();
-        Assert.assertEquals(firstStringValue, "string1_0");
-
-        // Test that we can continue reading
-        Assert.assertTrue(stringReader.hasNext());
-        Object secondStringValue = stringReader.next();
-        Assert.assertEquals(secondStringValue, "string1_1");
-
-        // Reset and test again
-        stringReader.rewind();
-        Assert.assertTrue(stringReader.hasNext());
-        firstStringValue = stringReader.next();
-        Assert.assertEquals(firstStringValue, "string1_0");
+        // Test reading values by document ID
+        assertEquals(stringReader.getValue(0), "string1_0");
+        assertEquals(stringReader.getValue(1), "string1_1");
 
         // Test getting all column readers
         Map<String, ColumnReader> allReaders = factory.getAllColumnReaders();
-        Assert.assertEquals(allReaders.size(), _originalSchema.getPhysicalColumnNames().size());
+        assertEquals(allReaders.size(), _originalSchema.getPhysicalColumnNames().size());
       }
     } finally {
       segment.destroy();
@@ -106,21 +96,15 @@ public class ColumnReaderInterfaceTest extends ColumnarSegmentBuildingTestBase {
 
         // Test getting reader for new column
         ColumnReader newStringReader = factory.getColumnReader(NEW_STRING_COL);
-        Assert.assertEquals(newStringReader.getColumnName(), NEW_STRING_COL);
+        assertEquals(newStringReader.getColumnName(), NEW_STRING_COL);
 
-        // Verify it returns default values using iterator pattern
-        Assert.assertTrue(newStringReader.hasNext());
-        Object defaultValue = newStringReader.next();
-        Assert.assertEquals(defaultValue, _extendedSchema.getFieldSpecFor(NEW_STRING_COL).getDefaultNullValue());
-
-        // Test that all values are the same (default)
-        int valueCount = 1; // We already read one value
-        while (newStringReader.hasNext()) {
-          Object value = newStringReader.next();
-          Assert.assertEquals(value, defaultValue);
-          valueCount++;
+        // Verify it returns default values by document ID
+        Object defaultValue = _extendedSchema.getFieldSpecFor(NEW_STRING_COL).getDefaultNullValue();
+        int numDocs = newStringReader.getTotalDocs();
+        assertEquals(numDocs, _testData.size());
+        for (int docId = 0; docId < numDocs; docId++) {
+          assertEquals(newStringReader.getValue(docId), defaultValue);
         }
-        Assert.assertEquals(valueCount, _testData.size());
       }
     } finally {
       segment.destroy();

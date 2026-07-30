@@ -343,7 +343,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
-        String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn";
+      String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();

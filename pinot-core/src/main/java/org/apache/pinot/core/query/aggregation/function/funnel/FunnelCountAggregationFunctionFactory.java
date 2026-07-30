@@ -27,8 +27,8 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.UpdateSketch;
+import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.UpdatableThetaSketch;
 import org.apache.datasketches.thetacommon.ThetaUtil;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -130,7 +130,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
     }
   }
 
-  AggregationStrategy<UpdateSketch[]> thetaSketchAggregationStrategy() {
+  AggregationStrategy<UpdatableThetaSketch[]> thetaSketchAggregationStrategy() {
     return new ThetaSketchAggregationStrategy(_stepExpressions, _correlateByExpressions, _nominalEntries);
   }
 
@@ -138,7 +138,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
     return new BitmapAggregationStrategy(_stepExpressions, _correlateByExpressions);
   }
 
-  MergeStrategy<List<Sketch>> thetaSketchMergeStrategy() {
+  MergeStrategy<List<ThetaSketch>> thetaSketchMergeStrategy() {
     return new ThetaSketchMergeStrategy(_numSteps, _nominalEntries);
   }
 
@@ -154,7 +154,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
     return new PartitionedMergeStrategy(_numSteps);
   }
 
-  ResultExtractionStrategy<UpdateSketch[], List<Sketch>> thetaSketchResultExtractionStrategy() {
+  ResultExtractionStrategy<UpdatableThetaSketch[], List<ThetaSketch>> thetaSketchResultExtractionStrategy() {
     return new ThetaSketchResultExtractionStrategy(_numSteps);
   }
 
@@ -168,6 +168,9 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
 
   ResultExtractionStrategy<DictIdsWrapper, List<Long>> bitmapPartitionedResultExtractionStrategy() {
     final MergeStrategy<List<RoaringBitmap>> bitmapMergeStrategy = bitmapMergeStrategy();
+    // For partitioned mode, each segment is self-contained: every row for a given correlation key
+    // appears in exactly one segment. Therefore we can count bitmap cardinality directly without
+    // converting segment-local composite IDs to global values — they will never be merged across segments.
     return dictIdsWrapper -> {
       if (dictIdsWrapper == null) {
         return Collections.nCopies(_numSteps, 0L);
@@ -176,8 +179,8 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
     };
   }
 
-  ResultExtractionStrategy<UpdateSketch[], List<Long>> thetaSketchPartitionedResultExtractionStrategy() {
-    final MergeStrategy<List<Sketch>> thetaSketchMergeStrategy = thetaSketchMergeStrategy();
+  ResultExtractionStrategy<UpdatableThetaSketch[], List<Long>> thetaSketchPartitionedResultExtractionStrategy() {
+    final MergeStrategy<List<ThetaSketch>> thetaSketchMergeStrategy = thetaSketchMergeStrategy();
     return sketches -> {
       if (sketches == null) {
         return Collections.nCopies(_numSteps, 0L);
@@ -226,7 +229,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
 
     public List<String> getLiterals(List<ExpressionContext> expressions) {
       List<ExpressionContext> inputExpressions =
-          find(expressions).map(exp -> exp.getFunction().getArguments()).orElseGet(Collections::emptyList);
+          find(expressions).map(exp -> exp.getFunction().getArguments()).orElseGet(List::of);
       Preconditions.checkArgument(
           inputExpressions.stream().allMatch(exp -> exp.getType() == ExpressionContext.Type.LITERAL),
           "FUNNELCOUNT: " + _name + " parameters must be literals");

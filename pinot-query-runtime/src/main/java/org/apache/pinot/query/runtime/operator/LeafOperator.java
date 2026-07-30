@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -44,6 +45,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
 import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
@@ -167,8 +169,14 @@ public class LeafOperator extends MultiStageOperator {
 
   @Override
   protected MultiStageQueryStats calculateUpstreamStats() {
+    // Return a COPY, not the shared instance. calculateStats() runs more than once per opchain (e.g. when the
+    // MailboxSendOperator serializes its EOS stats and again from the scheduler's completion callback that feeds the
+    // stream-stats listener), and the base calculateStats() appends this operator's entry to the returned object.
+    // Handing back the shared _pipelineBreakerStats would append LEAF (+ the downstream MAILBOX_SEND) once per call,
+    // duplicating the leaf opchain's own operators in the flat stats list. A non-pipeline-breaker leaf is immune
+    // because it returns a fresh emptyStats() each call.
     return _pipelineBreakerStats != null
-        ? _pipelineBreakerStats
+        ? MultiStageQueryStats.copy(_pipelineBreakerStats)
         : MultiStageQueryStats.emptyStats(_context.getStageId());
   }
 
@@ -360,6 +368,9 @@ public class LeafOperator extends MultiStageOperator {
         case NUM_GROUPS_WARNING_LIMIT_REACHED:
           _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
           break;
+        case LITE_MODE_LEAF_STAGE_LIMIT_REACHED:
+          _statMap.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
+          break;
         case TIME_USED_MS:
           _statMap.merge(StatKey.SSE_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
           break;
@@ -414,12 +425,28 @@ public class LeafOperator extends MultiStageOperator {
         case NUM_CONSUMING_SEGMENTS_MATCHED:
           _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
           break;
-        case SORTED:
         case EARLY_TERMINATION_REASON:
+          mergeEarlyTerminationReason(entry.getValue());
+          break;
+        case SORTED:
           break;
         default:
           throw new IllegalArgumentException("Unhandled leaf execution stat: " + key);
       }
+    }
+  }
+
+  private void mergeEarlyTerminationReason(@Nullable String earlyTerminationReason) {
+    if (earlyTerminationReason == null || earlyTerminationReason.isEmpty()) {
+      return;
+    }
+    try {
+      EarlyTerminationReason reason = EarlyTerminationReason.valueOf(earlyTerminationReason);
+      if (reason != EarlyTerminationReason.NONE) {
+        _statMap.merge(StatKey.EARLY_TERMINATION_REASONS, Set.of(reason.name()));
+      }
+    } catch (IllegalArgumentException e) {
+      LOGGER.debug("Skipping unknown early termination reason: {}", earlyTerminationReason);
     }
   }
 
@@ -726,6 +753,7 @@ public class LeafOperator extends MultiStageOperator {
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_RESIZES(StatMap.Type.INT, null),
     RESIZE_TIME_MS(StatMap.Type.LONG, null),
     THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),
@@ -749,7 +777,8 @@ public class LeafOperator extends MultiStageOperator {
     /**
      * Time spent in single-stage execution engine for this leaf stage.
      */
-    SSE_EXECUTION_TIME_MS(StatMap.Type.LONG, null);
+    SSE_EXECUTION_TIME_MS(StatMap.Type.LONG, null),
+    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
     //  call the constructor that accepts a String as last argument and set it to null.
     //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will
@@ -797,6 +826,9 @@ public class LeafOperator extends MultiStageOperator {
             break;
           case STRING:
             oldMetadata.merge(_brokerKey, stats.getString(this));
+            break;
+          case STRING_SET:
+            oldMetadata.merge(_brokerKey, stats.getStringSet(this));
             break;
           default:
             throw new IllegalStateException("Unsupported type: " + _type);

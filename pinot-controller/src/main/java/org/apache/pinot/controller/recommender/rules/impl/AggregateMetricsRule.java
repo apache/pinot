@@ -19,7 +19,6 @@
 
 package org.apache.pinot.controller.recommender.rules.impl;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -81,7 +80,7 @@ public class AggregateMetricsRule extends AbstractRule {
   private Set<ExpressionContext> getGroupByExpressions(QueryContext queryContext) {
     List<ExpressionContext> groupByExprs = queryContext.getGroupByExpressions();
     if (groupByExprs == null) {
-      return Collections.emptySet();
+      return Set.of();
     }
     return new HashSet<>(groupByExprs);
   }

@@ -297,6 +297,39 @@ public class DdlCompilerTest {
     assertEquals(custom.get("org.example.flag"), "true");
   }
 
+  /// `isMaterializedView` is identity (decides which CREATE statement to use), not a
+  /// PROPERTY. Routing it via CREATE TABLE PROPERTIES would either land in a config that the
+  /// SPI invariant `TableConfigUtils.validateMaterializedViewInvariants` rejects at addTable
+  /// time (flag=true with no MaterializedViewTask body) or silently no-op (flag=false is the
+  /// default). Reject up front so the operator gets a clear pointer to the dedicated
+  /// `CREATE MATERIALIZED VIEW` DDL form. Identity-source is the canonical
+  /// `TableConfig#isMaterializedView` flag introduced in PR #18564.
+  @Test
+  public void isMaterializedViewPropertyRejectedOnCreateTable() {
+    DdlCompilationException ex = expectThrows(DdlCompilationException.class, () -> compileCreate(
+        "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE PROPERTIES ("
+            + "  'isMaterializedView' = 'true'"
+            + ")"));
+    assertTrue(ex.getMessage() != null && ex.getMessage().contains("isMaterializedView"),
+        "expected error to name the offending property, got: " + ex.getMessage());
+    assertTrue(ex.getMessage().contains("CREATE MATERIALIZED VIEW"),
+        "expected error to point at the dedicated MV DDL form, got: " + ex.getMessage());
+  }
+
+  /// Case-insensitive variant of the above — the property routing is case-insensitive
+  /// throughout, so the rejection must be too. Without this we would reject only the
+  /// camelCase form and silently accept the lower-cased one (the latter would then route
+  /// through the same handler but be matched at the switch level via `lowerKey`).
+  @Test
+  public void isMaterializedViewPropertyRejectedCaseInsensitive() {
+    DdlCompilationException ex = expectThrows(DdlCompilationException.class, () -> compileCreate(
+        "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE PROPERTIES ("
+            + "  'ISMATERIALIZEDVIEW' = 'false'"
+            + ")"));
+    assertTrue(ex.getMessage() != null && ex.getMessage().contains("isMaterializedView"),
+        "expected error to canonicalise the key in its message, got: " + ex.getMessage());
+  }
+
   // -------------------------------------------------------------------------------------------
   // CREATE TABLE: validation
   // -------------------------------------------------------------------------------------------
@@ -474,6 +507,33 @@ public class DdlCompilerTest {
   public void compileShowFromDatabase() {
     CompiledShowTables s = (CompiledShowTables) DdlCompiler.compile("SHOW TABLES FROM analytics");
     assertEquals(s.getDatabaseName(), "analytics");
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // SHOW MATERIALIZED VIEWS
+  //
+  // Compile-layer mirror of SHOW TABLES. The controller is responsible for the actual MV
+  // filtering against TableConfig#isMaterializedView; here we only verify the compile result
+  // carries the right operation discriminator and the database scope is plumbed through
+  // (null when omitted, explicit string when `FROM db` is given).
+  // -------------------------------------------------------------------------------------------
+
+  @Test
+  public void compileShowMaterializedViewsDefault() {
+    CompiledShowMaterializedViews s = (CompiledShowMaterializedViews) DdlCompiler.compile(
+        "SHOW MATERIALIZED VIEWS");
+    assertNull(s.getDatabaseName(),
+        "Database must remain null when omitted so the controller falls back to the Database "
+            + "header rather than substituting a default at compile time.");
+    assertEquals(s.getOperation(), DdlOperation.SHOW_MATERIALIZED_VIEWS);
+  }
+
+  @Test
+  public void compileShowMaterializedViewsFromDatabase() {
+    CompiledShowMaterializedViews s = (CompiledShowMaterializedViews) DdlCompiler.compile(
+        "SHOW MATERIALIZED VIEWS FROM analytics");
+    assertEquals(s.getDatabaseName(), "analytics");
+    assertEquals(s.getOperation(), DdlOperation.SHOW_MATERIALIZED_VIEWS);
   }
 
   // -------------------------------------------------------------------------------------------

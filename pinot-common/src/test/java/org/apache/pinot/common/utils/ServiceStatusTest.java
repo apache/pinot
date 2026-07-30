@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -227,7 +226,7 @@ public class ServiceStatusTest {
 
   private TestIdealStateAndExternalViewMatchServiceStatusCallback buildTestISEVCallback() {
     return new TestIdealStateAndExternalViewMatchServiceStatusCallback("potato", INSTANCE_NAME,
-        Collections.singletonList(TABLE_NAME));
+        List.of(TABLE_NAME));
   }
 
   private String generateRandomString(int len) {

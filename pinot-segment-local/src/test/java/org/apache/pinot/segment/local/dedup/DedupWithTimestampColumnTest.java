@@ -212,8 +212,8 @@ public class DedupWithTimestampColumnTest {
     // TIMESTAMP values are stored as LONG (epoch milliseconds)
     long currentTimeMillis = System.currentTimeMillis();
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
-      this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
-    }});
+        this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
+      }});
     doReturn(currentTimeMillis).when(columnMetadata).getMaxValue();
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
 

@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -70,7 +69,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
           .addSingleValueDimension(NON_H3_INDEX_COLUMN, DataType.BYTES)
           .addSingleValueDimension(H3_INDEX_GEOMETRY_COLUMN, DataType.BYTES)
           .addSingleValueDimension(NON_H3_INDEX_GEOMETRY_COLUMN, DataType.BYTES).build();
-  private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
+  private static final Map<String, String> H3_INDEX_PROPERTIES = Map.of("resolutions", "5");
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setFieldConfigList(List.of(
           new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,

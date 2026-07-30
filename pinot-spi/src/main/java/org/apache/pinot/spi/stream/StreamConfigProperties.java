@@ -45,8 +45,7 @@ public class StreamConfigProperties {
   public static final String STREAM_IDLE_TIMEOUT_MILLIS = "idle.timeout.millis";
   public static final String STREAM_DECODER_CLASS = "decoder.class.name";
   public static final String DECODER_PROPS_PREFIX = "decoder.prop";
-  public static final String GROUP_ID = "hlc.group.id";
-  public static final String PARTITION_MSG_OFFSET_FACTORY_CLASS = "partition.offset.factory.class.name";
+  public static final String PARTITION_CONSUMPTION_RATE_LIMIT = "partition.consumption.rate.limit";
   public static final String TOPIC_CONSUMPTION_RATE_LIMIT = "topic.consumption.rate.limit";
   public static final String METADATA_POPULATE = "metadata.populate";
 
@@ -59,15 +58,10 @@ public class StreamConfigProperties {
    * @deprecated because the property key is confusing (says size but is actually rows). Use
    * {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS}
    *
-   * Row count flush threshold for realtime segments. This behaves in a similar way for HLC and LLC. For HLC,
-   * since there is only one consumer per server, this size is used as the size of the consumption buffer and
-   * determines after how many rows we flush to disk. For example, if this threshold is set to two million rows,
-   * then a high level consumer would have a buffer size of two million.
-   *
-   * For LLC, this size is divided across all the segments assigned to a given server and is set on a per segment
-   * basis. Assuming a low level consumer server is assigned four stream partitions to consume from and a flush
-   * size of two million, then each consuming segment would have a flush size of five hundred thousand rows, for a
-   * total of two million rows in memory.
+   * Row count flush threshold for realtime segments. This size is divided across all the segments assigned to a given
+   * server and is set on a per segment basis. Assuming a server is assigned four stream partitions to consume from and
+   * a flush size of two million, then each consuming segment would have a flush size of five hundred thousand rows, for
+   * a total of two million rows in memory.
    *
    * Keep in mind that this NOT a hard threshold, as other tables can also be assigned to this server, and that in
    * certain conditions (eg. if the number of servers, replicas of partitions changes) where partition

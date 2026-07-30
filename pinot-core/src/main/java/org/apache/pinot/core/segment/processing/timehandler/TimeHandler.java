@@ -36,6 +36,12 @@ public interface TimeHandler {
 
   String DEFAULT_PARTITION = "0";
 
+  /// Name of the hidden column carrying the original (pre-rounding) time value in millis. It is used as an extra
+  /// sort field in the intermediate generic row files so that order sensitive aggregations (e.g. FIRSTWITHTIME,
+  /// LASTWITHTIME) can pick values based on the original time order. It is never part of the table schema, and is
+  /// stripped before the output segments are created.
+  String ORIGINAL_TIME_MS_COLUMN = "$originalTimeMs$";
+
   /**
    * Filters/rounds the time value for the given row and returns the time partition, or {@code null} if the row is
    * filtered out. The time value is modified in-place.

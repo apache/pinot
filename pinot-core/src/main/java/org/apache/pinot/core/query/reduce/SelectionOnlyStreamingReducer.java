@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
@@ -96,7 +95,7 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
         SelectionOperatorUtils.getResultTableDataSchemaAndColumnIndices(_queryContext, _dataSchema);
     ResultTable resultTable;
     if (_rows.isEmpty()) {
-      resultTable = new ResultTable(pair.getLeft(), Collections.emptyList());
+      resultTable = new ResultTable(pair.getLeft(), List.of());
     } else {
       resultTable = SelectionOperatorUtils.renderResultTableWithoutOrdering(_rows, pair.getLeft(), pair.getRight());
     }

@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils.config;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +96,7 @@ public final class TierConfigUtils {
 
   @Nullable
   public static String getDataDirForTier(TableConfig tableConfig, String tierName) {
-    return getDataDirForTier(tableConfig, tierName, Collections.emptyMap());
+    return getDataDirForTier(tableConfig, tierName, Map.of());
   }
 
   @Nullable

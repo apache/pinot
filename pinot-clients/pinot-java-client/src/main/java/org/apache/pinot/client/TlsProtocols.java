@@ -19,34 +19,33 @@
 package org.apache.pinot.client;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
  * TLS Protocols enabled for AsyncHttpClient
  */
 public class TlsProtocols {
-    private final List<String> _enabledProtocols;
+  private final List<String> _enabledProtocols;
 
-    private TlsProtocols(List<String> enabledProtocols) {
-        _enabledProtocols = enabledProtocols;
-    }
+  private TlsProtocols(List<String> enabledProtocols) {
+    _enabledProtocols = enabledProtocols;
+  }
 
-    public List<String> getEnabledProtocols() {
-        if (_enabledProtocols != null) {
-            return _enabledProtocols;
-        }
-        return Collections.emptyList();
+  public List<String> getEnabledProtocols() {
+    if (_enabledProtocols != null) {
+      return _enabledProtocols;
     }
+    return List.of();
+  }
 
-    public static TlsProtocols defaultProtocols(boolean tlsV10Enabled) {
-        List<String> enabledProtocols = new ArrayList<>();
-        enabledProtocols.add("TLSv1.3");
-        enabledProtocols.add("TLSv1.2");
-        enabledProtocols.add("TLSv1.1");
-        if (tlsV10Enabled) {
-            enabledProtocols.add("TLSv1.0");
-        }
-        return new TlsProtocols(enabledProtocols);
+  public static TlsProtocols defaultProtocols(boolean tlsV10Enabled) {
+    List<String> enabledProtocols = new ArrayList<>();
+    enabledProtocols.add("TLSv1.3");
+    enabledProtocols.add("TLSv1.2");
+    enabledProtocols.add("TLSv1.1");
+    if (tlsV10Enabled) {
+      enabledProtocols.add("TLSv1.0");
     }
+    return new TlsProtocols(enabledProtocols);
+  }
 }

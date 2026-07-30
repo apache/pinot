@@ -46,9 +46,9 @@ public class CertBasedTlsChannelAccessControlFactory implements AccessControlFac
     private final Logger _logger = LoggerFactory.getLogger(CertBasedTlsChannelAccessControl.class);
 
     private final Set<String> _aclPrincipalAllowlist = new HashSet<String>() {{
-      add("CN=test-jks, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown");
-      add("CN=test-p12, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown");
-    }};
+        add("CN=test-jks, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown");
+        add("CN=test-p12, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown");
+      }};
 
     @Override
     public boolean isAuthorizedChannel(ChannelHandlerContext channelHandlerContext) {

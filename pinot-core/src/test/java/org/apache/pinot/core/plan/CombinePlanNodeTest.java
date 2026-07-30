@@ -31,11 +31,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class CombinePlanNodeTest {
@@ -63,7 +71,7 @@ public class CombinePlanNodeTest {
       _queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
       CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
       combinePlanNode.run();
-      Assert.assertEquals(numPlans, count.get());
+      assertEquals(numPlans, count.get());
     }
   }
 
@@ -89,12 +97,66 @@ public class CombinePlanNodeTest {
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {
-      Assert.assertTrue(e.getCause() instanceof TimeoutException);
-      Assert.assertFalse(notInterrupted.get());
+      assertTrue(e.getCause() instanceof TimeoutException);
+      assertFalse(notInterrupted.get());
       return;
     }
     // Fail.
-    Assert.fail();
+    fail();
+  }
+
+  /**
+   * Tests that query termination is checked while building the combine operator, so a terminated query stops before
+   * running the plan nodes. With a small number of plan nodes the combine operator is built sequentially on the
+   * calling thread (numTasks == 1), so it observes the QueryThreadContext set up on this thread.
+   */
+  @Test
+  public void testTerminationCheckedDuringPlanning() {
+    try (QueryThreadContext threadContext = QueryThreadContext.openForSseTest()) {
+      threadContext.getExecutionContext().terminate(QueryErrorCode.QUERY_CANCELLATION, "terminated for test");
+      AtomicInteger count = new AtomicInteger();
+      List<PlanNode> planNodes = new ArrayList<>();
+      for (int i = 0; i < 5; i++) {
+        planNodes.add(() -> {
+          count.incrementAndGet();
+          return null;
+        });
+      }
+      _queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
+      try {
+        combinePlanNode.run();
+        fail("Should have thrown TerminationException");
+      } catch (TerminationException e) {
+        assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_CANCELLATION);
+        // Termination is checked before running any plan node
+        assertEquals(count.get(), 0);
+      }
+    }
+  }
+
+  /**
+   * Tests that a QueryException thrown while building a plan node in parallel mode is surfaced as-is with its error
+   * code preserved, instead of being wrapped in a generic RuntimeException.
+   */
+  @Test
+  public void testQueryExceptionPreservedInParallel() {
+    List<PlanNode> planNodes = new ArrayList<>();
+    for (int i = 0; i < 20; i++) {
+      planNodes.add(() -> {
+        throw new BadQueryRequestException("Bad query for test");
+      });
+    }
+    _queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    // Force parallel execution (numTasks > 1) regardless of the number of available processors
+    _queryContext.setMaxExecutionThreads(2);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
+    try {
+      combinePlanNode.run();
+      fail("Should have thrown BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
+    }
   }
 
   @Test
@@ -110,11 +172,11 @@ public class CombinePlanNodeTest {
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {
-      Assert.assertEquals(e.getCause().getMessage(), "java.lang.RuntimeException: Inner exception message.");
+      assertEquals(e.getCause().getMessage(), "java.lang.RuntimeException: Inner exception message.");
       return;
     }
     // Fail.
-    Assert.fail();
+    fail();
   }
 
   @Test
@@ -156,7 +218,7 @@ public class CombinePlanNodeTest {
       // waiting can be cancelled as below.
       future.cancel(true);
     } catch (Exception e) {
-      Assert.fail();
+      fail();
     } finally {
       combineExecutor.shutdownNow();
     }

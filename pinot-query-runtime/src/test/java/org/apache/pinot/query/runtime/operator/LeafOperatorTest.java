@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,12 +29,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
@@ -48,8 +53,11 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterClass;
@@ -63,6 +71,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -121,7 +130,7 @@ public class LeafOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+    List<BaseResultsBlock> dataBlocks = List.of(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
@@ -143,6 +152,52 @@ public class LeafOperatorTest {
   }
 
   @Test
+  public void calculateStatsIsIdempotentWhenFoldingPipelineBreaker() {
+    // Regression for a pipeline-breaker leaf whose own operators were duplicated in the flat stats. calculateStats()
+    // runs more than once per opchain (the MailboxSendOperator serializing its EOS stats, then again from the
+    // scheduler completion callback that feeds the stream-stats listener). The folded pipeline-breaker stats are a
+    // shared mutable instance, so LeafOperator.calculateUpstreamStats() must hand back a COPY -- otherwise each call
+    // appends this leaf's own LEAF entry again, inflating the flat operator list and breaking the stats-tree encoder
+    // with a treeSize != flatSize mismatch.
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT intCol FROM tbl");
+    List<BaseResultsBlock> dataBlocks = List.of(
+        new SelectionResultsBlock(schema, List.<Object[]>of(new Object[]{1}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+
+    // The leaf folds two operators (MAILBOX_RECEIVE + PIPELINE_BREAKER) ahead of its own LEAF entry.
+    OpChainExecutionContext context = OperatorTestUtil.getTracingContext();
+    MultiStageQueryStats pipelineBreakerStats = new MultiStageQueryStats.Builder(context.getStageId())
+        .customizeOpen(open -> open
+            .addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE,
+                new StatMap<>(BaseMailboxReceiveOperator.StatKey.class))
+            .addLastOperator(MultiStageOperator.Type.PIPELINE_BREAKER,
+                new StatMap<>(PipelineBreakerOperator.StatKey.class)))
+        .build();
+
+    LeafOperator operator = new LeafOperator(context, mockQueryRequests(1), schema, queryExecutor, _executorService,
+        pipelineBreakerStats);
+    _operatorRef.set(operator);
+
+    // Drain so the leaf produces its stats.
+    while (!operator.nextBlock().isEos()) {
+      // consume blocks
+    }
+
+    int firstCount = operator.calculateStats().getCurrentStats().getLastOperatorIndex() + 1;
+    int secondCount = operator.calculateStats().getCurrentStats().getLastOperatorIndex() + 1;
+
+    // MAILBOX_RECEIVE + PIPELINE_BREAKER (folded) + LEAF (this operator) = 3. A shared upstream instance would
+    // append LEAF a second time on the second call, yielding 4.
+    assertEquals(firstCount, 3, "Expected MAILBOX_RECEIVE, PIPELINE_BREAKER, LEAF");
+    assertEquals(secondCount, firstCount, "calculateStats() must be idempotent for a pipeline-breaker leaf");
+
+    operator.close();
+  }
+
+  @Test
   public void shouldHandleDesiredDataSchemaConversionCorrectly() {
     // Given:
     QueryContext queryContext =
@@ -153,7 +208,7 @@ public class LeafOperatorTest {
         new DataSchema(new String[]{"boolCol", "tsCol", "newNamedBoolCol"}, new DataSchema.ColumnDataType[]{
             DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP, DataSchema.ColumnDataType.BOOLEAN
         });
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(new SelectionResultsBlock(resultSchema,
+    List<BaseResultsBlock> dataBlocks = List.of(new SelectionResultsBlock(resultSchema,
         Arrays.asList(new Object[]{1, 1660000000000L}, new Object[]{0, 1600000000000L}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
@@ -239,7 +294,7 @@ public class LeafOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+    List<BaseResultsBlock> dataBlocks = List.of(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock errorBlock = new InstanceResponseBlock();
     errorBlock.addException(QueryErrorCode.QUERY_EXECUTION, "foobar");
@@ -268,9 +323,9 @@ public class LeafOperatorTest {
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
     DataSchema desiredSchema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.emptyList();
+    List<BaseResultsBlock> dataBlocks = List.of();
     InstanceResponseBlock emptySelectionResponseBlock =
-        new InstanceResponseBlock(new SelectionResultsBlock(resultSchema, Collections.emptyList(), queryContext));
+        new InstanceResponseBlock(new SelectionResultsBlock(resultSchema, List.of(), queryContext));
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, emptySelectionResponseBlock);
     LeafOperator operator =
         new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), desiredSchema, queryExecutor,
@@ -292,7 +347,7 @@ public class LeafOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+    List<BaseResultsBlock> dataBlocks = List.of(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
@@ -315,7 +370,7 @@ public class LeafOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+    List<BaseResultsBlock> dataBlocks = List.of(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
@@ -338,7 +393,7 @@ public class LeafOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+    List<BaseResultsBlock> dataBlocks = List.of(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
@@ -409,6 +464,93 @@ public class LeafOperatorTest {
   }
 
   @Test
+  public void shouldPropagateDistinctEarlyTerminationReason() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCT intCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.EARLY_TERMINATION_REASON.getName(),
+        EarlyTerminationReason.DISTINCT_MAX_ROWS.name());
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+
+    // Then:
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertEquals(List.copyOf(leafStats.getStringSet(LeafOperator.StatKey.EARLY_TERMINATION_REASONS)),
+        List.of(EarlyTerminationReason.DISTINCT_MAX_ROWS.name()));
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertEquals(brokerResponse.getEarlyTerminationReasons(), List.of(EarlyTerminationReason.DISTINCT_MAX_ROWS.name()));
+    assertTrue(brokerResponse.isPartialResult());
+    JsonNode responseJson = JsonUtils.objectToJsonNode(brokerResponse);
+    assertEquals(responseJson.path("earlyTerminationReasons").path(0).asText(),
+        EarlyTerminationReason.DISTINCT_MAX_ROWS.name());
+    assertFalse(responseJson.has("maxRowsInDistinctReached"));
+    assertFalse(responseJson.has("maxRowsWithoutChangeInDistinctReached"));
+    assertFalse(responseJson.has("maxExecutionTimeInDistinctReached"));
+    assertTrue(responseJson.path("partialResult").asBoolean(false));
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldSkipNoneEarlyTerminationReason() {
+    assertSkippedEarlyTerminationReason(EarlyTerminationReason.NONE.name());
+  }
+
+  @Test
+  public void shouldSkipUnknownEarlyTerminationReason() {
+    assertSkippedEarlyTerminationReason("UNKNOWN_REASON");
+  }
+
+  @Test
+  public void shouldSkipEmptyEarlyTerminationReason() {
+    assertSkippedEarlyTerminationReason("");
+  }
+
+  @Test
+  public void shouldSkipNullEarlyTerminationReason() {
+    assertSkippedEarlyTerminationReason(null);
+  }
+
+  private void assertSkippedEarlyTerminationReason(@Nullable String earlyTerminationReason) {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCT intCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.EARLY_TERMINATION_REASON.getName(),
+        earlyTerminationReason);
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+
+    // Then:
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertTrue(leafStats.getStringSet(LeafOperator.StatKey.EARLY_TERMINATION_REASONS).isEmpty());
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertTrue(brokerResponse.getEarlyTerminationReasons().isEmpty());
+    assertFalse(brokerResponse.isPartialResult());
+
+    operator.close();
+  }
+
+  @Test
   public void shouldReturnAggregationResultBlock() {
     // Given:
     QueryContext queryContext =
@@ -417,7 +559,7 @@ public class LeafOperatorTest {
     AggregationResultsBlock aggBlock =
         new AggregationResultsBlock(aggFunctions, Arrays.asList(2L, 10.0), queryContext);
     DataSchema schema = aggBlock.getDataSchema();
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(aggBlock);
+    List<BaseResultsBlock> dataBlocks = List.of(aggBlock);
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
     LeafOperator operator =
@@ -450,7 +592,7 @@ public class LeafOperatorTest {
     when(table.size()).thenReturn(records.size());
     when(table.iterator()).thenAnswer(inv -> records.iterator());
     GroupByResultsBlock groupByBlock = new GroupByResultsBlock(table, queryContext);
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(groupByBlock);
+    List<BaseResultsBlock> dataBlocks = List.of(groupByBlock);
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
     LeafOperator operator =
@@ -483,7 +625,7 @@ public class LeafOperatorTest {
     when(distinctTable.size()).thenReturn(distinctRows.size());
     when(distinctTable.getRows()).thenReturn(distinctRows);
     DistinctResultsBlock distinctBlock = new DistinctResultsBlock(distinctTable, queryContext);
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(distinctBlock);
+    List<BaseResultsBlock> dataBlocks = List.of(distinctBlock);
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
     LeafOperator operator =
@@ -501,6 +643,65 @@ public class LeafOperatorTest {
     assertEquals(rows.get(1), new Object[]{2});
     assertEquals(rows.get(2), new Object[]{3});
     assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the distinct block");
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldPropagateLiteModeLeafStageLimitReached() {
+    // Given:
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(),
+        "true");
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+
+    // Then:
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertTrue(leafStats.getBoolean(LeafOperator.StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED));
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertTrue(brokerResponse.isMseLiteLeafStageLimitReached());
+    assertTrue(brokerResponse.isPartialResult());
+    JsonNode responseJson = JsonUtils.objectToJsonNode(brokerResponse);
+    assertTrue(responseJson.path("mseLiteLeafStageLimitReached").asBoolean(false));
+    assertTrue(responseJson.path("partialResult").asBoolean(false));
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldNotSetLiteModeLeafStageLimitWhenNotReached() {
+    // Given:
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+
+    // Then:
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertFalse(leafStats.getBoolean(LeafOperator.StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED));
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertFalse(brokerResponse.isMseLiteLeafStageLimitReached());
+    assertFalse(brokerResponse.isPartialResult());
 
     operator.close();
   }

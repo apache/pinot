@@ -22,11 +22,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.IntFunction;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -95,10 +96,10 @@ public class QuickstartRunner {
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
-    int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides, AuthProvider authProvider)
-    throws Exception {
+      int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides, AuthProvider authProvider)
+      throws Exception {
     this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, authProvider,
-      configOverrides, null, true, Map.of());
+        configOverrides, null, true, Map.of());
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
@@ -288,6 +289,16 @@ public class QuickstartRunner {
         .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
   }
 
+  /// @return names of the tables [#bootstrapTable()] creates, so that callers can tell which sample queries can
+  /// actually be answered.
+  public Set<String> getBootstrappedTableNames() {
+    Set<String> tableNames = new HashSet<>();
+    for (QuickstartTableRequest request : _tableRequests) {
+      tableNames.add(request.getTableName());
+    }
+    return tableNames;
+  }
+
   public void bootstrapTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
@@ -300,7 +311,7 @@ public class QuickstartRunner {
 
   public JsonNode runQuery(String query)
       throws Exception {
-    return runQuery(query, Collections.emptyMap());
+    return runQuery(query, Map.of());
   }
 
   public JsonNode runQuery(String query, Map<String, String> additionalOptions)

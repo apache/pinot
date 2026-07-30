@@ -39,25 +39,25 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     return new Object[][]{
         {"()"}, {String.format("(%s)", INT_MV_COLUMN)}, {String.format("(%s)", LONG_MV_COLUMN)}, {
         String.format("(%s)", FLOAT_MV_COLUMN)
-    }, {String.format("(%s)", DOUBLE_MV_COLUMN)}, {String.format("(%s)", STRING_MV_COLUMN)}, {
+      }, {String.format("(%s)", DOUBLE_MV_COLUMN)}, {String.format("(%s)", STRING_MV_COLUMN)}, {
         String.format("(%s, %s)", INT_MV_COLUMN, INT_SV_COLUMN)
-    }, {String.format("(%s, %s)", STRING_SV_COLUMN, INT_SV_COLUMN)}, {
+      }, {String.format("(%s, %s)", STRING_SV_COLUMN, INT_SV_COLUMN)}, {
         String.format("(%s, %s)", STRING_SV_COLUMN, LONG_SV_COLUMN)
-    }, {String.format("(%s, %s)", STRING_SV_COLUMN, FLOAT_SV_COLUMN)}, {
+      }, {String.format("(%s, %s)", STRING_SV_COLUMN, FLOAT_SV_COLUMN)}, {
         String.format("(%s, %s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN)
-    }, {String.format("(%s, %s)", STRING_SV_COLUMN, TIMESTAMP_COLUMN)}, {
+      }, {String.format("(%s, %s)", STRING_SV_COLUMN, TIMESTAMP_COLUMN)}, {
         String.format("(%s, %s)", INT_SV_COLUMN, TIMESTAMP_COLUMN)
-    }, {String.format("(%s, %s)", FLOAT_SV_COLUMN, TIMESTAMP_COLUMN)}, {
+      }, {String.format("(%s, %s)", FLOAT_SV_COLUMN, TIMESTAMP_COLUMN)}, {
         String.format("(%s, %s)", DOUBLE_SV_COLUMN, TIMESTAMP_COLUMN)
-    }, {String.format("(%s, %s)", TIMESTAMP_COLUMN, INT_SV_COLUMN)}, {
+      }, {String.format("(%s, %s)", TIMESTAMP_COLUMN, INT_SV_COLUMN)}, {
         String.format("(%s, %s)", INT_SV_COLUMN, INT_MV_COLUMN)
-    }, {String.format("(%s, %s)", INT_SV_COLUMN, STRING_SV_COLUMN)}, {
+      }, {String.format("(%s, %s)", INT_SV_COLUMN, STRING_SV_COLUMN)}, {
         String.format("(%s, %s)", TIMESTAMP_COLUMN, INT_SV_COLUMN)
-    }, {String.format("(%s, %s)", TIMESTAMP_COLUMN, FLOAT_SV_COLUMN)}, {
+      }, {String.format("(%s, %s)", TIMESTAMP_COLUMN, FLOAT_SV_COLUMN)}, {
         String.format("(%s, %s)", TIMESTAMP_COLUMN, DOUBLE_SV_COLUMN)
-    }, {String.format("(%s, %s)", TIMESTAMP_COLUMN, STRING_SV_COLUMN)}, {
+      }, {String.format("(%s, %s)", TIMESTAMP_COLUMN, STRING_SV_COLUMN)}, {
         String.format("(%s, %s)", TIMESTAMP_COLUMN, TIME_COLUMN)
-    }
+      }
     };
   }
 
@@ -257,7 +257,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     TransformFunction transformFunction = testLeastPreconditionsNullHandlingEnabled(
         String.format("least(%s, %s, %s)", INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.INT);
-   int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     RoaringBitmap expectedNull = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
       if (isNullRow(i)) {

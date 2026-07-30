@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -59,7 +60,7 @@ public final class VectorIndexConfigValidator {
       Arrays.asList("nlist", "trainSampleSize", "trainingSeed", "minRowsForIndex")));
 
   private static final Set<String> IVF_FLAT_EXCLUSIVE_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
-      Collections.singletonList("minRowsForIndex")));
+      List.of("minRowsForIndex")));
 
   private static final Set<String> IVF_PQ_EXCLUSIVE_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Arrays.asList("pqM", "pqNbits")));

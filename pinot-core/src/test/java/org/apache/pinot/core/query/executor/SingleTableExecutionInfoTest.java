@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.executor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.core.data.manager.DuoSegmentDataManager;
@@ -101,10 +100,10 @@ public class SingleTableExecutionInfoTest {
     DuoSegmentDataManager duo = new DuoSegmentDataManager(primary, secondary);
 
     InstanceDataManager instanceDataManager =
-        mockInstanceDataManager(Collections.singletonList(duo), /*isUpsertEnabled=*/ false);
+        mockInstanceDataManager(List.of(duo), /*isUpsertEnabled=*/ false);
 
     SingleTableExecutionInfo info = SingleTableExecutionInfo.create(instanceDataManager, TABLE_NAME_WITH_TYPE,
-        Collections.singletonList("seg01"), null, mock(QueryContext.class));
+        List.of("seg01"), null, mock(QueryContext.class));
 
     List<IndexSegment> indexSegments = info.getIndexSegments();
     assertEquals(indexSegments.size(), 1);
@@ -146,7 +145,7 @@ public class SingleTableExecutionInfoTest {
 
     expectThrows(TableNotFoundException.class,
         () -> SingleTableExecutionInfo.create(instanceDataManager, TABLE_NAME_WITH_TYPE,
-            Collections.emptyList(), null, mock(QueryContext.class)));
+            List.of(), null, mock(QueryContext.class)));
   }
 
   private static InstanceDataManager mockInstanceDataManager(List<SegmentDataManager> acquired,

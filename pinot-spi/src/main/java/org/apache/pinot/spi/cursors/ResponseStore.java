@@ -59,7 +59,7 @@ public interface ResponseStore {
    * @throws Exception Thrown if an error occurs when checking if the response exists.
    */
   boolean exists(String requestId)
-    throws Exception;
+      throws Exception;
 
   /**
    * Get all request ids of responses in the ResponseStore.

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.broker;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -40,7 +39,7 @@ public class AccessControlFactoryLoaderTest {
 
   @Test
   public void loadFactoryWithNullClassConfigReturnsAllowAllAccessControlFactory() {
-    PinotConfiguration emptyConfig = new PinotConfiguration(Collections.emptyMap());
+    PinotConfiguration emptyConfig = new PinotConfiguration(Map.of());
     AccessControlFactory factory = AccessControlFactory.loadFactory(emptyConfig, null);
     assertTrue(factory instanceof AllowAllAccessControlFactory,
         "Expected AllowAllAccessControlFactory when no `class` config is set, got: " + factory.getClass());

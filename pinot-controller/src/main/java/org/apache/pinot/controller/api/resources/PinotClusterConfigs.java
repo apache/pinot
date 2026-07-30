@@ -31,7 +31,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -170,7 +169,7 @@ public class PinotClusterConfigs {
       HelixAdmin admin = _pinotHelixResourceManager.getHelixAdmin();
       HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
           .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
-      admin.removeConfig(configScope, Collections.singletonList(configName));
+      admin.removeConfig(configScope, List.of(configName));
       return new SuccessResponse("Deleted cluster config: " + configName);
     } catch (Exception e) {
       String errStr = "Failed to delete cluster config: " + configName;

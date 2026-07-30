@@ -84,9 +84,9 @@ public class DistinctPlanNode implements PlanNode {
       ExpressionContext expr = expressions.get(0);
 
       // JSON index path
-      if (JsonIndexDistinctOperator.canUseJsonIndexDistinct(_indexSegment, expr)) {
+      if (JsonIndexDistinctOperator.canUseJsonIndexDistinct(expr)) {
         BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
-        return new JsonIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator);
+        return new JsonIndexDistinctOperator(_indexSegment, _queryContext, filterOperator);
       }
 
       // Inverted/sorted index path. For unsorted dictionaries the operator still avoids the scan/projection path,

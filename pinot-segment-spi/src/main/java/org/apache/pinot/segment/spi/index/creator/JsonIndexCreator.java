@@ -55,7 +55,7 @@ public interface JsonIndexCreator extends IndexCreator {
    * Adds the next json value for Map type
    */
   void add(Map jsonMap)
-    throws IOException;
+      throws IOException;
 
   /**
    * Seals the index and flushes it to disk.

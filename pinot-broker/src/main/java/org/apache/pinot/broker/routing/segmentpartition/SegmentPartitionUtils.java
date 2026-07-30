@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.segmentpartition;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -37,7 +36,7 @@ public class SegmentPartitionUtils {
   }
 
   public static final SegmentPartitionInfo INVALID_PARTITION_INFO = new SegmentPartitionInfo(null, null, null);
-  public static final Map<String, SegmentPartitionInfo> INVALID_COLUMN_PARTITION_INFO_MAP = Collections.emptyMap();
+  public static final Map<String, SegmentPartitionInfo> INVALID_COLUMN_PARTITION_INFO_MAP = Map.of();
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionUtils.class);
 
@@ -130,7 +129,7 @@ public class SegmentPartitionUtils {
     }
     if (columnSegmentPartitionInfoMap.size() == 1) {
       String partitionColumn = columnSegmentPartitionInfoMap.keySet().iterator().next();
-      return Collections.singletonMap(partitionColumn, columnSegmentPartitionInfoMap.get(partitionColumn));
+      return Map.of(partitionColumn, columnSegmentPartitionInfoMap.get(partitionColumn));
     }
     return columnSegmentPartitionInfoMap.isEmpty() ? INVALID_COLUMN_PARTITION_INFO_MAP : columnSegmentPartitionInfoMap;
   }

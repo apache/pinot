@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -229,7 +228,7 @@ public class ExpressionTransformerTest {
         .addSingleValueDimension("payload", FieldSpec.DataType.BYTES)
         .build();
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("payload", "Groovy({null})")));
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("payload", "Groovy({null})")));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("testBytesNullTransform")
         .setIngestionConfig(ingestionConfig)
@@ -254,7 +253,7 @@ public class ExpressionTransformerTest {
     Schema pinotSchema = new Schema();
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("fullName", FieldSpec.DataType.STRING, true);
     pinotSchema.addField(dimensionFieldSpec);
-    List<TransformConfig> transformConfigs = Collections.singletonList(
+    List<TransformConfig> transformConfigs = List.of(
         new TransformConfig("fullName", "Groovy({firstName + ' ' + lastName}, firstName, lastName)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
@@ -296,7 +295,7 @@ public class ExpressionTransformerTest {
         .build();
 
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(Collections.singletonList(
+    ingestionConfig.setTransformConfigs(List.of(
         new TransformConfig("bids", "Groovy({rawBids.toArray()}, rawBids)")));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("testExistingCollectionIsTransformed")
@@ -321,7 +320,7 @@ public class ExpressionTransformerTest {
     Schema schema =
         new Schema.SchemaBuilder().addSingleValueDimension("fullName", FieldSpec.DataType.STRING).build();
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("fullName", "Groovy({null})")));
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("fullName", "Groovy({null})")));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testNullTransform").setIngestionConfig(ingestionConfig)
             .build();
@@ -340,7 +339,7 @@ public class ExpressionTransformerTest {
     Schema schema =
         new Schema.SchemaBuilder().addMultiValueDimension("tags", FieldSpec.DataType.STRING).build();
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("tags", "Groovy({null})")));
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("tags", "Groovy({null})")));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testNullTransformExisting")
             .setIngestionConfig(ingestionConfig).build();
@@ -459,7 +458,7 @@ public class ExpressionTransformerTest {
     Schema pinotSchema = new Schema();
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.INT, true);
     pinotSchema.addField(dimensionFieldSpec);
-    List<TransformConfig> transformConfigs = Collections.singletonList(
+    List<TransformConfig> transformConfigs = List.of(
         new TransformConfig("y", "plus(x, 10)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
@@ -489,7 +488,7 @@ public class ExpressionTransformerTest {
     Schema pinotSchema = new Schema();
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.INT, true);
     pinotSchema.addField(dimensionFieldSpec);
-    List<TransformConfig> transformConfigs = Collections.singletonList(
+    List<TransformConfig> transformConfigs = List.of(
         new TransformConfig("y", "plus(x, 10)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
@@ -527,7 +526,7 @@ public class ExpressionTransformerTest {
         .build();
 
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(Collections.singletonList(
+    ingestionConfig.setTransformConfigs(List.of(
         new TransformConfig("columnMap", "jsonStringToMap(columnJson)")));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("testJsonToMapIngestionTransform")
@@ -553,7 +552,7 @@ public class ExpressionTransformerTest {
         .build();
 
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(Collections.singletonList(
+    ingestionConfig.setTransformConfigs(List.of(
         new TransformConfig("columnArray", "jsonPathArray(columnJson, '$')")));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("testJsonToArrayIngestionTransform")

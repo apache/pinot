@@ -38,7 +38,7 @@ public class TimeSeriesAuthIntegrationTest extends TimeSeriesIntegrationTest {
   }
 
   @Override
-  protected Map<String, String> getControllerRequestClientHeaders() {
+  protected Map<String, String> getAdminClientHeaders() {
     return AUTH_HEADER;
   }
 

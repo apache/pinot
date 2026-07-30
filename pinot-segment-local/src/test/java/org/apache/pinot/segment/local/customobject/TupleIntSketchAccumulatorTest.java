@@ -20,10 +20,10 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.util.stream.IntStream;
-import org.apache.datasketches.tuple.CompactSketch;
-import org.apache.datasketches.tuple.aninteger.IntegerSketch;
+import org.apache.datasketches.tuple.CompactTupleSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
+import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -48,9 +48,9 @@ public class TupleIntSketchAccumulatorTest {
 
   @Test
   public void testAccumulatorWithSingleSketch() {
-    IntegerSketch input = new IntegerSketch(_lgK, IntegerSummary.Mode.Sum);
+    IntegerTupleSketch input = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
     IntStream.range(0, 1000).forEach(i -> input.update(i, 1));
-    CompactSketch<IntegerSummary> sketch = input.compact();
+    CompactTupleSketch<IntegerSummary> sketch = input.compact();
 
     TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(_setOps, _nominalEntries, 2);
     accumulator.apply(sketch);
@@ -61,12 +61,12 @@ public class TupleIntSketchAccumulatorTest {
 
   @Test
   public void testAccumulatorMerge() {
-    IntegerSketch input1 = new IntegerSketch(_lgK, IntegerSummary.Mode.Sum);
+    IntegerTupleSketch input1 = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
     IntStream.range(0, 1000).forEach(i -> input1.update(i, 1));
-    CompactSketch<IntegerSummary> sketch1 = input1.compact();
-    IntegerSketch input2 = new IntegerSketch(_lgK, IntegerSummary.Mode.Sum);
+    CompactTupleSketch<IntegerSummary> sketch1 = input1.compact();
+    IntegerTupleSketch input2 = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
     IntStream.range(1000, 2000).forEach(i -> input2.update(i, 1));
-    CompactSketch<IntegerSummary> sketch2 = input2.compact();
+    CompactTupleSketch<IntegerSummary> sketch2 = input2.compact();
 
     TupleIntSketchAccumulator accumulator1 = new TupleIntSketchAccumulator(_setOps, _nominalEntries, 3);
     accumulator1.apply(sketch1);
@@ -79,12 +79,12 @@ public class TupleIntSketchAccumulatorTest {
 
   @Test
   public void testThresholdBehavior() {
-    IntegerSketch input1 = new IntegerSketch(_lgK, IntegerSummary.Mode.Sum);
+    IntegerTupleSketch input1 = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
     IntStream.range(0, 1000).forEach(i -> input1.update(i, 1));
-    CompactSketch<IntegerSummary> sketch1 = input1.compact();
-    IntegerSketch input2 = new IntegerSketch(_lgK, IntegerSummary.Mode.Sum);
+    CompactTupleSketch<IntegerSummary> sketch1 = input1.compact();
+    IntegerTupleSketch input2 = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
     IntStream.range(1000, 2000).forEach(i -> input2.update(i, 1));
-    CompactSketch<IntegerSummary> sketch2 = input2.compact();
+    CompactTupleSketch<IntegerSummary> sketch2 = input2.compact();
 
     TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(_setOps, _nominalEntries, 3);
     accumulator.apply(sketch1);

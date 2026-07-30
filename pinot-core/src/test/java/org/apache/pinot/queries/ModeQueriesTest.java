@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -249,13 +248,13 @@ public class ModeQueriesTest extends BaseQueriesTest {
       Long expectedValue = _values.get(key);
       assertNotNull(expectedValue);
       assertEquals(groupByResult.getResultForGroupId(0, groupKey._groupId),
-          Collections.singletonMap(key, expectedValue));
+          Map.of(key, expectedValue));
       assertEquals(groupByResult.getResultForGroupId(1, groupKey._groupId),
-          Collections.singletonMap(key.longValue(), expectedValue));
+          Map.of(key.longValue(), expectedValue));
       assertEquals(groupByResult.getResultForGroupId(2, groupKey._groupId),
-          Collections.singletonMap(key.floatValue(), expectedValue));
+          Map.of(key.floatValue(), expectedValue));
       assertEquals(groupByResult.getResultForGroupId(3, groupKey._groupId),
-          Collections.singletonMap(key.doubleValue(), expectedValue));
+          Map.of(key.doubleValue(), expectedValue));
     }
     assertEquals(numGroups, _values.size());
 
@@ -321,13 +320,13 @@ public class ModeQueriesTest extends BaseQueriesTest {
       Long expectedValue = _values.get(key) * 2;
       assertNotNull(expectedValue);
       assertEquals(groupByResult.getResultForGroupId(0, groupKey._groupId),
-          Collections.singletonMap(key, expectedValue));
+          Map.of(key, expectedValue));
       assertEquals(groupByResult.getResultForGroupId(1, groupKey._groupId),
-          Collections.singletonMap(key.longValue(), expectedValue));
+          Map.of(key.longValue(), expectedValue));
       assertEquals(groupByResult.getResultForGroupId(2, groupKey._groupId),
-          Collections.singletonMap(key.floatValue(), expectedValue));
+          Map.of(key.floatValue(), expectedValue));
       assertEquals(groupByResult.getResultForGroupId(3, groupKey._groupId),
-          Collections.singletonMap(key.doubleValue(), expectedValue));
+          Map.of(key.doubleValue(), expectedValue));
     }
     assertEquals(numGroups, _values.size());
 

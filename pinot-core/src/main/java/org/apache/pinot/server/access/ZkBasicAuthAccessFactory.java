@@ -104,7 +104,7 @@ public class ZkBasicAuthAccessFactory implements AccessControlFactory {
       return password2principal.entrySet().stream().filter(
           entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
               _userCache.getUserPasswordAuthCache())).map(u -> u.getValue()).filter(Objects::nonNull).findFirst().map(
-          zkprincipal -> StringUtils.isEmpty(tableName) || zkprincipal.hasTable(
+                zkprincipal -> StringUtils.isEmpty(tableName) || zkprincipal.hasTable(
               TableNameBuilder.extractRawTableName(tableName))).orElse(false);
     }
 

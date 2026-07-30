@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -250,30 +251,59 @@ public final class TlsUtils {
    */
   public static void installDefaultSSLSocketFactory(String keyStoreType, String keyStorePath, String keyStorePassword,
       String trustStoreType, String trustStorePath, String trustStorePassword) {
+    SSLContext sc = createSslContext(keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath,
+        trustStorePassword);
+    // HttpsURLConnection
+    HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+    setSslContext(sc);
+    logTlsDiagnosticsOnce("https.default", sc, null, false);
+  }
+
+  /// Creates a client-side SSL context from key/trust store settings without mutating JVM defaults.
+  ///
+  /// If both store paths are null, the returned context uses default key and trust managers. If either store path is
+  /// provided, its type and password must also be provided. File-backed stores are auto-renewed.
+  public static SSLContext createSslContext(@Nullable String keyStoreType, @Nullable String keyStorePath,
+      @Nullable String keyStorePassword, @Nullable String trustStoreType, @Nullable String trustStorePath,
+      @Nullable String trustStorePassword) {
+    return createSslContext(keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath,
+        trustStorePassword, true);
+  }
+
+  /// Creates a client-side SSL context without enabling file-store auto-renewal.
+  ///
+  /// This is intended for short-lived clients whose owners can close the HTTP client but do not own the renewal
+  /// executors/watch services created by auto-renewal.
+  public static SSLContext createSslContextWithoutAutoRenewal(@Nullable String keyStoreType,
+      @Nullable String keyStorePath, @Nullable String keyStorePassword, @Nullable String trustStoreType,
+      @Nullable String trustStorePath, @Nullable String trustStorePassword) {
+    return createSslContext(keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath,
+        trustStorePassword, false);
+  }
+
+  private static SSLContext createSslContext(@Nullable String keyStoreType, @Nullable String keyStorePath,
+      @Nullable String keyStorePassword, @Nullable String trustStoreType, @Nullable String trustStorePath,
+      @Nullable String trustStorePassword, boolean enableAutoRenewal) {
     try {
       SecureRandom secureRandom = new SecureRandom();
-      SSLContext sc;
       if (keyStorePath == null && trustStorePath == null) {
         // When neither keyStorePath nor trustStorePath is provided, a SSLFactory cannot be created. create SSLContext
         // directly and use the default key manager and trust manager.
-        sc = SSLContext.getInstance(SSL_CONTEXT_PROTOCOL);
-        sc.init(null, null, secureRandom);
-      } else {
-        SSLFactory sslFactory =
-            RenewableTlsUtils.createSSLFactory(keyStoreType, keyStorePath, keyStorePassword, trustStoreType,
-                trustStorePath, trustStorePassword, SSL_CONTEXT_PROTOCOL, secureRandom, true, false);
-        if (isKeyOrTrustStorePathNullOrHasFileScheme(keyStorePath) && isKeyOrTrustStorePathNullOrHasFileScheme(
-            trustStorePath)) {
-          RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, keyStoreType, keyStorePath,
-              keyStorePassword, trustStoreType, trustStorePath, trustStorePassword, SSL_CONTEXT_PROTOCOL, secureRandom,
-              PinotInsecureMode::isPinotInInsecureMode);
-        }
-        sc = sslFactory.getSslContext();
+        SSLContext sslContext = SSLContext.getInstance(SSL_CONTEXT_PROTOCOL);
+        sslContext.init(null, null, secureRandom);
+        return sslContext;
       }
-      // HttpsURLConnection
-      HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-      setSslContext(sc);
-      logTlsDiagnosticsOnce("https.default", sc, null, false);
+
+      SSLFactory sslFactory =
+          RenewableTlsUtils.createSSLFactory(keyStoreType, keyStorePath, keyStorePassword, trustStoreType,
+              trustStorePath, trustStorePassword, SSL_CONTEXT_PROTOCOL, secureRandom, true, false);
+      if (enableAutoRenewal && isKeyOrTrustStorePathNullOrHasFileScheme(keyStorePath)
+          && isKeyOrTrustStorePathNullOrHasFileScheme(trustStorePath)) {
+        RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, keyStoreType, keyStorePath,
+            keyStorePassword, trustStoreType, trustStorePath, trustStorePassword, SSL_CONTEXT_PROTOCOL, secureRandom,
+            PinotInsecureMode::isPinotInInsecureMode);
+      }
+      return sslFactory.getSslContext();
     } catch (GenericSSLContextException | GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }

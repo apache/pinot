@@ -26,7 +26,6 @@ import com.sun.net.httpserver.HttpHandler;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,52 +90,52 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     partitionToOffset1.put("1", "150");
     FakeConsumingInfoServer s0 = new FakeConsumingInfoServer(Lists.newArrayList(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0,
-            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Collections.emptyMap(),
-                Collections.emptyMap(), Collections.emptyMap())),
+            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Map.of(),
+                Map.of(), Map.of())),
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
-            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Collections.emptyMap(),
-                Collections.emptyMap(), Collections.emptyMap()))));
+            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Map.of(),
+                Map.of(), Map.of()))));
     s0.start(uriPath, createHandler(200, s0._consumerInfos, 0));
     _serverMap.put("server0", s0);
 
     // server1 - 1 consumer each for p0 and p1. CONSUMING.
     FakeConsumingInfoServer s1 = new FakeConsumingInfoServer(Lists.newArrayList(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0,
-            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Collections.emptyMap(),
-                Collections.emptyMap(), Collections.emptyMap())),
+            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Map.of(),
+                Map.of(), Map.of())),
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
-            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Collections.emptyMap(),
-                Collections.emptyMap(), Collections.emptyMap()))));
+            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Map.of(),
+                Map.of(), Map.of()))));
     s1.start(uriPath, createHandler(200, s1._consumerInfos, 0));
     _serverMap.put("server1", s1);
 
     // server2 - p1 consumer CONSUMING. p0 consumer NOT_CONSUMING
     FakeConsumingInfoServer s2 = new FakeConsumingInfoServer(Lists.newArrayList(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "NOT_CONSUMING", 0, partitionToOffset0,
-            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Collections.emptyMap(),
-                Collections.emptyMap(), Collections.emptyMap())),
+            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Map.of(),
+                Map.of(), Map.of())),
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
-            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Collections.emptyMap(),
-                Collections.emptyMap(), Collections.emptyMap()))));
+            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Map.of(),
+                Map.of(), Map.of()))));
     s2.start(uriPath, createHandler(200, s2._consumerInfos, 0));
     _serverMap.put("server2", s2);
 
     // server3 - 1 consumer for p1. No consumer for p0
     FakeConsumingInfoServer s3 = new FakeConsumingInfoServer(Lists.newArrayList(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
-            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Collections.emptyMap(),
-                Collections.emptyMap(), Collections.emptyMap()))));
+            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Map.of(),
+                Map.of(), Map.of()))));
     s3.start(uriPath, createHandler(200, s3._consumerInfos, 0));
     _serverMap.put("server3", s3);
 
     // server4 - unreachable/error/timeout
     FakeConsumingInfoServer s4 = new FakeConsumingInfoServer(Lists.newArrayList(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0,
-            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Collections.emptyMap(),
-                Collections.emptyMap(), Collections.emptyMap())),
+            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Map.of(),
+                Map.of(), Map.of())),
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
-            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Collections.emptyMap(),
-                Collections.emptyMap(), Collections.emptyMap()))));
+            new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Map.of(),
+                Map.of(), Map.of()))));
     s4.start(uriPath, createHandler(200, s4._consumerInfos, TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
     _serverMap.put("server4", s4);
   }
@@ -231,8 +230,8 @@ public class ConsumingSegmentInfoReaderStatelessTest {
   public void testEmptyTable()
       throws InvalidConfigException {
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
-        testRunner(new String[]{}, Collections.emptySet(), TABLE_NAME);
-    checkIngestionStatus(new String[]{}, Collections.emptySet(), TableStatus.IngestionState.HEALTHY);
+        testRunner(new String[]{}, Set.of(), TABLE_NAME);
+    checkIngestionStatus(new String[]{}, Set.of(), TableStatus.IngestionState.HEALTHY);
     assertTrue(consumingSegmentsInfoMap._segmentToConsumingInfoMap.isEmpty());
   }
 

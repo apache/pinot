@@ -113,7 +113,7 @@ public class StagesTestBase {
       PlanNode left = leftBuilder.build(stageId);
       PlanNode right = rightBuilder.build(stageId);
       return new JoinNode(stageId, mySchema, myHints, List.of(left, right), JoinRelType.FULL,
-          Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), JoinNode.JoinStrategy.HASH);
+          List.of(), List.of(), List.of(), JoinNode.JoinStrategy.HASH);
     };
   }
 
@@ -166,7 +166,7 @@ public class StagesTestBase {
    */
   public SimpleChildBuilder<TableScanNode> tableScan(String tableName) {
     return (stageId, mySchema, myHints) -> new TableScanNode(stageId, mySchema, myHints, List.of(), tableName,
-        Collections.emptyList());
+        List.of());
   }
 
   /**

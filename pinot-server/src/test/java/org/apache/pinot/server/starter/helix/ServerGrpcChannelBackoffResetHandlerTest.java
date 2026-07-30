@@ -19,7 +19,7 @@
 package org.apache.pinot.server.starter.helix;
 
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
@@ -77,13 +77,13 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     // First callback: server has IS_SHUTDOWN_IN_PROGRESS=true (starting up)
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
 
     // Second callback: server has IS_SHUTDOWN_IN_PROGRESS=false (startup complete)
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
     verify(_mailboxService).resetConnectBackoff(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
 
@@ -94,7 +94,7 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
 
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
 
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
   }
@@ -104,17 +104,17 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     // First callback: server is shutting down
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
 
     // Second callback: server still shutting down
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
 
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
   }
 
   @Test
   public void testDoesNotResetForSelfInstance() {
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(SELF_INSTANCE_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(SELF_INSTANCE_ID));
 
     verify(_helixAdmin, never()).getInstanceConfig(any(), any());
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
@@ -123,7 +123,7 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
   @Test
   public void testDoesNotResetForBrokerInstance() {
     String brokerId = "Broker_brokerhost_8000";
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(brokerId));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(brokerId));
 
     verify(_helixAdmin, never()).getInstanceConfig(any(), any());
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
@@ -134,12 +134,12 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     // First callback: server shutting down (no mailbox port)
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, -1, true));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
 
     // Second callback: server startup complete (no mailbox port)
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, -1, false));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
 
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
   }
@@ -149,19 +149,19 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     // First callback: server is healthy (IS_SHUTDOWN_IN_PROGRESS=false)
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
 
     // Second callback: server crashed and is restarting (IS_SHUTDOWN_IN_PROGRESS=true)
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
 
     // Third callback: server completed startup (IS_SHUTDOWN_IN_PROGRESS=false)
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
     verify(_mailboxService).resetConnectBackoff(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
 
@@ -170,21 +170,21 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     // First callback: server is healthy
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
 
     // Second callback: graceful shutdown started (IS_SHUTDOWN_IN_PROGRESS=true)
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
 
     // Third callback: still shutting down / restarting (IS_SHUTDOWN_IN_PROGRESS=true)
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
 
     // Fourth callback: startup complete (IS_SHUTDOWN_IN_PROGRESS=false)
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
     verify(_mailboxService).resetConnectBackoff(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
 
@@ -196,13 +196,13 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     // INIT callback: server is shutting down, triggers full cluster scan
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createInitContext());
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
 
     // Subsequent individual callback: server completes startup
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
     verify(_mailboxService).resetConnectBackoff(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
 
@@ -232,7 +232,7 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
   @Test
   public void testFinalizeNotificationIsNoOp() {
     // Simulate a FINALIZE notification where pathChanged is null. The listener should ignore this.
-    _handler.onInstanceConfigChange(Collections.emptyList(), createFinalizeContextWithNullPath());
+    _handler.onInstanceConfigChange(List.of(), createFinalizeContextWithNullPath());
 
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
     verify(_helixAdmin, never()).getInstancesInCluster(any());

@@ -26,6 +26,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -301,6 +302,43 @@ public class UnnestIntegrationTest extends CustomDataQueryClusterIntegrationTest
     long sum = rows.get(0).get(0).asLong();
     // Each row contributes 1+2+3 = 6; there are getCountStarResult() base rows
     assertEquals(sum, 6 * getCountStarResult());
+  }
+
+  @DataProvider(name = "columnPruningQueries")
+  public Object[][] columnPruningQueries() {
+    String table = getTableName();
+    return new Object[][]{
+        // single array, source array dropped
+        {String.format("SELECT intCol, u.elem FROM %s CROSS JOIN UNNEST(stringArrayCol) AS u(elem) "
+            + "ORDER BY intCol, u.elem", table)},
+        // select only the unnested element (zero passthrough)
+        {String.format("SELECT u.elem FROM %s CROSS JOIN UNNEST(stringArrayCol) AS u(elem) ORDER BY u.elem", table)},
+        // WITH ORDINALITY (ordinality index recomputed against pruned output)
+        {String.format("SELECT intCol, u.elem, u.idx FROM %s CROSS JOIN UNNEST(stringArrayCol) WITH ORDINALITY "
+            + "AS u(elem, idx) ORDER BY intCol, u.idx", table)},
+        // multiple arrays, both source arrays dropped
+        {String.format("SELECT intCol, u.longValue, u.stringValue FROM %s "
+            + "CROSS JOIN UNNEST(longArrayCol, stringArrayCol) AS u(longValue, stringValue) "
+            + "ORDER BY intCol, u.longValue", table)},
+        // source array also selected (must be retained)
+        {String.format("SELECT intCol, stringArrayCol, u.elem FROM %s CROSS JOIN UNNEST(stringArrayCol) AS u(elem) "
+            + "ORDER BY intCol, u.elem", table)}
+    };
+  }
+
+  @Test(dataProvider = "columnPruningQueries")
+  public void testCrossJoinUnnestColumnPruningMatchesDefault(String select)
+      throws Exception {
+    // Pruning input/passthrough columns from the UNNEST output must not change results. Verified end-to-end on the
+    // multi-stage engine (the only engine that supports UNNEST CROSS JOIN), with the flag toggled per query.
+    setUseMultiStageQueryEngine(true);
+    JsonNode defaultRows = postQuery(select).get("resultTable").get("rows");
+    JsonNode prunedRows = postQuery("SET unnestColumnPruning=true; " + select).get("resultTable").get("rows");
+
+    assertNotNull(defaultRows);
+    assertNotNull(prunedRows);
+    assertEquals(prunedRows.toString(), defaultRows.toString(),
+        "Column pruning must not change UNNEST results for: " + select);
   }
 
   @Override

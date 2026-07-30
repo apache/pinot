@@ -107,9 +107,10 @@ public class PinotSchemaRestletResourceTest {
     // Update the schema with addSchema api and override on
     expectValidationException(() -> adminClient.getSchemaClient().createSchema(schema.toSingleLineJsonString()));
 
-    // Update the schema with updateSchema api
-    expectValidationException(
-        () -> adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString()));
+    // Update the schema with updateSchema api - verify the error message includes the actual reason
+    expectValidationExceptionWithMessage(
+        () -> adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString()),
+        "Incompatible field specifications");
 
     // Change the column data type from STRING to BOOLEAN
     newColumnFieldSpec.setDataType(DataType.BOOLEAN);
@@ -228,6 +229,38 @@ public class PinotSchemaRestletResourceTest {
   }
 
   @Test
+  public void testRejectDeprecatedTimeFieldSpec()
+      throws Exception {
+    PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
+    String timeSchemaJson = "{\n"
+        + "  \"schemaName\" : \"legacyTimeSchema\",\n"
+        + "  \"dimensionFieldSpecs\" : [ { \"name\" : \"d1\", \"dataType\" : \"STRING\" } ],\n"
+        + "  \"timeFieldSpec\" : {\n"
+        + "    \"incomingGranularitySpec\" : { \"name\" : \"ts\", \"dataType\" : \"LONG\","
+        + " \"timeType\" : \"MILLISECONDS\" }\n"
+        + "  }\n"
+        + "}";
+
+    // POST must reject because TimeFieldSpec is deprecated; the check lives in SchemaUtils.validate so the
+    // POST/PUT/validate paths are uniformly strict. Existing schemas already in ZK keep loading because the
+    // single-arg SchemaUtils.validate(schema) used by server-side load does NOT apply this check.
+    RuntimeException runtimeException = expectThrows(RuntimeException.class,
+        () -> runUnchecked(() -> adminClient.getSchemaClient().createSchema(timeSchemaJson)));
+    Throwable cause = unwrap(runtimeException);
+    assertTrue(cause instanceof PinotAdminValidationException, "Unexpected exception: " + cause);
+    assertTrue(cause.getMessage().contains("TimeFieldSpec"),
+        "Expected TimeFieldSpec error, got: " + cause.getMessage());
+
+    // The /schemas/validate endpoint follows the same rule (also routes through SchemaUtils.validate).
+    RuntimeException validateException = expectThrows(RuntimeException.class,
+        () -> runUnchecked(() -> adminClient.getSchemaClient().validateSchema(timeSchemaJson)));
+    Throwable validateCause = unwrap(validateException);
+    assertTrue(validateCause instanceof PinotAdminValidationException, "Unexpected exception: " + validateCause);
+    assertTrue(validateCause.getMessage().contains("TimeFieldSpec"),
+        "Expected TimeFieldSpec error, got: " + validateCause.getMessage());
+  }
+
+  @Test
   public void testSchemaDeletionWithLogicalTable()
       throws Exception {
     String logicalTableName = "logical_table";
@@ -274,6 +307,15 @@ public class PinotSchemaRestletResourceTest {
         expectThrows(RuntimeException.class, () -> runUnchecked(runnable));
     Throwable cause = unwrap(runtimeException);
     assertTrue(cause instanceof PinotAdminValidationException, "Unexpected exception: " + cause);
+  }
+
+  private void expectValidationExceptionWithMessage(ThrowingRunnable runnable, String expectedMessageSubstring) {
+    RuntimeException runtimeException =
+        expectThrows(RuntimeException.class, () -> runUnchecked(runnable));
+    Throwable cause = unwrap(runtimeException);
+    assertTrue(cause instanceof PinotAdminValidationException, "Unexpected exception: " + cause);
+    assertTrue(cause.getMessage().contains(expectedMessageSubstring),
+        "Expected message to contain '" + expectedMessageSubstring + "' but was: " + cause.getMessage());
   }
 
   private void expectNotFoundException(ThrowingRunnable runnable) {

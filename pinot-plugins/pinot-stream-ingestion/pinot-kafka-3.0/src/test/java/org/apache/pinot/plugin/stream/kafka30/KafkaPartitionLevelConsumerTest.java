@@ -49,6 +49,7 @@ import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -279,6 +280,41 @@ public class KafkaPartitionLevelConsumerTest {
         assertEquals(((LongMsgOffset) metadata.getOffset()).getOffset(), i);
         assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + (partitionId * 1000L) + i);
       }
+    }
+  }
+
+  @Test
+  public void testComputePartitionGroupMetadataUsesKafkaPartitionIds()
+      throws Exception {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
+    String clientId = "partition-id-client";
+    String tableNameWithType = "tableName_REALTIME";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_SUBSET_PARTITION);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+    List<PartitionGroupConsumptionStatus> currentStatuses = List.of(
+        new PartitionGroupConsumptionStatus(0, 0, new LongMsgOffset(0), new LongMsgOffset(10), "DONE"),
+        new PartitionGroupConsumptionStatus(1, 1, new LongMsgOffset(0), new LongMsgOffset(10), "DONE"),
+        new PartitionGroupConsumptionStatus(3, 3, new LongMsgOffset(0), new LongMsgOffset(10), "DONE"),
+        new PartitionGroupConsumptionStatus(4, 4, new LongMsgOffset(0), new LongMsgOffset(10), "DONE"),
+        new PartitionGroupConsumptionStatus(5, 5, new LongMsgOffset(0), new LongMsgOffset(10), "DONE"),
+        new PartitionGroupConsumptionStatus(6, 6, new LongMsgOffset(0), new LongMsgOffset(10), "DONE"),
+        new PartitionGroupConsumptionStatus(7, 7, new LongMsgOffset(0), new LongMsgOffset(10), "DONE"));
+
+    try (KafkaStreamMetadataProvider streamMetadataProvider =
+        new KafkaStreamMetadataProvider(clientId, streamConfig)) {
+      List<PartitionGroupMetadata> partitionGroupMetadataList =
+          streamMetadataProvider.computePartitionGroupMetadata(clientId, streamConfig, currentStatuses, 10000);
+
+      assertEquals(partitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
+          .collect(Collectors.toList()), List.of(0, 1, 2, 3, 4, 5, 6, 7));
     }
   }
 

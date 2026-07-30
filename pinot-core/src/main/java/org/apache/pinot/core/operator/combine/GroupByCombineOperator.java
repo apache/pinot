@@ -57,7 +57,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
   private final int _numAggregationFunctions;
-  private final int _numGroupByExpressions;
+  /// Number of key columns: union group-by columns plus the synthetic $groupingId column for grouping sets.
+  /// Key columns precede the aggregation columns in the record layout.
+  private final int _numKeyColumns;
   private final int _numColumns;
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
@@ -75,8 +77,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     assert aggregationFunctions != null;
     _numAggregationFunctions = aggregationFunctions.length;
     assert _queryContext.getGroupByExpressions() != null;
-    _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
-    _numColumns = _numGroupByExpressions + _numAggregationFunctions;
+    _numKeyColumns = _queryContext.getNumGroupByKeyColumns();
+    _numColumns = _numKeyColumns + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
   }
 
@@ -150,7 +152,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
                 Object[] values = Arrays.copyOf(keys, _numColumns);
                 int groupId = groupKey._groupId;
                 for (int i = 0; i < _numAggregationFunctions; i++) {
-                  values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+                  values[_numKeyColumns + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
                 }
                 _indexedTable.upsert(new Key(keys), new Record(values));
               }

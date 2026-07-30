@@ -26,7 +26,6 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -1995,7 +1994,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
   private void testInterSegmentAggregationQueryHelper(String query, long expectedCount) {
     DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG});
-    List<Object[]> expectedRows = Collections.singletonList(new Object[]{expectedCount});
+    List<Object[]> expectedRows = List.<Object[]>of(new Object[]{expectedCount});
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
         new ResultTable(expectedDataSchema, expectedRows));
   }
@@ -2019,7 +2018,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expected = new ArrayList<>();
     expected.add(new Object[]{
         1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
+          + "storage, concurrency, multi-threading"
     });
     expected.add(new Object[]{
         1019,
@@ -2038,7 +2037,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expected1 = new ArrayList<>();
     expected1.add(new Object[]{
         1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
+          + "storage, concurrency, multi-threading"
     });
     String query1 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
         + ", '*ava realtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
@@ -2096,11 +2095,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
     expectedTensorFlow.add(new Object[]{
         1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
-        + "large scale systems, Machine learning"
+          + "large scale systems, Machine learning"
     });
     expectedTensorFlow.add(new Object[]{
         1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building"
-        + " high performance scalable systems"
+          + " high performance scalable systems"
     });
 
     // Test exact phrase "Tensor flow" with default settings (slop=0, inOrder=true)
@@ -2113,7 +2112,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedTensorDatabase = new ArrayList<>();
     expectedTensorDatabase.add(new Object[]{
         1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
-        + "large scale systems, Machine learning"
+          + "large scale systems, Machine learning"
     });
 
     String querySlop1 =
@@ -2189,7 +2188,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedWildcardAnd = new ArrayList<>();
     expectedWildcardAnd.add(new Object[]{
         1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
+          + "storage, concurrency, multi-threading"
     });
     expectedWildcardAnd.add(new Object[]{
         1018,
@@ -2348,7 +2347,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedMin2Of3 = new ArrayList<>();
     expectedMin2Of3.add(new Object[]{
         1008, "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and "
-        + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
+          + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
 
     String queryMin2Of3 =
@@ -2369,11 +2368,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
     expectedMin1Of2.add(new Object[]{
         1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
-        + "large scale systems, Machine learning"
+          + "large scale systems, Machine learning"
     });
     expectedMin1Of2.add(new Object[]{
         1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building"
-        + " high performance scalable systems"
+          + " high performance scalable systems"
     });
 
     String queryMin1Of2 =
@@ -2385,7 +2384,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedMin3Of4 = new ArrayList<>();
     expectedMin3Of4.add(new Object[]{
         1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production "
-        + "systems, concurrency, multi-threading, C++, CPU processing, Java"
+          + "systems, concurrency, multi-threading, C++, CPU processing, Java"
     });
 
     String queryMin3Of4 =
@@ -2397,7 +2396,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedMin3Of3 = new ArrayList<>();
     expectedMin3Of3.add(new Object[]{
         1008, "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and "
-        + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
+          + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
 
     String queryMin3Of3 =

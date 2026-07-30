@@ -67,7 +67,7 @@ public interface SegmentCompletionFSM {
    *
    * @return {@code true} if the FSM receives segment created signal, {@code false} otherwise.
    */
-   boolean isImmutableSegmentCreated();
+  boolean isImmutableSegmentCreated();
 
   /**
    * Processes the event where a server indicates it has consumed up to a specified offset.

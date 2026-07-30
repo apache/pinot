@@ -22,13 +22,14 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -38,6 +39,11 @@ import org.apache.pinot.sql.FilterKind;
 
 /**
  * Utility to convert a leaf stage to a {@link PinotQuery}.
+ *
+ * <p>{@link #createPinotQueryForRouting} folds a Calcite {@link RelNode} leaf stage into a routing query for the
+ * physical optimizer; {@code PlanNodeRoutingQueryBuilder} is the {@code PlanNode} (logical-planner) counterpart that
+ * must be kept in sync (same leaf-boundary stop and filter-combining behavior). The shared filter-normalization
+ * helpers ({@link #ensureFilterIsFunctionExpression} and {@link #addFilterExpression}) live here and are used by both.
  */
 public class LeafStageToPinotQuery {
   private LeafStageToPinotQuery() {
@@ -59,13 +65,20 @@ public class LeafStageToPinotQuery {
         "Could not find table scan");
     TableScan tableScan = (TableScan) bottomToTopNodes.get(0);
     PinotQuery pinotQuery = initializePinotQueryForTableScan(tableName, tableScan);
-    for (RelNode parentNode : bottomToTopNodes) {
+    for (int i = 1; i < bottomToTopNodes.size(); i++) {
+      RelNode parentNode = bottomToTopNodes.get(i);
       if (parentNode instanceof Filter) {
         if (!skipFilter) {
           handleFilter((Filter) parentNode, pinotQuery);
         }
       } else if (parentNode instanceof Project) {
         handleProject((Project) parentNode, pinotQuery);
+      } else {
+        // Leaf boundary: the first node that is neither Filter nor Project (e.g. an un-split DIRECT aggregate)
+        // changes the row space -- InputRefs in nodes above it index that node's output, not the scan/project
+        // columns -- so folding anything above it (e.g. a HAVING filter) would mis-resolve columns and corrupt the
+        // routing filter. Everything below this boundary is a genuine row-level condition; ignore everything above.
+        break;
       }
     }
     return pinotQuery;
@@ -103,8 +116,28 @@ public class LeafStageToPinotQuery {
       RexExpression rexExpression = RexExpressionUtils.fromRexNode(filter.getCondition());
       Expression filterExpression = CalciteRexExpressionParser.toExpression(rexExpression,
           pinotQuery.getSelectList());
-      pinotQuery.setFilterExpression(ensureFilterIsFunctionExpression(filterExpression));
+      addFilterExpression(pinotQuery, ensureFilterIsFunctionExpression(filterExpression));
     }
+  }
+
+  /**
+   * Adds the given filter to the query, AND-ing it with any previously set filter (rather than overwriting it, which
+   * would silently discard a genuine row-level condition when a leaf stage contains multiple filter nodes).
+   * <p>
+   * Note: this mutates {@code pinotQuery} (and, when combining, reuses the existing filter expression in-place). It
+   * assumes the query is freshly constructed for routing and not shared across concurrent callers.
+   */
+  public static void addFilterExpression(PinotQuery pinotQuery, @Nullable Expression filterExpression) {
+    if (filterExpression == null) {
+      return;
+    }
+    Expression existingFilter = pinotQuery.getFilterExpression();
+    if (existingFilter == null) {
+      pinotQuery.setFilterExpression(filterExpression);
+      return;
+    }
+    pinotQuery.setFilterExpression(
+        RequestUtils.getFunctionExpression(FilterKind.AND.name(), existingFilter, filterExpression));
   }
 
   /**
@@ -117,10 +150,18 @@ public class LeafStageToPinotQuery {
    * always-false predicate EQUALS(0, 1), and drops LITERAL true expressions (null = no filter).
    * For AND/OR/NOT nodes, operands are recursively fixed.
    * <p>
+   * Boolean scalar functions used directly as predicates (e.g. {@code WHERE contains(col, 'foo')}) are wrapped as
+   * {@code EQUALS(fn(...), true)}, mirroring the single-stage engine's {@code PredicateComparisonRewriter}: segment
+   * pruners resolve filter operators via {@code FilterKind.valueOf} and would otherwise throw on them.
+   * <p>
    * Note: This method mutates the input expression's operand lists in-place for AND/OR/NOT nodes.
    * It assumes the expression tree is freshly constructed and not shared across concurrent callers.
+   *
+   * @return the pruner-safe filter expression, or {@code null} when the input carries no filter constraint (e.g.
+   *         LITERAL true, or an AND/OR/NOT that reduces away entirely).
    */
-  public static Expression ensureFilterIsFunctionExpression(Expression expression) {
+  @Nullable
+  public static Expression ensureFilterIsFunctionExpression(@Nullable Expression expression) {
     if (expression == null) {
       return null;
     }
@@ -157,32 +198,36 @@ public class LeafStageToPinotQuery {
           return null;  // NOT(constant) — drop entire filter
         }
         operands.set(0, fixed);
+      } else if (!EnumUtils.isValidEnum(FilterKind.class, operator)) {
+        // Boolean scalar function used directly as a predicate (e.g. contains(col, 'foo')).
+        return wrapAsEqualsTrue(expression);
       }
       return expression;
     }
     if (expression.getIdentifier() != null) {
       // Bare boolean column reference (e.g., "is_active" after REINTERPRET stripped).
       // Wrap as EQUALS(col, true) so pruners see a standard predicate.
-      Function equalsFunction = new Function(FilterKind.EQUALS.name());
-      equalsFunction.setOperands(new ArrayList<>(List.of(expression, RequestUtils.getLiteralExpression(true))));
-      Expression wrapped = new Expression(ExpressionType.FUNCTION);
-      wrapped.setFunctionCall(equalsFunction);
-      return wrapped;
+      return wrapAsEqualsTrue(expression);
     }
     // LITERAL expression (constant-folded predicate, e.g., TRUE/FALSE).
     // Treat LITERAL false as an always-false predicate that pruners can process so they
     // don't unnecessarily scan everything.
     if (expression.getLiteral() != null && expression.getLiteral().isSetBoolValue()
         && !expression.getLiteral().getBoolValue()) {
-      Function alwaysFalse = new Function(FilterKind.EQUALS.name());
-      alwaysFalse.setOperands(new ArrayList<>(List.of(
-          RequestUtils.getLiteralExpression(0),
-          RequestUtils.getLiteralExpression(1))));
-      Expression wrapped = new Expression(ExpressionType.FUNCTION);
-      wrapped.setFunctionCall(alwaysFalse);
-      return wrapped;
+      // EQUALS(0, 1) — a predicate that is always false.
+      return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(),
+          RequestUtils.getLiteralExpression(0), RequestUtils.getLiteralExpression(1));
     }
     // LITERAL true or non-boolean literals have no filter constraint so we skip pruning
     return null;
+  }
+
+  /**
+   * Wraps a boolean-valued expression as the standard predicate {@code EQUALS(expression, true)}. The operand list
+   * is mutable so downstream rewriters (e.g. {@code PredicateComparisonRewriter}) can modify it.
+   */
+  private static Expression wrapAsEqualsTrue(Expression expression) {
+    return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), expression,
+        RequestUtils.getLiteralExpression(true));
   }
 }

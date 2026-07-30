@@ -150,7 +150,7 @@ public class PinotQueryResource {
   @Path("sql")
   @ManualAuthorization
   public StreamingOutput handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
-    @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
+      @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions);
   }
 
@@ -159,8 +159,8 @@ public class PinotQueryResource {
   @ManualAuthorization
   @ApiOperation(value = "Prometheus Compatible API for Pinot's Time Series Engine")
   public StreamingOutput handleTimeSeriesQueryRange(@QueryParam("language") String language,
-    @QueryParam("query") String query, @QueryParam("start") String start, @QueryParam("end") String end,
-    @QueryParam("step") String step, @Context HttpHeaders httpHeaders) {
+      @QueryParam("query") String query, @QueryParam("start") String start, @QueryParam("end") String end,
+      @QueryParam("step") String step, @Context HttpHeaders httpHeaders) {
     return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step);
   }
 
@@ -631,7 +631,7 @@ public class PinotQueryResource {
   }
 
   public void sendRequestRaw(String urlStr, String method, String requestStr, Map<String, String> headers,
-    OutputStream outputStream) {
+      OutputStream outputStream) {
     HttpURLConnection conn = null;
     try {
       LOGGER.info("Sending {} request to: {}", method, urlStr);
@@ -681,7 +681,7 @@ public class PinotQueryResource {
   }
 
   public StreamingOutput sendRequestRaw(String url, String method, String query, ObjectNode requestJson,
-    Map<String, String> headers) {
+      Map<String, String> headers) {
     return outputStream -> {
       final long startTime = System.currentTimeMillis();
       sendRequestRaw(url, method, requestJson.toString(), headers, outputStream);
@@ -699,13 +699,13 @@ public class PinotQueryResource {
   }
 
   private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
-    String start, String end, String step) {
+      String start, String end, String step) {
     return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, Map.of(), null, false);
   }
 
   private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
-    String start, String end, String step, Map<String, String> queryOptions, String mode,
-    boolean useBrokerCompatibleApi) {
+      String start, String end, String step, Map<String, String> queryOptions, String mode,
+      boolean useBrokerCompatibleApi) {
     try {
       LOGGER.debug("Language: {}, Query: {}, Start: {}, End: {}, Step: {}, UseBrokerAPI: {}",
           language, query, start, end, step, useBrokerCompatibleApi);
@@ -738,8 +738,8 @@ public class PinotQueryResource {
 
 
   private StreamingOutput sendTimeSeriesRequestToBroker(String language, String query, String start, String end,
-    String step, Map<String, String> queryOptions, String mode, String instanceId, HttpHeaders httpHeaders,
-    boolean useBrokerCompatibleApi) {
+      String step, Map<String, String> queryOptions, String mode, String instanceId, HttpHeaders httpHeaders,
+      boolean useBrokerCompatibleApi) {
     InstanceConfig instanceConfig = getInstanceConfig(instanceId);
     String hostName = getHost(instanceConfig);
     String protocol = _controllerConf.getControllerBrokerProtocol();
@@ -782,10 +782,10 @@ public class PinotQueryResource {
   }
 
   private String getTimeSeriesQueryURL(String protocol, String hostName, int port, String language, String query,
-    String start, String end, String step) {
+      String start, String end, String step) {
     try {
       URIBuilder uriBuilder = new URIBuilder().setScheme(protocol).setHost(hostName).setPort(port)
-        .setPath("/timeseries/api/v1/query_range").addParameter("language", language);
+          .setPath("/timeseries/api/v1/query_range").addParameter("language", language);
       // Add optional parameters
       if (query != null && !query.isEmpty()) {
         uriBuilder.addParameter("query", query);
@@ -831,6 +831,6 @@ public class PinotQueryResource {
 
   private int getPort(InstanceConfig instanceConfig) {
     return _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
-      : Integer.parseInt(instanceConfig.getPort());
+        : Integer.parseInt(instanceConfig.getPort());
   }
 }

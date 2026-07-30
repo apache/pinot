@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.HashMap;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -30,10 +31,42 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
 public class UpsertUtilsTest {
+
+  @Test
+  public void testGetValidDocIdsSnapshotFromSegmentReturnsValidDocsDirectly() {
+    IndexSegment segment = mock(IndexSegment.class);
+    ThreadSafeMutableRoaringBitmap validDocIds = mock(ThreadSafeMutableRoaringBitmap.class);
+    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    when(validDocIds.getMutableRoaringBitmap()).thenReturn(bitmap);
+    when(segment.getValidDocIds()).thenReturn(validDocIds);
+    // Queryable docs must never be consulted by this method, even when present.
+    when(segment.getQueryableDocIds()).thenReturn(mock(ThreadSafeMutableRoaringBitmap.class));
+
+    assertSame(UpsertUtils.getValidDocIdsSnapshotFromSegment(segment), bitmap);
+  }
+
+  @Test
+  public void testGetValidDocIdsSnapshotFromSegmentNullWithoutUseEmptyForNull() {
+    IndexSegment segment = mock(IndexSegment.class);
+    when(segment.getValidDocIds()).thenReturn(null);
+
+    assertNull(UpsertUtils.getValidDocIdsSnapshotFromSegment(segment));
+  }
+
+  @Test
+  public void testGetValidDocIdsSnapshotFromSegmentEmptyWithUseEmptyForNull() {
+    IndexSegment segment = mock(IndexSegment.class);
+    when(segment.getValidDocIds()).thenReturn(null);
+
+    MutableRoaringBitmap result = UpsertUtils.getValidDocIdsSnapshotFromSegment(segment, true);
+    assertTrue(result.isEmpty());
+  }
 
   /// Non-upsert table: `_partitionUpsertMetadataManager` is never set, so `hasNoQueryableDocs`
   /// short-circuits to `false`.
@@ -133,6 +166,78 @@ public class UpsertUtilsTest {
     when(liveQueryable.isEmpty()).thenReturn(true);
     segment.enableUpsert(manager, mock(ThreadSafeMutableRoaringBitmap.class), liveQueryable);
     assertFalse(segment.hasNoQueryableDocs());
+  }
+
+  // -------- hasNoValidDocs: mirrors hasNoQueryableDocs, but against the valid-docs bitmap/cache. --------
+
+  @Test
+  public void testHasNoValidDocsNonUpsert() {
+    ImmutableSegmentImpl segment = newSegment();
+    assertFalse(segment.hasNoValidDocs());
+  }
+
+  @Test
+  public void testHasNoValidDocsLiveEmpty() {
+    ImmutableSegmentImpl segment = newSegment();
+    PartitionUpsertMetadataManager manager = mock(PartitionUpsertMetadataManager.class);
+    when(manager.getUpsertViewManager()).thenReturn(null);
+    ThreadSafeMutableRoaringBitmap valid = mock(ThreadSafeMutableRoaringBitmap.class);
+    when(valid.isEmpty()).thenReturn(true);
+    segment.enableUpsert(manager, valid, null);
+    assertTrue(segment.hasNoValidDocs());
+  }
+
+  @Test
+  public void testHasNoValidDocsLiveNonEmpty() {
+    ImmutableSegmentImpl segment = newSegment();
+    PartitionUpsertMetadataManager manager = mock(PartitionUpsertMetadataManager.class);
+    when(manager.getUpsertViewManager()).thenReturn(null);
+    ThreadSafeMutableRoaringBitmap valid = mock(ThreadSafeMutableRoaringBitmap.class);
+    when(valid.isEmpty()).thenReturn(false);
+    segment.enableUpsert(manager, valid, null);
+    assertFalse(segment.hasNoValidDocs());
+  }
+
+  @Test
+  public void testHasNoValidDocsConsistencyModeSnapshotEmpty() {
+    ImmutableSegmentImpl segment = newSegment();
+    PartitionUpsertMetadataManager manager = mock(PartitionUpsertMetadataManager.class);
+    UpsertViewManager viewManager = mock(UpsertViewManager.class);
+    when(manager.getUpsertViewManager()).thenReturn(viewManager);
+    when(viewManager.getValidDocIdsSnapshot(any())).thenReturn(new MutableRoaringBitmap());
+    ThreadSafeMutableRoaringBitmap liveValid = mock(ThreadSafeMutableRoaringBitmap.class);
+    when(liveValid.isEmpty()).thenReturn(false);
+    segment.enableUpsert(manager, liveValid, null);
+    assertTrue(segment.hasNoValidDocs());
+  }
+
+  @Test
+  public void testHasNoValidDocsConsistencyModeSnapshotNonEmpty() {
+    ImmutableSegmentImpl segment = newSegment();
+    PartitionUpsertMetadataManager manager = mock(PartitionUpsertMetadataManager.class);
+    UpsertViewManager viewManager = mock(UpsertViewManager.class);
+    MutableRoaringBitmap snapshot = new MutableRoaringBitmap();
+    snapshot.add(0);
+    when(manager.getUpsertViewManager()).thenReturn(viewManager);
+    when(viewManager.getValidDocIdsSnapshot(any())).thenReturn(snapshot);
+    ThreadSafeMutableRoaringBitmap liveValid = mock(ThreadSafeMutableRoaringBitmap.class);
+    when(liveValid.isEmpty()).thenReturn(true);
+    segment.enableUpsert(manager, liveValid, null);
+    assertFalse(segment.hasNoValidDocs());
+  }
+
+  @Test
+  public void testHasNoValidDocsConsistencyModeSnapshotAbsent() {
+    // No refresh yet: don't claim empty even if the live bitmap currently is.
+    ImmutableSegmentImpl segment = newSegment();
+    PartitionUpsertMetadataManager manager = mock(PartitionUpsertMetadataManager.class);
+    UpsertViewManager viewManager = mock(UpsertViewManager.class);
+    when(manager.getUpsertViewManager()).thenReturn(viewManager);
+    when(viewManager.getValidDocIdsSnapshot(any())).thenReturn(null);
+    ThreadSafeMutableRoaringBitmap liveValid = mock(ThreadSafeMutableRoaringBitmap.class);
+    when(liveValid.isEmpty()).thenReturn(true);
+    segment.enableUpsert(manager, liveValid, null);
+    assertFalse(segment.hasNoValidDocs());
   }
 
   /// Returns a minimal {@link ImmutableSegmentImpl} usable for testing the upsert-aware methods.

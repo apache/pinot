@@ -73,10 +73,10 @@ public class CompositeQueryKillingStrategy implements QueryKillingStrategy {
 
   @Override
   public QueryKillReport buildKillReport(QueryScanCostContext ctx,
-      String queryId, String tableName, String configSource) {
+      long requestId, String queryId, String tableName, String configSource) {
     for (QueryKillingStrategy s : _strategies) {
       if (s.shouldTerminate(ctx)) {
-        return s.buildKillReport(ctx, queryId, tableName, configSource);
+        return s.buildKillReport(ctx, requestId, queryId, tableName, configSource);
       }
     }
     throw new IllegalStateException("buildKillReport called but no strategy triggered");

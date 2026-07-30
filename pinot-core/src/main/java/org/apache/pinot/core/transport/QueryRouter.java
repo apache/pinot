@@ -151,9 +151,11 @@ public class QueryRouter {
 
   public boolean hasChannel(ServerInstance serverInstance) {
     if (_serverChannelsTls != null) {
-      return _serverChannelsTls.hasChannel(serverInstance.toServerRoutingInstance(TableType.OFFLINE, true));
+      return _serverChannelsTls.hasChannel(
+          serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY_TLS));
     } else {
-      return _serverChannels.hasChannel(serverInstance.toServerRoutingInstance(TableType.OFFLINE, false));
+      return _serverChannels.hasChannel(
+          serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY));
     }
   }
 
@@ -163,9 +165,11 @@ public class QueryRouter {
   public boolean connect(ServerInstance serverInstance) {
     try {
       if (_serverChannelsTls != null) {
-        _serverChannelsTls.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, true));
+        _serverChannelsTls.connect(
+            serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY_TLS));
       } else {
-        _serverChannels.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, false));
+        _serverChannels.connect(
+            serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY));
       }
       return true;
     } catch (Exception e) {

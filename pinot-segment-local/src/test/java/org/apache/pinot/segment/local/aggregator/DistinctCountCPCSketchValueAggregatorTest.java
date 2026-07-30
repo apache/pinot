@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.stream.IntStream;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
@@ -33,7 +33,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
 
   @Test
   public void initialShouldCreateSingleItemSketch() {
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     assertEquals(toSketch(agg.getInitialAggregatedValue("hello world")).getEstimate(), 1.0);
   }
 
@@ -41,7 +41,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
   public void initialShouldParseASketch() {
     CpcSketch input = new CpcSketch(12);
     IntStream.range(0, 100).forEach(input::update);
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     byte[] bytes = agg.serializeAggregatedValue(input);
     assertEquals(Math.round(toSketch(agg.getInitialAggregatedValue(bytes)).getEstimate()),
         Math.round(input.getEstimate()));
@@ -54,14 +54,14 @@ public class DistinctCountCPCSketchValueAggregatorTest {
     input1.update("hello");
     CpcSketch input2 = new CpcSketch();
     input2.update("world");
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     byte[][] bytes = {agg.serializeAggregatedValue(input1), agg.serializeAggregatedValue(input2)};
     assertEquals(Math.round(toSketch(agg.getInitialAggregatedValue(bytes)).getEstimate()), 2);
   }
 
   @Test
   public void nullInitialShouldReturnEmptySketch() {
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     assertEquals(toSketch(agg.getInitialAggregatedValue(null)).getEstimate(), 0.0);
   }
 
@@ -71,7 +71,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
     IntStream.range(0, 1000).forEach(input1::update);
     CpcSketch input2 = new CpcSketch();
     IntStream.range(0, 1000).forEach(input2::update);
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     CpcSketch result = toSketch(agg.applyAggregatedValue(input1, input2));
 
     CpcUnion union = new CpcUnion(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
@@ -89,7 +89,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
     IntStream.range(0, 1000).forEach(input1::update);
     CpcSketch input2 = new CpcSketch();
     IntStream.range(0, 1000).forEach(input2::update);
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     byte[] result2bytes = agg.serializeAggregatedValue(input2);
     CpcSketch result = toSketch(agg.applyRawValue(input1, result2bytes));
 
@@ -106,7 +106,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
   public void applyRawValueShouldAdd() {
     CpcSketch input1 = new CpcSketch();
     input1.update("hello".hashCode());
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     CpcSketch result = toSketch(agg.applyRawValue(input1, "world"));
     assertEquals(Math.round(result.getEstimate()), 2);
 
@@ -120,7 +120,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
   public void applyRawValueShouldSupportMultiValue() {
     CpcSketch input1 = new CpcSketch();
     input1.update("hello");
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     String[] strings = {"hello", "world", "this", "is", "some", "strings"};
     CpcSketch result = toSketch(agg.applyRawValue(input1, strings));
 
@@ -135,7 +135,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
 
   @Test
   public void initialShouldHandleEmptyByteArray() {
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     // Empty byte array is the default null value for BYTES columns in Pinot
     byte[] emptyBytes = new byte[0];
     CpcSketch result = toSketch(agg.getInitialAggregatedValue(emptyBytes));
@@ -144,7 +144,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
 
   @Test
   public void initialShouldHandleMultiValueWithEmptyByteArrays() {
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     CpcSketch input = new CpcSketch();
     input.update("hello");
     byte[][] bytes = {new byte[0], agg.serializeAggregatedValue(input), new byte[0]};
@@ -154,7 +154,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
 
   @Test
   public void applyRawValueShouldHandleEmptyByteArray() {
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     CpcSketch input = new CpcSketch();
     input.update("hello");
     // Applying an empty byte array should not change the sketch
@@ -164,7 +164,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
 
   @Test
   public void getInitialValueShouldSupportDifferentTypes() {
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     assertEquals(toSketch(agg.getInitialAggregatedValue(12345)).getEstimate(), 1.0);
     assertEquals(toSketch(agg.getInitialAggregatedValue(12345L)).getEstimate(), 1.0);
     assertEquals(toSketch(agg.getInitialAggregatedValue(12.345f)).getEstimate(), 1.0);
@@ -174,7 +174,7 @@ public class DistinctCountCPCSketchValueAggregatorTest {
 
   @Test
   public void getInitialValueShouldSupportMultiValueTypes() {
-    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(List.of());
     Integer[] ints = {12345};
     assertEquals(toSketch(agg.getInitialAggregatedValue(ints)).getEstimate(), 1.0);
     Long[] longs = {12345L};

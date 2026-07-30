@@ -29,7 +29,6 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Set;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -66,7 +65,7 @@ public class ClientSSLContextGenerator {
   private final String _keyStorePassword;
 
   public static Set<String> getProtectedConfigKeys() {
-    return Collections.singleton(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
+    return Set.of(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
   }
 
   public ClientSSLContextGenerator(PinotConfiguration sslConfig) {

@@ -19,14 +19,20 @@
 
 package org.apache.pinot.segment.spi.index;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Sets;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class FieldIndexConfigsUtil {
@@ -49,6 +55,46 @@ public class FieldIndexConfigsUtil {
 
     return builderMap.entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().build()));
+  }
+
+  /// Builds a {@link FieldIndexConfigs} for a single column directly from one {@link FieldConfig}, without a
+  /// `TableConfig` or `Schema`. The dictionary entry is derived from `fieldConfig.getEncodingType()`
+  /// (RAW => disabled, otherwise default-enabled); every other index type is read from the modern
+  /// `fieldConfig.getIndexes()` JSON (keyed by index pretty name), falling back to each type's default config.
+  /// A `null` fieldConfig yields built-in defaults (dictionary enabled).
+  ///
+  /// This reads only the modern `indexes` format and never legacy `IndexingConfig` lists, so it suits
+  /// synthetic columns (e.g. OPEN_STRUCT materialized children) that exist in no schema.
+  public static FieldIndexConfigs fromFieldConfig(@Nullable FieldConfig fieldConfig, FieldSpec fieldSpec) {
+    FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
+    boolean rawEncoded = fieldConfig != null && fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW;
+    builder.add(StandardIndexes.dictionary(),
+        rawEncoded ? DictionaryIndexConfig.DISABLED : DictionaryIndexConfig.DEFAULT);
+    JsonNode indexes = fieldConfig != null ? fieldConfig.getIndexes() : null;
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      if (indexType.getId().equals(StandardIndexes.DICTIONARY_ID)) {
+        continue;
+      }
+      addConfigFromIndexes(builder, indexType, indexes);
+    }
+    return builder.build();
+  }
+
+  private static <C extends IndexConfig> void addConfigFromIndexes(FieldIndexConfigs.Builder builder,
+      IndexType<C, ?, ?> indexType, @Nullable JsonNode indexes) {
+    JsonNode node = indexes != null ? indexes.get(indexType.getPrettyName()) : null;
+    C config;
+    if (node != null) {
+      try {
+        config = JsonUtils.jsonNodeToObject(node, indexType.getIndexConfigClass());
+      } catch (IOException e) {
+        throw new IllegalArgumentException(
+            "Failed to parse '" + indexType.getPrettyName() + "' index config from FieldConfig", e);
+      }
+    } else {
+      config = indexType.getDefaultConfig();
+    }
+    builder.add(indexType, config);
   }
 
   @FunctionalInterface

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.killing;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.query.killing.strategy.ScanEntriesThresholdStrategy;
 import org.apache.pinot.spi.query.QueryScanCostContext;
@@ -91,7 +90,7 @@ public class CompositeQueryKillingStrategyTest {
   @Test
   public void testEmptyStrategiesNeverKills() {
     CompositeQueryKillingStrategy composite =
-        new CompositeQueryKillingStrategy(Collections.emptyList(), CompositeQueryKillingStrategy.Mode.ANY);
+        new CompositeQueryKillingStrategy(List.of(), CompositeQueryKillingStrategy.Mode.ANY);
     QueryScanCostContext ctx = new QueryScanCostContext();
     ctx.addEntriesScannedInFilter(Long.MAX_VALUE - 1);
     assertFalse(composite.shouldTerminate(ctx));
@@ -100,7 +99,7 @@ public class CompositeQueryKillingStrategyTest {
   @Test
   public void testEmptyStrategiesAllModeNeverKills() {
     CompositeQueryKillingStrategy composite =
-        new CompositeQueryKillingStrategy(Collections.emptyList(), CompositeQueryKillingStrategy.Mode.ALL);
+        new CompositeQueryKillingStrategy(List.of(), CompositeQueryKillingStrategy.Mode.ALL);
     QueryScanCostContext ctx = new QueryScanCostContext();
     assertFalse(composite.shouldTerminate(ctx));
   }
@@ -117,7 +116,7 @@ public class CompositeQueryKillingStrategyTest {
     ctx.addDocsScanned(501);
     assertTrue(composite.shouldTerminate(ctx));
 
-    QueryKillReport report = composite.buildKillReport(ctx, "q1", "t1", "cluster");
+    QueryKillReport report = composite.buildKillReport(ctx, 1L, "q1", "t1", "cluster");
     assertEquals(report.getTriggeringMetric(), "numDocsScanned");
     assertEquals(report.getActualValue(), 501L);
   }

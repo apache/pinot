@@ -41,7 +41,7 @@ public interface AccessControlFactory {
    * @param helixResourceManager Helix resource manager
    */
   default void init(PinotConfiguration configuration, PinotHelixResourceManager helixResourceManager)
-    throws IOException {
+      throws IOException {
     init(configuration);
   }
 

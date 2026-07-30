@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +56,46 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
         .map(e -> e.replaceFirst(parentPath + "/", "").split("/")[0])
         .distinct()
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Bulk-read variant that returns the stored {@link ZNRecord} for each immediate child of
+   * {@code parentPath}. Populates {@code stats} with the per-record stat in the same order as the
+   * returned list. The real Helix implementation goes through {@code _baseAccessor}, which is
+   * {@code null} in this fake; this override backs the same read shape from the in-memory map so
+   * tests that rely on bulk reads work end-to-end.
+   */
+  @Override
+  public List<ZNRecord> getChildren(String parentPath, List<Stat> stats, int options) {
+    List<String> childNames = getChildNames(parentPath, options);
+    List<ZNRecord> out = new ArrayList<>(childNames.size());
+    if (stats != null) {
+      stats.clear();
+    }
+    for (String childName : childNames) {
+      String childPath = parentPath + "/" + childName;
+      ZNRecord record = _contents.get(childPath);
+      if (record == null) {
+        continue;
+      }
+      out.add(record);
+      if (stats != null) {
+        Stat stat = _statMap.get(childPath);
+        stats.add(stat != null ? stat : new Stat());
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Five-arg getChildren overload used by Pinot via {@code CommonConstants.Helix.ZkClient.RETRY_*}.
+   * The retry parameters don't apply to the in-memory fake; delegates to the simpler signature
+   * above.
+   */
+  @Override
+  public List<ZNRecord> getChildren(String parentPath, List<Stat> stats, int options, int retryCount,
+      int retryInterval) {
+    return getChildren(parentPath, stats, options);
   }
 
   @Override

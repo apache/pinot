@@ -23,7 +23,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
@@ -423,7 +423,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
           //  Fix this before opening support for partitioning in Kinesis
           int numPartitionGroups =
               _partitionMetadataProvider.computePartitionGroupMetadata(getClientId(), _streamConfig,
-                  Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
+                  List.of(), /*maxWaitTimeMs=*/5000).size();
 
           if (numPartitionGroups != numPartitions) {
             _logger.info(

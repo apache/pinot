@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMetadata;
 import org.apache.pinot.segment.local.segment.index.inverted.InvertedIndexType;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -264,25 +265,33 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       DataType storedType = _columnMetadata.getStoredType();
       boolean backfillStats =
           !storedType.isFixedWidth() && _columnMetadata.getLengthOfShortestElement() < 0;
+      boolean compressionStatsEnabled = isCompressionStatsEnabled();
       int lengthOfShortestElement = Integer.MAX_VALUE;
       int lengthOfLongestElement = 0;
       boolean isAscii = storedType == DataType.STRING;
+      long dictionaryUncompressedValueSize = compressionStatsEnabled && storedType.isFixedWidth()
+          ? (long) _numDocs * storedType.size() : 0;
       for (int dictId = 0; dictId < _cardinality; dictId++) {
         ImmutableRoaringBitmap docIdsBitmap = invertedIndexReader.getDocIds(dictId);
         int finalDictId = dictId;
         docIdsBitmap.stream().forEach(docId -> putInt(_forwardIndexValueBuffer, docId, finalDictId));
+        int valueSize = backfillStats || (compressionStatsEnabled && !storedType.isFixedWidth())
+            ? dictionary.getValueSize(dictId) : 0;
         if (backfillStats) {
-          int valueSize = dictionary.getValueSize(dictId);
           lengthOfShortestElement = Math.min(lengthOfShortestElement, valueSize);
           lengthOfLongestElement = Math.max(lengthOfLongestElement, valueSize);
           if (isAscii) {
             isAscii = valueSize == dictionary.getStringValue(dictId).length();
           }
         }
+        if (compressionStatsEnabled && !storedType.isFixedWidth()) {
+          dictionaryUncompressedValueSize += (long) valueSize * docIdsBitmap.getCardinality();
+        }
       }
 
       IndexCreationContext.Builder builder =
-          new IndexCreationContext.Builder(_segmentMetadata.getIndexDir(), _tableConfig, _columnMetadata);
+          new IndexCreationContext.Builder(_segmentMetadata.getIndexDir(), _tableConfig, _columnMetadata)
+              .withCompressionStatsEnabled(compressionStatsEnabled);
       if (backfillStats) {
         builder.withLengthOfShortestElement(lengthOfShortestElement);
         builder.withLengthOfLongestElement(lengthOfLongestElement);
@@ -290,7 +299,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       }
 
       // NOTE: this method closes buffers and removes files
-      writeToForwardIndex(dictionary, builder.build());
+      CompressionStatsMetadata rawCompressionMetadata = writeToForwardIndex(dictionary, builder.build());
 
       // Setup and return the metadata properties to update
       Map<String, String> metadataProperties = new HashMap<>();
@@ -312,6 +321,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           metadataProperties.put(getKeyFor(_columnName, IS_ASCII), String.valueOf(isAscii));
         }
       }
+      addCompressionMetadata(metadataProperties, rawCompressionMetadata, dictionaryUncompressedValueSize);
       return metadataProperties;
     }
   }
@@ -365,16 +375,21 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       // the source segment is missing them, so we can backfill those metadata keys without a second dictionary scan.
       DataType storedType = _columnMetadata.getStoredType();
       boolean isFixedWidth = storedType.isFixedWidth();
+      boolean compressionStatsEnabled = isCompressionStatsEnabled();
       int fixedSize = isFixedWidth ? storedType.size() : 0;
       int maxRowLengthInBytes = isFixedWidth ? maxNumberOfMultiValues * fixedSize : 0;
       boolean backfillStats = !isFixedWidth && _columnMetadata.getLengthOfShortestElement() < 0;
       int lengthOfShortestElement = Integer.MAX_VALUE;
       int lengthOfLongestElement = 0;
       boolean isAscii = storedType == DataType.STRING;
+      long dictionaryUncompressedValueSize = 0;
       for (int dictId = 0; dictId < _cardinality; dictId++) {
         ImmutableRoaringBitmap docIdsBitmap = invertedIndexReader.getDocIds(dictId);
         PeekableIntIterator intIterator = docIdsBitmap.getIntIterator();
         int valueSize = isFixedWidth ? fixedSize : dictionary.getValueSize(dictId);
+        if (compressionStatsEnabled) {
+          dictionaryUncompressedValueSize += (long) valueSize * docIdsBitmap.getCardinality();
+        }
         if (backfillStats) {
           lengthOfShortestElement = Math.min(lengthOfShortestElement, valueSize);
           lengthOfLongestElement = Math.max(lengthOfLongestElement, valueSize);
@@ -403,14 +418,15 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       IndexCreationContext.Builder builder = new IndexCreationContext.Builder(indexDir, _tableConfig, _columnMetadata)
           .withTotalNumberOfEntries(_nextValueId)
           .withMaxNumberOfMultiValues(maxNumberOfMultiValues)
-          .withMaxRowLengthInBytes(maxRowLengthInBytes);
+          .withMaxRowLengthInBytes(maxRowLengthInBytes)
+          .withCompressionStatsEnabled(compressionStatsEnabled);
       if (backfillStats) {
         builder.withLengthOfShortestElement(lengthOfShortestElement);
         builder.withLengthOfLongestElement(lengthOfLongestElement);
         builder.withAscii(isAscii);
       }
 
-      writeToForwardIndex(dictionary, builder.build());
+      CompressionStatsMetadata rawCompressionMetadata = writeToForwardIndex(dictionary, builder.build());
 
       // Setup and return the metadata properties to update
       Map<String, String> metadataProperties = new HashMap<>();
@@ -437,11 +453,12 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           }
         }
       }
+      addCompressionMetadata(metadataProperties, rawCompressionMetadata, dictionaryUncompressedValueSize);
       return metadataProperties;
     }
   }
 
-  private void writeToForwardIndex(Dictionary dictionary, IndexCreationContext context)
+  private CompressionStatsMetadata writeToForwardIndex(Dictionary dictionary, IndexCreationContext context)
       throws IOException {
     try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, _forwardIndexConfig)) {
       if (creator.isDictionaryEncoded()) {
@@ -601,6 +618,10 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
             throw new IllegalStateException("Invalid type" + creator.getValueType() + " cannot create forward index");
         }
       }
+      return creator.isDictionaryEncoded() ? CompressionStatsMetadata.unavailable()
+          : CompressionStatsMetadata.forRawForwardIndex(
+              creator.getRawForwardIndexUncompressedValueSizeInBytes(),
+              creator.getRawForwardIndexChunkCompressionType());
     } catch (Exception e) {
       throw new IOException(String.format(
           "Cannot create the forward index from inverted index for column %s", _columnName), e);
@@ -609,6 +630,29 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       destroyBuffer(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile);
       destroyBuffer(_forwardIndexMaxSizeBuffer, _forwardIndexMaxSizeBufferFile);
     }
+  }
+
+  private boolean isCompressionStatsEnabled() {
+    return _tableConfig.getIndexingConfig() != null
+        && _tableConfig.getIndexingConfig().isCompressionStatsEnabled();
+  }
+
+  private void addCompressionMetadata(Map<String, String> metadataProperties,
+      CompressionStatsMetadata rawCompressionMetadata, long dictionaryUncompressedValueSizeInBytes) {
+    if (_isTemporaryForwardIndex) {
+      return;
+    }
+    CompressionStatsMetadata compressionMetadata = CompressionStatsMetadata.unavailable();
+    if (!isCompressionStatsEnabled()) {
+      compressionMetadata.applyTo(metadataProperties, _columnName);
+      return;
+    }
+    if (_forwardIndexConfig.getEncodingType() == EncodingType.DICTIONARY) {
+      compressionMetadata = CompressionStatsMetadata.forDictionary(dictionaryUncompressedValueSizeInBytes);
+    } else {
+      compressionMetadata = rawCompressionMetadata;
+    }
+    compressionMetadata.applyTo(metadataProperties, _columnName);
   }
 
   private static void putInt(PinotDataBuffer buffer, long index, int value) {

@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -79,27 +78,27 @@ public class TableTierReaderTest {
     Map<String, String> segTierMap = new HashMap<>();
     segTierMap.put("seg01", null);
     segTierMap.put("seg02", "someTier");
-    Set<String> muSegs = Collections.singleton("muSeg01");
+    Set<String> muSegs = Set.of("muSeg01");
     FakeSizeServer s = new FakeSizeServer(segTierMap, muSegs);
     s.start(URI_PATH_TABLE_TIERS, createHandler(200, s._segTierMap, muSegs, 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
     // server1 - all good
-    s = new FakeSizeServer(Collections.singletonMap("seg01", null));
-    s.start(URI_PATH_TABLE_TIERS, createHandler(200, s._segTierMap, Collections.emptySet(), 0));
+    s = new FakeSizeServer(nullableTierMap("seg01", null));
+    s.start(URI_PATH_TABLE_TIERS, createHandler(200, s._segTierMap, Set.of(), 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
     // server2 - always 404
-    s = new FakeSizeServer(Collections.singletonMap("seg02", "someTier"));
-    s.start(URI_PATH_TABLE_TIERS, createHandler(404, s._segTierMap, Collections.emptySet(), 0));
+    s = new FakeSizeServer(Map.of("seg02", "someTier"));
+    s.start(URI_PATH_TABLE_TIERS, createHandler(404, s._segTierMap, Set.of(), 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
     // server3 - empty server
-    s = new FakeSizeServer(Collections.emptyMap());
-    s.start(URI_PATH_TABLE_TIERS, createHandler(200, s._segTierMap, Collections.emptySet(), 0));
+    s = new FakeSizeServer(Map.of());
+    s.start(URI_PATH_TABLE_TIERS, createHandler(200, s._segTierMap, Set.of(), 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
@@ -110,14 +109,14 @@ public class TableTierReaderTest {
     s = new FakeSizeServer(segTierMap);
     segTierMap = new HashMap<>(segTierMap);
     segTierMap.remove("seg03");
-    s.start(URI_PATH_TABLE_TIERS, createHandler(200, segTierMap, Collections.emptySet(), 0));
+    s.start(URI_PATH_TABLE_TIERS, createHandler(200, segTierMap, Set.of(), 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
     // server5 - timing out server
-    s = new FakeSizeServer(Collections.singletonMap("seg04", "someTier"));
+    s = new FakeSizeServer(Map.of("seg04", "someTier"));
     s.start(URI_PATH_TABLE_TIERS,
-        createHandler(200, s._segTierMap, Collections.emptySet(), TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
+        createHandler(200, s._segTierMap, Set.of(), TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
     _serverMap.put(serverName(counter), s);
     counter++;
 
@@ -125,7 +124,7 @@ public class TableTierReaderTest {
     // server6 - all good for segX
     segTierMap = new HashMap<>();
     segTierMap.put("segX", "someTier");
-    muSegs = Collections.singleton("segY");
+    muSegs = Set.of("segY");
     s = new FakeSizeServer(segTierMap, muSegs);
     s.start(URI_PATH_SEGMENT_TIERS, createHandler(200, s._segTierMap, muSegs, 0));
     _serverMap.put(serverName(counter), s);
@@ -135,20 +134,20 @@ public class TableTierReaderTest {
     s = new FakeSizeServer(segTierMap);
     segTierMap = new HashMap<>(segTierMap);
     segTierMap.remove("segX");
-    s.start(URI_PATH_SEGMENT_TIERS, createHandler(200, segTierMap, Collections.emptySet(), 0));
+    s.start(URI_PATH_SEGMENT_TIERS, createHandler(200, segTierMap, Set.of(), 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
     // server8 - 404
-    s = new FakeSizeServer(Collections.singletonMap("segX", null));
-    s.start(URI_PATH_TABLE_TIERS, createHandler(404, s._segTierMap, Collections.emptySet(), 0));
+    s = new FakeSizeServer(nullableTierMap("segX", null));
+    s.start(URI_PATH_TABLE_TIERS, createHandler(404, s._segTierMap, Set.of(), 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
     // server9 - timing out
-    s = new FakeSizeServer(Collections.singletonMap("segX", null));
+    s = new FakeSizeServer(nullableTierMap("segX", null));
     s.start(URI_PATH_TABLE_TIERS,
-        createHandler(200, s._segTierMap, Collections.emptySet(), TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
+        createHandler(200, s._segTierMap, Set.of(), TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
     _serverMap.put(serverName(counter), s);
     counter++;
   }
@@ -183,12 +182,18 @@ public class TableTierReaderTest {
     return "server" + index;
   }
 
+  private static Map<String, String> nullableTierMap(String segmentName, String tier) {
+    Map<String, String> map = new HashMap<>();
+    map.put(segmentName, tier);
+    return map;
+  }
+
   private static class FakeSizeServer extends FakeHttpServer {
     Set<String> _mutableSegments;
     Map<String, String> _segTierMap;
 
     FakeSizeServer(Map<String, String> segTierMap) {
-      this(segTierMap, Collections.emptySet());
+      this(segTierMap, Set.of());
     }
 
     FakeSizeServer(Map<String, String> segTierMap, Set<String> mutableSegments) {

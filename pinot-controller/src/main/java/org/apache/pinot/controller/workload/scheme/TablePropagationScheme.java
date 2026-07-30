@@ -19,14 +19,13 @@
 package org.apache.pinot.controller.workload.scheme;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
-import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -100,21 +99,23 @@ public class TablePropagationScheme implements PropagationScheme {
 
   /**
    * Resolves the set of broker instances responsible for serving the given table name.
+   * Uses IdealState instead of ExternalView to ensure brokers that are temporarily offline
+   * (e.g., during restart) still receive workload configuration updates.
    *
    * Returns the first non-empty set of instances since the brokers are shared across all table types.
    */
   private Set<String> getBrokerInstances(String tableName) {
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
-    ExternalView brokerResource = HelixHelper.getExternalViewForResource(helixManager.getClusterManagmentTool(),
-        helixManager.getClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    // Using IdealState to include offline brokers (e.g. during rolling restart)
+    IdealState brokerIdealState = HelixHelper.getTableIdealState(helixManager,
+        CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     for (String tableWithType : expandToTablesWithType(tableName)) {
-      Set<String> instances = brokerResource.getStateMap(tableWithType) != null
-          ? brokerResource.getStateMap(tableWithType).keySet() : Collections.emptySet();
+      Set<String> instances = brokerIdealState.getInstanceSet(tableWithType);
       if (!instances.isEmpty()) {
-        return new HashSet<>(instances);
+        return instances;
       }
     }
-    return Collections.emptySet();
+    return Set.of();
   }
 
   private Set<String> getServerInstances(String tableName, @Nullable PropagationEntityOverrides override) {
@@ -165,10 +166,10 @@ public class TablePropagationScheme implements PropagationScheme {
         InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.COMPLETED);
     if (type == OverrideEntityType.CONSUMING) {
       Set<String> instances = getInstancesFromInstancePartitions(consumingKey);
-      return (instances == null) ? Collections.emptySet() : new HashSet<>(instances);
+      return (instances == null) ? Set.of() : new HashSet<>(instances);
     } else if (type == OverrideEntityType.COMPLETED) {
       Set<String> instances = getInstancesFromInstancePartitions(completedKey);
-      return (instances == null) ? Collections.emptySet() : new HashSet<>(instances);
+      return (instances == null) ? Set.of() : new HashSet<>(instances);
     }
 
     // Union CONSUMING + COMPLETED
@@ -204,14 +205,14 @@ public class TablePropagationScheme implements PropagationScheme {
       list.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
       return list;
     }
-    return Collections.singletonList(tableName);
+    return List.of(tableName);
   }
 
   private Set<String> getInstancesFromInstancePartitions(String instancePartitionsName) {
     InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
         _pinotHelixResourceManager.getPropertyStore(), instancePartitionsName);
     if (instancePartitions == null) {
-      return Collections.emptySet();
+      return Set.of();
     }
     Map<String, Integer> instanceToPartitionIdMap = instancePartitions.getInstanceToPartitionIdMap();
     return instanceToPartitionIdMap.keySet();

@@ -30,6 +30,7 @@ import java.net.InetSocketAddress;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -138,6 +139,38 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
       Throwable cause = ExceptionUtils.getRootCause(exception);
       assertEquals(cause.getClass().getName(), "java.util.concurrent.TimeoutException");
     }
+  }
+
+  @Test
+  public void withConnectionPropertiesRetainsConfiguredSchemeWhenSchemePropertyIsAbsent() {
+    JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+    factory.setScheme(CommonConstants.HTTPS_PROTOCOL);
+
+    factory.withConnectionProperties(new Properties());
+
+    assertEquals(factory.getScheme(), CommonConstants.HTTPS_PROTOCOL);
+  }
+
+  @Test
+  public void withConnectionPropertiesOverridesConfiguredSchemeWhenSchemePropertyIsPresent() {
+    JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+    factory.setScheme(CommonConstants.HTTP_PROTOCOL);
+    Properties connectionProps = new Properties();
+    connectionProps.setProperty("scheme", CommonConstants.HTTPS_PROTOCOL);
+
+    factory.withConnectionProperties(connectionProps);
+
+    assertEquals(factory.getScheme(), CommonConstants.HTTPS_PROTOCOL);
+  }
+
+  @Test
+  public void withConnectionPropertiesFallsBackToHttpWhenConfiguredSchemeIsNull() {
+    JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+    factory.setScheme(null);
+
+    factory.withConnectionProperties(new Properties());
+
+    assertEquals(factory.getScheme(), CommonConstants.HTTP_PROTOCOL);
   }
 
   // Cursor-related tests

@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -139,27 +138,27 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
             + RAW_LZ4_INDEX_COLUMNS.size() + RAW_GZIP_INDEX_COLUMNS.size());
 
     for (String indexColumn : RAW_SNAPPY_INDEX_COLUMNS) {
-      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, List.of(),
           FieldConfig.CompressionCodec.SNAPPY, null));
     }
 
     for (String indexColumn : RAW_ZSTANDARD_INDEX_COLUMNS) {
-      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, List.of(),
           FieldConfig.CompressionCodec.ZSTANDARD, null));
     }
 
     for (String indexColumn : RAW_PASS_THROUGH_INDEX_COLUMNS) {
-      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, List.of(),
           FieldConfig.CompressionCodec.PASS_THROUGH, null));
     }
 
     for (String indexColumn : RAW_LZ4_INDEX_COLUMNS) {
-      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, List.of(),
           FieldConfig.CompressionCodec.LZ4, null));
     }
 
     for (String indexColumn : RAW_GZIP_INDEX_COLUMNS) {
-      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, List.of(),
           FieldConfig.CompressionCodec.GZIP, null));
     }
 

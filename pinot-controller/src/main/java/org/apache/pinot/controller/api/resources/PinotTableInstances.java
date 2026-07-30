@@ -32,7 +32,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.net.URI;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -228,7 +227,7 @@ public class PinotTableInstances {
     String serverEndpoint;
     try {
       BiMap<String, String> dataInstanceAdminEndpoints =
-          _pinotHelixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(instanceId));
+          _pinotHelixResourceManager.getDataInstanceAdminEndpoints(Set.of(instanceId));
       serverEndpoint = dataInstanceAdminEndpoints.get(instanceId);
       Preconditions.checkNotNull(serverEndpoint, "Server endpoint not found for instance: " + instanceId);
     } catch (Exception e) {

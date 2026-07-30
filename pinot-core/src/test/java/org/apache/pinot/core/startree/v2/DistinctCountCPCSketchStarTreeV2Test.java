@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
@@ -33,7 +33,7 @@ public class DistinctCountCPCSketchStarTreeV2Test extends BaseStarTreeV2Test<Obj
 
   @Override
   ValueAggregator<Object, Object> getValueAggregator() {
-    return new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    return new DistinctCountCPCSketchValueAggregator(List.of());
   }
 
   @Override

@@ -139,7 +139,7 @@ public class TimeSeriesBlockSerde {
   }
 
   public static void encodeExceptionsToMetadata(TimeSeriesBlock timeSeriesBlock, Map<String, String> metadataMap)
-    throws Exception {
+      throws Exception {
     List<QueryException> exceptions = timeSeriesBlock.getExceptions();
     if (exceptions != null && !exceptions.isEmpty()) {
       List<Map<String, Object>> exceptionsList = new ArrayList<>();

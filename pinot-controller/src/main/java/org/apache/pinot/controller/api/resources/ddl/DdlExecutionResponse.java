@@ -31,8 +31,13 @@ import org.apache.pinot.sql.ddl.compile.DdlOperation;
 /// the wire payload focused on the fields that actually apply to the operation that ran.
 ///
 /// - CREATE_TABLE: `tableName, tableType, schema, tableConfig, ifNotExists, warnings, dryRun`
+/// - CREATE_MATERIALIZED_VIEW: same as CREATE_TABLE; `tableType` is always `OFFLINE`.
 /// - DROP_TABLE: `tableName, tableType, deletedTables, ifExists, dryRun`
-/// - SHOW_TABLES: `tableNames`
+/// - SHOW_TABLES: `tableNames` (raw names of every OFFLINE/REALTIME table in scope, including
+///   any that are materialized views — see `tableNames` field doc).
+/// - SHOW_MATERIALIZED_VIEWS: `tableNames` (raw names of every materialized view in scope;
+///   shape is identical to SHOW_TABLES so the wire payload stays uniform across the two
+///   Catalog-listing verbs).
 /// - SHOW_CREATE_TABLE: `tableName, tableType, ddl`
 ///
 /// `dryRun` is emitted only for operations that have dry-run semantics (CREATE, DROP); it is
@@ -166,6 +171,19 @@ public class DdlExecutionResponse {
     return this;
   }
 
+  /// Names returned by Catalog-listing DDLs.
+  ///
+  /// Populated by both `SHOW TABLES` and `SHOW MATERIALIZED VIEWS` — the underlying storage
+  /// substrate is the same (an MV is physically an OFFLINE table), so the wire field is shared
+  /// and the `operation` discriminator tells the client what the names represent. Names are
+  /// raw (no `_OFFLINE` / `_REALTIME` suffix) so they round-trip directly into subsequent
+  /// `SHOW CREATE ...` or `DROP ...` statements.
+  ///
+  /// `SHOW TABLES` returns every OFFLINE/REALTIME table in scope including MVs (an MV is
+  /// physically an OFFLINE table); `SHOW MATERIALIZED VIEWS` returns only the MVs. The two
+  /// listings are intentionally not mutually exclusive — separating them at the DDL surface
+  /// lets callers pick the verb that matches their intent without mutating what `SHOW TABLES`
+  /// has historically meant.
   @Nullable
   public List<String> getTableNames() {
     return _tableNames;

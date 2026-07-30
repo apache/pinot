@@ -34,14 +34,16 @@ public abstract class CompiledDdl {
   protected CompiledDdl(DdlOperation operation, @Nullable String databaseName, List<String> warnings) {
     _operation = operation;
     _databaseName = databaseName;
-    _warnings = warnings == null ? Collections.emptyList() : Collections.unmodifiableList(warnings);
+    _warnings = warnings == null ? List.of() : Collections.unmodifiableList(warnings);
   }
 
   public DdlOperation getOperation() {
     return _operation;
   }
 
-  /// Database name from `db.table` or `SHOW TABLES FROM db`; may be `null`.
+  /// Database name from `db.table` or `SHOW TABLES FROM db` / `SHOW MATERIALIZED VIEWS FROM db`;
+  /// may be `null` when no database qualifier is present at the DDL layer (the controller then
+  /// falls back to the `Database` HTTP header and finally to `DEFAULT_DATABASE`).
   @Nullable
   public String getDatabaseName() {
     return _databaseName;

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.config.table.ingestion;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -38,6 +37,9 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Config related to the stream data sources")
   private StreamIngestionConfig _streamIngestionConfig;
 
+  @JsonPropertyDescription("Configs to fix the data types of the source fields before applying other transforms")
+  private List<SourceFieldConfig> _sourceFieldConfigs;
+
   @JsonPropertyDescription("Config related to filtering records during ingestion")
   private FilterConfig _filterConfig;
 
@@ -51,15 +53,7 @@ public class IngestionConfig extends BaseJsonConfig {
   private ComplexTypeConfig _complexTypeConfig;
 
   @JsonPropertyDescription("Config related to the SchemaConformingTransformer")
-  @JsonProperty("schemaConformingTransformerConfig")
   private SchemaConformingTransformerConfig _schemaConformingTransformerConfig;
-
-  @JsonPropertyDescription("Config related to the SchemaConformingTransformerV2 (backward compatibility)")
-  @JsonProperty("schemaConformingTransformerV2Config")
-  public void setSchemaConformingTransformerV2Config(
-      SchemaConformingTransformerConfig schemaConformingTransformerConfig) {
-    _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
-  }
 
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
   private List<AggregationConfig> _aggregationConfigs;
@@ -84,26 +78,6 @@ public class IngestionConfig extends BaseJsonConfig {
   private int _ingestionExceptionLogRateLimitPerMin =
       CommonConstants.IngestionConfigs.DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN;
 
-  @Deprecated
-  public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
-      @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
-      @Nullable List<EnrichmentConfig> enrichmentConfigs,
-      @Nullable List<TransformConfig> transformConfigs, @Nullable ComplexTypeConfig complexTypeConfig,
-      @Nullable SchemaConformingTransformerConfig schemaConformingTransformerConfig,
-      @Nullable List<AggregationConfig> aggregationConfigs) {
-    _batchIngestionConfig = batchIngestionConfig;
-    _streamIngestionConfig = streamIngestionConfig;
-    _filterConfig = filterConfig;
-    _enrichmentConfigs = enrichmentConfigs;
-    _transformConfigs = transformConfigs;
-    _complexTypeConfig = complexTypeConfig;
-    _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
-    _aggregationConfigs = aggregationConfigs;
-  }
-
-  public IngestionConfig() {
-  }
-
   @Nullable
   public BatchIngestionConfig getBatchIngestionConfig() {
     return _batchIngestionConfig;
@@ -112,6 +86,11 @@ public class IngestionConfig extends BaseJsonConfig {
   @Nullable
   public StreamIngestionConfig getStreamIngestionConfig() {
     return _streamIngestionConfig;
+  }
+
+  @Nullable
+  public List<SourceFieldConfig> getSourceFieldConfigs() {
+    return _sourceFieldConfigs;
   }
 
   @Nullable
@@ -176,6 +155,10 @@ public class IngestionConfig extends BaseJsonConfig {
     _streamIngestionConfig = streamIngestionConfig;
   }
 
+  public void setSourceFieldConfigs(List<SourceFieldConfig> sourceFieldConfigs) {
+    _sourceFieldConfigs = sourceFieldConfigs;
+  }
+
   public void setFilterConfig(FilterConfig filterConfig) {
     _filterConfig = filterConfig;
   }
@@ -193,6 +176,13 @@ public class IngestionConfig extends BaseJsonConfig {
   }
 
   public void setSchemaConformingTransformerConfig(
+      SchemaConformingTransformerConfig schemaConformingTransformerConfig) {
+    _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
+  }
+
+  /// For backward compatibility.
+  @SuppressWarnings("unused")
+  public void setSchemaConformingTransformerV2Config(
       SchemaConformingTransformerConfig schemaConformingTransformerConfig) {
     _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
   }

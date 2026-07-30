@@ -21,7 +21,6 @@ package org.apache.pinot.tools.streams.githubevents;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -142,7 +141,7 @@ public class PullRequestMergedEvent {
         reviewers.add(reviewComment.get("user").get("login").asText());
       }
     } else {
-      reviewers = Collections.emptySet();
+      reviewers = Set.of();
     }
     return reviewers;
   }
@@ -158,7 +157,7 @@ public class PullRequestMergedEvent {
         commenters.add(comment.get("user").get("login").asText());
       }
     } else {
-      commenters = Collections.emptySet();
+      commenters = Set.of();
     }
     return commenters;
   }
@@ -180,7 +179,7 @@ public class PullRequestMergedEvent {
         }
       }
     } else {
-      committers = Collections.emptySet();
+      committers = Set.of();
     }
     return committers;
   }
@@ -202,7 +201,7 @@ public class PullRequestMergedEvent {
         }
       }
     } else {
-      authors = Collections.emptySet();
+      authors = Set.of();
     }
     return authors;
   }

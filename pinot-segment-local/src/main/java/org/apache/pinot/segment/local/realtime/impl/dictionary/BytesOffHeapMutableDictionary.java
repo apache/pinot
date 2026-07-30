@@ -66,7 +66,14 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
   @Override
   public int[] index(Object[] values) {
-    throw new UnsupportedOperationException();
+    int numValues = values.length;
+    int[] dictIds = new int[numValues];
+    for (int i = 0; i < numValues; i++) {
+      byte[] bytesValue = (byte[]) values[i];
+      updateStats(bytesValue);
+      dictIds[i] = indexValue(new ByteArray(bytesValue), bytesValue);
+    }
+    return dictIds;
   }
 
   @Override

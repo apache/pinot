@@ -19,8 +19,8 @@
 package org.apache.pinot.broker.api.resources;
 
 import java.lang.reflect.Field;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -45,7 +45,7 @@ public class PinotBrokerDebugTest {
       throws Exception {
     BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
     when(routingManager.getRoutingTable(any(BrokerRequest.class), anyLong()))
-        .thenReturn(new RoutingTable(Collections.emptyMap(), Collections.emptyList(), 0));
+        .thenReturn(new RoutingTable(Map.of(), List.of(), 0));
 
     PinotBrokerDebug brokerDebug = new PinotBrokerDebug();
     Field routingManagerField = PinotBrokerDebug.class.getDeclaredField("_routingManager");
@@ -69,7 +69,7 @@ public class PinotBrokerDebugTest {
       BrokerRequest brokerRequest = invocation.getArgument(0);
       String tableNameWithType = brokerRequest.getQuerySource().getTableName();
       if (tableNameWithType.endsWith("_REALTIME")) {
-        return new RoutingTable(Collections.emptyMap(), Collections.emptyList(), 0);
+        return new RoutingTable(Map.of(), List.of(), 0);
       }
       return null;
     });

@@ -103,7 +103,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
             break;
           case INT:
             _scalarArguments[i] =
-                parameterTypes[i].convert(literalTransformFunction.getIntLiteral(), PinotDataType.INTEGER);
+                parameterTypes[i].convert(literalTransformFunction.getIntLiteral(), PinotDataType.INT);
             break;
           case LONG:
             _scalarArguments[i] =
@@ -383,7 +383,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       PinotDataType parameterType = parameterTypes[_nonLiteralIndices[i]];
       TransformFunction transformFunction = _nonLiteralFunctions[i];
       switch (parameterType) {
-        case INTEGER:
+        case INT:
           _nonLiteralValues[i] = ArrayUtils.toObject(transformFunction.transformToIntValuesSV(valueBlock));
           break;
         case LONG:

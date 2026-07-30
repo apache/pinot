@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +28,7 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-public class ColocatedJoinQuickStart extends MultistageEngineQuickStart {
+public class ColocatedJoinQuickStart extends Quickstart {
   private static final String QUICKSTART_IDENTIFIER = "COLOCATED_JOIN";
   private static final String[] COLOCATED_JOIN_DIRECTORIES = new String[]{
       "examples/batch/colocated/userAttributes", "examples/batch/colocated/userGroups",
@@ -81,7 +80,7 @@ public class ColocatedJoinQuickStart extends MultistageEngineQuickStart {
 
   @Override
   public List<String> types() {
-    return Collections.singletonList(QUICKSTART_IDENTIFIER);
+    return List.of(QUICKSTART_IDENTIFIER);
   }
 
   @Override

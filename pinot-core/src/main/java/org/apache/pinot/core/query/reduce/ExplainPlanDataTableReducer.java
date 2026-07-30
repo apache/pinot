@@ -261,14 +261,14 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
 
     // Precedence: Other > MatchAllFilter > EmptyFilter > NoMatchingSegment
     if (maxOtherIdx > -1) {
-      return Collections.singletonList(explainPlanRowsList.get(maxOtherIdx));
+      return List.of(explainPlanRowsList.get(maxOtherIdx));
     } else if (maxMatchAllFilterIdx > -1) {
-      return Collections.singletonList(explainPlanRowsList.get(maxMatchAllFilterIdx));
+      return List.of(explainPlanRowsList.get(maxMatchAllFilterIdx));
     } else if (maxEmptyFilterIdx > -1) {
-      return Collections.singletonList(explainPlanRowsList.get(maxEmptyFilterIdx));
+      return List.of(explainPlanRowsList.get(maxEmptyFilterIdx));
     }
 
-    return Collections.singletonList(explainPlanRowsList.get(maxNoMatchingSegmentIdx));
+    return List.of(explainPlanRowsList.get(maxNoMatchingSegmentIdx));
   }
 
   private void addBrokerReduceOperation(List<Object[]> resultRows) {

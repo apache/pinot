@@ -19,16 +19,20 @@
 package org.apache.pinot.server.predownload;
 
 import io.netty.util.internal.StringUtil;
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,13 +120,17 @@ public class PredownloadSegmentInfo {
   public SegmentDirectory initSegmentDirectory(IndexLoadingConfig indexLoadingConfig,
       PredownloadTableInfo predownloadTableInfo) {
     try {
-      SegmentDirectoryLoaderContext loaderContext =
-          new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
-              .setSchema(indexLoadingConfig.getSchema()).setInstanceId(indexLoadingConfig.getInstanceId())
-              .setTableDataDir(indexLoadingConfig.getTableDataDir()).setSegmentName(_segmentName)
-              .setSegmentCrc(String.valueOf(_crc)).setSegmentTier(indexLoadingConfig.getSegmentTier())
-              .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
-              .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs()).build();
+      SegmentDirectoryLoaderContext loaderContext = new SegmentDirectoryLoaderContext.Builder()
+          .setReadMode(indexLoadingConfig.getReadMode())
+          .setTableConfig(indexLoadingConfig.getTableConfig())
+          .setSchema(indexLoadingConfig.getSchema())
+          .setInstanceId(indexLoadingConfig.getInstanceId())
+          .setTableDataDir(indexLoadingConfig.getTableDataDir())
+          .setSegmentName(_segmentName)
+          .setSegmentCrc(String.valueOf(_crc))
+          .setSegmentTier(indexLoadingConfig.getSegmentTier())
+          .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
+          .build();
       SegmentDirectoryLoader segmentDirectoryLoader =
           SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
       File indexDir = getSegmentDataDir(predownloadTableInfo, true);
@@ -172,9 +180,31 @@ public class PredownloadSegmentInfo {
     }
   }
 
-  public void updateSegmentInfoFromLocal(@Nullable SegmentDirectory segmentDirectory) {
-    SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
-    _localCrc = (segmentMetadata == null) ? null : segmentMetadata.getCrc();
-    _localSizeBytes = (segmentDirectory == null) ? 0 : segmentDirectory.getDiskSizeBytes();
+  /// Populates local CRC and size from the segment directory on disk, avoiding mmap of index files.
+  /// Reads CRC from `creation.meta` (8 bytes) and computes size via directory traversal.
+  /// Sets `_localCrc` to null and `_localSizeBytes` to 0 if the segment or its
+  /// creation.meta does not exist.
+  public void updateSegmentInfoFromLocal(File segDir) {
+    if (!segDir.isDirectory()) {
+      LOGGER.warn("Segment path is not a directory: {}", segDir);
+      return;
+    }
+    File creationMeta = SegmentDirectoryPaths.findCreationMetaFile(segDir);
+    if (creationMeta == null || !creationMeta.exists()) {
+      LOGGER.warn("creation.meta not found for segment: {} of table: {}", _segmentName, _tableNameWithType);
+      return;
+    }
+    try (DataInputStream ds = new DataInputStream(new FileInputStream(creationMeta))) {
+      // creation.meta layout: [8 bytes CRC] [8 bytes creation time]
+      _localCrc = String.valueOf(ds.readLong());
+    } catch (IOException e) {
+      LOGGER.warn("Failed to read creation.meta for segment: {} of table: {}", _segmentName, _tableNameWithType, e);
+      return;
+    }
+    try {
+      _localSizeBytes = FileUtils.sizeOfDirectory(segDir);
+    } catch (IllegalArgumentException e) {
+      LOGGER.warn("Failed to compute size for segment: {} of table: {}", _segmentName, _tableNameWithType, e);
+    }
   }
 }

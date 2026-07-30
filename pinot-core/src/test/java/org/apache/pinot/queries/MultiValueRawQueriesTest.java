@@ -2100,7 +2100,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
 
       DataSchema dataSchema = new DataSchema(new String[]{"countmv(valuein(mvRawStringCol2,'" + val1 + "','" + val2
-          + "'))"},
+            + "'))"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
       assertEquals(resultTable.getDataSchema(), dataSchema);
 

@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -842,12 +841,12 @@ public class PinotTaskRestletResource {
           .setMinionInstanceTag(minionInstanceTag)
           .setLeader(false);
       if (taskType != null) {
-        context.setTasksToSchedule(Collections.singleton(taskType));
+        context.setTasksToSchedule(Set.of(taskType));
       }
       if (tableName != null) {
-        context.setTablesToSchedule(Collections.singleton(DatabaseUtils.translateTableName(tableName, headers)));
+        context.setTablesToSchedule(Set.of(DatabaseUtils.translateTableName(tableName, headers)));
       } else {
-        context.setDatabasesToSchedule(Collections.singleton(database));
+        context.setDatabasesToSchedule(Set.of(database));
       }
       Map<String, TaskSchedulingInfo> allTaskInfos = _pinotTaskManager.scheduleTasks(context);
       allTaskInfos.forEach((key, value) -> {

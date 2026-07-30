@@ -48,6 +48,7 @@ import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -122,31 +123,37 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
       throws IOException, java.util.concurrent.TimeoutException {
-    if (_partitionIdSubset.isEmpty()) {
-      return StreamMetadataProvider.super.computePartitionGroupMetadata(clientId, streamConfig,
-          partitionGroupConsumptionStatuses, timeoutMillis);
-    }
     Map<Integer, StreamPartitionMsgOffset> partitionIdToEndOffset =
         new HashMap<>(partitionGroupConsumptionStatuses.size());
     for (PartitionGroupConsumptionStatus s : partitionGroupConsumptionStatuses) {
       partitionIdToEndOffset.put(s.getStreamPartitionGroupId(), s.getEndOffset());
     }
+
+    List<Integer> partitionIds;
+    if (_partitionIdSubset.isEmpty()) {
+      int partitionCount = fetchPartitionCount(timeoutMillis);
+      partitionIds = new ArrayList<>(partitionCount);
+      for (int partitionId = 0; partitionId < partitionCount; partitionId++) {
+        partitionIds.add(partitionId);
+      }
+    } else {
+      partitionIds = _partitionIdSubset;
+    }
+
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    List<PartitionGroupMetadata> result = new ArrayList<>(_partitionIdSubset.size());
-    for (Integer partitionId : _partitionIdSubset) {
-      StreamPartitionMsgOffset endOffset = partitionIdToEndOffset.get(partitionId);
-      StreamPartitionMsgOffset startOffset;
-      if (endOffset == null) {
+    List<PartitionGroupMetadata> result = new ArrayList<>(partitionIds.size());
+    for (Integer partitionId : partitionIds) {
+      if (partitionIdToEndOffset.containsKey(partitionId)) {
+        result.add(new PartitionGroupMetadata(partitionId, partitionIdToEndOffset.get(partitionId)));
+      } else {
         try (StreamMetadataProvider partitionMetadataProvider =
             streamConsumerFactory.createPartitionMetadataProvider(
                 StreamConsumerFactory.getUniqueClientId(clientId), partitionId)) {
-          startOffset = partitionMetadataProvider.fetchStreamPartitionOffset(
+          StreamPartitionMsgOffset startOffset = partitionMetadataProvider.fetchStreamPartitionOffset(
               streamConfig.getOffsetCriteria(), timeoutMillis);
+          result.add(new PartitionGroupMetadata(partitionId, startOffset));
         }
-      } else {
-        startOffset = endOffset;
       }
-      result.add(new PartitionGroupMetadata(partitionId, startOffset));
     }
     return result;
   }
@@ -179,18 +186,18 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     long offset;
     try {
       if (offsetCriteria.isLargest()) {
-        offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+        offset = _consumer.endOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
             .get(_topicPartition);
       } else if (offsetCriteria.isSmallest()) {
         offset =
-            _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+            _consumer.beginningOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
                 .get(_topicPartition);
       } else if (offsetCriteria.isPeriod()) {
-        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Collections.singletonMap(_topicPartition,
+        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Map.of(_topicPartition,
                 Clock.systemUTC().millis() - TimeUtils.convertPeriodToMillis(offsetCriteria.getOffsetString())))
             .get(_topicPartition);
         if (offsetAndTimestamp == null) {
-          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+          offset = _consumer.endOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
               .get(_topicPartition);
           LOGGER.warn(
               "initial offset type is period and its value evaluates to null hence proceeding with offset {} for "
@@ -199,10 +206,10 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
           offset = offsetAndTimestamp.offset();
         }
       } else if (offsetCriteria.isTimestamp()) {
-        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Collections.singletonMap(_topicPartition,
+        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Map.of(_topicPartition,
             TimeUtils.convertTimestampToMillis(offsetCriteria.getOffsetString()))).get(_topicPartition);
         if (offsetAndTimestamp == null) {
-          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+          offset = _consumer.endOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMillis))
               .get(_topicPartition);
           LOGGER.warn(
               "initial offset type is timestamp and its value evaluates to null hence proceeding with offset {} for "
@@ -228,17 +235,21 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       // Compute records-lag
       StreamPartitionMsgOffset currentOffset = partitionState.getCurrentOffset();
       StreamPartitionMsgOffset upstreamLatest = partitionState.getUpstreamLatestOffset();
-      String offsetLagString = "UNKNOWN";
+      String offsetLagString = PartitionLagState.NOT_CALCULATED;
 
       if (currentOffset instanceof LongMsgOffset && upstreamLatest instanceof LongMsgOffset) {
         long offsetLag = ((LongMsgOffset) upstreamLatest).getOffset() - ((LongMsgOffset) currentOffset).getOffset();
         offsetLagString = String.valueOf(offsetLag);
       }
 
-      // Compute record-availability
-      String availabilityLagMs = "UNKNOWN";
+      // Compute record-availability. Only when both the last-processed wall-clock time and the record's upstream
+      // ingestion time are valid; otherwise a missing/invalid ingestion time (e.g. records without a Kafka
+      // timestamp) would turn the subtraction into an epoch-sized value that leaks to the metric and UI. Keep the
+      // NOT_CALCULATED sentinel in that case so the lag is reported as not-calculated rather than a bogus number.
+      String availabilityLagMs = PartitionLagState.NOT_CALCULATED;
       StreamMessageMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
-      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
+      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0
+          && lastProcessedMessageMetadata.getRecordIngestionTimeMs() > 0) {
         long availabilityLag =
             partitionState.getLastProcessedTimeMs() - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
         availabilityLagMs = String.valueOf(availabilityLag);
@@ -255,7 +266,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       AdminClient adminClient = getOrCreateSharedAdminClient();
       ListTopicsResult result = adminClient.listTopics();
       if (result == null) {
-        return Collections.emptyList();
+        return List.of();
       }
       return result.names()
           .get()
@@ -382,7 +393,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
     if (lastError != null) {
       if (topicMissing) {
-        throw new RuntimeException("Topic does not exist: " + _topic);
+        throw new PermanentConsumerException(new RuntimeException("Topic does not exist: " + _topic));
       }
       if (lastError instanceof TransientConsumerException) {
         throw (TransientConsumerException) lastError;

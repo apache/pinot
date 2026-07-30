@@ -21,8 +21,8 @@ package org.apache.pinot.perf;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -126,7 +126,7 @@ public class BenchmarkJsonIndexDistinct {
 
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
       .setTableName(TABLE_NAME)
-      .setJsonIndexColumns(Collections.singletonList(TAGS_COLUMN))
+      .setJsonIndexColumns(List.of(TAGS_COLUMN))
       .build();
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
@@ -191,9 +191,9 @@ public class BenchmarkJsonIndexDistinct {
     Preconditions.checkState(samplePinotQuery.getLimit() == 10,
         "Unexpected default DISTINCT limit for sample query: %s", samplePinotQuery.getLimit());
 
-    QueryContext sampleBaselineQueryContext = compileQueryContext(sampleQuery, Collections.emptyMap());
+    QueryContext sampleBaselineQueryContext = compileQueryContext(sampleQuery, Map.of());
     QueryContext sampleOptimizedQueryContext = compileQueryContext(sampleQuery,
-        Collections.singletonMap(CommonConstants.Broker.Request.QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR,
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR,
             "true"));
     Preconditions.checkState(planOperator(sampleBaselineQueryContext) instanceof DistinctOperator,
         "Exact %s sample query must plan to DistinctOperator without %s", _queryVariant,
@@ -202,9 +202,9 @@ public class BenchmarkJsonIndexDistinct {
         "Exact " + _queryVariant + " sample query", planOperator(sampleOptimizedQueryContext));
 
     String benchmarkQuery = sampleQuery + " LIMIT " + _distinctLimit;
-    _baselineQueryContext = compileQueryContext(benchmarkQuery, Collections.emptyMap());
+    _baselineQueryContext = compileQueryContext(benchmarkQuery, Map.of());
     _optimizedQueryContext = compileQueryContext(benchmarkQuery,
-        Collections.singletonMap(CommonConstants.Broker.Request.QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR,
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR,
             "true"));
 
     Preconditions.checkState(planOperator(_baselineQueryContext) instanceof DistinctOperator,

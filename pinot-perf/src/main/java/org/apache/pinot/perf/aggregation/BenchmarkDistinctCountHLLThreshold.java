@@ -20,7 +20,6 @@ package org.apache.pinot.perf.aggregation;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -107,7 +106,7 @@ public class BenchmarkDistinctCountHLLThreshold {
     for (int i = 0; i < _numBatches; i++) {
       int[] dictIds = _batchedDictIds[i];
       Map<ExpressionContext, BlockValSet> blockValSetMap =
-          Collections.singletonMap(EXPR, new TestBlockValSet(_dictionary, dictIds));
+          Map.of(EXPR, new TestBlockValSet(_dictionary, dictIds));
       _aggregationFunction.aggregate(dictIds.length, resultHolder, blockValSetMap);
     }
 

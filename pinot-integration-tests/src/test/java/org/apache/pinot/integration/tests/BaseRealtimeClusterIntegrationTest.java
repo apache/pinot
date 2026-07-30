@@ -202,6 +202,13 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     super.testInstanceShutdown();
   }
 
+  @Test
+  @Override
+  public void testQueriesDisabled()
+      throws Exception {
+    super.testQueriesDisabled();
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {

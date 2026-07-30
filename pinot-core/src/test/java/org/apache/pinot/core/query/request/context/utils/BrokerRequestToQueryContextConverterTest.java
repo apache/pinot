@@ -19,15 +19,17 @@
 package org.apache.pinot.core.query.request.context.utils;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
@@ -38,6 +40,7 @@ import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -90,7 +93,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(selectExpressions.size(), 1);
       assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "count",
-              Collections.singletonList(ExpressionContext.forIdentifier("*")))));
+              List.of(ExpressionContext.forIdentifier("*")))));
       assertEquals(selectExpressions.get(0).toString(), "count(*)");
       assertFalse(queryContext.isDistinct());
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
@@ -239,7 +242,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
       assertEquals(selectExpressions.get(1).toString(), "bar");
       assertEquals(selectExpressions.get(2), ExpressionContext.forFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum", Collections.singletonList(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum", List.of(
               ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
                   Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar"))))))));
       assertEquals(selectExpressions.get(2).toString(), "sum(add(foo,bar))");
@@ -259,7 +262,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertNotNull(orderByExpressions);
       assertEquals(orderByExpressions.size(), 2);
       assertEquals(orderByExpressions.get(0), new OrderByExpressionContext(ExpressionContext.forFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum", Collections.singletonList(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum", List.of(
               ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
                   Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar"))))))),
           true));
@@ -329,7 +332,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(selectExpressions.size(), 2);
       assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-              Collections.singletonList(ExpressionContext.forIdentifier("foo")))));
+              List.of(ExpressionContext.forIdentifier("foo")))));
       assertEquals(selectExpressions.get(0).toString(), "sum(foo)");
       assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
       assertEquals(selectExpressions.get(1).toString(), "bar");
@@ -353,7 +356,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(orderByExpressions.size(), 1);
       assertEquals(orderByExpressions.get(0), new OrderByExpressionContext(ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-              Collections.singletonList(ExpressionContext.forIdentifier("foo")))), false));
+              List.of(ExpressionContext.forIdentifier("foo")))), false));
       assertEquals(orderByExpressions.get(0).toString(), "sum(foo) DESC");
       assertNull(queryContext.getHavingFilter());
       assertEquals(queryContext.getLimit(), 10);
@@ -373,7 +376,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(selectExpressions.size(), 2);
       assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-              Collections.singletonList(ExpressionContext.forIdentifier("foo")))));
+              List.of(ExpressionContext.forIdentifier("foo")))));
       assertEquals(selectExpressions.get(0).toString(), "sum(foo)");
       assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
       assertEquals(selectExpressions.get(1).toString(), "bar");
@@ -390,7 +393,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertNotNull(havingFilter);
       assertEquals(havingFilter, FilterContext.forPredicate(new InPredicate(ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-              Collections.singletonList(ExpressionContext.forIdentifier("foo")))), Arrays.asList("5", "10", "15"))));
+              List.of(ExpressionContext.forIdentifier("foo")))), Arrays.asList("5", "10", "15"))));
       assertEquals(havingFilter.toString(), "sum(foo) IN ('5','10','15')");
       assertEquals(queryContext.getLimit(), 10);
       assertEquals(queryContext.getOffset(), 0);
@@ -417,10 +420,10 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(arguments.size(), 2);
       assertEquals(arguments.get(0), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-              Collections.singletonList(ExpressionContext.forIdentifier("col1")))));
+              List.of(ExpressionContext.forIdentifier("col1")))));
       assertEquals(arguments.get(1), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
-              Collections.singletonList(ExpressionContext.forIdentifier("col2")))));
+              List.of(ExpressionContext.forIdentifier("col2")))));
 
       // HAVING clause
       FilterContext havingFilter = queryContext.getHavingFilter();
@@ -431,22 +434,19 @@ public class BrokerRequestToQueryContextConverterTest {
       FilterContext firstChild = children.get(0);
       assertEquals(firstChild.getType(), FilterContext.Type.PREDICATE);
       Predicate predicate = firstChild.getPredicate();
-      assertEquals(predicate.getType(), Predicate.Type.RANGE);
-      RangePredicate rangePredicate = (RangePredicate) predicate;
-      assertEquals(rangePredicate.getLowerBound(), "0");
-      assertFalse(rangePredicate.isLowerInclusive());
-      assertEquals(rangePredicate.getUpperBound(), RangePredicate.UNBOUNDED);
-      assertFalse(rangePredicate.isUpperInclusive());
-      function = rangePredicate.getLhs().getFunction();
-      assertEquals(function.getFunctionName(), "minus");
+      assertEquals(predicate.getType(), Predicate.Type.EQ);
+      EqPredicate eqPredicate = (EqPredicate) predicate;
+      assertEquals(eqPredicate.getValue(), "true");
+      function = eqPredicate.getLhs().getFunction();
+      assertEquals(function.getFunctionName(), "greater_than");
       arguments = function.getArguments();
       assertEquals(arguments.size(), 2);
       assertEquals(arguments.get(0), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-              Collections.singletonList(ExpressionContext.forIdentifier("col1")))));
+              List.of(ExpressionContext.forIdentifier("col1")))));
       assertEquals(arguments.get(1), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "min",
-              Collections.singletonList(ExpressionContext.forIdentifier("col2")))));
+              List.of(ExpressionContext.forIdentifier("col2")))));
       // Skip checking the second child of the AND filter
 
       // ORDER-BY clause
@@ -462,7 +462,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(arguments.get(0).getFunction().getFunctionName(), "plus");
       assertEquals(arguments.get(1), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-              Collections.singletonList(ExpressionContext.forIdentifier("col4")))));
+              List.of(ExpressionContext.forIdentifier("col4")))));
 
       assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("col1", "col2", "col3", "col4")));
       assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
@@ -484,17 +484,17 @@ public class BrokerRequestToQueryContextConverterTest {
       assertNotNull(indexMap);
       assertEquals(indexMap.size(), 6);
       assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-          Collections.singletonList(ExpressionContext.forIdentifier("col1"))), null)), 0);
+          List.of(ExpressionContext.forIdentifier("col1"))), null)), 0);
       assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
-          Collections.singletonList(ExpressionContext.forIdentifier("col2"))), null)), 1);
+          List.of(ExpressionContext.forIdentifier("col2"))), null)), 1);
       assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "min",
-          Collections.singletonList(ExpressionContext.forIdentifier("col2"))), null)), 2);
+          List.of(ExpressionContext.forIdentifier("col2"))), null)), 2);
       assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-          Collections.singletonList(ExpressionContext.forIdentifier("col4"))), null)), 3);
+          List.of(ExpressionContext.forIdentifier("col4"))), null)), 3);
       assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
-          Collections.singletonList(ExpressionContext.forIdentifier("col4"))), null)), 4);
+          List.of(ExpressionContext.forIdentifier("col4"))), null)), 4);
       assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
-          Collections.singletonList(ExpressionContext.forIdentifier("col1"))), null)), 5);
+          List.of(ExpressionContext.forIdentifier("col1"))), null)), 5);
     }
 
     // DistinctCountThetaSketch (string literal and escape quote)
@@ -809,5 +809,52 @@ public class BrokerRequestToQueryContextConverterTest {
     query = "SELECT * FROM testTable WHERE NOT 1 = 0";
     queryContext = QueryContextConverterUtils.getQueryContext(query);
     assertNull(queryContext.getFilter());
+  }
+
+  @Test
+  public void testInvalidGroupingSetsRejected() {
+    /// A well-formed grouping-set query decodes into per-set column-index arrays.
+    PinotQuery pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM testTable GROUP BY ROLLUP(a, b)");
+    assertNotNull(QueryContextConverterUtils.getQueryContext(pinotQuery).getGroupingSets());
+
+    /// A set referencing a non-existent union column (index >= groupByList size, or negative) must be rejected
+    /// at conversion instead of causing out-of-bounds access in the group key generator.
+    for (int badIndex : new int[]{2, -1}) {
+      PinotQuery corrupted =
+          CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM testTable GROUP BY ROLLUP(a, b)");
+      corrupted.setGroupingSets(List.of(List.of(0, 1), List.of(badIndex)));
+      assertThrows(IllegalStateException.class, () -> QueryContextConverterUtils.getQueryContext(corrupted));
+    }
+
+    /// An empty set list must be rejected rather than silently producing zero groups.
+    PinotQuery emptySets =
+        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM testTable GROUP BY ROLLUP(a, b)");
+    emptySets.setGroupingSets(List.of());
+    assertThrows(IllegalStateException.class, () -> QueryContextConverterUtils.getQueryContext(emptySets));
+  }
+
+  @Test
+  public void testManyGroupingColumnsSupported() {
+    /// The number of grouping columns is unlimited (the discriminator is the set ordinal, not a per-column
+    /// bitmask): a 40-column ROLLUP compiles and converts, where the retired 32-bit mask encoding capped the
+    /// union at 31 columns.
+    StringBuilder columns = new StringBuilder();
+    for (int i = 0; i < 40; i++) {
+      columns.append(i == 0 ? "c0" : ", c" + i);
+    }
+    PinotQuery pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM testTable GROUP BY ROLLUP(" + columns + ")");
+    List<int[]> groupingSets = QueryContextConverterUtils.getQueryContext(pinotQuery).getGroupingSets();
+    assertNotNull(groupingSets);
+    /// ROLLUP(c0..c39) -> the 41 prefixes (c0..c39), (c0..c38), ..., (c0), ().
+    assertEquals(groupingSets.size(), 41);
+    Set<Integer> seenSizes = new HashSet<>();
+    for (int[] set : groupingSets) {
+      assertTrue(seenSizes.add(set.length), "duplicate prefix length: " + set.length);
+      for (int columnIndex : set) {
+        assertTrue(columnIndex >= 0 && columnIndex < 40, "column index out of range: " + columnIndex);
+      }
+    }
   }
 }

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -273,7 +272,7 @@ public class CombineSlowOperatorsTest {
 
     @Override
     public List<Operator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override

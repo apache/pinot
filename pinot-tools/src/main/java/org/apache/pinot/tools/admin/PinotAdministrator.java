@@ -212,7 +212,7 @@ public class PinotAdministrator {
     pinotAdministrator.execute(args);
     if ((pinotAdministrator._status != 0)
         && Boolean.parseBoolean(System.getProperties().getProperty("pinot.admin.system.exit"))) {
-        System.exit(pinotAdministrator._status);
+      System.exit(pinotAdministrator._status);
     }
   }
 }

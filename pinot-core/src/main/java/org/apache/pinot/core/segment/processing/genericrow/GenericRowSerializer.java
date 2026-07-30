@@ -148,6 +148,22 @@ public class GenericRowSerializer {
             }
             _objectBytes[i] = stringBytesArray;
             break;
+          case BYTES:
+            numBytes += Integer.BYTES * numValues;
+            for (Object element : multiValue) {
+              numBytes += ((byte[]) element).length;
+            }
+            break;
+          case BIG_DECIMAL:
+            numBytes += Integer.BYTES * numValues;
+            byte[][] bigDecimalBytesArray = new byte[numValues][];
+            for (int j = 0; j < numValues; j++) {
+              byte[] bigDecimalBytes = BigDecimalUtils.serialize((BigDecimal) multiValue[j]);
+              numBytes += bigDecimalBytes.length;
+              bigDecimalBytesArray[j] = bigDecimalBytes;
+            }
+            _objectBytes[i] = bigDecimalBytesArray;
+            break;
           default:
             throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[i]);
         }
@@ -238,6 +254,20 @@ public class GenericRowSerializer {
             for (byte[] stringBytes : stringBytesArray) {
               byteBuffer.putInt(stringBytes.length);
               byteBuffer.put(stringBytes);
+            }
+            break;
+          case BYTES:
+            for (Object element : multiValue) {
+              byte[] bytes = (byte[]) element;
+              byteBuffer.putInt(bytes.length);
+              byteBuffer.put(bytes);
+            }
+            break;
+          case BIG_DECIMAL:
+            byte[][] bigDecimalBytesArray = (byte[][]) _objectBytes[i];
+            for (byte[] bigDecimalBytes : bigDecimalBytesArray) {
+              byteBuffer.putInt(bigDecimalBytes.length);
+              byteBuffer.put(bigDecimalBytes);
             }
             break;
           default:

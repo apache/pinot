@@ -182,6 +182,14 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-bson</artifactId>
+      <version>${project.version}</version>
+      <classifier>plugin</classifier>
+      <type>zip</type>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-orc</artifactId>
       <version>${project.version}</version>
       <classifier>plugin</classifier>

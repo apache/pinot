@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -327,7 +326,7 @@ public class PinotTaskManagerConcurrentSchedulingIntegrationTest extends Control
     public List<PinotTaskConfig> generateTasks(TableConfig tableConfig, Map<String, String> taskConfigs) {
       observeAndRendezvous();
       _generationCount.incrementAndGet();
-      return Collections.singletonList(
+      return List.of(
           new PinotTaskConfig(_taskType, mutableConfig(tableConfig.getTableName())));
     }
 

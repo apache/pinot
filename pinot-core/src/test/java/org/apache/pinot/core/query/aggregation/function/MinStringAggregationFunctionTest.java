@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -61,7 +61,7 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testNumericColumnExceptioninAggregateMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression),
         false);
 
     AggregationResultHolder resultHolder = function.createAggregationResultHolder();
@@ -81,7 +81,7 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testNumericColumnExceptioninAggregateGroupBySVMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression),
         false);
 
     GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
@@ -100,7 +100,7 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testNumericColumnExceptioninAggregateGroupByMVMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression),
         false);
 
     GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
@@ -119,7 +119,7 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testFunctionBasics() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression),
         false);
 
     // Test function type

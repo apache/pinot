@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator.utils;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -424,11 +423,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
         if (_stats != null) {
           serializedStats = _stats.serialize();
         } else {
-          serializedStats = Collections.emptyList();
+          serializedStats = List.of();
         }
       } catch (IOException ioEx) {
         LOGGER.warn("Could not serialize stats", ioEx);
-        serializedStats = Collections.emptyList();
+        serializedStats = List.of();
       }
       ErrorMseBlock errorBlock = ErrorMseBlock.fromException(code.asException(errMsg));
       return new ReceivingMailbox.MseBlockWithStats(errorBlock, serializedStats);
@@ -436,7 +435,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected ReceivingMailbox.MseBlockWithStats onSuccess() {
-      return new ReceivingMailbox.MseBlockWithStats(SuccessMseBlock.INSTANCE, Collections.emptyList());
+      return new ReceivingMailbox.MseBlockWithStats(SuccessMseBlock.INSTANCE, List.of());
     }
 
     public MultiStageQueryStats calculateStats() {

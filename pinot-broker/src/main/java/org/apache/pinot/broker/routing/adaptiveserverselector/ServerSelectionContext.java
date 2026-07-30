@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorConfig;
@@ -56,7 +55,7 @@ public class ServerSelectionContext {
    * @param queryOptions map of query options that may contain server selection preferences
    */
   public ServerSelectionContext(Map<String, String> queryOptions, InstanceSelectorConfig instanceSelectorConfig) {
-    _queryOptions = queryOptions == null ? Collections.emptyMap() : queryOptions;
+    _queryOptions = queryOptions == null ? Map.of() : queryOptions;
     _config = instanceSelectorConfig;
     _orderedPreferredPools = QueryOptionsUtils.getOrderedPreferredPools(_queryOptions);
     Boolean isUseFixedReplica = QueryOptionsUtils.isUseFixedReplica(_queryOptions);

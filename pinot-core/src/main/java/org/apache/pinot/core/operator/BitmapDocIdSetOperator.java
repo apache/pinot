@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
@@ -102,7 +101,7 @@ public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

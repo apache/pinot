@@ -32,7 +32,6 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -380,23 +379,16 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * Sets up the initial segments for a new LLC real-time table.
-   * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
-   */
+  /// Sets up the initial segments for a new real-time table.
   public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
     List<StreamMetadata> streamMetadataList =
-        getNewStreamMetadataList(streamConfigs, Collections.emptyList(), idealState);
+        getNewStreamMetadataList(streamConfigs, List.of(), idealState);
     setUpNewTable(tableConfig, idealState, streamMetadataList);
   }
 
-  /**
-   * Sets up the initial segments for a new LLC real-time table.
-   * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
-   */
-  public void setUpNewTable(TableConfig tableConfig, IdealState idealState,
-      List<StreamMetadata> streamMetadataList) {
+  /// Sets up the initial segments for a new real-time table.
+  public void setUpNewTable(TableConfig tableConfig, IdealState idealState, List<StreamMetadata> streamMetadataList) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -412,7 +404,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+        Map.of(InstancePartitionsType.CONSUMING, instancePartitions);
 
     long currentTimeMs = getCurrentTimeMs();
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
@@ -900,7 +892,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+        Map.of(InstancePartitionsType.CONSUMING, instancePartitions);
 
     return updateIdealStateOnSegmentCompletion(tableConfig.getTableName(), committingSegmentName,
         newConsumingSegmentName, segmentAssignment, instancePartitionsMap);
@@ -1170,8 +1162,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       }
       ColumnPartitionMetadata columnPartitionMetadata =
           new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), perStreamNumPartitions,
-              Collections.singleton(streamPartitionId), columnPartitionConfig.getFunctionConfig());
-      return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
+              Set.of(streamPartitionId), columnPartitionConfig.getFunctionConfig());
+      return new SegmentPartitionMetadata(Map.of(entry.getKey(), columnPartitionMetadata));
     } else {
       LOGGER.warn(
           "Skip persisting partition metadata because there are other than exact one partition column for table: {}",
@@ -1385,7 +1377,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     // in one of the cases and not the other.
     try {
       _helixAdmin.resetPartition(_helixManager.getClusterName(), instanceName, realtimeTableName,
-          Collections.singletonList(segmentName));
+          List.of(segmentName));
     } catch (Exception e) {
       // Ignore
     }
@@ -1496,7 +1488,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         boolean offsetsHaveToChange = offsetCriteria != null;
         if (isTableEnabled && !isTablePaused) {
           List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-              offsetsHaveToChange ? Collections.emptyList()
+              offsetsHaveToChange ? List.of()
                   // offsets from metadata are not valid anymore; fetch for all partitions
                   : getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
           // FIXME: Right now, we assume topics are sharing same offset criteria
@@ -1774,7 +1766,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+        Map.of(InstancePartitionsType.CONSUMING, instancePartitions);
 
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
     StreamPartitionMsgOffsetFactory offsetFactory =
@@ -2022,13 +2014,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
 
       // Kinesis shard-split flow requires us to pass currentPartitionGroupConsumptionStatusList so that
-      // we can check if its completely consumed
-      // However the kafka implementation of computePartitionGroupMetadata() breaks if we pass the current status
-      // This leads to streamSmallestOffset set to null in selectStartOffset() method
-      // The overall dependency isn't clean and is causing the issue and requires refactor
-      // Temporarily, we are passing a boolean flag to indicate if we want to use the current status
-      // The kafka implementation of computePartitionGroupMetadata() will ignore the current status
-      // while the kinesis implementation will use it.
+      // we can check if it is completely consumed. Kafka needs stream offsets for every partition in this path, so
+      // forceGetOffsetFromStream lets its metadata provider fetch offsets from the stream instead of reusing
+      // current status offsets.
       List<StreamMetadata> streamMetadataList = getNewStreamMetadataList(
           streamConfigs, currentPartitionGroupConsumptionStatusList, idealState, true);
       streamConfig.setOffsetCriteria(originalOffsetCriteria);
@@ -2921,9 +2909,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     Set<String> consumingSegments = findConsumingSegments(idealState);
     PauseState pauseState = extractTablePauseState(idealState);
     if (pauseState != null) {
-      // TODO: add paused topics information
       return new PauseStatusDetails(pauseState.isPaused(), consumingSegments, pauseState.getReasonCode(),
-          pauseState.getComment(), pauseState.getTimeInMillis());
+          pauseState.getComment(), pauseState.getTimeInMillis(), pauseState.getIndexOfInactiveTopics());
     }
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
     return new PauseStatusDetails(Boolean.parseBoolean(isTablePausedStr), consumingSegments,

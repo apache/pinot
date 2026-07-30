@@ -87,7 +87,7 @@ public class ZkTableCache implements TableCache {
   private final Map<String, SchemaInfo> _schemaInfoMap = new ConcurrentHashMap<>();
 
   private final ZkLogicalTableConfigChangeListener
-    _zkLogicalTableConfigChangeListener = new ZkLogicalTableConfigChangeListener();
+      _zkLogicalTableConfigChangeListener = new ZkLogicalTableConfigChangeListener();
   // Key is table name, value is logical table info
   private final Map<String, LogicalTableConfigInfo> _logicalTableConfigInfoMap = new ConcurrentHashMap<>();
   // Key is lower case logical table name, value is actual logical table name
@@ -133,8 +133,8 @@ public class ZkTableCache implements TableCache {
       List<String> tables = _propertyStore.getChildNames(ZkPaths.LOGICAL_TABLE_PARENT_PATH, AccessOption.PERSISTENT);
       if (CollectionUtils.isNotEmpty(tables)) {
         List<String> pathsToAdd = tables.stream()
-          .map(rawTableName -> ZkPaths.LOGICAL_TABLE_PATH_PREFIX + rawTableName)
-          .collect(Collectors.toList());
+            .map(rawTableName -> ZkPaths.LOGICAL_TABLE_PATH_PREFIX + rawTableName)
+            .collect(Collectors.toList());
         addLogicalTableConfigs(pathsToAdd);
       }
     }
@@ -173,8 +173,8 @@ public class ZkTableCache implements TableCache {
   @Override
   public String getActualLogicalTableName(String logicalTableName) {
     return _ignoreCase
-      ? _logicalTableNameMap.get(logicalTableName.toLowerCase())
-      : _logicalTableNameMap.get(logicalTableName);
+        ? _logicalTableNameMap.get(logicalTableName.toLowerCase())
+        : _logicalTableNameMap.get(logicalTableName);
   }
 
   /**
@@ -331,7 +331,7 @@ public class ZkTableCache implements TableCache {
   }
 
   private void putTableConfig(ZNRecord znRecord)
-    throws IOException {
+      throws IOException {
     TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -346,7 +346,7 @@ public class ZkTableCache implements TableCache {
   }
 
   private void putLogicalTableConfig(ZNRecord znRecord)
-    throws IOException {
+      throws IOException {
     LogicalTableConfig logicalTableConfig = LogicalTableConfigUtils.fromZNRecord(znRecord);
     String logicalTableName = logicalTableConfig.getTableName();
     _logicalTableConfigInfoMap.put(logicalTableName, new LogicalTableConfigInfo(logicalTableConfig));
@@ -493,7 +493,7 @@ public class ZkTableCache implements TableCache {
 
   @Override
   public boolean registerLogicalTableConfigChangeListener(
-    LogicalTableConfigChangeListener logicalTableConfigChangeListener) {
+      LogicalTableConfigChangeListener logicalTableConfigChangeListener) {
     synchronized (_zkLogicalTableConfigChangeListener) {
       boolean added = _logicalTableConfigChangeListeners.add(logicalTableConfigChangeListener);
       if (added) {

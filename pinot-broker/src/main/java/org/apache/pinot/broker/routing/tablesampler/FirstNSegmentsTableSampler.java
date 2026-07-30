@@ -64,7 +64,7 @@ public class FirstNSegmentsTableSampler implements TableSampler {
   @Override
   public Set<String> sampleSegments(Set<String> onlineSegments) {
     if (onlineSegments.isEmpty()) {
-      return Collections.emptySet();
+      return Set.of();
     }
     if (onlineSegments.size() <= _numSegments) {
       return onlineSegments;

@@ -35,12 +35,14 @@ import org.apache.pinot.verifier.PluginVerifier.CheckContext;
 public final class StreamConsumerCheck implements Check {
   // Map of pluginName -> StreamConsumerFactory FQCN. Plugin name matches
   // plugins/pinot-stream-ingestion/<name>.
-  private static final Map<String, String> CONSUMERS = new LinkedHashMap<>() {{
-    put("pinot-kafka-3.0", "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
-    put("pinot-kafka-4.0", "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
-    put("pinot-kinesis", "org.apache.pinot.plugin.stream.kinesis.KinesisConsumerFactory");
-    put("pinot-pulsar", "org.apache.pinot.plugin.stream.pulsar.PulsarConsumerFactory");
-  }};
+  private static final Map<String, String> CONSUMERS = new LinkedHashMap<>();
+
+  static {
+    CONSUMERS.put("pinot-kafka-3.0", "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+    CONSUMERS.put("pinot-kafka-4.0", "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
+    CONSUMERS.put("pinot-kinesis", "org.apache.pinot.plugin.stream.kinesis.KinesisConsumerFactory");
+    CONSUMERS.put("pinot-pulsar", "org.apache.pinot.plugin.stream.pulsar.PulsarConsumerFactory");
+  }
 
   @Override
   public String name() {

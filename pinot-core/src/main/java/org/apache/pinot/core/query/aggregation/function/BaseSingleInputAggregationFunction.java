@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -49,7 +48,7 @@ public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable
 
   @Override
   public List<ExpressionContext> getInputExpressions() {
-    return Collections.singletonList(_expression);
+    return List.of(_expression);
   }
 
   @Override

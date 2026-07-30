@@ -90,7 +90,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   protected void doAddOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
       @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
-    if (_partialUpsertHandler == null) {
+    if (_partialUpsertHandler != null) {
+      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
+    } else {
       // for full upsert, we are de-duping primary key once here to make sure that we are not adding
       // primary-key multiple times and subtracting just once in removeSegment.
       // for partial-upsert, we call this method in base class.
@@ -298,7 +300,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         if (queryableDocIds == null && _deleteRecordColumn != null) {
           queryableDocIds = new ThreadSafeMutableRoaringBitmap();
         }
-        addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
+        doAddOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
             oldSegment, validDocIdsForOldSegment);
       }
       if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {

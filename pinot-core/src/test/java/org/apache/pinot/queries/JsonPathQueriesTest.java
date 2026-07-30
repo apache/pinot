@@ -222,7 +222,7 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
   public void testTopLevelArrayPathExpressions() {
     // SELECT using json path expressions that refers to second element of a top-level array.
     Object[][] expecteds1 = {{"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,"
-        + "\"i2\":4}"}};
+            + "\"i2\":4}"}};
     checkResult("SELECT jsonColumn[1] FROM testTable WHERE intColumn=14", expecteds1);
 
     // SELECT using json path expressions that refers to item within second element of a top-level array.

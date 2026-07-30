@@ -27,11 +27,13 @@ netstat -i
 
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
+  # pinot-bom is included to ensure it is installed into the local repo before
+  # the assembly-descriptor invoker plugin copies it to the isolated IT repo.
   mvn clean install \
     -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
     -am -B -T 16 -ntp \
     -P github-actions,integration-tests \
-    -pl 'pinot-integration-tests' || exit 1
+    -pl 'pinot-bom,pinot-integration-tests' || exit 1
 else
   # Unit Tests
   #   - TEST_SET#1 runs install and test together so the module list must ensure no additional modules were tested
@@ -41,6 +43,7 @@ else
       -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
       -am -B -T 16 -ntp \
       -P github-actions \
+      -pl 'pinot-bom' \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \

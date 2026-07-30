@@ -32,13 +32,13 @@ public class RegexpReplaceVarFunctions {
 
   /**
    * Replace a regular expression pattern. If matchStr is not found, inputStr will be returned. By default, all
-   * occurences of match pattern in the input string will be replaced. Default matching pattern is case sensitive.
+   * occurrences of match pattern in the input string will be replaced. Default matching pattern is case sensitive.
    *
    * @param inputStr      Input string to apply the regexpReplace
    * @param matchStr      Regexp or string to match against inputStr
    * @param replaceStr    Regexp or string to replace if matchStr is found
    * @param matchStartPos Index of inputStr from where matching should start. Default is 0.
-   * @param occurence     Controls which occurence of the matched pattern must be replaced. Counting starts at 0.
+   * @param occurrence     Controls which occurrence of the matched pattern must be replaced. Counting starts at 0.
    *                      Default
    *                      is -1
    * @param flag          Single character flag that controls how the regex finds matches in inputStr. If an
@@ -51,20 +51,20 @@ public class RegexpReplaceVarFunctions {
    */
   @ScalarFunction
   public String regexpReplaceVar(String inputStr, String matchStr, String replaceStr, int matchStartPos,
-      int occurence, String flag) {
+      int occurrence, String flag) {
     int patternFlag = "i".equals(flag) ? Pattern.CASE_INSENSITIVE : 0;
     Pattern p = Pattern.compile(matchStr, patternFlag);
     Matcher matcher = p.matcher(inputStr).region(matchStartPos, inputStr.length());
 
-    if (occurence >= 0) {
+    if (occurrence >= 0) {
       _buffer.setLength(0);
       _buffer.append(inputStr);
-      while (occurence >= 0 && matcher.find()) {
-        if (occurence == 0) {
+      while (occurrence >= 0 && matcher.find()) {
+        if (occurrence == 0) {
           _buffer.replace(matcher.start(), matcher.end(), replaceStr);
           break;
         }
-        occurence--;
+        occurrence--;
       }
     } else {
       _buffer.setLength(0);
@@ -79,7 +79,7 @@ public class RegexpReplaceVarFunctions {
 
   /**
    * See #regexpReplace(String, String, String, int, int, String). Matches against entire inputStr and replaces all
-   * occurences. Match is performed in case-sensitive mode.
+   * occurrences. Match is performed in case-sensitive mode.
    *
    * @param inputStr   Input string to apply the regexpReplace
    * @param matchStr   Regexp or string to match against inputStr
@@ -93,7 +93,7 @@ public class RegexpReplaceVarFunctions {
 
   /**
    * See #regexpReplace(String, String, String, int, int, String). Matches against entire inputStr and replaces all
-   * occurences. Match is performed in case-sensitive mode.
+   * occurrences. Match is performed in case-sensitive mode.
    *
    * @param inputStr      Input string to apply the regexpReplace
    * @param matchStr      Regexp or string to match against inputStr
@@ -113,13 +113,13 @@ public class RegexpReplaceVarFunctions {
    * @param matchStr      Regexp or string to match against inputStr
    * @param replaceStr    Regexp or string to replace if matchStr is found
    * @param matchStartPos Index of inputStr from where matching should start. Default is 0.
-   * @param occurence     Controls which occurence of the matched pattern must be replaced. Counting starts
+   * @param occurrence     Controls which occurrence of the matched pattern must be replaced. Counting starts
    *                      at 0. Default is -1
    * @return replaced input string
    */
   @ScalarFunction
   public String regexpReplaceVar(String inputStr, String matchStr, String replaceStr, int matchStartPos,
-      int occurence) {
-    return regexpReplaceVar(inputStr, matchStr, replaceStr, matchStartPos, occurence, "");
+      int occurrence) {
+    return regexpReplaceVar(inputStr, matchStr, replaceStr, matchStartPos, occurrence, "");
   }
 }

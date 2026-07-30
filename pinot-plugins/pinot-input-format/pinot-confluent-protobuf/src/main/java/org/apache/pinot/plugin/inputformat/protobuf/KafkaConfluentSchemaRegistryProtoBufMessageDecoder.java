@@ -27,8 +27,8 @@ import io.confluent.kafka.schemaregistry.client.rest.RestService;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchemaProvider;
 import io.confluent.kafka.serializers.protobuf.KafkaProtobufDeserializer;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -118,7 +118,7 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
         props.getOrDefault(CACHED_SCHEMA_MAP_CAPACITY, DEFAULT_CACHED_SCHEMA_MAP_CAPACITY));
     SchemaRegistryClient schemaRegistryClient =
         new CachedSchemaRegistryClient(createRestService(schemaRegistryUrl, props),
-            identityMapCapacity, Collections.singletonList(protobufSchemaProvider), props, null);
+            identityMapCapacity, List.of(protobufSchemaProvider), props, null);
     _deserializer = new KafkaProtobufDeserializer<>(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");
     _topicName = topicName;

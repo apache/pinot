@@ -27,7 +27,6 @@ import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
 import java.io.Closeable;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,7 +59,7 @@ public abstract class BaseGrpcQueryClient<REQUEST, RESPONSE> implements Closeabl
   private final int _channelShutdownTimeoutSeconds;
 
   public BaseGrpcQueryClient(String host, int port) {
-    this(host, port, new GrpcConfig(Collections.emptyMap()));
+    this(host, port, new GrpcConfig(Map.of()));
   }
 
   public BaseGrpcQueryClient(String host, int port, GrpcConfig config) {

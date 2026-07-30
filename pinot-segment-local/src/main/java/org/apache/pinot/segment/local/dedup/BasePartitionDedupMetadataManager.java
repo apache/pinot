@@ -52,7 +52,8 @@ import org.slf4j.LoggerFactory;
 
 public abstract class BasePartitionDedupMetadataManager implements PartitionDedupMetadataManager {
   // The special value to indicate the largest seen time is not set yet, assuming times are positive.
-  protected static final double TTL_WATERMARK_NOT_SET = 0;
+  public static final double TTL_WATERMARK_NOT_SET = 0;
+
   protected final String _tableNameWithType;
   protected final List<String> _primaryKeyColumns;
   protected final int _partitionId;

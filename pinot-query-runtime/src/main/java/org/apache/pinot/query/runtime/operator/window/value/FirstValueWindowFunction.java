@@ -29,6 +29,7 @@ import org.apache.pinot.common.collections.DualValueList;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
@@ -42,6 +43,9 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
 
   @Override
   public List<Object> processRows(List<Object[]> rows) {
+    if (!_windowFrame.isExcludeNoOthers()) {
+      return processWithExclude(rows);
+    }
     if (_windowFrame.isRowType()) {
       if (_ignoreNulls) {
         return processRowsWindowIgnoreNulls(rows);
@@ -55,6 +59,39 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
         return processRangeWindow(rows);
       }
     }
+  }
+
+  /**
+   * FIRST_VALUE for a non-default EXCLUDE clause. Computes the first non-excluded index for each row in O(1) using
+   * the precomputed peer-group boundaries; if {@code IGNORE NULLS} is set, advances past null values respecting the
+   * exclude rules.
+   */
+  private List<Object> processWithExclude(List<Object[]> rows) {
+    int numRows = rows.size();
+    WindowNode.WindowExclusion exclude = _windowFrame.getExclude();
+    int[] peerStart = null;
+    int[] peerEnd = null;
+    if (needsPeerBoundaries(exclude) || !_windowFrame.isRowType()) {
+      peerStart = new int[numRows];
+      peerEnd = new int[numRows];
+      computePeerBoundaries(rows, peerStart, peerEnd);
+    }
+
+    List<Object> result = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      int pStart = peerStart != null ? peerStart[i] : i;
+      int pEnd = peerEnd != null ? peerEnd[i] : i;
+      int fs = frameStartForRow(i, pStart, numRows);
+      int fe = frameEndForRow(i, pEnd, numRows);
+      int idx = firstNonExcluded(fs, fe, i, pStart, pEnd, exclude);
+      if (_ignoreNulls) {
+        while (idx != -1 && extractValueFromRow(rows.get(idx)) == null) {
+          idx = firstNonExcluded(idx + 1, fe, i, pStart, pEnd, exclude);
+        }
+      }
+      result.add(idx == -1 ? null : extractValueFromRow(rows.get(idx)));
+    }
+    return result;
   }
 
   private List<Object> processRowsWindow(List<Object[]> rows) {

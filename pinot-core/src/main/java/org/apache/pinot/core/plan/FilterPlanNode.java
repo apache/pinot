@@ -30,7 +30,6 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusPredicate;
@@ -54,8 +53,6 @@ import org.apache.pinot.core.operator.filter.VectorSearchMode;
 import org.apache.pinot.core.operator.filter.VectorSearchParams;
 import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
-import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.IFSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
@@ -100,20 +97,20 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public BaseFilterOperator run() {
-    MutableRoaringBitmap queryableDocIdsSnapshot = _segmentContext.getQueryableDocIdsSnapshot();
+    MutableRoaringBitmap docIdsSnapshot = _segmentContext.getDocIdsSnapshot();
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
 
     if (_filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
-      if (queryableDocIdsSnapshot != null) {
-        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
+      if (docIdsSnapshot != null) {
+        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(docIdsSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
             numDocs);
       } else {
         return filterOperator;
       }
-    } else if (queryableDocIdsSnapshot != null) {
-      return new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
+    } else if (docIdsSnapshot != null) {
+      return new BitmapBasedFilterOperator(docIdsSnapshot, false, numDocs);
     } else {
       return new MatchAllFilterOperator(numDocs);
     }
@@ -306,27 +303,10 @@ public class FilterPlanNode implements PlanNode {
                 return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs);
               }
             case REGEXP_LIKE:
-              // Check if case-insensitive flag is present
-              RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicate;
-              boolean caseInsensitive = regexpLikePredicate.isCaseInsensitive();
-              if (caseInsensitive) {
-                if (dataSource.getIFSTIndex() != null) {
-                  predicateEvaluator =
-                      IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLikePredicate,
-                          dataSource.getIFSTIndex(), dataSource.getDictionary());
-                } else {
-                  predicateEvaluator =
-                      PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);
-                }
-              } else {
-                if (dataSource.getFSTIndex() != null) {
-                  predicateEvaluator = FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLikePredicate,
-                      dataSource.getFSTIndex(), dataSource.getDictionary());
-                } else {
-                  predicateEvaluator =
-                      PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);
-                }
-              }
+              // PredicateEvaluatorProvider handles FST/IFST upgrade internally when the dictionary is usable for
+              // filtering and a matching text index exists on the data source.
+              predicateEvaluator =
+                  PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
               return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
             case JSON_MATCH:

@@ -174,8 +174,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
 
   @Test(dataProvider = "scenarios")
   void aggrSvSelfWithoutNull(Scenario scenario) {
-    PinotDataType pinotDataType = scenario._dataType == FieldSpec.DataType.INT
-        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario._dataType.name());
+    PinotDataType pinotDataType = PinotDataType.valueOf(scenario._dataType.name());
 
     Object defaultNullValue;
     switch (scenario._dataType) {
@@ -213,8 +212,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
 
   @Test(dataProvider = "scenarios")
   void aggrSvSelfWithNull(Scenario scenario) {
-    PinotDataType pinotDataType = scenario._dataType == FieldSpec.DataType.INT
-        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario._dataType.name());
+    PinotDataType pinotDataType = PinotDataType.valueOf(scenario._dataType.name());
 
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField",

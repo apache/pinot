@@ -201,6 +201,22 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   }
 
   @Override
+  protected File fetchUntarSegmentToLocalWithoutRetry(URI uri, File dest, long maxStreamRateInByte)
+      throws Exception {
+    String hostName = uri.getHost();
+    int port = uri.getPort();
+    // If the original download address is specified as host name, need add a "HOST" HTTP header to the HTTP
+    // request. Otherwise, if the download address is a LB address, when the LB be configured as "disallow direct
+    // access by IP address", downloading will fail.
+    List<Header> httpHeaders = new LinkedList<>();
+    if (!InetAddresses.isInetAddress(hostName)) {
+      httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
+    }
+    return _httpClient.downloadUntarFileStreamed(uri, dest, _authProvider, httpHeaders, maxStreamRateInByte,
+        _connectionRequestTimeoutMs, _socketTimeoutMs);
+  }
+
+  @Override
   public void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
       throws Exception {
     try {

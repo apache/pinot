@@ -37,6 +37,7 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.internal.PlatformDependent;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.NettyConfig;
@@ -117,12 +118,10 @@ public class QueryServer {
     try {
       ServerBootstrap serverBootstrap = new ServerBootstrap();
 
-      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
-      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
-      ServerMetrics metrics = ServerMetrics.get();
       PooledByteBufAllocator bufAllocatorWithLimits =
-          PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric);
-      metric = bufAllocatorWithLimits.metric();
+          PooledByteBufAllocatorWithLimits.getSharedBufferAllocatorWithLimits();
+      PooledByteBufAllocatorMetric metric = bufAllocatorWithLimits.metric();
+      ServerMetrics metrics = ServerMetrics.get();
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
@@ -185,5 +184,10 @@ public class QueryServer {
   @VisibleForTesting
   int getConnectedChannelCount() {
     return _allChannels.size();
+  }
+
+  @VisibleForTesting
+  Set<SocketChannel> getConnectedChannels() {
+    return _allChannels.keySet();
   }
 }

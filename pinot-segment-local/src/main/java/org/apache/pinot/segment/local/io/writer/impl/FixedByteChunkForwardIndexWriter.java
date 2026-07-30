@@ -78,7 +78,17 @@ public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWrite
   }
 
   @Override
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    // Include in-flight bytes from the current unflushed chunk so callers reading
+    // before close() (e.g., writeMetadata()) get the correct total.
+    return _trackUncompressedValueSize ? _uncompressedValueSize + _chunkDataOffset : -1;
+  }
+
+  @Override
   protected void writeChunk() {
+    if (_trackUncompressedValueSize) {
+      _uncompressedValueSize += _chunkDataOffset;
+    }
     super.writeChunk();
     _chunkDataOffset = 0;
   }

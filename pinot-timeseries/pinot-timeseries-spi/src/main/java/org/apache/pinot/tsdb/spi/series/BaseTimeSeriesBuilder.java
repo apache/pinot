@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tsdb.spi.series;
 
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
@@ -33,7 +32,7 @@ import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
  * <b>Important:</b> Refer to {@link TimeSeries} for details on Series ID and how to use it in general.
  */
 public abstract class BaseTimeSeriesBuilder {
-  public static final List<String> UNINITIALISED_TAG_NAMES = Collections.emptyList();
+  public static final List<String> UNINITIALISED_TAG_NAMES = List.of();
   public static final Object[] UNINITIALISED_TAG_VALUES = new Object[]{};
   protected final String _id;
   @Nullable

@@ -20,7 +20,6 @@ package org.apache.pinot.tsdb.planner;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -93,7 +92,7 @@ public class TimeSeriesPlanFragmenter {
     Context context = new Context();
     if (isSingleServerQuery) {
       final String id = rootNode.getId();
-      return List.of(new TimeSeriesExchangeNode(id, Collections.emptyList(), null), rootNode);
+      return List.of(new TimeSeriesExchangeNode(id, List.of(), null), rootNode);
     }
     result.add(fragmentRecursively(rootNode, context));
     result.addAll(context._fragments);
@@ -105,13 +104,13 @@ public class TimeSeriesPlanFragmenter {
       LeafTimeSeriesPlanNode leafNode = (LeafTimeSeriesPlanNode) planNode;
       AggInfo currentAggInfo = leafNode.getAggInfo();
       if (currentAggInfo == null) {
-        context._fragments.add(leafNode.withInputs(Collections.emptyList()));
+        context._fragments.add(leafNode.withInputs(List.of()));
       } else {
         Preconditions.checkState(!currentAggInfo.getIsPartial(),
             "Leaf node in the logical plan should not have partial agg");
         context._fragments.add(leafNode.withAggInfo(currentAggInfo.withPartialAggregation()));
       }
-      return new TimeSeriesExchangeNode(planNode.getId(), Collections.emptyList(), currentAggInfo);
+      return new TimeSeriesExchangeNode(planNode.getId(), List.of(), currentAggInfo);
     }
     List<BaseTimeSeriesPlanNode> newInputs = new ArrayList<>();
     for (BaseTimeSeriesPlanNode input : planNode.getInputs()) {

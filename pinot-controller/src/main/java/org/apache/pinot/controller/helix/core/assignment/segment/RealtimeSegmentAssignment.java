@@ -38,6 +38,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.strategy.Segmen
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 /**
@@ -115,6 +116,11 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
   }
 
   protected List<String> assignConsumingSegment(int segmentPartitionId, InstancePartitions instancePartitions) {
+    // For multi-stream tables, Pinot partition IDs are encoded as (streamIndex * 10000 + streamPartitionId).
+    // Extract the stream-level partition id before computing the instance index to avoid incorrect slot mapping.
+    segmentPartitionId =
+        IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_tableConfig, segmentPartitionId);
+
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     int numPartitions = instancePartitions.getNumPartitions();
 

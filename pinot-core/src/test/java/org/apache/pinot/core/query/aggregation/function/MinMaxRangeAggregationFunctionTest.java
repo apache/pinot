@@ -137,8 +137,7 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
 
   @Test(dataProvider = "scenarios")
   void aggrSvSelfWithoutNull(DataTypeScenario scenario) {
-    PinotDataType pinotDataType = scenario.getDataType() == FieldSpec.DataType.INT
-        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario.getDataType().name());
+    PinotDataType pinotDataType = PinotDataType.valueOf(scenario.getDataType().name());
 
     Object defaultNullValue;
     switch (scenario.getDataType()) {
@@ -176,8 +175,7 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
 
   @Test(dataProvider = "scenarios")
   void aggrSvSelfWithNull(DataTypeScenario scenario) {
-    PinotDataType pinotDataType = scenario.getDataType() == FieldSpec.DataType.INT
-        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario.getDataType().name());
+    PinotDataType pinotDataType = PinotDataType.valueOf(scenario.getDataType().name());
 
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField",

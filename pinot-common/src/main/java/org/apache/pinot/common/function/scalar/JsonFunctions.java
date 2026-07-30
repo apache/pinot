@@ -31,13 +31,18 @@ import com.jayway.jsonpath.spi.cache.CacheProvider;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.function.FastJsonPathExtractor;
 import org.apache.pinot.common.function.JsonPathCache;
+import org.apache.pinot.common.function.SimpleJsonPath;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -105,6 +110,63 @@ public class JsonFunctions {
     return PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES);
   }
 
+  /// Resolves `jsonPath` against `object` using the fast extractor ([FastJsonPathExtractor]) when
+  /// `object` is a JSON `String` and the path is a simple linear chain, and falls back to the Jayway
+  /// [#jsonPath] implementation otherwise, so a caller sees the same value and the same exceptions either way.
+  /// Backs the opt-in fast scalar functions below. See [FastJsonPathExtractor] for the one edge case
+  /// where the fast and Jayway results differ.
+  @Nullable
+  private static Object fastJsonPath(Object object, String jsonPath, boolean useBigDecimal, boolean earlyExit) {
+    if (object instanceof String) {
+      String json = (String) object;
+      SimpleJsonPath simpleJsonPath = SimpleJsonPath.compile(jsonPath);
+      if (simpleJsonPath != null && FastJsonPathExtractor.canExtract(json)) {
+        try {
+          return FastJsonPathExtractor.extract(json, simpleJsonPath, useBigDecimal, earlyExit);
+        } catch (Exception e) {
+          /// Any failure in the fast path degrades to the reference Jayway implementation, so an unforeseen
+          /// fast bug can never change a caller's result - at worst it costs a second parse on that row.
+          /// Malformed JSON also lands here: Jayway then raises the same exception the fast path would have.
+          return jsonPath(json, jsonPath);
+        }
+      }
+    }
+    /// Complex path, non-JSON input, or an already-parsed container: the existing Jayway implementation.
+    return jsonPath(object, jsonPath);
+  }
+
+  /**
+   * Returns {@code false} when the input is known to be non-extractable by a json path without invoking the JSON
+   * parser: a {@code null} value, or a string whose first non-whitespace character cannot begin a JSON value. Used
+   * by the default-value {@code jsonPath*} overloads to skip parsing plain-text input (e.g. raw log lines) that
+   * would otherwise throw a {@link com.jayway.jsonpath.InvalidJsonException} whose {@code fillInStackTrace()}
+   * dominates the hot ingestion path. It is intentionally conservative: any string that could begin a JSON value
+   * (object, array, string, number, or a {@code true}/{@code false}/{@code null} literal) is still handed to the
+   * parser, so the parser's behavior - including any exception it raises - is unchanged for those inputs. Returning
+   * the caller's default for the skipped inputs is equivalent to the prior behavior, where the parse exception was
+   * caught and the default returned.
+   */
+  private static boolean canExtractJsonPath(@Nullable Object object) {
+    if (object == null) {
+      return false;
+    }
+    if (!(object instanceof String)) {
+      // Already-parsed Map/List/etc. - handled by jsonPath() directly without re-parsing.
+      return true;
+    }
+    String s = (String) object;
+    for (int i = 0, n = s.length(); i < n; i++) {
+      char c = s.charAt(i);
+      if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+        continue;
+      }
+      // First non-whitespace character of any valid JSON value.
+      return c == '{' || c == '[' || c == '"' || c == '-' || (c >= '0' && c <= '9') || c == 't' || c == 'f'
+          || c == 'n';
+    }
+    return false; // empty / all-whitespace is not valid JSON
+  }
+
   /**
    * Extract object array based on Json path
    */
@@ -119,8 +181,11 @@ public class JsonFunctions {
 
   @ScalarFunction(nullableParameters = true)
   public static Object[] jsonPathArrayDefaultEmpty(@Nullable Object object, String jsonPath) {
+    if (!canExtractJsonPath(object)) {
+      return EMPTY;
+    }
     try {
-      Object[] result = object == null ? null : jsonPathArray(object, jsonPath);
+      Object[] result = jsonPathArray(object, jsonPath);
       return result == null ? EMPTY : result;
     } catch (Exception e) {
       return EMPTY;
@@ -161,10 +226,7 @@ public class JsonFunctions {
   public static String jsonPathString(Object object, String jsonPath)
       throws JsonProcessingException {
     Object jsonValue = jsonPath(object, jsonPath);
-    if (jsonValue instanceof String) {
-      return (String) jsonValue;
-    }
-    return jsonValue == null ? null : JsonUtils.objectToString(jsonValue);
+    return jsonValue != null ? jsonValueToString(jsonValue) : null;
   }
 
   /**
@@ -172,12 +234,61 @@ public class JsonFunctions {
    */
   @ScalarFunction(nullableParameters = true)
   public static String jsonPathString(@Nullable Object object, String jsonPath, String defaultValue) {
+    if (!canExtractJsonPath(object)) {
+      return defaultValue;
+    }
     try {
       Object jsonValue = jsonPath(object, jsonPath);
-      if (jsonValue instanceof String) {
-        return (String) jsonValue;
-      }
-      return jsonValue == null ? defaultValue : JsonUtils.objectToString(jsonValue);
+      return jsonValue != null ? jsonValueToString(jsonValue) : defaultValue;
+    } catch (Exception ignore) {
+      return defaultValue;
+    }
+  }
+
+  /// Renders a value resolved by a JSON path to its string form for the `jsonPathString*` family. A `String`
+  /// leaf is returned verbatim (unquoted). [UUID] / [LocalDate] / [LocalTime] are non-JSON-native scalars a
+  /// record extractor can materialize; [JsonUtils#objectToString] would wrap them in JSON string quotes, so
+  /// they are rendered via their natural (canonical UUID / ISO-8601) `toString` instead. Every other value -
+  /// `Number`, `Boolean`, `Timestamp` (epoch millis), `byte[]`, and `Map` / `Collection` / array containers -
+  /// goes through [JsonUtils#objectToString], matching the json-path-to-string behavior of `jsonExtractScalar`.
+  private static String jsonValueToString(Object jsonValue)
+      throws JsonProcessingException {
+    if (jsonValue instanceof String) {
+      return (String) jsonValue;
+    }
+    if (jsonValue instanceof UUID || jsonValue instanceof LocalDate || jsonValue instanceof LocalTime) {
+      return jsonValue.toString();
+    }
+    return JsonUtils.objectToString(jsonValue);
+  }
+
+  /// Opt-in fast variant of [#jsonPathString(Object, String, String)] with identical results: a simple
+  /// linear path over a JSON string is resolved in a single forward pass instead of building a full Jayway DOM
+  /// (see [FastJsonPathExtractor]), and complex paths / non-JSON input fall back to Jayway. Faster; choose
+  /// this when the value matters and the result must match `jsonPathString`.
+  @ScalarFunction(nullableParameters = true)
+  public static String jsonPathStringFast(@Nullable Object object, String jsonPath, String defaultValue) {
+    return fastJsonPathString(object, jsonPath, defaultValue, false);
+  }
+
+  /// Like [#jsonPathStringFast] but stops the pass at the addressed field. Faster still when the field appears
+  /// early, at the cost of two behavior changes on undefined/corrupt input: duplicate object keys resolve to the
+  /// **first** occurrence (Jayway and `jsonPathString` take the last), and a document that is malformed strictly
+  /// **after** the addressed field is not rejected. Choose this only when the source JSON is known to be
+  /// well-formed and free of duplicate keys.
+  @ScalarFunction(nullableParameters = true)
+  public static String jsonPathStringFirstMatch(@Nullable Object object, String jsonPath, String defaultValue) {
+    return fastJsonPathString(object, jsonPath, defaultValue, true);
+  }
+
+  private static String fastJsonPathString(@Nullable Object object, String jsonPath, String defaultValue,
+      boolean earlyExit) {
+    if (!canExtractJsonPath(object)) {
+      return defaultValue;
+    }
+    try {
+      Object jsonValue = fastJsonPath(object, jsonPath, false, earlyExit);
+      return jsonValue != null ? jsonValueToString(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
@@ -196,8 +307,44 @@ public class JsonFunctions {
    */
   @ScalarFunction(nullableParameters = true)
   public static long jsonPathLong(@Nullable Object object, String jsonPath, long defaultValue) {
+    if (!canExtractJsonPath(object)) {
+      return defaultValue;
+    }
     try {
       Object jsonValue = jsonPath(object, jsonPath);
+      if (jsonValue == null) {
+        return defaultValue;
+      }
+      if (jsonValue instanceof Number) {
+        return ((Number) jsonValue).longValue();
+      }
+      return Long.parseLong(jsonValue.toString());
+    } catch (Exception ignore) {
+      return defaultValue;
+    }
+  }
+
+  /// Opt-in fast variant of [#jsonPathLong(Object, String, long)] with identical results; see
+  /// [#jsonPathStringFast] for the fast/Jayway-fallback contract.
+  @ScalarFunction(nullableParameters = true)
+  public static long jsonPathLongFast(@Nullable Object object, String jsonPath, long defaultValue) {
+    return fastJsonPathLong(object, jsonPath, defaultValue, false);
+  }
+
+  /// Early-exit fast variant of [#jsonPathLong(Object, String, long)]; see [#jsonPathStringFirstMatch] for
+  /// the two behavior changes and when to use it.
+  @ScalarFunction(nullableParameters = true)
+  public static long jsonPathLongFirstMatch(@Nullable Object object, String jsonPath, long defaultValue) {
+    return fastJsonPathLong(object, jsonPath, defaultValue, true);
+  }
+
+  private static long fastJsonPathLong(@Nullable Object object, String jsonPath, long defaultValue,
+      boolean earlyExit) {
+    if (!canExtractJsonPath(object)) {
+      return defaultValue;
+    }
+    try {
+      Object jsonValue = fastJsonPath(object, jsonPath, false, earlyExit);
       if (jsonValue == null) {
         return defaultValue;
       }
@@ -223,8 +370,44 @@ public class JsonFunctions {
    */
   @ScalarFunction(nullableParameters = true)
   public static double jsonPathDouble(@Nullable Object object, String jsonPath, double defaultValue) {
+    if (!canExtractJsonPath(object)) {
+      return defaultValue;
+    }
     try {
       Object jsonValue = jsonPath(object, jsonPath);
+      if (jsonValue == null) {
+        return defaultValue;
+      }
+      if (jsonValue instanceof Number) {
+        return ((Number) jsonValue).doubleValue();
+      }
+      return Double.parseDouble(jsonValue.toString());
+    } catch (Exception ignore) {
+      return defaultValue;
+    }
+  }
+
+  /// Opt-in fast variant of [#jsonPathDouble(Object, String, double)] with identical results; see
+  /// [#jsonPathStringFast] for the fast/Jayway-fallback contract.
+  @ScalarFunction(nullableParameters = true)
+  public static double jsonPathDoubleFast(@Nullable Object object, String jsonPath, double defaultValue) {
+    return fastJsonPathDouble(object, jsonPath, defaultValue, false);
+  }
+
+  /// Early-exit fast variant of [#jsonPathDouble(Object, String, double)]; see [#jsonPathStringFirstMatch]
+  /// for the two behavior changes and when to use it.
+  @ScalarFunction(nullableParameters = true)
+  public static double jsonPathDoubleFirstMatch(@Nullable Object object, String jsonPath, double defaultValue) {
+    return fastJsonPathDouble(object, jsonPath, defaultValue, true);
+  }
+
+  private static double fastJsonPathDouble(@Nullable Object object, String jsonPath, double defaultValue,
+      boolean earlyExit) {
+    if (!canExtractJsonPath(object)) {
+      return defaultValue;
+    }
+    try {
+      Object jsonValue = fastJsonPath(object, jsonPath, false, earlyExit);
       if (jsonValue == null) {
         return defaultValue;
       }
@@ -323,6 +506,33 @@ public class JsonFunctions {
     return null;
   }
 
+  /**
+   * Parse a JSON document into a reusable {@code Map}/{@code List}, or pass through an already-parsed container,
+   * returning {@code null} for null, scalar, or non-JSON input <b>without throwing</b>.
+   * <p>Intended for "parse-once" ingestion transforms: materialize an intermediate object column once and point
+   * multiple {@code jsonPath*} extractions at it, instead of re-parsing the same source document for every extracted
+   * field. {@link #jsonPath} navigates the returned object directly (no re-parse), and because this never throws it
+   * is safe for columns that are sometimes structured JSON and sometimes plain text (e.g. a log {@code message}
+   * field) - the plain-text rows simply yield {@code null} and fall through to the default of the downstream
+   * extraction. Example transform configs:
+   * <pre>
+   *   {"columnName": "message_obj", "transformFunction": "jsonExtractObject(message)"}
+   *   {"columnName": "level",       "transformFunction": "JSONPATHSTRING(message_obj, '$.level', null)"}
+   * </pre>
+   */
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static Object jsonExtractObject(@Nullable Object object) {
+    if (object instanceof String) {
+      return jsonStringToListOrMap((String) object);
+    }
+    if (object instanceof Map || object instanceof List || object instanceof Object[]) {
+      // Already parsed (e.g. a nested object surfaced by the decoder or an upstream transform) - reuse as-is.
+      return object;
+    }
+    return null;
+  }
+
   private static void setValuesToMap(String keyColumnName, String valueColumnName, Object obj,
       Map<String, String> result) {
     if (obj instanceof Map) {
@@ -374,7 +584,7 @@ public class JsonFunctions {
     JsonExtractFunctionParameters params = new JsonExtractFunctionParameters(paramString);
 
     if (params._maxDepth == 0) {
-      return java.util.Collections.emptyList();
+      return java.util.List.of();
     }
     // Special handling for empty string, '$.**' and '$..' recursive key extraction
     if ("".equals(jsonPath) || "$..**".equals(jsonPath) || "$..".equals(jsonPath)) {

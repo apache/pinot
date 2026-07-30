@@ -185,4 +185,36 @@ public class UnnestNodeTest {
     Assert.assertEquals(node1.hashCode(), node2.hashCode());
     Assert.assertNotEquals(node1, node3);
   }
+
+  @Test
+  public void testDefaultPassthroughIsNotPruned() {
+    DataSchema dataSchema = new DataSchema(new String[]{"id", "elem"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+    UnnestNode node = new UnnestNode(0, dataSchema, PlanNode.NodeHint.EMPTY,
+        new ArrayList<>(), List.of(new RexExpression.InputRef(1)), List.of("elem"), false, null);
+
+    // Legacy/default construction: no pruning, empty passthrough map.
+    Assert.assertFalse(node.isPrunedPassthrough());
+    Assert.assertTrue(node.getPassthroughInputIndexes().isEmpty());
+  }
+
+  @Test
+  public void testPrunedPassthroughMetadata() {
+    DataSchema dataSchema = new DataSchema(new String[]{"id", "elem"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+    UnnestNode.TableFunctionContext context =
+        new UnnestNode.TableFunctionContext(false, List.of(1), UnnestNode.UNSPECIFIED_INDEX, List.of(0), true);
+    UnnestNode node = new UnnestNode(0, dataSchema, PlanNode.NodeHint.EMPTY,
+        new ArrayList<>(), List.of(new RexExpression.InputRef(1)), context);
+
+    Assert.assertTrue(node.isPrunedPassthrough());
+    Assert.assertEquals(node.getPassthroughInputIndexes(), List.of(0));
+
+    // A pruned node must not equal an otherwise-identical non-pruned node.
+    UnnestNode legacy = new UnnestNode(0, dataSchema, PlanNode.NodeHint.EMPTY,
+        new ArrayList<>(), List.of(new RexExpression.InputRef(1)),
+        new UnnestNode.TableFunctionContext(false, List.of(1), UnnestNode.UNSPECIFIED_INDEX));
+    Assert.assertNotEquals(node, legacy);
+    Assert.assertNotEquals(node.hashCode(), legacy.hashCode());
+  }
 }

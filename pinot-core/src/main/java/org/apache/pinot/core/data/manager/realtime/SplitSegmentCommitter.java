@@ -97,7 +97,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return segmentLocation.toString();
     }
     if (_peerDownloadScheme != null) {
-        return StringUtil.join("/", CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME,
+      return StringUtil.join("/", CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME,
             params.getSegmentName());
     }
     return null;

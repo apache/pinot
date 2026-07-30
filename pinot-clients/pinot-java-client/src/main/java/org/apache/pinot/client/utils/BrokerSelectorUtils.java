@@ -19,7 +19,6 @@
 package org.apache.pinot.client.utils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +76,7 @@ public class BrokerSelectorUtils {
   public static Set<String> getTablesCommonBrokersSet(
       @Nullable List<String> tableNames, Map<String, List<String>> brokerData) {
     if (tableNames == null || tableNames.isEmpty()) {
-      return Collections.emptySet();
+      return Set.of();
     }
     HashSet<String> commonBrokers = getBrokers(tableNames.get(0), brokerData);
     for (int i = 1; i < tableNames.size() && !commonBrokers.isEmpty(); i++) {

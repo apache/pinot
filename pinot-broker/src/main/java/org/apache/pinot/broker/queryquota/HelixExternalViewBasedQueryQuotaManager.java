@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.RateLimiter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -332,7 +331,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     if (!_databaseRateLimiterMap.containsKey(databaseName)) {
       return;
     }
-    createOrUpdateDatabaseRateLimiter(Collections.singletonList(databaseName));
+    createOrUpdateDatabaseRateLimiter(List.of(databaseName));
   }
 
   /**
@@ -375,11 +374,11 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   public synchronized void createOrUpdateApplicationRateLimiter(String applicationName) {
-    createOrUpdateApplicationRateLimiter(Collections.singletonList(applicationName), DISABLED_APP_QUOTA);
+    createOrUpdateApplicationRateLimiter(List.of(applicationName), DISABLED_APP_QUOTA);
   }
 
   public synchronized void createOrUpdateApplicationRateLimiter(String applicationName, double newQps) {
-    createOrUpdateApplicationRateLimiter(Collections.singletonList(applicationName), newQps);
+    createOrUpdateApplicationRateLimiter(List.of(applicationName), newQps);
   }
 
   private synchronized void createOrUpdateApplicationRateLimiter(List<String> applicationNames) {
@@ -497,7 +496,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     if (_databaseRateLimiterMap.containsKey(databaseName)) {
       return;
     }
-    createOrUpdateDatabaseRateLimiter(Collections.singletonList(databaseName));
+    createOrUpdateDatabaseRateLimiter(List.of(databaseName));
   }
 
   /**
@@ -906,7 +905,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_helixManager.getClusterName()).build();
     return Double.parseDouble(helixAdmin.getConfig(configScope,
-            Collections.singletonList(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
+            List.of(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
             .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, "-1"));
   }
 
@@ -915,7 +914,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_helixManager.getClusterName()).build();
     String value = helixAdmin.getConfig(configScope,
-            Collections.singletonList(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
+            List.of(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
         .get(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND);
     if (value != null) {
       return Double.parseDouble(value);

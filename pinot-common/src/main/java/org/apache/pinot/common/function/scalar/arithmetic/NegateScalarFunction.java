@@ -35,6 +35,8 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 @ScalarFunction
 public class NegateScalarFunction extends BaseUnaryArithmeticScalarFunction {
 
+  public static final String FUNCTION_NAME = "negate";
+
   private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new EnumMap<>(ColumnDataType.class);
 
   static {
@@ -62,7 +64,7 @@ public class NegateScalarFunction extends BaseUnaryArithmeticScalarFunction {
 
   @Override
   public String getName() {
-    return "negate";
+    return FUNCTION_NAME;
   }
 
   @Override

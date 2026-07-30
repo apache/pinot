@@ -25,6 +25,10 @@ import java.util.stream.Collectors;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
+import org.apache.pinot.core.query.killing.QueryKillingManager;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -55,10 +59,39 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   protected void checkTermination() {
     QueryThreadContext.checkTermination(this::getExplainName);
+    checkScanBasedKilling();
   }
 
   protected void checkTerminationAndSampleUsage() {
     QueryThreadContext.checkTerminationAndSampleUsage(this::getExplainName);
+    checkScanBasedKilling();
+  }
+
+  private void checkScanBasedKilling() {
+    QueryKillingManager killingManager = QueryKillingManager.getInstance();
+    if (killingManager == null) {
+      return;
+    }
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    if (ctx == null) {
+      return;
+    }
+    QueryExecutionContext execCtx = ctx.getExecutionContext();
+    QueryScanCostContext scanCost = execCtx.getQueryScanCostContext();
+    if (scanCost == null) {
+      return;
+    }
+    killingManager.checkAndKillIfNeeded(execCtx, scanCost);
+    TerminationException te = execCtx.getTerminateException();
+    if (te != null) {
+      throw te;
+    }
+  }
+
+  @javax.annotation.Nullable
+  protected static QueryScanCostContext getScanCostContext() {
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 
   protected List<ExplainInfo> getChildrenExplainInfo() {

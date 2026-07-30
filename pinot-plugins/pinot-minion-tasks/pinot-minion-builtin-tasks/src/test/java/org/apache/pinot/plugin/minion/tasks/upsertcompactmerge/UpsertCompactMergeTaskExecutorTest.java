@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -225,7 +224,7 @@ public class UpsertCompactMergeTaskExecutorTest {
    */
   @Test(expectedExceptions = NoSuchElementException.class)
   public void testGetCommonPartitionIDForEmptySegmentList() {
-    List<SegmentMetadataImpl> segmentMetadataList = Collections.emptyList();
+    List<SegmentMetadataImpl> segmentMetadataList = List.of();
     _taskExecutor.getCommonPartitionIDForSegments(segmentMetadataList);
   }
 

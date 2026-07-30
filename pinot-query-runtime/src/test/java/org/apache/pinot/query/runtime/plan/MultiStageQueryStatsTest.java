@@ -18,15 +18,19 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
@@ -55,6 +59,41 @@ public class MultiStageQueryStatsTest {
     rootStats.mergeUpstream(buffers);
 
     Assert.assertEquals(mergingHeap, rootStats, "Merging objects should be equal to merging serialized buffers");
+  }
+
+  /**
+   * The legacy binary stat format encodes the operator type id as a single unsigned byte, so serializing a
+   * plugin-defined operator type (id >= {@link OperatorTypeDescriptor#PLUGIN_ID_FLOOR}) must fail loudly instead of
+   * truncating the id and letting the receiver silently decode the wrong built-in type. Plugin operator stats can
+   * only travel via stream-mode stats reporting, whose proto carries the id as an int32.
+   */
+  @Test
+  public void testSerializePluginOperatorIdFailsLoudly() {
+    OperatorTypeDescriptor pluginType = new OperatorTypeDescriptor() {
+      @Override
+      public int getId() {
+        return OperatorTypeDescriptor.PLUGIN_ID_FLOOR;
+      }
+
+      @Override
+      public String name() {
+        return "TEST_PLUGIN";
+      }
+
+      @Override
+      @SuppressWarnings("rawtypes")
+      public Class getStatKeyClass() {
+        return AggregateOperator.StatKey.class;
+      }
+
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+      }
+    };
+    MultiStageQueryStats.StageStats.Closed closed = new MultiStageQueryStats.StageStats.Closed(
+        List.of(pluginType), List.of(new StatMap<>(AggregateOperator.StatKey.class)));
+    Assert.assertThrows(IllegalStateException.class,
+        () -> closed.serialize(new DataOutputStream(new ByteArrayOutputStream())));
   }
 
   @DataProvider(name = "stats")

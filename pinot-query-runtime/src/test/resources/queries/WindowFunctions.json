@@ -2378,6 +2378,252 @@
         "outputs": [
           ["a", 5, 1, 1]
         ]
+      },
+      {
+        "description": "EXCLUDE CURRENT ROW on a bounded ROWS frame",
+        "sql": "SELECT string_col, int_col, double_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col, double_col ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE CURRENT ROW) FROM {tbl} ORDER BY string_col, int_col, double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 2, 300.0, 2],
+          ["a", 2, 400.0, 44],
+          ["a", 42, 42.0, 44],
+          ["a", 42, 50.5, 84],
+          ["a", 42, 75.0, 42],
+          ["b", 3, 100.0, 100],
+          ["b", 100, 1.0, 3],
+          ["c", 2, 400.0, 3],
+          ["c", 3, 100.0, 103],
+          ["c", 101, 1.01, 153],
+          ["c", 150, 1.5, 101],
+          ["d", 42, 42.0, null],
+          ["e", 42, 42.0, 42],
+          ["e", 42, 50.5, 42],
+          ["g", 3, 100.0, null],
+          ["h", 150, 1.53, null]
+        ]
+      },
+      {
+        "description": "EXCLUDE GROUP on an unbounded RANGE frame",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE GROUP) FROM {tbl} ORDER BY string_col, int_col",
+        "outputs": [
+          ["a", 2, 126],
+          ["a", 2, 126],
+          ["a", 42, 4],
+          ["a", 42, 4],
+          ["a", 42, 4],
+          ["b", 3, 100],
+          ["b", 100, 3],
+          ["c", 2, 254],
+          ["c", 3, 253],
+          ["c", 101, 155],
+          ["c", 150, 106],
+          ["d", 42, null],
+          ["e", 42, null],
+          ["e", 42, null],
+          ["g", 3, null],
+          ["h", 150, null]
+        ]
+      },
+      {
+        "description": "EXCLUDE TIES on an unbounded RANGE frame",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE TIES) FROM {tbl} ORDER BY string_col, int_col",
+        "outputs": [
+          ["a", 2, 128],
+          ["a", 2, 128],
+          ["a", 42, 46],
+          ["a", 42, 46],
+          ["a", 42, 46],
+          ["b", 3, 103],
+          ["b", 100, 103],
+          ["c", 2, 256],
+          ["c", 3, 256],
+          ["c", 101, 256],
+          ["c", 150, 256],
+          ["d", 42, 42],
+          ["e", 42, 42],
+          ["e", 42, 42],
+          ["g", 3, 3],
+          ["h", 150, 150]
+        ]
+      },
+      {
+        "description": "EXCLUDE GROUP on RANGE UNBOUNDED PRECEDING to CURRENT ROW",
+        "sql": "SELECT string_col, int_col, COUNT(*) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW EXCLUDE GROUP) FROM {tbl} ORDER BY string_col, int_col",
+        "outputs": [
+          ["a", 2, 0],
+          ["a", 2, 0],
+          ["a", 42, 2],
+          ["a", 42, 2],
+          ["a", 42, 2],
+          ["b", 3, 0],
+          ["b", 100, 1],
+          ["c", 2, 0],
+          ["c", 3, 1],
+          ["c", 101, 2],
+          ["c", 150, 3],
+          ["d", 42, 0],
+          ["e", 42, 0],
+          ["e", 42, 0],
+          ["g", 3, 0],
+          ["h", 150, 0]
+        ]
+      },
+      {
+        "description": "EXCLUDE TIES on RANGE CURRENT ROW to UNBOUNDED FOLLOWING",
+        "sql": "SELECT string_col, int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING EXCLUDE TIES) FROM {tbl} ORDER BY string_col, int_col",
+        "outputs": [
+          ["a", 2, 128],
+          ["a", 2, 128],
+          ["a", 42, 42],
+          ["a", 42, 42],
+          ["a", 42, 42],
+          ["b", 3, 103],
+          ["b", 100, 100],
+          ["c", 2, 256],
+          ["c", 3, 254],
+          ["c", 101, 251],
+          ["c", 150, 150],
+          ["d", 42, 42],
+          ["e", 42, 42],
+          ["e", 42, 42],
+          ["g", 3, 3],
+          ["h", 150, 150]
+        ]
+      },
+      {
+        "description": "EXCLUDE CURRENT ROW on RANGE CURRENT ROW to CURRENT ROW (peer-group only)",
+        "sql": "SELECT string_col, int_col, COUNT(*) OVER(PARTITION BY string_col ORDER BY int_col RANGE BETWEEN CURRENT ROW AND CURRENT ROW EXCLUDE CURRENT ROW) FROM {tbl} ORDER BY string_col, int_col",
+        "outputs": [
+          ["a", 2, 1],
+          ["a", 2, 1],
+          ["a", 42, 2],
+          ["a", 42, 2],
+          ["a", 42, 2],
+          ["b", 3, 0],
+          ["b", 100, 0],
+          ["c", 2, 0],
+          ["c", 3, 0],
+          ["c", 101, 0],
+          ["c", 150, 0],
+          ["d", 42, 0],
+          ["e", 42, 1],
+          ["e", 42, 1],
+          ["g", 3, 0],
+          ["h", 150, 0]
+        ]
+      },
+      {
+        "description": "AVG with EXCLUDE CURRENT ROW on an unbounded ROWS frame",
+        "sql": "SELECT string_col, int_col, double_col, AVG(int_col) OVER(PARTITION BY string_col ORDER BY int_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW) FROM {tbl} ORDER BY string_col, int_col, double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 2, 300.0, 32.0],
+          ["a", 2, 400.0, 32.0],
+          ["a", 42, 42.0, 22.0],
+          ["a", 42, 50.5, 22.0],
+          ["a", 42, 75.0, 22.0],
+          ["b", 3, 100.0, 100.0],
+          ["b", 100, 1.0, 3.0],
+          ["c", 2, 400.0, 84.66666666666667],
+          ["c", 3, 100.0, 84.33333333333333],
+          ["c", 101, 1.01, 51.666666666666664],
+          ["c", 150, 1.5, 35.333333333333336],
+          ["d", 42, 42.0, null],
+          ["e", 42, 42.0, 42.0],
+          ["e", 42, 50.5, 42.0],
+          ["g", 3, 100.0, null],
+          ["h", 150, 1.53, null]
+        ]
+      },
+      {
+        "description": "MIN with EXCLUDE GROUP on an unbounded ROWS frame",
+        "sql": "SELECT string_col, int_col, MIN(int_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE GROUP) FROM {tbl} ORDER BY string_col, int_col",
+        "outputs": [
+          ["a", 2, 42],
+          ["a", 2, 42],
+          ["a", 42, 2],
+          ["a", 42, 2],
+          ["a", 42, 2],
+          ["b", 3, 100],
+          ["b", 100, 3],
+          ["c", 2, 3],
+          ["c", 3, 2],
+          ["c", 101, 2],
+          ["c", 150, 2],
+          ["d", 42, null],
+          ["e", 42, null],
+          ["e", 42, null],
+          ["g", 3, null],
+          ["h", 150, null]
+        ]
+      },
+      {
+        "description": "FIRST_VALUE with EXCLUDE CURRENT ROW on an unbounded ROWS frame",
+        "sql": "SELECT string_col, int_col, double_col, FIRST_VALUE(int_col) OVER(PARTITION BY string_col ORDER BY int_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW) FROM {tbl} ORDER BY string_col, int_col, double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 2, 300.0, 2],
+          ["a", 2, 400.0, 2],
+          ["a", 42, 42.0, 2],
+          ["a", 42, 50.5, 2],
+          ["a", 42, 75.0, 2],
+          ["b", 3, 100.0, 100],
+          ["b", 100, 1.0, 3],
+          ["c", 2, 400.0, 3],
+          ["c", 3, 100.0, 2],
+          ["c", 101, 1.01, 2],
+          ["c", 150, 1.5, 2],
+          ["d", 42, 42.0, null],
+          ["e", 42, 42.0, 42],
+          ["e", 42, 50.5, 42],
+          ["g", 3, 100.0, null],
+          ["h", 150, 1.53, null]
+        ]
+      },
+      {
+        "description": "LAST_VALUE with EXCLUDE TIES on an unbounded ROWS frame",
+        "sql": "SELECT string_col, int_col, LAST_VALUE(int_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE TIES) FROM {tbl} ORDER BY string_col, int_col",
+        "outputs": [
+          ["a", 2, 42],
+          ["a", 2, 42],
+          ["a", 42, 42],
+          ["a", 42, 42],
+          ["a", 42, 42],
+          ["b", 3, 100],
+          ["b", 100, 100],
+          ["c", 2, 150],
+          ["c", 3, 150],
+          ["c", 101, 150],
+          ["c", 150, 150],
+          ["d", 42, 42],
+          ["e", 42, 42],
+          ["e", 42, 42],
+          ["g", 3, 3],
+          ["h", 150, 150]
+        ]
+      },
+      {
+        "description": "EXCLUDE CURRENT ROW with PARTITION BY only (no ORDER BY)",
+        "sql": "SELECT string_col, int_col, double_col, SUM(int_col) OVER(PARTITION BY string_col ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW) FROM {tbl} ORDER BY string_col, int_col, double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 2, 300.0, 128],
+          ["a", 2, 400.0, 128],
+          ["a", 42, 42.0, 88],
+          ["a", 42, 50.5, 88],
+          ["a", 42, 75.0, 88],
+          ["b", 3, 100.0, 100],
+          ["b", 100, 1.0, 3],
+          ["c", 2, 400.0, 254],
+          ["c", 3, 100.0, 253],
+          ["c", 101, 1.01, 155],
+          ["c", 150, 1.5, 106],
+          ["d", 42, 42.0, null],
+          ["e", 42, 42.0, 42],
+          ["e", 42, 50.5, 42],
+          ["g", 3, 100.0, null],
+          ["h", 150, 1.53, null]
+        ]
       }
     ]
   },

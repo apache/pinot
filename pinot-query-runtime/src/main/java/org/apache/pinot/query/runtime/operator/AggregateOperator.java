@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -69,7 +68,7 @@ public class AggregateOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
-      new CountAggregationFunction(Collections.singletonList(ExpressionContext.forIdentifier("*")), false);
+      new CountAggregationFunction(List.of(ExpressionContext.forIdentifier("*")), false);
 
   private final MultiStageOperator _input;
   private final DataSchema _resultSchema;
@@ -96,7 +95,6 @@ public class AggregateOperator extends MultiStageOperator {
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node) {
     super(context);
-    _input = input;
     _resultSchema = node.getDataSchema();
     _aggFunctions = getAggFunctions(node.getAggCalls());
     int numFunctions = _aggFunctions.length;
@@ -110,7 +108,10 @@ public class AggregateOperator extends MultiStageOperator {
       maxFilterArgId = Math.max(maxFilterArgId, filterArgIds[i]);
     }
 
+    /// Grouping-set aggregates never reach this operator directly: PlanNodeToOpChain pre-wraps the input in a
+    /// RepeatOperator and rewrites the node into the equivalent plain GROUP BY over the expanded input.
     List<Integer> groupKeys = node.getGroupKeys();
+    _input = input;
 
     int groupTrimSize = Integer.MAX_VALUE;
     Comparator<Object[]> comparator = null;
@@ -377,7 +378,7 @@ public class AggregateOperator extends MultiStageOperator {
     List<ExpressionContext> expressions = aggFunction.getInputExpressions();
     int numExpressions = expressions.size();
     if (numExpressions == 0) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     DataSchema dataSchema = block.getDataSchema();
     assert dataSchema != null;
@@ -410,7 +411,7 @@ public class AggregateOperator extends MultiStageOperator {
     List<ExpressionContext> expressions = aggFunction.getInputExpressions();
     int numExpressions = expressions.size();
     if (numExpressions == 0) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     DataSchema dataSchema = block.getDataSchema();
     assert dataSchema != null;

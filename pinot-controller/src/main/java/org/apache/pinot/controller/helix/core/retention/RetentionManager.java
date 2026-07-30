@@ -94,8 +94,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       BrokerServiceHelper brokerServiceHelper) {
     super(TASK_NAME, config.getRetentionControllerFrequencyInSeconds(),
-        config.getRetentionManagerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
-        controllerMetrics);
+            config.getRetentionManagerInitialDelayInSeconds(), config.getRetentionControllerCronExpression(),
+        pinotHelixResourceManager,
+        leadControllerManager, controllerMetrics);
     _untrackedSegmentDeletionEnabled = config.getUntrackedSegmentDeletionEnabled();
     _untrackedSegmentsRetentionTimeInDays = config.getUntrackedSegmentsRetentionTimeInDays();
     _agedSegmentsDeletionBatchSize = config.getAgedSegmentsDeletionBatchSize();
@@ -142,19 +143,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.info("Segment push type is not APPEND for table: {}, skip managing retention", tableNameWithType);
       return;
     }
-    String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
-    String retentionTimeValue = validationConfig.getRetentionTimeValue();
     int untrackedSegmentsDeletionBatchSize =
         validationConfig.getUntrackedSegmentsDeletionBatchSize() != null ? Integer.parseInt(
             validationConfig.getUntrackedSegmentsDeletionBatchSize()) : DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE;
 
-    RetentionStrategy retentionStrategy;
-    try {
-      retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
-          Long.parseLong(retentionTimeValue), _useCreationTimeFallbackForRetention);
-    } catch (Exception e) {
-      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue,
-          tableNameWithType);
+    RetentionStrategy retentionStrategy =
+        TableConfigRetentionUtils.buildRetentionStrategy(tableConfig, _useCreationTimeFallbackForRetention);
+    if (retentionStrategy == null) {
       return;
     }
 
@@ -317,6 +312,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
   }
 
+  @VisibleForTesting
+  protected Set<String> getSegmentNames(String tableNameWithType,
+      List<SegmentZKMetadata> segmentZKMetadataList) {
+    return segmentZKMetadataList.stream()
+        .map(SegmentZKMetadata::getSegmentName)
+        .collect(Collectors.toCollection(HashSet::new));
+  }
+
+  protected List<String> getSegmentNames(String tableNameWithType) {
+    return _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false);
+  }
+
   private List<String> getSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
       List<SegmentZKMetadata> segmentZKMetadataList, int untrackedSegmentsDeletionBatchSize,
       RetentionStrategy untrackedSegmentsRetentionStrategy) {
@@ -349,18 +356,11 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return segmentsToDelete;
     }
 
-    Set<String> segmentsPresentInZK;
+    Set<String> segmentsPresentInZK = getSegmentNames(tableNameWithType, segmentZKMetadataList);
     if (isHybridTable) {
-      segmentsPresentInZK = new HashSet<>();
       // This must be the OFFLINE table
-      segmentsPresentInZK.addAll(
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet()));
       // Add segments from the REALTIME table as well
-      segmentsPresentInZK.addAll(
-          _pinotHelixResourceManager.getSegmentsFor(TableNameBuilder.REALTIME.tableNameWithType(rawTableName), false));
-    } else {
-      segmentsPresentInZK =
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet());
+      segmentsPresentInZK.addAll(getSegmentNames(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)));
     }
 
     try {

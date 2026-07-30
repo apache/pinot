@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -225,6 +224,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-        Collections.emptyMap());
+        Map.of());
   }
 }

@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
 import java.io.File;
 import java.net.URI;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,7 +88,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, getControllerBaseApiUrl());
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(
-        new BatchIngestionConfig(Collections.singletonList(batchConfigMap), "APPEND", "HOURLY"));
+        new BatchIngestionConfig(List.of(batchConfigMap), "APPEND", "HOURLY"));
     return ingestionConfig;
   }
 

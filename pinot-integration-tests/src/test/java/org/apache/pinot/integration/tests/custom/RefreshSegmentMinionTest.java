@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests.custom;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -135,13 +134,13 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
   public void testFirstSegmentRefresh() {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     assertNotNull(getTaskManager().scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName)))
+            .setTablesToSchedule(Set.of(offlineTableName)))
         .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
     assertTrue(getHelixTaskResourceManager().getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RefreshSegmentTask.TASK_TYPE)));
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
         getTaskManager());
     waitForTaskToComplete();
 
@@ -155,8 +154,8 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
 
     // No-op: nothing changed, should not schedule
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
         getTaskManager());
     for (SegmentZKMetadata metadata : getSharedHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
       Map<String, String> customMap = metadata.getCustomMap();
@@ -177,11 +176,11 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
     forceUpdateSchema(schema);
 
     assertNotNull(getTaskManager().scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName)))
+            .setTablesToSchedule(Set.of(offlineTableName)))
         .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
         getTaskManager());
     waitForTaskToComplete();
 
@@ -225,11 +224,11 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     assertNotNull(getTaskManager().scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName)))
+            .setTablesToSchedule(Set.of(offlineTableName)))
         .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
         getTaskManager());
     waitForTaskToComplete();
 
@@ -314,11 +313,11 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
 
     // Schedule refresh — should result in no actual changes since nothing changed
     assertNotNull(getTaskManager().scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName)))
+            .setTablesToSchedule(Set.of(offlineTableName)))
         .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
         getTaskManager());
     waitForTaskToComplete();
 
@@ -345,11 +344,11 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
     forceUpdateSchema(schema);
 
     assertNotNull(getTaskManager().scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName)))
+            .setTablesToSchedule(Set.of(offlineTableName)))
         .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
     MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(offlineTableName))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
         getTaskManager());
     waitForTaskToComplete();
 
@@ -396,7 +395,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
   private TableTaskConfig getRefreshSegmentTaskConfig() {
     Map<String, String> tableTaskConfigs = new HashMap<>();
     return new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.RefreshSegmentTask.TASK_TYPE, tableTaskConfigs));
+        Map.of(MinionConstants.RefreshSegmentTask.TASK_TYPE, tableTaskConfigs));
   }
 
   private TableTaskConfig getRefreshSegmentMetadataPushTaskConfig() {
@@ -404,6 +403,6 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
     tableTaskConfigs.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.name());
     tableTaskConfigs.put(MinionTaskUtils.ALLOW_METADATA_PUSH_WITH_LOCAL_FS, "true");
     return new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.RefreshSegmentTask.TASK_TYPE, tableTaskConfigs));
+        Map.of(MinionConstants.RefreshSegmentTask.TASK_TYPE, tableTaskConfigs));
   }
 }

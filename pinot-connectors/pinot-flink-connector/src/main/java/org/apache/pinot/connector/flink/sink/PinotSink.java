@@ -21,7 +21,6 @@ package org.apache.pinot.connector.flink.sink;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -117,7 +116,7 @@ public class PinotSink<T> implements Sink<T> {
     if (ingestionConfig == null) {
       ingestionConfig = new IngestionConfig();
       ingestionConfig.setBatchIngestionConfig(
-          new BatchIngestionConfig(Collections.singletonList(requiredBatchConfig), "APPEND", "HOURLY"));
+          new BatchIngestionConfig(List.of(requiredBatchConfig), "APPEND", "HOURLY"));
       tableConfig.setIngestionConfig(ingestionConfig);
       return tableConfig;
     }
@@ -125,13 +124,13 @@ public class PinotSink<T> implements Sink<T> {
     BatchIngestionConfig batchIngestionConfig = ingestionConfig.getBatchIngestionConfig();
     if (batchIngestionConfig == null) {
       ingestionConfig.setBatchIngestionConfig(
-          new BatchIngestionConfig(Collections.singletonList(requiredBatchConfig), "APPEND", "HOURLY"));
+          new BatchIngestionConfig(List.of(requiredBatchConfig), "APPEND", "HOURLY"));
       return tableConfig;
     }
 
     List<Map<String, String>> batchConfigMaps = batchIngestionConfig.getBatchConfigMaps();
     if (batchConfigMaps == null || batchConfigMaps.isEmpty()) {
-      batchIngestionConfig.setBatchConfigMaps(Collections.singletonList(requiredBatchConfig));
+      batchIngestionConfig.setBatchConfigMaps(List.of(requiredBatchConfig));
     } else if (batchConfigMaps.size() > 1) {
       throw new IllegalStateException(String.format(
           "Flink connector requires exactly 1 batchConfigMap for table %s, got %d", tableConfig.getTableName(),
@@ -139,7 +138,7 @@ public class PinotSink<T> implements Sink<T> {
     } else {
       Map<String, String> mergedBatchConfig = new HashMap<>(batchConfigMaps.get(0));
       mergedBatchConfig.putAll(requiredBatchConfig);
-      batchIngestionConfig.setBatchConfigMaps(Collections.singletonList(mergedBatchConfig));
+      batchIngestionConfig.setBatchConfigMaps(List.of(mergedBatchConfig));
     }
     return tableConfig;
   }

@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +27,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 
 
-public class LookupJoinEngineQuickStart extends MultistageEngineQuickStart {
+public class LookupJoinEngineQuickStart extends Quickstart {
   private static final String QUICKSTART_IDENTIFIER = "LOOKUP_JOIN";
   // Reuse userAttributes from ColocatedJoinEngineQuickStart
   private static final String[] LOOKUP_JOIN_DIRECTORIES = new String[]{
@@ -37,7 +36,7 @@ public class LookupJoinEngineQuickStart extends MultistageEngineQuickStart {
 
   @Override
   public List<String> types() {
-    return Collections.singletonList(QUICKSTART_IDENTIFIER);
+    return List.of(QUICKSTART_IDENTIFIER);
   }
 
   @Override

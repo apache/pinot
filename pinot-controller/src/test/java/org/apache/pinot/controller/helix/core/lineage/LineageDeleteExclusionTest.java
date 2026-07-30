@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.lineage;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -95,10 +94,10 @@ public class LineageDeleteExclusionTest {
   @Test
   public void testDeleteBlockedForInProgressSegmentsFrom() {
     addSegments("ipfA1", "ipfA2", "ipfB1");
-    writeLineageEntry("e1", Arrays.asList("ipfA1", "ipfA2"), Collections.singletonList("ipfB1"),
+    writeLineageEntry("e1", Arrays.asList("ipfA1", "ipfA2"), List.of("ipfB1"),
         LineageEntryState.IN_PROGRESS);
     PinotResourceManagerResponse response =
-        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("ipfA1"));
+        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of("ipfA1"));
     assertFalse(response.isSuccessful());
     assertTrue(response.getMessage().contains("ipfA1"));
     // IdealState untouched
@@ -108,10 +107,10 @@ public class LineageDeleteExclusionTest {
   @Test
   public void testDeleteBlockedForInProgressSegmentsTo() {
     addSegments("iptA1", "iptB1");
-    writeLineageEntry("e1", Collections.singletonList("iptA1"), Collections.singletonList("iptB1"),
+    writeLineageEntry("e1", List.of("iptA1"), List.of("iptB1"),
         LineageEntryState.IN_PROGRESS);
     PinotResourceManagerResponse response =
-        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("iptB1"));
+        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of("iptB1"));
     assertFalse(response.isSuccessful());
     assertTrue(_resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).contains("iptB1"));
   }
@@ -119,10 +118,10 @@ public class LineageDeleteExclusionTest {
   @Test
   public void testDeleteBlockedForCompletedSegmentsFrom() {
     addSegments("cpfA1", "cpfB1");
-    writeLineageEntry("e1", Collections.singletonList("cpfA1"), Collections.singletonList("cpfB1"),
+    writeLineageEntry("e1", List.of("cpfA1"), List.of("cpfB1"),
         LineageEntryState.COMPLETED);
     PinotResourceManagerResponse response =
-        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("cpfA1"));
+        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of("cpfA1"));
     assertFalse(response.isSuccessful());
     assertTrue(_resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).contains("cpfA1"));
   }
@@ -130,17 +129,17 @@ public class LineageDeleteExclusionTest {
   @Test
   public void testDeleteAllowedForCompletedSegmentsTo() {
     addSegments("cptA1", "cptB1");
-    writeLineageEntry("e1", Collections.singletonList("cptA1"), Collections.singletonList("cptB1"),
+    writeLineageEntry("e1", List.of("cptA1"), List.of("cptB1"),
         LineageEntryState.COMPLETED);
     PinotResourceManagerResponse response =
-        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("cptB1"));
+        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of("cptB1"));
     assertTrue(response.isSuccessful(), response.getMessage());
   }
 
   @Test
   public void testDeleteAllowedForRevertedEntry() {
     addSegments("revA1", "revB1");
-    writeLineageEntry("e1", Collections.singletonList("revA1"), Collections.singletonList("revB1"),
+    writeLineageEntry("e1", List.of("revA1"), List.of("revB1"),
         LineageEntryState.REVERTED);
     // Either segmentsFrom or segmentsTo of a REVERTED entry should be unblocked.
     PinotResourceManagerResponse response =
@@ -151,7 +150,7 @@ public class LineageDeleteExclusionTest {
   @Test
   public void testBatchRejectionLeavesIdealStateUntouched() {
     addSegments("batchA1", "batchA2", "batchFree");
-    writeLineageEntry("e1", Collections.singletonList("batchA1"), Collections.singletonList("batchA2"),
+    writeLineageEntry("e1", List.of("batchA1"), List.of("batchA2"),
         LineageEntryState.IN_PROGRESS);
     PinotResourceManagerResponse response =
         _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Arrays.asList("batchA1", "batchFree"));
@@ -165,10 +164,10 @@ public class LineageDeleteExclusionTest {
   @Test
   public void testBypassOverloadAllowsBlockedSegments() {
     addSegments("byA1", "byB1");
-    writeLineageEntry("e1", Collections.singletonList("byA1"), Collections.singletonList("byB1"),
+    writeLineageEntry("e1", List.of("byA1"), List.of("byB1"),
         LineageEntryState.IN_PROGRESS);
     PinotResourceManagerResponse response =
-        _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, Collections.singletonList("byA1"));
+        _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, List.of("byA1"));
     assertTrue(response.isSuccessful(), response.getMessage());
   }
 
@@ -176,7 +175,7 @@ public class LineageDeleteExclusionTest {
   public void testNoLineageZnodeFastPath() {
     addSegments("nolzA1");
     PinotResourceManagerResponse response =
-        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("nolzA1"));
+        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of("nolzA1"));
     assertTrue(response.isSuccessful(), response.getMessage());
   }
 

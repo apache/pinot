@@ -113,9 +113,9 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
     return new Object[][]{
         new Object[]{String.format("sub(%s)", INT_SV_COLUMN)}, new Object[]{
         String.format("sub(%s, %s)", INT_MV_COLUMN, LONG_SV_COLUMN)
-    }, new Object[]{
+        }, new Object[]{
         String.format("sub(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)
-    }
+        }
     };
   }
 

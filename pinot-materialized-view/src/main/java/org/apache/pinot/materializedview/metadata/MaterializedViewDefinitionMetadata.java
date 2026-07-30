@@ -21,10 +21,10 @@ package org.apache.pinot.materializedview.metadata;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -46,6 +46,7 @@ public class MaterializedViewDefinitionMetadata {
   private static final String SPLIT_SOURCE_TIME_COLUMN_KEY = "splitSourceTimeColumn";
   private static final String SPLIT_SOURCE_TIME_FORMAT_KEY = "splitSourceTimeFormat";
   private static final String SPLIT_MATERIALIZED_VIEW_TIME_COLUMN_KEY = "splitMaterializedViewTimeColumn";
+  private static final String SPLIT_MATERIALIZED_VIEW_TIME_FORMAT_KEY = "splitMaterializedViewTimeFormat";
   private static final String SPLIT_BUCKET_MS_KEY = "splitBucketMs";
   private static final String STALENESS_THRESHOLD_MS_KEY = "stalenessThresholdMs";
   private static final String REWRITE_ENABLED_KEY = "rewriteEnabled";
@@ -143,6 +144,10 @@ public class MaterializedViewDefinitionMetadata {
       znRecord.setSimpleField(SPLIT_SOURCE_TIME_COLUMN_KEY, _splitSpec.getSourceTimeColumn());
       znRecord.setSimpleField(SPLIT_SOURCE_TIME_FORMAT_KEY, _splitSpec.getSourceTimeFormat());
       znRecord.setSimpleField(SPLIT_MATERIALIZED_VIEW_TIME_COLUMN_KEY, _splitSpec.getMaterializedViewTimeColumn());
+      String viewFormat = _splitSpec.getMaterializedViewTimeFormat();
+      if (viewFormat != null) {
+        znRecord.setSimpleField(SPLIT_MATERIALIZED_VIEW_TIME_FORMAT_KEY, viewFormat);
+      }
       znRecord.setLongField(SPLIT_BUCKET_MS_KEY, _splitSpec.getBucketMs());
     }
 
@@ -162,7 +167,7 @@ public class MaterializedViewDefinitionMetadata {
       String baseTablesJson = znRecord.getSimpleField(BASE_TABLES_KEY);
       List<String> baseTables = baseTablesJson != null
           ? JsonUtils.stringToObject(baseTablesJson, STRING_LIST_TYPE)
-          : Collections.emptyList();
+          : List.of();
 
       String definedSql = znRecord.getSimpleField(DEFINED_SQL_KEY);
 
@@ -176,9 +181,10 @@ public class MaterializedViewDefinitionMetadata {
       if (sourceTimeColumn != null) {
         String sourceTimeFormat = znRecord.getSimpleField(SPLIT_SOURCE_TIME_FORMAT_KEY);
         String viewTimeColumn = znRecord.getSimpleField(SPLIT_MATERIALIZED_VIEW_TIME_COLUMN_KEY);
+        String viewTimeFormat = znRecord.getSimpleField(SPLIT_MATERIALIZED_VIEW_TIME_FORMAT_KEY);
         long bucketMs = znRecord.getLongField(SPLIT_BUCKET_MS_KEY, 0L);
-        splitSpec =
-            new MaterializedViewSplitSpec(sourceTimeColumn, sourceTimeFormat, viewTimeColumn, bucketMs);
+        splitSpec = new MaterializedViewSplitSpec(sourceTimeColumn, sourceTimeFormat, viewTimeColumn,
+            viewTimeFormat, bucketMs);
       }
 
       long stalenessThresholdMs = znRecord.getLongField(STALENESS_THRESHOLD_MS_KEY, 0L);
@@ -189,6 +195,50 @@ public class MaterializedViewDefinitionMetadata {
     } catch (IOException e) {
       throw new IllegalStateException("Failed to deserialize MaterializedViewDefinitionMetadata from ZNRecord", e);
     }
+  }
+
+  /// Value equality used by the controller-side DDL endpoint to distinguish "idempotent retry"
+  /// (same content as existing znode → proceed) from "stale orphan from a different definedSQL"
+  /// (mismatch → fail 409).
+  ///
+  /// Coverage at this outer level: every direct field of
+  /// [MaterializedViewDefinitionMetadata] is compared
+  /// (`_materializedViewTableNameWithType`, `_baseTables`, `_definedSql`, `_partitionExprMaps`,
+  /// `_splitSpec`, `_stalenessThresholdMs`, `_rewriteEnabled`).
+  ///
+  /// Caveat about the nested [MaterializedViewSplitSpec]: its own equals/hashCode currently
+  /// covers only `sourceTimeColumn`, `sourceTimeFormat`, `materializedViewTimeColumn`, and
+  /// `bucketMs`. `materializedViewTimeFormat` is persisted in the ZNRecord but intentionally
+  /// excluded from equality today (it was added after the existing equals/hashCode and is
+  /// tracked as a separate follow-up — see `MaterializedViewMetadataTest#testSplitSpecEquals
+  /// AndHashCode` which pins the current contract). Two definitions that differ ONLY in
+  /// `splitSpec.materializedViewTimeFormat` will therefore compare equal here. This is by
+  /// design and acceptable because the controller's idempotency check (`createIfAbsent`) only
+  /// uses this comparison to short-circuit a redundant write; differing time formats with
+  /// otherwise identical SplitSpecs cannot occur for the same MV produced by today's compiler
+  /// pipeline.
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof MaterializedViewDefinitionMetadata)) {
+      return false;
+    }
+    MaterializedViewDefinitionMetadata other = (MaterializedViewDefinitionMetadata) o;
+    return _stalenessThresholdMs == other._stalenessThresholdMs
+        && _rewriteEnabled == other._rewriteEnabled
+        && Objects.equals(_materializedViewTableNameWithType, other._materializedViewTableNameWithType)
+        && Objects.equals(_baseTables, other._baseTables)
+        && Objects.equals(_definedSql, other._definedSql)
+        && Objects.equals(_partitionExprMaps, other._partitionExprMaps)
+        && Objects.equals(_splitSpec, other._splitSpec);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_materializedViewTableNameWithType, _baseTables, _definedSql,
+        _partitionExprMaps, _splitSpec, _stalenessThresholdMs, _rewriteEnabled);
   }
 
   /// Specifies the time columns used to express the split boundary `watermarkMs`:
@@ -205,13 +255,15 @@ public class MaterializedViewDefinitionMetadata {
     private final String _sourceTimeColumn;
     private final String _sourceTimeFormat;
     private final String _materializedViewTimeColumn;
+    private final String _materializedViewTimeFormat;
     private final long _bucketMs;
 
     public MaterializedViewSplitSpec(String sourceTimeColumn, String sourceTimeFormat,
-        String viewTimeColumn, long bucketMs) {
+        String viewTimeColumn, String viewTimeFormat, long bucketMs) {
       _sourceTimeColumn = sourceTimeColumn;
       _sourceTimeFormat = sourceTimeFormat;
       _materializedViewTimeColumn = viewTimeColumn;
+      _materializedViewTimeFormat = viewTimeFormat;
       _bucketMs = bucketMs;
     }
 
@@ -227,8 +279,32 @@ public class MaterializedViewDefinitionMetadata {
       return _materializedViewTimeColumn;
     }
 
+    public String getMaterializedViewTimeFormat() {
+      return _materializedViewTimeFormat;
+    }
+
     public long getBucketMs() {
       return _bucketMs;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof MaterializedViewSplitSpec)) {
+        return false;
+      }
+      MaterializedViewSplitSpec other = (MaterializedViewSplitSpec) o;
+      return _bucketMs == other._bucketMs
+          && Objects.equals(_sourceTimeColumn, other._sourceTimeColumn)
+          && Objects.equals(_sourceTimeFormat, other._sourceTimeFormat)
+          && Objects.equals(_materializedViewTimeColumn, other._materializedViewTimeColumn);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_sourceTimeColumn, _sourceTimeFormat, _materializedViewTimeColumn, _bucketMs);
     }
   }
 }

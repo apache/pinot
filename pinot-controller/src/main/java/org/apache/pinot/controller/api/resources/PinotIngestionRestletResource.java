@@ -234,7 +234,8 @@ public class PinotIngestionRestletResource {
 
     FileIngestionHelper fileIngestionHelper =
         new FileIngestionHelper(tableConfig, schema, batchConfigMap, getControllerUri(),
-            new File(_controllerConf.getLocalTempDir(), INGESTION_DIR), authProvider);
+            new File(_controllerConf.getLocalTempDir(), INGESTION_DIR), authProvider,
+            _controllerConf.isIngestFromUriLocalFileSystemAllowed());
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }
 

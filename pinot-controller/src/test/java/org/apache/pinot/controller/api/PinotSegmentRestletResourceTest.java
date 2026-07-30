@@ -19,12 +19,15 @@
 package org.apache.pinot.controller.api;
 
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -82,13 +85,13 @@ public class PinotSegmentRestletResourceTest {
 
     // Now starts to replace segments.
     List<String> segmentsFrom = Arrays.asList("s0", "s1");
-    List<String> segmentsTo = Collections.singletonList("some_segment");
+    List<String> segmentsTo = List.of("some_segment");
     String segmentLineageId = resourceManager.startReplaceSegments(offlineTableName, segmentsFrom, segmentsTo, false,
         null);
 
     // Replace more segments to add another entry to segment lineage.
     segmentsFrom = Arrays.asList("s2", "s3");
-    segmentsTo = Collections.singletonList("another_segment");
+    segmentsTo = List.of("another_segment");
     String nextSegmentLineageId =
         resourceManager.startReplaceSegments(offlineTableName, segmentsFrom, segmentsTo, false, null);
 
@@ -100,8 +103,15 @@ public class PinotSegmentRestletResourceTest {
     assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"some_segment\"]"));
     assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"s2\",\"s3\"]"));
     assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"another_segment\"]"));
+    SegmentLineage lineage =
+        SegmentLineageAccessHelper.getSegmentLineage(resourceManager.getPropertyStore(), offlineTableName);
+    // Sort the two entry ids the same way toJsonObject does -- by timestamp, then by id.
+    List<String> orderedIds = Stream.of(segmentLineageId, nextSegmentLineageId)
+        .sorted(Comparator.comparingLong((String id) -> lineage.getLineageEntry(id).getTimestamp())
+            .thenComparing(Comparator.naturalOrder()))
+        .toList();
     // Ensures the two entries are sorted in chronological order by timestamp.
-    assertTrue(segmentLineageResponse.indexOf(segmentLineageId) < segmentLineageResponse.indexOf(nextSegmentLineageId));
+    assertTrue(segmentLineageResponse.indexOf(orderedIds.get(0)) < segmentLineageResponse.indexOf(orderedIds.get(1)));
 
     // List segment lineage should fail for non-existing table
     assertThrows(Exception.class,
@@ -225,7 +235,7 @@ public class PinotSegmentRestletResourceTest {
 
     // case 2: delete all remaining segments
     reply = adminClient.getSegmentClient()
-        .deleteMultipleSegments(TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), Collections.emptyList(),
+        .deleteMultipleSegments(TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), List.of(),
             null);
     assertTrue(reply.contains("All segments of table offlineTableName1_OFFLINE deleted"));
   }
@@ -235,7 +245,7 @@ public class PinotSegmentRestletResourceTest {
       throws Exception {
     Map<String, String> crcMap = adminClient.getSegmentClient().getSegmentToCrcMap(tableName);
     if (crcMap == null) {
-      crcMap = java.util.Collections.emptyMap();
+      crcMap = java.util.Map.of();
     }
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);

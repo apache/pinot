@@ -81,6 +81,7 @@ public class LiteModeSortInsertRule extends PRelOptRule {
             liteModeLimit);
         return sort;
       }
+      _context.setLiteModeEffectiveSortLimit(liteModeLimit);
       return sort.withFetch(newFetch);
     }
     if (call._currentNode instanceof PhysicalAggregate) {
@@ -88,7 +89,13 @@ public class LiteModeSortInsertRule extends PRelOptRule {
       PhysicalAggregate aggregate = (PhysicalAggregate) call._currentNode;
       Preconditions.checkState(aggregate.getLimit() <= liteModeLimit,
           "Group trim limit={} exceeds server stage limit={}", aggregate.getLimit(), liteModeLimit);
-      int limit = aggregate.getLimit() > 0 ? aggregate.getLimit() : liteModeLimit;
+      int limit;
+      if (aggregate.getLimit() > 0) {
+        limit = aggregate.getLimit();
+      } else {
+        limit = liteModeLimit;
+        _context.setLiteModeEffectiveSortLimit(liteModeLimit);
+      }
       return aggregate.withLimit(limit);
     }
     RelCollation relCollation = RelCollations.EMPTY;
@@ -103,6 +110,7 @@ public class LiteModeSortInsertRule extends PRelOptRule {
       }
     }
     PRelNode input = call._currentNode;
+    _context.setLiteModeEffectiveSortLimit(liteModeLimit);
     return new PhysicalSort(input.unwrap().getCluster(), RelTraitSet.createEmpty(), List.of(),
         relCollation, null /* offset */, newFetch, input, nodeId(), input.getPinotDataDistributionOrThrow(),
         true);

@@ -129,17 +129,17 @@ public class InputManager {
   Map<String, Triple<Double, BrokerRequest, QueryContext>> _parsedQueries = new HashMap<>();
 
   Map<FieldSpec.DataType, Integer> _dataTypeSizeMap = new HashMap<FieldSpec.DataType, Integer>() {{
-    put(FieldSpec.DataType.INT, Integer.BYTES);
-    put(FieldSpec.DataType.LONG, Long.BYTES);
-    put(FieldSpec.DataType.TIMESTAMP, Long.BYTES);
-    put(FieldSpec.DataType.FLOAT, Float.BYTES);
-    put(FieldSpec.DataType.DOUBLE, Double.BYTES);
-    put(FieldSpec.DataType.BYTES, Byte.BYTES);
-    put(FieldSpec.DataType.STRING, Character.BYTES);
-    put(FieldSpec.DataType.JSON, Character.BYTES);
-    put(FieldSpec.DataType.BOOLEAN, Integer.BYTES); // Stored internally as an INTEGER
-    put(null, DEFAULT_NULL_SIZE);
-  }};
+      put(FieldSpec.DataType.INT, Integer.BYTES);
+      put(FieldSpec.DataType.LONG, Long.BYTES);
+      put(FieldSpec.DataType.TIMESTAMP, Long.BYTES);
+      put(FieldSpec.DataType.FLOAT, Float.BYTES);
+      put(FieldSpec.DataType.DOUBLE, Double.BYTES);
+      put(FieldSpec.DataType.BYTES, Byte.BYTES);
+      put(FieldSpec.DataType.STRING, Character.BYTES);
+      put(FieldSpec.DataType.JSON, Character.BYTES);
+      put(FieldSpec.DataType.BOOLEAN, Integer.BYTES); // Stored internally as an INTEGER
+      put(null, DEFAULT_NULL_SIZE);
+    }};
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
 
   /**

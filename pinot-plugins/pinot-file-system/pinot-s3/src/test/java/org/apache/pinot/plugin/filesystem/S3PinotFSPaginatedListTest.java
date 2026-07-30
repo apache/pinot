@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
 import org.apache.pinot.spi.filesystem.FileMetadata;
@@ -238,7 +237,7 @@ public class S3PinotFSPaginatedListTest {
   @Test
   public void testEmptyBucket() throws IOException {
     when(_mockS3Client.listObjectsV2(any(ListObjectsV2Request.class)))
-        .thenReturn(page(Collections.emptyList(), false, null));
+        .thenReturn(page(List.of(), false, null));
 
     final List<FileMetadata> result = _s3PinotFS.listFilesWithMetadata(
         URI.create("s3://bucket/data/"), true, ACCEPT_ALL, 10);
@@ -343,7 +342,7 @@ public class S3PinotFSPaginatedListTest {
   @Test
   public void testPrefixSentToS3() throws IOException {
     when(_mockS3Client.listObjectsV2(any(ListObjectsV2Request.class)))
-        .thenReturn(page(Collections.emptyList(), false, null));
+        .thenReturn(page(List.of(), false, null));
 
     _s3PinotFS.listFilesWithMetadata(
         URI.create("s3://bucket/data/2026/01/"), true, ACCEPT_ALL, 10);

@@ -129,17 +129,17 @@ public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
 
     List<File> avroFiles = WindowFunnelUtils.createAvroFiles(_tempDir);
       // create offline table
-      TableConfig tableConfig = createOfflineTableConfig();
-      addTableConfig(tableConfig);
+    TableConfig tableConfig = createOfflineTableConfig();
+    addTableConfig(tableConfig);
 
       // create & upload segments
-      int segmentIndex = 0;
-      for (File avroFile : avroFiles) {
-        ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex++, _segmentDir,
+    int segmentIndex = 0;
+    for (File avroFile : avroFiles) {
+      ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex++, _segmentDir,
             _tarDir);
-        uploadSegments(getTableName(), _tarDir);
-      }
+      uploadSegments(getTableName(), _tarDir);
     }
+  }
 
   @AfterClass
   public void tearDown()

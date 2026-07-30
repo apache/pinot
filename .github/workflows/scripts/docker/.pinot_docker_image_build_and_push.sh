@@ -28,7 +28,7 @@ if [ -z "${BUILD_PLATFORM}" ]; then
   BUILD_PLATFORM="linux/arm64,linux/amd64"
 fi
 if [ -z "${JDK_VERSION}" ]; then
-  JDK_VERSION="21"
+  JDK_VERSION="25"
 fi
 if [ -z "${PINOT_BASE_IMAGE_TAG}" ]; then
   PINOT_BASE_IMAGE_TAG="${JDK_VERSION}-amazoncorretto"

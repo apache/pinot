@@ -73,6 +73,12 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
     SSLContext sslContext;
     if (config.getProperty(CommonConstants.CONFIG_OF_SSL_USE_RENEWABLE_CONTEXT, false)) {
       sslContext = TlsUtils.getSslContext();
+    } else if (sslConfig.getKeys().isEmpty()) {
+      // No explicit ssl.* config provided for the segment fetcher; use the globally-installed
+      // SSL context which is initialized from the component's tls.* config (keystore + truststore).
+      // This is needed because the default fetcher config namespace (e.g. pinot.server.segment.fetcher)
+      // typically does not contain ssl.* keys — the TLS config lives under pinot.server.tls.*.
+      sslContext = TlsUtils.getSslContext();
     } else {
       sslContext = new ClientSSLContextGenerator(sslConfig).generate();
     }

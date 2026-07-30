@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.query.planner.physical.v2;
 
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
@@ -47,7 +47,7 @@ public class PinotDataDistributionTest {
       // Case-2: Hash distribution with empty hash distribution desc.
       try {
         new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED, List.of("0@0"), 0L,
-            Collections.emptySet(), null);
+            Set.of(), null);
         fail();
       } catch (IllegalStateException ignored) {
       }
@@ -95,7 +95,7 @@ public class PinotDataDistributionTest {
       final List<Integer> keys = List.of(1, 3);
       final int numPartitions = 8;
       PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
-          List.of("0@0", "1@0"), 0L, Collections.singleton(
+          List.of("0@0", "1@0"), 0L, Set.of(
               new HashDistributionDesc(keys,
                   DistHashFunction.valueOf(MURMUR_HASH_FUNCTION.toUpperCase()), numPartitions)), null);
       assertTrue(distribution.satisfies(RelDistributions.hash(keys)));
@@ -119,7 +119,7 @@ public class PinotDataDistributionTest {
   @Test
   public void testSatisfiesHashDistributionDesc() {
     PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
-        List.of("0@0", "1@0"), 0L, Collections.singleton(
+        List.of("0@0", "1@0"), 0L, Set.of(
             new HashDistributionDesc(List.of(1, 3),
                 DistHashFunction.valueOf(MURMUR_HASH_FUNCTION.toUpperCase()), 8)), null);
     {

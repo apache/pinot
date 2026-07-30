@@ -67,6 +67,33 @@ addresses:
 - Range-based STALE marking is useless when the partition key is not derived
   from a base column the controller can read from segment metadata.
 
+### 1.1 V1 broker routing limitation and the V2 per-bucket routing plan
+
+V1 broker routing (`MaterializedViewQueryRewriteEngine`) splits a query on a
+single cutoff: the MV side serves `time < watermarkMs`, the base side serves
+`time >= watermarkMs`.  Per-bucket state is **not** consulted.  Consequently a
+bucket strictly below the watermark that is
+
+- **STALE** (a historical base-table change the consistency manager marked but
+  OVERWRITE has not yet re-materialized),
+- **VALID-empty** (a retention `DELETE` emptied it; a backfill may since have
+  re-marked it STALE), or
+- **absent** (never materialized — possible below the watermark only in
+  anomalous states)
+
+is still routed to the MV side and can return stale or missing rows until the
+scheduler re-materializes it via OVERWRITE.  The exposure window is bounded by
+the consistency-manager debounce plus one scheduling cycle (plus, for the
+DELETE-vs-backfill residual, one period of the VALID-empty self-heal sweep).
+
+**V2 plan — per-bucket routing.**  The broker already caches the full partition
+map on `MaterializedViewCacheEntry`; the rewrite engine will consult it to carve
+non-VALID buckets out of the MV-side time range and route those sub-ranges to
+the base table, making bucket-level staleness invisible to queries at the cost
+of a slightly more complex split predicate.  This is a focused broker-side
+follow-up that requires no changes to the partition-state engine or the
+on-the-wire metadata shape.
+
 ## 2. The fixed-partition extension
 
 ### 2.1 Two shapes to support

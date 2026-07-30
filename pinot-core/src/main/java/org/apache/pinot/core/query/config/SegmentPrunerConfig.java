@@ -28,9 +28,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
  * Config for SegmentPruner.
  */
 public class SegmentPrunerConfig {
-  @Deprecated
-  public static final String SEGMENT_PRUNER_NAMES_KEY = Server.CLASS;
-
   private final int _numSegmentPruners;
   private final List<String> _segmentPrunerNames;
   private final List<PinotConfiguration> _segmentPrunerConfigs;

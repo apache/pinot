@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -70,13 +69,13 @@ public class IvfPqIndexFormatTest {
     int[] subvectorLengths = {2, 2};
     @SuppressWarnings("unchecked")
     List<Integer>[] listDocIds = new List[]{
-        Collections.singletonList(11),
-        Collections.singletonList(7)
+        List.of(11),
+        List.of(7)
     };
     @SuppressWarnings("unchecked")
     List<byte[]>[] listCodes = new List[]{
-        Collections.singletonList(new byte[]{1, 2}),
-        Collections.singletonList(new byte[]{3, 4})
+        List.of(new byte[]{1, 2}),
+        List.of(new byte[]{3, 4})
     };
 
     IvfPqIndexFormat.write(indexFile, 4, 2, 2, 4, 32, 123L, VectorIndexConfig.VectorDistanceFunction.COSINE,
@@ -124,13 +123,13 @@ public class IvfPqIndexFormatTest {
     int[] subvectorLengths = {2, 2};
     @SuppressWarnings("unchecked")
     List<Integer>[] listDocIds = new List[]{
-        Collections.singletonList(11),
-        Collections.singletonList(7)
+        List.of(11),
+        List.of(7)
     };
     @SuppressWarnings("unchecked")
     List<byte[]>[] listCodes = new List[]{
-        Collections.singletonList(new byte[]{1, 2}),
-        Collections.singletonList(new byte[]{3, 4})
+        List.of(new byte[]{1, 2}),
+        List.of(new byte[]{3, 4})
     };
 
     writeLegacyBigEndianIndex(indexFile, 4, 2, 2, 4, 32, 123L, VectorIndexConfig.VectorDistanceFunction.COSINE,

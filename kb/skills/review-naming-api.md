@@ -23,6 +23,10 @@ Severity:
 - Public API surface: if adding a method to an SPI interface, confirm domain-1 backward-compat story (C1.3).
 - Javadoc: new public classes must describe behavior and thread-safety.
 - Imports: `com.foo.Bar foo = new com.foo.Bar()` → use import.
+- Modern collection factories: apply C7.12 to direct calls and method references. Flag any reintroduction of
+  Checkstyle-blocked `Collections.emptyList`, `Collections.emptySet`, or `Collections.emptyMap` usage. Do not
+  recommend blanket bans for `Collections.singleton*`, but only allow them for explicit null element/key/value
+  arguments; check whether empty collections flow to mutating callers before replacement.
 - CLAUDE.md checks: license header, Java 21 target (Java 11 bytecode for SPI/client modules), SLF4J logger pattern.
 
 ## 3. Findings

@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.segmentuploader;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +52,7 @@ public class SegmentUploaderDefault implements SegmentUploader {
 
   @Override
   public void init(TableConfig tableConfig) throws Exception {
-    init(tableConfig, Collections.emptyMap());
+    init(tableConfig, Map.of());
   }
 
   @Override
@@ -89,7 +88,7 @@ public class SegmentUploaderDefault implements SegmentUploader {
   public void uploadSegment(URI segmentTarURI, @Nullable AuthProvider authProvider)
       throws Exception {
     IngestionUtils
-        .uploadSegment(_tableNameWithType, _batchConfig, Collections.singletonList(segmentTarURI), authProvider);
+        .uploadSegment(_tableNameWithType, _batchConfig, List.of(segmentTarURI), authProvider);
     LOGGER.info("Successfully uploaded segment: {} to table: {}", segmentTarURI, _tableNameWithType);
   }
 

@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusPredicate;
@@ -137,7 +136,7 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

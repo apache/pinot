@@ -22,7 +22,6 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -136,7 +135,7 @@ public class TextIndexUtils {
 
   public static List<String> parseEntryAsString(@Nullable Map<String, String> columnProperties, String stopWordKey) {
     if (columnProperties == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     String includeWords = columnProperties.get(stopWordKey);
     if (includeWords == null) {

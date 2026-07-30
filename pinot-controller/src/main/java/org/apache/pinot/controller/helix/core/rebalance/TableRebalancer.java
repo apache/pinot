@@ -42,6 +42,7 @@ import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.AccessOption;
@@ -80,6 +81,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -160,6 +162,7 @@ public class TableRebalancer {
   private final RebalancePreChecker _rebalancePreChecker;
   private final TableSizeReader _tableSizeReader;
   private final PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
+  private QueryWorkloadManager _queryWorkloadManager;
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
       @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
@@ -174,8 +177,22 @@ public class TableRebalancer {
     _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
   }
 
+  public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
+      @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
+      @Nullable TableSizeReader tableSizeReader,
+      @Nullable PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager,
+      @Nullable QueryWorkloadManager queryWorkloadManager) {
+    this(helixManager, tableRebalanceObserver, controllerMetrics, rebalancePreChecker, tableSizeReader,
+        pinotLLCRealtimeSegmentManager);
+    _queryWorkloadManager = queryWorkloadManager;
+  }
+
   public TableRebalancer(HelixManager helixManager) {
     this(helixManager, null, null, null, null, null);
+  }
+
+  public TableRebalancer(HelixManager helixManager, @Nullable QueryWorkloadManager queryWorkloadManager) {
+    this(helixManager, null, null, null, null, null, queryWorkloadManager);
   }
 
   public static String createUniqueRebalanceJobIdentifier() {
@@ -637,11 +654,22 @@ public class TableRebalancer {
           // If all the segments to be moved remain unchanged (same instance state map) in the new ideal state, apply
           // the same target instance state map for these segments to the new ideal state as the target assignment
           segmentsToMoveChanged = false;
-          if (segmentAssignment instanceof BaseStrictRealtimeSegmentAssignment) {
-            // For StrictRealtimeSegmentAssignment, we need to recompute the target assignment because the assignment
-            // for new added segments is based on the existing assignment
+          if (isStrictRealtimeSegmentAssignment
+              && !isMovingOnlyTierSegments(segmentsToMove, providedTierToSegmentsMap)) {
+            // For strict segment assignment, a newly added segment (a new consuming segment or an uploaded segment) is
+            // assigned by the instance partitions, then overridden to match the existing assignment of its partition
+            // in the IdealState when they differ, keeping the partition collocated. This rebalance moves a non-tier
+            // segment, i.e. the base placement of a partition, so a segment added to the IdealState while we wait can
+            // be placed on the partition's old placement and must be re-collocated to the target: recompute the full
+            // target assignment.
             segmentsToMoveChanged = true;
           } else {
+            // Non-strict segment assignment, or strict assignment that only moves tier segments (completed segments
+            // assigned to a tier). In the latter case the base placements do not move, so a segment added while we
+            // wait is placed consistently with the target; a full recompute is only needed if a segment we are moving
+            // actually changed state. Skipping it (a full recompute reads segment ZK metadata for the completed
+            // segments) narrows the window in which the versioned IdealState update below can lose the race to a
+            // concurrent write on a continuously-ingesting table.
             for (String segment : segmentsToMove) {
               Map<String, String> oldInstanceStateMap = oldAssignment.get(segment);
               Map<String, String> currentInstanceStateMap = currentAssignment.get(segment);
@@ -976,7 +1004,7 @@ public class TableRebalancer {
       // turn the map into {server: added consuming segments}
       for (Map.Entry<String, Set<String>> entry : newServersToConsumingSegmentMap.entrySet()) {
         String server = entry.getKey();
-        entry.getValue().removeAll(existingServersToConsumingSegmentMap.getOrDefault(server, Collections.emptySet()));
+        entry.getValue().removeAll(existingServersToConsumingSegmentMap.getOrDefault(server, Set.of()));
       }
       newServersToConsumingSegmentMap.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
@@ -1281,7 +1309,7 @@ public class TableRebalancer {
           if (!dryRun && !instancePartitionsUnchanged) {
             tableRebalanceLogger.info("Persisting instance partitions: {} to ZK", instancePartitions);
             InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
-                instancePartitions);
+                instancePartitions, _queryWorkloadManager);
           }
         } else {
           String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
@@ -1298,7 +1326,7 @@ public class TableRebalancer {
               tableRebalanceLogger.info("Persisting instance partitions: {} (based on {})", instancePartitions,
                   preConfiguredInstancePartitions);
               InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
-                  instancePartitions);
+                  instancePartitions, _queryWorkloadManager);
             }
           } else {
             instancePartitions =
@@ -1309,7 +1337,7 @@ public class TableRebalancer {
               tableRebalanceLogger.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
                   referenceInstancePartitionsName);
               InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
-                  instancePartitions);
+                  instancePartitions, _queryWorkloadManager);
             }
           }
         }
@@ -1419,7 +1447,8 @@ public class TableRebalancer {
         boolean instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
         if (!dryRun && !instancePartitionsUnchanged) {
           tableRebalanceLogger.info("Persisting instance partitions: {} to ZK", instancePartitions);
-          InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+          InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions,
+              _queryWorkloadManager);
         }
         return Pair.of(instancePartitions, instancePartitionsUnchanged);
       }
@@ -1852,9 +1881,9 @@ public class TableRebalancer {
    *         all segments that fall in that category
    */
   private static Map<Pair<Set<String>, Set<String>>, Map<Integer, Map<String, Map<String, String>>>>
-  getCurrentAndTargetInstancesToPartitionIdToCurrentAssignmentMap(Map<String, Map<String, String>> currentAssignment,
-      Map<String, Map<String, String>> targetAssignment, Object2IntOpenHashMap<String> segmentPartitionIdMap,
-      PartitionIdFetcher partitionIdFetcher) {
+      getCurrentAndTargetInstancesToPartitionIdToCurrentAssignmentMap(
+          Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+          Object2IntOpenHashMap<String> segmentPartitionIdMap, PartitionIdFetcher partitionIdFetcher) {
     Map<Pair<Set<String>, Set<String>>, Map<Integer, Map<String, Map<String, String>>>>
         currentAndTargetInstancesToPartitionIdToCurrentAssignmentMap = new HashMap<>();
 
@@ -2211,6 +2240,35 @@ public class TableRebalancer {
     }
   }
 
+  /// Returns whether all the segments to be moved are tier segments, i.e. contained in the provided tier-to-segments
+  /// map. When true, this rebalance only relocates completed segments onto tiers and leaves the base (non-tier)
+  /// placements of the partitions untouched, so a segment added to the IdealState mid-rebalance is still placed
+  /// consistently with the target. Returns false when the tier segments are not pre-computed (the map is null/empty),
+  /// conservatively treating the moves as base placement changes.
+  private static boolean isMovingOnlyTierSegments(List<String> segmentsToMove,
+      @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
+    if (segmentsToMove.isEmpty()) {
+      return true;
+    }
+    if (MapUtils.isEmpty(providedTierToSegmentsMap)) {
+      return false;
+    }
+    Set<String> tierSegments;
+    if (providedTierToSegmentsMap.size() == 1) {
+      tierSegments = providedTierToSegmentsMap.values().iterator().next();
+    } else {
+      tierSegments = new HashSet<>();
+      providedTierToSegmentsMap.values().forEach(tierSegments::addAll);
+    }
+    return tierSegments.size() >= segmentsToMove.size() && tierSegments.containsAll(segmentsToMove);
+  }
+
+  /// Returns the consuming segments that would be moved between the current and target assignment: those whose target
+  /// has a `CONSUMING` replica and whose assigned instances differ from the current assignment. Assumes a segment's
+  /// replicas are never a mix of `ONLINE` and `CONSUMING` (a realtime segment is either consuming or completed, and
+  /// completion flips the whole segment at once), so the scan over a segment's replicas can stop at the first `ONLINE`
+  /// replica (the segment is completed, hence not consuming) or the first `CONSUMING` replica (the segment is
+  /// consuming), skipping only `OFFLINE` replicas.
   @VisibleForTesting
   static Set<String> getMovingConsumingSegments(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment) {
@@ -2219,12 +2277,21 @@ public class TableRebalancer {
       String segmentName = entry.getKey();
       Map<String, String> currentInstanceStateMap = entry.getValue();
       Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
-      if (targetInstanceStateMap != null && targetInstanceStateMap.values().stream()
-          .noneMatch(state -> state.equals(SegmentStateModel.ONLINE)) && targetInstanceStateMap.values().stream()
-          .anyMatch(state -> state.equals(SegmentStateModel.CONSUMING))) {
-        if (!currentInstanceStateMap.keySet().equals(targetInstanceStateMap.keySet())) {
-          movingConsumingSegments.add(segmentName);
+      if (targetInstanceStateMap == null) {
+        continue;
+      }
+      for (String state : targetInstanceStateMap.values()) {
+        if (state.equals(SegmentStateModel.ONLINE)) {
+          // Completed segment (no CONSUMING replica by the assumption above), not a moving consuming segment.
+          break;
         }
+        if (state.equals(SegmentStateModel.CONSUMING)) {
+          if (!currentInstanceStateMap.keySet().equals(targetInstanceStateMap.keySet())) {
+            movingConsumingSegments.add(segmentName);
+          }
+          break;
+        }
+        // OFFLINE replica, keep scanning for an ONLINE or CONSUMING replica.
       }
     }
     return movingConsumingSegments;

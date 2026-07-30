@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -208,7 +207,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
       Set<String> onlineInstances;
       if (externalViewInstanceStateMap == null) {
-        onlineInstances = Collections.emptySet();
+        onlineInstances = Set.of();
       } else {
         onlineInstances = getOnlineInstances(idealStateInstanceStateMap, externalViewInstanceStateMap);
       }
@@ -267,7 +266,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       Map<String, String> sortedIdealStateInstanceStateMap = convertToSortedMap(idealStateInstanceStateMap);
 
       Set<String> unavailableInstances =
-          unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Collections.emptySet());
+          unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Set.of());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
       int idealStateReplicaId = 0;
       for (String instance : sortedIdealStateInstanceStateMap.keySet()) {

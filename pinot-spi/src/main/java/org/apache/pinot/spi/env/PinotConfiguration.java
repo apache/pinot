@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  * Provides a configuration abstraction for Pinot to decouple services from configuration sources and frameworks.
  * </p>
  * <p>
- * Pinot services may retreived configurations from PinotConfiguration independently from any source of configuration.
+ * Pinot services may retrieve configurations from PinotConfiguration independently from any source of configuration.
  * {@link PinotConfiguration} currently supports configuration loaded from the following sources :
  *
  * <ul>

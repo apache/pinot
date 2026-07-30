@@ -25,7 +25,6 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntListIterator;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +46,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -61,8 +61,9 @@ public class PinotLogicalQueryPlanner {
    */
   public static SubPlan makePlan(RelRoot relRoot,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
-      String hashFunction) {
-    PlanNode rootNode = new RelToPlanNodeConverter(tracker, hashFunction).toPlanNode(relRoot.rel);
+      String hashFunction, boolean pruneUnnestColumns) {
+    PlanNode rootNode = new RelToPlanNodeConverter(tracker, hashFunction,
+        !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE, pruneUnnestColumns).toPlanNode(relRoot.rel);
 
     PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools, hashFunction);
     return new SubPlan(rootFragment,
@@ -162,6 +163,6 @@ public class PinotLogicalQueryPlanner {
       }
     }
 
-    return new PlanFragment(0, rootReceiveNode, Collections.singletonList(planFragment1));
+    return new PlanFragment(0, rootReceiveNode, List.of(planFragment1));
   }
 }

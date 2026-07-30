@@ -63,7 +63,8 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
   public TenantRebalanceChecker(ControllerConf config,
       PinotHelixResourceManager pinotHelixResourceManager, TenantRebalancer tenantRebalancer) {
     super(TASK_NAME, config.getTenantRebalanceCheckerFrequencyInSeconds(),
-        config.getTenantRebalanceCheckerInitialDelayInSeconds());
+        config.getTenantRebalanceCheckerInitialDelayInSeconds(),
+        config.getTenantRebalanceCheckerCronExpression());
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _tenantRebalancer = tenantRebalancer;
   }

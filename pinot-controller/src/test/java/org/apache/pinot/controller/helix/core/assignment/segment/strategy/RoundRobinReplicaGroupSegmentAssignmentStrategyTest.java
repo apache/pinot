@@ -20,9 +20,9 @@ package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -93,7 +93,7 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
     TableConfig tableConfigWithoutPartitions =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITHOUT_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
-            .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
                 new SegmentAssignmentConfig(
                     AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY))).build();
     _segmentAssignmentWithoutPartition =
@@ -115,7 +115,7 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
       _instancePartitionsWithoutPartition.setInstances(0, replicaGroupId, instancesForReplicaGroup);
     }
     _instancePartitionsMapWithoutPartition =
-        Collections.singletonMap(InstancePartitionsType.OFFLINE, _instancePartitionsWithoutPartition);
+        Map.of(InstancePartitionsType.OFFLINE, _instancePartitionsWithoutPartition);
 
     // Mock HelixManager for partition metadata
     ZkHelixPropertyStore<ZNRecord> propertyStoreWithPartitions = mock(ZkHelixPropertyStore.class);
@@ -124,8 +124,8 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
       String segmentName = SEGMENTS.get(segmentId);
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
       int partitionId = segmentId % NUM_PARTITIONS;
-      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
-          new ColumnPartitionMetadata(null, NUM_PARTITIONS, Collections.singleton(partitionId), null))));
+      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Map.of(PARTITION_COLUMN,
+          new ColumnPartitionMetadata(null, NUM_PARTITIONS, Set.of(partitionId), null))));
       ZNRecord segmentZKMetadataZNRecord = segmentZKMetadata.toZNRecord();
       when(propertyStoreWithPartitions.get(
           eq(ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME_WITH_PARTITION, segmentName)),
@@ -145,7 +145,7 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
             .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig)
-            .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
                 new SegmentAssignmentConfig(
                     AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY))).build();
     _segmentAssignmentWithPartition =
@@ -168,7 +168,7 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
       }
     }
     _instancePartitionsMapWithPartition =
-        Collections.singletonMap(InstancePartitionsType.OFFLINE, _instancePartitionsWithPartition);
+        Map.of(InstancePartitionsType.OFFLINE, _instancePartitionsWithPartition);
   }
 
   @Test

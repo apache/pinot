@@ -149,12 +149,17 @@ public class SegmentLineage {
     for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
       String lineageId = listField.getKey();
       List<String> value = listField.getValue();
-      Preconditions.checkState(value.size() == 4);
+      // Tolerant read: legacy entries are 4-tuples. Newer entries append a 5th element
+      // ("autoCompleteLineageEntry") only when true; a missing 5th defaults to false. The reader
+      // accepts both formats so older controllers/writers and newer ones can interoperate.
+      Preconditions.checkState(value.size() >= 4);
       List<String> segmentsFrom = Arrays.asList(StringUtils.split(value.get(0), COMMA_SEPARATOR));
       List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), COMMA_SEPARATOR));
       LineageEntryState state = LineageEntryState.valueOf(value.get(2));
       long timestamp = Long.parseLong(value.get(3));
-      lineageEntries.put(lineageId, new LineageEntry(segmentsFrom, segmentsTo, state, timestamp));
+      boolean autoCompleteLineageEntry = value.size() >= 5 && Boolean.parseBoolean(value.get(4));
+      lineageEntries.put(lineageId,
+          new LineageEntry(segmentsFrom, segmentsTo, state, timestamp, autoCompleteLineageEntry));
     }
     return new SegmentLineage(tableNameWithType, lineageEntries, customMap);
   }
@@ -171,7 +176,11 @@ public class SegmentLineage {
       String segmentsTo = String.join(COMMA_SEPARATOR, lineageEntry.getSegmentsTo());
       String state = lineageEntry.getState().toString();
       String timestamp = Long.toString(lineageEntry.getTimestamp());
-      List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo, state, timestamp);
+      // Omit the 5th element when the flag is the default (false): keeps the wire format
+      // identical to legacy 4-tuples for every entry that does not opt into observer-driven
+      // completion, so older readers continue to parse them.
+      List<String> listEntry = lineageEntry.isAutoCompleteLineageEntry() ? Arrays.asList(segmentsFrom, segmentsTo,
+          state, timestamp, Boolean.toString(true)) : Arrays.asList(segmentsFrom, segmentsTo, state, timestamp);
       znRecord.setListField(entry.getKey(), listEntry);
     }
     if (_customMap != null) {
@@ -182,14 +191,17 @@ public class SegmentLineage {
 
   /**
    * Returns a json representation of the segment lineage.
-   * Segment lineage entries are sorted in chronological order by default.
+   * Segment lineage entries are sorted by timestamp, with the entry id as a tiebreaker so that entries
+   * sharing the same millisecond are still ordered deterministically (instead of by HashMap iteration).
    */
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("tableNameWithType", _tableNameWithType);
     LinkedHashMap<String, LineageEntry> sortedLineageEntries = new LinkedHashMap<>();
     _lineageEntries.entrySet().stream()
-        .sorted(Map.Entry.comparingByValue(Comparator.comparingLong(LineageEntry::getTimestamp)))
+        .sorted(Map.Entry.<String, LineageEntry>comparingByValue(
+                Comparator.comparingLong(LineageEntry::getTimestamp))
+            .thenComparing(Map.Entry.comparingByKey()))
         .forEachOrdered(x -> sortedLineageEntries.put(x.getKey(), x.getValue()));
     jsonObject.set("lineageEntries", JsonUtils.objectToJsonNode(sortedLineageEntries));
     if (_customMap != null) {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.materializedview.metadata;
 
+import com.google.common.hash.Hashing;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -36,6 +37,29 @@ import java.util.TreeMap;
 /// Thread-safety: instances are immutable after construction.
 public class PartitionFingerprint {
   private static final char SEPARATOR = ',';
+
+  /// Canonical fingerprint for an "empty" partition window — no base segments overlap.
+  ///
+  /// The `crcChecksum` field is initialised by running the same `farmHashFingerprint64`
+  /// hasher with no input bytes, which is byte-identical to what
+  /// `MaterializedViewTaskUtils#computeWindowFingerprint` (the single source of truth used
+  /// by both the scheduler and the minion executor) produces when the overlapping segment
+  /// list is empty. Two consequences:
+  ///
+  ///   - Existing ZK records written by the APPEND-empty path (carrying `(0, farmHash64(""))`)
+  ///     are byte-equal to this constant, so `equals` comparisons against [#EMPTY] continue
+  ///     to behave correctly across rolling upgrades.
+  ///
+  ///   - The DELETE task executor uses [#EMPTY] when it persists a `VALID + empty`
+  ///     PartitionInfo after retention-deleting the source data. Reusing the same value the
+  ///     APPEND-empty path naturally produces avoids introducing a second representation of
+  ///     "empty fingerprint" that would silently fail equality checks.
+  ///
+  /// `farmHashFingerprint64("")` is a deterministic non-zero constant; never use
+  /// `new PartitionFingerprint(0, 0L)` as a stand-in for "empty" — the two values do NOT
+  /// compare equal.
+  public static final PartitionFingerprint EMPTY =
+      new PartitionFingerprint(0, Hashing.farmHashFingerprint64().newHasher().hash().asLong());
 
   /// Number of base table segments whose time range overlaps this partition window.
   private final int _segmentCount;

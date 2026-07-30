@@ -75,48 +75,48 @@ public class QueryTestSet {
         new Object[]{"SELECT * FROM a LEFT JOIN b on a.col1 = b.col2"},
 
         new Object[]{"SELECT a.col1, SUM(CASE WHEN b.col3 IS NULL THEN 0 ELSE b.col3 END) "
-            + " FROM a LEFT JOIN b on a.col1 = b.col2 GROUP BY a.col1"},
+              + " FROM a LEFT JOIN b on a.col1 = b.col2 GROUP BY a.col1"},
 
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
         // thus the final JOIN result will be 1 x 3 x 1 = 3.
         new Object[]{"SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-            + " WHERE a.col3 >= 0 AND a.col2 = 'alice' AND b.col3 >= 0"},
+              + " WHERE a.col3 >= 0 AND a.col2 = 'alice' AND b.col3 >= 0"},
 
         // Join query with IN and Not-IN clause. Table A's side of join will return 9 rows and Table B's side will
         // return 2 rows. Join will be only on col1=bar and since A will return 3 rows with that value and B will return
         // 1 row, the final output will have 3 rows.
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE a.col1 IN ('foo', 'bar', 'alice') AND b.col2 NOT IN ('foo', 'alice')"},
+              + " WHERE a.col1 IN ('foo', 'bar', 'alice') AND b.col2 NOT IN ('foo', 'alice')"},
 
         // Same query as above but written using OR/AND instead of IN.
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE (a.col1 = 'foo' OR a.col1 = 'bar' OR a.col1 = 'alice') AND b.col2 != 'foo'"
-            + " AND b.col2 != 'alice'"},
+              + " WHERE (a.col1 = 'foo' OR a.col1 = 'bar' OR a.col1 = 'alice') AND b.col2 != 'foo'"
+              + " AND b.col2 != 'alice'"},
 
         // Same as above but with single argument IN clauses. Left side of the join returns 3 rows, and the right side
         // returns 5 rows. Only key where join succeeds is col1=foo, and since table B has only 1 row with that value,
         // the number of rows should be 3.
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE a.col1 IN ('foo') AND b.col2 NOT IN ('')"},
+              + " WHERE a.col1 IN ('foo') AND b.col2 NOT IN ('')"},
 
         // Range conditions with continuous and non-continuous range.
         // Calcite default compilation will convert multiple `=` and `<>` into range IN and NOT IN search predicates.
         new Object[]{"SELECT a.col1, SUM(CASE WHEN a.col2 = 'foo' OR a.col2 = 'alice' THEN 1 ELSE 0 END) AS match_sum, "
-            + " SUM(CASE WHEN a.col2 <> 'foo' AND a.col2 <> 'alice' THEN 1 ELSE 0 END) as unmatch_sum "
-            + " FROM a WHERE a.ts >= 1600000000 GROUP BY a.col1"},
+              + " SUM(CASE WHEN a.col2 <> 'foo' AND a.col2 <> 'alice' THEN 1 ELSE 0 END) as unmatch_sum "
+              + " FROM a WHERE a.ts >= 1600000000 GROUP BY a.col1"},
 
         new Object[]{"SELECT a.col1, CASE WHEN sum(a.col3) = 0 THEN 0 ELSE SUM(a.col3) END AS match_sum "
-            + " FROM a WHERE a.ts >= 1600000000 GROUP BY a.col1"},
+              + " FROM a WHERE a.ts >= 1600000000 GROUP BY a.col1"},
 
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE a.col3 IN (1, 2, 3) OR (a.col3 > 10 AND a.col3 < 50)"},
+              + " WHERE a.col3 IN (1, 2, 3) OR (a.col3 > 10 AND a.col3 < 50)"},
 
         new Object[]{"SELECT col1, SUM(col3) FROM a WHERE a.col3 BETWEEN 23 AND 36 "
-            + " GROUP BY col1 HAVING SUM(col3) > 10.0 AND MIN(col3) <> 123 AND MAX(col3) BETWEEN 10 AND 20"},
+              + " GROUP BY col1 HAVING SUM(col3) > 10.0 AND MIN(col3) <> 123 AND MAX(col3) BETWEEN 10 AND 20"},
 
         new Object[]{"SELECT col1, SUM(col3) FROM a WHERE (col3 > 0 AND col3 < 45) AND (col3 > 15 AND col3 < 50) "
-            + " GROUP BY col1 HAVING (SUM(col3) > 10 AND SUM(col3) < 20) AND (SUM(col3) > 30 AND SUM(col3) < 40)"},
+              + " GROUP BY col1 HAVING (SUM(col3) > 10 AND SUM(col3) < 20) AND (SUM(col3) > 30 AND SUM(col3) < 40)"},
 
         // Projection pushdown
         new Object[]{"SELECT a.col1, a.col3 + a.col3 FROM a WHERE a.col3 >= 0 AND a.col2 = 'alice'"},
@@ -124,7 +124,7 @@ public class QueryTestSet {
         // Inequality JOIN & partial filter pushdown
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3"},
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND "
-            + "((a.col1 <> 'foo' AND b.col2 <> 'bar') or (a.col1 <> 'bar' AND b.col2 <> 'foo'))"},
+              + "((a.col1 <> 'foo' AND b.col2 <> 'bar') or (a.col1 <> 'bar' AND b.col2 <> 'foo'))"},
 
         new Object[]{"SELECT * FROM a, b WHERE a.col1 > b.col2 AND a.col3 > b.col3"},
 
@@ -147,35 +147,35 @@ public class QueryTestSet {
         //   filtered at :    ^                      ^
         // thus the final JOIN result will have 6 rows: 3 "foo" <-> "foo"; and 3 "bob" <-> "bob"
         new Object[]{"SELECT a.col1, a.col2, a.ts, b.col1, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-            + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0"},
+              + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0"},
 
         // Making transform after JOIN, number of rows should be the same as JOIN result.
         new Object[]{"SELECT a.col1, a.ts, a.col3 - b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-            + " WHERE a.col3 >= 0 AND b.col3 >= 0"},
+              + " WHERE a.col3 >= 0 AND b.col3 >= 0"},
 
         // Making transform after GROUP-BY, number of rows should be the same as GROUP-BY result.
         new Object[]{"SELECT a.col1, a.col2, SUM(a.col3) - MIN(a.col3) FROM a"
-            + " WHERE a.col3 >= 0 GROUP BY a.col1, a.col2"},
+              + " WHERE a.col3 >= 0 GROUP BY a.col1, a.col2"},
 
         // GROUP BY after JOIN
         //   - optimizable transport for GROUP BY key after JOIN, using SINGLETON exchange
         //     only 3 GROUP BY key exist because b.col2 cycles between "foo", "bar", "alice".
         new Object[]{"SELECT a.col1, SUM(b.col3), COUNT(*), SUM(2) FROM a JOIN b ON a.col1 = b.col2 "
-            + " WHERE a.col3 >= 0 GROUP BY a.col1"},
+              + " WHERE a.col3 >= 0 GROUP BY a.col1"},
         //   - non-optimizable transport for GROUP BY key after JOIN, using HASH exchange
         //     only 2 GROUP BY key exist for b.col3.
         new Object[]{"SELECT b.col3, SUM(a.col3) FROM a JOIN b"
-            + " on a.col1 = b.col1 AND a.col2 = b.col2 GROUP BY b.col3"},
+              + " on a.col1 = b.col1 AND a.col2 = b.col2 GROUP BY b.col3"},
 
         // Sub-query
         new Object[]{"SELECT b.col1, b.col3, i.maxVal FROM b JOIN "
-            + "  (SELECT a.col2 AS joinKey, MAX(a.col3) AS maxVal FROM a GROUP BY a.col2) AS i "
-            + "  ON b.col1 = i.joinKey"},
+              + "  (SELECT a.col2 AS joinKey, MAX(a.col3) AS maxVal FROM a GROUP BY a.col2) AS i "
+              + "  ON b.col1 = i.joinKey"},
 
         // Sub-query with predicate clause to SEMI JOIN.
         new Object[]{"SELECT * FROM b WHERE b.col1 IN (SELECT a.col2 FROM a)"},
         new Object[]{"SELECT b.col1, b.col2, SUM(b.col3) * 100 / COUNT(b.col3) FROM b WHERE b.col1 IN "
-            + " (SELECT a.col2 FROM a WHERE a.col2 != 'foo') GROUP BY b.col1, b.col2"},
+              + " (SELECT a.col2 FROM a WHERE a.col2 != 'foo') GROUP BY b.col1, b.col2"},
         new Object[]{"SELECT SUM(b.col3) FROM b WHERE b.col3 > (SELECT AVG(a.col3) FROM a WHERE a.col2 != 'bar')"},
 
         // Aggregate query with HAVING clause, "foo" and "bar" occurred 6/2 times each and "alice" occurred 3/1 times
@@ -185,10 +185,10 @@ public class QueryTestSet {
         // - last condition doesn't match anything.
         // total to 3 rows.
         new Object[]{"SELECT a.col2, COUNT(*), MAX(a.col3), MIN(a.col3), SUM(a.col3) FROM a GROUP BY a.col2 "
-            + "HAVING COUNT(*) < 5 OR (COUNT(*) > 5 AND SUM(a.col3) >= 10)"
-            + "OR (MIN(a.col3) != 20 AND SUM(a.col3) = 100)"},
+              + "HAVING COUNT(*) < 5 OR (COUNT(*) > 5 AND SUM(a.col3) >= 10)"
+              + "OR (MIN(a.col3) != 20 AND SUM(a.col3) = 100)"},
         new Object[]{"SELECT COUNT(*) AS Count, MAX(a.col3) AS \"max\" FROM a GROUP BY a.col2 "
-            + "HAVING Count > 1 AND \"max\" < 50"},
+              + "HAVING Count > 1 AND \"max\" < 50"},
 
         // Order-by
         new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON a.col1 = b.col1 ORDER BY a.col3, b.col3 DESC"},
@@ -199,14 +199,14 @@ public class QueryTestSet {
         new Object[]{"SELECT a.col1, a.col2, AVG(a.col3) FROM a GROUP BY a.col1, a.col2"},
         new Object[]{"SELECT a.col1 FROM a WHERE a.col3 >= 0.5 AND a.col3 < 0.7 OR a.col3 = 42.0"},
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a GROUP BY a.col1 "
-            + " HAVING MIN(a.col3) > 0.5 AND MIN(a.col3) <> 0.7 OR MIN(a.col3) > 30"},
+              + " HAVING MIN(a.col3) > 0.5 AND MIN(a.col3) <> 0.7 OR MIN(a.col3) > 30"},
         //   - explicit CAST
         new Object[]{"SELECT a.col1, CAST(SUM(a.col3) AS BIGINT) FROM a GROUP BY a.col1"},
 
         // Test DISTINCT
         //   - distinct value done via GROUP BY with empty expr aggregation list.
         new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3"},
+              + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3"},
         new Object[]{"SELECT col3 FROM a GROUP BY col3, col1"},
         new Object[]{"SELECT col1 FROM a GROUP BY col3, col1"},
         new Object[]{"SELECT AVG(col3) FROM (SELECT col1, col3 FROM a WHERE col3 > 1 GROUP BY col1, col3)"},
@@ -233,9 +233,9 @@ public class QueryTestSet {
 
         // CASE WHEN function
         new Object[]{"SELECT MAX(CAST((CASE WHEN col3 > 0 THEN 1 WHEN col3 > 10 then 2 ELSE 0 END) AS INTEGER)) "
-            + " FROM a"},
+              + " FROM a"},
         new Object[]{"SELECT col2, CASE WHEN SUM(col3) > 0 THEN 1 WHEN SUM(col3) > 10 then 2 WHEN SUM(col3) > 100 "
-            + " THEN 3 ELSE 0 END FROM a GROUP BY col2"}
+              + " THEN 3 ELSE 0 END FROM a GROUP BY col2"}
     };
   }
 }

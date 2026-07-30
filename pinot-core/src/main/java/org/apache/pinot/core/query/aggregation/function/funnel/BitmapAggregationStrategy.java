@@ -38,7 +38,17 @@ class BitmapAggregationStrategy extends AggregationStrategy<DictIdsWrapper> {
   }
 
   @Override
+  public DictIdsWrapper createAggregationResultMultiKey(Dictionary[] dictionaries) {
+    return new DictIdsWrapper(_numSteps, dictionaries);
+  }
+
+  @Override
   protected void add(Dictionary dictionary, DictIdsWrapper dictIdsWrapper, int step, int correlationId) {
     dictIdsWrapper._stepsBitmaps[step].add(correlationId);
+  }
+
+  @Override
+  void addMultiKey(DictIdsWrapper dictIdsWrapper, int step, Dictionary[] dictionaries, int[] correlationDictIds) {
+    dictIdsWrapper._stepsBitmaps[step].add(dictIdsWrapper.getCompositeCorrelationId(correlationDictIds));
   }
 }

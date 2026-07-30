@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.timeseries;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import javax.annotation.Nullable;
@@ -41,7 +40,7 @@ public class TimeSeriesExchangeReceivePlanNode extends BaseTimeSeriesPlanNode {
 
   public TimeSeriesExchangeReceivePlanNode(String id, long deadlineMs, @Nullable AggInfo aggInfo,
       TimeSeriesBuilderFactory factory) {
-    super(id, Collections.emptyList());
+    super(id, List.of());
     _deadlineMs = deadlineMs;
     _aggInfo = aggInfo;
     _factory = factory;

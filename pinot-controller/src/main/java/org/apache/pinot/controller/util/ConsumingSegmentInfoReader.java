@@ -24,7 +24,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.BiMap;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,7 +92,7 @@ public class ConsumingSegmentInfoReader {
     }
     // Segments which are in CONSUMING state but found no consumer on the server
     Set<String> consumingSegments = _pinotHelixResourceManager.getConsumingSegments(tableNameWithType);
-    consumingSegments.forEach(c -> consumingSegmentInfoMap.putIfAbsent(c, Collections.emptyList()));
+    consumingSegments.forEach(c -> consumingSegmentInfoMap.putIfAbsent(c, List.of()));
     return new ConsumingSegmentsInfoMap(consumingSegmentInfoMap, response._failedResponseCount, response._failedParses);
   }
 

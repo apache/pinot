@@ -26,7 +26,6 @@ import java.net.URISyntaxException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -306,7 +305,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
       LOGGER.info("New segments are pushed successfully and now serving queries.");
     } catch (Exception e) {
       LOGGER.error("Failed to upload segments, reverting lineage entry.", e);
-      Map<URI, String> uriToLineageEntryIdMap = Collections.singletonMap(controllerURI, segmentLineageEntryId);
+      Map<URI, String> uriToLineageEntryIdMap = Map.of(controllerURI, segmentLineageEntryId);
       ConsistentDataPushUtils.handleUploadException(spec, uriToLineageEntryIdMap, e);
       LOGGER.info("Reverted lineage entry [{}]. Any newly uploaded segments should have been deleted.",
           segmentLineageEntryId);

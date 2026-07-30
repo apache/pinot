@@ -169,8 +169,8 @@ public class ParquetMapUDFTest {
       recordsProcessed++;
 
       for (RecordTransformer transformer : transformers) {
-           transformer.transform(inputRow);
-       }
+        transformer.transform(inputRow);
+      }
 
       // Verify transformation created a MAP column
       Object eventPropsMap = inputRow.getValue("event_properties_map");

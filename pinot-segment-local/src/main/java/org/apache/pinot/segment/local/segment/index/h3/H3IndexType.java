@@ -22,7 +22,6 @@ package org.apache.pinot.segment.local.segment.index.h3;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -60,7 +59,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "h3";
-  private static final List<String> EXTENSIONS = Collections.singletonList(V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
+  private static final List<String> EXTENSIONS = List.of(V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
 
   protected H3IndexType() {
     super(StandardIndexes.H3_ID);

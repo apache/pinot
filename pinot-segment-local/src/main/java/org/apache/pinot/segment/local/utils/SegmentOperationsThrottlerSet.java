@@ -155,24 +155,33 @@ public class SegmentOperationsThrottlerSet implements PinotClusterConfigChangeLi
       return;
     }
 
-    // Parse maxConcurrency. 0 is a valid kill-switch value; negative values are treated as misconfiguration.
-    int maxConcurrency = parseConfigValue(clusterConfigs, maxConcurrencyConfigKey, maxConcurrencyDefault);
-    if (maxConcurrency < 0) {
-      return;
+    // Only parse the config that actually changed; pass null for the unchanged one so the throttler keeps its
+    // current value. This prevents a single changed config from inadvertently resetting the other. 0 is a valid
+    // kill-switch value; negative values are treated as misconfiguration.
+    Integer maxConcurrency = null;
+    if (maxConcurrencyChanged) {
+      int parsed = parseConfigValue(clusterConfigs, maxConcurrencyConfigKey, maxConcurrencyDefault);
+      if (parsed < 0) {
+        return;
+      }
+      maxConcurrency = parsed;
     }
 
-    // Parse maxConcurrencyBeforeServingQueries. Same handling as maxConcurrency.
-    int maxConcurrencyBeforeServingQueries =
-        parseConfigValue(clusterConfigs, maxConcurrencyBeforeServingQueriesConfigKey,
-            maxConcurrencyBeforeServingQueriesDefault);
-    if (maxConcurrencyBeforeServingQueries < 0) {
-      return;
+    Integer maxConcurrencyBeforeServingQueries = null;
+    if (maxConcurrencyBeforeServingQueriesChanged) {
+      int parsed = parseConfigValue(clusterConfigs, maxConcurrencyBeforeServingQueriesConfigKey,
+          maxConcurrencyBeforeServingQueriesDefault);
+      if (parsed < 0) {
+        return;
+      }
+      maxConcurrencyBeforeServingQueries = parsed;
     }
 
-    // Update throttler
-    LOGGER.info("Updating {} throttler with maxConcurrency: {}, maxConcurrencyBeforeServingQueries: {}",
-        throttlerName, maxConcurrency, maxConcurrencyBeforeServingQueries);
-    if (maxConcurrency == 0 || maxConcurrencyBeforeServingQueries == 0) {
+    // Update throttler (null = unchanged)
+    LOGGER.info("Updating {} throttler with maxConcurrency: {}, maxConcurrencyBeforeServingQueries: {} "
+            + "(null = unchanged)", throttlerName, maxConcurrency, maxConcurrencyBeforeServingQueries);
+    if ((maxConcurrency != null && maxConcurrency == 0)
+        || (maxConcurrencyBeforeServingQueries != null && maxConcurrencyBeforeServingQueries == 0)) {
       LOGGER.warn("Throttler {} configured with 0 permits (maxConcurrency: {}, maxConcurrencyBeforeServingQueries: "
               + "{}) — all operations will block until value is raised",
           throttlerName, maxConcurrency, maxConcurrencyBeforeServingQueries);

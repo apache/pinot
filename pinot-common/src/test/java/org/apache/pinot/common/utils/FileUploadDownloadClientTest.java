@@ -29,7 +29,6 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.IOUtils;
@@ -105,7 +104,7 @@ public class FileUploadDownloadClientTest {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       Header crypterClassHeader = new BasicHeader(FileUploadDownloadClient.CustomHeaders.CRYPTER, TEST_CRYPTER);
 
-      List<Header> headers = Collections.singletonList(crypterClassHeader);
+      List<Header> headers = List.of(crypterClassHeader);
       List<NameValuePair> params = null;
 
       SimpleHttpResponse response = fileUploadDownloadClient

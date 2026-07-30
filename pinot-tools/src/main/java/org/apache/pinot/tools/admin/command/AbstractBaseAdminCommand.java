@@ -28,7 +28,6 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -74,7 +73,7 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
 
   public static String sendRequest(String requestMethod, String urlString, String payload)
       throws IOException {
-    return sendRequest(requestMethod, urlString, payload, Collections.emptyList());
+    return sendRequest(requestMethod, urlString, payload, List.of());
   }
 
   public static String sendRequest(String requestMethod, String urlString, String payload, List<Header> headers)

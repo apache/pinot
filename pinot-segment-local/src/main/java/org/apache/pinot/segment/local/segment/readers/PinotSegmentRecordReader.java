@@ -31,6 +31,8 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -55,6 +57,9 @@ public class PinotSegmentRecordReader implements RecordReader {
   private ArrayList<PinotSegmentColumnReader> _columnReaders;
 
   private Map<String, PinotSegmentColumnReader> _columnReaderMap;
+  // OPEN_STRUCT parent columns have no forward index of their own (they expose per-key sub-columns),
+  // so they cannot be read via PinotSegmentColumnReader. Their per-doc value is reconstructed as a map.
+  private Map<String, OpenStructDataSource> _openStructDataSources;
   private int[] _sortedDocIds;
   private boolean _skipDefaultNullValues;
 
@@ -180,21 +185,16 @@ public class PinotSegmentRecordReader implements RecordReader {
       _columnReaderMap = new HashMap<>();
       _columnReaders = new ArrayList<>();
       _columnNames = new ArrayList<>();
+      _openStructDataSources = new HashMap<>();
       Set<String> columnsInSegment = _indexSegment.getPhysicalColumnNames();
       if (CollectionUtils.isEmpty(fieldsToRead)) {
         for (String column : columnsInSegment) {
-          PinotSegmentColumnReader reader = new PinotSegmentColumnReader(indexSegment, column);
-          _columnReaderMap.put(column, reader);
-          _columnNames.add(column);
-          _columnReaders.add(reader);
+          addColumnReader(column);
         }
       } else {
         for (String column : fieldsToRead) {
           if (columnsInSegment.contains(column)) {
-            PinotSegmentColumnReader reader = new PinotSegmentColumnReader(indexSegment, column);
-            _columnReaderMap.put(column, reader);
-            _columnNames.add(column);
-            _columnReaders.add(reader);
+            addColumnReader(column);
           } else {
             LOGGER.warn("Ignoring column: {} that does not exist in the segment", column);
           }
@@ -213,6 +213,23 @@ public class PinotSegmentRecordReader implements RecordReader {
 
       _skipDefaultNullValues = skipDefaultNullValues;
     }
+  }
+
+  /**
+   * Registers a reader for the given column. OPEN_STRUCT parent columns are tracked separately and
+   * reconstructed as maps at read time (they have no forward index of their own); all other columns
+   * use a {@link PinotSegmentColumnReader}.
+   */
+  private void addColumnReader(String column) {
+    DataSource dataSource = _indexSegment.getDataSourceNullable(column);
+    if (dataSource instanceof OpenStructDataSource) {
+      _openStructDataSources.put(column, (OpenStructDataSource) dataSource);
+      return;
+    }
+    PinotSegmentColumnReader reader = new PinotSegmentColumnReader(_indexSegment, column);
+    _columnReaderMap.put(column, reader);
+    _columnNames.add(column);
+    _columnReaders.add(reader);
   }
 
   /**
@@ -253,6 +270,14 @@ public class PinotSegmentRecordReader implements RecordReader {
         buffer.putDefaultNullValue(column, columnReader.getValue(docId));
       }
     }
+    for (Map.Entry<String, OpenStructDataSource> entry : _openStructDataSources.entrySet()) {
+      Map<String, Object> value = entry.getValue().getMapValue(docId);
+      // A null map means no key is present at this doc; leave the column unset so the OPEN_STRUCT
+      // build treats it as an absent/empty struct.
+      if (value != null) {
+        buffer.putValue(entry.getKey(), value);
+      }
+    }
   }
 
   public Object[] getRecordValues(int docId, int[] columnIndexes) {
@@ -286,6 +311,10 @@ public class PinotSegmentRecordReader implements RecordReader {
   //   - Currently there is no check on column existence
   //   - Null value is not handled (default null value is returned)
   public Object getValue(int docId, String column) {
+    OpenStructDataSource openStructDataSource = _openStructDataSources.get(column);
+    if (openStructDataSource != null) {
+      return openStructDataSource.getMapValue(docId);
+    }
     return _columnReaderMap.get(column).getValue(docId);
   }
 

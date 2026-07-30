@@ -34,12 +34,14 @@ import org.apache.pinot.verifier.PluginVerifier.CheckContext;
  */
 public final class PinotFsCheck implements Check {
   // Map of pluginName -> PinotFS FQCN. Plugin name matches plugins/pinot-file-system/.
-  private static final Map<String, String> FILESYSTEMS = new LinkedHashMap<>() {{
-    put("pinot-s3", "org.apache.pinot.plugin.filesystem.S3PinotFS");
-    put("pinot-gcs", "org.apache.pinot.plugin.filesystem.GcsPinotFS");
-    put("pinot-adls", "org.apache.pinot.plugin.filesystem.ADLSGen2PinotFS");
-    put("pinot-hdfs", "org.apache.pinot.plugin.filesystem.HadoopPinotFS");
-  }};
+  private static final Map<String, String> FILESYSTEMS = new LinkedHashMap<>();
+
+  static {
+    FILESYSTEMS.put("pinot-s3", "org.apache.pinot.plugin.filesystem.S3PinotFS");
+    FILESYSTEMS.put("pinot-gcs", "org.apache.pinot.plugin.filesystem.GcsPinotFS");
+    FILESYSTEMS.put("pinot-adls", "org.apache.pinot.plugin.filesystem.ADLSGen2PinotFS");
+    FILESYSTEMS.put("pinot-hdfs", "org.apache.pinot.plugin.filesystem.HadoopPinotFS");
+  }
 
   @Override
   public String name() {

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -44,12 +43,12 @@ public class EmptyAggregationOperator extends BaseOperator<AggregationResultsBlo
 
   @Override
   protected AggregationResultsBlock getNextBlock() {
-    return new AggregationResultsBlock(_queryContext.getAggregationFunctions(), Collections.emptyList(), _queryContext);
+    return new AggregationResultsBlock(_queryContext.getAggregationFunctions(), List.of(), _queryContext);
   }
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

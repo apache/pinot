@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.Closeable;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -81,6 +80,6 @@ public interface TableUpsertMetadataManager extends Closeable {
   }
 
   default Set<String> getNewlyAddedSegments() {
-    return Collections.emptySet();
+    return Set.of();
   }
 }

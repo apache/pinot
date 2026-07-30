@@ -20,7 +20,6 @@ package org.apache.pinot.common.request.context;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
@@ -95,7 +94,7 @@ public class RequestContextUtils {
       }
       return new FunctionContext(functionType, functionName, arguments);
     } else {
-      return new FunctionContext(functionType, functionName, Collections.emptyList());
+      return new FunctionContext(functionType, functionName, List.of());
     }
   }
 

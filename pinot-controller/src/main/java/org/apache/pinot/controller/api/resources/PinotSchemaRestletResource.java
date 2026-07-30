@@ -477,7 +477,7 @@ public class PinotSchemaRestletResource {
     } catch (SchemaBackwardIncompatibleException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
-          String.format("Backward incompatible schema %s. Only allow adding new columns", schemaName),
+          String.format("Backward incompatible schema %s. Reason: %s", schemaName, e.getMessage()),
           Response.Status.BAD_REQUEST, e);
     } catch (TableNotFoundException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);

@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -198,7 +197,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       // Set the first exception's error code in the request context
       requestContext.setErrorCode(exceptions.get(0).getErrorCode());
       requestContext.setProcessingExceptions(exceptions.stream().map(QueryException::getMessage)
-        .collect(Collectors.toList()));
+          .collect(Collectors.toList()));
     }
   }
 
@@ -397,7 +396,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     AccessControl accessControl = _accessControlFactory.create();
     for (String tableName : tableNames) {
       AuthorizationResult authorizationResult = accessControl.authorize(httpHeaders, TargetType.TABLE, tableName,
-        Actions.Table.QUERY);
+          Actions.Table.QUERY);
       if (!authorizationResult.hasAccess()) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
@@ -416,8 +415,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       DataSchema schema = new DataSchema(new String[]{"QUERY", "PLAN"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
       BrokerResponseNative response = BrokerResponseNative.empty();
-      response.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[]{request.getQuery(),
-        plan})));
+      response.setResultTable(new ResultTable(schema, List.<Object[]>of(new Object[]{request.getQuery(),
+          plan})));
       return response;
     } catch (URISyntaxException e) {
       throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);

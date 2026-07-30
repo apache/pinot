@@ -218,8 +218,17 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       InstanceIdToSegments instanceIdToSegments, Map<String, TablePartitionInfo> tpiMap,
       boolean inferInvalidPartitionSegment, boolean inferRealtimeSegmentPartition) {
     Set<String> tableTypes = instanceIdToSegments.getActiveTableTypes();
+    if (tableTypes.isEmpty()) {
+      // The table has a routing entry but no routable segments for either table type (e.g. an empty table, or all
+      // segments were pruned by the broker). Assign zero workers instead of throwing, mirroring the legacy
+      // WorkerManager. The resulting empty leaf stage is detected and short-circuited to an empty result on the
+      // broker (see PinotDispatchPlanner#finalizeDispatchableSubPlan).
+      List<String> noWorkers = List.of();
+      PinotDataDistribution emptyDistribution = new PinotDataDistribution(RelDistribution.Type.RANDOM_DISTRIBUTED,
+          noWorkers, noWorkers.hashCode(), null, null);
+      return new TableScanWorkerAssignmentResult(emptyDistribution, new HashMap<>());
+    }
     Set<String> partitionedTableTypes = tableTypes.stream().filter(tpiMap::containsKey).collect(Collectors.toSet());
-    Preconditions.checkState(!tableTypes.isEmpty(), "No routing entry for offline or realtime type");
     if (tableTypes.equals(partitionedTableTypes)) {
       // TODO(mse-physical): Support auto-partitioning inference for Hybrid tables.
       if (partitionedTableTypes.size() == 1) {

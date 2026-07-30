@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.HelixConfigScope;
@@ -110,8 +109,8 @@ public abstract class ErrorCodesIntegrationTest extends BaseClusterIntegrationTe
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
-    return Collections.singletonList(
-        new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
+    return List.of(
+        new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, List.of(),
             FieldConfig.CompressionCodec.MV_ENTRY_DICT, null));
   }
 

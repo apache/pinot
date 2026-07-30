@@ -74,6 +74,7 @@ public class PhysicalPlannerContext {
   private final boolean _liteModeJoinsEnabled;
   @Nullable
   private final MultiClusterRoutingContext _multiClusterRoutingContext;
+  private int _liteModeEffectiveSortLimit = -1;
 
   /**
    * Used by controller when it needs to extract table names from the query.
@@ -184,6 +185,18 @@ public class PhysicalPlannerContext {
 
   public int getLiteModeLeafStageFanOutAdjustedLimit() {
     return _liteModeLeafStageFanOutAdjustedLimit;
+  }
+
+  public void setLiteModeEffectiveSortLimit(int effectiveLimit) {
+    _liteModeEffectiveSortLimit = effectiveLimit;
+  }
+
+  public boolean isLiteModeImplicitSortApplied() {
+    return _liteModeEffectiveSortLimit >= 0;
+  }
+
+  public int getLiteModeEffectiveSortLimit() {
+    return _liteModeEffectiveSortLimit;
   }
 
   /**

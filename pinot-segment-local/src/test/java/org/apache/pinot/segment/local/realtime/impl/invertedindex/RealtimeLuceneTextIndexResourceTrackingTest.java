@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -296,12 +296,12 @@ public class RealtimeLuceneTextIndexResourceTrackingTest {
 
     @Override
     public Collection<? extends ThreadResourceTracker> getThreadResources() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override
     public Map<String, ? extends QueryResourceTracker> getQueryResources() {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     public int getSetupTaskCount() {

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
@@ -54,7 +53,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
         SelectionOperatorUtils.getResultTableDataSchemaAndColumnIndices(_queryContext, dataSchema);
     int limit = _queryContext.getLimit();
     if (dataTableMap.isEmpty() || limit == 0) {
-      brokerResponseNative.setResultTable(new ResultTable(pair.getLeft(), Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTable(pair.getLeft(), List.of()));
       return;
     }
     if (_queryContext.getOrderByExpressions() == null) {

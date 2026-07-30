@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
@@ -94,7 +93,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override
@@ -128,6 +127,9 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   }
 
   private ImmutableRoaringBitmap getMatchingDocIdBitmap() {
+    // getMatchingDocIds may return a read-only bitmap backed by the index's (possibly memory-mapped) storage. This
+    // operator only iterates it (BitmapDocIdSet / BitmapCollection / getCardinality) within the segment's acquired
+    // lifetime and never mutates it, so a borrowed posting list can be consumed directly without a copy.
     if (_predicate != null) {
       return _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate());
     } else {

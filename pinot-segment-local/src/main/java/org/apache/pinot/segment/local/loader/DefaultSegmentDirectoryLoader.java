@@ -21,14 +21,12 @@ package org.apache.pinot.segment.local.loader;
 import java.io.File;
 import java.net.URI;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentLoader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +40,12 @@ public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
 
   /**
    * Creates and loads the {@link SegmentLocalFSDirectory} which is the default implementation of
-   * {@link SegmentDirectory}
+   * {@link SegmentDirectory}.
+   *
+   * <p>The {@link SegmentDirectoryLoaderContext} is forwarded into the {@link SegmentLocalFSDirectory}
+   * so downstream consumers (e.g. {@code SingleFileIndexDirectory#createRemoteBuffers}) can use it to
+   * propagate the table's task configuration into remote/empty index buffers.
+   *
    * @param indexDir segment index directory
    * @param segmentLoaderContext context for instantiation of the SegmentDirectory
    * @return instance of {@link SegmentLocalFSDirectory}
@@ -50,13 +53,13 @@ public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
   @Override
   public SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentLoaderContext)
       throws Exception {
-    PinotConfiguration segmentDirectoryConfigs = segmentLoaderContext.getSegmentDirectoryConfigs();
     File directory = new File(indexDir);
     if (!directory.exists()) {
       return new SegmentLocalFSDirectory(directory);
     }
-    return new SegmentLocalFSDirectory(directory, segmentLoaderContext,
-        ReadMode.valueOf(segmentDirectoryConfigs.getProperty(IndexLoadingConfig.READ_MODE_KEY)));
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(directory);
+    return new SegmentLocalFSDirectory(directory, metadata, segmentLoaderContext.getReadMode(),
+        segmentLoaderContext);
   }
 
   @Override

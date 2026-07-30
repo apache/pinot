@@ -234,16 +234,16 @@ public class RenewableTlsUtils {
       // Use daemon thread to allow JVM to exit when on-demand processes complete.
       Executors.newSingleThreadScheduledExecutor(new NamedThreadFactory(SSL_DAILY_RELOAD_THREAD_PREFIX, true))
               .scheduleAtFixedRate(() -> {
-        LOGGER.info("Creating a scheduled thread to reloadSsl once a day");
-        try {
-          reloadSslFactory(sslFactory,
-              keyStoreType, keyStorePath, keyStorePassword,
-              trustStoreType, trustStorePath, trustStorePassword,
-              sslContextProtocol, secureRandom, insecureModeSupplier);
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
-      }, CERT_RELOAD_JOB_INITAL_DELAY_IN_MINUTES, CERT_RELOAD_JOB_INTERVAL_IN_MINUTES, TimeUnit.MINUTES);
+                LOGGER.info("Creating a scheduled thread to reloadSsl once a day");
+                try {
+                  reloadSslFactory(sslFactory,
+                      keyStoreType, keyStorePath, keyStorePassword,
+                      trustStoreType, trustStorePath, trustStorePassword,
+                      sslContextProtocol, secureRandom, insecureModeSupplier);
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              }, CERT_RELOAD_JOB_INITAL_DELAY_IN_MINUTES, CERT_RELOAD_JOB_INTERVAL_IN_MINUTES, TimeUnit.MINUTES);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

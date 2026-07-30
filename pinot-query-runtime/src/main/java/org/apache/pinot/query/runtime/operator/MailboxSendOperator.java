@@ -21,14 +21,13 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
@@ -116,7 +115,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
     Function<List<SendingMailbox>, Integer> statsIndexChooser = getStatsIndexChooser(ctx, node);
     return BlockExchange.getExchange(perStageSendingMailboxes, RelDistribution.Type.BROADCAST_DISTRIBUTED,
-        Collections.emptyList(), mainSplitter, statsIndexChooser, node.getHashFunction());
+        List.of(), mainSplitter, statsIndexChooser, node.getHashFunction());
   }
 
   private static Function<List<SendingMailbox>, Integer> getStatsIndexChooser(OpChainExecutionContext ctx,
@@ -198,7 +197,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return Collections.singletonList(_input);
+    return List.of(_input);
   }
 
   @Override
@@ -260,10 +259,10 @@ public class MailboxSendOperator extends MultiStageOperator {
         serializedStats = stats.serialize();
       } catch (Exception e) {
         LOGGER.warn("Failed to serialize stats", e);
-        serializedStats = Collections.emptyList();
+        serializedStats = List.of();
       }
     } else {
-      serializedStats = Collections.emptyList();
+      serializedStats = List.of();
     }
     // no need to check early terminate signal b/c the current block is already EOS
     sendMseBlock(eosBlockWithoutStats, serializedStats);
@@ -308,17 +307,17 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private void updateMetrics(MultiStageQueryStats queryStats) {
-    ServerMetrics serverMetrics = ServerMetrics.get();
+    MseMetrics mseMetrics = MseMetrics.get();
     if (queryStats == null) {
       LOGGER.info("Query stats not found in the EOS block.");
     } else {
       for (MultiStageQueryStats.StageStats.Closed closed : queryStats.getClosedStats()) {
         if (closed != null) {
-          closed.forEach((type, stats) -> type.updateServerMetrics(stats, serverMetrics));
+          closed.forEach((type, stats) -> type.updateMseMetrics(stats, mseMetrics));
         }
       }
       queryStats.getCurrentStats().forEach((type, stats) -> {
-        type.updateServerMetrics(stats, serverMetrics);
+        type.updateMseMetrics(stats, mseMetrics);
       });
     }
   }

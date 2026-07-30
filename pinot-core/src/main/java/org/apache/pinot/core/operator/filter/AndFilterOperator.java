@@ -103,11 +103,7 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   @Override
   public boolean canOptimizeCount() {
-    boolean allChildrenCanProduceBitmaps = true;
-    for (BaseFilterOperator child : _filterOperators) {
-      allChildrenCanProduceBitmaps &= child.canProduceBitmaps();
-    }
-    return allChildrenCanProduceBitmaps;
+    return canProduceBitmaps();
   }
 
   @Override
@@ -121,6 +117,25 @@ public class AndFilterOperator extends BaseFilterOperator {
       bitmaps[i++] = child.getBitmaps().reduce();
     }
     return BufferFastAggregation.andCardinality(bitmaps);
+  }
+
+  @Override
+  public boolean canProduceBitmaps() {
+    for (BaseFilterOperator child : _filterOperators) {
+      if (!child.canProduceBitmaps()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Override
+  public BitmapCollection getBitmaps() {
+    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[_filterOperators.size()];
+    for (int i = 0; i < _filterOperators.size(); i++) {
+      bitmaps[i] = _filterOperators.get(i).getBitmaps().reduce();
+    }
+    return new BitmapCollection(_numDocs, false, BufferFastAggregation.and(bitmaps));
   }
 
   @Override

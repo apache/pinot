@@ -21,8 +21,8 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -64,8 +64,8 @@ public class MutableSegmentImplNullValueVectorTest implements PinotBuffersAfterC
     assertNotNull(dataResourceUrl);
     File jsonFile = new File(dataResourceUrl.getFile());
     _mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.emptySet(), Collections.emptySet(),
-            Collections.emptySet(), false, true);
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(), Set.of(),
+            Set.of(), false, true);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, jsonFile,
         schema.getColumnNames(), null)) {

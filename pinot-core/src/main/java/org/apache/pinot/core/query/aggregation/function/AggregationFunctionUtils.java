@@ -23,9 +23,10 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +42,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -54,6 +56,7 @@ import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -113,11 +116,11 @@ public class AggregationFunctionUtils {
     List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
     int numExpressions = expressions.size();
     if (numExpressions == 0) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     if (numExpressions == 1) {
       ExpressionContext expression = expressions.get(0);
-      return Collections.singletonMap(expression, valueBlock.getBlockValueSet(expression));
+      return Map.of(expression, valueBlock.getBlockValueSet(expression));
     }
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     for (ExpressionContext expression : expressions) {
@@ -136,7 +139,7 @@ public class AggregationFunctionUtils {
       AggregationFunctionColumnPair aggregationFunctionColumnPair, ValueBlock valueBlock) {
     ExpressionContext expression = ExpressionContext.forIdentifier(aggregationFunctionColumnPair.getColumn());
     BlockValSet blockValSet = valueBlock.getBlockValueSet(aggregationFunctionColumnPair.toColumnName());
-    return Collections.singletonMap(expression, blockValSet);
+    return Map.of(expression, blockValSet);
   }
 
   /**
@@ -163,6 +166,41 @@ public class AggregationFunctionUtils {
       case OBJECT:
         CustomObject customObject = dataTable.getCustomObject(rowId, colId);
         return customObject != null ? aggregationFunction.deserializeIntermediateResult(customObject) : null;
+      default:
+        throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);
+    }
+  }
+
+  /**
+   * Writes a non-OBJECT intermediate result into the {@link DataTableBuilder} at the given column.
+   * Counterpart of {@link #getIntermediateResult}. OBJECT columns are handled by the caller via
+   * {@link AggregationFunction#serializeIntermediateResult}, since they need the aggregation function.
+   */
+  public static void setIntermediateResult(DataTableBuilder dataTableBuilder, ColumnDataType columnDataType, int colId,
+      Object result)
+      throws IOException {
+    switch (columnDataType) {
+      case INT:
+        dataTableBuilder.setColumn(colId, (int) result);
+        break;
+      case LONG:
+        dataTableBuilder.setColumn(colId, (long) result);
+        break;
+      case FLOAT:
+        dataTableBuilder.setColumn(colId, (float) result);
+        break;
+      case DOUBLE:
+        dataTableBuilder.setColumn(colId, (double) result);
+        break;
+      case BIG_DECIMAL:
+        dataTableBuilder.setColumn(colId, (BigDecimal) result);
+        break;
+      case STRING:
+        dataTableBuilder.setColumn(colId, result.toString());
+        break;
+      case BYTES:
+        dataTableBuilder.setColumn(colId, (ByteArray) result);
+        break;
       default:
         throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);
     }
@@ -316,6 +354,11 @@ public class AggregationFunctionUtils {
   public static AggregationInfo buildAggregationInfoWithStarTree(SegmentContext segmentContext,
       QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
       BaseFilterOperator filterOperator, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
+    /// Star-tree stores pre-aggregated values per group key and cannot expand a row across multiple grouping
+    /// sets, so it cannot serve GROUP BY GROUPING SETS / ROLLUP / CUBE queries. Fall back to the regular path.
+    if (queryContext.isGroupingSets()) {
+      return null;
+    }
     if (!filterOperator.isResultEmpty()) {
       BaseProjectOperator<?> projectOperator =
           StarTreeUtils.createStarTreeBasedProjectOperator(segmentContext.getIndexSegment(), queryContext,
@@ -360,7 +403,7 @@ public class AggregationFunctionUtils {
       BaseProjectOperator<?> projectOperator =
           new ProjectPlanNode(segmentContext, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
               mainFilterOperator).run();
-      return Collections.singletonList(new AggregationInfo(aggregationFunctions, projectOperator, false));
+      return List.of(new AggregationInfo(aggregationFunctions, projectOperator, false));
     }
 
     // For each aggregation function, check if the aggregation function is a filtered aggregate. If so, populate the

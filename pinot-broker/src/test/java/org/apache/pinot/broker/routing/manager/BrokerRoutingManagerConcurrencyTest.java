@@ -170,7 +170,7 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     try {
       _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
     } catch (Exception e) {
-     Assert.fail("Direct call to processClusterChange failed", e);
+      Assert.fail("Direct call to processClusterChange failed", e);
     }
   }
 

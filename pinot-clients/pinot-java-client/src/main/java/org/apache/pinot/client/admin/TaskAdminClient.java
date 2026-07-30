@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client.admin;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
@@ -50,7 +51,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
   public Set<String> listTaskTypes()
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/tasktypes", null, _headers);
-    return PinotAdminTransport.getObjectMapper().convertValue(response.get("taskTypes"), Set.class);
+    return PinotAdminTransport.getObjectMapper().convertValue(response, Set.class);
   }
 
   /**
@@ -63,7 +64,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
   public TaskState getTaskQueueState(String taskType)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/" + taskType + "/state", null, _headers);
-    return TaskState.valueOf(response.get("state").asText());
+    return TaskState.valueOf(response.asText());
   }
 
   /**
@@ -76,7 +77,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
   public Set<String> getTasks(String taskType)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/" + taskType + "/tasks", null, _headers);
-    return PinotAdminTransport.getObjectMapper().convertValue(response.get("tasks"), Set.class);
+    return PinotAdminTransport.getObjectMapper().convertValue(response, Set.class);
   }
 
   /**
@@ -90,7 +91,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
       throws PinotAdminException {
     JsonNode response =
         _transport.executeGet(_controllerAddress, "/tasks/" + taskType + "/tasks/count", null, _headers);
-    return response.get("count").asInt();
+    return response.asInt();
   }
 
   /**
@@ -106,7 +107,8 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     JsonNode response =
         _transport.executeGet(_controllerAddress, "/tasks/" + taskType + "/" + tableNameWithType + "/state",
             null, _headers);
-    return PinotAdminTransport.getObjectMapper().convertValue(response.get("taskStates"), Map.class);
+    return PinotAdminTransport.getObjectMapper().convertValue(response, new TypeReference<Map<String, TaskState>>() {
+    });
   }
 
   /**
@@ -159,7 +161,8 @@ public class TaskAdminClient extends BaseServiceAdminClient {
       queryParams.put("state", state);
     }
     if (tableNameWithType != null) {
-      queryParams.put("tableNameWithType", tableNameWithType);
+      /// Controller reads the table filter from the "table" query param (see PinotTaskRestletResource#getTaskCounts).
+      queryParams.put("table", tableNameWithType);
     }
     if (minNumSubtasks != null) {
       queryParams.put("minNumSubtasks", String.valueOf(minNumSubtasks));
@@ -239,7 +242,9 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     Map<String, String> queryParams = new HashMap<>();
     queryParams.put("verbosity", String.valueOf(verbosity));
     if (tableNameWithType != null) {
-      queryParams.put("tableNameWithType", tableNameWithType);
+      /// Controller reads the table filter from the "tableName" query param (see
+      /// PinotTaskRestletResource#getTaskDebugInfo).
+      queryParams.put("tableName", tableNameWithType);
     }
 
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/task/" + taskName + "/debug",
@@ -257,7 +262,8 @@ public class TaskAdminClient extends BaseServiceAdminClient {
   public Map<String, TaskState> getTaskStates(String taskType)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/" + taskType + "/taskstates", null, _headers);
-    return PinotAdminTransport.getObjectMapper().convertValue(response.get("taskStates"), Map.class);
+    return PinotAdminTransport.getObjectMapper().convertValue(response, new TypeReference<Map<String, TaskState>>() {
+    });
   }
 
   /**
@@ -270,7 +276,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
   public TaskState getTaskState(String taskName)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/task/" + taskName + "/state", null, _headers);
-    return TaskState.valueOf(response.get("state").asText());
+    return TaskState.valueOf(response.asText());
   }
 
   /**
@@ -284,7 +290,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
       throws PinotAdminException {
     JsonNode response =
         _transport.executeGet(_controllerAddress, "/tasks/subtask/" + taskName + "/state", null, _headers);
-    return PinotAdminTransport.getObjectMapper().convertValue(response.get("subtaskStates"), Map.class);
+    return PinotAdminTransport.getObjectMapper().convertValue(response, Map.class);
   }
 
   /**
@@ -329,7 +335,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
   public CompletableFuture<Set<String>> listTaskTypesAsync() {
     return _transport.executeGetAsync(_controllerAddress, "/tasks/tasktypes", null, _headers)
         .thenApply(response -> PinotAdminTransport.getObjectMapper()
-            .convertValue(response.get("taskTypes"), Set.class));
+            .convertValue(response, Set.class));
   }
 
   /**
@@ -337,7 +343,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
    */
   public CompletableFuture<TaskState> getTaskQueueStateAsync(String taskType) {
     return _transport.executeGetAsync(_controllerAddress, "/tasks/" + taskType + "/state", null, _headers)
-        .thenApply(response -> TaskState.valueOf(response.get("state").asText()));
+        .thenApply(response -> TaskState.valueOf(response.asText()));
   }
 
   /**
@@ -345,7 +351,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
    */
   public CompletableFuture<Set<String>> getTasksAsync(String taskType) {
     return _transport.executeGetAsync(_controllerAddress, "/tasks/" + taskType + "/tasks", null, _headers)
-        .thenApply(response -> PinotAdminTransport.getObjectMapper().convertValue(response.get("tasks"), Set.class));
+        .thenApply(response -> PinotAdminTransport.getObjectMapper().convertValue(response, Set.class));
   }
 
   /**
@@ -353,6 +359,6 @@ public class TaskAdminClient extends BaseServiceAdminClient {
    */
   public CompletableFuture<TaskState> getTaskStateAsync(String taskName) {
     return _transport.executeGetAsync(_controllerAddress, "/tasks/task/" + taskName + "/state", null, _headers)
-        .thenApply(response -> TaskState.valueOf(response.get("state").asText()));
+        .thenApply(response -> TaskState.valueOf(response.asText()));
   }
 }

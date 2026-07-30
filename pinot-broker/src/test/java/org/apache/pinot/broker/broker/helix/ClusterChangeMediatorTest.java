@@ -19,7 +19,8 @@
 package org.apache.pinot.broker.broker.helix;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -48,7 +49,7 @@ public class ClusterChangeMediatorTest {
   @Test
   public void testDeadLock() {
     ClusterChangeMediator mediator = new ClusterChangeMediator(
-        Collections.singletonMap(ChangeType.IDEAL_STATE, Collections.singletonList(new Handler())),
+        Map.of(ChangeType.IDEAL_STATE, List.of(new Handler())),
         mock(BrokerMetrics.class));
     mediator.start();
 
@@ -65,7 +66,7 @@ public class ClusterChangeMediatorTest {
   private void sendClusterChange(ClusterChangeMediator mediator) {
     _lock.lock();
     try {
-      mediator.onIdealStateChange(Collections.emptyList(), mock(NotificationContext.class));
+      mediator.onIdealStateChange(List.of(), mock(NotificationContext.class));
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     } finally {

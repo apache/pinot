@@ -21,7 +21,6 @@ package org.apache.pinot.common.utils.config;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -150,8 +149,24 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
 
+  /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`
+  /// (absence ⇒ rewrite allowed) for backward compatibility with the pre-option behavior; the
+  /// MV minion executor sets it to `false` so a materialization query is never rewritten back
+  /// onto an MV.
+  public static boolean isMaterializedViewRewriteEnabled(Map<String, String> queryOptions) {
+    if (queryOptions == null) {
+      return true;
+    }
+    String value = queryOptions.get(QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE);
+    return value == null || Boolean.parseBoolean(value);
+  }
+
   public static boolean isSkipUpsertView(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT_VIEW));
+  }
+
+  public static boolean isSkipUpsertDelete(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT_DELETE));
   }
 
   public static boolean isTraceRuleProductions(Map<String, String> queryOptions) {
@@ -190,6 +205,13 @@ public class QueryOptionsUtils {
   public static Double getInvertedIndexDistinctCostRatio(Map<String, String> queryOptions) {
     return checkedParseDoubleNonNegative(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO,
         queryOptions.get(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO));
+  }
+
+  /// When true, [org.apache.pinot.core.operator.query.JsonIndexDistinctOperator] skips its missing-path handling —
+  /// does not add a 4-arg default, does not add null, and does not throw `Illegal Json Path`. The distinct set is
+  /// purely the values returned by the JSON-index lookup.
+  public static boolean isJsonIndexDistinctSkipMissingPath(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.JSON_INDEX_DISTINCT_SKIP_MISSING_PATH));
   }
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
@@ -272,7 +294,7 @@ public class QueryOptionsUtils {
   public static List<Integer> getOrderedPreferredPools(Map<String, String> queryOptions) {
     String orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_POOLS);
     if (StringUtils.isEmpty(orderedPreferredPools)) {
-      return Collections.emptyList();
+      return List.of();
     }
     // cannot use comma as the delimiter of pool list
     // because query option use comma as the delimiter of different options
@@ -528,6 +550,15 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
+  /**
+   * Reads the {@code streamStats} query option that opts a single query into the {@code SubmitWithStream}
+   * dispatch path. See {@link QueryOptionKey#STREAM_STATS}.
+   */
+  public static boolean isStreamStats(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.STREAM_STATS);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
   public static boolean isMultiClusterRoutingEnabled(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
@@ -557,6 +588,12 @@ public class QueryOptionsUtils {
     String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT);
     return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT, option)
         : defaultValue;
+  }
+
+  @Nullable
+  public static Integer getLiteModeImplicitLeafStageLimit(Map<String, String> queryOptions) {
+    String val = queryOptions.get(QueryOptionKey.LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT);
+    return val != null ? Integer.parseInt(val) : null;
   }
 
   @Nullable

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.utils.request;
 
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.dialect.AnsiSqlDialect;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -280,6 +283,95 @@ public class QueryFingerprintUtilsTest {
         "Multi-line and single-line queries should have same fingerprint");
     Assert.assertFalse(fingerprint1.getFingerprint().contains("\n"),
         "Fingerprint should not contain newlines");
+  }
+
+  /**
+   * Data provider for queries whose original SqlNode tree must not be mutated by fingerprint generation.
+   * The broker compiles the same SqlNode to a PinotQuery after computing the fingerprint, so any in-place
+   * mutation (e.g. literal -> SqlDynamicParam) breaks query execution downstream.
+   */
+  @DataProvider(name = "noMutationQueries")
+  public Object[][] provideNoMutationQueries() {
+    return new Object[][]{
+        // simple SELECT with WHERE literal
+        {"SELECT col1 FROM table1 WHERE col2 = 100"},
+        // IN list
+        {"SELECT col1 FROM table1 WHERE col2 IN (1, 2, 3)"},
+        // NOT IN list
+        {"SELECT col1 FROM table1 WHERE col2 NOT IN (1, 2, 3)"},
+        // IN with subquery (exercises the visitIn fallback branch)
+        {"SELECT col1 FROM table1 WHERE col2 IN (SELECT col2 FROM table2 WHERE col3 = 100)"},
+        // JOIN with literal in ON / WHERE
+        {"SELECT t1.col1, t2.col2 FROM table1 t1 JOIN table2 t2 ON t1.id = t2.id WHERE t1.col3 > 100"},
+        // BETWEEN
+        {"SELECT col1 FROM table1 WHERE col2 BETWEEN 10 AND 100"},
+        // CASE expression
+        {"SELECT CASE WHEN col1 > 100 THEN 'high' ELSE 'low' END FROM table1"},
+        // CTE
+        {"WITH cte AS (SELECT col1 FROM table1 WHERE col2 = 100) SELECT * FROM cte WHERE col1 > 50"},
+        // Window function with literal in aggregate
+        {"SELECT SUM(amount + 10) OVER (PARTITION BY category) FROM sales WHERE date_col = '2024-01-01'"},
+        // ORDER BY + LIMIT (top-level SqlOrderBy wraps SqlSelect)
+        {"SELECT col1 FROM table1 WHERE col2 = 100 ORDER BY col1 LIMIT 5"},
+    };
+  }
+
+  /**
+   * Regression: {@link QueryFingerprintUtils#generateFingerprint(SqlNodeAndOptions)} must not mutate the
+   * input {@link SqlNodeAndOptions#getSqlNode()}. The broker passes the same SqlNode to the compiler after
+   * computing the fingerprint, so any in-place replacement of literals with dynamic params would poison
+   * the parse tree and break downstream query compilation.
+   */
+  @Test(dataProvider = "noMutationQueries")
+  public void testFingerprintDoesNotMutateInputSqlNode(String query) throws Exception {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+    SqlNode originalSqlNode = sqlNodeAndOptions.getSqlNode();
+    String beforeFingerprint = originalSqlNode.toSqlString(c -> c.withDialect(AnsiSqlDialect.DEFAULT)).getSql();
+
+    QueryFingerprint fingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+    Assert.assertNotNull(fingerprint, "Fingerprint should be generated for query: " + query);
+
+    // Same object reference — no replacement was expected, just no mutation.
+    Assert.assertSame(sqlNodeAndOptions.getSqlNode(), originalSqlNode,
+        "SqlNodeAndOptions.getSqlNode() reference should be unchanged");
+
+    String afterFingerprint = originalSqlNode.toSqlString(c -> c.withDialect(AnsiSqlDialect.DEFAULT)).getSql();
+    Assert.assertEquals(afterFingerprint, beforeFingerprint,
+        "Original SqlNode must not be mutated by generateFingerprint. Query: " + query);
+    Assert.assertFalse(afterFingerprint.contains("?"),
+        "Original SqlNode should not contain dynamic params after fingerprinting. Query: " + query);
+  }
+
+  /**
+   * Data provider for single-stage queries that the broker's SSE path must be able to compile to a
+   * PinotQuery after fingerprint generation. JOIN/CTE/OVER are excluded here because they are MSE-only
+   * constructs in {@link CalciteSqlParser#compileToPinotQuery}.
+   */
+  @DataProvider(name = "noMutationSseQueries")
+  public Object[][] provideNoMutationSseQueries() {
+    return new Object[][]{
+        {"SELECT col1 FROM table1 WHERE col2 = 100"},
+        {"SELECT col1 FROM table1 WHERE col2 IN (1, 2, 3)"},
+        {"SELECT col1 FROM table1 WHERE col2 NOT IN (1, 2, 3)"},
+        {"SELECT col1 FROM table1 WHERE col2 BETWEEN 10 AND 100"},
+        {"SELECT col1 FROM table1 WHERE col2 = 100 ORDER BY col1 LIMIT 5"},
+        {"SELECT col1, COUNT(*) FROM table1 WHERE col2 > 100 GROUP BY col1 HAVING COUNT(*) > 10"},
+        {"SELECT CASE WHEN col1 > 100 THEN 'high' ELSE 'low' END FROM table1"},
+    };
+  }
+
+  /**
+   * End-to-end regression for the SSE broker flow: generate a fingerprint, then compile the same
+   * SqlNodeAndOptions to a PinotQuery. With the visitor mutating literals in place this used to fail
+   * because compileToPinotQuery saw SqlDynamicParam nodes where literals were expected.
+   */
+  @Test(dataProvider = "noMutationSseQueries")
+  public void testFingerprintThenSseCompileSucceeds(String query) throws Exception {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+    QueryFingerprint fingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+    Assert.assertNotNull(fingerprint, "Fingerprint should be generated for query: " + query);
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
+    Assert.assertNotNull(pinotQuery, "PinotQuery compilation should succeed after fingerprint. Query: " + query);
   }
 
   @Test

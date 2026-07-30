@@ -20,7 +20,7 @@ package org.apache.pinot.common.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
@@ -59,7 +59,7 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
   }
 
   public ServerMetrics(PinotMetricsRegistry metricsRegistry) {
-    this(DEFAULT_METRICS_PREFIX, metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptySet());
+    this(DEFAULT_METRICS_PREFIX, metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Set.of());
   }
 
   public ServerMetrics(PinotMetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,

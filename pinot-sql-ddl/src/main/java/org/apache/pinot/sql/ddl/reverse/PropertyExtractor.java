@@ -283,6 +283,9 @@ public final class PropertyExtractor {
     if (i.isAggregateMetrics()) {
       props.put("aggregateMetrics", "true");
     }
+    if (i.isCompressionStatsEnabled()) {
+      props.put("compressionStatsEnabled", "true");
+    }
     // Stream configs are routed verbatim with their original keys (stream.* / realtime.*).
     Map<String, String> streamConfigs = i.getStreamConfigs();
     if (streamConfigs != null) {
@@ -332,6 +335,11 @@ public final class PropertyExtractor {
     if (config.isDimTable()) {
       props.put("isDimTable", "true");
     }
+    // `isMaterializedView` is intentionally NOT emitted here. The flag (introduced in
+    // PR #18564) is identity, not configuration: it decides whether CanonicalDdlEmitter
+    // renders `CREATE TABLE` or `CREATE MATERIALIZED VIEW`, and round-tripping it through a
+    // PROPERTIES entry would only confuse users — both forward routers reject the key
+    // explicitly. The compiler stamps the flag automatically on the MV path.
     putIfPresent(props, "description", config.getDescription());
     List<String> tags = config.getTags();
     if (tags != null && !tags.isEmpty()) {

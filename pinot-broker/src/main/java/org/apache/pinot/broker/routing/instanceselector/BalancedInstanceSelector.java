@@ -86,7 +86,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
 
     for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
       _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
-        BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getKey()));
+          BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getKey()));
     }
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }

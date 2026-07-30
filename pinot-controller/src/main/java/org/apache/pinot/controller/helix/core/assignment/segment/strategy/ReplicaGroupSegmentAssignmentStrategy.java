@@ -33,6 +33,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +42,7 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupSegmentAssignmentStrategy.class);
 
   protected HelixManager _helixManager;
+  protected TableConfig _tableConfig;
   protected String _tableName;
   protected String _partitionColumn;
   protected int _replication;
@@ -48,6 +50,7 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
     _helixManager = helixManager;
+    _tableConfig = tableConfig;
     _tableName = tableConfig.getTableName();
     SegmentsValidationAndRetentionConfig validationAndRetentionConfig = tableConfig.getValidationConfig();
     Preconditions.checkState(validationAndRetentionConfig != null, "segmentsConfig is null");
@@ -77,9 +80,7 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
     if (numPartitions == 1) {
       partitionId = 0;
     } else {
-      partitionId =
-          SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableName, _helixManager, _partitionColumn)
-              % numPartitions;
+      partitionId = getPartitionIdFromSegmentName(segmentName, numPartitions);
     }
     return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);
   }
@@ -106,9 +107,7 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
     } else {
       Map<Integer, List<String>> instancePartitionIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numPartitions);
       for (String segmentName : currentAssignment.keySet()) {
-        int instancePartitionId =
-            SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableName, _helixManager, _partitionColumn)
-                % numPartitions;
+        int instancePartitionId = getPartitionIdFromSegmentName(segmentName, numPartitions);
         instancePartitionIdToSegmentsMap.computeIfAbsent(instancePartitionId, k -> new ArrayList<>()).add(segmentName);
       }
 
@@ -123,6 +122,16 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
       return SegmentAssignmentUtils
           .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions, instancePartitionIdToSegmentsMap);
     }
+  }
+
+  private int getPartitionIdFromSegmentName(String segmentName, int numPartitions) {
+    int rawPartitionId =
+        SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableName, _helixManager, _partitionColumn);
+    // For multi-stream realtime tables, translate the Pinot partition ID (which encodes stream index and stream
+    // partition as streamIndex * 10000 + streamPartitionId) to the stream partition id before computing the slot.
+    // getStreamPartitionIdFromPinotPartitionId is a no-op for offline tables and single-stream realtime tables.
+    rawPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_tableConfig, rawPartitionId);
+    return rawPartitionId % numPartitions;
   }
 
   /**

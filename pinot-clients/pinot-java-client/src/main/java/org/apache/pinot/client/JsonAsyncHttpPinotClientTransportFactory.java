@@ -85,9 +85,9 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
       _headers = ConnectionUtils.getHeadersFromProperties(properties);
     }
 
-    String scheme = properties.getProperty("scheme", CommonConstants.HTTP_PROTOCOL);
-    if (_scheme == null || !_scheme.contentEquals(scheme)) {
-      _scheme = scheme;
+    _scheme = properties.getProperty("scheme", _scheme);
+    if (_scheme == null) {
+      _scheme = CommonConstants.HTTP_PROTOCOL;
     }
 
     if (_sslContext == null && _scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {

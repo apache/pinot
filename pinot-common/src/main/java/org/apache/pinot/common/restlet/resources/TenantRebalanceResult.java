@@ -530,10 +530,7 @@ public class TenantRebalanceResult {
 
       // Aggregate server consuming segment summaries by server name
       if (summary.getServerConsumingSegmentSummary() != null) {
-        for (Map.Entry<String,
-            RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer> entry
-            : summary.getServerConsumingSegmentSummary()
-            .entrySet()) {
+        for (var entry : summary.getServerConsumingSegmentSummary().entrySet()) {
           String serverName = entry.getKey();
           RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer serverSummary =
               entry.getValue();

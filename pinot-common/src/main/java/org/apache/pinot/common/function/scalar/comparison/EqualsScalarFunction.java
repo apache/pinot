@@ -38,7 +38,7 @@ public class EqualsScalarFunction extends PolymorphicComparisonScalarFunction {
 
   static {
     try {
-       DOUBLE_EQUALS_WITH_TOLERANCE = new FunctionInfo(
+      DOUBLE_EQUALS_WITH_TOLERANCE = new FunctionInfo(
            EqualsScalarFunction.class.getMethod("doubleEqualsWithTolerance", double.class, double.class),
            EqualsScalarFunction.class, false);
 

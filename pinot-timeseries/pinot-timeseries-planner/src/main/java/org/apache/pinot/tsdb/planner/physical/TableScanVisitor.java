@@ -91,7 +91,7 @@ public class TableScanVisitor {
     if (planNode instanceof LeafTimeSeriesPlanNode) {
       LeafTimeSeriesPlanNode sfpNode = (LeafTimeSeriesPlanNode) planNode;
       TableRouteInfo routeInfo = _tableRouteProvider.getTableRouteInfo(sfpNode.getTableName(), _tableCache,
-        _routingManager);
+          _routingManager);
       String tableNameWithType = getTableNameWithType(routeInfo);
       Preconditions.checkNotNull(tableNameWithType, "Table not found for table name: " + sfpNode.getTableName());
       requestContext.setTableName(tableNameWithType);
@@ -115,7 +115,7 @@ public class TableScanVisitor {
   @Nullable
   private String getTableNameWithType(TableRouteInfo routeInfo) {
     Preconditions.checkState(!routeInfo.isHybrid(),
-      "Hybrid tables are not supported yet for timeseries queries");
+        "Hybrid tables are not supported yet for timeseries queries");
     if (routeInfo.isOffline()) {
       return routeInfo.getOfflineTableName();
     }

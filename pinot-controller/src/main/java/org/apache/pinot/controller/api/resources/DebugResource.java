@@ -419,10 +419,16 @@ public class DebugResource {
     ExternalView externalView =
         helixDataAccessor.getProperty(helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE));
 
-    for (Map.Entry<String, String> entry : idealState.getInstanceStateMap(tableNameWithType).entrySet()) {
+    Map<String, String> isStateMap = idealState != null ? idealState.getInstanceStateMap(tableNameWithType) : null;
+    if (isStateMap == null) {
+      return brokerDebugInfos;
+    }
+    Map<String, String> evStateMap =
+        externalView != null ? externalView.getStateMap(tableNameWithType) : null;
+    for (Map.Entry<String, String> entry : isStateMap.entrySet()) {
       String brokerName = entry.getKey();
       String isState = entry.getValue();
-      String evState = externalView.getStateMap(tableNameWithType).get(brokerName);
+      String evState = evStateMap != null ? evStateMap.get(brokerName) : null;
       if (verbosity > 0 || !isState.equals(evState)) {
         brokerDebugInfos.add(new TableDebugInfo.BrokerDebugInfo(brokerName, isState, evState));
       }

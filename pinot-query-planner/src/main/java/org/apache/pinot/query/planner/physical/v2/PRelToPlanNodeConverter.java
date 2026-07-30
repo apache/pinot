@@ -43,10 +43,12 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.rules.GroupingSetsPlanUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
@@ -188,7 +190,8 @@ public class PRelToPlanNodeConverter {
     }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         new ArrayList<>(), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
-        aggCalls, windowFrameType, lowerBound, upperBound, constants);
+        aggCalls, windowFrameType, lowerBound, upperBound,
+        RelToPlanNodeConverter.fromRexWindowExclusion(windowGroup.exclude), constants);
   }
 
   public static SortNode convertSort(Sort node) {
@@ -199,6 +202,8 @@ public class PRelToPlanNodeConverter {
   }
 
   public static AggregateNode convertAggregate(PhysicalAggregate node) {
+    /// GROUP BY GROUPING SETS / ROLLUP / CUBE is split by AggregatePushdownRule (LEAF carrying the grouping sets +
+    /// $groupingId, FINAL grouping on $groupingId); the grouping sets below carry to the runtime RepeatOperator.
     List<AggregateCall> aggregateCalls = node.getAggCallList();
     int numAggregates = aggregateCalls.size();
     List<RexExpression.FunctionCall> functionCalls = new ArrayList<>(numAggregates);
@@ -209,7 +214,8 @@ public class PRelToPlanNodeConverter {
     }
     return new AggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         new ArrayList<>(), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
-        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit());
+        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(),
+        GroupingSetsPlanUtils.computeGroupingSets(node));
   }
 
   public static ProjectNode convertProject(Project node) {
@@ -307,9 +313,23 @@ public class PRelToPlanNodeConverter {
       case TINYINT:
       case SMALLINT:
       case INTEGER:
+      // Calcite 1.41+ (CALCITE-1466) parses unsigned integer types under BABEL conformance. Pinot has no unsigned
+      // storage, so map each to the narrowest signed type that holds its full range: UTINYINT (0..2^8-1) and
+      // USMALLINT (0..2^16-1) fit in INT; UINTEGER (0..2^32-1) needs LONG (a signed INT would wrap values above 2^31).
+      // Kept in sync with RelToPlanNodeConverter.convertToColumnDataType.
+      case UTINYINT:
+      case USMALLINT:
         return isArray ? ColumnDataType.INT_ARRAY : ColumnDataType.INT;
       case BIGINT:
+      case UINTEGER:
         return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
+      // UBIGINT (0..2^64-1) has no signed Pinot type wide enough to hold its full range; mapping it to LONG would
+      // silently wrap values above Long.MAX_VALUE (a wrong result), so reject it at planning instead. CALCITE-1466.
+      // Kept in sync with RelToPlanNodeConverter.convertToColumnDataType.
+      case UBIGINT:
+        throw new IllegalArgumentException(
+            "Unsigned BIGINT (BIGINT UNSIGNED) is not supported: Pinot has no type that can represent the full "
+                + "unsigned 64-bit range. CAST to BIGINT or DECIMAL instead.");
       case DECIMAL:
         return resolveDecimal(relDataType, isArray);
       case FLOAT:

@@ -43,10 +43,10 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             "null"
         )
         .whenQuery("select DISTINCT_COUNT(myField) from testTable")
-        .thenResultIs("INTEGER",
+        .thenResultIs("INT",
             "3"
         ).whenQueryWithNullHandlingEnabled("select DISTINCT_COUNT(myField) from testTable")
-        .thenResultIs("INTEGER",
+        .thenResultIs("INT",
             "2"
         );
   }
@@ -68,14 +68,14 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             "null"
         )
         .whenQuery("select myField, DISTINCT_COUNT(myField) from testTable group by myField order by myField")
-        .thenResultIs("INTEGER | INTEGER",
+        .thenResultIs("INT | INT",
             "-2147483648 | 1",
             "1           | 1",
             "2           | 1"
         )
         .whenQueryWithNullHandlingEnabled(
             "select myField, DISTINCT_COUNT(myField) from testTable  group by myField order by myField")
-        .thenResultIs("INTEGER | INTEGER",
+        .thenResultIs("INT | INT",
             "1    | 1",
             "2    | 1",
             "null | 0"
@@ -102,7 +102,7 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
         )
         .whenQuery("select tags, DISTINCT_COUNT(value) from testTable group by tags order by tags")
         .thenResultIs(
-            "STRING | INTEGER",
+            "STRING | INT",
             "tag1    | 1",
             "tag2    | 2",
             "tag3    | 1"
@@ -110,7 +110,7 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
         .whenQueryWithNullHandlingEnabled(
             "select tags, DISTINCT_COUNT(value) from testTable group by tags order by tags")
         .thenResultIs(
-            "STRING | INTEGER",
+            "STRING | INT",
             "tag1    | 1",
             "tag2    | 1",
             "tag3    | 0"
@@ -135,7 +135,7 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             new Object[]{"9;10;11;12"}
         )
         .whenQuery("select DISTINCT_COUNT(mv) from testTable")
-        .thenResultIs("INTEGER", "12");
+        .thenResultIs("INT", "12");
   }
 
   @Test
@@ -156,9 +156,9 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             new Object[]{"1;2"}
         )
         .whenQuery("select DISTINCT_COUNT(mv) from testTable")
-        .thenResultIs("INTEGER", "3")
+        .thenResultIs("INT", "3")
         .whenQueryWithNullHandlingEnabled("select DISTINCT_COUNT(mv) from testTable")
-        .thenResultIs("INTEGER", "2");
+        .thenResultIs("INT", "2");
   }
 
   @Test
@@ -179,9 +179,9 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             new Object[]{"1;2", "k1"}
         )
         .whenQuery("select DISTINCT_COUNT(mv) from testTable group by sv")
-        .thenResultIs("INTEGER", "3")
+        .thenResultIs("INT", "3")
         .whenQueryWithNullHandlingEnabled("select DISTINCT_COUNT(mv) from testTable group by sv")
-        .thenResultIs("INTEGER", "2");
+        .thenResultIs("INT", "2");
   }
 
   @Test
@@ -200,7 +200,7 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             "3.5"
         )
         .whenQuery("select DISTINCT_COUNT(myField) from testTable")
-        .thenResultIs("INTEGER", "3");
+        .thenResultIs("INT", "3");
   }
 
   @Test
@@ -222,7 +222,7 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             new Object[]{"b", "3.5"}
         )
         .whenQuery("select grp, DISTINCT_COUNT(value) from testTable group by grp order by grp")
-        .thenResultIs("STRING | INTEGER",
+        .thenResultIs("STRING | INT",
             "a | 2",
             "b | 1"
         );
@@ -244,7 +244,7 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             new Object[]{"3.5;4.5"}
         )
         .whenQuery("select DISTINCT_COUNT(mv) from testTable")
-        .thenResultIs("INTEGER", "4");
+        .thenResultIs("INT", "4");
   }
 
   @Test
@@ -265,7 +265,7 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             new Object[]{"b", "3.5;4.5"}
         )
         .whenQuery("select grp, DISTINCT_COUNT(mv) from testTable group by grp order by grp")
-        .thenResultIs("STRING | INTEGER",
+        .thenResultIs("STRING | INT",
             "a | 3",
             "b | 2"
         );
@@ -286,7 +286,7 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             new Object[]{"b;c", "2.5;3.5"}
         )
         .whenQuery("select grp, DISTINCT_COUNT(mv) from testTable group by grp order by grp")
-        .thenResultIs("STRING | INTEGER",
+        .thenResultIs("STRING | INT",
             "a | 2",
             "b | 3",
             "c | 2"
@@ -312,8 +312,8 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
             new Object[]{"1;2", "k1;k2"}
         )
         .whenQuery("select DISTINCT_COUNT(mv1) from testTable group by mv2")
-        .thenResultIs("INTEGER", "3", "3")
+        .thenResultIs("INT", "3", "3")
         .whenQueryWithNullHandlingEnabled("select DISTINCT_COUNT(mv1) from testTable group by mv2")
-        .thenResultIs("INTEGER", "2", "2");
+        .thenResultIs("INT", "2", "2");
   }
 }

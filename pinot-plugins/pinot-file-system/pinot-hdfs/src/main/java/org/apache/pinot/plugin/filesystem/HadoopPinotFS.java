@@ -239,7 +239,11 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public boolean isDirectory(URI uri)
       throws IOException {
-    return _hadoopFS.getFileStatus(new Path(uri)).isDirectory();
+    try {
+      return _hadoopFS.getFileStatus(new Path(uri)).isDirectory();
+    } catch (FileNotFoundException e) {
+      return false;
+    }
   }
 
   @Override

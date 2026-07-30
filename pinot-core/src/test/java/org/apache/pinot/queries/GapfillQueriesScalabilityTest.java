@@ -108,7 +108,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
     for (int i = 0; i < 15; i++) {
       for (int j = 0; j < NUM_LOTS; j++) {
         for (int k = 0; k < 4; k++) {
-            records.add(createRow(start + i * 3600_000, k, i * NUM_LOTS + j, true));
+          records.add(createRow(start + i * 3600_000, k, i * NUM_LOTS + j, true));
         }
       }
     }

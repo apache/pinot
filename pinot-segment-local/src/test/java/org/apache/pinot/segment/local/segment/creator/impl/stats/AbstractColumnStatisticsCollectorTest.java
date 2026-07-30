@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import java.math.BigDecimal;
-import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
@@ -61,7 +61,7 @@ public class AbstractColumnStatisticsCollectorTest {
 
     if (withPartitioning) {
       builder.setSegmentPartitionConfig(new SegmentPartitionConfig(
-          Collections.singletonMap(COLUMN_NAME, new ColumnPartitionConfig("Murmur", NUM_PARTITIONS))));
+          Map.of(COLUMN_NAME, new ColumnPartitionConfig("Murmur", NUM_PARTITIONS))));
     }
 
     TableConfig tableConfig = builder.build();

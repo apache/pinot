@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -367,7 +366,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
     }
     updated |= HelixHelper.addDefaultTags(instanceConfig,
-        () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
+        () -> List.of(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
     updated |= HelixHelper.updateMaxConcurrentTasksPerInstance(instanceConfig,

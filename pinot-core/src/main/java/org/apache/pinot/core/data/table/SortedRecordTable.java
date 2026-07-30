@@ -53,7 +53,7 @@ public class SortedRecordTable extends BaseTable {
       QueryContext queryContext, ExecutorService executorService) {
     super(dataSchema);
     assert queryContext.getGroupByExpressions() != null;
-    _numKeyColumns = queryContext.getGroupByExpressions().size();
+    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _executorService = executorService;
     _numThreadsExtractFinalResult = Math.min(queryContext.getNumThreadsExtractFinalResult(),

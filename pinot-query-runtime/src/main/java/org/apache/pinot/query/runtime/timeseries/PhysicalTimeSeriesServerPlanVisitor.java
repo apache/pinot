@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.timeseries;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +82,7 @@ public class PhysicalTimeSeriesServerPlanVisitor {
 
   private TimeSeriesPhysicalTableScan convertLeafToPhysicalTableScan(LeafTimeSeriesPlanNode leafNode,
       TimeSeriesExecutionContext context) {
-    List<String> segments = context.getPlanIdToSegmentsMap().getOrDefault(leafNode.getId(), Collections.emptyList());
+    List<String> segments = context.getPlanIdToSegmentsMap().getOrDefault(leafNode.getId(), List.of());
     ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, segments, context);
     return new TimeSeriesPhysicalTableScan(context, leafNode.getId(), serverQueryRequest, _queryExecutor,
         _executorService);
@@ -111,7 +110,7 @@ public class PhysicalTimeSeriesServerPlanVisitor {
         leafNode.getValueExpression(), rawTimeValuesInLong, leafNode.getTimeUnit(),
         leafNode.getOffsetSeconds() == null ? 0 : leafNode.getOffsetSeconds(), timeBuckets, leafNode.getAggInfo());
     Map<String, String> queryOptions = new HashMap<>(Optional.ofNullable(leafNode.getQueryOptions())
-            .orElseGet(Collections::emptyMap));
+            .orElseGet(Map::of));
     queryOptions.put(QueryOptionKey.TIMEOUT_MS, Long.toString(Math.max(0L, context.getRemainingTimeMs())));
     return new QueryContext.Builder()
         .setTableName(leafNode.getTableName())
@@ -119,7 +118,7 @@ public class PhysicalTimeSeriesServerPlanVisitor {
         .setGroupByExpressions(groupByExpressions)
         .setSelectExpressions(List.of(aggregation))
         .setQueryOptions(queryOptions)
-        .setAliasList(Collections.emptyList())
+        .setAliasList(List.of())
         .setLimit(leafNode.getLimit())
         .build();
   }

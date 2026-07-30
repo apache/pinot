@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -48,8 +47,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -215,13 +212,11 @@ public class LuceneTextIndexConfigReloadTest {
    */
   private boolean checkNeedUpdateIndices(File segmentFile, TableConfig tableConfig, Schema schema)
       throws Exception {
-    Map<String, Object> props = new HashMap<>();
-    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap);
-    PinotConfiguration segmentDirectoryConfigs = new PinotConfiguration(props);
-
-    SegmentDirectoryLoaderContext segmentLoaderContext =
-        new SegmentDirectoryLoaderContext.Builder().setTableConfig(tableConfig).setSchema(schema)
-            .setSegmentName(segmentFile.getName()).setSegmentDirectoryConfigs(segmentDirectoryConfigs).build();
+    SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setSegmentName(segmentFile.getName())
+        .build();
     SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(segmentFile.toURI(), segmentLoaderContext);
 

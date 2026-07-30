@@ -157,8 +157,13 @@ public final class AndDocIdSet implements BlockDocIdSet {
         if (numBitmapBasedDocIdIterators == 1) {
           docIds = bitmapBasedDocIdIterators.get(0).getDocIds();
         } else {
-          MutableRoaringBitmap mutableDocIds = bitmapBasedDocIdIterators.get(0).getDocIds().toMutableRoaringBitmap();
-          for (int i = 1; i < numBitmapBasedDocIdIterators; i++) {
+          // NOTE: Intersect the two lowest-cardinality bitmaps (guaranteed by the sort above) into a fresh result
+          //       with the static and(), which allocates only the intersection's containers, then intersect the
+          //       remaining bitmaps into it in place (the intersection is usually much smaller than any operand).
+          //       Inputs are never mutated.
+          MutableRoaringBitmap mutableDocIds = ImmutableRoaringBitmap.and(
+              bitmapBasedDocIdIterators.get(0).getDocIds(), bitmapBasedDocIdIterators.get(1).getDocIds());
+          for (int i = 2; i < numBitmapBasedDocIdIterators; i++) {
             mutableDocIds.and(bitmapBasedDocIdIterators.get(i).getDocIds());
           }
           docIds = mutableDocIds;

@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 public class HashUtils {
@@ -47,6 +48,15 @@ public class HashUtils {
   /**
    * Returns a byte array that is a concatenation of the binary representation of each of the passed UUID values.
    * If any of the values is not a valid UUID, then we return the result of {@link PrimaryKey#asBytes()}.
+   *
+   * <p>String inputs are parsed via {@link UUID#fromString(String)} (lenient — accepts non-canonical short
+   * forms like {@code "1-2-3-4-5"}) for backward compatibility with tables that have been hashed under the
+   * pre-UUID-type {@code HashFunction.UUID} contract. Binary inputs ({@code byte[]} or {@link UUID}) go
+   * through {@link UuidUtils#toBytes(Object)} since they carry no parse ambiguity. Un-parseable strings
+   * (and any other invalid value) still fall through to {@link PrimaryKey#asBytes()} via the outer
+   * {@code catch (RuntimeException)} below — matching master's behavior. Newly-declared
+   * {@code DataType.UUID} primary-key columns are independently constrained to canonical form at ingest
+   * time by {@code DataTypeTransformer.validateCanonicalUuidPrimaryKey}.
    */
   public static byte[] hashUUID(PrimaryKey primaryKey) {
     Object[] values = primaryKey.getValues();
@@ -56,14 +66,17 @@ public class HashUtils {
       if (value == null) {
         throw new IllegalArgumentException("Found null value in primary key");
       }
-      UUID uuid;
       try {
-        uuid = UUID.fromString(value.toString());
-      } catch (Throwable t) {
+        if (value instanceof CharSequence) {
+          UUID uuid = UUID.fromString(value.toString());
+          byteBuffer.putLong(uuid.getMostSignificantBits());
+          byteBuffer.putLong(uuid.getLeastSignificantBits());
+        } else {
+          byteBuffer.put(UuidUtils.toBytes(value));
+        }
+      } catch (RuntimeException e) {
         return primaryKey.asBytes();
       }
-      byteBuffer.putLong(uuid.getMostSignificantBits());
-      byteBuffer.putLong(uuid.getLeastSignificantBits());
     }
     return result;
   }

@@ -22,7 +22,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -153,7 +152,7 @@ public class SelectionOperatorServiceTest {
     when(dataSchema.getColumnNames()).thenReturn(new String[]{"*"});
     selectionColumns = SelectionOperatorUtils.getSelectionColumns(
         QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable"), dataSchema);
-    assertEquals(selectionColumns, new ArrayList<>(Collections.singletonList("*")));
+    assertEquals(selectionColumns, new ArrayList<>(List.of("*")));
   }
 
   @Test
@@ -180,7 +179,7 @@ public class SelectionOperatorServiceTest {
         OrderByComparatorFactory.getComparator(_queryContext.getOrderByExpressions(), false);
     int maxNumRows = _queryContext.getOffset() + _queryContext.getLimit();
     SelectionResultsBlock mergedBlock =
-        new SelectionResultsBlock(_dataSchema, Collections.emptyList(), comparator, _queryContext);
+        new SelectionResultsBlock(_dataSchema, List.of(), comparator, _queryContext);
     List<Object[]> rowsToMerge1 = Arrays.asList(_row2, _row1);
     SelectionResultsBlock blockToMerge1 =
         new SelectionResultsBlock(_dataSchema, rowsToMerge1, comparator, _queryContext);

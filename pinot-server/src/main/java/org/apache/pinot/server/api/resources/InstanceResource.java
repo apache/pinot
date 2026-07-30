@@ -28,7 +28,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
@@ -86,7 +85,7 @@ public class InstanceResource {
     if (config != null && config.getTags() != null) {
       return config.getTags();
     }
-    return Collections.emptyList();
+    return List.of();
   }
 
   /**
@@ -104,10 +103,10 @@ public class InstanceResource {
   public Map<String, String> getInstancePools() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
     if (instanceConfig == null || instanceConfig.getRecord() == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, String> pools = instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY);
-    return pools == null ? Collections.emptyMap() : pools;
+    return pools == null ? Map.of() : pools;
   }
 
   @GET

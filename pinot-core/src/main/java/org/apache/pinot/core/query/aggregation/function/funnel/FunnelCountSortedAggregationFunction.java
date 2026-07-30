@@ -34,6 +34,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
  * It leverages a more efficient counting strategy for segments sorted by correlate_by column, falls back to a regular
  * counting strategy for unsorted segments (e.g. uncommitted segments).
  *
+ * <p>For multi-key correlate-by, the sorted/partitioned optimization applies to the first (primary) column only.
+ *
  * Example:
  *   SELECT
  *    dateTrunc('day', timestamp) AS ts,
@@ -59,14 +61,14 @@ public class FunnelCountSortedAggregationFunction<A> extends FunnelCountAggregat
     super(expressions, stepExpressions, correlateByExpressions, aggregationStrategy, resultExtractionStrategy,
         mergeStrategy);
     _sortedAggregationStrategy = new SortedAggregationStrategy(stepExpressions, correlateByExpressions);
-    _sortedResultExtractionStrategy = SortedAggregationResult::extractResult;;
+    _sortedResultExtractionStrategy = SortedAggregationResult::extractResult;
     _primaryCorrelationCol = correlateByExpressions.get(0);
   }
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (isSortedDictionary(blockValSetMap)) {
+    if (isPrimarySortedDictionary(blockValSetMap)) {
       _sortedAggregationStrategy.aggregate(length, aggregationResultHolder, blockValSetMap);
     } else {
       super.aggregate(length, aggregationResultHolder, blockValSetMap);
@@ -76,7 +78,7 @@ public class FunnelCountSortedAggregationFunction<A> extends FunnelCountAggregat
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (isSortedDictionary(blockValSetMap)) {
+    if (isPrimarySortedDictionary(blockValSetMap)) {
       _sortedAggregationStrategy.aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
     } else {
       super.aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
@@ -86,7 +88,7 @@ public class FunnelCountSortedAggregationFunction<A> extends FunnelCountAggregat
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (isSortedDictionary(blockValSetMap)) {
+    if (isPrimarySortedDictionary(blockValSetMap)) {
       _sortedAggregationStrategy.aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
     } else {
       super.aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
@@ -111,15 +113,15 @@ public class FunnelCountSortedAggregationFunction<A> extends FunnelCountAggregat
     }
   }
 
-  private boolean isSortedDictionary(Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    return getDictionary(blockValSetMap).isSorted();
+  private boolean isPrimarySortedDictionary(Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    return getPrimaryDictionary(blockValSetMap).isSorted();
   }
 
   private boolean isSortedAggResult(Object aggResult) {
     return aggResult instanceof SortedAggregationResult;
   }
 
-  private Dictionary getDictionary(Map<ExpressionContext, BlockValSet> blockValSetMap) {
+  private Dictionary getPrimaryDictionary(Map<ExpressionContext, BlockValSet> blockValSetMap) {
     final Dictionary primaryCorrelationDictionary = blockValSetMap.get(_primaryCorrelationCol).getDictionary();
     Preconditions.checkArgument(primaryCorrelationDictionary != null,
         "CORRELATE_BY column in FUNNELCOUNT aggregation function not supported for sorted setting, "

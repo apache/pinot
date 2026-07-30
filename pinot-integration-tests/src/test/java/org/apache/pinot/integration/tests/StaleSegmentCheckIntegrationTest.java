@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -56,7 +55,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   private Schema _schema;
   private List<File> _avroFiles;
   private static final String H3_INDEX_COLUMN = "h3Column";
-  private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
+  private static final Map<String, String> H3_INDEX_PROPERTIES = Map.of("resolutions", "5");
   private static final String TEXT_INDEX_COLUMN = "textColumn";
   private static final String NULL_INDEX_COLUMN = "nullField";
 
@@ -91,7 +90,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setTimeColumnName(getTimeColumnName())
             .setIngestionConfig(getIngestionConfig()).setNullHandlingEnabled(true)
-            .setNoDictionaryColumns(Collections.singletonList(TEXT_INDEX_COLUMN)).build();
+            .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN)).build();
     addTableConfig(_tableConfig);
 
     // Create and upload segments
@@ -129,7 +128,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     // Add a sorted column to the table
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    indexingConfig.setSortedColumn(Collections.singletonList("Carrier"));
+    indexingConfig.setSortedColumn(List.of("Carrier"));
     updateTableConfig(_tableConfig);
 
     Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
@@ -142,7 +141,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     // Add a raw index column
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    indexingConfig.setNoDictionaryColumns(Collections.singletonList("ActualElapsedTime"));
+    indexingConfig.setNoDictionaryColumns(List.of("ActualElapsedTime"));
     updateTableConfig(_tableConfig);
 
     Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
@@ -154,7 +153,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   public void testH3IndexChange()
       throws Exception {
     // Add a H3 index column
-    _tableConfig.setFieldConfigList(Collections.singletonList(getH3FieldConfig()));
+    _tableConfig.setFieldConfigList(List.of(getH3FieldConfig()));
     updateTableConfig(_tableConfig);
 
     Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();

@@ -37,6 +37,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -148,7 +149,7 @@ public class PluginManager {
   PluginManager() {
     // For the shaded plugins
     _registry = new HashMap<>();
-    _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
+    _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(List.of()));
 
     // for the new pinot plugins
     try {
@@ -296,10 +297,19 @@ public class PluginManager {
 
         ClassRealm pinotRealm = _classWorld.getClassRealm(PINOT_REALMID);
 
-        // All packages to look up in pinot realm BEFORE itself
-        Stream<String> importedPinotPackages =
-            Stream.of("org.apache.pinot.spi"); // this works like a prefix, so ALL spi classes will be accessible
-        importedPinotPackages.forEach(p -> pluginRealm.importFrom(pinotRealm, p));
+        // All packages to look up in pinot realm BEFORE itself.
+        // Acts like a prefix so all classes in (and below) the listed package are accessible.
+        // Hardcoding the list here is cheap while it stays small. A cleaner long-term approach
+        // would have each SPI module self-declare its exports in a META-INF/pinot-realm-exports
+        // resource file (one package per line) and have PluginManager discover them at init time
+        // via ClassLoader.getResources() — that would eliminate the layering violation of
+        // pinot-spi naming packages from higher-level modules such as pinot-query-planner-spi.
+        // TODO: implement the self-declaring META-INF/pinot-realm-exports mechanism.
+        Stream.of(
+            "org.apache.pinot.spi",
+            "org.apache.pinot.query.planner.spi",     // RuleSetCustomizer SPI (pinot-query-planner-spi)
+            "org.apache.calcite.plan"                 // RelOptRule, used by RuleSetCustomizer.customize
+        ).forEach(p -> pluginRealm.importFrom(pinotRealm, p));
 
         // Additional importForm as specified by the plugin configuration
         config.getImportsFromPerRealm().forEach((r, ifs) -> {
@@ -626,9 +636,19 @@ public class PluginManager {
     return null;
   }
 
-  /// Discovers all `ServiceLoader` implementations of `iface` across every plugin classloader
-  /// known to this manager (both legacy [PluginClassLoader] entries and Plexus
-  /// [ClassRealm]s) plus the classloader that loaded this class.
+  /// Discovers all `ServiceLoader` implementations of `iface` across **every** classloader that
+  /// can contribute an extension.
+  ///
+  /// Classloaders consulted, in this order:
+  ///  1. the classloader that loaded this class (Pinot core / `pinot-all.jar`);
+  ///  2. every Plexus [ClassRealm] — new-style plugin realms **and** the core `pinot` and
+  ///     `DEFAULT` realms;
+  ///  3. every legacy [PluginClassLoader] in the registry.
+  ///
+  /// Contrast with [#getPluginClassLoaders], which is deliberately narrower: it returns only
+  /// the new-style plugin realms — items 1 and 3 above, plus the `pinot` and `DEFAULT` realms,
+  /// are excluded there. Prefer this method unless an extension point must be restricted to
+  /// new-style plugins.
   ///
   /// Use this in place of `ServiceLoader.load(iface)` (which only consults the
   /// thread-context classloader). When plugins live in isolated realms — i.e. their classes
@@ -648,23 +668,43 @@ public class PluginManager {
   /// registered after the snapshot is taken won't be visible to that call. Safe to call from
   /// any thread under those semantics.
   public <T> List<T> loadServices(Class<T> iface) {
-    List<ClassLoader> classLoaders;
-    synchronized (this) {
-      classLoaders = new ArrayList<>(_classWorld.getRealms().size() + _registry.size());
-      classLoaders.add(getClass().getClassLoader());
-      for (ClassRealm realm : _classWorld.getRealms()) {
-        classLoaders.add(realm);
-      }
-      for (PluginClassLoader pluginClassLoader : _registry.values()) {
-        classLoaders.add(pluginClassLoader);
-      }
-    }
+    // Snapshot under the lock, then run ServiceLoader outside it: instantiating arbitrary
+    // plugin-provided implementations while holding the manager lock risks deadlock if an
+    // implementation's constructor calls back into PluginManager.
+    Set<ClassLoader> classLoaders = collectClassLoaders(true);
     List<T> results = new ArrayList<>();
     Set<String> seenFqcns = new HashSet<>();
     for (ClassLoader cl : classLoaders) {
       loadServicesInto(iface, cl, results, seenFqcns);
     }
     return results;
+  }
+
+  /// Snapshots the classloaders to walk, in discovery order.
+  ///
+  /// With `includeCoreAndLegacy` set, returns every classloader that can contribute an
+  /// extension: this manager's own classloader first, then all [ClassRealm]s (including the
+  /// core `pinot` realm and the `DEFAULT` realm), then legacy [PluginClassLoader] entries.
+  /// Otherwise returns only the dedicated realms of new-style plugins — the core `pinot` and
+  /// `DEFAULT` realms and all legacy plugins are excluded.
+  ///
+  /// Synchronised so a concurrent [#load] cannot cause a `ConcurrentModificationException`.
+  /// Callers must not do expensive or re-entrant work while iterating under the lock.
+  private synchronized Set<ClassLoader> collectClassLoaders(boolean includeCoreAndLegacy) {
+    Set<ClassLoader> classLoaders = new LinkedHashSet<>();
+    if (includeCoreAndLegacy) {
+      classLoaders.add(getClass().getClassLoader());
+    }
+    for (ClassRealm realm : _classWorld.getRealms()) {
+      String id = realm.getId();
+      if (includeCoreAndLegacy || (!PINOT_REALMID.equals(id) && !DEFAULT_PLUGIN_NAME.equals(id))) {
+        classLoaders.add(realm);
+      }
+    }
+    if (includeCoreAndLegacy) {
+      classLoaders.addAll(_registry.values());
+    }
+    return classLoaders;
   }
 
   private static <T> void loadServicesInto(Class<T> iface, ClassLoader classLoader, List<T> results,
@@ -701,6 +741,34 @@ public class PluginManager {
         results.add(impl);
       }
     }
+  }
+
+  /// Returns the classloaders of all new-style plugins, in load order.
+  /// New-style plugins are those packaged with a `pinot-plugin.properties` file
+  /// and loaded into a dedicated [ClassRealm].
+  ///
+  /// Classloaders returned: **only** the [ClassRealm] of each new-style plugin. Specifically
+  /// excluded are:
+  ///  - the classloader that loaded this class (Pinot core / `pinot-all.jar`);
+  ///  - the core `pinot` realm and the `DEFAULT` realm;
+  ///  - every legacy [PluginClassLoader] — new SPIs should only target new-style plugins.
+  ///
+  /// This is deliberately narrower than [#loadServices], which walks all of the above. An
+  /// extension point wired through this method therefore will **not** see implementations
+  /// shipped by Pinot core or by legacy plugins; use [#loadServices] if it should.
+  ///
+  /// Intended for `ServiceLoader` enumeration across plugin classloaders:
+  ///
+  /// ```java
+  /// for (ClassLoader cl : PluginManager.get().getPluginClassLoaders()) {
+  ///   for (MyService svc : ServiceLoader.load(MyService.class, cl)) { ... }
+  /// }
+  /// ```
+  ///
+  /// Call after all plugins have been loaded; classloaders added after this
+  /// call returns will not appear in the snapshot.
+  public Set<ClassLoader> getPluginClassLoaders() {
+    return Collections.unmodifiableSet(collectClassLoaders(false));
   }
 
   public static PluginManager get() {

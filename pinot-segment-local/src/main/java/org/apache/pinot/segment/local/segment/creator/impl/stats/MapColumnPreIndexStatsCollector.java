@@ -316,7 +316,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       default:
         LOGGER.warn("Unknown data type {} for key {}", dataType, key);
         return new StringColumnPreIndexStatsCollector(key, config);
-      }
+    }
   }
 
   private AbstractColumnStatisticsCollector promoteNumericKeyStatsToStringCollector(String key,
@@ -363,7 +363,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       case BYTE:
       case CHARACTER:
       case SHORT:
-      case INTEGER:
+      case INT:
         return FieldSpec.DataType.INT;
       case LONG:
         return FieldSpec.DataType.LONG;

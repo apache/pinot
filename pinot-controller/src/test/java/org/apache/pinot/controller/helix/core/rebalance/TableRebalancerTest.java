@@ -19,8 +19,8 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -66,7 +66,7 @@ public class TableRebalancerTest {
     TableRebalancer.SingleSegmentAssignment assignment =
         getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 0, false);
     assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
 
     // Without common instance, first assignment should be the same as target assignment
     targetInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host3", "host4"), ONLINE);
@@ -99,12 +99,12 @@ public class TableRebalancerTest {
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3"), ONLINE);
     TableRebalancer.SingleSegmentAssignment assignment =
         getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 0, true);
-    assertEquals(assignment._instanceStateMap, Collections.singletonMap("host1", ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._instanceStateMap, Map.of("host1", ONLINE));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should be the same as target assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 0, true);
     assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
 
     // Without common instance, first assignment should drop all instances
     targetInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host3", "host4"), ONLINE);
@@ -157,7 +157,7 @@ public class TableRebalancerTest {
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE);
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1, false);
     assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
 
     // Without common instance, first assignment should have 1 common instances with current assignment
     targetInstanceStateMap =
@@ -165,7 +165,7 @@ public class TableRebalancerTest {
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1, false);
     assertEquals(assignment._instanceStateMap,
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should be the same as target assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, false);
     assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
@@ -177,7 +177,7 @@ public class TableRebalancerTest {
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1, false);
     assertEquals(assignment._instanceStateMap,
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5", "host6"), ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should be the same as target assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, false);
     assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
@@ -191,20 +191,20 @@ public class TableRebalancerTest {
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1, false);
     assertEquals(assignment._instanceStateMap,
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host5", "host6"), ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should be the same as target assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, false);
     assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
     assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host5", "host6")));
 
     // With increasing from 1 replica, first assignment should have 1 common instances with current assignment
-    currentInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(Collections.singletonList("host1"), ONLINE);
+    currentInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(List.of("host1"), ONLINE);
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE);
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1, false);
     assertEquals(assignment._instanceStateMap,
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should be the same as target assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, false);
     assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
@@ -232,24 +232,24 @@ public class TableRebalancerTest {
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE);
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1, true);
-    assertEquals(assignment._instanceStateMap, Collections.singletonMap("host1", ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singletonList("host1"));
+    assertEquals(assignment._instanceStateMap, Map.of("host1", ONLINE));
+    assertEquals(assignment._availableInstances, List.of("host1"));
     // Second assignment should be the same as target assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, true);
     assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
 
     // Without common instance, fist assignment should keep 1 instance from current assignment
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4", "host5", "host6"), ONLINE);
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1, true);
-    assertEquals(assignment._instanceStateMap, Collections.singletonMap("host1", ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._instanceStateMap, Map.of("host1", ONLINE));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should add 2 instances from target assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, true);
     assertEquals(assignment._instanceStateMap,
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Third assignment should remove the old instance from current assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, true);
     assertEquals(assignment._instanceStateMap,
@@ -264,13 +264,13 @@ public class TableRebalancerTest {
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4", "host5", "host6", "host7"), ONLINE);
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1, true);
-    assertEquals(assignment._instanceStateMap, Collections.singletonMap("host1", ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._instanceStateMap, Map.of("host1", ONLINE));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should add 3 instances from target assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, true);
     assertEquals(assignment._instanceStateMap,
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5", "host6"), ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Third assignment should remove the old instance from current assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, true);
     assertEquals(assignment._instanceStateMap,
@@ -287,13 +287,13 @@ public class TableRebalancerTest {
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host5", "host6", "host7"), ONLINE);
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1, true);
-    assertEquals(assignment._instanceStateMap, Collections.singletonMap("host1", ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._instanceStateMap, Map.of("host1", ONLINE));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should add 2 instances from target assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, true);
     assertEquals(assignment._instanceStateMap,
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host5", "host6"), ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Third assignment should remove the old instance from current assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, true);
     assertEquals(assignment._instanceStateMap,
@@ -306,13 +306,13 @@ public class TableRebalancerTest {
 
     // With increasing from 1 replica, fist assignment should keep the instance from current assignment, and add 2
     // instances from target assignment
-    currentInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(Collections.singletonList("host1"), ONLINE);
+    currentInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(List.of("host1"), ONLINE);
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE);
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1, true);
     assertEquals(assignment._instanceStateMap,
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should remove the old instance from current assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1, true);
     assertEquals(assignment._instanceStateMap,
@@ -399,13 +399,13 @@ public class TableRebalancerTest {
 
     // With increasing from 1 replica, first assignment should have 1 common instances with current assignment
     // NOTE: This is the best we can do because we don't have 2 replicas available
-    currentInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(Collections.singletonList("host1"), ONLINE);
+    currentInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(List.of("host1"), ONLINE);
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE);
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 2, false);
     assertEquals(assignment._instanceStateMap,
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should make the assignment the same as target assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 2, false);
     assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
@@ -543,13 +543,13 @@ public class TableRebalancerTest {
     // With increasing from 1 replica, fist assignment should keep the instance from current assignment, and add 2
     // instances from target assignment
     // NOTE: This is the best we can do because we don't have 2 replicas available
-    currentInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(Collections.singletonList("host1"), ONLINE);
+    currentInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(List.of("host1"), ONLINE);
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE);
     assignment = getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 2, true);
     assertEquals(assignment._instanceStateMap,
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
+    assertEquals(assignment._availableInstances, Set.of("host1"));
     // Second assignment should remove the old instance from current assignment
     assignment = getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 2, true);
     assertEquals(assignment._instanceStateMap,

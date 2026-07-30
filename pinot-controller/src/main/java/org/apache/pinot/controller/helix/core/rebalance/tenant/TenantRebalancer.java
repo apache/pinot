@@ -329,7 +329,7 @@ public class TenantRebalancer {
 
   @VisibleForTesting
   Pair<ConcurrentLinkedDeque<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>>
-  createParallelAndSequentialQueues(
+      createParallelAndSequentialQueues(
       TenantRebalanceConfig config, Map<String, RebalanceResult> dryRunResults, @Nullable Set<String> parallelWhitelist,
       @Nullable Set<String> parallelBlacklist) {
     Set<String> parallelTables = getTablesToRunInParallel(dryRunResults.keySet(), parallelWhitelist, parallelBlacklist);

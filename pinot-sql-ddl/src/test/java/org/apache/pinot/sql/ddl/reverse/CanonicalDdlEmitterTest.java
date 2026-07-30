@@ -19,7 +19,6 @@
 package org.apache.pinot.sql.ddl.reverse;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -338,7 +337,7 @@ public class CanonicalDdlEmitterTest {
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("t")
         .setCustomConfig(new TableCustomConfig(
-            Collections.singletonMap("mySpecialKey", "someValue")))
+            Map.of("mySpecialKey", "someValue")))
         .build();
 
     String emitted = CanonicalDdlEmitter.emit(schema, config);
@@ -371,7 +370,7 @@ public class CanonicalDdlEmitterTest {
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("t")
         .setCustomConfig(new TableCustomConfig(
-            Collections.singletonMap("ingestionConfig", "anything")))
+            Map.of("ingestionConfig", "anything")))
         .build();
     try {
       CanonicalDdlEmitter.emit(schema, config);
@@ -394,7 +393,7 @@ public class CanonicalDdlEmitterTest {
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("t")
         .setCustomConfig(new TableCustomConfig(
-            Collections.singletonMap("task.MyTask.foo", "bar")))
+            Map.of("task.MyTask.foo", "bar")))
         .build();
     try {
       CanonicalDdlEmitter.emit(schema, config);
@@ -413,7 +412,7 @@ public class CanonicalDdlEmitterTest {
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("t")
         .setCustomConfig(new TableCustomConfig(
-            Collections.singletonMap("streamType", "not-a-stream-config")))
+            Map.of("streamType", "not-a-stream-config")))
         .build();
     try {
       CanonicalDdlEmitter.emit(schema, config);

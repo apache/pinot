@@ -455,13 +455,12 @@ public class StringFunctions {
   }
 
   /**
-   * @param input UUID serialized to bytes
-   * @return String representation of UUID
-   * returns bytes and null on exception
+   * @param input UUID serialized to its 16-byte form
+   * @return canonical RFC 4122 String representation of the UUID
    */
   @ScalarFunction
   public static String fromUUIDBytes(byte[] input) {
-    return UuidUtils.fromBytes(input).toString();
+    return UuidUtils.toString(input);
   }
 
   /**
@@ -710,22 +709,158 @@ public class StringFunctions {
   }
 
   /**
+   * Splits input by delimiter with a limit on the number of parts and returns the part at the given index.
+   * Avoids allocating the full String array by scanning the input directly.
+   *
+   * <p>Replicates the semantics of {@link StringUtils#splitByWholeSeparator(String, String, int)}:
+   * leading separators are stripped, consecutive separators in the middle are collapsed,
+   * and trailing separators produce one empty trailing token.
+   *
    * @param input the input String to be split into parts.
    * @param delimiter the specified delimiter to split the input string.
-   * @param limit the max count of parts that the input string can be splitted into.
-   * @param index the specified index for the splitted parts to be returned.
-   * @return splits string on the delimiter with the limit count and returns String at specified index from the split.
+   * @param limit the max count of parts that the input string can be split into (0 or negative means unlimited).
+   * @param index the specified index for the split parts to be returned; negative indices count from the end.
+   * @return the part at the given index, or "null" if the index is out of bounds.
    */
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int limit, int index) {
-    String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter, limit);
-    if (index >= 0 && index < splitString.length) {
-      return splitString[index];
-    } else if (index < 0 && index >= -splitString.length) {
-      return splitString[splitString.length + index];
-    } else {
+    // Null/empty delimiter splits on whitespace — complex rules best handled by Apache Commons.
+    if (delimiter == null || delimiter.isEmpty()) {
+      return splitPartArrayBased(StringUtils.splitByWholeSeparator(input, delimiter, limit), index);
+    }
+
+    int inputLen = input.length();
+    int delimLen = delimiter.length();
+    if (inputLen == 0) {
       return "null";
     }
+
+    // Guard against Integer.MIN_VALUE (negation overflows)
+    if (index == Integer.MIN_VALUE) {
+      return "null";
+    }
+
+    // effectiveLimit: 0 or negative means unlimited
+    int effectiveLimit = limit <= 0 ? Integer.MAX_VALUE : limit;
+
+    if (index >= 0) {
+      return splitPartLimitedForward(input, delimiter, effectiveLimit, index, inputLen, delimLen);
+    } else {
+      // For negative index, count total fields first then extract the target
+      int totalFields = countFieldsLimited(input, delimiter, effectiveLimit, inputLen, delimLen);
+      if (totalFields == 0) {
+        return "null";
+      }
+      int adjustedIndex = totalFields + index;
+      if (adjustedIndex < 0) {
+        return "null";
+      }
+      return splitPartLimitedForward(input, delimiter, effectiveLimit, adjustedIndex, inputLen, delimLen);
+    }
+  }
+
+  /**
+   * Counts the number of fields produced by splitting input with the given delimiter and limit,
+   * following splitByWholeSeparator semantics (leading seps stripped, consecutive collapsed,
+   * trailing seps produce one empty field). Does not allocate any String objects.
+   */
+  private static int countFieldsLimited(String input, String delimiter, int effectiveLimit,
+      int inputLen, int delimLen) {
+    int pos = 0;
+    // Skip leading separators
+    while (pos < inputLen && input.startsWith(delimiter, pos)) {
+      pos += delimLen;
+    }
+    if (pos >= inputLen) {
+      // Entire string is separators — produces a single empty trailing token
+      return 1;
+    }
+
+    int totalFields = 0;
+    while (pos < inputLen) {
+      totalFields++;
+      if (totalFields >= effectiveLimit) {
+        // Limit reached — this is the last field (remainder)
+        break;
+      }
+      // Scan past non-delimiter content to find the next delimiter
+      int end = input.indexOf(delimiter, pos);
+      if (end == -1) {
+        // No more delimiters — check for trailing delimiter (there isn't one), so this is the last field
+        break;
+      }
+      // Advance past delimiter(s)
+      pos = end + delimLen;
+      while (pos < inputLen && input.startsWith(delimiter, pos)) {
+        pos += delimLen;
+      }
+      // If we've consumed to end after delimiters, there's a trailing empty field
+      if (pos >= inputLen) {
+        totalFields++;
+        break;
+      }
+    }
+    return totalFields;
+  }
+
+  /**
+   * Extracts the field at the given positive index by scanning forward through the input.
+   * Follows splitByWholeSeparator semantics: leading separators stripped, consecutive collapsed,
+   * trailing separators produce one empty token. With limit, the last field gets the remainder.
+   */
+  private static String splitPartLimitedForward(String input, String delimiter, int effectiveLimit, int index,
+      int inputLen, int delimLen) {
+    int pos = 0;
+    // Skip leading separators
+    while (pos < inputLen && input.startsWith(delimiter, pos)) {
+      pos += delimLen;
+    }
+    if (pos >= inputLen) {
+      // Entire string is separators — single empty trailing token at index 0
+      return index == 0 ? "" : "null";
+    }
+
+    int fieldCount = 0;
+    while (pos <= inputLen) {
+      // Check if this is the last field due to limit
+      if (fieldCount + 1 >= effectiveLimit) {
+        // Limit reached — remainder from pos to end is the last field
+        return fieldCount == index ? input.substring(pos) : "null";
+      }
+
+      // Find the next delimiter
+      int end = input.indexOf(delimiter, pos);
+      if (end == -1) {
+        // No more delimiters — current field extends to end of input
+        if (fieldCount == index) {
+          return input.substring(pos);
+        }
+        // Check if input ends with delimiter characters that were already consumed
+        // (this case is handled by the trailing-delimiter logic below)
+        return "null";
+      }
+
+      // Found a delimiter at 'end' — current field is [pos, end)
+      if (fieldCount == index) {
+        return input.substring(pos, end);
+      }
+
+      // Advance past delimiter and consecutive delimiters
+      pos = end + delimLen;
+      while (pos < inputLen && input.startsWith(delimiter, pos)) {
+        pos += delimLen;
+      }
+      fieldCount++;
+
+      // If we've consumed to the end after delimiters, there's a trailing empty field
+      if (pos >= inputLen) {
+        if (fieldCount == index) {
+          return "";
+        }
+        return "null";
+      }
+    }
+    return "null";
   }
 
   /**
@@ -1119,5 +1254,88 @@ public class StringFunctions {
   public static String regexpSubstr(String input, String regexp) {
     Matcher matcher = Pattern.compile(regexp).matcher(input);
     return matcher.find() ? matcher.group() : null;
+  }
+
+  /**
+   * Returns a string with every occurrence of a character in {@code from} replaced by the corresponding character in
+   * {@code to}. Characters in {@code input} that do not appear in {@code from} are left unchanged. If {@code from} is
+   * longer than {@code to}, characters beyond the length of {@code to} are deleted from the result. Equivalent to the
+   * SQL standard {@code TRANSLATE(string, from, to)} function supported by PostgreSQL, Oracle, and Trino.
+   *
+   * <p>Examples:
+   * <pre>
+   *   translate("hello", "aeiou", "AEIOU") → "hEllO"
+   *   translate("abc", "abc", "xy")        → "xy"   (c has no target → deleted)
+   *   translate("abcdef", "ace", "XY")     → "XbYdf" (e has no target → deleted)
+   * </pre>
+   *
+   * @param input the source string
+   * @param from  characters to search for (must not be null)
+   * @param to    replacement characters (must not be null; may be shorter than {@code from})
+   * @return the translated string
+   */
+  @ScalarFunction
+  public static String translate(String input, String from, String to) {
+    if (input.isEmpty() || from.isEmpty()) {
+      return input;
+    }
+    StringBuilder sb = new StringBuilder(input.length());
+    for (int i = 0; i < input.length(); i++) {
+      char c = input.charAt(i);
+      int idx = from.indexOf(c);
+      if (idx < 0) {
+        sb.append(c);
+      } else if (idx < to.length()) {
+        sb.append(to.charAt(idx));
+      }
+      // idx >= to.length(): character is deleted (not appended)
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Replaces a substring of {@code input} with {@code replacement}, starting at the 1-based position {@code start}
+   * and replacing {@code length} characters. Equivalent to the SQL standard
+   * {@code OVERLAY(string PLACING replacement FROM start FOR length)} function supported by PostgreSQL and Trino.
+   *
+   * <p>When {@code length} is omitted (i.e. {@code OVERLAY(string PLACING new_str FROM start)}), it defaults to the
+   * length of {@code replacement}, so the replaced and inserted substrings are the same width.
+   *
+   * <p>Examples:
+   * <pre>
+   *   overlay("hello world", "there", 7)     → "hello there"   (length defaults to len("there") = 5)
+   *   overlay("hello world", "there", 7, 5)  → "hello there"
+   *   overlay("abcdef", "XY", 3, 0)          → "abXYcdef"      (insertion without deletion)
+   *   overlay("abcdef", "XY", 3, 4)          → "abXY"          (delete 4 chars cdef, insert 2)
+   * </pre>
+   *
+   * @param input       the source string
+   * @param replacement the string to insert
+   * @param start       1-based position in {@code input} at which replacement begins (clamped to [1, len+1])
+   * @return the result string
+   */
+  @ScalarFunction
+  public static String overlay(String input, String replacement, int start) {
+    return overlay(input, replacement, start, replacement.length());
+  }
+
+  /**
+   * Replaces {@code length} characters of {@code input} with {@code replacement}, starting at the 1-based position
+   * {@code start}. Equivalent to the SQL standard
+   * {@code OVERLAY(string PLACING replacement FROM start FOR length)} function.
+   *
+   * @param input       the source string
+   * @param replacement the string to insert
+   * @param start       1-based start position (clamped to [1, len+1])
+   * @param length      number of characters to delete from {@code input} (clamped to [0, remaining])
+   * @return the result string
+   */
+  @ScalarFunction
+  public static String overlay(String input, String replacement, int start, int length) {
+    int len = input.length();
+    // Convert to 0-based, clamping to valid range
+    int s = Math.max(0, Math.min(start - 1, len));
+    int e = Math.min(s + Math.max(0, length), len);
+    return input.substring(0, s) + replacement + input.substring(e);
   }
 }

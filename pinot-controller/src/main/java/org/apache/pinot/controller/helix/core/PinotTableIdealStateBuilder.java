@@ -42,15 +42,13 @@ public class PinotTableIdealStateBuilder {
   private static final RetryPolicy DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY =
       RetryPolicies.randomDelayRetryPolicy(3, 100L, 200L);
 
-  public static IdealState buildEmptyIdealStateFor(String tableNameWithType, int numReplicas,
-      boolean enableBatchMessageMode) {
+  public static IdealState buildEmptyIdealStateFor(String tableNameWithType, int numReplicas) {
     CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(tableNameWithType);
     customModeIdealStateBuilder
         .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
         .setNumPartitions(0).setNumReplica(numReplicas).setMaxPartitionsPerNode(1);
     IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(tableNameWithType);
-    idealState.setBatchMessageMode(enableBatchMessageMode);
     return idealState;
   }
 

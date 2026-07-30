@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.DataSizeUtils;
@@ -50,7 +49,7 @@ public class StreamConfig {
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
   public static final int DEFAULT_IDLE_TIMEOUT_MILLIS = 3 * 60 * 1000;
 
-  private static final double CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED = -1;
+  public static final double CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED = -1;
 
   private final String _type;
   private final String _topicName;
@@ -71,8 +70,7 @@ public class StreamConfig {
   private final double _flushThresholdVarianceFraction;
   private final int _flushAutotuneInitialRows; // initial num rows to use for SegmentSizeBasedFlushThresholdUpdater
 
-  private final String _groupId;
-
+  private final double _partitionConsumptionRateLimit;
   private final double _topicConsumptionRateLimit;
 
   private final boolean _enableOffsetAutoReset;
@@ -198,11 +196,13 @@ public class StreamConfig {
     }
     _flushAutotuneInitialRows = autotuneInitialRows > 0 ? autotuneInitialRows : DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS;
 
-    String groupIdKey = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.GROUP_ID);
-    _groupId = streamConfigMap.get(groupIdKey);
+    String partitionRate = streamConfigMap.get(StreamConfigProperties.PARTITION_CONSUMPTION_RATE_LIMIT);
+    _partitionConsumptionRateLimit =
+        partitionRate != null ? Double.parseDouble(partitionRate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
 
-    String rate = streamConfigMap.get(StreamConfigProperties.TOPIC_CONSUMPTION_RATE_LIMIT);
-    _topicConsumptionRateLimit = rate != null ? Double.parseDouble(rate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
+    String topicRate = streamConfigMap.get(StreamConfigProperties.TOPIC_CONSUMPTION_RATE_LIMIT);
+    _topicConsumptionRateLimit =
+        topicRate != null ? Double.parseDouble(topicRate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
 
     _enableOffsetAutoReset = Boolean.parseBoolean(streamConfigMap.get(StreamConfigProperties.ENABLE_OFFSET_AUTO_RESET));
     _offsetAutoResetOffsetThreshold = parseOffsetAutoResetOffsetThreshold(streamConfigMap);
@@ -413,13 +413,14 @@ public class StreamConfig {
     return _flushAutotuneInitialRows;
   }
 
-  public String getGroupId() {
-    return _groupId;
+  /// Returns the partition level consumption rate limit. Non-positive value means consumption is not throttled.
+  public double getPartitionConsumptionRateLimit() {
+    return _partitionConsumptionRateLimit;
   }
 
-  public Optional<Double> getTopicConsumptionRateLimit() {
-    return _topicConsumptionRateLimit == CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED ? Optional.empty()
-        : Optional.of(_topicConsumptionRateLimit);
+  /// Returns the topic level consumption rate limit. Non-positive value means consumption is not throttled.
+  public double getTopicConsumptionRateLimit() {
+    return _topicConsumptionRateLimit;
   }
 
   public boolean isEnableOffsetAutoReset() {
@@ -448,22 +449,32 @@ public class StreamConfig {
 
   @Override
   public String toString() {
-    return "StreamConfig{" + "_type='" + _type + '\'' + ", _topicName='" + _topicName + '\'' + ", _tableNameWithType='"
-        + _tableNameWithType + '\'' + ", _consumerFactoryClassName='" + _consumerFactoryClassName + '\''
-        + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties=" + _decoderProperties
-        + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis + ", _fetchTimeoutMillis=" + _fetchTimeoutMillis
-        + ", _idleTimeoutMillis=" + _idleTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows
-        + ", _flushThresholdSegmentRows=" + _flushThresholdSegmentRows + ", _flushThresholdTimeMillis="
-        + _flushThresholdTimeMillis + ", _flushThresholdSegmentSizeBytes=" + _flushThresholdSegmentSizeBytes
+    return "StreamConfig{"
+        + "_type='" + _type + '\''
+        + ", _topicName='" + _topicName + '\''
+        + ", _tableNameWithType='" + _tableNameWithType + '\''
+        + ", _consumerFactoryClassName='" + _consumerFactoryClassName + '\''
+        + ", _decoderClass='" + _decoderClass + '\''
+        + ", _decoderProperties=" + _decoderProperties
+        + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis
+        + ", _fetchTimeoutMillis=" + _fetchTimeoutMillis
+        + ", _idleTimeoutMillis=" + _idleTimeoutMillis
+        + ", _flushThresholdRows=" + _flushThresholdRows
+        + ", _flushThresholdSegmentRows=" + _flushThresholdSegmentRows
+        + ", _flushThresholdTimeMillis=" + _flushThresholdTimeMillis
+        + ", _flushThresholdSegmentSizeBytes=" + _flushThresholdSegmentSizeBytes
         + ", _flushThresholdVarianceFraction=" + _flushThresholdVarianceFraction
-        + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _groupId='" + _groupId + '\''
+        + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows
+        + ", _partitionConsumptionRateLimit=" + _partitionConsumptionRateLimit
         + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit
         + ", _enableOffsetAutoReset=" + _enableOffsetAutoReset
-        + ", _offsetAutoResetOffsetThreshold" + _offsetAutoResetOffsetThreshold
-        + ", _offSetAutoResetTimeSecThreshold" + _offsetAutoResetTimeSecThreshold
+        + ", _offsetAutoResetOffsetThreshold=" + _offsetAutoResetOffsetThreshold
+        + ", _offsetAutoResetTimeSecThreshold=" + _offsetAutoResetTimeSecThreshold
         + ", _backfillTopic=" + _backfillTopic
         + ", _streamConfigMap=" + _streamConfigMap
-        + ", _offsetCriteria=" + _offsetCriteria + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore + '}';
+        + ", _offsetCriteria=" + _offsetCriteria
+        + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore
+        + '}';
   }
 
   @Override
@@ -475,23 +486,30 @@ public class StreamConfig {
       return false;
     }
     StreamConfig that = (StreamConfig) o;
-    return _connectionTimeoutMillis == that._connectionTimeoutMillis && _fetchTimeoutMillis == that._fetchTimeoutMillis
-        && _idleTimeoutMillis == that._idleTimeoutMillis && _flushThresholdRows == that._flushThresholdRows
+    return Objects.equals(_type, that._type)
+        && Objects.equals(_topicName, that._topicName)
+        && Objects.equals(_tableNameWithType, that._tableNameWithType)
+        && Objects.equals(_consumerFactoryClassName, that._consumerFactoryClassName)
+        && Objects.equals(_decoderClass, that._decoderClass)
+        && Objects.equals(_decoderProperties, that._decoderProperties)
+        && _connectionTimeoutMillis == that._connectionTimeoutMillis
+        && _fetchTimeoutMillis == that._fetchTimeoutMillis
+        && _idleTimeoutMillis == that._idleTimeoutMillis
+        && _flushThresholdRows == that._flushThresholdRows
         && _flushThresholdSegmentRows == that._flushThresholdSegmentRows
         && _flushThresholdTimeMillis == that._flushThresholdTimeMillis
         && _flushThresholdSegmentSizeBytes == that._flushThresholdSegmentSizeBytes
+        && Double.compare(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction) == 0
         && _flushAutotuneInitialRows == that._flushAutotuneInitialRows
+        && Double.compare(_partitionConsumptionRateLimit, that._partitionConsumptionRateLimit) == 0
         && Double.compare(_topicConsumptionRateLimit, that._topicConsumptionRateLimit) == 0
-        && Objects.equals(_serverUploadToDeepStore, that._serverUploadToDeepStore) && Objects.equals(_type, that._type)
-        && Objects.equals(_topicName, that._topicName) && Objects.equals(_tableNameWithType, that._tableNameWithType)
-        && Objects.equals(_consumerFactoryClassName, that._consumerFactoryClassName) && Objects.equals(_decoderClass,
-        that._decoderClass) && Objects.equals(_decoderProperties, that._decoderProperties) && Objects.equals(_groupId,
-        that._groupId) && Objects.equals(_streamConfigMap, that._streamConfigMap) && Objects.equals(_offsetCriteria,
-        that._offsetCriteria) && Objects.equals(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction)
         && _enableOffsetAutoReset == that._enableOffsetAutoReset
         && _offsetAutoResetOffsetThreshold == that._offsetAutoResetOffsetThreshold
         && _offsetAutoResetTimeSecThreshold == that._offsetAutoResetTimeSecThreshold
-        && Objects.equals(_backfillTopic, that._backfillTopic);
+        && Objects.equals(_backfillTopic, that._backfillTopic)
+        && Objects.equals(_streamConfigMap, that._streamConfigMap)
+        && Objects.equals(_offsetCriteria, that._offsetCriteria)
+        && Objects.equals(_serverUploadToDeepStore, that._serverUploadToDeepStore);
   }
 
   @Override
@@ -499,8 +517,8 @@ public class StreamConfig {
     return Objects.hash(_type, _topicName, _tableNameWithType, _consumerFactoryClassName, _decoderClass,
         _decoderProperties, _connectionTimeoutMillis, _fetchTimeoutMillis, _idleTimeoutMillis, _flushThresholdRows,
         _flushThresholdSegmentRows, _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
-        _flushAutotuneInitialRows, _groupId, _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria,
-        _serverUploadToDeepStore, _flushThresholdVarianceFraction, _offsetAutoResetOffsetThreshold,
-        _enableOffsetAutoReset, _offsetAutoResetTimeSecThreshold, _backfillTopic);
+        _flushThresholdVarianceFraction, _flushAutotuneInitialRows, _partitionConsumptionRateLimit,
+        _topicConsumptionRateLimit, _enableOffsetAutoReset, _offsetAutoResetOffsetThreshold,
+        _offsetAutoResetTimeSecThreshold, _backfillTopic, _streamConfigMap, _offsetCriteria, _serverUploadToDeepStore);
   }
 }

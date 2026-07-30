@@ -130,6 +130,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       InstanceRequest instanceRequest = new InstanceRequest();
       THREAD_LOCAL_T_DESERIALIZER.get().deserialize(instanceRequest, requestBytes);
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
+      _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES_ON_TABLE, 1);
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
     } catch (Exception e) {

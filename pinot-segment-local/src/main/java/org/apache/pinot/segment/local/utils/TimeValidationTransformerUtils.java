@@ -122,7 +122,7 @@ public class TimeValidationTransformerUtils {
       timeValueMs = config.getTimeFormatSpec().fromFormatToMillis(value.toString());
     } catch (Exception e) {
       String errorMessage = String.format("Caught exception while parsing time value: %s with format: %s", value,
-        config.getTimeFormatSpec());
+          config.getTimeFormatSpec());
       if (!config.isContinueOnError()) {
         throw new IllegalStateException(errorMessage, e);
       }

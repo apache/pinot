@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -381,7 +380,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

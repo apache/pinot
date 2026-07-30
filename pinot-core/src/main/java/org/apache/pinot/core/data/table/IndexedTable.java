@@ -87,7 +87,9 @@ public abstract class IndexedTable extends BaseTable {
 
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
-    _numKeyColumns = groupByExpressions.size();
+    /// Includes the synthetic $groupingId key column for GROUP BY GROUPING SETS / ROLLUP / CUBE queries, so
+    /// that rows from different grouping sets are keyed (and therefore merged) independently.
+    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _hasOrderBy = queryContext.getOrderByExpressions() != null;
     _tableResizer = _hasOrderBy ? new TableResizer(dataSchema, hasFinalInput, queryContext) : null;

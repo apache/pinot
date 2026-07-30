@@ -19,14 +19,15 @@
 package org.apache.pinot.materializedview.metadata;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata.MaterializedViewSplitSpec;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -41,7 +42,7 @@ public class MaterializedViewMetadataTest {
     partitionExprMaps.put("DaysSinceEpoch", "DaysSinceEpoch");
 
     MaterializedViewSplitSpec splitSpec = new MaterializedViewSplitSpec(
-        "ts", "1:MILLISECONDS:EPOCH", "DaysSinceEpoch", 86400000L);
+        "ts", "1:MILLISECONDS:EPOCH", "DaysSinceEpoch", "1:DAYS:EPOCH", 86400000L);
 
     MaterializedViewDefinitionMetadata original = new MaterializedViewDefinitionMetadata(
         viewTableName,
@@ -63,7 +64,9 @@ public class MaterializedViewMetadataTest {
     MaterializedViewSplitSpec restoredSpec = restored.getSplitSpec();
     assertNotNull(restoredSpec);
     assertEquals(restoredSpec.getSourceTimeColumn(), "ts");
+    assertEquals(restoredSpec.getSourceTimeFormat(), "1:MILLISECONDS:EPOCH");
     assertEquals(restoredSpec.getMaterializedViewTimeColumn(), "DaysSinceEpoch");
+    assertEquals(restoredSpec.getMaterializedViewTimeFormat(), "1:DAYS:EPOCH");
     assertEquals(restoredSpec.getBucketMs(), 86400000L);
   }
 
@@ -71,15 +74,15 @@ public class MaterializedViewMetadataTest {
   public void testDefinitionWithNoSplitSpec() {
     MaterializedViewDefinitionMetadata metadata = new MaterializedViewDefinitionMetadata(
         "mv_OFFLINE",
-        Collections.singletonList("src_OFFLINE"),
+        List.of("src_OFFLINE"),
         null,
-        Collections.emptyMap(),
+        Map.of(),
         null);
 
     ZNRecord znRecord = metadata.toZNRecord();
     MaterializedViewDefinitionMetadata restored = MaterializedViewDefinitionMetadata.fromZNRecord(znRecord);
 
-    assertEquals(restored.getBaseTables(), Collections.singletonList("src_OFFLINE"));
+    assertEquals(restored.getBaseTables(), List.of("src_OFFLINE"));
     assertNull(restored.getDefinedSql());
     assertTrue(restored.getPartitionExprMaps().isEmpty());
     assertNull(restored.getSplitSpec());
@@ -151,5 +154,99 @@ public class MaterializedViewMetadataTest {
     ZNRecord znRecord = metadata.toZNRecord();
     assertTrue(znRecord.getSimpleFields().containsKey("watermarkMs"),
         "watermarkMs key must always be written");
+  }
+
+  /// Definition equality is the controller's idempotency check at CREATE MV time: a second
+  /// CREATE with the same definedSQL must hash/compare equal to the first so a stale orphan
+  /// znode from a prior failed CREATE doesn't get classified as "different content".
+  ///
+  /// Verifies that every direct field of [MaterializedViewDefinitionMetadata] independently
+  /// flips equality (so an equals() that silently drops a comparison is caught here). The
+  /// nested SplitSpec's own field-by-field coverage is pinned separately in
+  /// [#testSplitSpecEqualsAndHashCode]; that test also documents the one persisted-but-not-
+  /// compared field (`materializedViewTimeFormat`), which is intentional and tracked as a
+  /// separate follow-up. A regression that adds a new direct field on
+  /// [MaterializedViewDefinitionMetadata] without wiring it through equals/hashCode must add
+  /// a matching `assertNotEquals` line below — otherwise the controller's idempotency check
+  /// would silently treat two distinct definitions as the same.
+  @Test
+  public void testDefinitionEqualsAndHashCodeAllFields() {
+    Map<String, String> partitionExprMaps = new HashMap<>();
+    partitionExprMaps.put("ts", "ts");
+    MaterializedViewSplitSpec splitSpec =
+        new MaterializedViewSplitSpec("ts", "1:MILLISECONDS:TIMESTAMP", "ts",
+            "1:MILLISECONDS:TIMESTAMP", 86400000L);
+    MaterializedViewDefinitionMetadata a = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", List.of("orders"),
+        "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, true);
+    MaterializedViewDefinitionMetadata b = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", List.of("orders"),
+        "SELECT ts FROM orders", new HashMap<>(partitionExprMaps),
+        new MaterializedViewSplitSpec("ts", "1:MILLISECONDS:TIMESTAMP", "ts",
+            "1:MILLISECONDS:TIMESTAMP", 86400000L),
+        0L, true);
+    assertEquals(a, b);
+    assertEquals(a.hashCode(), b.hashCode());
+
+    // Each field independently flips equality — guards against an equals() that silently
+    // omits a field. Use a fresh `a` baseline for each delta so order in the chain doesn't
+    // matter.
+    MaterializedViewDefinitionMetadata diffName = new MaterializedViewDefinitionMetadata(
+        "mv_other_OFFLINE", List.of("orders"),
+        "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, true);
+    assertNotEquals(a, diffName);
+
+    MaterializedViewDefinitionMetadata diffBase = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", List.of("products"),
+        "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, true);
+    assertNotEquals(a, diffBase);
+
+    MaterializedViewDefinitionMetadata diffSql = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", List.of("orders"),
+        "SELECT ts FROM other", partitionExprMaps, splitSpec, 0L, true);
+    assertNotEquals(a, diffSql);
+
+    Map<String, String> diffExprMap = new HashMap<>();
+    diffExprMap.put("ts", "renamed_ts");
+    MaterializedViewDefinitionMetadata diffExpr = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", List.of("orders"),
+        "SELECT ts FROM orders", diffExprMap, splitSpec, 0L, true);
+    assertNotEquals(a, diffExpr);
+
+    MaterializedViewSplitSpec diffSpec =
+        new MaterializedViewSplitSpec("ts", "1:HOURS:EPOCH", "ts", "1:HOURS:EPOCH", 86400000L);
+    MaterializedViewDefinitionMetadata diffSplit = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", List.of("orders"),
+        "SELECT ts FROM orders", partitionExprMaps, diffSpec, 0L, true);
+    assertNotEquals(a, diffSplit);
+
+    MaterializedViewDefinitionMetadata diffStaleness = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", List.of("orders"),
+        "SELECT ts FROM orders", partitionExprMaps, splitSpec, 60000L, true);
+    assertNotEquals(a, diffStaleness);
+
+    MaterializedViewDefinitionMetadata diffRewrite = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", List.of("orders"),
+        "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, false);
+    assertNotEquals(a, diffRewrite);
+  }
+
+  /// SplitSpec equality covers `sourceTimeColumn`, `sourceTimeFormat`,
+  /// `materializedViewTimeColumn`, and `bucketMs` — the same four fields whose Δ flips
+  /// definition equality (so a regression that drops a field comparison is caught here too).
+  /// `materializedViewTimeFormat` is intentionally NOT part of this contract today (it was
+  /// added later, and the existing equals/hashCode predates it); changing that is tracked as a
+  /// separate follow-up since it would alter the `createIfAbsent` idempotency surface.
+  @Test
+  public void testSplitSpecEqualsAndHashCode() {
+    MaterializedViewSplitSpec a = new MaterializedViewSplitSpec("ts", "fmt", "v", "vfmt", 1000L);
+    MaterializedViewSplitSpec b = new MaterializedViewSplitSpec("ts", "fmt", "v", "vfmt", 1000L);
+    assertEquals(a, b);
+    assertEquals(a.hashCode(), b.hashCode());
+
+    assertNotEquals(a, new MaterializedViewSplitSpec("other", "fmt", "v", "vfmt", 1000L));
+    assertNotEquals(a, new MaterializedViewSplitSpec("ts", "other", "v", "vfmt", 1000L));
+    assertNotEquals(a, new MaterializedViewSplitSpec("ts", "fmt", "other", "vfmt", 1000L));
+    assertNotEquals(a, new MaterializedViewSplitSpec("ts", "fmt", "v", "vfmt", 2000L));
   }
 }

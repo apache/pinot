@@ -30,6 +30,7 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
 /**
@@ -71,6 +72,12 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
       IntFunction<Object[]> rowFetcher = fetchBlock(valueBlock, blockValSets);
       int numDocsFetched = valueBlock.getNumDocs();
       _numDocsScanned += numDocsFetched;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsFetched);
+        scanCost.addEntriesScannedPostFilter(
+            (long) numDocsFetched * _projectOperator.getNumColumnsProjected());
+      }
       ListBuilder listBuilder = listBuilderSupplier.get();
 
       // first, calculate the best rows on this block

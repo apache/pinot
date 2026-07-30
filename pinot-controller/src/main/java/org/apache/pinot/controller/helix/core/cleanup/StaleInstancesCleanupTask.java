@@ -61,7 +61,8 @@ public class StaleInstancesCleanupTask extends BasePeriodicTask {
   public StaleInstancesCleanupTask(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     super(TASK_NAME, controllerConf.getStaleInstancesCleanupTaskFrequencyInSeconds(),
-        controllerConf.getStaleInstanceCleanupTaskInitialDelaySeconds());
+        controllerConf.getStaleInstanceCleanupTaskInitialDelaySeconds(),
+        controllerConf.getStaleInstancesCleanupTaskCronExpression());
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _leadControllerManager = leadControllerManager;
     _controllerMetrics = controllerMetrics;

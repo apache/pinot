@@ -68,7 +68,7 @@ public class AggInfo {
     Preconditions.checkNotNull(aggFunction, "Received null aggFunction in AggInfo");
     _aggFunction = aggFunction;
     _isPartial = isPartial;
-    _params = params != null ? params : Collections.emptyMap();
+    _params = params != null ? params : Map.of();
   }
 
   public AggInfo withPartialAggregation() {

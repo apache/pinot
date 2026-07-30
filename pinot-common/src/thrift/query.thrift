@@ -32,6 +32,16 @@ struct PinotQuery {
   11: optional map<string, string> queryOptions;
   12: optional bool explain;
   13: optional map<Expression, Expression> expressionOverrideHints;
+  // GROUP BY GROUPING SETS / ROLLUP / CUBE: one entry per grouping set, in query order; each entry lists the
+  // indexes into groupByList (the ordered union of all grouping columns) that participate in (are grouped by)
+  // that set. An empty inner list is the grand-total set (). A set's position in this list is its ordinal, which
+  // the engine carries as the synthetic $groupingId discriminator key, so the number of grouping columns is
+  // unlimited (mirroring Calcite's per-set column bitset). Unset for a plain GROUP BY query.
+  // Rolling upgrade: a server that predates this field ignores it and runs a plain GROUP BY, returning results
+  // without the $groupingId column the reducer expects. The reduce path reconciles positionally (by column type,
+  // not name), so this is NOT rejected cleanly — it surfaces as an opaque error or as silently collapsed/wrong
+  // results (missing subtotal/grand-total rows). Upgrade all servers before issuing grouping-set queries.
+  14: optional list<list<i32>> groupingSets;
 }
 
 struct DataSource {

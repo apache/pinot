@@ -1,6 +1,7 @@
 {
   "tableName": "airlineStatsMv",
   "tableType": "OFFLINE",
+  "isMaterializedView": true,
   "segmentsConfig": {
     "timeColumnName": "tsMs",
     "timeType": "MILLISECONDS",

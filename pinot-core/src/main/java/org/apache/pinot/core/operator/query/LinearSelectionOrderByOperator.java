@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -181,7 +180,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
   @Override
   public List<BaseProjectOperator<?>> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   /**

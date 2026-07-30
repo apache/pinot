@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.plan.server;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -78,6 +77,13 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       List<Expression> groupByList = CalciteRexExpressionParser.convertInputRefs(node.getGroupKeys(), pinotQuery);
       if (!groupByList.isEmpty()) {
         pinotQuery.setGroupByList(groupByList);
+      }
+      /// GROUP BY GROUPING SETS / ROLLUP / CUBE: push the per-set row expansion down to the single-stage engine. The
+      /// per-set column-index lists are over groupByList (== node.getGroupKeys()), so they transfer directly. The
+      /// single-stage leaf expands each row across the sets and appends the synthetic $groupingId ordinal column; the
+      /// multi-stage final stage then groups on it (it is one of the group keys), keeping the grouping sets distinct.
+      if (node.isGroupingSets()) {
+        pinotQuery.setGroupingSets(node.getGroupingSets());
       }
       List<Expression> selectList = CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(),
           node.getFilterArgs(), pinotQuery.getSelectList());
@@ -159,7 +165,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       if (visit(left, context)) {
         PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
         int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
-        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
+        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, List.of());
         List<Object[]> resultDataContainer = new ArrayList<>();
         DataSchema dataSchema = right.getDataSchema();
         for (MseBlock block : blocks) {
@@ -183,6 +189,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     return null;
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public Void visitEnrichedJoin(EnrichedJoinNode node, ServerPlanRequestContext context) {
     // We can reach here for dynamic broadcast SEMI join and lookup join.
@@ -198,7 +205,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         // semi join to dynamic filter logic
         PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
         int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
-        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
+        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, List.of());
         List<Object[]> resultDataContainer = new ArrayList<>();
         DataSchema dataSchema = right.getDataSchema();
         for (MseBlock block : blocks) {

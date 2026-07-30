@@ -36,6 +36,7 @@ public class BrokerMeter implements AbstractMetrics.Meter {
 
   public static final BrokerMeter UNCAUGHT_GET_EXCEPTIONS = create("UNCAUGHT_GET_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter UNCAUGHT_POST_EXCEPTIONS = create("UNCAUGHT_POST_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter BAD_REQUEST_EXCEPTIONS = create("BAD_REQUEST_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter WEB_APPLICATION_EXCEPTIONS = create("WEB_APPLICATION_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter HEALTHCHECK_BAD_CALLS = create("HEALTHCHECK_BAD_CALLS", "healthcheck", true);
   public static final BrokerMeter HEALTHCHECK_OK_CALLS = create("HEALTHCHECK_OK_CALLS", "healthcheck", true);
@@ -118,6 +119,10 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "QUERY_VALIDATION_EXCEPTIONS", "exceptions", false);
   // Query validation phase.
   public static final BrokerMeter UNKNOWN_COLUMN_EXCEPTIONS = create("UNKNOWN_COLUMN_EXCEPTIONS", "exceptions", false);
+  /// Materialized-view rewrite path: strategy bug or contract violation triggered the
+  /// defense-in-depth fallback to the base-table query path.  Non-zero values indicate a
+  /// strategy regression that must be investigated; the query itself still succeeded.
+  public static final BrokerMeter QUERY_REWRITE_EXCEPTIONS = create("QUERY_REWRITE_EXCEPTIONS", "exceptions", false);
   // Queries preempted by accountant
   public static final BrokerMeter QUERIES_KILLED = create("QUERIES_KILLED", "query", true);
   public static final BrokerMeter QUERIES_THROTTLED = create("QUERIES_THROTTLED", "query", true);
@@ -168,6 +173,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
   public static final BrokerMeter BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED = create(
       "BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED", "badResponses", false);
+
+  public static final BrokerMeter BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED = create(
+      "BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED", "badResponses", false);
 
   // These metrics track the cost of the query.
   public static final BrokerMeter DOCUMENTS_SCANNED = create(
@@ -246,6 +254,28 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter MSE_OPCHAINS_COMPLETED = create("MSE_OPCHAINS_COMPLETED", "opchains", true);
 
   /**
+   * Number of MSE queries that used the {@code SubmitWithStream} bidi-RPC stats path (stream mode).
+   */
+  public static final BrokerMeter MSE_STREAM_STATS_QUERIES = create("MSE_STREAM_STATS_QUERIES", "queries", true);
+
+  /**
+   * Number of MSE stream-mode queries that returned with incomplete stats coverage (at least one stage had missing or
+   * merge-failed opchain reports). Operators can alert on this counter to detect persistent stats gaps.
+   */
+  public static final BrokerMeter MSE_STREAM_STATS_INCOMPLETE_COVERAGE =
+      create("MSE_STREAM_STATS_INCOMPLETE_COVERAGE", "queries", true);
+
+  /**
+   * Number of non-empty cancel broadcasts sent by stream-mode queries to their peer servers. A broadcast is
+   * triggered by the first peer error or by a broker-side processing exception; a single query can contribute more
+   * than one (e.g. a peer error followed by a recovery-path cancel), so this counts broadcasts rather than affected
+   * queries. At high QPS during a partial degradation this can amplify into a cancel storm, so operators can watch
+   * this counter to detect that condition.
+   */
+  public static final BrokerMeter MSE_STREAM_STATS_CANCEL_FANOUTS =
+      create("MSE_STREAM_STATS_CANCEL_FANOUTS", "broadcasts", true);
+
+  /**
    * How many MSE queries have encountered segments with invalid partitions.
    * <p>
    * This is only emitted for when usePhysicalOptimizer is set to true.
@@ -278,6 +308,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter GRPC_TRANSPORT_READY = create("GRPC_TRANSPORT_READY", "grpcTransport", true);
   public static final BrokerMeter GRPC_TRANSPORT_TERMINATED = create(
       "GRPC_TRANSPORT_TERMINATED", "grpcTransport", true);
+  // Workload related metrics
+  public static final BrokerMeter WORKLOAD_QUERIES = create("WORKLOAD_QUERIES", "queries", false);
+  public static final BrokerMeter WORKLOAD_BUDGET_EXCEEDED = create("WORKLOAD_QUERY_EXCEPTIONS", "exceptions", true);
 
   public static final BrokerMeter RLS_FILTERS_APPLIED = create("RLS_FILTERS_APPLIED", "queries", false);
 

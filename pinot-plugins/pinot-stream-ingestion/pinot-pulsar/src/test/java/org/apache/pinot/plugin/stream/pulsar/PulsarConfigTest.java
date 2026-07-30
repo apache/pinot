@@ -59,7 +59,7 @@ public class PulsarConfigTest {
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.METADATA_FIELDS),
         "messageId,messageIdBytes, publishTime, eventTime, key, topicName, ");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
-    PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
+    PulsarConfig pulsarConfig = new PulsarConfig(streamConfig);
     Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
         pulsarConfig.getMetadataFields();
     Assert.assertEquals(metadataFieldsToExtract.size(), 6);
@@ -78,7 +78,7 @@ public class PulsarConfigTest {
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE), "true");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
-    PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
+    PulsarConfig pulsarConfig = new PulsarConfig(streamConfig);
     Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
         pulsarConfig.getMetadataFields();
     Assert.assertEquals(metadataFieldsToExtract.size(), 0);
@@ -90,7 +90,7 @@ public class PulsarConfigTest {
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE), "false");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
-    PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
+    PulsarConfig pulsarConfig = new PulsarConfig(streamConfig);
     Assert.assertFalse(pulsarConfig.isPopulateMetadata());
     Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
         pulsarConfig.getMetadataFields();
@@ -105,7 +105,7 @@ public class PulsarConfigTest {
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.METADATA_FIELDS),
         "messageId,messageIdBytes, publishTime, eventTime, key, topicName, ");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
-    PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
+    PulsarConfig pulsarConfig = new PulsarConfig(streamConfig);
     Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
         pulsarConfig.getMetadataFields();
     Assert.assertFalse(pulsarConfig.isPopulateMetadata());
@@ -128,7 +128,7 @@ public class PulsarConfigTest {
           "urn:test:test");
       StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
 
-      PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
+      PulsarConfig pulsarConfig = new PulsarConfig(streamConfig);
       Assert.assertEquals(pulsarConfig.getIssuerUrl(), "http://auth.test.com");
       Assert.assertEquals(pulsarConfig.getCredentialsFilePath(), "file://" + testFile.toFile().getAbsolutePath());
       Assert.assertEquals(pulsarConfig.getAudience(), "urn:test:test");
@@ -149,6 +149,6 @@ public class PulsarConfigTest {
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_AUDIENCE),
         "urn:test:test");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
-    new PulsarConfig(streamConfig, "testId");
+    new PulsarConfig(streamConfig);
   }
 }

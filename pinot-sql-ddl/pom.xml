@@ -45,6 +45,22 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
     </dependency>
+    <!--
+      pinot-query-planner gives the MV schema inferer access to Calcite's full validator
+      via QueryEnvironment.  The validator surfaces SQL-shape errors (column typos,
+      function arity, type compatibility, multi-source FROM, etc.) at DDL-compile time
+      instead of letting them through to the analyzer's create-time checks, which is the
+      "MSE-aligned inference" decision recorded in DESIGN.md.
+
+      Note: pinot-controller — the only production caller of pinot-sql-ddl — already
+      depends on pinot-query-planner, so this is not a new transitive at deploy time.
+      Tests in this module instantiate QueryEnvironment with a Mockito-backed TableCache,
+      which keeps unit tests free of the heavy controller test fixtures.
+    -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-planner</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.calcite</groupId>
       <artifactId>calcite-babel</artifactId>
@@ -59,6 +75,23 @@
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Test-only: the MaterializedViewDdlAnalyzerIntegrationTest needs the real
+         MaterializedViewAnalyzer to validate that DDL-compiled artifacts (TableConfig,
+         Schema, taskConfigs, definedSQL) reach the analyzer's full validation chain
+         without the controller's stubbing layer that sits in front of it. Production code
+         in pinot-sql-ddl never references pinot-materialized-view — the analyzer is
+         invoked at runtime by the controller via TaskConfigUtils, not from the DDL
+         compiler itself. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-materialized-view</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

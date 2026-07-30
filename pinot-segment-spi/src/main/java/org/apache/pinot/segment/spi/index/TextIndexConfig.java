@@ -22,7 +22,6 @@ package org.apache.pinot.segment.spi.index;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -54,7 +53,7 @@ public class TextIndexConfig extends IndexConfig {
   );
 
   public static final TextIndexConfig DISABLED =
-      new TextIndexConfig(true, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
+      new TextIndexConfig(true, null, false, false, List.of(), List.of(), false,
           LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0, false, null,
           LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE);
 
@@ -210,12 +209,12 @@ public class TextIndexConfig extends IndexConfig {
   @SuppressWarnings("unchecked")
   private static List<String> parseToList(final @Nullable Object value, final boolean escapeComma, final boolean trim) {
     if (value == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     if (value instanceof List) {
       final List<?> list = (List<?>) value;
       if (list.isEmpty()) {
-        return Collections.emptyList();
+        return List.of();
       }
       // Convert each element to String and optionally trim
       final List<String> result = new ArrayList<>();

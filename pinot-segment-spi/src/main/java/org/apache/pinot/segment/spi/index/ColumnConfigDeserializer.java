@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.spi.index;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.function.Predicate;
 import org.apache.pinot.spi.config.table.IndexConfig;
@@ -56,6 +55,6 @@ public interface ColumnConfigDeserializer<C> {
       ColumnConfigDeserializer<C> delegate) {
     return ((tableConfig, schema) -> predicate.test(tableConfig)
         ? delegate.deserialize(tableConfig, schema)
-        : Collections.emptyMap());
+        : Map.of());
   }
 }

@@ -88,10 +88,7 @@ public class PinotLogicalAggregateRule {
           return;
         }
       }
-      int limit = 0;
-      if (sortRel.fetch != null) {
-        limit = RexLiteral.intValue(sortRel.fetch);
-      }
+      int limit = getGroupTrimLimit(sortRel);
       if (limit <= 0) {
         // Cannot enable group trim when there is no limit.
         return;
@@ -125,10 +122,7 @@ public class PinotLogicalAggregateRule {
 
       Sort sortRel = call.rel(0);
       List<RelFieldCollation> collations = sortRel.getCollation().getFieldCollations();
-      int limit = 0;
-      if (sortRel.fetch != null) {
-        limit = RexLiteral.intValue(sortRel.fetch);
-      }
+      int limit = getGroupTrimLimit(sortRel);
       if (limit <= 0) {
         // Cannot enable group trim when there is no limit.
         return;
@@ -160,6 +154,28 @@ public class PinotLogicalAggregateRule {
 
   private static PinotLogicalAggregate createWithNoGroupTrim(Aggregate aggRel) {
     return createPlan(aggRel, null, 0);
+  }
+
+  /**
+   * Returns the limit to push down into the aggregate for group trim, or 0 if group trim should not be applied.
+   * The pushed-down limit is {@code offset + fetch} so that the leaf/intermediate aggregate retains enough groups to
+   * cover the outer {@code OFFSET ... FETCH} window. Adding only {@code fetch} would trim away rows that the offset
+   * window still needs, under-counting paginated queries.
+   */
+  private static int getGroupTrimLimit(Sort sortRel) {
+    if (sortRel.fetch == null) {
+      return 0;
+    }
+    int limit = RexLiteral.intValue(sortRel.fetch);
+    if (limit <= 0) {
+      return 0;
+    }
+    if (sortRel.offset != null) {
+      // Clamp to avoid int overflow. Integer.MAX_VALUE is safe downstream: GroupByUtils.getTableCapacity uses long
+      // arithmetic.
+      limit = (int) Math.min(Integer.MAX_VALUE, (long) limit + RexLiteral.intValue(sortRel.offset));
+    }
+    return limit;
   }
 
   private static PinotLogicalAggregate createPlan(Aggregate aggRel, @Nullable List<RelFieldCollation> collations,

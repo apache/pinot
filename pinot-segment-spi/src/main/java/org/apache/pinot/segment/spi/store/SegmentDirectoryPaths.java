@@ -134,12 +134,14 @@ public class SegmentDirectoryPaths {
   public static File findVectorIndexIndexFile(File segmentIndexDir, String column) {
     File formatFile = findHnswVectorIndexFile(segmentIndexDir, column);
     if (formatFile == null) {
-      formatFile = findFlatVectorIndexFile(segmentIndexDir, column,
-          V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+      formatFile = findIvfVectorIndexFile(segmentIndexDir, column,
+          V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
+          V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
     }
     if (formatFile == null) {
-      formatFile = findFlatVectorIndexFile(segmentIndexDir, column,
-          V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+      formatFile = findIvfVectorIndexFile(segmentIndexDir, column,
+          V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION,
+          V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
     }
     return formatFile;
   }
@@ -160,18 +162,34 @@ public class SegmentDirectoryPaths {
       case HNSW:
         return findHnswVectorIndexFile(segmentIndexDir, column);
       case IVF_FLAT:
-        return findFlatVectorIndexFile(segmentIndexDir, column,
-            V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+        return findIvfVectorIndexFile(segmentIndexDir, column,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
       case IVF_PQ:
-        return findFlatVectorIndexFile(segmentIndexDir, column,
-            V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+        return findIvfVectorIndexFile(segmentIndexDir, column,
+            V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION,
+            V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
       case IVF_ON_DISK:
         // IVF_ON_DISK reuses the IVF_FLAT file format with FileChannel random-access reads
-        return findFlatVectorIndexFile(segmentIndexDir, column,
-            V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+        return findIvfVectorIndexFile(segmentIndexDir, column,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
       default:
         throw new IllegalStateException("Unsupported vector backend type: " + backendType);
     }
+  }
+
+  /**
+   * Probes for an IVF vector index file under either the legacy extension (sidecar layout) or
+   * the combined extension (transient single-file form left on disk when a build with
+   * {@code storeInSegmentFile=true} has not yet been absorbed into {@code columns.psf}). Legacy
+   * wins if both are present so the caller's behaviour is stable for unchanged segments.
+   */
+  @Nullable
+  private static File findIvfVectorIndexFile(File segmentIndexDir, String column, String legacyExtension,
+      String combinedExtension) {
+    File legacy = findFlatVectorIndexFile(segmentIndexDir, column, legacyExtension);
+    return legacy != null ? legacy : findFlatVectorIndexFile(segmentIndexDir, column, combinedExtension);
   }
 
   /**
@@ -209,6 +227,13 @@ public class SegmentDirectoryPaths {
     }
     if (formatFile == null) {
       vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    }
+    // Combined-form: a single packed file built by HnswVectorIndexCombined that bundles the
+    // Lucene HNSW directory's contents. Probed after the legacy directories so existing segments
+    // keep the pre-existing behaviour when a directory and a combined file coexist.
+    if (formatFile == null) {
+      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION;
       formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
     }
     return formatFile;

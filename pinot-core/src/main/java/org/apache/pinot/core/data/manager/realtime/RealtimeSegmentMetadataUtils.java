@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -53,7 +53,7 @@ public class RealtimeSegmentMetadataUtils {
     try {
       int partitionId = realtimeSegmentDataManager.getStreamPartitionId();
       Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
-          streamMetadataProvider.fetchLatestStreamOffset(Collections.singleton(partitionId),
+          streamMetadataProvider.fetchLatestStreamOffset(Set.of(partitionId),
               STREAM_METADATA_FETCH_TIMEOUT_MS);
       return partitionMsgOffsetMap.get(partitionId);
     } catch (Exception e) {

@@ -21,7 +21,6 @@ package org.apache.pinot.common.restlet.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -49,8 +48,8 @@ public class StartReplaceSegmentsRequest {
   public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
       @JsonProperty("segmentsTo") @Nullable List<String> segmentsTo,
       @JsonProperty("customMap") @Nullable Map<String, String> customMap) {
-    _segmentsFrom = (segmentsFrom == null) ? Collections.emptyList() : segmentsFrom;
-    _segmentsTo = (segmentsTo == null) ? Collections.emptyList() : segmentsTo;
+    _segmentsFrom = (segmentsFrom == null) ? List.of() : segmentsFrom;
+    _segmentsTo = (segmentsTo == null) ? List.of() : segmentsTo;
     Preconditions.checkArgument(!_segmentsFrom.isEmpty() || !_segmentsTo.isEmpty(),
         "'segmentsFrom' and 'segmentsTo' cannot both be empty");
     _customMap = customMap;

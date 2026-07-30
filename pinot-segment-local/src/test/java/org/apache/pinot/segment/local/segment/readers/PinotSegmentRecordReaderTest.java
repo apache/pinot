@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.readers;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -71,7 +70,7 @@ public class PinotSegmentRecordReaderTest {
 
     TableConfig rawNoDictTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME)
-            .setNoDictionaryColumns(Collections.singletonList(D_SV_1)).build();
+            .setNoDictionaryColumns(List.of(D_SV_1)).build();
     _rawNoDictSegmentIndexDir = PinotSegmentUtil.createSegment(rawNoDictTableConfig, schema,
         segmentName + "_raw_no_dict", _segmentOutputDir, new GenericRowRecordReader(_rows));
   }

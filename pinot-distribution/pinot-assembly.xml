@@ -103,6 +103,7 @@
         <include>org.apache.pinot:pinot-confluent-protobuf:zip:plugin</include>
         <include>org.apache.pinot:pinot-csv:zip:plugin</include>
         <include>org.apache.pinot:pinot-json:zip:plugin</include>
+        <include>org.apache.pinot:pinot-bson:zip:plugin</include>
         <include>org.apache.pinot:pinot-parquet:zip:plugin</include>
         <include>org.apache.pinot:pinot-orc:zip:plugin</include>
         <include>org.apache.pinot:pinot-thrift:zip:plugin</include>

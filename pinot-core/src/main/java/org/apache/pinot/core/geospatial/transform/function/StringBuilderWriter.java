@@ -32,64 +32,64 @@ public class StringBuilderWriter extends Writer {
 
   @Override
   public void write(char[] cbuf, int off, int len)
-  throws IOException {
+      throws IOException {
     _buffer.append(cbuf, off, len);
   }
 
   @Override
   public void write(int c)
-  throws IOException {
+      throws IOException {
     _buffer.append((char) c);
   }
 
   @Override
   public void write(String str)
-  throws IOException {
+      throws IOException {
     _buffer.append(str);
   }
 
   @Override
   public void write(char[] cbuf)
-  throws IOException {
+      throws IOException {
     _buffer.append(cbuf);
   }
 
   @Override
   public void write(String str, int off, int len)
-  throws IOException {
+      throws IOException {
     _buffer.append(str, off, off + len);
   }
 
   @Override
   public Writer append(char c)
-  throws IOException {
+      throws IOException {
     _buffer.append(c);
     return this;
   }
 
   @Override
   public Writer append(CharSequence csq)
-  throws IOException {
+      throws IOException {
     _buffer.append(csq);
     return this;
   }
 
   @Override
   public Writer append(CharSequence csq, int start, int end)
-  throws IOException {
+      throws IOException {
     _buffer.append(csq, start, end);
     return this;
   }
 
   @Override
   public void flush()
-  throws IOException {
+      throws IOException {
     // nothing to do
   }
 
   @Override
   public void close()
-  throws IOException {
+      throws IOException {
     // nothing to do
   }
 

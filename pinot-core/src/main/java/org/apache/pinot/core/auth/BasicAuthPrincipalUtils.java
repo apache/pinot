@@ -20,7 +20,6 @@ package org.apache.pinot.core.auth;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -116,13 +115,13 @@ public final class BasicAuthPrincipalUtils {
           String role = user.getRoleType().toString();
 
           Set<String> tables = Optional.ofNullable(user.getTables())
-              .orElseGet(() -> Collections.emptyList())
+              .orElseGet(() -> List.of())
               .stream().collect(Collectors.toSet());
           Set<String> excludeTables = Optional.ofNullable(user.getExcludeTables())
-              .orElseGet(() -> Collections.emptyList())
+              .orElseGet(() -> List.of())
               .stream().collect(Collectors.toSet());
           Set<String> permissions = Optional.ofNullable(user.getPermissions())
-              .orElseGet(() -> Collections.emptyList())
+              .orElseGet(() -> List.of())
               .stream().map(x -> x.toString())
               .collect(Collectors.toSet());
           //todo: Handle RLS filters properly
@@ -137,6 +136,6 @@ public final class BasicAuthPrincipalUtils {
     if (StringUtils.isNotBlank(input) && !ALL.equals(input)) {
       return Arrays.stream(input.split(",")).map(String::trim).collect(Collectors.toSet());
     }
-    return Collections.emptySet();
+    return Set.of();
   }
 }

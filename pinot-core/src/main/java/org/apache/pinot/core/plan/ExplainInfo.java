@@ -19,7 +19,6 @@
 package org.apache.pinot.core.plan;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.proto.Plan;
@@ -38,8 +37,8 @@ public class ExplainInfo {
 
   public ExplainInfo(String title) {
     _title = title;
-    _attributes = Collections.emptyMap();
-    _inputs = Collections.emptyList();
+    _attributes = Map.of();
+    _inputs = List.of();
   }
 
   @JsonCreator

@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.io.IOUtils;
@@ -69,7 +68,7 @@ public class UrlAuthProvider implements AuthProvider {
 
   @Override
   public Map<String, Object> getRequestHeaders() {
-    return Collections.singletonMap(_header, makeToken());
+    return Map.of(_header, makeToken());
   }
 
   @Override

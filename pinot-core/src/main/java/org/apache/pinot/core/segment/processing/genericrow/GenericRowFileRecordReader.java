@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.Arrays;
 import java.io.File;
 import java.util.Set;
@@ -90,8 +91,14 @@ public class GenericRowFileRecordReader implements RecordReader {
    * Compares the records at the given row ids.
    */
   public int compare(int rowId1, int rowId2) {
-    assert _sortedRowIds != null;
+    Preconditions.checkState(_sortedRowIds != null, "Cannot compare rows on an unsorted reader");
     return _fileReader.compare(_sortedRowIds[rowId1], _sortedRowIds[rowId2]);
+  }
+
+  /// Compares the records at the given row ids. Only compare the values for the first `numFieldsToCompare` fields.
+  public int compare(int rowId1, int rowId2, int numFieldsToCompare) {
+    Preconditions.checkState(_sortedRowIds != null, "Cannot compare rows on an unsorted reader");
+    return _fileReader.compare(_sortedRowIds[rowId1], _sortedRowIds[rowId2], numFieldsToCompare);
   }
 
   @Override

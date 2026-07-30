@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
@@ -140,7 +139,7 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

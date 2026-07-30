@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -138,6 +137,7 @@ import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.controller.validation.UtilizationChecker;
+import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.instance.context.ControllerContext;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
@@ -202,7 +202,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected String _helixControllerInstanceId;
   protected String _helixParticipantInstanceId;
   protected boolean _isUpdateStateModel;
-  protected boolean _enableBatchMessageMode;
   protected ControllerConf.ControllerMode _controllerMode;
   protected HelixManager _helixControllerManager;
   protected HelixManager _helixParticipantManager;
@@ -285,7 +284,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(_hostname, _port);
     }
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
-    _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
     _serviceStatusCallbackList = new ArrayList<>();
     if (_controllerMode == ControllerConf.ControllerMode.HELIX_ONLY) {
@@ -576,8 +574,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     }
 
     // Set up Pinot cluster in Helix if needed
-    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode,
-        _config);
+    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _config);
 
     // Start all components
     initPinotFSFactory();
@@ -627,12 +624,21 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       try {
         HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
             .forCluster(helixClusterName).build();
-        Map<String, String> values = helixAdminForMv.getConfig(scope, Collections.singletonList(configName));
+        Map<String, String> values = helixAdminForMv.getConfig(scope, List.of(configName));
         return values == null ? null : values.get(configName);
       } catch (Exception e) {
         return null;
       }
     });
+    // Backfill the reverse index against the authoritative TableConfig list before exposing
+    // the consistency manager to controller-side notify paths.  init() above only seeds the
+    // index from existing definition znodes, so MVs whose znode is missing — best-effort
+    // persist failures, znodes lost to manual ZK surgery, or MVs created on a controller
+    // version older than definition znodes — would be invisible to the DROP TABLE delete-guard
+    // and an operator could silently orphan them by dropping their base table.  Backfill must
+    // run BEFORE the register* calls below so segment / table notifies that begin firing as
+    // soon as `_materializedViewConsistencyManager` is non-null already see a complete index.
+    _helixResourceManager.backfillMaterializedViewReverseIndex(_materializedViewConsistencyManager);
     _helixResourceManager.registerMaterializedViewConsistencyManager(_materializedViewConsistencyManager);
     _helixResourceManager.getSegmentDeletionManager()
         .registerMaterializedViewConsistencyManager(_materializedViewConsistencyManager);
@@ -691,6 +697,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getRebalanceDiskUtilizationThreshold());
     _rebalancerExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
         "rebalance-thread-%d");
+    _helixResourceManager.setQueryWorkloadManager(new QueryWorkloadManager(_helixResourceManager, _config,
+        _controllerMetrics));
     _tableRebalanceManager =
         new TableRebalanceManager(_helixResourceManager, _controllerMetrics, _rebalancePreChecker, _tableSizeReader,
             _rebalancerExecutorService);
@@ -1019,8 +1027,24 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
     if (_tlsPort > 0) {
       updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    } else {
+      // If no TLS port from listener configs, check if VIP is configured with HTTPS
+      // This supports scenarios where SSL termination is handled externally (e.g. NGINX)
+      String vipProtocol = _config.getControllerVipProtocol();
+      if (CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(vipProtocol)) {
+        String vipPort = _config.getControllerVipPort();
+        if (vipPort != null) {
+          try {
+            int httpsPort = Integer.parseInt(vipPort);
+            LOGGER.info("Setting VIP HTTPS port {} in InstanceConfig (external SSL termination)", httpsPort);
+            updated |= HelixHelper.updateTlsPort(instanceConfig, httpsPort);
+          } catch (NumberFormatException e) {
+            LOGGER.warn("Invalid controller.vip.port value: {}", vipPort);
+          }
+        }
+      }
     }
-    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> Collections.singletonList(Helix.CONTROLLER_INSTANCE));
+    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> List.of(Helix.CONTROLLER_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
 
@@ -1049,8 +1073,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     initRealtimeOffsetAutoResetManager(periodicTasks);
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
-    _retentionManager = new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-        brokerServiceHelper);
+    _retentionManager = createRetentionManager(brokerServiceHelper);
     periodicTasks.add(_retentionManager);
     _offlineSegmentValidationManager =
         new OfflineSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
@@ -1106,6 +1129,17 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new RealtimeOffsetAutoResetManager(_config, _helixResourceManager, _leadControllerManager,
             _pinotLLCRealtimeSegmentManager, _controllerMetrics);
     periodicTasks.add(_realtimeOffsetAutoResetManager);
+  }
+
+  /**
+   * Factory hook for the controller's {@link RetentionManager}. Subclasses override to install a
+   * deployment-specific retention manager (e.g. to extend the untracked-segment sweep with names
+   * tracked outside the standard per-segment ZK znodes). The default constructs the stock
+   * {@link RetentionManager}.
+   */
+  protected RetentionManager createRetentionManager(BrokerServiceHelper brokerServiceHelper) {
+    return new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+        brokerServiceHelper);
   }
 
   /**

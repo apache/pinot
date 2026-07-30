@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.timeseries.serde;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +51,7 @@ public class TimeSeriesBlockSerdeTest {
       ByteString byteString1 = TimeSeriesBlockSerde.serializeTimeSeriesBlock(block1);
       String serializedBlockString1 = byteString1.toStringUtf8();
       TimeSeriesBlock block2 = TimeSeriesBlockSerde.deserializeTimeSeriesBlock(byteString1.asReadOnlyByteBuffer(),
-          Collections.emptyMap());
+          Map.of());
       String serializedBlockString2 = TimeSeriesBlockSerde.serializeTimeSeriesBlock(block2).toStringUtf8();
       // Serialized blocks in both cases should be the same since serialization is deterministic.
       assertEquals(serializedBlockString1, serializedBlockString2);
@@ -117,7 +116,7 @@ public class TimeSeriesBlockSerdeTest {
   private static TimeSeriesBlock buildBlockWithNoTags() {
     TimeBuckets timeBuckets = TIME_BUCKETS;
     // Single series: []
-    List<String> tagNames = Collections.emptyList();
+    List<String> tagNames = List.of();
     Object[] seriesValues = new Object[0];
     long seriesHash = TimeSeries.hash(seriesValues);
     Map<Long, List<TimeSeries>> seriesMap = new HashMap<>();

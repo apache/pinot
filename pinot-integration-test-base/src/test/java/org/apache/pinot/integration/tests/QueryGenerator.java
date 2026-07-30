@@ -25,7 +25,6 @@ import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -221,7 +220,7 @@ public class QueryGenerator {
   public static void main(String[] args)
       throws Exception {
     File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
-    QueryGenerator queryGenerator = new QueryGenerator(Collections.singletonList(avroFile), "mytable", "mytable");
+    QueryGenerator queryGenerator = new QueryGenerator(List.of(avroFile), "mytable", "mytable");
     File outputFile = new File(
         "pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K.sql");
     try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
@@ -381,7 +380,7 @@ public class QueryGenerator {
 
     if (predicateCount < 2) {
       // No need to join.
-      return new PredicateQueryFragment(predicates, Collections.emptyList());
+      return new PredicateQueryFragment(predicates, List.of());
     } else {
       // Join predicates with ANDs and ORs.
       List<QueryFragment> operators = new ArrayList<>(predicateCount - 1);
@@ -871,8 +870,8 @@ public class QueryGenerator {
       ArrayList<String> arrayOfAggregationColumnsAndFunctions = new ArrayList<>(aggregationColumnsAndFunctions);
       HavingQueryFragment havingPredicate;
       if (isDistinctQuery) {
-        havingPredicate = new HavingQueryFragment(Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList());
+        havingPredicate = new HavingQueryFragment(List.of(), List.of(),
+            List.of());
       } else {
         havingPredicate = generateHavingPredicate(arrayOfAggregationColumnsAndFunctions);
       }

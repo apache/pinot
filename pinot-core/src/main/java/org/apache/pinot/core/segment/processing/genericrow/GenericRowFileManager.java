@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -38,17 +39,35 @@ public class GenericRowFileManager {
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
   private final int _numSortFields;
+  private final boolean _hasOriginalTimeField;
 
   private GenericRowFileWriter _fileWriter;
   private GenericRowFileReader _fileReader;
 
   public GenericRowFileManager(File outputDir, List<FieldSpec> fieldSpecs, boolean includeNullFields,
       int numSortFields) {
+    this(outputDir, fieldSpecs, includeNullFields, numSortFields, false);
+  }
+
+  /// Creates the file manager. When `hasOriginalTimeField` is `true`, the last sort field must be the
+  /// hidden column ([TimeHandler#ORIGINAL_TIME_MS_COLUMN]) carrying the original (pre-rounding) time value,
+  /// appended by the mapper for order sensitive aggregations (FIRSTWITHTIME/LASTWITHTIME). The flag is carried
+  /// explicitly instead of being inferred from the column name, so that a schema column which happens to share the
+  /// name can never be mistaken for the hidden field.
+  public GenericRowFileManager(File outputDir, List<FieldSpec> fieldSpecs, boolean includeNullFields,
+      int numSortFields, boolean hasOriginalTimeField) {
+    if (hasOriginalTimeField) {
+      Preconditions.checkArgument(numSortFields > 0 && fieldSpecs.get(numSortFields - 1).getName()
+              .equals(TimeHandler.ORIGINAL_TIME_MS_COLUMN),
+          "The last sort field must be the hidden original time column: %s",
+          TimeHandler.ORIGINAL_TIME_MS_COLUMN);
+    }
     _offsetFile = new File(outputDir, OFFSET_FILE_NAME);
     _dataFile = new File(outputDir, DATA_FILE_NAME);
     _fieldSpecs = fieldSpecs;
     _includeNullFields = includeNullFields;
     _numSortFields = numSortFields;
+    _hasOriginalTimeField = hasOriginalTimeField;
   }
 
   /**
@@ -70,6 +89,12 @@ public class GenericRowFileManager {
    */
   public int getNumSortFields() {
     return _numSortFields;
+  }
+
+  /// Returns `true` if the last sort field is the hidden column carrying the original (pre-rounding) time
+  /// value ([TimeHandler#ORIGINAL_TIME_MS_COLUMN]), `false` otherwise.
+  public boolean hasOriginalTimeField() {
+    return _hasOriginalTimeField;
   }
 
   /**

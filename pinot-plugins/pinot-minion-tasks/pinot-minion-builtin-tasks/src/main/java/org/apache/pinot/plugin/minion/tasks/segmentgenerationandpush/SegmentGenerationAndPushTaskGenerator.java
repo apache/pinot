@@ -26,7 +26,6 @@ import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -128,7 +127,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
           URI inputDirURI =
               SegmentGenerationUtils.getDirectoryURI(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
           updateRecordReaderConfigs(batchConfigMap);
-          List<SegmentZKMetadata> segmentsZKMetadata = Collections.emptyList();
+          List<SegmentZKMetadata> segmentsZKMetadata = List.of();
           // For append mode, we don't create segments for input file URIs already created.
           if (BatchConfigProperties.SegmentIngestionType.APPEND.name().equalsIgnoreCase(batchSegmentIngestionType)) {
             segmentsZKMetadata = getSegmentsZKMetadataForTable(tableNameWithType);
@@ -189,7 +188,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     try {
       URI inputDirURI =
           SegmentGenerationUtils.getDirectoryURI(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
-      List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI, Collections.emptySet());
+      List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI, Set.of());
       if (inputFileURIs.isEmpty()) {
         LOGGER.warn("Skip generating SegmentGenerationAndPushTask, no input files found : {}", inputDirURI);
         return List.of();
@@ -326,7 +325,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
         files = inputDirFS.listFiles(inputDirURI, true);
       } catch (IOException e) {
         LOGGER.error("Unable to list files under URI: {}", inputDirURI, e);
-        return Collections.emptyList();
+        return List.of();
       }
       PathMatcher includeFilePathMatcher = null;
       if (includeFileNamePattern != null) {

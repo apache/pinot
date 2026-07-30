@@ -46,6 +46,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -303,6 +304,11 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
    */
   protected BaseControllerStarter getSharedControllerStarter() {
     return _sharedClusterTestSuite._controllerStarter;
+  }
+
+  /// Returns server starters from the shared suite instance.
+  protected List<BaseServerStarter> getSharedServerStarters() {
+    return _sharedClusterTestSuite._serverStarters;
   }
 
   /**

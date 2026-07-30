@@ -177,19 +177,19 @@ public class TestConfigEngine {
             .build();
 
     Set<String> results = new HashSet<String>() {{
-      add("[[PredicateParseResult{dims{[3]}, AND, BITMAP, nESI=1.645, selected=0.034, nESIWithIdx=0.695}, "
-          + "PredicateParseResult{dims{[2]},"
-          + " AND, BITMAP, nESI=1.645, selected=0.034, nESIWithIdx=0.835}, PredicateParseResult{dims{[]}, AND, "
-          + "NESTED, nESI=1.645, selected=0.034, nESIWithIdx=1.645}]]");
-      add("[[PredicateParseResult{dims{[7]}, AND, BITMAP, nESI=0.150, selected=0.015, nESIWithIdx=0.058}, "
-          + "PredicateParseResult{dims{[]}, "
-          + "AND, NESTED, nESI=0.150, selected=0.015, nESIWithIdx=0.150}], [PredicateParseResult{dims{[5, 9]}, AND, "
-          + "BITMAP, nESI=12.000, "
-          + "selected=0.500, nESIWithIdx=4.000}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=12.000, selected=0"
-          + ".500, nESIWithIdx=12.000}]]");
-      add("[[PredicateParseResult{dims{[2, 4]}, AND, BITMAP, nESI=7.625, selected=0.023, nESIWithIdx=1.309}, "
-          + "PredicateParseResult{dims{[]}, AND, NESTED, nESI=7.625, selected=0.023, nESIWithIdx=7.625}]]");
-    }};
+        add("[[PredicateParseResult{dims{[3]}, AND, BITMAP, nESI=1.645, selected=0.034, nESIWithIdx=0.695}, "
+            + "PredicateParseResult{dims{[2]},"
+            + " AND, BITMAP, nESI=1.645, selected=0.034, nESIWithIdx=0.835}, PredicateParseResult{dims{[]}, AND, "
+            + "NESTED, nESI=1.645, selected=0.034, nESIWithIdx=1.645}]]");
+        add("[[PredicateParseResult{dims{[7]}, AND, BITMAP, nESI=0.150, selected=0.015, nESIWithIdx=0.058}, "
+            + "PredicateParseResult{dims{[]}, "
+            + "AND, NESTED, nESI=0.150, selected=0.015, nESIWithIdx=0.150}], [PredicateParseResult{dims{[5, 9]}, AND, "
+            + "BITMAP, nESI=12.000, "
+            + "selected=0.500, nESIWithIdx=4.000}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=12.000, selected=0"
+            + ".500, nESIWithIdx=12.000}]]");
+        add("[[PredicateParseResult{dims{[2, 4]}, AND, BITMAP, nESI=7.625, selected=0.023, nESIWithIdx=1.309}, "
+            + "PredicateParseResult{dims{[]}, AND, NESTED, nESI=7.625, selected=0.023, nESIWithIdx=7.625}]]");
+      }};
 
     String q1 =
         "select i from tableName where b in (2,4) and ((a in (1,2,3) and e = 4) or c = 7) and d in ('#VALUES', 23) "

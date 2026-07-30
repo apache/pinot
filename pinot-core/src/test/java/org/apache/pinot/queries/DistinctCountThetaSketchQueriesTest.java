@@ -26,9 +26,9 @@ import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.UpdateSketch;
-import org.apache.datasketches.theta.UpdateSketchBuilder;
+import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.UpdatableThetaSketch;
+import org.apache.datasketches.theta.UpdatableThetaSketchBuilder;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
@@ -116,7 +116,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
   public void setUp()
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
-    UpdateSketchBuilder sketchBuilder = new UpdateSketchBuilder();
+    UpdatableThetaSketchBuilder sketchBuilder = new UpdatableThetaSketchBuilder();
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
@@ -133,7 +133,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
       record.putValue(DOUBLE_MV_COLUMN, mvEntry);
       record.putValue(STRING_MV_COLUMN, mvEntry);
       // Store serialized sketches in the BYTES column
-      UpdateSketch sketch = sketchBuilder.build();
+      UpdatableThetaSketch sketch = sketchBuilder.build();
       sketch.update(i);
       sketch.update(i + NUM_RECORDS);
       sketch.update(i + 2 * NUM_RECORDS);
@@ -224,7 +224,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
           List<ThetaSketchAccumulator> accumulators =
               (List<ThetaSketchAccumulator>) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId);
           assertEquals(accumulators.size(), 1);
-          Sketch sketch = accumulators.get(0).getResult();
+          ThetaSketch sketch = accumulators.get(0).getResult();
           if (i < 5) {
             assertEquals(Math.round(sketch.getEstimate()), 1);
           } else {
@@ -301,7 +301,8 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
     String query = "SELECT DISTINCT_COUNT_RAW_THETA_SKETCH(intSVColumn) FROM testTable";
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     String serializedSketch = (String) brokerResponse.getResultTable().getRows().get(0)[0];
-    Sketch sketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(Base64.getDecoder().decode(serializedSketch));
+    ThetaSketch sketch =
+        ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(Base64.getDecoder().decode(serializedSketch));
     assertEquals(Math.round(sketch.getEstimate()), NUM_RECORDS);
   }
 

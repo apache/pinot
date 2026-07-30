@@ -26,8 +26,8 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -100,11 +100,11 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       addSchema(schema);
       TableConfig tableConfig = createTableConfig(tableFile);
       addTableConfig(tableConfig);
-      ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
+      ClusterIntegrationTestUtils.buildSegmentsFromAvro(List.of(dataFile), tableConfig, schema, 0,
           tableSegmentDir, tarDir);
       uploadSegments(tableName, tarDir);
       // H2
-      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
+      ClusterIntegrationTestUtils.setUpH2TableWithAvro(List.of(dataFile), tableName, _h2Connection);
     }
   }
 
