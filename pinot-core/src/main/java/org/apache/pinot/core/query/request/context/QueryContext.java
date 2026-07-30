@@ -44,6 +44,7 @@ import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -143,6 +144,11 @@ public class QueryContext {
   private int _effectiveSegmentGroupTrimSize;
   // Flush threshold for streaming group-by (0 = disabled)
   private int _streamingGroupByFlushThreshold;
+  // Opt-in: use the streaming k-way-merge selection ORDER BY combine over sorted segments
+  private boolean _sortedSelectionMergeEnabled;
+  // Output block size (rows) for the streaming selection ORDER BY combine
+  private int _sortedSelectionMergeBlockSize = Broker.DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE;
+
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -545,6 +551,22 @@ public class QueryContext {
 
   public void setStreamingGroupByFlushThreshold(int streamingGroupByFlushThreshold) {
     _streamingGroupByFlushThreshold = streamingGroupByFlushThreshold;
+  }
+
+  public boolean isSortedSelectionMergeEnabled() {
+    return _sortedSelectionMergeEnabled;
+  }
+
+  public void setSortedSelectionMergeEnabled(boolean sortedSelectionMergeEnabled) {
+    _sortedSelectionMergeEnabled = sortedSelectionMergeEnabled;
+  }
+
+  public int getSortedSelectionMergeBlockSize() {
+    return _sortedSelectionMergeBlockSize;
+  }
+
+  public void setSortedSelectionMergeBlockSize(int sortedSelectionMergeBlockSize) {
+    _sortedSelectionMergeBlockSize = sortedSelectionMergeBlockSize;
   }
 
   public boolean isNullHandlingEnabled() {

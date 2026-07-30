@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.serde;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -36,6 +37,7 @@ import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
@@ -115,6 +117,41 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     assertEquals(roundTripped.get(1).getProjectAndResultSchema().getProject(),
         List.of(new RexExpression.InputRef(1)));
     assertEquals(roundTripped.get(1).getProjectAndResultSchema().getSchema(), projectResultSchema);
+  }
+
+  /// Every {@link JoinNode.JoinStrategy} must survive the round-trip through its {@code Plan.JoinStrategy} proto
+  /// counterpart. The strategy is a wire value, so a mis-mapped switch arm in either direction silently runs a join
+  /// with the wrong semantics on the server rather than failing. Iterating the enum (rather than listing cases) also
+  /// makes this fail when a future strategy is added without serde wiring.
+  @Test
+  public void testJoinStrategySerDe() {
+    DataSchema schema = new DataSchema(new String[]{"l0", "r0"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    for (JoinNode.JoinStrategy strategy : JoinNode.JoinStrategy.values()) {
+      // ASOF joins carry a match condition; the other strategies must not.
+      RexExpression matchCondition =
+          strategy == JoinNode.JoinStrategy.ASOF ? new RexExpression.InputRef(0) : null;
+      JoinNode node = new JoinNode(1, schema, PlanNode.NodeHint.EMPTY, new ArrayList<>(), JoinRelType.INNER,
+          List.of(0), List.of(0), List.of(), strategy, matchCondition);
+      JoinNode deserialized = (JoinNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+      assertEquals(deserialized.getJoinStrategy(), strategy, "JoinStrategy did not round-trip: " + strategy);
+    }
+  }
+
+  /// A plan carrying a strategy this node does not know about must fail loudly. Falling back to HASH would drop the
+  /// semantics the sending broker asked for (an ASOF-style match condition, or the sorted-input assumption) and
+  /// return wrong rows with no signal.
+  @Test
+  public void testUnknownJoinStrategyFailsFast() {
+    DataSchema schema = new DataSchema(new String[]{"l0", "r0"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    JoinNode node = new JoinNode(1, schema, PlanNode.NodeHint.EMPTY, new ArrayList<>(), JoinRelType.INNER,
+        List.of(0), List.of(0), List.of(), JoinNode.JoinStrategy.HASH, null);
+    Plan.PlanNode protoNode = PlanNodeSerializer.process(node);
+    Plan.PlanNode withUnknownStrategy = protoNode.toBuilder()
+        .setJoinNode(protoNode.getJoinNode().toBuilder().setJoinStrategyValue(999))
+        .build();
+    assertThrows(IllegalStateException.class, () -> PlanNodeDeserializer.process(withUnknownStrategy));
   }
 
   @Test
