@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.plugin.inputformat.json.format;
 
+import com.fasterxml.jackson.core.JsonFactory;
 import java.util.Map;
-import org.apache.pinot.spi.utils.JsonUtils;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /// Parses the PostgreSQL `jsonb` binary wire format: a single version byte (currently `1`) followed by the
@@ -32,12 +35,16 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// logical replication via `pgoutput` — routes through that same send function, so the version-byte + text
 /// framing is what a stream actually carries.
 ///
-/// Because the body is ordinary text JSON, values decode through [JsonUtils#bytesToMap] and therefore follow
-/// exactly the same type contract as [TextJsonPayloadParser].
-class PostgresJsonbPayloadParser implements JsonPayloadParser {
+/// Because the body is ordinary text JSON, values follow exactly the same type contract as
+/// [TextJsonPayloadParser].
+class PostgresJsonbPayloadParser extends JacksonPayloadParser {
 
   /// The only version `jsonb_recv` accepts.
   private static final byte JSONB_VERSION = 1;
+
+  PostgresJsonbPayloadParser() {
+    super(new JsonFactory());
+  }
 
   @Override
   public boolean matches(byte[] payload, int offset, int length) {
@@ -50,9 +57,21 @@ class PostgresJsonbPayloadParser implements JsonPayloadParser {
   @Override
   public Map<String, Object> parse(byte[] payload, int offset, int length)
       throws Exception {
+    validate(payload, offset, length);
+    return parseMap(payload, offset + 1, length - 1);
+  }
+
+  @Override
+  public boolean parseTo(byte[] payload, int offset, int length, @Nullable Set<String> fields,
+      GenericRow destination)
+      throws Exception {
+    validate(payload, offset, length);
+    return parseToRow(payload, offset + 1, length - 1, fields, destination);
+  }
+
+  private static void validate(byte[] payload, int offset, int length) {
     if (length < 2 || payload[offset] != JSONB_VERSION) {
       throw new IllegalArgumentException("Payload is not a version-1 PostgreSQL jsonb value");
     }
-    return JsonUtils.bytesToMap(payload, offset + 1, length - 1);
   }
 }

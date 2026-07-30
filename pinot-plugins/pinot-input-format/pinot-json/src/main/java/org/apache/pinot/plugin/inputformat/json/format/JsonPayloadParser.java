@@ -19,6 +19,9 @@
 package org.apache.pinot.plugin.inputformat.json.format;
 
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /// Parses a stream payload encoded in a particular (text or binary) JSON representation into a Jackson-style
@@ -51,4 +54,16 @@ public interface JsonPayloadParser {
   /// @throws Exception if the region is not valid for this format
   Map<String, Object> parse(byte[] payload, int offset, int length)
       throws Exception;
+
+  /// Parses the payload directly into {@code destination}, avoiding a top-level per-record map when the
+  /// implementation supports it.
+  ///
+  /// @param fields fields to populate, or {@code null} to populate every top-level field
+  /// @return {@code true} when the payload was decoded into {@code destination}; {@code false} when the caller
+  ///     should fall back to [#parse]
+  default boolean parseTo(byte[] payload, int offset, int length, @Nullable Set<String> fields,
+      GenericRow destination)
+      throws Exception {
+    return false;
+  }
 }

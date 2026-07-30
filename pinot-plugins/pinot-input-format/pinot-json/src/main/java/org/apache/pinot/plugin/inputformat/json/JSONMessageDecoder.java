@@ -53,6 +53,8 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
+  private Set<String> _fieldsToRead;
+  private boolean _usesDefaultRecordExtractor;
   // For AUTO this resolves the concrete format per message; otherwise it is the pinned format's parser.
   private JsonPayloadParser _parser;
 
@@ -70,6 +72,9 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     }
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _jsonRecordExtractor.init(fieldsToRead, null);
+    _fieldsToRead = fieldsToRead == null || fieldsToRead.isEmpty() ? null : Set.copyOf(fieldsToRead);
+    // A configured extractor can change conversion semantics, so only bypass Pinot's exact default class.
+    _usesDefaultRecordExtractor = _jsonRecordExtractor.getClass() == JSONRecordExtractor.class;
     _parser = JsonPayloadFormat.fromConfig(jsonFormat).getParser();
   }
 
@@ -81,7 +86,9 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
-      // Parse directly to Map, avoiding an intermediate JsonNode representation for better performance.
+      if (_usesDefaultRecordExtractor && _parser.parseTo(payload, offset, length, _fieldsToRead, destination)) {
+        return destination;
+      }
       Map<String, Object> jsonMap = _parser.parse(payload, offset, length);
       return _jsonRecordExtractor.extract(jsonMap, destination);
     } catch (Exception e) {
