@@ -77,7 +77,18 @@ public class OfflineTableDataManager extends BaseTableDataManager {
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager == null) {
+      if (isLazyLoadEnabled() && canRegisterStub(segmentName, zkMetadata)) {
+        // Lazy loading: register a metadata-only stub instead of downloading. The first query that touches the
+        // segment materializes it from the deep store. Segments without an authoritative deep-store copy or with an
+        // existing local copy load eagerly (see canRegisterStub).
+        registerStubbedSegment(segmentName, zkMetadata);
+        return;
+      }
       addNewOnlineSegment(zkMetadata, indexLoadingConfig);
+      // Clear any stale stub (e.g. re-sent ONLINE after an eviction that kept the local copy) only AFTER the eager
+      // load succeeds: while loading, concurrent queries can still self-heal through the stub, and if the load
+      // throws, the stub keeps the segment servable from the deep store.
+      unregisterStubbedSegment(segmentName);
     } else {
       replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
     }

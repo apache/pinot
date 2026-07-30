@@ -69,6 +69,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String TABLE_SAMPLERS_KEY = "tableSamplers";
   public static final String DESCRIPTION_KEY = "description";
   public static final String TAGS_KEY = "tags";
+  public static final String LAZY_LOAD_CONFIG_KEY = "lazyLoadConfig";
 
   // Double underscore is reserved for real-time segment name delimiter
   public static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
@@ -138,6 +139,9 @@ public class TableConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription(value = "Configs for table samplers")
   private List<TableSamplerConfig> _tableSamplers;
+
+  @JsonPropertyDescription(value = "Config for lazy segment loading (OFFLINE tables only)")
+  private LazyLoadConfig _lazyLoadConfig;
 
   /// Legacy constructor preserved for binary backward-compatibility on the public SPI surface.
   /// Callers compiled against the pre-`isMaterializedView` signature still link against this entry
@@ -251,6 +255,7 @@ public class TableConfig extends BaseJsonConfig {
     _tableSamplers = sanitizeAndValidateTableSamplers(tableConfig.getTableSamplers());
     _description = tableConfig.getDescription();
     _tags = tableConfig.getTags();
+    _lazyLoadConfig = tableConfig.getLazyLoadConfig();
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -565,6 +570,21 @@ public class TableConfig extends BaseJsonConfig {
 
   public void setSegmentAssignmentConfigMap(Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap) {
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
+  }
+
+  @JsonProperty(LAZY_LOAD_CONFIG_KEY)
+  @Nullable
+  public LazyLoadConfig getLazyLoadConfig() {
+    return _lazyLoadConfig;
+  }
+
+  public void setLazyLoadConfig(LazyLoadConfig lazyLoadConfig) {
+    _lazyLoadConfig = lazyLoadConfig;
+  }
+
+  @JsonIgnore
+  public boolean isLazyLoadEnabled() {
+    return _lazyLoadConfig != null && _lazyLoadConfig.isEnabled();
   }
 
   @JsonIgnore
