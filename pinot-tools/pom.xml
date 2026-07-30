@@ -51,47 +51,33 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-minion-builtin-tasks</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-batch-ingestion-common</artifactId>
     </dependency>
+    <!--
+      Depend on *-base (the shared library) rather than the full plugin, so pinot-tools' Java
+      code can use the utility classes without pulling the plugin implementation classes into
+      pinot-all.jar. The plugin classes live exclusively in plugins/ and are realm-loaded at
+      runtime.
+    -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-avro</artifactId>
+      <artifactId>pinot-avro-base</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-confluent-avro</artifactId>
+      <artifactId>pinot-json-base</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-csv</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-protobuf</artifactId>
-    </dependency>
+    <!-- pinot-json ships JSONMessageDecoder, which KafkaJSONMessageDecoder extends. pinot-kafka-base
+         declares pinot-json as provided, so it would be excluded from the transitive runtime
+         classpath; keep it here so JSONMessageDecoder is loadable at runtime. -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-json</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-bson</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-orc</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-parquet</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-thrift</artifactId>
+      <artifactId>pinot-parquet-base</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -130,6 +116,12 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-compound-metrics</artifactId>
+    </dependency>
+
+    <!-- QuickStartBase.createKafkaAdminClient() uses AdminClient directly -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
     </dependency>
 
     <dependency>
@@ -191,6 +183,11 @@
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-parquet</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -316,6 +313,67 @@
             <program>
               <mainClass>org.apache.pinot.tools.RealtimeQuickStart</mainClass>
               <name>quick-start-streaming</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.UpsertQuickStart</mainClass>
+              <name>quick-start-upsert-streaming</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.PartialUpsertQuickStart</mainClass>
+              <name>quick-start-partial-upsert-streaming</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.JsonIndexQuickStart</mainClass>
+              <name>quick-start-json-index-batch</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.RealtimeJsonIndexQuickStart</mainClass>
+              <name>quick-start-json-index-streaming</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.RealtimeComplexTypeHandlingQuickStart</mainClass>
+              <name>quick-start-complex-type-handling-streaming</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.OfflineComplexTypeHandlingQuickStart</mainClass>
+              <name>quick-start-complex-type-handling-offline</name>
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>

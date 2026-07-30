@@ -21,8 +21,8 @@ package org.apache.pinot.spi.cursors;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.Set;
+import org.apache.pinot.spi.plugin.PluginManager;
 
 
 public class ResponseStoreService {
@@ -50,7 +50,7 @@ public class ResponseStoreService {
 
   public static ResponseStoreService fromServiceLoader() {
     Set<ResponseStore> storeSet = new HashSet<>();
-    for (ResponseStore responseStore : ServiceLoader.load(ResponseStore.class)) {
+    for (ResponseStore responseStore : PluginManager.get().loadServices(ResponseStore.class)) {
       storeSet.add(responseStore);
     }
 

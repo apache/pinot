@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.minion.utils.SegmentConversionUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;

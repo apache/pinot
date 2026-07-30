@@ -11,6 +11,10 @@ target/
 /logs/
 bin/
 */bin/
+# pinot-plugin-verifier ships a launcher script from src/main/resources/bin, which the
+# generic bin/ rules above would swallow. Negate the directory (not just the file): git
+# cannot re-include a path whose parent directory is excluded.
+!pinot-plugin-verifier/src/main/resources/bin/
 .idea
 .vscode
 *.iml

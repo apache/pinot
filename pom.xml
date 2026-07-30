@@ -52,6 +52,7 @@
     <module>pinot-minion</module>
     <module>pinot-plugins</module>
     <module>pinot-tools</module>
+    <module>pinot-plugin-verifier</module>
     <module>pinot-perf</module>
     <module>pinot-integration-test-base</module>
     <module>pinot-integration-tests</module>
@@ -370,7 +371,7 @@
                   <rules>
                     <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
                       <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
-                        pinot-tools,contrib,pinot-dependency-verifier</skipModules>
+                        pinot-tools,contrib,pinot-dependency-verifier,pinot-distribution</skipModules>
                     </pinotCustomDependencyVersionRule>
                   </rules>
                   <fail>true</fail>
@@ -2733,6 +2734,10 @@
             <!-- Spark datasource register -->
             <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
 
+            <!-- ServiceLoader registration files under META-INF/services/ — plain text files
+                 listing FQCNs, no license header format applies -->
+            <exclude>**/META-INF/services/**</exclude>
+
             <!-- Binary files -->
             <exclude>**/*.avro</exclude>
             <exclude>**/*.avsc</exclude>
@@ -2891,20 +2896,6 @@
               </excludes>
             </filter>
           </filters>
-          <relocations>
-            <relocation>
-              <pattern>com.fasterxml.jackson</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.scala-lang</pattern>
-              <shadedPattern>${shade.prefix}.org.scala-lang</shadedPattern>
-            </relocation>
-          </relocations>
         </configuration>
       </plugin>
       <!-- Include apache LICENSE, NOTICE files for jar resource bundle -->

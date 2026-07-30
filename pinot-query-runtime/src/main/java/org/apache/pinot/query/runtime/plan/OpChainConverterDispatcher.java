@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.plan;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -30,14 +29,15 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
  * Dispatches physical plan conversion to the active {@link OpChainConverter}. The active instance is resolved from
- * {@link ServiceLoader} when the JVM loads this class and whenever {@link #setActiveConverterIdOverride} runs (intended
- * to be rare, e.g. on config change).
+ * {@link PluginManager#loadServices(Class)} when the JVM loads this class and whenever
+ * {@link #setActiveConverterIdOverride} runs (intended to be rare, e.g. on config change).
  */
 public final class OpChainConverterDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainConverterDispatcher.class);
@@ -59,7 +59,7 @@ public final class OpChainConverterDispatcher {
   }
 
   /**
-   * Re-resolves converters from {@link ServiceLoader} and sets the active one to the given
+   * Re-resolves converters from {@link PluginManager#loadServices(Class)} and sets the active one to the given
    * {@link OpChainConverter#converterId()} (case-insensitive), or to the highest-{@link OpChainConverter#priority()}
    * implementation when {@code null}.
    */
@@ -99,7 +99,7 @@ public final class OpChainConverterDispatcher {
 
   private static Map<String, OpChainConverter> loadConvertersById() {
     Map<String, OpChainConverter> converters = new HashMap<>();
-    for (OpChainConverter converter : ServiceLoader.load(OpChainConverter.class)) {
+    for (OpChainConverter converter : PluginManager.get().loadServices(OpChainConverter.class)) {
       String converterId = converter.converterId();
       if (StringUtils.isBlank(converterId)) {
         LOGGER.warn("Skipping OpChainConverter {} because converterId() is blank",

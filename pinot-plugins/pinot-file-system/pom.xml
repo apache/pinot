@@ -33,7 +33,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <plugin.type>pinot-file-system</plugin.type>
   </properties>
 
   <modules>

@@ -52,6 +52,7 @@ import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
+import org.apache.pinot.minion.utils.SegmentConversionUtils;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;

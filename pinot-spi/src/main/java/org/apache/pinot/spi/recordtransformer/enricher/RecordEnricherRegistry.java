@@ -22,8 +22,8 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.ServiceLoader;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +36,7 @@ public class RecordEnricherRegistry {
   private static final Map<String, RecordEnricherFactory> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
 
   static {
-    for (RecordEnricherFactory recordEnricherFactory : ServiceLoader.load(RecordEnricherFactory.class)) {
+    for (RecordEnricherFactory recordEnricherFactory : PluginManager.get().loadServices(RecordEnricherFactory.class)) {
       LOGGER.info("Registered record enricher factory type: {}", recordEnricherFactory.getEnricherType());
       RECORD_ENRICHER_FACTORY_MAP.put(recordEnricherFactory.getEnricherType(), recordEnricherFactory);
     }

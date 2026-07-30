@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks;
+package org.apache.pinot.minion.utils;
 
 import com.google.common.net.InetAddresses;
 import java.io.File;

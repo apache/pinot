@@ -31,12 +31,12 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <shade.phase.prop>package</shade.phase.prop>
   </properties>
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
+      <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
     <!-- Replace bcprov-jdk15on which is excluded from hadoop-common -->
     <dependency>
