@@ -213,20 +213,23 @@ public class H3IndexHandler extends BaseIndexHandler {
             .createIndexReader(segmentWriter, colIndexConf, columnMetadata);
         GeoSpatialIndexCreator h3IndexCreator = StandardIndexes.h3().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
-      // Decode each distinct dictionary value at most once. Old segments reloaded after a geo column was added are
-      // dominated by a single empty default value (cardinality 1), so caching by dictId avoids re-reading and
-      // re-decoding that same value for every doc. Decoding through the creator's toGeometry() fast-paths the empty
-      // default value to null instead of failing the whole reload with a BufferUnderflowException, tolerating it the
-      // same way the segment-creation path does.
-      Geometry[] geometryByDictId = new Geometry[dictionary.length()];
-      boolean[] decoded = new boolean[dictionary.length()];
-      for (int i = 0; i < numDocs; i++) {
-        int dictId = forwardIndexReader.getDictId(i, readerContext);
-        if (!decoded[dictId]) {
-          geometryByDictId[dictId] = h3IndexCreator.toGeometry(dictionary.getBytesValue(dictId));
-          decoded[dictId] = true;
+      // Old segments reloaded after a geo column was added hold a single empty default value (cardinality 1). Decode
+      // that one value once and reuse it for every doc, so the empty default is decoded a single time rather than per
+      // doc. Decoding through the creator's toGeometry() fast-paths the empty default value to null instead of failing
+      // the whole reload with a BufferUnderflowException, tolerating it the same way the segment-creation path does.
+      // For higher-cardinality columns, decode per doc instead of retaining one Geometry per dict id (which for a
+      // high-cardinality geo column would be roughly one per doc and risk a large heap during reload); the per-doc
+      // path still goes through toGeometry(), so the empty default value never throws.
+      if (dictionary.length() == 1) {
+        Geometry geometry = h3IndexCreator.toGeometry(dictionary.getBytesValue(0));
+        for (int i = 0; i < numDocs; i++) {
+          h3IndexCreator.add(geometry);
         }
-        h3IndexCreator.add(geometryByDictId[dictId]);
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          int dictId = forwardIndexReader.getDictId(i, readerContext);
+          h3IndexCreator.add(h3IndexCreator.toGeometry(dictionary.getBytesValue(dictId)));
+        }
       }
       h3IndexCreator.seal();
     }
