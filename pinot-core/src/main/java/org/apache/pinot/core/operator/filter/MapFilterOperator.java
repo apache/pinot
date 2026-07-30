@@ -117,7 +117,8 @@ public class MapFilterOperator extends BaseFilterOperator {
       return buildAbsentKeyFilterOperator(osDs, queryContext, numDocs);
     }
 
-    // Sparse — can't be sure, fall through to JSON/expression
+    // Sparse — the key may be in the sparse blob, which neither the JSON nor the expression path can
+    // read yet, so it evaluates as NULL. See ImmutableOpenStructDataSource#getDataSource.
     return null;
   }
 

@@ -39,14 +39,13 @@ import org.apache.pinot.spi.data.FieldSpec;
 /// creation gets its own materialized [DataSource] (forward index + optional inverted index /
 /// dictionary). Keys that did not meet the density threshold are stored in an optional sparse
 /// column. [#getDataSource(String)] returns `null` for any unmaterialized key — the sparse
-/// {@link DataSource} is never returned from it; sparse keys are read via the JSON/expression
-/// fallback path in the query layer.
+/// {@link DataSource} is never returned from it.
 ///
 /// Use [#isMaterialized(String)] and [#isFullyMaterialized()] together to choose
 /// the query execution path:
 /// - Materialized key → fast path via per-key DataSource (inverted/dictionary index available).
-/// - Not materialized + not fully materialized → key may be in the sparse blob; fall through to
-///   the JSON/expression path (see `MapFilterOperator.tryPerKeyIndex`).
+/// - Not materialized + not fully materialized → key may be in the sparse blob, which the query
+///   layer cannot read yet; the key reads as NULL.
 /// - Not materialized + fully materialized → key is definitively absent; short-circuit.
 ///
 /// Thread-safety: immutable after construction; safe for concurrent reads.
@@ -88,6 +87,7 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   @Override
   @Nullable
   public DataSource getDataSource(String key) {
+    // TODO: sparse keys read as NULL on the query path; wire the sparse column in (PR 4/4).
     return _perKeyDataSources.get(key);
   }
 
