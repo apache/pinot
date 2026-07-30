@@ -44,7 +44,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -768,6 +767,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
       AdaptiveServerSelector adaptiveServerSelector =
           AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
+      // For StrictReplicaGroupInstanceSelector tables, pool-level adaptive routing is used,
+      // preserving the same-replica-group guarantee while benefiting from adaptive server selection.
       InstanceSelector instanceSelector =
           InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
               adaptiveServerSelector, _pinotConfig, _routableServerInstanceMap.keySet(), _enabledServerInstanceMap,
@@ -1488,8 +1489,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
-        return new InstanceSelector.SelectionResult(Pair.of(Map.of(), Map.of()),
-            List.of(), numPrunedSegments);
+        return InstanceSelector.SelectionResult.empty(numPrunedSegments);
       }
     }
 

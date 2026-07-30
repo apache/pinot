@@ -18,10 +18,24 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.HashUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * Instance selector for strict replica-group routing strategy.
@@ -50,14 +64,175 @@ import org.apache.helix.model.IdealState;
  * segments with the same assignment ([S1, S2, S3]) down on S1 to ensure that we always route the segments to the same
  * replica-group.
  *
+ * When adaptive server selection is enabled, this selector uses replica-group-level adaptive routing: it picks the best
+ * replica group for the entire query (using worst-case server rank within each group) and routes all segments to
+ * that group. This preserves the same-replica-group guarantee while benefiting from adaptive routing intelligence.
+ *
  * Note that new segments won't be used to exclude instances from serving when the segment is unavailable.
  * </pre>
  */
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StrictReplicaGroupInstanceSelector.class);
 
   @Override
   void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, Long> newSegmentCreationTimeMap) {
     super.updateSegmentMapsForUpsertTable(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
+  }
+
+  @Override
+  public InstanceMapping select(List<String> segments, int requestId,
+      SegmentStates segmentStates, Map<String, String> queryOptions) {
+
+    if (_adaptiveServerSelector == null || _priorityPoolInstanceSelector == null) {
+      ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
+      return selectServers(segments, requestId, segmentStates, null, ctx);
+    }
+
+    // Build a map: idealStateReplicaId (replica group) -> distinct servers in that group that are candidates for this
+    // query. Keyed by instance name to deduplicate (a server hosting multiple segments appears once per group).
+    // Also track how many query segments each replica group can serve (segment coverage) in a single pass.
+    // The guard defends against multiple candidates per replica group per segment (e.g., during rebalancing).
+    Map<Integer, Map<String, SegmentInstanceCandidate>> replicaGroupToQueryServers = new LinkedHashMap<>();
+    Map<Integer, Integer> replicaGroupSegmentCount = new HashMap<>();
+    int totalSegmentsWithCandidates = 0;
+
+    Set<Integer> seenReplicaIds = new HashSet<>(); // allocate once and clear per segment to avoid O(n) allocations
+    for (String segment : segments) {
+      List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
+      if (candidates == null) {
+        continue;
+      }
+
+      seenReplicaIds.clear();
+
+      totalSegmentsWithCandidates++;
+      for (SegmentInstanceCandidate candidate : candidates) {
+        int replicaId = candidate.getIdealStateReplicaId();
+        replicaGroupToQueryServers
+            .computeIfAbsent(replicaId, k -> new LinkedHashMap<>())
+            .putIfAbsent(candidate.getInstance(), candidate);
+        if (seenReplicaIds.add(replicaId)) {
+          replicaGroupSegmentCount.merge(replicaId, 1, Integer::sum);
+        }
+      }
+    }
+
+    if (replicaGroupToQueryServers.isEmpty()) {
+      return new InstanceMapping(Map.of(), Map.of());
+    }
+
+    // Collect all distinct query-relevant candidates from replicaGroupToQueryServers, which already
+    // deduplicates by instance name. This avoids a second traversal of segments.
+    List<SegmentInstanceCandidate> allQueryCandidates = replicaGroupToQueryServers.values().stream()
+        .flatMap(m -> m.values().stream())
+        .collect(Collectors.toList());
+    ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
+    int bestReplicaGroupId = chooseBestReplicaGroup(
+        replicaGroupToQueryServers, replicaGroupSegmentCount, totalSegmentsWithCandidates,
+        allQueryCandidates, ctx, requestId);
+    return selectServersForReplicaGroup(segments, bestReplicaGroupId, segmentStates, queryOptions);
+  }
+
+  /**
+   * Scores and ranks replica groups using adaptive server selection stats.
+   *
+   * Each replica group is scored by the worst (maximum) rank among its query-relevant servers.
+   * Since scatter-gather query latency is bounded by the slowest server, we pick the group
+   * whose bottleneck server is the best (lowest worst-case rank).
+   *
+   * Groups that can serve ALL query segments (full coverage) are preferred over groups that
+   * would drop segments. Among full-coverage groups, the one with the best worst-case rank wins.
+   * If no group has full coverage, the best-ranked group is chosen regardless of coverage.
+   */
+  private int chooseBestReplicaGroup(
+      Map<Integer, Map<String, SegmentInstanceCandidate>> replicaGroupToQueryServers,
+      Map<Integer, Integer> replicaGroupSegmentCount,
+      int totalSegmentsWithCandidates,
+      List<SegmentInstanceCandidate> allQueryCandidates,
+      ServerSelectionContext ctx,
+      int requestId) {
+
+    List<String> rankedServers = _priorityPoolInstanceSelector.rank(ctx, allQueryCandidates);
+
+    // If no stats are available yet (empty ranking), fall back to pool based round-robin.
+    if (rankedServers.isEmpty()) {
+      List<Integer> groupIds = new ArrayList<>(replicaGroupToQueryServers.keySet());
+      return groupIds.get(Math.abs(requestId) % groupIds.size());
+    }
+
+    Map<String, Integer> serverRankMap = new HashMap<>(HashUtil.getHashMapCapacity(rankedServers.size()));
+    for (int i = 0; i < rankedServers.size(); i++) {
+      serverRankMap.put(rankedServers.get(i), i);
+    }
+
+    // Pick the group with full coverage first, then best worst-case rank.
+    // getOrDefault guards against AdaptiveServerSelector implementations that may not return every
+    // submitted server — unranked servers get rank -1 (best), matching HybridSelector's convention.
+    // As of 8 July 2026, this fallback is unreachable, but new implementations could require it.
+    return replicaGroupToQueryServers.entrySet().stream()
+        .min(Comparator.<Map.Entry<Integer, Map<String, SegmentInstanceCandidate>>>comparingInt(
+                e -> hasFullCoverage(e.getKey(), replicaGroupSegmentCount, totalSegmentsWithCandidates) ? 0 : 1)
+            .thenComparingInt(e -> e.getValue().values().stream()
+                .mapToInt(c -> serverRankMap.getOrDefault(c.getInstance(), -1))
+                .max().orElse(Integer.MAX_VALUE)))
+        .map(Map.Entry::getKey)
+        .orElse(-1);
+  }
+
+  private boolean hasFullCoverage(int pool, Map<Integer, Integer> replicaGroupSegmentCount,
+      int totalSegmentsWithCandidates) {
+    return replicaGroupSegmentCount.getOrDefault(pool, 0) >= totalSegmentsWithCandidates;
+  }
+
+  /**
+   * Routes all segments to the chosen replica group. For each segment, picks the candidate whose
+   * idealStateReplicaId matches the selected replica group ID. If no candidate matches (transitional state during
+   * rebalancing), the segment is reported as unavailable.
+   */
+  private InstanceMapping selectServersForReplicaGroup(
+      List<String> segments, int replicaGroupId, SegmentStates segmentStates, Map<String, String> queryOptions) {
+
+    Map<String, String> segmentToInstance = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    Map<String, String> optionalSegmentToInstance = new HashMap<>();
+    List<String> unavailableSegments = new ArrayList<>();
+    Map<Integer, Integer> poolToSegmentCount = new HashMap<>();
+
+    for (String segment : segments) {
+      List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
+      if (candidates == null) {
+        continue;
+      }
+
+      SegmentInstanceCandidate selected = candidates.stream()
+          .filter(c -> c.getIdealStateReplicaId() == replicaGroupId)
+          .findFirst()
+          .orElse(null);
+
+      // Skip segments with no candidate in the chosen replica group to preserve the strict same-replica-group
+      // invariant. We prefer to use groups that cover all queried segments, so this warning only occurs when we've
+      // selected a partial group.
+      if (selected == null) {
+        LOGGER.debug("No candidate found in replica group {} for segment {}; reporting as unavailable",
+            replicaGroupId, segment);
+        unavailableSegments.add(segment);
+        continue;
+      }
+
+      if (selected.isOnline()) {
+        segmentToInstance.put(segment, selected.getInstance());
+      } else {
+        optionalSegmentToInstance.put(segment, selected.getInstance());
+      }
+      poolToSegmentCount.merge(selected.getPool(), 1, Integer::sum);
+    }
+
+    // Emit per-pool POOL_SEG_QUERIES metric for observability, matching the parent's pattern.
+    for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
+          BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getKey()));
+    }
+
+    return new InstanceMapping(segmentToInstance, optionalSegmentToInstance, unavailableSegments);
   }
 }
