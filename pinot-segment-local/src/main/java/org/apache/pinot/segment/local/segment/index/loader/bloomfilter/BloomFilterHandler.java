@@ -27,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
+import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -37,6 +38,7 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -53,6 +55,7 @@ import org.slf4j.LoggerFactory;
 
 public class BloomFilterHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
+  private static final double FPP_EPSILON = 1e-6d; // used for fpp value comparison, margin of error
 
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
@@ -72,6 +75,29 @@ public class BloomFilterHandler extends BaseIndexHandler {
       if (!columnsToAddBF.remove(column)) {
         LOGGER.info("Need to remove existing bloom filter from segment: {}, column: {}", segmentName, column);
         return true;
+      } else {
+        // Index already exists, check for change in FPP config
+        BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(column);
+        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        if (columnMetadata != null) {
+          double newFpp = GuavaBloomFilterReaderUtils.computeFPP(bloomFilterConfig.getFpp(),
+              bloomFilterConfig.getMaxSizeInBytes(), columnMetadata.getCardinality());
+          double oldFpp;
+          IndexReaderFactory<BloomFilterReader> readerFactory = StandardIndexes.bloomFilter().getReaderFactory();
+          try (BloomFilterReader bloomFilterReader = readerFactory.createIndexReader(
+              segmentReader, _fieldIndexConfigs.get(column), columnMetadata)) {
+            oldFpp = bloomFilterReader.getFPP();
+          } catch (Exception e) {
+            LOGGER.warn("Failed to read existing bloom filter for segment: {}, column: {}", segmentName, column, e);
+            continue;
+          }
+          if (oldFpp < 0 || Math.abs(newFpp - oldFpp) > FPP_EPSILON) {
+            LOGGER.info(
+                    "Old version of bloom filter detected or FPP changed for segment: {}, column: {}, "
+                        + "old FPP: {}, new FPP: {}. Index needs to be rebuilt.", segmentName, column, oldFpp, newFpp);
+            return true;
+          }
+        }
       }
     }
     // Check if any new bloomfilter need to be added.
@@ -97,6 +123,33 @@ public class BloomFilterHandler extends BaseIndexHandler {
         LOGGER.info("Removing existing bloom filter from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.bloomFilter());
         LOGGER.info("Removed existing bloom filter from segment: {}, column: {}", segmentName, column);
+      } else {
+        // Index already exists, check for change in FPP config
+        BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(column);
+        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        if (columnMetadata != null) {
+          double newFpp = GuavaBloomFilterReaderUtils.computeFPP(bloomFilterConfig.getFpp(),
+              bloomFilterConfig.getMaxSizeInBytes(), columnMetadata.getCardinality());
+          double oldFpp;
+          IndexReaderFactory<BloomFilterReader> readerFactory = StandardIndexes.bloomFilter().getReaderFactory();
+          try (BloomFilterReader bloomFilterReader = readerFactory.createIndexReader(
+              segmentWriter, _fieldIndexConfigs.get(column), columnMetadata)) {
+            oldFpp = bloomFilterReader.getFPP();
+          } catch (Exception e) {
+            LOGGER.warn("Failed to read existing bloom filter for segment: {}, column: {}", segmentName, column, e);
+            segmentWriter.removeIndex(column, StandardIndexes.bloomFilter());
+            columnsToAddBF.add(column);
+            continue;
+          }
+          if (oldFpp < 0 || Math.abs(newFpp - oldFpp) > FPP_EPSILON) {
+            LOGGER.info(
+                    "Old version of bloom filter detected or FPP changed for segment: {}, column: {}, "
+                        + "old FPP: {}, new FPP: {}. Deleting existing Bloom filter before rebuilding a new one.",
+                    segmentName, column, oldFpp, newFpp);
+            segmentWriter.removeIndex(column, StandardIndexes.bloomFilter());
+            columnsToAddBF.add(column);
+          }
+        }
       }
     }
     for (String column : columnsToAddBF) {

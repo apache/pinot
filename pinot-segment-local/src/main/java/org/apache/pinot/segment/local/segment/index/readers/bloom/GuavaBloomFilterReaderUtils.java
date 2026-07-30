@@ -68,10 +68,14 @@ public class GuavaBloomFilterReaderUtils {
   /**
    * Calculates the fpp (false positive probability) based on the given bloom filter size and number of insertions.
    */
-  public static double computeFPP(int sizeInBytes, int numInsertions) {
-    double b = (double) sizeInBytes * Byte.SIZE / numInsertions;
-    double k = b * Math.log(2);
-    return Math.pow(2, -k);
+  public static double computeFPP(double fpp, int sizeInBytes, int numInsertions) {
+    if (sizeInBytes > 0) {
+      double b = (double) sizeInBytes * Byte.SIZE / numInsertions;
+      double k = b * Math.log(2);
+      double minFpp = Math.pow(2, -k);
+      fpp = Math.max(fpp, minFpp);
+    }
+    return fpp;
   }
 
   public static class Hash128AsLongs {
