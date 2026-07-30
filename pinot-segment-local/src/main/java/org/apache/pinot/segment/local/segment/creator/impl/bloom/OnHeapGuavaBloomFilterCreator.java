@@ -43,15 +43,14 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapGuavaBloomFilterCreator.class);
 
   public static final int TYPE_VALUE = 1;
-  /** V1 format (current write format): {@code [TYPE_VALUE=1 (int)][VERSION=1 (int)][Guava bytes...]}. */
+  /** V1 format (legacy): {@code [TYPE_VALUE=1 (int)][VERSION=1 (int)][Guava bytes...]}. Not written by new code. */
   public static final int VERSION = 1;
   /**
-   * V2 format: {@code [TYPE_VALUE=1 (int)][VERSION_V2=2 (int)][effective FPP (double)][Guava bytes...]}.
-   * This format was introduced to embed the effective FPP in the header for change detection, but it broke
-   * backward compatibility because release-1.5.0 and older servers throw
-   * {@code IllegalStateException: Unsupported bloom filter type value: 1 and version: 2} on load.
-   * New segments are written in V1 format; this constant is kept so the reader can still handle any
-   * V2 segments that were created during the short window when V2 was the write format.
+   * V2 format (current write format):
+   * {@code [TYPE_VALUE=1 (int)][VERSION_V2=2 (int)][effective FPP (double, 8 B)][Guava bytes...]}.
+   * Stores the effective fpp in the header so {@code BloomFilterHandler} can detect config changes exactly.
+   * Old servers (pre-1.6) that only validate {@code VERSION=1} will throw on load; rolling upgrades should
+   * complete before forcing a segment rebuild.
    */
   public static final int VERSION_V2 = 2;
   /** Byte offset of the fpp field in a v2 bloom filter file (after TYPE_VALUE + VERSION_V2). */
@@ -93,7 +92,8 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
       throws IOException {
     try (DataOutputStream out = new DataOutputStream(new FileOutputStream(_bloomFilterFile))) {
       out.writeInt(TYPE_VALUE);
-      out.writeInt(VERSION);
+      out.writeInt(VERSION_V2);
+      out.writeDouble(_effectiveFpp);
       _bloomFilter.writeTo(out);
     }
   }
