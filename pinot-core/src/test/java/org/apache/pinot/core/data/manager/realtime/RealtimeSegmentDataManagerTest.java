@@ -67,10 +67,12 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -138,6 +140,109 @@ public class RealtimeSegmentDataManagerTest {
   private FakeRealtimeSegmentDataManager createFakeSegmentManager()
       throws Exception {
     return createFakeSegmentManager(false, new TimeSupplier(), null, null, null);
+  }
+
+  // Verifies that for a multi-stream table, the constructor decodes and threads the topicId (rather than silently
+  // defaulting it to 0) into the resulting PartitionGroupConsumptionStatus.
+  @Test
+  public void testMultiStreamConstructorSetsTopicId()
+      throws Exception {
+    TableConfig tableConfig = createTableConfig();
+    Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(List.of(streamConfigMap, streamConfigMap)));
+    tableConfig.setIngestionConfig(ingestionConfig);
+
+    // Topic 1, raw stream partition 1 -> padded pinot partition id 10001
+    int rawStreamPartitionId = 1;
+    int topicId = 1;
+    int paddedPartitionGroupId =
+        IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(rawStreamPartitionId, topicId);
+    LLCSegmentName llcSegmentName =
+        new LLCSegmentName(RAW_TABLE_NAME, paddedPartitionGroupId, SEQUENCE_ID, SEG_TIME_MS);
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(llcSegmentName.getSegmentName());
+    segmentZKMetadata.setStartOffset(START_OFFSET.toString());
+    segmentZKMetadata.setCreationTime(System.currentTimeMillis());
+    segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+
+    RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
+    _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(paddedPartitionGroupId,
+        new ConsumerCoordinator(false, tableDataManager));
+    Schema schema = Fixtures.createSchema();
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = new FakeRealtimeSegmentDataManager(segmentZKMetadata,
+        tableConfig, tableDataManager, new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema,
+        llcSegmentName, _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, new TimeSupplier())) {
+      Field partitionGroupConsumptionStatusField =
+          RealtimeSegmentDataManager.class.getDeclaredField("_partitionGroupConsumptionStatus");
+      partitionGroupConsumptionStatusField.setAccessible(true);
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
+          (PartitionGroupConsumptionStatus) partitionGroupConsumptionStatusField.get(segmentDataManager);
+      Assert.assertEquals(partitionGroupConsumptionStatus.getTopicId(), topicId);
+      Assert.assertEquals(partitionGroupConsumptionStatus.getStreamPartitionGroupId(), rawStreamPartitionId);
+    }
+  }
+
+  // Verifies that for a single-stream table, the constructor sets topicId to 0.
+  @Test
+  public void testSingleStreamConstructorSetsTopicIdToZero()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      Field partitionGroupConsumptionStatusField =
+          RealtimeSegmentDataManager.class.getDeclaredField("_partitionGroupConsumptionStatus");
+      partitionGroupConsumptionStatusField.setAccessible(true);
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
+          (PartitionGroupConsumptionStatus) partitionGroupConsumptionStatusField.get(segmentDataManager);
+      Assert.assertEquals(partitionGroupConsumptionStatus.getTopicId(), 0);
+    }
+  }
+
+  // Same as testMultiStreamConstructorSetsTopicId, but using the newer multi-topic-format segment name (topicId
+  // embedded directly in the segment name) instead of the legacy padded-partition-id encoding, to verify
+  // LLCSegmentName.getTopicId(true)/getStreamPartitionGroupId(true) are used (rather than always re-deriving from
+  // the padded id, which would be wrong for multi-topic-format segment names).
+  @Test
+  public void testMultiStreamConstructorSetsTopicIdMultiTopicFormat()
+      throws Exception {
+    TableConfig tableConfig = createTableConfig();
+    Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(List.of(streamConfigMap, streamConfigMap)));
+    tableConfig.setIngestionConfig(ingestionConfig);
+
+    // Deliberately "unaligned" values (streamPartitionId 1 for topic 3) that a padded-id-arithmetic decode would
+    // get wrong, to make sure the test would actually catch the regression.
+    int topicId = 1;
+    int rawStreamPartitionId = 3;
+    // Round-trip through the segment name string, since only the string-parsing constructor sets
+    // isMultiTopicFormat=true.
+    String segmentNameStr =
+        new LLCSegmentName(RAW_TABLE_NAME, topicId, rawStreamPartitionId, SEQUENCE_ID, SEG_TIME_MS).getSegmentName();
+    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentNameStr);
+    Assert.assertTrue(llcSegmentName.isMultiTopicFormat());
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentNameStr);
+    segmentZKMetadata.setStartOffset(START_OFFSET.toString());
+    segmentZKMetadata.setCreationTime(System.currentTimeMillis());
+    segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+
+    RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
+    _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(llcSegmentName.getPartitionGroupId(),
+        new ConsumerCoordinator(false, tableDataManager));
+    Schema schema = Fixtures.createSchema();
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = new FakeRealtimeSegmentDataManager(segmentZKMetadata,
+        tableConfig, tableDataManager, new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema,
+        llcSegmentName, _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, new TimeSupplier())) {
+      Field partitionGroupConsumptionStatusField =
+          RealtimeSegmentDataManager.class.getDeclaredField("_partitionGroupConsumptionStatus");
+      partitionGroupConsumptionStatusField.setAccessible(true);
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
+          (PartitionGroupConsumptionStatus) partitionGroupConsumptionStatusField.get(segmentDataManager);
+      Assert.assertEquals(partitionGroupConsumptionStatus.getTopicId(), topicId);
+      Assert.assertEquals(partitionGroupConsumptionStatus.getStreamPartitionGroupId(), rawStreamPartitionId);
+    }
   }
 
   @Test

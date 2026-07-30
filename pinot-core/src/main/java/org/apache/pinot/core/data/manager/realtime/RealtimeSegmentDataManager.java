@@ -1861,26 +1861,29 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _partitionGroupId = llcSegmentName.getPartitionGroupId();
     List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(_tableConfig);
     int numStreams = streamConfigMaps.size();
+    int topicId;
     if (numStreams == 1) {
       // Single stream
       // NOTE: We skip partition id translation logic to handle cases where custom stream might return partition id
       // larger than 10000.
       _streamPartitionId = _partitionGroupId;
+      topicId = 0;
       _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(0));
     } else {
       // Multiple streams
-      _streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
-      int index = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId);
-      Preconditions.checkState(numStreams > index, "Cannot find stream config of index: %s for table: %s", index,
-          _tableNameWithType);
-      _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(index));
+      _streamPartitionId = llcSegmentName.getStreamPartitionGroupId(true);
+      topicId = llcSegmentName.getTopicId(true);
+      Preconditions.checkState(numStreams > topicId, "Cannot find stream config of topicId: %s for table: %s",
+          topicId, _tableNameWithType);
+      _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(topicId));
     }
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
     String streamTopic = _streamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _partitionGroupConsumptionStatus =
-        new PartitionGroupConsumptionStatus(_partitionGroupId, _streamPartitionId, llcSegmentName.getSequenceNumber(),
+        new PartitionGroupConsumptionStatus(_partitionGroupId, _streamPartitionId, topicId,
+            llcSegmentName.getSequenceNumber(),
             _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
             _segmentZKMetadata.getEndOffset() == null ? null
                 : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),

@@ -71,9 +71,9 @@ public class PinotTableRestletResourceTest {
 
     List<StreamMetadata> streamMetadataList = resource.getStreamMetadataList(List.of(streamConfig0, streamConfig1),
         new WatermarkInductionResult(List.of(
-            new WatermarkInductionResult.Watermark(1, 3, 101L),
-            new WatermarkInductionResult.Watermark(0, 2, 100L),
-            new WatermarkInductionResult.Watermark(10000, 5, 200L))));
+            new WatermarkInductionResult.Watermark(1, 0, 3, 101L),
+            new WatermarkInductionResult.Watermark(0, 0, 2, 100L),
+            new WatermarkInductionResult.Watermark(0, 1, 5, 200L))));
 
     assertEquals(streamMetadataList.size(), 2);
 
@@ -95,7 +95,7 @@ public class PinotTableRestletResourceTest {
     assertEquals(streamMetadata1.getStreamConfig(), streamConfig1);
     assertEquals(streamMetadata1.getNumPartitions(), 8);
     assertEquals(streamMetadata1.getPartitionGroupMetadataList().size(), 1);
-    assertEquals(streamMetadata1.getPartitionGroupMetadataList().get(0).getPartitionGroupId(), 10000);
+    assertEquals(streamMetadata1.getPartitionGroupMetadataList().get(0).getPartitionGroupId(), 0);
     assertEquals(((LongMsgOffset) streamMetadata1.getPartitionGroupMetadataList().get(0).getStartOffset()).getOffset(),
         200L);
     assertEquals(streamMetadata1.getPartitionGroupMetadataList().get(0).getSequenceNumber(), 5);
