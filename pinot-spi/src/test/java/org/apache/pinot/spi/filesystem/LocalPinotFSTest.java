@@ -20,6 +20,7 @@ package org.apache.pinot.spi.filesystem;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -309,5 +310,46 @@ public class LocalPinotFSTest {
     Assert.assertTrue(
         expectedRecursive.containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
         fileMetadata.toString());
+  }
+
+  @Test
+  public void testOpenForRead()
+      throws IOException {
+    LocalPinotFS localPinotFS = new LocalPinotFS();
+    Assert.assertTrue(localPinotFS.supportsRangedRead());
+
+    File rangeFile = new File(_absoluteTmpDirPath, "rangeFile");
+    byte[] data = new byte[256];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+    FileUtils.writeByteArrayToFile(rangeFile, data);
+    URI uri = rangeFile.toURI();
+
+    // Mid-file range [10, 30)
+    try (InputStream in = localPinotFS.openForRead(uri, 10, 20)) {
+      Assert.assertEquals(in.readAllBytes(), Arrays.copyOfRange(data, 10, 30));
+    }
+    // From the start
+    try (InputStream in = localPinotFS.openForRead(uri, 0, 5)) {
+      Assert.assertEquals(in.readAllBytes(), Arrays.copyOfRange(data, 0, 5));
+    }
+    // Length beyond EOF is truncated at end-of-file
+    try (InputStream in = localPinotFS.openForRead(uri, 250, 100)) {
+      Assert.assertEquals(in.readAllBytes(), Arrays.copyOfRange(data, 250, 256));
+    }
+    // Zero length yields an empty stream
+    try (InputStream in = localPinotFS.openForRead(uri, 30, 0)) {
+      Assert.assertEquals(in.readAllBytes().length, 0);
+    }
+    // Whole file
+    try (InputStream in = localPinotFS.openForRead(uri, 0, 256)) {
+      Assert.assertEquals(in.readAllBytes(), data);
+    }
+    // Negative arguments are rejected
+    Assert.assertThrows(IllegalArgumentException.class, () -> localPinotFS.openForRead(uri, -1, 10));
+    Assert.assertThrows(IllegalArgumentException.class, () -> localPinotFS.openForRead(uri, 0, -1));
+
+    Assert.assertTrue(rangeFile.delete());
   }
 }
