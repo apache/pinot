@@ -72,6 +72,7 @@ import org.apache.pinot.broker.routing.segmentselector.SegmentSelectorFactory;
 import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
+import org.apache.pinot.broker.stats.BrokerTableStatsManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -143,6 +144,11 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private final ExecutorService _executorService;
   @Nullable
   private Consumer<ServerInstance> _serverReenableCallback;
+  /** Optional CBO stats manager. Null when stats collection is disabled. Volatile so that the
+   * write in {@link #setStatsManager} (startup thread) is visible to Helix event threads that
+   * call {@link #buildRouting}. */
+  @Nullable
+  private volatile BrokerTableStatsManager _statsManager;
 
   // Providers of extra per-table segment ZK metadata fetch listeners, registered alongside the built-in segment
   // pruners on every table's routing entry. Each provider is invoked once per table (with the table name with type)
@@ -216,6 +222,15 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
    */
   public void setServerReenableCallback(Consumer<ServerInstance> callback) {
     _serverReenableCallback = callback;
+  }
+
+  /// Installs the optional CBO stats manager. Must be called before routing entries are built
+  /// (i.e. before any [#buildRouting(String)] call). When `null`, stats collection
+  /// is disabled and all related code paths are skipped.
+  ///
+  /// @param statsManager the stats manager to use, or `null` to disable stats
+  public void setStatsManager(@Nullable BrokerTableStatsManager statsManager) {
+    _statsManager = statsManager;
   }
 
   /**
@@ -852,6 +867,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       if (partitionMetadataManager != null) {
         segmentZkMetadataFetcher.register(partitionMetadataManager);
       }
+      // Register CBO stats listener before the fetcher's init() so the first bulk-load is captured.
+      if (_statsManager != null) {
+        segmentZkMetadataFetcher.register(_statsManager.createListener(tableNameWithType));
+      }
       for (Function<String, SegmentZkMetadataFetchListener> provider : _extraFetchListenerProviders) {
         SegmentZkMetadataFetchListener listener = provider.apply(tableNameWithType);
         if (listener != null) {
@@ -1012,6 +1031,11 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         _routingTableBuildStartTimeMs.remove(tableNameWithType);
         if (!tableCounterPartExists) {
           _routingTableBuildLocks.remove(rawTableName);
+        }
+
+        // Remove persisted CBO stats for this table
+        if (_statsManager != null) {
+          _statsManager.onTableRemoved(tableNameWithType);
         }
       } else {
         LOGGER.warn("Routing does not exist for table: {}, skipping removing routing", tableNameWithType);
