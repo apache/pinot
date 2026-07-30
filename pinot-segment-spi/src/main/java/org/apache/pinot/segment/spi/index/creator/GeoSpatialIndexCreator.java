@@ -32,14 +32,29 @@ public interface GeoSpatialIndexCreator extends IndexCreator {
   @Override
   default void add(Object value, int dictId)
       throws IOException {
-    Geometry geometry;
-    try {
-      geometry = deserialize((byte[]) value);
-    } catch (Exception e) {
-      // Swallow the exception and treat the geometry as null
-      geometry = null;
+    add(toGeometry((byte[]) value));
+  }
+
+  /**
+   * Converts a serialized geometry value into a {@link Geometry}, returning {@code null} for values that cannot be
+   * decoded into a geometry.
+   * <p>The empty byte array is fast-pathed to {@code null} without attempting deserialization: it is the BYTES
+   * default-null value assigned to a derived geo column when it is added to the schema of segments that predate its
+   * source data, so on reload every such row would otherwise throw a {@code BufferUnderflowException}. Skipping the
+   * deserialization avoids one exception (and its stack-trace capture) per row for these all-default segments. Any
+   * other undecodable value is also mapped to {@code null}; {@link #add(Geometry)} then decides whether to skip or
+   * fail it based on whether {@code continueOnError} is enabled.
+   */
+  @Nullable
+  default Geometry toGeometry(@Nullable byte[] value) {
+    if (value == null || value.length == 0) {
+      return null;
     }
-    add(geometry);
+    try {
+      return deserialize(value);
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   @Override
