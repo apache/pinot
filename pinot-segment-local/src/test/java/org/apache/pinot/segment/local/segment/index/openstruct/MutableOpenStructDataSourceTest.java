@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 import java.util.Map;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
@@ -189,6 +190,50 @@ public class MutableOpenStructDataSourceTest {
       assertNotNull(col);
       assertEquals(col.getLastIndexedDocId(), 2);
       assertEquals(idx.getKeyColumn("other").getLastIndexedDocId(), 1);
+    }
+  }
+
+  @Test
+  public void testForwardIndexSafeForAbsentTailDocs()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 3000)) {
+      idx.index(0, Map.of("clicks", 5L));
+      idx.index(3, Map.of("clicks", 9L));
+      // Docs 4..2499 never see "clicks": docs in chunk 0 are in-range holes, docs >= 1000 hit
+      // forward-index chunks that were never allocated.
+      int numDocs = 2500;
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, numDocs);
+      DataSource clicks = ds.getDataSource("clicks");
+      assertNotNull(clicks);
+      ForwardIndexReader<?> fwd = clicks.getForwardIndex();
+
+      // Single-doc reads: hole in chunk 0, then past the last allocated chunk.
+      assertEquals(fwd.getDictId(1, null), 0);
+      assertEquals(fwd.getDictId(2400, null), 0);
+      // Present docs unaffected.
+      assertEquals(clicks.getDictionary().get(fwd.getDictId(0, null)), 5L);
+      assertEquals(clicks.getDictionary().get(fwd.getDictId(3, null)), 9L);
+
+      // Bulk read spanning present docs, holes, and the unallocated tail.
+      int[] docIds = {0, 1, 3, 999, 1000, 2499};
+      int[] dictIds = new int[docIds.length];
+      fwd.readDictIds(docIds, docIds.length, dictIds, null);
+      assertEquals(clicks.getDictionary().get(dictIds[0]), 5L);
+      assertEquals(dictIds[1], 0);
+      assertEquals(clicks.getDictionary().get(dictIds[2]), 9L);
+      assertEquals(dictIds[3], 0);
+      assertEquals(dictIds[4], 0);
+      assertEquals(dictIds[5], 0);
+
+      // Bulk fast path: all docIds at or below the watermark delegate to the raw index.
+      int[] presentDocIds = {0, 1, 2, 3};
+      int[] presentDictIds = new int[4];
+      fwd.readDictIds(presentDocIds, 4, presentDictIds, null);
+      assertEquals(clicks.getDictionary().get(presentDictIds[0]), 5L);
+      assertEquals(presentDictIds[1], 0);
+      assertEquals(presentDictIds[2], 0);
+      assertEquals(clicks.getDictionary().get(presentDictIds[3]), 9L);
     }
   }
 }

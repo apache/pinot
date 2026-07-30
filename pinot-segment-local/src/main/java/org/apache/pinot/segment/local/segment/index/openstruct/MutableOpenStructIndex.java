@@ -229,7 +229,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       return Map.of();
     }
     return Map.of(
-        StandardIndexes.forward(), col.getForwardIndex(),
+        StandardIndexes.forward(), col.getGuardedForwardIndex(),
         StandardIndexes.dictionary(), col.getDictionary(),
         StandardIndexes.inverted(), col.getInvertedIndex());
   }

@@ -27,6 +27,8 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeInvert
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -158,5 +160,55 @@ public class MutableKeyColumn implements Closeable {
     _forwardIndex.close();
     _dictionary.close();
     _invertedIndex.close();
+  }
+
+  /// Read-side view of the forward index for query threads. The raw index only has chunks
+  /// allocated up to the highest docId written for this key, but scans read every docId in
+  /// `[0, numDocs)`; docIds past the watermark read as dictId 0 — the reserved default null
+  /// value — matching what a sealed segment folds in at build time for absent docs. In-range
+  /// holes need no guard: chunks are zero-initialized, so they already read dictId 0.
+  public ForwardIndexReader<ForwardIndexReaderContext> getGuardedForwardIndex() {
+    return new TailGuardedReader();
+  }
+
+  private final class TailGuardedReader implements ForwardIndexReader<ForwardIndexReaderContext> {
+    @Override
+    public boolean isDictionaryEncoded() {
+      return true;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return true;
+    }
+
+    @Override
+    public DataType getStoredType() {
+      return _forwardIndex.getStoredType();
+    }
+
+    @Override
+    public int getDictId(int docId, ForwardIndexReaderContext context) {
+      return docId <= _lastIndexedDocId ? _forwardIndex.getDictId(docId) : 0;
+    }
+
+    @Override
+    public void readDictIds(int[] docIds, int length, int[] dictIdBuffer, ForwardIndexReaderContext context) {
+      int watermark = _lastIndexedDocId;
+      if (length > 0 && docIds[length - 1] <= watermark) {
+        // DocIds within a block are ascending, so the last one bounds them all.
+        _forwardIndex.readDictIds(docIds, length, dictIdBuffer, null);
+        return;
+      }
+      for (int i = 0; i < length; i++) {
+        int docId = docIds[i];
+        dictIdBuffer[i] = docId <= watermark ? _forwardIndex.getDictId(docId) : 0;
+      }
+    }
+
+    @Override
+    public void close() {
+      // The raw forward index is owned and closed by MutableKeyColumn.
+    }
   }
 }
