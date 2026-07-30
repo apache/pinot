@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformerUtils;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
@@ -45,6 +46,7 @@ import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 ///
 /// NOTE: This class is not thread safe. The post partial upsert transformers keep reusable evaluation state, so a
 /// handler belongs to exactly one partition and must be used by one thread at a time.
+@NotThreadSafe
 public class PartialUpsertHandler {
   private final List<String> _primaryKeyColumns;
   private final List<String> _comparisonColumns;
