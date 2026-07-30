@@ -54,7 +54,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected static final int NUM_REALTIME_SEGMENTS = 48;
   protected static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
   protected static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
-  private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000;
+  private static final long FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000;
 
   protected List<File> _avroFiles;
   protected boolean _failureEnabled = false;
@@ -104,8 +104,8 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     startController();
     startBroker();
     startServer();
-    setMaxSegmentCompletionTimeMillis();
     setupNonPauselessTable();
+    setMaxSegmentCompletionTimeMillis();
     injectFailure();
     setupPauselessTable();
     waitForAllDocsLoaded(600_000L);
@@ -155,10 +155,15 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   }
 
   protected void setMaxSegmentCompletionTimeMillis() {
+    // Only shorten the completion timeout while testing an injected controller failure. Normal segment commits can
+    // legitimately take longer than this on a busy CI runner.
+    if (getFailurePoint() == null) {
+      return;
+    }
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
     if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
       ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)
-          .setMaxSegmentCompletionTimeoutMs(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+          .setMaxSegmentCompletionTimeoutMs(FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
     }
   }
 
@@ -171,10 +176,18 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   }
 
   protected void disableFailure() {
-    _failureEnabled = false;
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
     if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
       ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).disableTestFault(getFailurePoint());
+    }
+    _failureEnabled = false;
+  }
+
+  protected void restoreMaxSegmentCompletionTimeMillis() {
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
+    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).setMaxSegmentCompletionTimeoutMs(
+          PinotLLCRealtimeSegmentManager.DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
     }
   }
 
@@ -208,10 +221,15 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
       return segmentZKMetadataList.size() == getExpectedZKMetadataWithFailure();
     }, 1000, 100000, "New Segment ZK Metadata not created");
 
-    Thread.sleep(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+    Thread.sleep(FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
     disableFailure();
 
-    _controllerStarter.getRealtimeSegmentValidationManager().run();
+    try {
+      _controllerStarter.getRealtimeSegmentValidationManager().run();
+    } finally {
+      // Keep the short timeout through the repair pass, then restore the production timeout for normal commits.
+      restoreMaxSegmentCompletionTimeMillis();
+    }
 
     waitForAllDocsLoaded(600_000L);
     waitForAllDocsLoaded(tableNameWithType2, 600_000L);
