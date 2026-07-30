@@ -154,4 +154,36 @@ public class MutableOpenStructDataSourceTest {
       assertNotNull(ds.getDataSource("clicks"));
     }
   }
+
+  @Test
+  public void testDictionaryReservesDefaultNullValueAtDictIdZero()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("clicks", 5L));
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
+      DataSource clicks = ds.getDataSource("clicks");
+      assertNotNull(clicks);
+      // dictId 0 is the reserved default null value for the inferred LONG type; the first real
+      // value lands at dictId 1. Zero-initialized forward-index chunks therefore read absent
+      // docs as the default, matching sealed segments which fold the default at build time.
+      assertEquals(clicks.getDictionary().get(0), Long.MIN_VALUE);
+      assertEquals(clicks.getDictionary().get(1), 5L);
+    }
+  }
+
+  @Test
+  public void testLastIndexedDocIdWatermark()
+      throws Exception {
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("clicks", 5L));
+      idx.index(1, Map.of("other", 1L));
+      idx.index(2, Map.of("clicks", 7L));
+      MutableKeyColumn col = idx.getKeyColumn("clicks");
+      assertNotNull(col);
+      assertEquals(col.getLastIndexedDocId(), 2);
+      assertEquals(idx.getKeyColumn("other").getLastIndexedDocId(), 1);
+    }
+  }
 }

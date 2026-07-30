@@ -48,12 +48,17 @@ public class MutableKeyColumn implements Closeable {
   private final MutableDictionary _dictionary;
   private final RealtimeInvertedIndex _invertedIndex;
 
-  public MutableKeyColumn(String key, DataType storedType, PinotDataBufferMemoryManager memoryManager, int capacity) {
-    this(key, storedType, memoryManager, capacity, key);
+  /// Highest docId written for this key. Volatile store after the forward-index write publishes
+  /// the row to query threads; docIds beyond the watermark may not have allocated chunks yet.
+  private volatile int _lastIndexedDocId = -1;
+
+  public MutableKeyColumn(String key, DataType storedType, Object defaultNullValue,
+      PinotDataBufferMemoryManager memoryManager, int capacity) {
+    this(key, storedType, defaultNullValue, memoryManager, capacity, key);
   }
 
-  public MutableKeyColumn(String key, DataType storedType, PinotDataBufferMemoryManager memoryManager, int capacity,
-      String allocationContext) {
+  public MutableKeyColumn(String key, DataType storedType, Object defaultNullValue,
+      PinotDataBufferMemoryManager memoryManager, int capacity, String allocationContext) {
     _key = key;
     _storedType = storedType;
     _presenceBitmap = new ThreadSafeMutableRoaringBitmap();
@@ -64,6 +69,15 @@ public class MutableKeyColumn implements Closeable {
     _dictionary = MutableDictionaryFactory.getMutableDictionary(
         storedType, false, memoryManager, avgLength, estimatedCardinality,
         allocationContext + ".dict");
+    // Reserve dictId 0 for the default null value. Forward-index chunks are zero-initialized, so
+    // any doc where this key is absent reads dictId 0 and resolves to the default — the same
+    // value a sealed segment folds in at build time for absent docs. Not marked present: the
+    // presence bitmap only reflects explicit writes. Side effect: getDistinctValues() includes
+    // the default even if never observed (seal-time cardinality estimate is +1; estimation only).
+    _dictionary.index(defaultNullValue);
+    // Mirror the reservation in the inverted index: slot 0 stays empty unless a doc explicitly
+    // writes the default value, keeping dictIds and bitmap slots contiguous.
+    _invertedIndex.reserveNextDictId();
 
     _forwardIndex = new FixedByteSVMutableForwardIndex(true, DataType.INT,
         DEFAULT_ROWS_PER_CHUNK, memoryManager, allocationContext + ".fwd");
@@ -110,12 +124,18 @@ public class MutableKeyColumn implements Closeable {
     return _invertedIndex;
   }
 
+  /// Highest docId written for this key, or -1 if never written.
+  public int getLastIndexedDocId() {
+    return _lastIndexedDocId;
+  }
+
   /// Indexes `value` at `docId`. The value must already be coerced to the stored type.
   public void setValue(int docId, Object value) {
     _presenceBitmap.add(docId);
     int dictId = _dictionary.index(value);
     _forwardIndex.setDictId(docId, dictId);
     _invertedIndex.add(dictId, docId);
+    _lastIndexedDocId = docId;
   }
 
   public Object getValue(int docId) {
