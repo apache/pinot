@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,6 +41,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator.Type;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.service.dispatch.AdaptiveRoutingUpstreamTimings;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
@@ -55,6 +57,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -264,9 +267,58 @@ public class MailboxReceiveOperatorTest {
     }
   }
 
+  /**
+   * Verifies that {@link BaseMailboxReceiveOperator#copyStatMaps()} includes per-sender timing for
+   * senders whose EOS arrived before the query was cancelled or timed out, even when {@code onEos()}
+   * was never called (because a slow sender never completed).
+   *
+   * <p>This is the timeout path fix: fast-server timings are "trapped" in
+   * {@code _multiConsumer._senderElapsedMs} until {@code onEos()} fires, but on timeout
+   * {@code onEos()} never fires.  {@code copyStatMaps()} must flush the partial map so that
+   * {@code applyUpstreamTimingsFromStats} can exempt those fast servers from the full elapsed-time
+   * penalty in the {@code finally} block.
+   */
+  @Test
+  public void copyStatMapsIncludesPartialTimingWhenSlowSenderNeverCompletes() {
+    // mailbox 1 (fast sender): returns EOS immediately.
+    // mailbox 2 (slow sender): never returns data; the operator will time out waiting for it.
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.eosWithEmptyStats());
+
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    // _mailbox2.poll() returns null by default (slow sender never completes).
+
+    // Use a short deadline so the test does not take too long waiting for the slow sender.
+    long shortDeadlineMs = System.currentTimeMillis() + 500L;
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY, "true");
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED,
+        shortDeadlineMs, metadata)) {
+      MseBlock block = operator.nextBlock();
+      // The operator times out waiting for mailbox 2.
+      assertTrue(block.isError(), "Expected a timeout error block");
+
+      // onEos() was NOT called (only one of two senders completed), so _statMap has no timing.
+      // copyStatMaps() must flush partial timing from _multiConsumer._senderElapsedMs.
+      StatMap<BaseMailboxReceiveOperator.StatKey> stats = operator.copyStatMaps();
+      String encoded = stats.getString(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS);
+      assertNotNull(encoded, "copyStatMaps() should include partial timing for fast sender that already sent EOS");
+      // The sender key is derived from the MailboxInfo hostname/port ("localhost", 1234).
+      String expectedKey = "localhost|1234";
+      assertTrue(encoded.contains(expectedKey),
+          "Encoded timing '" + encoded + "' should contain the sender key '" + expectedKey + "'");
+    }
+  }
+
   private MailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,
       long deadlineMs) {
-    OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(_mailboxService, deadlineMs, stageMetadata);
+    return getOperator(stageMetadata, distributionType, deadlineMs, Map.of());
+  }
+
+  private MailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,
+      long deadlineMs, Map<String, String> opChainMetadata) {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getOpChainContext(_mailboxService, deadlineMs, stageMetadata, opChainMetadata);
     MailboxReceiveNode node = mock(MailboxReceiveNode.class);
     when(node.getDistributionType()).thenReturn(distributionType);
     when(node.getSenderStageId()).thenReturn(1);
