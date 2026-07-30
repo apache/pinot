@@ -24,8 +24,11 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -45,6 +48,8 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -69,6 +74,24 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
 
   // ROOT PlanFragment ID is 0, current PlanFragment ID starts with 1, next PlanFragment ID starts with 2.
   private int _nextPlanFragmentId = 2;
+
+  // When true (query option sortedSelectionMergeEnabled), the fragmenter may mark a MailboxReceiveNode as
+  // sorted-on-sender for a validated leaf selection ORDER BY sender fragment, enabling the k-way merge in
+  // SortedMailboxReceiveOperator.
+  private final boolean _sortedSelectionMergeEnabled;
+  // Used to verify that a leaf scan resolves to exactly one physical table. Only consulted when
+  // _sortedSelectionMergeEnabled is true; a null cache disables the marking entirely (fail closed).
+  @Nullable
+  private final TableCache _tableCache;
+
+  public PlanFragmenter() {
+    this(false, null);
+  }
+
+  public PlanFragmenter(boolean sortedSelectionMergeEnabled, @Nullable TableCache tableCache) {
+    _sortedSelectionMergeEnabled = sortedSelectionMergeEnabled;
+    _tableCache = tableCache;
+  }
 
   public Context createContext() {
     // ROOT PlanFragment ID is 0, current PlanFragment ID starts with 1.
@@ -200,10 +223,18 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     _mailboxSendToExchangeNodeMap.put(mailboxSendNode, node);
 
     // Return the MailboxReceiveNode as the leave node of the current PlanFragment.
+    // Mark the receive as sorted-on-sender (so SortedMailboxReceiveOperator can perform a k-way merge) when either:
+    //   - the rel-level exchange already declares sender-side sorting (node.isSortOnSender()), or
+    //   - the `sortedSelectionMergeEnabled` option is on and the sender fragment is a validated leaf selection
+    //     ORDER BY whose collation matches the exchange collation.
+    // With the option off the flag is unchanged (equal to the existing rel value node.isSortOnSender()).
+    boolean sortedOnSender = node.isSortOnSender()
+        || (_sortedSelectionMergeEnabled && isLeafSelectionOrderBy(nextPlanFragmentRoot)
+            && collationsMatch(((SortNode) nextPlanFragmentRoot).getCollations(), node.getCollations()));
     MailboxReceiveNode mailboxReceiveNode =
         new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
             senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), node.isSortOnReceiver(),
-            node.isSortOnSender(), mailboxSendNode);
+            sortedOnSender, mailboxSendNode);
     _mailboxReceiveToExchangeNodeMap.put(mailboxReceiveNode, node);
     return mailboxReceiveNode;
   }
@@ -228,6 +259,103 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
 
   private boolean isPlanFragmentSplitter(PlanNode node) {
     return ((ExchangeNode) node).getExchangeType() != PinotRelExchangeType.SUB_PLAN;
+  }
+
+  /**
+   * Returns {@code true} if the given sender fragment root represents a <i>leaf selection ORDER BY</i> over a single
+   * physical table, i.e. a {@link SortNode} whose single-input chain down to the leaf consists solely of
+   * {@link ProjectNode} and {@link TableScanNode} nodes, bottoms out at a {@link TableScanNode}, and that scan resolves
+   * to exactly one physical table (see {@link #resolvesToSinglePhysicalTable}).
+   *
+   * <p>Any branching node (input count != 1 that is not the leaf scan) or any node that breaks the single-table leaf
+   * shape (Join, Aggregate, MailboxReceive/Exchange, Window, SetOp, etc.) makes this return {@code false}. This is the
+   * shape for which the k-way merge in {@code SortedMailboxReceiveOperator} can be safely auto-activated.
+   */
+  private boolean isLeafSelectionOrderBy(PlanNode root) {
+    if (!(root instanceof SortNode)) {
+      return false;
+    }
+    PlanNode current = root;
+    while (true) {
+      if (current instanceof TableScanNode) {
+        return resolvesToSinglePhysicalTable(((TableScanNode) current).getTableName());
+      }
+      // Only SortNode (root), ProjectNode and TableScanNode are allowed in the chain.
+      if (!(current instanceof SortNode) && !(current instanceof ProjectNode)) {
+        return false;
+      }
+      List<PlanNode> inputs = current.getInputs();
+      if (inputs.size() != 1) {
+        return false;
+      }
+      current = inputs.get(0);
+    }
+  }
+
+  /**
+   * Returns {@code true} only if the scanned table is guaranteed to be served by exactly one physical table.
+   *
+   * <p>This is a hard precondition for the k-way merge: a scan over a hybrid (OFFLINE + REALTIME) table is compiled
+   * into two {@code ServerQueryRequest}s that {@code LeafOperator} runs concurrently, pushing both result sets into the
+   * same mailbox with no cross-request merge. That mailbox stream is the concatenation of two independently sorted
+   * runs, not a sorted stream, and the merge would silently emit rows in the wrong order. The same applies to a logical
+   * table, which can fan out to several physical tables.
+   *
+   * <p>Fails closed: an unknown table or a missing {@link TableCache} yields {@code false}, so the receiver keeps the
+   * accumulate-then-sort path.
+   */
+  private boolean resolvesToSinglePhysicalTable(String tableName) {
+    if (_tableCache == null) {
+      return false;
+    }
+    // An explicit type suffix (t_OFFLINE / t_REALTIME) already pins the scan to one physical table.
+    if (TableNameBuilder.getTableTypeFromTableName(tableName) != null) {
+      return true;
+    }
+    String actualTableName = _tableCache.getActualTableName(tableName);
+    if (actualTableName == null) {
+      // Unknown to the table cache: it may be a logical table or simply absent. Either way, do not mark.
+      return false;
+    }
+    if (TableNameBuilder.getTableTypeFromTableName(actualTableName) != null) {
+      return true;
+    }
+    if (_tableCache.isLogicalTable(actualTableName)) {
+      return false;
+    }
+    boolean hasOffline =
+        _tableCache.getTableConfig(TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(actualTableName))
+            != null;
+    boolean hasRealtime =
+        _tableCache.getTableConfig(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(actualTableName))
+            != null;
+    return hasOffline != hasRealtime;
+  }
+
+  /**
+   * Returns {@code true} if the two collation lists are equivalent for sorted-merge purposes: same size and, for each
+   * position, equal field index and equal direction (and equal null direction). A {@code null} list (e.g. a plain,
+   * non-sorted exchange) is treated as "not a sorted collation" and yields {@code false}.
+   *
+   * <p>An <i>empty</i> list is likewise rejected, and that case is load-bearing rather than cosmetic. A plain
+   * {@code SELECT ... LIMIT n} with no ORDER BY compiles to a collation-less {@code LogicalSort} (fetch only) under a
+   * collation-less sort exchange, so both lists are empty and an element-wise comparison alone would call them
+   * "matching". That would mark the receive as sorted-on-sender, and {@code SortedMailboxReceiveOperator} rejects an
+   * empty collation outright, failing every such query. There is also nothing to merge on without a collation.
+   */
+  private static boolean collationsMatch(@Nullable List<RelFieldCollation> a, @Nullable List<RelFieldCollation> b) {
+    if (a == null || b == null || a.isEmpty() || a.size() != b.size()) {
+      return false;
+    }
+    for (int i = 0; i < a.size(); i++) {
+      RelFieldCollation ca = a.get(i);
+      RelFieldCollation cb = b.get(i);
+      if (ca.getFieldIndex() != cb.getFieldIndex() || ca.getDirection() != cb.getDirection()
+          || ca.nullDirection != cb.nullDirection) {
+        return false;
+      }
+    }
+    return true;
   }
 
   public static class Context {

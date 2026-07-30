@@ -38,7 +38,8 @@ import static org.testng.Assert.fail;
 public class QueryOptionsUtilsTest {
   private static final List<String> POSITIVE_INT_KEYS =
       List.of(NUM_REPLICA_GROUPS_TO_QUERY, MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW);
+          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW, SORTED_SELECTION_MERGE_BLOCK_SIZE,
+          STREAMING_SORTED_MAILBOX_RECEIVE_BLOCK_SIZE);
   private static final List<String> NON_NEGATIVE_INT_KEYS = List.of(MULTI_STAGE_LEAF_LIMIT);
   private static final List<String> UNBOUNDED_INT_KEYS =
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
@@ -303,6 +304,21 @@ public class QueryOptionsUtilsTest {
     }
   }
 
+  @Test
+  public void testStreamingSortedMailboxReceiveEnabled() {
+    // Unset and any non-"true" value are equivalent: the k-way merge stays off.
+    assertFalse(QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(Map.of()));
+    assertFalse(QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(new HashMap<>()));
+    assertTrue(QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(
+        Map.of(STREAMING_SORTED_MAILBOX_RECEIVE, "true")));
+    assertTrue(QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(
+        Map.of(STREAMING_SORTED_MAILBOX_RECEIVE, "TRUE")));
+    assertFalse(QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(
+        Map.of(STREAMING_SORTED_MAILBOX_RECEIVE, "false")));
+    assertFalse(QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(
+        Map.of(STREAMING_SORTED_MAILBOX_RECEIVE, "1")));
+  }
+
   private static Object getValue(Map<String, String> map, String key) {
     switch (key) {
       // Positive ints
@@ -320,6 +336,10 @@ public class QueryOptionsUtilsTest {
         return QueryOptionsUtils.getMaxRowsInJoin(map);
       case MAX_ROWS_IN_WINDOW:
         return QueryOptionsUtils.getMaxRowsInWindow(map);
+      case SORTED_SELECTION_MERGE_BLOCK_SIZE:
+        return QueryOptionsUtils.getSortedSelectionMergeBlockSize(map);
+      case STREAMING_SORTED_MAILBOX_RECEIVE_BLOCK_SIZE:
+        return QueryOptionsUtils.getStreamingSortedMailboxReceiveBlockSize(map);
       // Non-negative ints
       case MULTI_STAGE_LEAF_LIMIT:
         return QueryOptionsUtils.getMultiStageLeafLimit(map);
