@@ -21,6 +21,8 @@ package org.apache.pinot.spi.utils.builder;
 
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -41,5 +43,60 @@ public class TableConfigBuilderTest {
         .setSkipSegmentPreprocess(true).build();
     Assert.assertTrue(tableconfig.getIndexingConfig().isSkipSegmentPreprocess(),
         "skipSegmentPreprocess will be true");
+  }
+
+  @Test
+  public void testDeprecatedSetSegmentPushTypeForwardsToIngestionConfig() {
+    // REFRESH push type set via deprecated setter must appear in BatchIngestionConfig
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setSegmentPushType("REFRESH")
+        .build();
+    BatchIngestionConfig batch = tableConfig.getIngestionConfig().getBatchIngestionConfig();
+    Assert.assertNotNull(batch);
+    Assert.assertEquals(batch.getSegmentIngestionType(), "REFRESH");
+  }
+
+  @Test
+  public void testDeprecatedSetSegmentPushFrequencyForwardsToIngestionConfig() {
+    // Push frequency set via deprecated setter must appear in BatchIngestionConfig
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setSegmentPushFrequency("HOURLY")
+        .build();
+    BatchIngestionConfig batch = tableConfig.getIngestionConfig().getBatchIngestionConfig();
+    Assert.assertNotNull(batch);
+    Assert.assertEquals(batch.getSegmentIngestionFrequency(), "HOURLY");
+  }
+
+  @Test
+  public void testDeprecatedSettersDoNotOverrideExplicitIngestionConfig() {
+    // Explicit IngestionConfig must take precedence over deprecated setter values
+    BatchIngestionConfig explicit = new BatchIngestionConfig(null, "APPEND", "DAILY");
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(explicit);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setSegmentPushType("REFRESH")
+        .setSegmentPushFrequency("HOURLY")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    BatchIngestionConfig batch = tableConfig.getIngestionConfig().getBatchIngestionConfig();
+    Assert.assertEquals(batch.getSegmentIngestionType(), "APPEND",
+        "Explicit ingestionConfig should take precedence over deprecated setter");
+    Assert.assertEquals(batch.getSegmentIngestionFrequency(), "DAILY",
+        "Explicit ingestionConfig should take precedence over deprecated setter");
+  }
+
+  @Test
+  public void testRealtimeTableWithoutDeprecatedSettersHasNoBatchIngestionConfig() {
+    // REALTIME tables that never call the deprecated setters must not get a spurious BatchIngestionConfig
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .build();
+    Assert.assertNull(tableConfig.getIngestionConfig(),
+        "REALTIME table with no deprecated setters should have no IngestionConfig");
   }
 }

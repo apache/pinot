@@ -410,7 +410,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     QuotaConfig quotaConfig = new QuotaConfig("6G", null);
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
-            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
     ZKMetadataProvider.setTableConfig(_testPropertyStore, realtimeTableConfig);
 
@@ -431,7 +431,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     QuotaConfig quotaConfig = new QuotaConfig("6G", TABLE_MAX_QPS_STR);
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
-            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
     ZKMetadataProvider.setTableConfig(_testPropertyStore, realtimeTableConfig);
 
@@ -456,11 +456,11 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     QuotaConfig quotaConfig = new QuotaConfig("6G", TABLE_MAX_QPS_STR);
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
-            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
-            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
 
     ZKMetadataProvider.setTableConfig(_testPropertyStore, realtimeTableConfig);
@@ -534,7 +534,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     QuotaConfig quotaConfig = new QuotaConfig("6G", null);
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
-            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
     ZKMetadataProvider.setTableConfig(_testPropertyStore, offlineTableConfig);
 
@@ -550,7 +550,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     QuotaConfig quotaConfig = new QuotaConfig("6G", TABLE_MAX_QPS_STR);
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
-            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
     ZKMetadataProvider.setTableConfig(_testPropertyStore, offlineTableConfig);
 
