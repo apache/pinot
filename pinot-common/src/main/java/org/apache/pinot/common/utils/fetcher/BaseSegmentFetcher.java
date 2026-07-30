@@ -34,9 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation of segment fetcher with the retry logic embedded.
- */
+/// Base implementation of segment fetcher with the retry logic embedded.
 public abstract class BaseSegmentFetcher implements SegmentFetcher {
   public static final String RETRY_COUNT_CONFIG_KEY = "retry.count";
   public static final String RETRY_WAIT_MS_CONFIG_KEY = "retry.wait.ms";
@@ -63,9 +61,7 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
         _retryWaitMs, _retryDelayScaleFactor);
   }
 
-  /**
-   * Override this for custom initialization.
-   */
+  /// Override this for custom initialization.
   protected void doInit(PinotConfiguration config) {
   }
 
@@ -110,15 +106,12 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @param segmentName the name of the segment to fetch.
-   * @param uriSupplier the supplier to the list of segment download uris.
-   * @param dest        The destination to put the downloaded segment.
-   * @throws Exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
-   * This method keeps retrying (with exponential backoff) to go through the list download uris to fetch the segment
-   * until the retry limit is reached.
-   *
-   */
+  /// @param segmentName the name of the segment to fetch.
+  /// @param uriSupplier the supplier to the list of segment download uris.
+  /// @param dest        The destination to put the downloaded segment.
+  /// @throws Exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
+  /// This method keeps retrying (with exponential backoff) to go through the list download uris to fetch the segment
+  /// until the retry limit is reached.
   @Override
   public void fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest) throws Exception {
     try {
@@ -144,10 +137,8 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     }
   }
 
-  /**
-   * Fetches a segment from URI location to local without retry. Sub-class should override this or
-   * {@link #fetchSegmentToLocal(URI, File)}.
-   */
+  /// Fetches a segment from URI location to local without retry. Sub-class should override this or
+  /// [#fetchSegmentToLocal(URI, File)].
   protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
       throws Exception {
     throw new UnsupportedOperationException();
@@ -182,10 +173,8 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     }
   }
 
-  /**
-   * Fetches a segment from URI location and untars it to local in a streamed manner, without retry. Sub-class
-   * should override this to support {@link #fetchUntarSegmentToLocalStreamed(String, Supplier, File, long)}.
-   */
+  /// Fetches a segment from URI location and untars it to local in a streamed manner, without retry. Sub-class
+  /// should override this to support [#fetchUntarSegmentToLocalStreamed(String, Supplier, File, long)].
   protected File fetchUntarSegmentToLocalWithoutRetry(URI uri, File dest, long maxStreamRateInByte)
       throws Exception {
     throw new UnsupportedOperationException();

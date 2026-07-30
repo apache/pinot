@@ -115,18 +115,16 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     return 1_200_000L;
   }
 
-  /**
-   * Diagnostic override of the inherited "wait for COUNT(*) to converge" loop. The base
-   * implementation polls every 100 ms and, on timeout, only reports the assertion message
-   * "Failed to load N documents" with no progress information -- so the silent 20-minute
-   * gap that has been the dominant flake on CI is impossible to triage from the surefire
-   * log. This override does the same convergence wait but prints periodic progress lines
-   * (current count, kafka log-end-offsets per partition, kafka read_committed count) and,
-   * on timeout, dumps a thread-stack snapshot for every Kafka / Pinot consumer thread
-   * before throwing the same AssertionError shape the inherited code produced.
-   *
-   * Note: pure observability change. No retry, no behavior change on the success path.
-   */
+  /// Diagnostic override of the inherited "wait for COUNT(\*) to converge" loop. The base
+  /// implementation polls every 100 ms and, on timeout, only reports the assertion message
+  /// "Failed to load N documents" with no progress information -- so the silent 20-minute
+  /// gap that has been the dominant flake on CI is impossible to triage from the surefire
+  /// log. This override does the same convergence wait but prints periodic progress lines
+  /// (current count, kafka log-end-offsets per partition, kafka read_committed count) and,
+  /// on timeout, dumps a thread-stack snapshot for every Kafka / Pinot consumer thread
+  /// before throwing the same AssertionError shape the inherited code produced.
+  ///
+  /// Note: pure observability change. No retry, no behavior change on the success path.
   @Override
   protected void waitForAllDocsLoaded(String tableName, long timeoutMs) {
     long expected = getCountStarResult();
@@ -198,11 +196,9 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
         lastCount, kafkaCommittedFinal, kafkaUncommittedFinal, elapsed));
   }
 
-  /**
-   * Dump stack traces for threads whose names suggest they are part of the Pinot realtime
-   * consumer pipeline or the Kafka consumer pool. Helps identify whether the stall is in
-   * fetch, segment commit, GC, or somewhere unexpected.
-   */
+  /// Dump stack traces for threads whose names suggest they are part of the Pinot realtime
+  /// consumer pipeline or the Kafka consumer pool. Helps identify whether the stall is in
+  /// fetch, segment commit, GC, or somewhere unexpected.
   private void dumpRelevantThreadStacks() {
     Map<Thread, StackTraceElement[]> all = Thread.getAllStackTraces();
     int dumped = 0;
@@ -273,14 +269,12 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     waitForAllCommittedRecordsVisible(kafkaBrokerList, getCountStarResult());
   }
 
-  /**
-   * Wait until an independent read_committed consumer can read exactly {@code expected}
-   * records from the topic. Throws an {@link AssertionError} if the count never matches
-   * within 120 s, or if it overshoots (which would indicate the aborted batch leaked
-   * through). Reaching this method's "ok" return is the gate that the rest of setUp
-   * relies on -- the caller (the inherited setUp in {@link BaseRealtimeClusterIntegrationTest})
-   * then waits for Pinot's COUNT(*) to converge on the same count.
-   */
+  /// Wait until an independent read_committed consumer can read exactly `expected`
+  /// records from the topic. Throws an [AssertionError] if the count never matches
+  /// within 120 s, or if it overshoots (which would indicate the aborted batch leaked
+  /// through). Reaching this method's "ok" return is the gate that the rest of setUp
+  /// relies on -- the caller (the inherited setUp in [BaseRealtimeClusterIntegrationTest])
+  /// then waits for Pinot's COUNT(\*) to converge on the same count.
   private void waitForAllCommittedRecordsVisible(String brokerList, long expected) {
     long deadline = System.currentTimeMillis() + 120_000L;
     int lastCommitted = 0;
@@ -322,10 +316,8 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
             + "read_committed=%d, read_uncommitted=%d", expected, lastCommitted, lastUncommitted));
   }
 
-  /**
-   * Push Avro records to Kafka within a transaction. Does NOT call initTransactions().
-   * Returns the number of records sent.
-   */
+  /// Push Avro records to Kafka within a transaction. Does NOT call initTransactions().
+  /// Returns the number of records sent.
   private long pushAvroRecords(KafkaProducer<byte[], byte[]> producer, List<File> avroFiles, boolean commit)
       throws Exception {
     int maxMessagesPerTransaction =
@@ -384,16 +376,14 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     return counter;
   }
 
-  /**
-   * Count records visible in the topic with the given isolation level.
-   *
-   * <p>For {@code read_committed}, {@link KafkaConsumer#endOffsets(java.util.Collection, Duration)}
-   * returns the LSO (Last Stable Offset) per partition; for {@code read_uncommitted} it returns the
-   * log-end-offset. We poll until every partition's position catches up to that snapshot rather than
-   * breaking on the first empty poll. On a freshly assigned consumer the first poll often returns
-   * empty while metadata/fetch sessions are being established, and breaking on it produced false
-   * zero counts and spurious {@code markers were not propagated} failures.
-   */
+  /// Count records visible in the topic with the given isolation level.
+  ///
+  /// For `read_committed`, [KafkaConsumer#endOffsets(java.util.Collection, Duration)]
+  /// returns the LSO (Last Stable Offset) per partition; for `read_uncommitted` it returns the
+  /// log-end-offset. We poll until every partition's position catches up to that snapshot rather than
+  /// breaking on the first empty poll. On a freshly assigned consumer the first poll often returns
+  /// empty while metadata/fetch sessions are being established, and breaking on it produced false
+  /// zero counts and spurious `markers were not propagated` failures.
   private int countRecords(String brokerList, String isolationLevel) {
     Properties props = new Properties();
     props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);

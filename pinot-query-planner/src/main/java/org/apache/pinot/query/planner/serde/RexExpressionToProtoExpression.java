@@ -34,9 +34,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Serialize RexExpressions to the Protobuf equivalent classes defined expressions.proto.
- */
+/// Serialize RexExpressions to the Protobuf equivalent classes defined expressions.proto.
 public class RexExpressionToProtoExpression {
   private RexExpressionToProtoExpression() {
   }

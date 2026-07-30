@@ -30,24 +30,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Broker-side gRPC client {@code StreamObserver} for the {@code SubmitWithStream} bidi RPC. Routes inbound
- * {@link Worker.ServerToBroker} messages to either the {@code submit_ack} callback (first message) or the
- * {@link StreamingQuerySession} (subsequent {@code OpChainComplete}s), and adapts the inbound side of the stream
- * (the {@link StreamObserver} we use to send {@code BrokerToServer} messages) into a
- * {@link StreamingServerHandle} so the session can fan out cancel.
- *
- * <p>Lifecycle — created when the broker opens a {@code SubmitWithStream} call to one server, then registered with
- * the session via {@link StreamingQuerySession#registerStream}. Receives:
- * <ol>
- *   <li>Exactly one {@code submit_ack} (always the first server→broker message).</li>
- *   <li>Zero or more {@code OpChainComplete} messages (one per opchain that ran on this server).</li>
- *   <li>Exactly one {@code ServerDone} after the last opchain has reported.</li>
- * </ol>
- *
- * <p>On {@code onError} or unexpected message order, drains the latch by {@code remainingExpected} via the session
- * so {@link StreamingQuerySession#awaitCompletion} can still finalize.
- */
+/// Broker-side gRPC client `StreamObserver` for the `SubmitWithStream` bidi RPC. Routes inbound
+/// [Worker.ServerToBroker] messages to either the `submit_ack` callback (first message) or the
+/// [StreamingQuerySession] (subsequent `OpChainComplete`s), and adapts the inbound side of the stream
+/// (the [StreamObserver] we use to send `BrokerToServer` messages) into a
+/// [StreamingServerHandle] so the session can fan out cancel.
+///
+/// Lifecycle — created when the broker opens a `SubmitWithStream` call to one server, then registered with
+/// the session via [StreamingQuerySession#registerStream]. Receives:
+///
+/// 1. Exactly one `submit_ack` (always the first server→broker message).
+/// 2. Zero or more `OpChainComplete` messages (one per opchain that ran on this server).
+/// 3. Exactly one `ServerDone` after the last opchain has reported.
+///
+/// On `onError` or unexpected message order, drains the latch by `remainingExpected` via the session
+/// so [StreamingQuerySession#awaitCompletion] can still finalize.
 public class StreamingDispatchObserver
     implements StreamObserver<Worker.ServerToBroker>, StreamingServerHandle {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingDispatchObserver.class);
@@ -59,44 +56,36 @@ public class StreamingDispatchObserver
   private final BiConsumer<Worker.QueryResponse, Throwable> _ackCallback;
   private final int _expectedOpChainsForThisServer;
   private final AtomicBoolean _ackReceived = new AtomicBoolean(false);
-  /**
-   * Guards {@link #onError} against double invocation. gRPC guarantees at most one terminal callback per stream,
-   * but {@code DispatchClient.submitWithStream} also invokes {@link #onError} manually when opening the stream or
-   * sending the submit fails — and in the send-failure case a gRPC-initiated {@code onError} for the same (started)
-   * call can follow. Without this guard the second invocation would drain the session latch a second time, making
-   * {@code awaitCompletion} return before other servers' reports arrived.
-   */
+  /// Guards [#onError] against double invocation. gRPC guarantees at most one terminal callback per stream,
+  /// but `DispatchClient.submitWithStream` also invokes [#onError] manually when opening the stream or
+  /// sending the submit fails — and in the send-failure case a gRPC-initiated `onError` for the same (started)
+  /// call can follow. Without this guard the second invocation would drain the session latch a second time, making
+  /// `awaitCompletion` return before other servers' reports arrived.
   private final AtomicBoolean _errorHandled = new AtomicBoolean(false);
 
-  /**
-   * Counts how many opchains we've already drained from the session for this server, so an onError doesn't
-   * double-drain after some opchains already reported successfully.
-   *
-   * <p>Written only from gRPC inbound callbacks ({@code onNext}), which gRPC serializes per stream — no additional
-   * synchronization is needed. {@link #cancel} may be called from a different thread (via
-   * {@link StreamingQuerySession#fanOutCancel}) but only touches {@link #_outbound} (which is {@code volatile}).
-   * {@link #onError} can additionally be invoked manually from the dispatcher thread when
-   * {@code DispatchClient.submitWithStream} fails to open the stream or send the submit; in that scenario no
-   * inbound callback has run yet (the counter is still 0, its initial value, visible to any thread) and the
-   * {@link #_errorHandled} CAS picks a single winner between the manual and any later gRPC-initiated invocation.
-   */
+  /// Counts how many opchains we've already drained from the session for this server, so an onError doesn't
+  /// double-drain after some opchains already reported successfully.
+  ///
+  /// Written only from gRPC inbound callbacks (`onNext`), which gRPC serializes per stream — no additional
+  /// synchronization is needed. [#cancel] may be called from a different thread (via
+  /// [StreamingQuerySession#fanOutCancel]) but only touches [#_outbound] (which is `volatile`).
+  /// [#onError] can additionally be invoked manually from the dispatcher thread when
+  /// `DispatchClient.submitWithStream` fails to open the stream or send the submit; in that scenario no
+  /// inbound callback has run yet (the counter is still 0, its initial value, visible to any thread) and the
+  /// [#_errorHandled] CAS picks a single winner between the manual and any later gRPC-initiated invocation.
   private int _opChainsReportedForThisServer = 0;
 
-  /**
-   * The inbound side of the bidi stream — used to send {@code submit} (initial) and {@code cancel} (fan-out) from
-   * the broker. Set once via {@link #attachOutboundStream} after the gRPC stub is asked to start the stream; lives
-   * for the duration of the call.
-   */
+  /// The inbound side of the bidi stream — used to send `submit` (initial) and `cancel` (fan-out) from
+  /// the broker. Set once via [#attachOutboundStream] after the gRPC stub is asked to start the stream; lives
+  /// for the duration of the call.
   private volatile StreamObserver<Worker.BrokerToServer> _outbound;
 
-  /**
-   * Serializes every {@code onNext} call on {@link #_outbound}. gRPC {@code StreamObserver}s are not thread-safe,
-   * and the two outbound writers can genuinely overlap: the dispatcher thread calls {@link #sendSubmit} while a
-   * fan-out cancel triggered by another server's failure calls {@link #cancel} from that stream's gRPC inbound
-   * thread (the session registers this observer before the submit is sent, so it is already visible to
-   * {@link StreamingQuerySession#fanOutCancel}). Two concurrent {@code fanOutCancel} invocations (peer error +
-   * recovery path) can also overlap on the same handle.
-   */
+  /// Serializes every `onNext` call on [#_outbound]. gRPC `StreamObserver`s are not thread-safe,
+  /// and the two outbound writers can genuinely overlap: the dispatcher thread calls [#sendSubmit] while a
+  /// fan-out cancel triggered by another server's failure calls [#cancel] from that stream's gRPC inbound
+  /// thread (the session registers this observer before the submit is sent, so it is already visible to
+  /// [StreamingQuerySession#fanOutCancel]). Two concurrent `fanOutCancel` invocations (peer error +
+  /// recovery path) can also overlap on the same handle.
   private final Object _outboundLock = new Object();
 
   public StreamingDispatchObserver(QueryServerInstance server, StreamingQuerySession session,
@@ -111,12 +100,12 @@ public class StreamingDispatchObserver
     return _server;
   }
 
-  /** Wires the outbound side of the bidi stream once the gRPC stub returns it. */
+  /// Wires the outbound side of the bidi stream once the gRPC stub returns it.
   public void attachOutboundStream(StreamObserver<Worker.BrokerToServer> outbound) {
     _outbound = outbound;
   }
 
-  /** Sends the initial {@code BrokerToServer.submit} message on the outbound side. */
+  /// Sends the initial `BrokerToServer.submit` message on the outbound side.
   public void sendSubmit(Worker.QueryRequest request) {
     StreamObserver<Worker.BrokerToServer> outbound = _outbound;
     if (outbound == null) {
@@ -202,13 +191,11 @@ public class StreamingDispatchObserver
 
   // --- StreamingServerHandle -------------------------------------------------
 
-  /**
-   * Sends a cancel message on the outbound stream. May be called from any thread — in particular from the
-   * {@link StreamingQuerySession#fanOutCancel} path, which runs on whichever thread first observes a peer error and
-   * iterates {@code _openStreams} — and may overlap with {@link #sendSubmit} on the dispatcher thread or with
-   * another concurrent fan-out. All sends are serialized on {@link #_outboundLock}; beyond the {@code volatile}
-   * read of {@link #_outbound}, this method must not access any other mutable state of this instance.
-   */
+  /// Sends a cancel message on the outbound stream. May be called from any thread — in particular from the
+  /// [StreamingQuerySession#fanOutCancel] path, which runs on whichever thread first observes a peer error and
+  /// iterates `_openStreams` — and may overlap with [#sendSubmit] on the dispatcher thread or with
+  /// another concurrent fan-out. All sends are serialized on [#_outboundLock]; beyond the `volatile`
+  /// read of [#_outbound], this method must not access any other mutable state of this instance.
   @Override
   public void cancel(long requestId) {
     StreamObserver<Worker.BrokerToServer> outbound = _outbound;

@@ -92,10 +92,8 @@ public interface RebalancePreChecker {
       return _rebalanceSummaryResult;
     }
 
-    /**
-     * Returns the tier name to segments map computed while updating the target tiers of this rebalance, or
-     * {@code null} if the target tiers were not updated (i.e. updateTargetTier is disabled).
-     */
+    /// Returns the tier name to segments map computed while updating the target tiers of this rebalance, or
+    /// `null` if the target tiers were not updated (i.e. updateTargetTier is disabled).
     @Nullable
     public Map<String, Set<String>> getProvidedTierToSegmentsMap() {
       return _providedTierToSegmentsMap;

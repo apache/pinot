@@ -24,9 +24,7 @@ import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.locationtech.jts.geom.Geometry;
 
 
-/**
- * Index creator for geospatial index.
- */
+/// Index creator for geospatial index.
 public interface GeoSpatialIndexCreator extends IndexCreator {
 
   Geometry deserialize(byte[] bytes);
@@ -49,15 +47,11 @@ public interface GeoSpatialIndexCreator extends IndexCreator {
       throws IOException {
   }
 
-  /**
-   * Adds the next geospatial value.
-   */
+  /// Adds the next geospatial value.
   void add(@Nullable Geometry geometry)
       throws IOException;
 
-  /**
-   * Seals the index and flushes it to disk.
-   */
+  /// Seals the index and flushes it to disk.
   void seal()
       throws IOException;
 }

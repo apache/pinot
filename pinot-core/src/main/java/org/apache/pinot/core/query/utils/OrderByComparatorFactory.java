@@ -30,9 +30,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-/**
- * A utility class used to create comparators that should be used by operators that implements order by semantics.
- */
+/// A utility class used to create comparators that should be used by operators that implements order by semantics.
 public class OrderByComparatorFactory {
   private OrderByComparatorFactory() {
   }
@@ -63,9 +61,7 @@ public class OrderByComparatorFactory {
     return getComparator(orderByExpressions, nullHandlingEnabled, 0, orderByExpressions.size());
   }
 
-  /**
-   * Get orderBy expressions on the groupBy keys when orderBy keys match groupBy keys
-   */
+  /// Get orderBy expressions on the groupBy keys when orderBy keys match groupBy keys
   public static Comparator<Record> getRecordKeyComparator(List<OrderByExpressionContext> orderByExpressions,
       List<ExpressionContext> groupByExpressions, boolean nullHandlingEnabled) {
     List<OrderByExpressionWithIndex> groupKeyOrderByExpressions =
@@ -83,9 +79,7 @@ public class OrderByComparatorFactory {
     return groupByExpressionIndexMap;
   }
 
-  /**
-   * Orderby expression with an index with respect to its position in the group keys
-   */
+  /// Orderby expression with an index with respect to its position in the group keys
   private static class OrderByExpressionWithIndex {
     final OrderByExpressionContext _orderByExpressionContext;
     final int _index;
@@ -96,9 +90,7 @@ public class OrderByComparatorFactory {
     }
   }
 
-  /**
-   * Add an index for each orderby expression with respect to its position in the group keys
-   */
+  /// Add an index for each orderby expression with respect to its position in the group keys
   private static List<OrderByExpressionWithIndex> getGroupKeyOrderByExpressionFromRowOrderByExpressions(
       List<OrderByExpressionContext> rowOrderByExpressions, List<ExpressionContext> groupByExpressions) {
     Map<String, Integer> groupByExpressionIndexMap = getGroupByExpressionIndexMap(groupByExpressions);
@@ -110,9 +102,7 @@ public class OrderByComparatorFactory {
     return result;
   }
 
-  /**
-   * Get comparator that applies list of orderByExpressions that each has a column index
-   */
+  /// Get comparator that applies list of orderByExpressions that each has a column index
   @SuppressWarnings({"rawtypes", "unchecked"})
   private static Comparator<Object[]> getComparatorWithIndex(List<OrderByExpressionWithIndex> orderByExpressions,
       boolean nullHandlingEnabled) {

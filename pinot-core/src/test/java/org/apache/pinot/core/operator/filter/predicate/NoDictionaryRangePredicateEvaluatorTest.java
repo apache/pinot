@@ -27,9 +27,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for no-dictionary based range predicate evaluators.
- */
+/// Unit test for no-dictionary based range predicate evaluators.
 public class NoDictionaryRangePredicateEvaluatorTest {
   private static final ExpressionContext COLUMN_EXPRESSION = ExpressionContext.forIdentifier("column");
 

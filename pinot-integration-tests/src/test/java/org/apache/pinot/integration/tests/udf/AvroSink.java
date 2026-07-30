@@ -170,9 +170,7 @@ public class AvroSink implements AutoCloseable {
     }
   }
 
-  /**
-   * Converts a Pinot schema to an Avro schema
-   */
+  /// Converts a Pinot schema to an Avro schema
   private static Schema convertPinotSchemaToAvroSchema(org.apache.pinot.spi.data.Schema pinotSchema) {
     SchemaBuilder.FieldAssembler<Schema> fieldAssembler = SchemaBuilder.record("record").fields();
 

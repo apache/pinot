@@ -163,12 +163,10 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathString("{\"foo\": \"null\"}", "$.foo", "default"), "null");
   }
 
-  /**
-   * The default-value {@code jsonPath*} overloads return the caller's default for input that cannot begin a JSON
-   * value (plain text, null, empty) without invoking the parser - this avoids the {@code fillInStackTrace()} cost
-   * of a thrown-and-caught {@link InvalidJsonException} on the ingestion hot path. Behavior is unchanged for valid
-   * JSON and for any input that could begin a JSON value (which is still handed to the parser).
-   */
+  /// The default-value `jsonPath*` overloads return the caller's default for input that cannot begin a JSON
+  /// value (plain text, null, empty) without invoking the parser - this avoids the `fillInStackTrace()` cost
+  /// of a thrown-and-caught [InvalidJsonException] on the ingestion hot path. Behavior is unchanged for valid
+  /// JSON and for any input that could begin a JSON value (which is still handed to the parser).
   @Test
   public void testJsonPathDefaultVariantsSkipNonJson() {
     // Plain-text input (e.g. a raw log line) -> default, no exception thrown.
@@ -208,12 +206,10 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathString("'single quoted'", "$.x", "def"), "def");
   }
 
-  /**
-   * {@code jsonExtractObject} parses a JSON document once into a reusable Map/List (or passes through an
-   * already-parsed container), returns null without throwing for null/scalar/non-JSON input, and the returned object
-   * is navigable by {@code jsonPath*} with results identical to parsing the raw string - enabling parse-once
-   * transform configs.
-   */
+  /// `jsonExtractObject` parses a JSON document once into a reusable Map/List (or passes through an
+  /// already-parsed container), returns null without throwing for null/scalar/non-JSON input, and the returned object
+  /// is navigable by `jsonPath*` with results identical to parsing the raw string - enabling parse-once
+  /// transform configs.
   @Test
   public void testJsonExtractObject()
       throws Exception {

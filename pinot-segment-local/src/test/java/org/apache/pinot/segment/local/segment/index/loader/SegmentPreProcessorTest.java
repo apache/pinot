@@ -343,14 +343,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     return new SegmentVersion[][]{{SegmentVersion.v1}, {SegmentVersion.v3}};
   }
 
-  /**
-   * Test to check for default column handling and text index creation during
-   * segment load after a new raw column is added to the schema with text index
-   * creation enabled.
-   * This will exercise both code paths in SegmentPreprocessor (segment load):
-   * (1) Default column handler to add forward index and dictionary
-   * (2) Text index handler to add text index
-   */
+  /// Test to check for default column handling and text index creation during
+  /// segment load after a new raw column is added to the schema with text index
+  /// creation enabled.
+  /// This will exercise both code paths in SegmentPreprocessor (segment load):
+  /// (1) Default column handler to add forward index and dictionary
+  /// (2) Text index handler to add text index
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnNewColumnRaw(SegmentVersion segmentVersion)
       throws Exception {
@@ -808,14 +806,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         false, 4, 106688, 13, false, ChunkCompressionType.ZSTANDARD);
   }
 
-  /**
-   * Test to check for default column handling and text index creation during
-   * segment load after a new dictionary encoded column is added to the schema
-   * with text index creation enabled.
-   * This will exercise both code paths in SegmentPreprocessor (segment load):
-   * (1) Default column handler to add forward index and dictionary
-   * (2) Text index handler to add text index
-   */
+  /// Test to check for default column handling and text index creation during
+  /// segment load after a new dictionary encoded column is added to the schema
+  /// with text index creation enabled.
+  /// This will exercise both code paths in SegmentPreprocessor (segment load):
+  /// (1) Default column handler to add forward index and dictionary
+  /// (2) Text index handler to add text index
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnNewColumnDictEncoded(SegmentVersion segmentVersion)
       throws Exception {
@@ -831,11 +827,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         100000, 1, true, null, false);
   }
 
-  /**
-   * Test to check text index creation during segment load after text index
-   * creation is enabled on an existing raw column.
-   * This will exercise the SegmentPreprocessor code path during segment load
-   */
+  /// Test to check text index creation during segment load after text index
+  /// creation is enabled on an existing raw column.
+  /// This will exercise the SegmentPreprocessor code path during segment load
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnExistingRawColumn(SegmentVersion segmentVersion)
       throws Exception {
@@ -847,11 +841,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     checkTextIndexCreation(_schema, EXISTING_STRING_COL_RAW, approxCardinalityStr, false, false, 4, false);
   }
 
-  /**
-   * Test to check text index creation during segment load after text index
-   * creation is enabled on an existing dictionary encoded column.
-   * This will exercise the SegmentPreprocessor code path during segment load
-   */
+  /// Test to check text index creation during segment load after text index
+  /// creation is enabled on an existing dictionary encoded column.
+  /// This will exercise the SegmentPreprocessor code path during segment load
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnExistingDictEncodedColumn(SegmentVersion segmentVersion)
       throws Exception {
@@ -2241,9 +2233,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     SegmentMetadataUtils.savePropertiesConfiguration(configuration, INDEX_DIR);
   }
 
-  /**
-   * Test to check the behavior of the forward index disabled feature when enabled on a new SV column
-   */
+  /// Test to check the behavior of the forward index disabled feature when enabled on a new SV column
   @Test(dataProvider = "bothV1AndV3")
   public void testForwardIndexDisabledOnNewColumnsSV(SegmentVersion segmentVersion)
       throws Exception {
@@ -2285,9 +2275,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         true);
   }
 
-  /**
-   * Test to check the behavior of the forward index disabled feature when enabled on a new MV column
-   */
+  /// Test to check the behavior of the forward index disabled feature when enabled on a new MV column
   @Test(dataProvider = "bothV1AndV3")
   public void testForwardIndexDisabledOnNewColumnsMV(SegmentVersion segmentVersion)
       throws Exception {

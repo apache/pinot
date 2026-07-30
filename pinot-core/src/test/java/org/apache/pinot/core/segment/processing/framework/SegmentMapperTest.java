@@ -66,9 +66,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Tests for {@link SegmentMapper}
- */
+/// Tests for [SegmentMapper]
 public class SegmentMapperTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentMapperTest");
 
@@ -194,9 +192,7 @@ public class SegmentMapperTest {
     }
   }
 
-  /**
-   * Provides several combinations of transform functions, partitioning, partition filters
-   */
+  /// Provides several combinations of transform functions, partitioning, partition filters
   @DataProvider(name = "segmentMapperConfigProvider")
   public Object[][] segmentMapperConfigProvider() {
     List<Object[]> outputData =
@@ -318,10 +314,8 @@ public class SegmentMapperTest {
     return inputs.toArray(new Object[0][]);
   }
 
-  /**
-   * RecordReader that throws fetch or parse errors at configured positions.
-   * Used to test continueOnError and consecutiveFetchFailures short-circuit logic.
-   */
+  /// RecordReader that throws fetch or parse errors at configured positions.
+  /// Used to test continueOnError and consecutiveFetchFailures short-circuit logic.
   private static final class FailingRecordReader implements RecordReader {
     enum Action {
       SUCCESS,
@@ -331,10 +325,8 @@ public class SegmentMapperTest {
 
     private final List<GenericRow> _rows;
     private final List<Action> _actions;
-    /**
-     * If false, on FETCH_FAIL we do not advance the index (simulates stuck reader).
-     * If true, we advance so the next call can succeed (intermittent failures).
-     */
+    /// If false, on FETCH_FAIL we do not advance the index (simulates stuck reader).
+    /// If true, we advance so the next call can succeed (intermittent failures).
     private final boolean _advanceOnFetchFail;
     private int _index;
 
@@ -393,9 +385,7 @@ public class SegmentMapperTest {
     }
   }
 
-  /**
-   * Builds a TableConfig with continueOnError=true and optional max consecutive fetch failures.
-   */
+  /// Builds a TableConfig with continueOnError=true and optional max consecutive fetch failures.
   private static TableConfig getTableConfigWithContinueOnError(int maxConsecutiveRecordFetchFailuresAllowed) {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setContinueOnError(true);
@@ -403,9 +393,7 @@ public class SegmentMapperTest {
     return TABLE_CONFIG_BUILDER.setIngestionConfig(ingestionConfig).build();
   }
 
-  /**
-   * Creates a list of GenericRows suitable for the test schema (campaign, clicks, ts).
-   */
+  /// Creates a list of GenericRows suitable for the test schema (campaign, clicks, ts).
   private static List<GenericRow> rows(Object[]... raw) {
     List<GenericRow> list = new ArrayList<>();
     for (Object[] r : raw) {

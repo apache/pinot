@@ -38,11 +38,9 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 
 
-/**
- * The {@code TransformFunctionType} enum represents all the transform functions supported by Calcite SQL parser in
- * v2 engine.
- * TODO: Add support for scalar functions auto registration.
- */
+/// The `TransformFunctionType` enum represents all the transform functions supported by Calcite SQL parser in
+/// v2 engine.
+/// TODO: Add support for scalar functions auto registration.
 public enum TransformFunctionType {
   // arithmetic functions for single-valued columns
   ADD("add", "plus"),
@@ -305,7 +303,7 @@ public enum TransformFunctionType {
     return _operandTypeChecker;
   }
 
-  /** Returns the optional explicit returning type specification. */
+  /// Returns the optional explicit returning type specification.
   private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos) {
     return positionalReturnTypeInferenceFromStringLiteral(opBinding, pos, SqlTypeName.ANY);
   }

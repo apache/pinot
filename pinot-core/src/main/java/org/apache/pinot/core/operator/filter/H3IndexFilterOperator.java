@@ -43,9 +43,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * A filter operator that uses H3 index for geospatial data retrieval
- */
+/// A filter operator that uses H3 index for geospatial data retrieval
 public class H3IndexFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_H3_INDEX";
 
@@ -186,48 +184,42 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     }
   }
 
-  /**
-   * Returns the H3 ids that is ALWAYS fully covered by the circle with the given distance as the radius and a point
-   * within the _h3Id hexagon as the center.
-   * <p>The farthest distance from the center of the center hexagon to the center of a hexagon in the nth ring is
-   * {@code sqrt(3) * n * edgeLength}. Counting the distance from the center to a point in the hexagon, which is up
-   * to the edge length, it is guaranteed that the hexagons in the nth ring are always fully covered if:
-   * {@code distance >= (sqrt(3) * n + 2) * edgeLength}.
-   */
+  /// Returns the H3 ids that is ALWAYS fully covered by the circle with the given distance as the radius and a point
+  /// within the \_h3Id hexagon as the center.
+  ///
+  /// The farthest distance from the center of the center hexagon to the center of a hexagon in the nth ring is
+  /// `sqrt(3) * n * edgeLength`. Counting the distance from the center to a point in the hexagon, which is up
+  /// to the edge length, it is guaranteed that the hexagons in the nth ring are always fully covered if:
+  /// `distance >= (sqrt(3) * n + 2) * edgeLength`.
   private List<Long> getAlwaysMatchH3Ids(double distance) {
     // NOTE: Pick a constant slightly larger than sqrt(3) to be conservative
     int numRings = (int) Math.floor((distance / _edgeLength - 2) / 1.7321);
     return numRings >= 0 ? getH3Ids(numRings) : List.of();
   }
 
-  /**
-   * Returns the H3 ids that MIGHT BE fully/partially covered by the circle with the given distance as the radius and a
-   * point within the _h3Id hexagon as the center.
-   * <p>The shortest distance from the center of the center hexagon to the center of a hexagon in the nth ring is
-   * {@code >= 1.5 * n * edgeLength}. Counting the distance from the center to a point in the hexagon, which is up
-   * to the edge length, it is guaranteed that the hexagons in the nth ring are always not fully/partially covered if:
-   * {@code distance < (1.5 * n - 2) * edgeLength}.
-   */
+  /// Returns the H3 ids that MIGHT BE fully/partially covered by the circle with the given distance as the radius and a
+  /// point within the \_h3Id hexagon as the center.
+  ///
+  /// The shortest distance from the center of the center hexagon to the center of a hexagon in the nth ring is
+  /// `>= 1.5 * n * edgeLength`. Counting the distance from the center to a point in the hexagon, which is up
+  /// to the edge length, it is guaranteed that the hexagons in the nth ring are always not fully/partially covered if:
+  /// `distance < (1.5 * n - 2) * edgeLength`.
   private List<Long> getPossibleMatchH3Ids(double distance) {
     // NOTE: Add a small delta (0.001) to be conservative
     int numRings = (int) Math.floor((distance / _edgeLength + 2) / 1.5 + 0.001);
     return getH3Ids(numRings);
   }
 
-  /**
-   * Returns the H3 ids for the given number of rings around the _h3Id.
-   * IMPORTANT: Throw exception when number of rings is too large because H3 library might send SIGILL for large number
-   * of rings, which can terminate the JVM. Also, the result won't be accurate when the distance is too large. In such
-   * case, the operator will fallback to ExpressionFilterOperator.
-   */
+  /// Returns the H3 ids for the given number of rings around the \_h3Id.
+  /// IMPORTANT: Throw exception when number of rings is too large because H3 library might send SIGILL for large number
+  /// of rings, which can terminate the JVM. Also, the result won't be accurate when the distance is too large. In such
+  /// case, the operator will fallback to ExpressionFilterOperator.
   private List<Long> getH3Ids(int numRings) {
     Preconditions.checkState(numRings <= 100, "Expect numRings <= 100, got: %s", numRings);
     return H3Utils.H3_CORE.gridDisk(_h3Id, numRings);
   }
 
-  /**
-   * Returns the filter block document IDs based on the given full match doc ids and the partial match doc ids.
-   */
+  /// Returns the filter block document IDs based on the given full match doc ids and the partial match doc ids.
   private BlockDocIdSet getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
     ExpressionFilterOperator expressionFilterOperator =
         new ExpressionFilterOperator(_segment, _queryContext, _predicate, _numDocs);

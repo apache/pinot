@@ -28,10 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Main admin client for Pinot controller operations.
- * Provides access to all administrative APIs for managing Pinot clusters.
- */
+/// Main admin client for Pinot controller operations.
+/// Provides access to all administrative APIs for managing Pinot clusters.
 public class PinotAdminClient implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdminClient.class);
 
@@ -56,52 +54,44 @@ public class PinotAdminClient implements AutoCloseable {
   private ZookeeperAdminClient _zookeeperClient;
   private FileIngestClient _fileIngestClient;
 
-  /**
-   * Creates a PinotAdminClient with the specified controller address.
-   *
-   * @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
-   * @throws PinotClientException If the client cannot be initialized
-   */
+  /// Creates a PinotAdminClient with the specified controller address.
+  ///
+  /// @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
+  /// @throws PinotClientException If the client cannot be initialized
   public PinotAdminClient(String controllerAddress)
       throws PinotClientException {
     this(controllerAddress, new Properties());
   }
 
-  /**
-   * Creates a PinotAdminClient with the specified controller address and properties.
-   *
-   * @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
-   * @param properties Configuration properties for the client
-   * @throws PinotClientException If the client cannot be initialized
-   */
+  /// Creates a PinotAdminClient with the specified controller address and properties.
+  ///
+  /// @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
+  /// @param properties Configuration properties for the client
+  /// @throws PinotClientException If the client cannot be initialized
   public PinotAdminClient(String controllerAddress, Properties properties)
       throws PinotClientException {
     this(controllerAddress, properties, null);
   }
 
-  /**
-   * Creates a PinotAdminClient with the specified controller address, properties, and authentication headers.
-   *
-   * @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
-   * @param properties Configuration properties for the client
-   * @param authHeaders Authentication headers for admin operations
-   * @throws PinotClientException If the client cannot be initialized
-   */
+  /// Creates a PinotAdminClient with the specified controller address, properties, and authentication headers.
+  ///
+  /// @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
+  /// @param properties Configuration properties for the client
+  /// @param authHeaders Authentication headers for admin operations
+  /// @throws PinotClientException If the client cannot be initialized
   public PinotAdminClient(String controllerAddress, Properties properties, @Nullable Map<String, String> authHeaders)
       throws PinotClientException {
     this(controllerAddress, properties, authHeaders, null);
   }
 
-  /**
-   * Creates a PinotAdminClient with the specified controller address, properties, authentication headers, and SSL
-   * context.
-   *
-   * @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
-   * @param properties Configuration properties for the client
-   * @param authHeaders Authentication headers for admin operations
-   * @param sslContext Optional SSL context used when connecting over HTTPS
-   * @throws PinotClientException If the client cannot be initialized
-   */
+  /// Creates a PinotAdminClient with the specified controller address, properties, authentication headers, and SSL
+  /// context.
+  ///
+  /// @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
+  /// @param properties Configuration properties for the client
+  /// @param authHeaders Authentication headers for admin operations
+  /// @param sslContext Optional SSL context used when connecting over HTTPS
+  /// @throws PinotClientException If the client cannot be initialized
   public PinotAdminClient(String controllerAddress, Properties properties, @Nullable Map<String, String> authHeaders,
       @Nullable SSLContext sslContext)
       throws PinotClientException {
@@ -111,16 +101,14 @@ public class PinotAdminClient implements AutoCloseable {
     LOGGER.info("Created Pinot admin client for controller at {}", controllerAddress);
   }
 
-  /**
-   * Creates a PinotAdminClient with authentication configuration.
-   *
-   * @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
-   * @param properties Configuration properties for the client
-   * @param authType Authentication type
-   * @param authConfig Authentication configuration
-   * @throws PinotClientException If the client cannot be initialized
-   * @throws PinotAdminAuthenticationException If authentication configuration is invalid
-   */
+  /// Creates a PinotAdminClient with authentication configuration.
+  ///
+  /// @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
+  /// @param properties Configuration properties for the client
+  /// @param authType Authentication type
+  /// @param authConfig Authentication configuration
+  /// @throws PinotClientException If the client cannot be initialized
+  /// @throws PinotAdminAuthenticationException If authentication configuration is invalid
   public PinotAdminClient(String controllerAddress, Properties properties,
       PinotAdminAuthentication.AuthType authType, Map<String, String> authConfig)
       throws PinotClientException, PinotAdminAuthenticationException {
@@ -139,11 +127,9 @@ public class PinotAdminClient implements AutoCloseable {
     _headers = headers != null ? headers : Map.of();
   }
 
-  /**
-   * Gets the table administration client.
-   *
-   * @return Table administration operations
-   */
+  /// Gets the table administration client.
+  ///
+  /// @return Table administration operations
   public TableAdminClient getTableClient() {
     if (_tableClient == null) {
       _tableClient = new TableAdminClient(_transport, _controllerAddress, _headers);
@@ -151,11 +137,9 @@ public class PinotAdminClient implements AutoCloseable {
     return _tableClient;
   }
 
-  /**
-   * Gets the schema administration client.
-   *
-   * @return Schema administration operations
-   */
+  /// Gets the schema administration client.
+  ///
+  /// @return Schema administration operations
   public SchemaAdminClient getSchemaClient() {
     if (_schemaClient == null) {
       _schemaClient = new SchemaAdminClient(_transport, _controllerAddress, _headers);
@@ -163,11 +147,9 @@ public class PinotAdminClient implements AutoCloseable {
     return _schemaClient;
   }
 
-  /**
-   * Gets the instance administration client.
-   *
-   * @return Instance administration operations
-   */
+  /// Gets the instance administration client.
+  ///
+  /// @return Instance administration operations
   public InstanceAdminClient getInstanceClient() {
     if (_instanceClient == null) {
       _instanceClient = new InstanceAdminClient(_transport, _controllerAddress, _headers);
@@ -175,11 +157,9 @@ public class PinotAdminClient implements AutoCloseable {
     return _instanceClient;
   }
 
-  /**
-   * Gets the broker administration client.
-   *
-   * @return Broker administration operations
-   */
+  /// Gets the broker administration client.
+  ///
+  /// @return Broker administration operations
   public BrokerAdminClient getBrokerClient() {
     if (_brokerClient == null) {
       _brokerClient = new BrokerAdminClient(_transport, _controllerAddress, _headers);
@@ -195,9 +175,7 @@ public class PinotAdminClient implements AutoCloseable {
     return _zookeeperClient;
   }
 
-  /**
-   * Gets the file ingestion client.
-   */
+  /// Gets the file ingestion client.
   public FileIngestClient getFileIngestClient() {
     if (_fileIngestClient == null) {
       _fileIngestClient = new FileIngestClient(_transport, _controllerAddress, _headers);
@@ -206,11 +184,9 @@ public class PinotAdminClient implements AutoCloseable {
   }
 
 
-  /**
-   * Gets the segment administration client.
-   *
-   * @return Segment administration operations
-   */
+  /// Gets the segment administration client.
+  ///
+  /// @return Segment administration operations
   public SegmentAdminClient getSegmentClient() {
     if (_segmentClient == null) {
       _segmentClient = new SegmentAdminClient(_transport, _controllerAddress, _headers);
@@ -218,11 +194,9 @@ public class PinotAdminClient implements AutoCloseable {
     return _segmentClient;
   }
 
-  /**
-   * Gets the tenant administration client.
-   *
-   * @return Tenant administration operations
-   */
+  /// Gets the tenant administration client.
+  ///
+  /// @return Tenant administration operations
   public TenantAdminClient getTenantClient() {
     if (_tenantClient == null) {
       _tenantClient = new TenantAdminClient(_transport, _controllerAddress, _headers);
@@ -230,11 +204,9 @@ public class PinotAdminClient implements AutoCloseable {
     return _tenantClient;
   }
 
-  /**
-   * Gets the task administration client.
-   *
-   * @return Task administration operations
-   */
+  /// Gets the task administration client.
+  ///
+  /// @return Task administration operations
   public TaskAdminClient getTaskClient() {
     if (_taskClient == null) {
       _taskClient = new TaskAdminClient(_transport, _controllerAddress, _headers);
@@ -242,9 +214,7 @@ public class PinotAdminClient implements AutoCloseable {
     return _taskClient;
   }
 
-  /**
-   * Gets the logical table administration client.
-   */
+  /// Gets the logical table administration client.
   public LogicalTableAdminClient getLogicalTableClient() {
     if (_logicalTableClient == null) {
       _logicalTableClient = new LogicalTableAdminClient(_transport, _controllerAddress, _headers);
@@ -252,9 +222,7 @@ public class PinotAdminClient implements AutoCloseable {
     return _logicalTableClient;
   }
 
-  /**
-   * Gets the cluster administration client.
-   */
+  /// Gets the cluster administration client.
   public ClusterAdminClient getClusterClient() {
     if (_clusterClient == null) {
       _clusterClient = new ClusterAdminClient(_transport, _controllerAddress, _headers);
@@ -262,9 +230,7 @@ public class PinotAdminClient implements AutoCloseable {
     return _clusterClient;
   }
 
-  /**
-   * Gets the rebalance administration client.
-   */
+  /// Gets the rebalance administration client.
   public RebalanceAdminClient getRebalanceClient() {
     if (_rebalanceClient == null) {
       _rebalanceClient = new RebalanceAdminClient(_transport, _controllerAddress, _headers);
@@ -279,9 +245,7 @@ public class PinotAdminClient implements AutoCloseable {
     return _userClient;
   }
 
-  /**
-   * Gets the query workload administration client.
-   */
+  /// Gets the query workload administration client.
   public QueryWorkloadAdminClient getQueryWorkloadClient() {
     if (_queryWorkloadClient == null) {
       _queryWorkloadClient = new QueryWorkloadAdminClient(_transport, _controllerAddress, _headers);
@@ -289,9 +253,7 @@ public class PinotAdminClient implements AutoCloseable {
     return _queryWorkloadClient;
   }
 
-  /**
-   * Gets the query administration client.
-   */
+  /// Gets the query administration client.
   public QueryAdminClient getQueryClient() {
     if (_queryClient == null) {
       _queryClient = new QueryAdminClient(_transport, _controllerAddress, _headers);
@@ -309,23 +271,17 @@ public class PinotAdminClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Exposes controller host:port for helper utilities.
-   */
+  /// Exposes controller host:port for helper utilities.
   public String getControllerAddress() {
     return _controllerAddress;
   }
 
-  /**
-   * Returns the controller base URL, e.g., http://host:port
-   */
+  /// Returns the controller base URL, e.g., http://host:port
   public String getControllerBaseUrl() {
     return _transport.getScheme() + "://" + _controllerAddress;
   }
 
-  /**
-   * Returns the v2 segment upload URL.
-   */
+  /// Returns the v2 segment upload URL.
   public String getSegmentUploadUrl() {
     return getControllerBaseUrl() + "/v2/segments";
   }

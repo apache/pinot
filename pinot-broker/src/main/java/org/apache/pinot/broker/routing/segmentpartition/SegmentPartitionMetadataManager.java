@@ -43,14 +43,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code PartitionDataManager} manages partitions of a table. It manages
- *   1. all the online segments associated with the partition and their allocated servers
- *   2. all the replica of a specific segment.
- * It provides API to query
- *   1. For each partition ID, what are the servers that contains ALL segments belong to this partition ID.
- *   2. For each server, what are all the partition IDs and list of segments of those partition IDs on this server.
- */
+/// The `PartitionDataManager` manages partitions of a table. It manages
+///   1. all the online segments associated with the partition and their allocated servers
+///   2. all the replica of a specific segment.
+/// It provides API to query
+///   1. For each partition ID, what are the servers that contains ALL segments belong to this partition ID.
+///   2. For each server, what are all the partition IDs and list of segments of those partition IDs on this server.
 public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionMetadataManager.class);
   private static final int INVALID_PARTITION_ID = -1;

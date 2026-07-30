@@ -29,10 +29,8 @@ import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * The {@code DistinctCountRawThetaSketchAggregationFunction} shares the same usage as the
- * {@link DistinctCountThetaSketchAggregationFunction}, and returns the sketch as a base64 encoded string.
- */
+/// The `DistinctCountRawThetaSketchAggregationFunction` shares the same usage as the
+/// [DistinctCountThetaSketchAggregationFunction], and returns the sketch as a base64 encoded string.
 public class DistinctCountRawThetaSketchAggregationFunction extends DistinctCountThetaSketchAggregationFunction {
 
   public DistinctCountRawThetaSketchAggregationFunction(List<ExpressionContext> arguments) {

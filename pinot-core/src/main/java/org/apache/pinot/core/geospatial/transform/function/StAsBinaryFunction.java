@@ -32,9 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 
 
-/**
- * Returns the WKB representation of the geometry object.
- */
+/// Returns the WKB representation of the geometry object.
 public class StAsBinaryFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "ST_AsBinary";
 

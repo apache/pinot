@@ -1040,9 +1040,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     _queryEnvironment.planQuery(query);
   }
 
-  /**
-   * Tests that queries with ORDER BY / LIMIT use singleton worker for the intermediate sort stage.
-   */
+  /// Tests that queries with ORDER BY / LIMIT use singleton worker for the intermediate sort stage.
   @Test
   public void testSingletonWorkerForLimitAndOrderByQueries() {
     String[] queries =
@@ -1065,9 +1063,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
-  /**
-   * Helper method to find an intermediate stage (non-leaf, non-root).
-   */
+  /// Helper method to find an intermediate stage (non-leaf, non-root).
   private DispatchablePlanFragment findIntermediateStage(DispatchableSubPlan dispatchableSubPlan) {
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
       int stageId = fragment.getPlanFragment().getFragmentId();
@@ -1079,11 +1075,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return null;
   }
 
-  /**
-   * Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
-   * correctness of unmatched row tracking. With multiple workers, the broadcast right table would be on each worker
-   * but each worker only sees a subset of left rows, leading to incorrect unmatched-right-rows output.
-   */
+  /// Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
+  /// correctness of unmatched row tracking. With multiple workers, the broadcast right table would be on each worker
+  /// but each worker only sees a subset of left rows, leading to incorrect unmatched-right-rows output.
   @Test
   public void testFullOuterNonEquiJoinUsesSingletonWorker() {
     String query = "SELECT * FROM a FULL OUTER JOIN b ON a.col3 > b.col3";
@@ -1097,11 +1091,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "FULL OUTER non-equi join should use singleton worker for join stage");
   }
 
-  /**
-   * Tests that RIGHT JOIN with only non-equi conditions uses BROADCAST for the left side and RANDOM for the right
-   * side. This inverted distribution (compared to the default RANDOM left + BROADCAST right) ensures that each worker
-   * has the complete left table so it can correctly determine unmatched right rows for its local right partition.
-   */
+  /// Tests that RIGHT JOIN with only non-equi conditions uses BROADCAST for the left side and RANDOM for the right
+  /// side. This inverted distribution (compared to the default RANDOM left + BROADCAST right) ensures that each worker
+  /// has the complete left table so it can correctly determine unmatched right rows for its local right partition.
   @Test
   public void testRightNonEquiJoinUsesBroadcastLeftRandomRight() {
     String query = "SELECT * FROM a RIGHT JOIN b ON a.col3 > b.col3";
@@ -1118,12 +1110,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "RIGHT side of RIGHT non-equi join should be RANDOM");
   }
 
-  /**
-   * The {@code windowOptions(is_partitioned_by_window_keys='true')} hint forces a pre-partitioned (direct) exchange
-   * below the window, avoiding a data shuffle. Here the window partitions by {@code col1}, which is NOT table a's
-   * partition column ({@code col2}), so without the hint the planner would shuffle. This exercises the
-   * {@link org.apache.pinot.calcite.rel.logical.PinotLogicalExchange} path (PARTITION BY only).
-   */
+  /// The `windowOptions(is_partitioned_by_window_keys='true')` hint forces a pre-partitioned (direct) exchange
+  /// below the window, avoiding a data shuffle. Here the window partitions by `col1`, which is NOT table a's
+  /// partition column (`col2`), so without the hint the planner would shuffle. This exercises the
+  /// [org.apache.pinot.calcite.rel.logical.PinotLogicalExchange] path (PARTITION BY only).
   @Test
   public void testWindowPartitionByKeysHintForcesPrePartitionedExchange() {
     String query = "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ "
@@ -1134,10 +1124,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "windowOptions(is_partitioned_by_window_keys='true') should force a pre-partitioned exchange");
   }
 
-  /**
-   * Without the hint and with a window partition key that does not match the table's partitioning, the exchange below
-   * the window must be a regular (shuffled) exchange.
-   */
+  /// Without the hint and with a window partition key that does not match the table's partitioning, the exchange below
+  /// the window must be a regular (shuffled) exchange.
   @Test
   public void testWindowWithoutHintIsNotPrePartitioned() {
     String query = "SELECT col1, SUM(col3) OVER (PARTITION BY col1) FROM a";
@@ -1146,11 +1134,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "Without the hint and matching partitioning, the window exchange should be a full shuffle");
   }
 
-  /**
-   * The hint must also flow through the {@link org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange} path,
-   * used when PARTITION BY and ORDER BY are on different keys. This is the path the PR fixes: previously
-   * {@code RelToPlanNodeConverter} hardcoded {@code prePartitioned = null} for sort exchanges, dropping the hint.
-   */
+  /// The hint must also flow through the [org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange] path,
+  /// used when PARTITION BY and ORDER BY are on different keys. This is the path the PR fixes: previously
+  /// `RelToPlanNodeConverter` hardcoded `prePartitioned = null` for sort exchanges, dropping the hint.
   @Test
   public void testWindowPartitionByKeysHintForcesPrePartitionedSortExchange() {
     String query = "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ "
@@ -1161,11 +1147,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "windowOptions hint should force a pre-partitioned sort exchange (PARTITION BY + ORDER BY on different keys)");
   }
 
-  /**
-   * Setting the hint to {@code 'false'} overrides the planner's automatic detection of pre-partitioning. Here table a
-   * is declared partitioned by {@code col2} (via tableOptions) and the window also partitions by {@code col2}, so the
-   * planner would otherwise auto-detect a pre-partitioned exchange; the hint disables it.
-   */
+  /// Setting the hint to `'false'` overrides the planner's automatic detection of pre-partitioning. Here table a
+  /// is declared partitioned by `col2` (via tableOptions) and the window also partitions by `col2`, so the
+  /// planner would otherwise auto-detect a pre-partitioned exchange; the hint disables it.
   @Test
   public void testWindowPartitionByKeysHintFalseDisablesAutoDetectedPrePartitioning() {
     String query = "SELECT /*+ windowOptions(is_partitioned_by_window_keys='false') */ "
@@ -1176,11 +1160,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "windowOptions(is_partitioned_by_window_keys='false') should disable auto-detected pre-partitioning");
   }
 
-  /**
-   * With matching tableOptions partitioning and no window hint, the planner auto-detects pre-partitioning. This must
-   * hold for both window exchange paths: PinotLogicalExchange (PARTITION BY only) and PinotLogicalSortExchange
-   * (PARTITION BY + ORDER BY). The latter verifies the PR preserves the {@code null -> auto-detect} behavior.
-   */
+  /// With matching tableOptions partitioning and no window hint, the planner auto-detects pre-partitioning. This must
+  /// hold for both window exchange paths: PinotLogicalExchange (PARTITION BY only) and PinotLogicalSortExchange
+  /// (PARTITION BY + ORDER BY). The latter verifies the PR preserves the `null -> auto-detect` behavior.
   @Test
   public void testWindowAutoDetectsPrePartitioningWithoutHint() {
     String partitionOnly = "SELECT col1, SUM(col3) OVER (PARTITION BY col2) "
@@ -1194,10 +1176,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "Sort exchange should also auto-detect pre-partitioning when the table is partitioned by the window key");
   }
 
-  /**
-   * Finds the {@link MailboxSendNode} that feeds the (single) WINDOW stage's input exchange, i.e. the sender side of
-   * the exchange inserted directly below the window. The {@code prePartitioned} flag lives on this send node.
-   */
+  /// Finds the [MailboxSendNode] that feeds the (single) WINDOW stage's input exchange, i.e. the sender side of
+  /// the exchange inserted directly below the window. The `prePartitioned` flag lives on this send node.
   private MailboxSendNode findWindowInputSendNode(DispatchableSubPlan dispatchableSubPlan) {
     WindowNode window = null;
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
@@ -1215,10 +1195,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return (MailboxSendNode) senderRoot;
   }
 
-  /// The {@code setOpOptions(is_colocated_by_set_op_keys='true')} hint forces a pre-partitioned (direct) exchange on
-  /// every input of a set operation, avoiding the shuffle. Here the inputs project {@code col3}, which is neither
+  /// The `setOpOptions(is_colocated_by_set_op_keys='true')` hint forces a pre-partitioned (direct) exchange on
+  /// every input of a set operation, avoiding the shuffle. Here the inputs project `col3`, which is neither
   /// table's partition column, so without the hint the planner would shuffle. Covers UNION ALL, INTERSECT and EXCEPT,
-  /// which all share {@link org.apache.pinot.calcite.rel.rules.PinotSetOpExchangeNodeInsertRule}.
+  /// which all share [org.apache.pinot.calcite.rel.rules.PinotSetOpExchangeNodeInsertRule].
   @Test(dataProvider = "setOpColocationHintQueries")
   public void testSetOpColocationHintForcesPrePartitionedExchange(String query) {
     List<MailboxSendNode> sendNodes = findSetOpInputSendNodes(_queryEnvironment.planQuery(query));
@@ -1239,7 +1219,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     };
   }
 
-  /// The hint also lands on the set operation when it is wrapped in an outer {@code SELECT} that carries the hint (the
+  /// The hint also lands on the set operation when it is wrapped in an outer `SELECT` that carries the hint (the
   /// hint then attaches to the set operation directly rather than to a branch).
   @Test
   public void testSetOpColocationHintViaOuterSelectWrap() {
@@ -1252,7 +1232,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   /// When branches carry conflicting hints, the first input that specifies the hint wins and its value is applied to
   /// all inputs (the documented precedence of the rule). Here the first branch forces it on, so both branches are
-  /// pre-partitioned even though the second branch sets it to {@code 'false'}.
+  /// pre-partitioned even though the second branch sets it to `'false'`.
   @Test
   public void testSetOpColocationHintFirstInputWins() {
     String query = "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ col3 FROM a "
@@ -1276,7 +1256,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   /// When each input is declared partitioned by the projected column, the single-column set-op exchange matches the
   /// input partitioning, so the planner auto-detects a pre-partitioned exchange even without the hint. This is the
-  /// baseline that {@link #testSetOpColocationHintFalseDisablesAutoDetected} overrides.
+  /// baseline that [#testSetOpColocationHintFalseDisablesAutoDetected] overrides.
   @Test
   public void testSetOpAutoDetectsPrePartitioningWithoutHint() {
     for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(AUTO_DETECTED_SET_OP))) {
@@ -1285,8 +1265,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
-  /// Setting the hint to {@code 'false'} overrides the planner's automatic detection of pre-partitioning (see
-  /// {@link #testSetOpAutoDetectsPrePartitioningWithoutHint} for the same query without the hint).
+  /// Setting the hint to `'false'` overrides the planner's automatic detection of pre-partitioning (see
+  /// [#testSetOpAutoDetectsPrePartitioningWithoutHint] for the same query without the hint).
   @Test
   public void testSetOpColocationHintFalseDisablesAutoDetected() {
     String query = AUTO_DETECTED_SET_OP.replaceFirst("SELECT",
@@ -1305,8 +1285,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
           + "SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', "
           + "partition_size='4') */";
 
-  /// Finds the {@link MailboxSendNode}s feeding each input exchange of the (single) set-op stage. A set operation has
-  /// one mailbox exchange per branch, and the {@code prePartitioned} flag lives on each branch's send node.
+  /// Finds the [MailboxSendNode]s feeding each input exchange of the (single) set-op stage. A set operation has
+  /// one mailbox exchange per branch, and the `prePartitioned` flag lives on each branch's send node.
   private List<MailboxSendNode> findSetOpInputSendNodes(DispatchableSubPlan dispatchableSubPlan) {
     SetOpNode setOpNode = null;
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
@@ -1331,8 +1311,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   /// When colocation hints are applied to a chain of operations that are all keyed on the same (partition) column, the
   /// whole chain executes without a data shuffle: every hash-distributed exchange in the plan is pre-partitioned. This
-  /// covers combinations of colocated joins, window functions and set operations (see {@link #colocatedChains}). The
-  /// join key is {@code a.col2}/{@code b.col1} (each table's partition column), so the join is colocated, and the
+  /// covers combinations of colocated joins, window functions and set operations (see [#colocatedChains]). The
+  /// join key is `a.col2`/`b.col1` (each table's partition column), so the join is colocated, and the
   /// window and set op keep that same key.
   @Test(dataProvider = "colocatedChains")
   public void testColocatedOperationsChainWithoutShuffle(String description, String query) {
@@ -1367,7 +1347,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     };
   }
 
-  /// Baseline for {@link #testColocatedOperationsChainWithoutShuffle}: without the colocation hints the same
+  /// Baseline for [#testColocatedOperationsChainWithoutShuffle]: without the colocation hints the same
   /// join -> window chain still shuffles (at least one hash exchange is not pre-partitioned), proving the hints are
   /// what eliminate the shuffles.
   @Test
@@ -1379,7 +1359,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   /// Set-op-specific baseline for the "set op of colocated joins" chain: with
-  /// {@code is_colocated_by_set_op_keys='false'} the set-op exchange is forced back to a shuffle (while the per-branch
+  /// `is_colocated_by_set_op_keys='false'` the set-op exchange is forced back to a shuffle (while the per-branch
   /// joins stay colocated), proving the set-op hint is what keeps the set-op level of the chain colocated.
   @Test
   public void testSetOpChainWithoutSetOpHintShuffles() {
@@ -1392,7 +1372,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "With is_colocated_by_set_op_keys='false', the set-op level of the chain should shuffle");
   }
 
-  /// Collects the {@link MailboxSendNode} at the root of every hash-distributed stage in the plan (i.e. every
+  /// Collects the [MailboxSendNode] at the root of every hash-distributed stage in the plan (i.e. every
   /// inter-stage hash exchange). A pre-partitioned send is a direct, no-shuffle exchange; a non-pre-partitioned one is
   /// a full shuffle.
   private List<MailboxSendNode> findHashSendNodes(DispatchableSubPlan dispatchableSubPlan) {
@@ -1407,9 +1387,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return sendNodes;
   }
 
-  /**
-   * Finds the DispatchablePlanFragment containing a JoinNode (non-leaf, non-root stage).
-   */
+  /// Finds the DispatchablePlanFragment containing a JoinNode (non-leaf, non-root stage).
   private DispatchablePlanFragment findJoinStage(DispatchableSubPlan dispatchableSubPlan) {
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
       int stageId = fragment.getPlanFragment().getFragmentId();
@@ -1423,9 +1401,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return null;
   }
 
-  /**
-   * Finds the JoinNode in the plan.
-   */
+  /// Finds the JoinNode in the plan.
   private JoinNode findJoinNode(DispatchableSubPlan dispatchableSubPlan) {
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
       JoinNode joinNode = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(), JoinNode.class);

@@ -36,11 +36,9 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class for command to convert avro schema to pinot schema. Given that it is not always possible to
- * automatically do this, the intention is to get most of the work done by this class, and require any
- * manual editing on top.
- */
+/// Class for command to convert avro schema to pinot schema. Given that it is not always possible to
+/// automatically do this, the intention is to get most of the work done by this class, and require any
+/// manual editing on top.
 @CommandLine.Command(name = "AvroSchemaToPinotSchema", mixinStandardHelpOptions = true)
 public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroSchemaToPinotSchema.class);
@@ -136,12 +134,10 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
         + " _collectionNotUnnestedToJson " + _collectionNotUnnestedToJson;
   }
 
-  /**
-   * Build a Map with column name as key and fieldType (dimension/metric/time) as value, from the
-   * options list.
-   *
-   * @return The column <-> fieldType map.
-   */
+  /// Build a Map with column name as key and fieldType (dimension/metric/time) as value, from the
+  /// options list.
+  ///
+  /// @return The column <-> fieldType map.
   private Map<String, FieldSpec.FieldType> buildFieldTypesMap() {
     Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<>();
     if (_dimensions != null) {

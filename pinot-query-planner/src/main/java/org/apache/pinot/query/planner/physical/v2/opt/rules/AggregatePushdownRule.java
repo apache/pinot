@@ -67,12 +67,10 @@ import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Does the following:
- * 1. Converts agg calls to their proper forms.
- * 2. Adds aggregate under Exchange, if exchange is an input.
- * 3. Handles leafReturnFinalResult thing.
- */
+/// Does the following:
+/// 1. Converts agg calls to their proper forms.
+/// 2. Adds aggregate under Exchange, if exchange is an input.
+/// 3. Handles leafReturnFinalResult thing.
 public class AggregatePushdownRule extends PRelOptRule {
   private final PhysicalPlannerContext _context;
 
@@ -151,16 +149,16 @@ public class AggregatePushdownRule extends PRelOptRule {
   }
 
   /// Splits a GROUP BY GROUPING SETS / ROLLUP / CUBE aggregate (v2 physical planner). Mirrors the SIMPLE split
-  /// {@link #addPartialAggregate} but threads the synthetic {@code $groupingId} discriminator column, exactly like the
+  /// [#addPartialAggregate] but threads the synthetic `$groupingId` discriminator column, exactly like the
   /// single-stage rule PinotAggregateExchangeNodeInsertRule:
-  ///   - LEAF carries the grouping sets and only the real aggregations; {@link PhysicalAggregate#deriveRowType} appends
-  ///     {@code $groupingId} after the union group keys. The per-set row expansion happens at runtime in the
+  ///   - LEAF carries the grouping sets and only the real aggregations; [PhysicalAggregate#deriveRowType] appends
+  ///     `$groupingId` after the union group keys. The per-set row expansion happens at runtime in the
   ///     RepeatOperator.
-  ///   - EXCHANGE repartitions by the union keys AND {@code $groupingId} (so all rows of a (set, key) co-locate).
-  ///   - FINAL is a SIMPLE aggregate grouping by {@code [union keys..., $groupingId]}.
+  ///   - EXCHANGE repartitions by the union keys AND `$groupingId` (so all rows of a (set, key) co-locate).
+  ///   - FINAL is a SIMPLE aggregate grouping by `[union keys..., $groupingId]`.
   ///   - PROJECT restores the original aggregate row type: the group keys, then for each original aggregate call either
-  ///     the real aggregate result or, for GROUPING() / GROUPING_ID(), the value computed from {@code $groupingId};
-  ///     {@code $groupingId} itself is dropped.
+  ///     the real aggregate result or, for GROUPING() / GROUPING_ID(), the value computed from `$groupingId`;
+  ///     `$groupingId` itself is dropped.
   private static PRelNode addPartialAggregateForGroupingSets(PhysicalAggregate aggPRelNode,
       Supplier<Integer> idGenerator) {
     PhysicalAggregate o0 = aggPRelNode;
@@ -210,9 +208,9 @@ public class AggregatePushdownRule extends PRelOptRule {
         Set.of(), idGenerator.get(), n0, n0.getPinotDataDistributionOrThrow(), false);
   }
 
-  /// FINAL aggregate for a grouping-set split: like {@link #convertAggFromIntermediateInput} but groups by
-  /// {@code [union keys..., $groupingId]} ({@code finalGroupCount = groupCount + 1}), aggregates only the real
-  /// (non-GROUPING) calls, and reads the intermediate aggregate columns starting at {@code finalGroupCount}.
+  /// FINAL aggregate for a grouping-set split: like [#convertAggFromIntermediateInput] but groups by
+  /// `[union keys..., $groupingId]` (`finalGroupCount = groupCount + 1`), aggregates only the real
+  /// (non-GROUPING) calls, and reads the intermediate aggregate columns starting at `finalGroupCount`.
   private static PhysicalAggregate convertAggForGroupingSets(PhysicalAggregate physicalAggregate,
       PhysicalExchange exchange, List<AggregateCall> realAggCalls, int finalGroupCount, Supplier<Integer> nodeId) {
     Aggregate aggRel = (Aggregate) physicalAggregate.unwrap();
@@ -344,8 +342,8 @@ public class AggregatePushdownRule extends PRelOptRule {
     return buildAggCalls(aggRel, aggRel.getAggCallList(), aggType, leafReturnFinalResult);
   }
 
-  /// As {@link #buildAggCalls(Aggregate, AggType, boolean)} but over an explicit list of aggregate calls (rather than
-  /// {@code aggRel.getAggCallList()}). The grouping-set split passes only the real (non-GROUPING) aggregates.
+  /// As [#buildAggCalls(Aggregate, AggType, boolean)] but over an explicit list of aggregate calls (rather than
+  /// `aggRel.getAggCallList()`). The grouping-set split passes only the real (non-GROUPING) aggregates.
   public static List<AggregateCall> buildAggCalls(Aggregate aggRel, List<AggregateCall> orgAggCalls, AggType aggType,
       boolean leafReturnFinalResult) {
     RelNode input = aggRel.getInput();

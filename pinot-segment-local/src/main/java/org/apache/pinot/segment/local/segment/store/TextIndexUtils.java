@@ -57,10 +57,8 @@ public class TextIndexUtils {
   private TextIndexUtils() {
   }
 
-  /**
-   * Configuration change listener for Lucene max clause count.
-   * This allows updating the max clause count dynamically without server restart.
-   */
+  /// Configuration change listener for Lucene max clause count.
+  /// This allows updating the max clause count dynamically without server restart.
   public static class LuceneMaxClauseCountConfigChangeListener implements PinotClusterConfigChangeListener {
     @Override
     public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
@@ -146,14 +144,13 @@ public class TextIndexUtils {
         .collect(Collectors.toList());
   }
 
-  /**
-   * Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text config.
-   * If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
-   *
-   * @param config Pinot TextIndexConfig to fetch the configuration from
-   * @return Lucene Analyzer class instance
-   * @throws ReflectiveOperationException if instantiation via reflection fails
-   */
+  /// Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text
+  /// config.
+  /// If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
+  ///
+  /// @param config Pinot TextIndexConfig to fetch the configuration from
+  /// @return Lucene Analyzer class instance
+  /// @throws ReflectiveOperationException if instantiation via reflection fails
   public static Analyzer getAnalyzer(TextIndexConfig config)
       throws ReflectiveOperationException {
     String analyzerClassName = config.getLuceneAnalyzerClass();
@@ -173,15 +170,14 @@ public class TextIndexUtils {
     return getCustomAnalyzer(analyzerClassArgs, analyzerClassArgTypes, analyzerClassName);
   }
 
-  /**
-   * Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text config.
-   * If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
-   *
-   * @param config Pinot TextIndexConfig to fetch the configuration from
-   * @param override column-specific configuration that overrides the shared configuration
-   * @return Lucene Analyzer class instance
-   * @throws ReflectiveOperationException if instantiation via reflection fails
-   */
+  /// Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text
+  /// config.
+  /// If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
+  ///
+  /// @param config Pinot TextIndexConfig to fetch the configuration from
+  /// @param override column-specific configuration that overrides the shared configuration
+  /// @return Lucene Analyzer class instance
+  /// @throws ReflectiveOperationException if instantiation via reflection fails
   public static Analyzer getAnalyzer(TextIndexConfig config, MultiColumnLuceneTextIndexReader.ColumnConfig override)
       throws ReflectiveOperationException {
     String luceneAnalyzerClassName = firstNotNull(override.getLuceneAnalyzerClass(), config.getLuceneAnalyzerClass());
@@ -249,12 +245,10 @@ public class TextIndexUtils {
     return v2;
   }
 
-  /**
-   * Parse the Java value type specified in the type string
-   * @param valueTypeString FQCN of the value type class or the name of the primitive value type
-   * @return Class object of the value type
-   * @throws ClassNotFoundException when the value type is not supported
-   */
+  /// Parse the Java value type specified in the type string
+  /// @param valueTypeString FQCN of the value type class or the name of the primitive value type
+  /// @return Class object of the value type
+  /// @throws ClassNotFoundException when the value type is not supported
   public static Class<?> parseSupportedTypes(String valueTypeString)
       throws ClassNotFoundException {
     try {
@@ -285,13 +279,11 @@ public class TextIndexUtils {
     }
   }
 
-  /**
-   * Attempt to coerce string into supported value type
-   * @param stringValue string representation of the value
-   * @param clazz of the value
-   * @return class object of the value, auto-boxed if it is a primitive type
-   * @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
-   */
+  /// Attempt to coerce string into supported value type
+  /// @param stringValue string representation of the value
+  /// @param clazz of the value
+  /// @return class object of the value, auto-boxed if it is a primitive type
+  /// @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
   public static Object parseSupportedTypeValues(String stringValue, Class<?> clazz)
       throws ReflectiveOperationException {
     try {
@@ -375,13 +367,11 @@ public class TextIndexUtils {
     return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);
   }
 
-  /**
-   * Writes the config to the properties file. Configs saved include luceneAnalyzerClass, luceneAnalyzerClassArgs,
-   * luceneAnalyzerClassArgTypes, and luceneQueryParserClass.
-   *
-   * @param indexDir directory where the properties file is saved
-   * @param config config to write to the properties file
-   */
+  /// Writes the config to the properties file. Configs saved include luceneAnalyzerClass, luceneAnalyzerClassArgs,
+  /// luceneAnalyzerClassArgTypes, and luceneQueryParserClass.
+  ///
+  /// @param indexDir directory where the properties file is saved
+  /// @param config config to write to the properties file
   public static void writeConfigToPropertiesFile(File indexDir, TextIndexConfig config) {
     PropertiesConfiguration properties = new PropertiesConfiguration();
     List<String> escapedLuceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs()
@@ -403,15 +393,13 @@ public class TextIndexUtils {
     CommonsConfigurationUtils.saveToFile(properties, propertiesFile);
   }
 
-  /**
-   * Returns an updated TextIndexConfig, overriding the values in the config with the values in the properties file.
-   * The configs overwritten include luceneAnalyzerClass, luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes,
-   * and luceneQueryParserClass.
-   *
-   * @param file properties file to read from
-   * @param config config to update
-   * @return updated TextIndexConfig
-   */
+  /// Returns an updated TextIndexConfig, overriding the values in the config with the values in the properties file.
+  /// The configs overwritten include luceneAnalyzerClass, luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes,
+  /// and luceneQueryParserClass.
+  ///
+  /// @param file properties file to read from
+  /// @param config config to update
+  /// @return updated TextIndexConfig
   public static TextIndexConfig getUpdatedConfigFromPropertiesFile(File file, TextIndexConfig config)
       throws ConfigurationException {
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(file);

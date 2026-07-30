@@ -175,23 +175,17 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
   protected void onProcessSegmentsFinish() {
   }
 
-  /**
-   * Returns whether the child operator returns only a single block.
-   */
+  /// Returns whether the child operator returns only a single block.
   protected boolean isChildOperatorSingleBlock() {
     return true;
   }
 
-  /**
-   * Creates a tracker object to track if the query is satisfied.
-   */
+  /// Creates a tracker object to track if the query is satisfied.
   protected Object createQuerySatisfiedTracker() {
     return null;
   }
 
-  /**
-   * Returns {@code true} if the query is already satisfied with the results block.
-   */
+  /// Returns `true` if the query is already satisfied with the results block.
   protected boolean isQuerySatisfied(T resultsBlock, Object tracker) {
     return _resultsBlockMerger.isQuerySatisfied(resultsBlock);
   }

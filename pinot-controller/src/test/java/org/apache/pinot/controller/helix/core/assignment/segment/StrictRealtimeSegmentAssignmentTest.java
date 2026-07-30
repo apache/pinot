@@ -392,11 +392,9 @@ public class StrictRealtimeSegmentAssignmentTest {
     }
   }
 
-  /**
-   * Verifies the MultiTierStrictRealtimeSegmentAssignment override picks the LATEST LLC segment (highest sequence
-   * number) for the partition rather than the first one encountered, so a new CONSUMING segment is aligned with the
-   * current location of the partition after a rebalance.
-   */
+  /// Verifies the MultiTierStrictRealtimeSegmentAssignment override picks the LATEST LLC segment (highest sequence
+  /// number) for the partition rather than the first one encountered, so a new CONSUMING segment is aligned with the
+  /// current location of the partition after a rebalance.
   @Test
   public void testMultiTierAssignSegmentUsesLatestExistingAssignment() {
     SegmentAssignment segmentAssignment = createSegmentAssignment("dedup");
@@ -429,11 +427,9 @@ public class StrictRealtimeSegmentAssignmentTest {
     assertEquals(instancesAssigned, newInstances);
   }
 
-  /**
-   * Verifies the MultiTierStrictRealtimeSegmentAssignment override returns null when the latest LLC segment for the
-   * partition has been moved to a tier (ZK metadata getTier() != null). In that case the existing assignment must not
-   * be reused because tiered segments live on a different instance pool than CONSUMING segments.
-   */
+  /// Verifies the MultiTierStrictRealtimeSegmentAssignment override returns null when the latest LLC segment for the
+  /// partition has been moved to a tier (ZK metadata getTier() != null). In that case the existing assignment must not
+  /// be reused because tiered segments live on a different instance pool than CONSUMING segments.
   @Test
   public void testMultiTierAssignSegmentSkipsExistingWhenLatestOnTier() {
     String olderSegment = _segments.get(0); // partition 0, sequence 0

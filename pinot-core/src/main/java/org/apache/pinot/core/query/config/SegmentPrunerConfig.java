@@ -24,9 +24,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
-/**
- * Config for SegmentPruner.
- */
+/// Config for SegmentPruner.
 public class SegmentPrunerConfig {
   private final int _numSegmentPruners;
   private final List<String> _segmentPrunerNames;

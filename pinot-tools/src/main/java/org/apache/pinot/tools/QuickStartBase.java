@@ -66,17 +66,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Assuming that database name is DBNAME, bootstrap path must have the file structure specified below to properly
- * load the table:
- *  DBNAME
- *  ├── ingestionJobSpec.yaml
- *  ├── rawdata
- *  │   └── DBNAME_data.csv
- *  ├── DBNAME_offline_table_config.json
- *  └── DBNAME_schema.json
- *
- */
+/// Assuming that database name is DBNAME, bootstrap path must have the file structure specified below to properly
+/// load the table:
+///  DBNAME
+///  ├── ingestionJobSpec.yaml
+///  ├── rawdata
+///  │   └── DBNAME_data.csv
+///  ├── DBNAME_offline_table_config.json
+///  └── DBNAME_schema.json
 public abstract class QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickStartBase.class);
   private static final String TAB = "\t\t";
@@ -141,17 +138,17 @@ public abstract class QuickStartBase {
     return _bootstrapDataDirs != null && _bootstrapDataDirs.length == 1 ? _bootstrapDataDirs[0] : null;
   }
 
-  /** @return Table name specified by command line argument -bootstrapTableDir */
+  /// @return Table name specified by command line argument -bootstrapTableDir
   public String getTableName() {
     return Paths.get(getBootstrapDataDir()).getFileName().toString();
   }
 
-  /** @return Table name if specified by input bootstrap directory. */
+  /// @return Table name if specified by input bootstrap directory.
   public String getTableName(String bootstrapDataDir) {
     return Paths.get(bootstrapDataDir).getFileName().toString();
   }
 
-  /** @return true if bootstrapTableDir is not specified by command line argument -bootstrapTableDir, else false.*/
+  /// @return true if bootstrapTableDir is not specified by command line argument -bootstrapTableDir, else false.
   public boolean useDefaultBootstrapTableDir() {
     return _bootstrapDataDirs == null;
   }

@@ -30,9 +30,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * The <code>PinotSegmentToAvroConverter</code> class is the tool to convert Pinot segment to AVRO format.
- */
+/// The `PinotSegmentToAvroConverter` class is the tool to convert Pinot segment to AVRO format.
 public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
   private final String _segmentDir;
   private final String _outputFile;

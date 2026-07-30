@@ -19,13 +19,10 @@
 package org.apache.pinot.common.auth;
 
 import java.util.Map;
-import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Standardized auth config container for AuthProvider
- * @see AuthProviderUtils#extractAuthConfig(PinotConfiguration, String)
- */
+/// Standardized auth config container for AuthProvider
+/// @see AuthProviderUtils#extractAuthConfig(org.apache.pinot.spi.env.PinotConfiguration, String)
 public class AuthConfig {
   public static final String PROVIDER_CLASS = "provider.class";
 

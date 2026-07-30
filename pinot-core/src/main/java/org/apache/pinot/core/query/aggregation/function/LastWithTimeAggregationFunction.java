@@ -36,17 +36,16 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.IntIterator;
 
 
-/**
- * This function is used for LastWithTime calculations.
- * <p>The function can be used as LastWithTime(dataExpression, timeExpression, 'dataType')
- * <p>Following arguments are supported:
- * <ul>
- *   <li>dataExpression: expression that contains the column to be calculated last on</li>
- *   <li>timeExpression: expression that contains the column to be used to decide which data is last, can be any
- *   Numeric column</li>
- *   <li>dataType: the data type of data column</li>
- * </ul>
- */
+/// This function is used for LastWithTime calculations.
+///
+/// The function can be used as LastWithTime(dataExpression, timeExpression, 'dataType')
+///
+/// Following arguments are supported:
+///
+/// - dataExpression: expression that contains the column to be calculated last on
+/// - timeExpression: expression that contains the column to be used to decide which data is last, can be any
+///   Numeric column
+/// - dataType: the data type of data column
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
     extends NullableSingleInputAggregationFunction<ValueLongPair<V>, V> {

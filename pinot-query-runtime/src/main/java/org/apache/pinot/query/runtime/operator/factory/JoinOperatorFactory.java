@@ -25,9 +25,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-/**
- * Factory for join operators.
- */
+/// Factory for join operators.
 public interface JoinOperatorFactory {
 
   MultiStageOperator createJoinOperator(OpChainExecutionContext context, MultiStageOperator leftOperator,

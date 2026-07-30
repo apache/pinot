@@ -42,9 +42,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * Operator which executes DISTINCT operation based on dictionary
- */
+/// Operator which executes DISTINCT operation based on dictionary
 public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT_DICTIONARY";
 

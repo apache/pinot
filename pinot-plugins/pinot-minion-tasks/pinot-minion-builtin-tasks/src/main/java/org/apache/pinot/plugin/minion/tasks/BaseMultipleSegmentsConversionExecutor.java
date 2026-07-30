@@ -66,16 +66,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base class which provides a framework for N -> M segment conversion tasks.
- * <p> This class handles segment download and upload
- *
- * {@link BaseMultipleSegmentsConversionExecutor} assumes that output segments are new segments derived from input
- * segments. So, we do not check crc or modify zk metadata when uploading segments. In case of modifying the existing
- * segments, {@link BaseSingleSegmentConversionExecutor} has to be used.
- *
- * TODO: add test for SegmentZKMetadataCustomMapModifier
- */
+/// Base class which provides a framework for N -> M segment conversion tasks.
+///
+/// This class handles segment download and upload
+///
+/// [BaseMultipleSegmentsConversionExecutor] assumes that output segments are new segments derived from input
+/// segments. So, we do not check crc or modify zk metadata when uploading segments. In case of modifying the existing
+/// segments, [BaseSingleSegmentConversionExecutor] has to be used.
+///
+/// TODO: add test for SegmentZKMetadataCustomMapModifier
 public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseMultipleSegmentsConversionExecutor.class);
   private static final String CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID = "lineageEntryId";
@@ -90,25 +89,21 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     _minionConf = minionConf;
   }
 
-  /**
-   * Converts the segment based on the given {@link PinotTaskConfig}.
-   *
-   * @param pinotTaskConfig Task config
-   * @param segmentDirs Index directories for the original segments
-   * @param workingDir Working directory for the converted segment
-   * @return a list of segment conversion result
-   * @throws Exception
-   */
+  /// Converts the segment based on the given [PinotTaskConfig].
+  ///
+  /// @param pinotTaskConfig Task config
+  /// @param segmentDirs Index directories for the original segments
+  /// @param workingDir Working directory for the converted segment
+  /// @return a list of segment conversion result
+  /// @throws Exception
   protected abstract List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> segmentDirs,
       File workingDir)
       throws Exception;
 
-  /**
-   * Pre processing operations to be done at the beginning of task execution
-   *
-   * The default implementation checks whether all segments to process exist in the table, if not, terminate early to
-   * avoid wasting computing resources.
-   */
+  /// Pre processing operations to be done at the beginning of task execution
+  ///
+  /// The default implementation checks whether all segments to process exist in the table, if not, terminate early to
+  /// avoid wasting computing resources.
   protected void preProcess(PinotTaskConfig pinotTaskConfig)
       throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -127,9 +122,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     }
   }
 
-  /**
-   * Post processing operations to be done before exiting a successful task execution
-   */
+  /// Post processing operations to be done before exiting a successful task execution
   protected void postProcess(PinotTaskConfig pinotTaskConfig)
       throws Exception {
   }

@@ -37,16 +37,14 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Exhaustive tests for all valid and invalid combinations of:
- * - Forward index encoding: DICTIONARY vs RAW
- * - Dictionary: enabled (default), disabled (noDictionaryColumns), or explicit (indexes.dictionary)
- * - Secondary indexes: inverted, FST, IFST, range, text, JSON, bloom filter
- * - Column data types: STRING (SV), INT (SV), INT (MV), FLOAT (SV)
- *
- * The core invariant under test: any column that uses an index requiring a dictionary
- * (inverted, FST, IFST) must have an explicit dictionary config when the forward index is raw.
- */
+/// Exhaustive tests for all valid and invalid combinations of:
+/// - Forward index encoding: DICTIONARY vs RAW
+/// - Dictionary: enabled (default), disabled (noDictionaryColumns), or explicit (indexes.dictionary)
+/// - Secondary indexes: inverted, FST, IFST, range, text, JSON, bloom filter
+/// - Column data types: STRING (SV), INT (SV), INT (MV), FLOAT (SV)
+///
+/// The core invariant under test: any column that uses an index requiring a dictionary
+/// (inverted, FST, IFST) must have an explicit dictionary config when the forward index is raw.
 public class IndexCombinationValidationTest {
 
   private static final String TABLE_NAME = "testTable";
@@ -65,14 +63,14 @@ public class IndexCombinationValidationTest {
 
   // ----- helpers -----
 
-  /** Build a FieldConfig with an explicit dictionary node in the indexes section. */
+  /// Build a FieldConfig with an explicit dictionary node in the indexes section.
   private static FieldConfig rawWithExplicitDict(String col, List<IndexType> indexes) {
     ObjectNode indexesNode = JsonUtils.newObjectNode();
     indexesNode.set("dictionary", JsonUtils.newObjectNode());
     return new FieldConfig(col, EncodingType.RAW, null, indexes, null, null, indexesNode, null, null);
   }
 
-  /** Validate and expect success. */
+  /// Validate and expect success.
   private static void assertValid(TableConfig tableConfig) {
     try {
       TableConfigUtils.validate(tableConfig, SCHEMA);
@@ -81,7 +79,7 @@ public class IndexCombinationValidationTest {
     }
   }
 
-  /** Validate and expect failure containing the given message fragment. */
+  /// Validate and expect failure containing the given message fragment.
   private static void assertInvalid(TableConfig tableConfig, String errorFragment) {
     try {
       TableConfigUtils.validate(tableConfig, SCHEMA);

@@ -62,56 +62,46 @@ public class MultiValueResult<T> {
     _nulls = nulls;
   }
 
-  /**
-   * Create a MultiValueResult with optional nulls information.
-   *
-   * @param values The values array (int[], long[], float[], double[])
-   * @param nulls BitSet where set bits indicate null elements,
-   *              or null if no nulls exist in the range
-   * @param <T> The array type
-   * @return A new MultiValueResult instance
-   */
+  /// Create a MultiValueResult with optional nulls information.
+  ///
+  /// @param values The values array (int\[\], long\[\], float\[\], double\[\])
+  /// @param nulls BitSet where set bits indicate null elements,
+  ///              or null if no nulls exist in the range
+  /// @param <T> The array type
+  /// @return A new MultiValueResult instance
   public static <T> MultiValueResult<T> of(T values, @Nullable BitSet nulls) {
     return new MultiValueResult<>(values, nulls);
   }
 
-  /**
-   * Check if any elements in this result are null.
-   *
-   * @return true if there are null elements, false otherwise
-   */
+  /// Check if any elements in this result are null.
+  ///
+  /// @return true if there are null elements, false otherwise
   public boolean hasNulls() {
     return _nulls != null;
   }
 
-  /**
-   * Check if a specific element is null.
-   *
-   * @param index The index of the element to check
-   * @return true if the element is null, false if it's valid
-   */
+  /// Check if a specific element is null.
+  ///
+  /// @param index The index of the element to check
+  /// @return true if the element is null, false if it's valid
   public boolean isNull(int index) {
     return _nulls != null && _nulls.get(index);
   }
 
-  /**
-   * Get the values array.
-   *
-   * <p>Note: If {@link #hasNulls()} returns true, some elements in this array
-   * may contain default values (0 for numeric types) for null positions.
-   * Use {@link #isNull(int)} to check individual elements.
-   *
-   * @return The values array
-   */
+  /// Get the values array.
+  ///
+  /// Note: If [#hasNulls()] returns true, some elements in this array
+  /// may contain default values (0 for numeric types) for null positions.
+  /// Use [#isNull(int)] to check individual elements.
+  ///
+  /// @return The values array
   public T getValues() {
     return _values;
   }
 
-  /**
-   * Get the nulls BitSet.
-   *
-   * @return The nulls BitSet where set bits indicate null elements, or null if no nulls exist
-   */
+  /// Get the nulls BitSet.
+  ///
+  /// @return The nulls BitSet where set bits indicate null elements, or null if no nulls exist
   @Nullable
   public BitSet getNulls() {
     return _nulls;

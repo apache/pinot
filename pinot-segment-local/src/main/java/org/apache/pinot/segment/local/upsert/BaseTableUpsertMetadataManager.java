@@ -148,10 +148,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     initCustomVariables();
   }
 
-  /**
-   * Can be overridden to initialize custom variables after other variables are set but before preload starts. This is
-   * needed because preload will load segments which might require these custom variables.
-   */
+  /// Can be overridden to initialize custom variables after other variables are set but before preload starts. This is
+  /// needed because preload will load segments which might require these custom variables.
   protected void initCustomVariables() {
   }
 

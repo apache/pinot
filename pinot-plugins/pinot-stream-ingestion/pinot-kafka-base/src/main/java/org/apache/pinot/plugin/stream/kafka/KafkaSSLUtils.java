@@ -43,11 +43,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * SSL utils class which helps in initialization of Kafka client SSL configuration. The class can install the
- * provided server certificate enabling one-way SSL or it can install the server certificate and the
- * client certificates enabling two-way SSL.
- */
+/// SSL utils class which helps in initialization of Kafka client SSL configuration. The class can install the
+/// provided server certificate enabling one-way SSL or it can install the server certificate and the
+/// client certificates enabling two-way SSL.
 public class KafkaSSLUtils {
 
   private KafkaSSLUtils() {

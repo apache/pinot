@@ -22,9 +22,7 @@ import java.nio.ByteBuffer;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Helper wrapper class for {@link MutableRoaringBitmap} to make it thread-safe.
- */
+/// Helper wrapper class for [MutableRoaringBitmap] to make it thread-safe.
 public class ThreadSafeMutableRoaringBitmap {
   private final MutableRoaringBitmap _mutableRoaringBitmap;
 

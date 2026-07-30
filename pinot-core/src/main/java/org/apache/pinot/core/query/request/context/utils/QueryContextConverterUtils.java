@@ -43,16 +43,12 @@ public class QueryContextConverterUtils {
   private QueryContextConverterUtils() {
   }
 
-  /**
-   * Converts the given query into a {@link QueryContext}.
-   */
+  /// Converts the given query into a [QueryContext].
   public static QueryContext getQueryContext(String query) {
     return getQueryContext(CalciteSqlParser.compileToPinotQuery(query));
   }
 
-  /**
-   * Converts the given {@link PinotQuery} into a {@link QueryContext}.
-   */
+  /// Converts the given [PinotQuery] into a [QueryContext].
   public static QueryContext getQueryContext(PinotQuery pinotQuery) {
     // FROM
     String tableName;

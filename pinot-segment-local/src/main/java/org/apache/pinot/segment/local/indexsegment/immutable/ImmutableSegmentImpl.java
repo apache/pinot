@@ -167,9 +167,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
   }
 
-  /**
-   * Enables upsert for this segment. It should be called before the segment getting queried.
-   */
+  /// Enables upsert for this segment. It should be called before the segment getting queried.
   public void enableUpsert(PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds) {
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
@@ -237,9 +235,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     return getSnapshotFile(fileName).exists();
   }
 
-  /**
-   * if re processing or reload is needed on a segment then return true
-   */
+  /// if re processing or reload is needed on a segment then return true
   public boolean isReloadNeeded(IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     return ImmutableSegmentLoader.needPreprocess(_segmentDirectory, indexLoadingConfig);
@@ -424,10 +420,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     return _hasDeletedDocIds;
   }
 
-  /**
-   * Marks that this segment has externally-supplied deleted docs -- excluded at query time but still counted in
-   * total docs -- so selection LIMIT pruning skips it.
-   */
+  /// Marks that this segment has externally-supplied deleted docs -- excluded at query time but still counted in
+  /// total docs -- so selection LIMIT pruning skips it.
   public void setHasDeletedDocIds(boolean hasDeletedDocIds) {
     _hasDeletedDocIds = hasDeletedDocIds;
   }

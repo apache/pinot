@@ -34,10 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Get the size information details from the server. Only the servers returning success are returned by the method
- * For servers returning errors (http error or otherwise), no entry is created in the return map
- */
+/// Get the size information details from the server. Only the servers returning success are returned by the method
+/// For servers returning errors (http error or otherwise), no entry is created in the return map
 public class ServerTableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableSizeReader.class);
 

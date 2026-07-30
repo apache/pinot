@@ -21,16 +21,14 @@ package org.apache.pinot.segment.local.function;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 
 
-/**
- * Deprecated forwarding wrapper for the legacy time spec evaluator type name.
- *
- * <p>Instances inherit the thread-safety characteristics of
- * {@link org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator}.
- *
- * <p>TODO: Delete this shim after Pinot 1.6.0 is released.
- *
- * @deprecated Use {@link org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator} instead.
- */
+/// Deprecated forwarding wrapper for the legacy time spec evaluator type name.
+///
+/// Instances inherit the thread-safety characteristics of
+/// [org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator].
+///
+/// TODO: Delete this shim after Pinot 1.6.0 is released.
+///
+/// @deprecated Use [org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator] instead.
 @Deprecated
 public class TimeSpecFunctionEvaluator extends org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator
     implements FunctionEvaluator {

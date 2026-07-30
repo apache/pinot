@@ -29,10 +29,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code DimensionValueTransformer} class will transform certain dimension values by substituting the
- * existing value for that dimension with the 'defaultNullValue' from its 'fieldSpec'.
- */
+/// The `DimensionValueTransformer` class will transform certain dimension values by substituting the
+/// existing value for that dimension with the 'defaultNullValue' from its 'fieldSpec'.
 public class DimensionValueTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(DimensionValueTransformer.class);
 

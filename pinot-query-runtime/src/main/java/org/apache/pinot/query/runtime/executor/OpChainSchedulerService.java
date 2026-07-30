@@ -286,7 +286,7 @@ public class OpChainSchedulerService {
     });
   }
 
-  /** Returns the number of requestIds with at least one active opchain. Exposed for tests only. */
+  /// Returns the number of requestIds with at least one active opchain. Exposed for tests only.
   @VisibleForTesting
   int activeRequestCount() {
     return _executionContextByRequest.size();
@@ -306,37 +306,31 @@ public class OpChainSchedulerService {
     }
   }
 
-  /**
-   * Registers an {@link OpChainCompletionListener} that fires once per opchain finishing for the given request id.
-   * Used by the stream-mode stats reporting path. Returns the previously-registered listener, or {@code null} if
-   * none — callers should always pass {@code null}.
-   */
+  /// Registers an [OpChainCompletionListener] that fires once per opchain finishing for the given request id.
+  /// Used by the stream-mode stats reporting path. Returns the previously-registered listener, or `null` if
+  /// none — callers should always pass `null`.
   @Nullable
   public OpChainCompletionListener registerCompletionListener(long requestId, OpChainCompletionListener listener) {
     return _completionListeners.put(requestId, listener);
   }
 
-  /**
-   * Removes any registered listener for the given request id. Idempotent — safe to call even if no listener was
-   * registered. Returns the removed listener, or {@code null}.
-   */
+  /// Removes any registered listener for the given request id. Idempotent — safe to call even if no listener was
+  /// registered. Returns the removed listener, or `null`.
   @Nullable
   public OpChainCompletionListener unregisterCompletionListener(long requestId) {
     return _completionListeners.remove(requestId);
   }
 
-  /**
-   * Cancels all opchains registered for {@code requestId} by terminating the shared
-   * {@link QueryExecutionContext} for that request. The cancel is O(1) via a direct context look-up; no
-   * per-opchain scan is needed.
-   *
-   * <p>Stats for cancelled opchains are NOT returned synchronously. In stream mode, each cancelled opchain
-   * delivers its (partial) stats asynchronously via {@link OpChainCompletionListener#onOpChainComplete} once the
-   * opchain finishes after being interrupted. In legacy mode, cancel-path stats are not collected.
-   *
-   * <p>If no opchains are currently registered (pre-registration cancel race), the requestId is marked in the
-   * cancelled-query cache so that any future registrations for that requestId are immediately rejected.
-   */
+  /// Cancels all opchains registered for `requestId` by terminating the shared
+  /// [QueryExecutionContext] for that request. The cancel is O(1) via a direct context look-up; no
+  /// per-opchain scan is needed.
+  ///
+  /// Stats for cancelled opchains are NOT returned synchronously. In stream mode, each cancelled opchain
+  /// delivers its (partial) stats asynchronously via [OpChainCompletionListener#onOpChainComplete] once the
+  /// opchain finishes after being interrupted. In legacy mode, cancel-path stats are not collected.
+  ///
+  /// If no opchains are currently registered (pre-registration cancel race), the requestId is marked in the
+  /// cancelled-query cache so that any future registrations for that requestId are immediately rejected.
   public void cancel(long requestId) {
     // Acquire the write lock BEFORE eviction so that register()'s readLock cannot overlap with the window
     // between the context eviction and the cancelled-query cache write. Without the write lock first, a
@@ -376,9 +370,7 @@ public class OpChainSchedulerService {
     }
   }
 
-  /**
-   * Counts the number of operators in the tree rooted at the given operator.
-   */
+  /// Counts the number of operators in the tree rooted at the given operator.
   private int countOperators(MultiStageOperator root) {
     // This stack will have at most 2 elements on most stages given that there is only 1 join in a stage
     // and joins only have 2 children.

@@ -33,9 +33,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * The {@link BaseFilterOperator} class is the base class for all filter operators.
- */
+/// The [BaseFilterOperator] class is the base class for all filter operators.
 public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   protected final int _numDocs;
   protected final boolean _nullHandlingEnabled;
@@ -47,51 +45,37 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     _nullHandlingEnabled = nullHandlingEnabled;
   }
 
-  /**
-   * Returns {@code true} if the result is always empty, {@code false} otherwise.
-   */
+  /// Returns `true` if the result is always empty, `false` otherwise.
   public boolean isResultEmpty() {
     return false;
   }
 
-  /**
-   * Returns {@code true} if the result matches all the records, {@code false} otherwise.
-   */
+  /// Returns `true` if the result matches all the records, `false` otherwise.
   public boolean isResultMatchingAll() {
     return false;
   }
 
-  /**
-   * Returns {@code true} if the filter has an optimized count implementation.
-   */
+  /// Returns `true` if the filter has an optimized count implementation.
   public boolean canOptimizeCount() {
     return false;
   }
 
-  /**
-   * @return the number of matching docs, or throws if it cannot produce this count.
-   */
+  /// @return the number of matching docs, or throws if it cannot produce this count.
   public int getNumMatchingDocs() {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @return true if the filter operator can produce a bitmap of docIds
-   */
+  /// @return true if the filter operator can produce a bitmap of docIds
   public boolean canProduceBitmaps() {
     return false;
   }
 
-  /**
-   * @return bitmaps of matching docIds
-   */
+  /// @return bitmaps of matching docIds
   public BitmapCollection getBitmaps() {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Exact filtered docIds for the operator. {@code null} indicates match-all.
-   */
+  /// Exact filtered docIds for the operator. `null` indicates match-all.
   public static final class FilteredDocIds {
     @Nullable
     private final ImmutableRoaringBitmap _docIds;
@@ -112,10 +96,8 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     }
   }
 
-  /**
-   * Returns the exact filtered docIds for the operator. Implementations that cannot produce a bitmap directly are
-   * materialized once through the filter operator itself so callers can reuse the same primitive.
-   */
+  /// Returns the exact filtered docIds for the operator. Implementations that cannot produce a bitmap directly are
+  /// materialized once through the filter operator itself so callers can reuse the same primitive.
   public FilteredDocIds getFilteredDocIds() {
     if (_filteredDocIds != null) {
       return _filteredDocIds;
@@ -149,21 +131,15 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     return new FilterBlock(getTrues());
   }
 
-  /**
-   * @return document IDs in which the predicate evaluates to true.
-   */
+  /// @return document IDs in which the predicate evaluates to true.
   protected abstract BlockDocIdSet getTrues();
 
-  /**
-   * @return document IDs in which the predicate evaluates to NULL.
-   */
+  /// @return document IDs in which the predicate evaluates to NULL.
   protected BlockDocIdSet getNulls() {
     return EmptyDocIdSet.getInstance();
   }
 
-  /**
-   * @return document IDs in which the predicate evaluates to false.
-   */
+  /// @return document IDs in which the predicate evaluates to false.
   protected BlockDocIdSet getFalses() {
     BlockDocIdSet trues = getTrues();
     if (trues instanceof MatchAllDocIdSet) {

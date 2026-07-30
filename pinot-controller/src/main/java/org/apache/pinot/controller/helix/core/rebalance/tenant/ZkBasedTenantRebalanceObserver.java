@@ -216,14 +216,12 @@ public class ZkBasedTenantRebalanceObserver {
     }
   }
 
-  /**
-   * Cancel the tenant rebalance job.
-   * @param isCancelledByUser true if the cancellation is triggered by user, false if it is triggered by system
-   *                           (e.g. tenant rebalance checker retrying a job)
-   * @return a pair of "list of TABLE rebalance job IDs that are successfully cancelled" and "whether the TENANT
-   * rebalance
-   * job cancellation is successful"
-   */
+  /// Cancel the tenant rebalance job.
+  /// @param isCancelledByUser true if the cancellation is triggered by user, false if it is triggered by system
+  ///                           (e.g. tenant rebalance checker retrying a job)
+  /// @return a pair of "list of TABLE rebalance job IDs that are successfully cancelled" and "whether the TENANT
+  /// rebalance
+  /// job cancellation is successful"
   public Pair<List<String>, Boolean> cancelJob(boolean isCancelledByUser) {
     List<String> cancelledJobs = new ArrayList<>();
     try {

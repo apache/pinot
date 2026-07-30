@@ -24,34 +24,22 @@ import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockValSet;
 
 
-/**
- * The {@code ValueBlock} contains a block of values for multiple expressions.
- */
+/// The `ValueBlock` contains a block of values for multiple expressions.
 public interface ValueBlock extends Block {
 
-  /**
-   * Returns the number of documents within the block.
-   */
+  /// Returns the number of documents within the block.
   int getNumDocs();
 
-  /**
-   * Returns the document ids from the segment, or {@code null} if it is not available.
-   */
+  /// Returns the document ids from the segment, or `null` if it is not available.
   @Nullable
   int[] getDocIds();
 
-  /**
-   * Returns the values for a given expression.
-   */
+  /// Returns the values for a given expression.
   BlockValSet getBlockValueSet(ExpressionContext expression);
 
-  /**
-   * Returns the values for a given column (identifier).
-   */
+  /// Returns the values for a given column (identifier).
   BlockValSet getBlockValueSet(String column);
 
-  /**
-   * Returns the values for a given column path.
-   */
+  /// Returns the values for a given column path.
   BlockValSet getBlockValueSet(String[] paths);
 }

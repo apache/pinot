@@ -540,10 +540,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
   }
 
-  /**
-   * This test is added because SSE engine supports it and is used in production.
-   * Make sure that the difference in support is well-documented.
-   */
+  /// This test is added because SSE engine supports it and is used in production.
+  /// Make sure that the difference in support is well-documented.
   @Test
   void testDualWithNotExistsTableMSE()
       throws Exception {
@@ -1182,10 +1180,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertFalse(jsonNode.get("exceptions").isEmpty());
   }
 
-  /**
-   * Helper method to verify the result of a query that is assumed to return a single column with the same value for
-   * all the rows. Only the first row value is checked.
-   */
+  /// Helper method to verify the result of a query that is assumed to return a single column with the same value for
+  /// all the rows. Only the first row value is checked.
   private void checkSingleColumnSameValueResult(JsonNode result, long expectedRows, String type,
       Object expectedValue) {
     assertEquals(result.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);

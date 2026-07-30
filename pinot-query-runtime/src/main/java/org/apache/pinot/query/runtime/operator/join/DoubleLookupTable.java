@@ -25,9 +25,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 
-/**
- * The {@code DoubleLookupTable} is a lookup table for double keys.
- */
+/// The `DoubleLookupTable` is a lookup table for double keys.
 @SuppressWarnings("unchecked")
 public class DoubleLookupTable extends PrimitiveLookupTable {
   private final Double2ObjectOpenHashMap<Object> _lookupTable = new Double2ObjectOpenHashMap<>(INITIAL_CAPACITY);

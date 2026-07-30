@@ -353,9 +353,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     return instanceResponse;
   }
 
-  /**
-   * Get a mapping of explain plan depth to a unique list of explain plans for each depth
-   */
+  /// Get a mapping of explain plan depth to a unique list of explain plans for each depth
   private static Map<Integer, List<ExplainPlanRows>> getAllSegmentsUniqueExplainPlanRowData(Operator root) {
     Map<Integer, List<ExplainPlanRows>> operatorDepthToRowDataMap = new HashMap<>();
     if (root == null) {
@@ -461,10 +459,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
   }
 
-  /**
-   * Handles the subquery in the given query.
-   * <p>Currently only supports subquery within the filter.
-   */
+  /// Handles the subquery in the given query.
+  ///
+  /// Currently only supports subquery within the filter.
   private void handleSubquery(QueryContext queryContext, TableExecutionInfo tableExecutionInfo,
       TimerContext timerContext, ExecutorService executorService)
       throws Exception {
@@ -474,10 +471,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
   }
 
-  /**
-   * Handles the subquery in the given filter.
-   * <p>Currently only supports subquery within the lhs of the predicate.
-   */
+  /// Handles the subquery in the given filter.
+  ///
+  /// Currently only supports subquery within the lhs of the predicate.
   private void handleSubquery(FilterContext filter, TableExecutionInfo executionInfo, TimerContext timerContext,
       ExecutorService executorService, long endTimeMs)
       throws Exception {
@@ -491,13 +487,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
   }
 
-  /**
-   * Handles the subquery in the given expression.
-   * <p>When subquery is detected, first executes the subquery on the given segments and gets the response, then
-   * rewrites the expression with the subquery response.
-   * <p>Currently only supports ID_SET subquery within the IN_PARTITIONED_SUBQUERY transform function, which will be
-   * rewritten to an IN_ID_SET transform function.
-   */
+  /// Handles the subquery in the given expression.
+  ///
+  /// When subquery is detected, first executes the subquery on the given segments and gets the response, then
+  /// rewrites the expression with the subquery response.
+  ///
+  /// Currently only supports ID_SET subquery within the IN_PARTITIONED_SUBQUERY transform function, which will be
+  /// rewritten to an IN_ID_SET transform function.
   private void handleSubquery(ExpressionContext expression, TableExecutionInfo executionInfo,
       TimerContext timerContext, ExecutorService executorService, long endTimeMs)
       throws Exception {
@@ -544,11 +540,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
   }
 
-  /**
-   * Initializes scan-based query killing for this query. Sets up a {@link QueryScanCostContext}
-   * on the current thread's {@link QueryExecutionContext} so operators can push scan deltas, and
-   * caches the resolved per-query strategy so table-level overrides are applied only once.
-   */
+  /// Initializes scan-based query killing for this query. Sets up a [QueryScanCostContext]
+  /// on the current thread's [QueryExecutionContext] so operators can push scan deltas, and
+  /// caches the resolved per-query strategy so table-level overrides are applied only once.
   private void initScanBasedKilling(ServerQueryRequest queryRequest, String tableNameWithType) {
     QueryKillingManager killingManager = QueryKillingManager.getInstance();
     if (killingManager == null) {

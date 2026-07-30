@@ -24,19 +24,17 @@ import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
 
-/**
- * Forward index writer that extends {@link VarByteChunkForwardIndexWriterV5} and delta-encodes the chunk header
- * when compression is enabled, writing individual entry sizes instead of cumulative byte offsets.
- *
- * - **V4 chunk header**: `[numDocs][offset0][offset1]...[offsetN-1]` — cumulative byte offsets.
- * - **V6 chunk header** (compressed): `[numDocs][size0][size1]...[sizeN-1]` — individual entry sizes.
- *   Sizes compress dramatically better (e.g. 11x with ZSTD) because they are small, repetitive values.
- *   The reader converts sizes back to offsets at read time with a single forward pass.
- * - **PASS_THROUGH**: delta encoding provides no benefit, so V6 falls back to V4's offset-based header.
- *
- * @see VarByteChunkForwardIndexWriterV4
- * @see VarByteChunkForwardIndexWriterV5
- */
+/// Forward index writer that extends [VarByteChunkForwardIndexWriterV5] and delta-encodes the chunk header
+/// when compression is enabled, writing individual entry sizes instead of cumulative byte offsets.
+///
+/// - \*\*V4 chunk header\*\*: `\[numDocs\]\[offset0\]\[offset1\]...\[offsetN-1\]` — cumulative byte offsets.
+/// - \*\*V6 chunk header\*\* (compressed): `\[numDocs\]\[size0\]\[size1\]...\[sizeN-1\]` — individual entry sizes.
+///   Sizes compress dramatically better (e.g. 11x with ZSTD) because they are small, repetitive values.
+///   The reader converts sizes back to offsets at read time with a single forward pass.
+/// - \*\*PASS_THROUGH\*\*: delta encoding provides no benefit, so V6 falls back to V4's offset-based header.
+///
+/// @see VarByteChunkForwardIndexWriterV4
+/// @see VarByteChunkForwardIndexWriterV5
 @NotThreadSafe
 public class VarByteChunkForwardIndexWriterV6 extends VarByteChunkForwardIndexWriterV5 {
   public static final int VERSION = 6;
@@ -54,11 +52,9 @@ public class VarByteChunkForwardIndexWriterV6 extends VarByteChunkForwardIndexWr
     return VERSION;
   }
 
-  /**
-   * When compression is enabled, delta-encodes cumulative offsets into individual entry sizes
-   * directly into the chunk buffer for better compression. When PASS_THROUGH (no compression),
-   * delegates to V4's offset-based header since delta encoding provides no benefit.
-   */
+  /// When compression is enabled, delta-encodes cumulative offsets into individual entry sizes
+  /// directly into the chunk buffer for better compression. When PASS_THROUGH (no compression),
+  /// delegates to V4's offset-based header since delta encoding provides no benefit.
   @Override
   protected void writeChunkHeader(int numDocs, int[] offsets, int limit) {
     if (!_deltaEncoding) {

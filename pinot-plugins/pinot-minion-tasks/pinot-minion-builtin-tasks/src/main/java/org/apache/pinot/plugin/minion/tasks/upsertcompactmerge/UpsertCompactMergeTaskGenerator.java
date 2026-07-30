@@ -261,11 +261,9 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  /**
-   * Determines which segments are eligible for deletion or compact-merge. For each segment, replicas are validated
-   * via {@code consensusMode} (CRC match, server health, validDocIds agreement); segments that fail are skipped.
-   * Segments with zero valid docs are marked for deletion, the rest are grouped by partition for compaction.
-   */
+  /// Determines which segments are eligible for deletion or compact-merge. For each segment, replicas are validated
+  /// via `consensusMode` (CRC match, server health, validDocIds agreement); segments that fail are skipped.
+  /// Segments with zero valid docs are marked for deletion, the rest are grouped by partition for compaction.
   @VisibleForTesting
   public static SegmentSelectionResult processValidDocIdsMetadata(String tableNameWithType,
       Map<String, String> taskConfigs, Map<String, SegmentZKMetadata> candidateSegmentsMap,

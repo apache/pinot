@@ -162,24 +162,22 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 }))
 @Path("/")
 public class PinotTableRestletResource {
-  /**
-   * URI Mappings:
-   * - "/tables", "/tables/": List all the tables
-   * - "/tables/{tableName}", "/tables/{tableName}/": List config for specified table.
-   *
-   * - "/tables/{tableName}?state={state}"
-   *   Set the state for the specified {tableName} to the specified {state} (enable|disable|drop).
-   *
-   * - "/tables/{tableName}?type={type}"
-   *   List all tables of specified type, type can be one of {offline|realtime}.
-   *
-   *   Set the state for the specified {tableName} to the specified {state} (enable|disable|drop).
-   *   * - "/tables/{tableName}?state={state}&amp;type={type}"
-   *
-   *   Set the state for the specified {tableName} of specified type to the specified {state} (enable|disable|drop).
-   *   Type here is type of the table, one of 'offline|realtime'.
-   * {@inheritDoc}
-   */
+  /// URI Mappings:
+  /// - "/tables", "/tables/": List all the tables
+  /// - "/tables/{tableName}", "/tables/{tableName}/": List config for specified table.
+  ///
+  /// - "/tables/{tableName}?state={state}"
+  ///   Set the state for the specified {tableName} to the specified {state} (enable|disable|drop).
+  ///
+  /// - "/tables/{tableName}?type={type}"
+  ///   List all tables of specified type, type can be one of {offline|realtime}.
+  ///
+  ///   Set the state for the specified {tableName} to the specified {state} (enable|disable|drop).
+  ///   \* - "/tables/{tableName}?state={state}&amp;type={type}"
+  ///
+  ///   Set the state for the specified {tableName} of specified type to the specified {state} (enable|disable|drop).
+  ///   Type here is type of the table, one of 'offline|realtime'.
+  /// {@inheritDoc}
 
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotTableRestletResource.class);
 
@@ -210,10 +208,8 @@ public class PinotTableRestletResource {
   @Inject
   HttpClientConnectionManager _connectionManager;
 
-  /**
-   * API to create a table. Before adding, validations will be done (min number of replicas, checking offline and
-   * realtime table configs match, checking for tenants existing).
-   */
+  /// API to create a table. Before adding, validations will be done (min number of replicas, checking offline and
+  /// realtime table configs match, checking for tenants existing).
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
@@ -428,13 +424,11 @@ public class PinotTableRestletResource {
     return streamMetadataList;
   }
 
-  /**
-   * Helper method to tweak the realtime table config. This method is used to set the broker and server tenants, and
-   * optionally replace the pool tags in the instance assignment config.
-   *
-   * @param realtimeTableConfigNode The JSON object representing the realtime table config.
-   * @param copyTablePayload The payload containing tenant and tag pool replacement information.
-   */
+  /// Helper method to tweak the realtime table config. This method is used to set the broker and server tenants, and
+  /// optionally replace the pool tags in the instance assignment config.
+  ///
+  /// @param realtimeTableConfigNode The JSON object representing the realtime table config.
+  /// @param copyTablePayload The payload containing tenant and tag pool replacement information.
   @VisibleForTesting
   static void tweakRealtimeTableConfig(ObjectNode realtimeTableConfigNode, CopyTablePayload copyTablePayload) {
     String brokerTenant = copyTablePayload.getBrokerTenant();
@@ -1064,11 +1058,9 @@ public class PinotTableRestletResource {
     }
   }
 
-  /**
-   * Waits for jobId to be persisted or the rebalance to complete using a retry policy.
-   * Tables with 100k+ segments take up to a few seconds for the jobId to persist. This ensures the jobId is present
-   * before returning the jobId to the caller, so they can correctly poll the jobId.
-   */
+  /// Waits for jobId to be persisted or the rebalance to complete using a retry policy.
+  /// Tables with 100k+ segments take up to a few seconds for the jobId to persist. This ensures the jobId is present
+  /// before returning the jobId to the caller, so they can correctly poll the jobId.
   public boolean waitForRebalanceToPersist(
       String jobId, String tableNameWithType, Future<RebalanceResult> rebalanceResultFuture) {
     try {
@@ -1470,13 +1462,11 @@ public class PinotTableRestletResource {
     return JsonUtils.objectToJsonNode(tableIndexMetadataResponse);
   }
 
-  /**
-   * This is a helper method to get the metadata for all segments for a given table name.
-   * @param tableNameWithType name of the table along with its type
-   * @param columns name of the columns
-   * @param numReplica num or replica for the table
-   * @return aggregated metadata of the table segments
-   */
+  /// This is a helper method to get the metadata for all segments for a given table name.
+  /// @param tableNameWithType name of the table along with its type
+  /// @param columns name of the columns
+  /// @param numReplica num or replica for the table
+  /// @return aggregated metadata of the table segments
   private JsonNode getAggregateMetadataFromServer(String tableNameWithType, List<String> columns, int numReplica,
       boolean compressionStatsEnabled, boolean includeColumnCompressionStats)
       throws InvalidConfigException, IOException {

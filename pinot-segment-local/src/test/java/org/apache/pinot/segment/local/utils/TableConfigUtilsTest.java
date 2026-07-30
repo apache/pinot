@@ -3265,15 +3265,13 @@ public class TableConfigUtilsTest {
     }
   }
 
-  /**
-   * Utility function that can be used to write simple tests that modify the table config and schema.
-   *
-   * This function has been designed to test the nullability of the partial upsert config, but feel free to use it to
-   * other tests as well (probably changing the method name).
-   *
-   * @param configureFun A BiConsumer that takes a TableConfigBuilder and a Schema.SchemaBuilder and modifies them
-   *                   accordingly to what the test needs.
-   */
+  /// Utility function that can be used to write simple tests that modify the table config and schema.
+  ///
+  /// This function has been designed to test the nullability of the partial upsert config, but feel free to use it to
+  /// other tests as well (probably changing the method name).
+  ///
+  /// @param configureFun A BiConsumer that takes a TableConfigBuilder and a Schema.SchemaBuilder and modifies them
+  ///                   accordingly to what the test needs.
   private void testPartialUpsertConfigNullability(BiConsumer<TableConfigBuilder, Schema.SchemaBuilder> configureFun) {
     Map<String, String> streamConfigs = getStreamConfigs();
 
@@ -3305,11 +3303,9 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
   }
 
-  /**
-   * Tests that the partial upsert config fails when the null handling is disabled.
-   *
-   * This means that both table config and schema nullability is turned off.
-   */
+  /// Tests that the partial upsert config fails when the null handling is disabled.
+  ///
+  /// This means that both table config and schema nullability is turned off.
   @Test
   public void partialUpsertConfigFailWhenNotNullableColumns() {
     try {
@@ -3322,11 +3318,9 @@ public class TableConfigUtilsTest {
     }
   }
 
-  /**
-   * Tests that the partial upsert config succeeds when table null handling is used.
-   *
-   * This means that schema nullability is turned off, but table null handling is turned on.
-   */
+  /// Tests that the partial upsert config succeeds when table null handling is used.
+  ///
+  /// This means that schema nullability is turned off, but table null handling is turned on.
   @Test
   public void partialUpsertConfigSuccessWhenUsingTableLevelNullability() {
     testPartialUpsertConfigNullability((tableConfigBuilder, schemaBuilder) -> {
@@ -3335,11 +3329,9 @@ public class TableConfigUtilsTest {
     });
   }
 
-  /**
-   * Tests that the partial upsert config succeeds when column null handling is used.
-   *
-   * This means that schema nullability is turned on, but table null handling can be either true or false.
-   */
+  /// Tests that the partial upsert config succeeds when column null handling is used.
+  ///
+  /// This means that schema nullability is turned on, but table null handling can be either true or false.
   @Test
   public void partialUpsertConfigSuccessWhenUsingColumnLevelNullability() {
     testPartialUpsertConfigNullability((tableConfigBuilder, schemaBuilder) -> {

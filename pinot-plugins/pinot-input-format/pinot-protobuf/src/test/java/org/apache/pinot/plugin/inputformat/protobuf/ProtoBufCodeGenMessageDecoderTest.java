@@ -153,14 +153,11 @@ public class ProtoBufCodeGenMessageDecoderTest {
     assertEquals(((Map<String, Object>) destination.getValue("sample_record")).get("id"), 18);
   }
 
-  /**
-   * For each case, we have:
-   * <ol>
-   *   <li>The name of the field to change</li>
-   *   <li>A valid protobuf value which is not the default field value</li>
-   *   <li>The expected pinot value</li>
-   * </ol>
-   */
+  /// For each case, we have:
+  ///
+  /// 1. The name of the field to change
+  /// 2. A valid protobuf value which is not the default field value
+  /// 3. The expected pinot value
   @DataProvider(name = "normalCases")
   public Object[][] normalCases() {
     return new Object[][]{
@@ -187,14 +184,11 @@ public class ProtoBufCodeGenMessageDecoderTest {
     };
   }
 
-  /**
-   * For each case, we have:
-   * <ol>
-   *   <li>The name of the field to change</li>
-   *   <li>A valid protobuf value which <b>is</b> the default field value</li>
-   *   <li>The expected pinot value</li>
-   * </ol>
-   */
+  /// For each case, we have:
+  ///
+  /// 1. The name of the field to change
+  /// 2. A valid protobuf value which **is** the default field value
+  /// 3. The expected pinot value
   @Test(dataProvider = "normalCases")
   public void whenNormalCases(String fieldName, Object protoVal, Object pinotVal)
       throws Exception {
@@ -209,13 +203,10 @@ public class ProtoBufCodeGenMessageDecoderTest {
     Assert.assertEquals(row.getValue(fd.getName()), pinotVal);
   }
 
-  /**
-   * For each case, we have:
-   * <ol>
-   *   <li>The name of the field read</li>
-   *   <li>The expected pinot value when the value is not set</li>
-   * </ol>
-   */
+  /// For each case, we have:
+  ///
+  /// 1. The name of the field read
+  /// 2. The expected pinot value when the value is not set
   @DataProvider(name = "defaultCases")
   public Object[][] defaultCases() {
     return new Object[][]{

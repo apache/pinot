@@ -672,10 +672,8 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Download snapshot for the given immutable segment for upsert table. This endpoint is used when get snapshot from
-   * peer to avoid recompute when reload segments.
-   */
+  /// Download snapshot for the given immutable segment for upsert table. This endpoint is used when get snapshot from
+  /// peer to avoid recompute when reload segments.
   @Deprecated
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -905,21 +903,19 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Deprecated. Use /segments/{realtimeTableName}/{segmentName}/uploadLLCSegment instead.
-   * Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used
-   * when segment store copy is unavailable for committed low level consumer segments.
-   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
-   * to upload it.
-   *
-   * @see <a href="https://tinyurl.com/f63ru4sb></a>
-   * @param realtimeTableName table name with type.
-   * @param segmentName name of the segment to be uploaded
-   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
-   *                  would be used.
-   * @return full url where the segment is uploaded
-   * @throws Exception if an error occurred during the segment upload.
-   */
+  /// Deprecated. Use /segments/{realtimeTableName}/{segmentName}/uploadLLCSegment instead.
+  /// Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used
+  /// when segment store copy is unavailable for committed low level consumer segments.
+  /// Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
+  /// to upload it.
+  ///
+  /// @see <a href="https://tinyurl.com/f63ru4sb></a>
+  /// @param realtimeTableName table name with type.
+  /// @param segmentName name of the segment to be uploaded
+  /// @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+  ///                  would be used.
+  /// @return full url where the segment is uploaded
+  /// @throws Exception if an error occurred during the segment upload.
   @Deprecated
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/upload")
@@ -978,21 +974,19 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Upload a low level consumer segment to segment store and return the segment download url, crc and
-   * other segment metadata. This endpoint is used when segment store copy is unavailable for committed
-   * low level consumer segments.
-   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
-   * to upload it.
-   *
-   * @see <a href="https://tinyurl.com/f63ru4sb></a>
-   * @param realtimeTableNameWithType table name with type.
-   * @param segmentName name of the segment to be uploaded
-   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
-   *                  would be used.
-   * @return full url where the segment is uploaded, crc, segmentName. Can add more segment metadata in the future.
-   * @throws Exception if an error occurred during the segment upload.
-   */
+  /// Upload a low level consumer segment to segment store and return the segment download url, crc and
+  /// other segment metadata. This endpoint is used when segment store copy is unavailable for committed
+  /// low level consumer segments.
+  /// Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
+  /// to upload it.
+  ///
+  /// @see <a href="https://tinyurl.com/f63ru4sb></a>
+  /// @param realtimeTableNameWithType table name with type.
+  /// @param segmentName name of the segment to be uploaded
+  /// @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+  ///                  would be used.
+  /// @return full url where the segment is uploaded, crc, segmentName. Can add more segment metadata in the future.
+  /// @throws Exception if an error occurred during the segment upload.
   @Deprecated
   @POST
   @Path("/segments/{realtimeTableNameWithType}/{segmentName}/uploadLLCSegment")
@@ -1057,20 +1051,18 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Upload a real-time committed segment to segment store and return the segment ZK metadata in json format.
-   * This endpoint is used when segment store copy is unavailable for real-time committed segments.
-   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment to
-   * upload it.
-   *
-   * @see <a href="https://tinyurl.com/f63ru4sb></a>
-   * @param realtimeTableName table name with type.
-   * @param segmentName name of the segment to be uploaded
-   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
-   *                  would be used.
-   * @return segment ZK metadata in json format.
-   * @throws Exception if an error occurred during the segment upload.
-   */
+  /// Upload a real-time committed segment to segment store and return the segment ZK metadata in json format.
+  /// This endpoint is used when segment store copy is unavailable for real-time committed segments.
+  /// Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment to
+  /// upload it.
+  ///
+  /// @see <a href="https://tinyurl.com/f63ru4sb></a>
+  /// @param realtimeTableName table name with type.
+  /// @param segmentName name of the segment to be uploaded
+  /// @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+  ///                  would be used.
+  /// @return segment ZK metadata in json format.
+  /// @throws Exception if an error occurred during the segment upload.
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/uploadCommittedSegment")
   @Produces(MediaType.APPLICATION_JSON)
@@ -1142,9 +1134,7 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Creates a tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
-   */
+  /// Creates a tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
   private File createSegmentTarFile(TableDataManager tableDataManager, String segmentName)
       throws IOException {
     File segmentTarUploadDir =
@@ -1159,9 +1149,7 @@ public class TablesResource {
     return segmentTarFile;
   }
 
-  /**
-   * Uploads a segment tar file to the segment store and returns the segment download url.
-   */
+  /// Uploads a segment tar file to the segment store and returns the segment download url.
   private String uploadSegment(File segmentTarFile, String tableNameWithType, String segmentName, int timeoutMs) {
     SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
     URI segmentDownloadUrl;

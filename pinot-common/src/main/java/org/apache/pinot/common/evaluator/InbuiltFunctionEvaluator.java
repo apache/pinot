@@ -33,16 +33,15 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
-/**
- * Evaluates an expression.
- * <p>This is optimized for evaluating an expression multiple times with different inputs.
- * <p>Overall idea: parse the expression into an ExecutableNode, where an ExecutableNode can be:
- * <ul>
- *   <li>FunctionNode - executes a function</li>
- *   <li>ColumnNode - fetches the value of the column from the input GenericRow</li>
- *   <li>ConstantNode - returns the literal value</li>
- * </ul>
- */
+/// Evaluates an expression.
+///
+/// This is optimized for evaluating an expression multiple times with different inputs.
+///
+/// Overall idea: parse the expression into an ExecutableNode, where an ExecutableNode can be:
+///
+/// - FunctionNode - executes a function
+/// - ColumnNode - fetches the value of the column from the input GenericRow
+/// - ConstantNode - returns the literal value
 public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   // Root of the execution tree
   private final ExecutableNode _rootNode;

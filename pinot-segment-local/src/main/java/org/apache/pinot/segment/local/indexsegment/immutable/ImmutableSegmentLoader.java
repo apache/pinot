@@ -61,21 +61,17 @@ public class ImmutableSegmentLoader {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ImmutableSegmentLoader.class);
 
-  /**
-   * Loads the segment with empty schema and IndexLoadingConfig. This method is used to
-   * access the segment without modifying it, i.e. in read-only mode.
-   */
+  /// Loads the segment with empty schema and IndexLoadingConfig. This method is used to
+  /// access the segment without modifying it, i.e. in read-only mode.
   public static ImmutableSegment load(File indexDir, ReadMode readMode)
       throws Exception {
     return load(indexDir, readMode, false);
   }
 
-  /**
-   * Loads the segment in read-only mode with an option to load only column-level forward index, dictionary,
-   * and null value vector, skipping other column-level secondary indexes. Segment-level indexes (such as
-   * star-tree or multi-column text index) are still loaded when present. This is useful for tools like segment
-   * converters that only need to read data without requiring column-level secondary indexes.
-   */
+  /// Loads the segment in read-only mode with an option to load only column-level forward index, dictionary,
+  /// and null value vector, skipping other column-level secondary indexes. Segment-level indexes (such as
+  /// star-tree or multi-column text index) are still loaded when present. This is useful for tools like segment
+  /// converters that only need to read data without requiring column-level secondary indexes.
   public static ImmutableSegment load(File indexDir, ReadMode readMode, boolean forwardIndexOnly)
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
@@ -84,50 +80,40 @@ public class ImmutableSegmentLoader {
     return load(indexDir, defaultIndexLoadingConfig, false, null, null);
   }
 
-  /**
-   * Loads the segment with specified IndexLoadingConfig.
-   * This method modifies the segment like to convert segment format, add or remove indices.
-   * Mostly used by UT cases to add some specific index for testing purpose.
-   */
+  /// Loads the segment with specified IndexLoadingConfig.
+  /// This method modifies the segment like to convert segment format, add or remove indices.
+  /// Mostly used by UT cases to add some specific index for testing purpose.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     return load(indexDir, indexLoadingConfig, true, null, null);
   }
-  /**
-   * Loads the segment with specified IndexLoadingConfig.
-   * This method modifies the segment like to convert segment format, add or remove indices.
-   * Mostly used by UT cases to add some specific index for testing purpose.
-   */
+  /// Loads the segment with specified IndexLoadingConfig.
+  /// This method modifies the segment like to convert segment format, add or remove indices.
+  /// Mostly used by UT cases to add some specific index for testing purpose.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet)
       throws Exception {
     return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottlerSet, null);
   }
 
-  /**
-   * Loads the segment with specified IndexLoadingConfig.
-   * This method modifies the segment like to convert segment format, add or remove indices.
-   * Mostly used by UT cases to add some specific index for testing purpose.
-   */
+  /// Loads the segment with specified IndexLoadingConfig.
+  /// This method modifies the segment like to convert segment format, add or remove indices.
+  /// Mostly used by UT cases to add some specific index for testing purpose.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottlerSet, zkMetadata);
   }
 
-  /**
-   * Loads the segment with specified IndexLoadingConfig.
-   * This method modifies the segment like to convert segment format, add or remove indices.
-   */
+  /// Loads the segment with specified IndexLoadingConfig.
+  /// This method modifies the segment like to convert segment format, add or remove indices.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess)
       throws Exception {
     return load(indexDir, indexLoadingConfig, needPreprocess, null, null);
   }
 
-  /**
-   * Loads the segment with specified schema and IndexLoadingConfig, and allows to control whether to
-   * modify the segment like to convert segment format, add or remove indices.
-   */
+  /// Loads the segment with specified schema and IndexLoadingConfig, and allows to control whether to
+  /// modify the segment like to convert segment format, add or remove indices.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
@@ -192,9 +178,7 @@ public class ImmutableSegmentLoader {
     }
   }
 
-  /**
-   * Load the segment represented by the SegmentDirectory object to serve queries.
-   */
+  /// Load the segment represented by the SegmentDirectory object to serve queries.
   public static ImmutableSegment load(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     return load(segmentDirectory, indexLoadingConfig, indexLoadingConfig.getSchema());
@@ -284,10 +268,8 @@ public class ImmutableSegmentLoader {
     return segment;
   }
 
-  /**
-   * Check segment directory against the IndexLoadingConfig to see if any preprocessing is needed, such as changing
-   * segment format, adding new indices or updating default columns.
-   */
+  /// Check segment directory against the IndexLoadingConfig to see if any preprocessing is needed, such as changing
+  /// segment format, adding new indices or updating default columns.
   public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     if (indexLoadingConfig.isSkipSegmentPreprocess()) {

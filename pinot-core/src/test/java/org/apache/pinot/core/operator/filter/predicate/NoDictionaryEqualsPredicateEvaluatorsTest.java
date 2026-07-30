@@ -32,9 +32,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for no-dictionary based Eq and NEq predicate evaluators.
- */
+/// Unit test for no-dictionary based Eq and NEq predicate evaluators.
 public class NoDictionaryEqualsPredicateEvaluatorsTest {
   private static final ExpressionContext COLUMN_EXPRESSION = ExpressionContext.forIdentifier("column");
   private static final int NUM_MULTI_VALUES = 100;

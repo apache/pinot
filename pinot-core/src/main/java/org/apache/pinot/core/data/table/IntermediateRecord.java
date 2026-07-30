@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.core.data.table;
 
-/**
- * Helper class to store the values to be ordered. It also wraps the Key and Record of the record.
- * - When ordering on an aggregation, stores the final result of the aggregation
- * - When ordering on a column/transform, stores the actual value of the expression
- */
+/// Helper class to store the values to be ordered. It also wraps the Key and Record of the record.
+/// - When ordering on an aggregation, stores the final result of the aggregation
+/// - When ordering on a column/transform, stores the actual value of the expression
 @SuppressWarnings("rawtypes")
 public class IntermediateRecord {
   public final Key _key;

@@ -26,11 +26,11 @@ import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.PinotClientTransport;
 
 
-/// A {@link PinotClientTransport} that replays a fixed broker response instead of talking to a broker, so the verifier
-/// can drive the real {@code Connection} / {@code ResultSetGroup} / JDBC code paths without standing up a cluster.
+/// A [PinotClientTransport] that replays a fixed broker response instead of talking to a broker, so the verifier
+/// can drive the real `Connection` / `ResultSetGroup` / JDBC code paths without standing up a cluster.
 ///
 /// Records the last query it was handed so callers can assert that query construction
-/// (for example {@code PreparedStatement} parameter binding) happened on the way in.
+/// (for example `PreparedStatement` parameter binding) happened on the way in.
 ///
 /// Not thread-safe: the verifier drives it from a single thread.
 final class CannedResponseTransport implements PinotClientTransport<Void> {

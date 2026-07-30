@@ -26,9 +26,7 @@ import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 
 
-/**
- * Factory for creating {@link RealtimeToOfflineSegmentsTaskExecutor} tasks
- */
+/// Factory for creating [RealtimeToOfflineSegmentsTaskExecutor] tasks
 @TaskExecutorFactory
 public class RealtimeToOfflineSegmentsTaskExecutorFactory implements PinotTaskExecutorFactory {
   private MinionTaskZkMetadataManager _zkMetadataManager;

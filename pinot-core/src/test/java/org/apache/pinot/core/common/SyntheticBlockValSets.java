@@ -28,19 +28,15 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
-/**
- * Synthetic {@link BlockValSet} for testing and benchmarking.
- */
+/// Synthetic [BlockValSet] for testing and benchmarking.
 public class SyntheticBlockValSets {
   private SyntheticBlockValSets() {
   }
 
-  /**
-   * Base class for synthetic {@link BlockValSet}.
-   *
-   * Most of its methods throw {@link UnsupportedOperationException} and should be overridden by subclasses if they
-   * need to be used.
-   */
+  /// Base class for synthetic [BlockValSet].
+  ///
+  /// Most of its methods throw [UnsupportedOperationException] and should be overridden by subclasses if they
+  /// need to be used.
   public static abstract class Base implements BlockValSet {
     @Nullable
     @Override
@@ -140,9 +136,7 @@ public class SyntheticBlockValSets {
     }
   }
 
-  /**
-   * A simple {@link BlockValSet} for nullable, not dictionary-encoded long values.
-   */
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded long values.
   public static class Long extends Base {
 
     @Nullable
@@ -199,9 +193,7 @@ public class SyntheticBlockValSets {
     }
   }
 
-  /**
-   * A simple {@link BlockValSet} for nullable, not dictionary-encoded double values.
-   */
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded double values.
   public static class Double extends Base {
 
     @Nullable

@@ -31,9 +31,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Task generator for {@link SimpleMinionClusterIntegrationTest}.
- */
+/// Task generator for [SimpleMinionClusterIntegrationTest].
 @TaskGenerator
 public class TestTaskGenerator extends BaseTaskGenerator {
 

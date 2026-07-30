@@ -59,7 +59,7 @@ public class UpsertContext {
   @Nullable
   private final Map<String, String> _metadataManagerConfigs;
 
-  /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+  /// @deprecated use [org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)] instead.
   @Deprecated
   private final boolean _allowPartialUpsertConsumptionDuringCommit;
 
@@ -192,12 +192,10 @@ public class UpsertContext {
     return _tableIndexDir;
   }
 
-  /**
-   * Returns true if the table configuration has settings that can lead to inconsistent upsert metadata
-   * during segment replacement after force commit. This happens when:
-   * - Partial upsert is enabled (records need to be merged with previous values)
-   * - dropOutOfOrderRecord is enabled with NONE consistency mode (records may have been dropped)
-   */
+  /// Returns true if the table configuration has settings that can lead to inconsistent upsert metadata
+  /// during segment replacement after force commit. This happens when:
+  /// - Partial upsert is enabled (records need to be merged with previous values)
+  /// - dropOutOfOrderRecord is enabled with NONE consistency mode (records may have been dropped)
   public boolean isTableTypeInconsistentDuringConsumption() {
     return _dropOutOfOrderRecord || _outOfOrderRecordColumn != null || _partialUpsertHandler != null;
   }

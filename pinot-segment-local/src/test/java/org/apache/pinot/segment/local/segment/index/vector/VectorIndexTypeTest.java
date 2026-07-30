@@ -108,12 +108,10 @@ public class VectorIndexTypeTest {
     }
   }
 
-  /**
-   * Regression: with {@code storeInSegmentFile=true} but no consolidated entry in columns.psf (e.g.
-   * a legacy sidecar that the handler has not yet absorbed), the IVF reader factory must fall back
-   * to the on-disk sidecar and return a usable reader — mirroring the HNSW fallback — rather than
-   * returning null and silently disabling the index (forcing an exact scan).
-   */
+  /// Regression: with `storeInSegmentFile=true` but no consolidated entry in columns.psf (e.g.
+  /// a legacy sidecar that the handler has not yet absorbed), the IVF reader factory must fall back
+  /// to the on-disk sidecar and return a usable reader — mirroring the HNSW fallback — rather than
+  /// returning null and silently disabling the index (forcing an exact scan).
   @Test
   public void testReaderFactoryFallsBackToSidecarWhenStoreInSegmentFileButNoConsolidatedEntry()
       throws Exception {
@@ -174,14 +172,12 @@ public class VectorIndexTypeTest {
     }
   }
 
-  /**
-   * Rolling-upgrade safety: with {@code storeInSegmentFile=true} and the legacy HNSW Lucene
-   * directory still on disk (a not-yet-migrated V3 segment, or a V1/V2 segment backed by
-   * {@code FilePerIndexDirectory}), the reader factory must use the directory directly WITHOUT
-   * probing the consolidated entry. On {@code FilePerIndexDirectory} the probe resolves the
-   * directory itself and fails to map it ({@code IllegalArgumentException: ... must be a regular
-   * file}), which used to kill the segment load before the legacy fallback could run.
-   */
+  /// Rolling-upgrade safety: with `storeInSegmentFile=true` and the legacy HNSW Lucene
+  /// directory still on disk (a not-yet-migrated V3 segment, or a V1/V2 segment backed by
+  /// `FilePerIndexDirectory`), the reader factory must use the directory directly WITHOUT
+  /// probing the consolidated entry. On `FilePerIndexDirectory` the probe resolves the
+  /// directory itself and fails to map it (`IllegalArgumentException: ... must be a regular file`), which used to kill
+  /// the segment load before the legacy fallback could run.
   @Test
   public void testReaderFactoryUsesLegacyHnswDirectoryWithoutProbingConsolidatedEntry()
       throws Exception {
@@ -242,12 +238,10 @@ public class VectorIndexTypeTest {
     }
   }
 
-  /**
-   * V3-layout sibling of the legacy-directory-first test: a not-yet-migrated V3 segment keeps its
-   * Lucene directory under the {@code v3/} subdirectory. The gate's lookup
-   * ({@code SegmentDirectoryPaths.findVectorIndexIndexFile}) must find it there and skip the
-   * consolidated-entry probe the same way.
-   */
+  /// V3-layout sibling of the legacy-directory-first test: a not-yet-migrated V3 segment keeps its
+  /// Lucene directory under the `v3/` subdirectory. The gate's lookup
+  /// (`SegmentDirectoryPaths.findVectorIndexIndexFile`) must find it there and skip the
+  /// consolidated-entry probe the same way.
   @Test
   public void testReaderFactoryUsesLegacyHnswDirectoryInV3LayoutWithoutProbing()
       throws Exception {
@@ -303,13 +297,11 @@ public class VectorIndexTypeTest {
     }
   }
 
-  /**
-   * Regression: when the segment directory path is not a local filesystem directory (e.g. a
-   * {@code SegmentDirectory} backed by remote storage), the legacy-directory probe must be skipped
-   * — {@code SegmentDirectoryPaths.findFormatFile} rejects non-directory paths with
-   * {@code IllegalArgumentException}, which used to fail the whole segment load. The factory must
-   * go straight to the consolidated columns.psf entry and return a working reader.
-   */
+  /// Regression: when the segment directory path is not a local filesystem directory (e.g. a
+  /// `SegmentDirectory` backed by remote storage), the legacy-directory probe must be skipped
+  /// — `SegmentDirectoryPaths.findFormatFile` rejects non-directory paths with
+  /// `IllegalArgumentException`, which used to fail the whole segment load. The factory must
+  /// go straight to the consolidated columns.psf entry and return a working reader.
   @Test
   public void testReaderFactoryLoadsConsolidatedHnswWhenSegmentDirectoryIsNotLocal()
       throws Exception {

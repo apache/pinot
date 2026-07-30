@@ -49,10 +49,9 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 
-/**
- * Registry for all {@link TaskFactory}.
- * <p>All {@link PinotTaskExecutor} in {@link TaskExecutorFactoryRegistry} will automatically be registered.
- */
+/// Registry for all [TaskFactory].
+///
+/// All [PinotTaskExecutor] in [TaskExecutorFactoryRegistry] will automatically be registered.
 public class TaskFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskFactoryRegistry.class);
   // we use 1000 as the limit for the following reasons:
@@ -210,9 +209,7 @@ public class TaskFactoryRegistry {
     return rootCauseMessage;
   }
 
-  /**
-   * Returns the task factory registry.
-   */
+  /// Returns the task factory registry.
   public Map<String, TaskFactory> getTaskFactoryRegistry() {
     return _taskFactoryRegistry;
   }

@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.spi.trace;
 
-/**
- * Models the lifecycle of a span of synchronous work, analogous to the Scope concept in tracing libraries.
- * Must be created and closed on the same thread.
- */
+/// Models the lifecycle of a span of synchronous work, analogous to the Scope concept in tracing libraries.
+/// Must be created and closed on the same thread.
 public interface Scope extends AutoCloseable {
 
   @Override

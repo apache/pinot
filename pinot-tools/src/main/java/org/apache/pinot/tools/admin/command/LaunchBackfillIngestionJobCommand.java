@@ -194,13 +194,11 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     return segmentsToBackfill;
   }
 
-  /**
-   * Checks if a segment matches the specified partition column and value.
-   *
-   * @param spec SegmentGenerationJobSpec containing table and cluster info
-   * @param segmentName Name of the segment to check
-   * @return true if the segment matches the partition, false otherwise
-   */
+  /// Checks if a segment matches the specified partition column and value.
+  ///
+  /// @param spec SegmentGenerationJobSpec containing table and cluster info
+  /// @param segmentName Name of the segment to check
+  /// @return true if the segment matches the partition, false otherwise
   private boolean isSegmentMatchPartition(SegmentGenerationJobSpec spec, String segmentName) {
     try {
       Map<String, Object> metadataMap = _pinotSegmentAdminClient.getSegmentMetadata(

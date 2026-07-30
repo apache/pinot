@@ -47,28 +47,24 @@ import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.spi.config.table.TableType;
 
 
-/**
- * <h1>Responsibilities</h1>
- * This does the following:
- * <ul>
- *   <li>Splits plan around PhysicalExchange nodes to create plan fragments.</li>
- *   <li>Converts PRelNodes to PlanNodes.</li>
- *   <li>
- *     Creates mailboxes for connecting plan fragments. This is done simply based on the workers in the send/receive
- *     plan nodes, and the exchange strategy (identity, partitioning, etc.).
- *   </li>
- *   <li>
- *     Creates metadata for each plan fragment, which includes the scanned tables, unavailable segments, etc.
- *   </li>
- * </ul>
- * <h1>Design Note</h1>
- * This class is completely un-opinionated. The old optimizer had a lot of custom logic added to mailbox assignment,
- * but this class instead doesn't do any special handling, apart from assigning mailboxes based on the exchange
- * strategy. This is an important and conscious design choice, because it ensures division of responsibilities and
- * allows optimizer rules like worker assignment to completely own their responsibilities. This is also important for
- * keeping the optimizer maximally pluggable. (e.g. you can swap out the default worker assignment rule with a
- * custom rule like the LiteMode worker assignment rule).
- */
+/// # Responsibilities
+///
+/// This does the following:
+///
+/// - Splits plan around PhysicalExchange nodes to create plan fragments.
+/// - Converts PRelNodes to PlanNodes.
+/// - Creates mailboxes for connecting plan fragments. This is done simply based on the workers in the send/receive
+///   plan nodes, and the exchange strategy (identity, partitioning, etc.).
+/// - Creates metadata for each plan fragment, which includes the scanned tables, unavailable segments, etc.
+///
+/// # Design Note
+///
+/// This class is completely un-opinionated. The old optimizer had a lot of custom logic added to mailbox assignment,
+/// but this class instead doesn't do any special handling, apart from assigning mailboxes based on the exchange
+/// strategy. This is an important and conscious design choice, because it ensures division of responsibilities and
+/// allows optimizer rules like worker assignment to completely own their responsibilities. This is also important for
+/// keeping the optimizer maximally pluggable. (e.g. you can swap out the default worker assignment rule with a
+/// custom rule like the LiteMode worker assignment rule).
 public class PlanFragmentAndMailboxAssignment {
   private static final int ROOT_FRAGMENT_ID = 0;
 
@@ -178,18 +174,16 @@ public class PlanFragmentAndMailboxAssignment {
     }
   }
 
-  /**
-   * Handles LOOKUP_LOCAL_EXCHANGE: a pseudo-exchange that does NOT split fragments. The dim table
-   * stays in the join's fragment. This method:
-   * <ol>
-   *   <li>Registers the dim table name so the fragment is classified as a leaf stage</li>
-   *   <li>Sets fake empty segments per worker (the dim table is accessed via
-   *       {@code DimensionTableDataManager} at runtime, not via segment routing)</li>
-   *   <li>Converts children to PlanNodes in the same fragment (no MailboxSend/Receive)</li>
-   * </ol>
-   * This matches V1's behavior in {@code WorkerManager.assignWorkersToNonRootFragment} where
-   * lookup joins are detected and the dim table is registered with empty segments.
-   */
+  /// Handles LOOKUP_LOCAL_EXCHANGE: a pseudo-exchange that does NOT split fragments. The dim table
+  /// stays in the join's fragment. This method:
+  ///
+  /// 1. Registers the dim table name so the fragment is classified as a leaf stage
+  /// 2. Sets fake empty segments per worker (the dim table is accessed via
+  ///       `DimensionTableDataManager` at runtime, not via segment routing)
+  /// 3. Converts children to PlanNodes in the same fragment (no MailboxSend/Receive)
+  ///
+  /// This matches V1's behavior in `WorkerManager.assignWorkersToNonRootFragment` where
+  /// lookup joins are detected and the dim table is registered with empty segments.
   private void processLookupLocalExchange(PRelNode pRelNode, @Nullable PlanNode parent, int currentFragmentId,
       Context context) {
     // Find the dim table scan in the exchange's children and register it with empty segments.
@@ -215,11 +209,9 @@ public class PlanFragmentAndMailboxAssignment {
     }
   }
 
-  /**
-   * Recursively find TableScan nodes and register the dim table name in the fragment metadata with
-   * fake empty segments per worker, matching V1's {@code WorkerManager.assignWorkersToNonRootFragment}
-   * behavior for lookup joins.
-   */
+  /// Recursively find TableScan nodes and register the dim table name in the fragment metadata with
+  /// fake empty segments per worker, matching V1's `WorkerManager.assignWorkersToNonRootFragment`
+  /// behavior for lookup joins.
   private void registerDimTableInFragment(PRelNode pRelNode, DispatchablePlanMetadata fragmentMetadata) {
     if (pRelNode.unwrap() instanceof TableScan) {
       PhysicalTableScan tableScan = (PhysicalTableScan) pRelNode.unwrap();

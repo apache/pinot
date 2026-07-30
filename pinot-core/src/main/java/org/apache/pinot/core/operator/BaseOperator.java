@@ -34,9 +34,7 @@ import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 
 
-/**
- * Any other Pinot Operators should extend BaseOperator
- */
+/// Any other Pinot Operators should extend BaseOperator
 public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   @Override

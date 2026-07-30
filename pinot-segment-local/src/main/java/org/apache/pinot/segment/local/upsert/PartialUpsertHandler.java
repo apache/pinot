@@ -34,16 +34,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 
 
-/**
- * Handler for partial-upsert.
- *
- * This class is responsible for merging the new record with the previous record.
- * It uses the configured merge strategies to merge the columns. If no merge strategy is configured for a column,
- * it uses the default merge strategy.
- *
- * It is also possible to define a custom logic for merging rows by implementing {@link PartialUpsertMerger}.
- * If a merger for row is defined then it takes precedence and ignores column mergers.
- */
+/// Handler for partial-upsert.
+///
+/// This class is responsible for merging the new record with the previous record.
+/// It uses the configured merge strategies to merge the columns. If no merge strategy is configured for a column,
+/// it uses the default merge strategy.
+///
+/// It is also possible to define a custom logic for merging rows by implementing [PartialUpsertMerger].
+/// If a merger for row is defined then it takes precedence and ignores column mergers.
 public class PartialUpsertHandler {
   private final List<String> _primaryKeyColumns;
   private final List<String> _comparisonColumns;

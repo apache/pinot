@@ -66,7 +66,7 @@ import static org.testng.Assert.assertTrue;
 /// committed segment's materialized child columns, their `index_map`, and the dense/sparse split.
 ///
 /// This class is abstract and is not run on its own; the concrete table-type variant (currently
-/// {@link OpenStructIngestionCommitRealtimeTest}) supplies the table name and commit trigger and
+/// [OpenStructIngestionCommitRealtimeTest]) supplies the table name and commit trigger and
 /// reuses the inherited validation. An OFFLINE variant is added in a follow-up change once the
 /// offline OPEN_STRUCT build path is fixed.
 public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryClusterIntegrationTest {

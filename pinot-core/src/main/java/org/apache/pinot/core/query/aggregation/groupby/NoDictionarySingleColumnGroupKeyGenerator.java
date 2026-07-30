@@ -44,11 +44,8 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Implementation of {@link GroupKeyGenerator} interface for single group by column,
- * in absence of dictionary for the group by column.
- *
- */
+/// Implementation of [GroupKeyGenerator] interface for single group by column,
+/// in absence of dictionary for the group by column.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final ExpressionContext _groupByExpression;
@@ -228,13 +225,11 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     }
   }
 
-  /**
-   * Helper method to create the group-key map, depending on the data type.
-   * Uses primitive maps when possible.
-   *
-   * @param keyType DataType for the key
-   * @return Map
-   */
+  /// Helper method to create the group-key map, depending on the data type.
+  /// Uses primitive maps when possible.
+  ///
+  /// @param keyType DataType for the key
+  /// @return Map
   private Map createGroupKeyMap(DataType keyType) {
     switch (keyType) {
       case INT:

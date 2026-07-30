@@ -123,11 +123,9 @@ public class QueryRoutingTest {
     return new QueryServer(port, null, handler);
   }
 
-  /**
-   * Starts the query server and returns the actual bound port. Uses port 0 to let the OS assign a free port,
-   * avoiding TOCTOU race conditions. {@link QueryServer#start()} blocks on {@code bind().sync()}, so the
-   * server is ready to accept connections when this method returns.
-   */
+  /// Starts the query server and returns the actual bound port. Uses port 0 to let the OS assign a free port,
+  /// avoiding TOCTOU race conditions. [QueryServer#start()] blocks on `bind().sync()`, so the
+  /// server is ready to accept connections when this method returns.
   private int startAndGetPort(QueryServer server) {
     server.start();
     return ((InetSocketAddress) server.getChannel().localAddress()).getPort();

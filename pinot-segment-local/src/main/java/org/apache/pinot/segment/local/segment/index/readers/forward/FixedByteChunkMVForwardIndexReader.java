@@ -27,11 +27,10 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Chunk-based multi-value raw (non-dictionary-encoded) forward index reader for values of fixed length data type (INT,
- * LONG, FLOAT, DOUBLE).
- * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriter}
- */
+/// Chunk-based multi-value raw (non-dictionary-encoded) forward index reader for values of fixed length data type (INT,
+/// LONG, FLOAT, DOUBLE).
+///
+/// For data layout, please refer to the documentation for [VarByteChunkForwardIndexWriter]
 public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader {
   private static final int ROW_OFFSET_SIZE = VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
@@ -105,9 +104,7 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     }
   }
 
-  /**
-   * Helper method to read BYTES value from the compressed index.
-   */
+  /// Helper method to read BYTES value from the compressed index.
   private ByteBuffer sliceBytesCompressed(int docId, ChunkReaderContext context) {
     int chunkRowId = docId % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkBuffer(docId, context);
@@ -119,9 +116,7 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     return (ByteBuffer) chunkBuffer.duplicate().position(valueStartOffset).limit(valueEndOffset);
   }
 
-  /**
-   * Helper method to read BYTES value from the uncompressed index.
-   */
+  /// Helper method to read BYTES value from the uncompressed index.
   private ByteBuffer sliceBytesUncompressed(int docId) {
     int chunkId = docId / _numDocsPerChunk;
     int chunkRowId = docId % _numDocsPerChunk;
@@ -134,9 +129,7 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     return _dataBuffer.toDirectByteBuffer(valueStartOffset, (int) (valueEndOffset - valueStartOffset));
   }
 
-  /**
-   * Helper method to compute the end offset of the value in the chunk buffer.
-   */
+  /// Helper method to compute the end offset of the value in the chunk buffer.
   private int getValueEndOffset(int rowId, ByteBuffer chunkBuffer) {
     if (rowId == _numDocsPerChunk - 1) {
       // Last row in the chunk
@@ -152,9 +145,7 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     }
   }
 
-  /**
-   * Helper method to compute the end offset of the value in the data buffer.
-   */
+  /// Helper method to compute the end offset of the value in the data buffer.
   private long getValueEndOffset(int chunkId, int chunkRowId, long chunkStartOffset) {
     if (chunkId == _numChunks - 1) {
       // Last chunk

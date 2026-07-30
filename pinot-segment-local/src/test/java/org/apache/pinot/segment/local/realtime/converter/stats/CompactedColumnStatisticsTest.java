@@ -992,7 +992,7 @@ public class CompactedColumnStatisticsTest {
 
   // ======== Helpers ========
 
-  /** Mocks a Dictionary with INT values at consecutive IDs starting from 0. */
+  /// Mocks a Dictionary with INT values at consecutive IDs starting from 0.
   private Dictionary mockIntDictionary(int[] values) {
     Dictionary dict = mock(Dictionary.class);
     when(dict.getValueType()).thenReturn(DataType.INT);

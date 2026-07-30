@@ -464,7 +464,7 @@ public class JsonPayloadFormatTest {
   private static final int SQLITE_TYPE_ARRAY = 11;
   private static final int SQLITE_TYPE_OBJECT = 12;
 
-  /// Builds a SQLite JSONB element (header + payload) whose declared size exactly matches {@code payload},
+  /// Builds a SQLite JSONB element (header + payload) whose declared size exactly matches `payload`,
   /// choosing the narrowest size descriptor. Used to hand-build arbitrarily large / deep valid fixtures.
   private static byte[] sqliteElement(int type, byte[] payload) {
     int size = payload.length;
@@ -484,7 +484,7 @@ public class JsonPayloadFormatTest {
     return out;
   }
 
-  /// {@code {"<key>": <value element>}} as an exactly-filling SQLite JSONB object.
+  /// `{"<key>": <value element>}` as an exactly-filling SQLite JSONB object.
   private static byte[] sqliteObject(String key, byte[] valueElement) {
     byte[] label = sqliteElement(SQLITE_TYPE_TEXT, key.getBytes(StandardCharsets.US_ASCII));
     byte[] payload = new byte[label.length + valueElement.length];
@@ -493,7 +493,7 @@ public class JsonPayloadFormatTest {
     return sqliteElement(SQLITE_TYPE_OBJECT, payload);
   }
 
-  /// {@code {"a": [[[ ... ]]]}} with {@code depth} nested arrays, innermost empty. Each level is a valid,
+  /// `{"a": [[[ ... ]]]}` with `depth` nested arrays, innermost empty. Each level is a valid,
   /// exactly-filling element, so the whole payload is well-formed apart from its depth.
   private static byte[] sqliteNestedArrays(int depth) {
     byte[] element = sqliteElement(SQLITE_TYPE_ARRAY, new byte[0]);

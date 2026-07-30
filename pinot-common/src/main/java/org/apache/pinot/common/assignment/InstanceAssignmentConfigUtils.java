@@ -39,17 +39,15 @@ public class InstanceAssignmentConfigUtils {
   private InstanceAssignmentConfigUtils() {
   }
 
-  /**
-   * Returns whether the COMPLETED segments should be relocated (offloaded from CONSUMING instances to COMPLETED
-   * instances) for a LLC real-time table based on the given table config.
-   * <p>COMPLETED segments should be relocated iff:
-   * <ul>
-   *   <li>The COMPLETED instance assignment is configured via {@code instanceAssignmentConfigMap}, or</li>
-   *   <li>The COMPLETED instance partitions are pre-configured via {@code instancePartitionsMap} (import), or</li>
-   *   <li>(For backward-compatibility) COMPLETED server tag is overridden to be different from the CONSUMING
-   *       server tag.</li>
-   * </ul>
-   */
+  /// Returns whether the COMPLETED segments should be relocated (offloaded from CONSUMING instances to COMPLETED
+  /// instances) for a LLC real-time table based on the given table config.
+  ///
+  /// COMPLETED segments should be relocated iff:
+  ///
+  /// - The COMPLETED instance assignment is configured via `instanceAssignmentConfigMap`, or
+  /// - The COMPLETED instance partitions are pre-configured via `instancePartitionsMap` (import), or
+  /// - (For backward-compatibility) COMPLETED server tag is overridden to be different from the CONSUMING
+  ///      server tag.
   public static boolean shouldRelocateCompletedSegments(TableConfig tableConfig) {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     return (instanceAssignmentConfigMap != null
@@ -58,9 +56,7 @@ public class InstanceAssignmentConfigUtils {
         || TagNameUtils.isRelocateCompletedSegments(tableConfig.getTenantConfig());
   }
 
-  /**
-   * Returns whether the instance assignment is allowed for the given table config and instance partitions type.
-   */
+  /// Returns whether the instance assignment is allowed for the given table config and instance partitions type.
   public static boolean allowInstanceAssignment(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
     if (InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
@@ -93,9 +89,7 @@ public class InstanceAssignmentConfigUtils {
     }
   }
 
-  /**
-   * Extracts or generates default instance assignment config from the given table config.
-   */
+  /// Extracts or generates default instance assignment config from the given table config.
   public static InstanceAssignmentConfig getInstanceAssignmentConfig(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
     Preconditions.checkState(allowInstanceAssignment(tableConfig, instancePartitionsType),

@@ -36,18 +36,15 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * <code>BinaryOperatorTransformFunction</code> abstracts common functions for binary operators (=, !=, >=, >, <=, <).
- * The results are BOOLEAN type.
- *
- * TODO: Support MV columns
- */
+/// `BinaryOperatorTransformFunction` abstracts common functions for binary operators (=, !=, >=, >, <=, <).
+/// The results are BOOLEAN type.
+///
+/// TODO: Support MV columns
 public abstract class BinaryOperatorTransformFunction extends BaseTransformFunction {
   private static final int EQUALS = 0;
   private static final int GREATER_THAN_OR_EQUAL = 1;
@@ -128,10 +125,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  /**
-   * Creates a predicate evaluator for the binary operator. Returns {@code null} when the binary operator always
-   * evaluates to the same value (true/false/null) where the predicate evaluator is not needed.
-   */
+  /// Creates a predicate evaluator for the binary operator. Returns `null` when the binary operator always
+  /// evaluates to the same value (true/false/null) where the predicate evaluator is not needed.
   @Nullable
   private PredicateEvaluator createPredicateEvaluator(DataType leftDataType, @Nullable Dictionary leftDictionary,
       LiteralContext rightLiteral) {
@@ -146,13 +141,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, leftDictionary, leftDataType, null);
   }
 
-  /**
-   * Creates a predicate for the binary operator. Returns {@code null} when the binary operator always evaluates to the
-   * same value (true/false/null) where the predicate is not needed.
-   *
-   * It might rewrite the right value similar to {@link NumericalFilterOptimizer}.
-   * TODO: Extract the common logic.
-   */
+  /// Creates a predicate for the binary operator. Returns `null` when the binary operator always evaluates to the
+  /// same value (true/false/null) where the predicate is not needed.
+  ///
+  /// It might rewrite the right value similar to
+  /// [org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer].
+  /// TODO: Extract the common logic.
   @Nullable
   private Predicate createPredicate(DataType leftDataType, LiteralContext rightLiteral) {
     DataType rightDataType = rightLiteral.getType();
@@ -413,9 +407,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  /**
-   * Returns the operator (int value) for the given comparison result of actual value and converted value.
-   */
+  /// Returns the operator (int value) for the given comparison result of actual value and converted value.
   private int getOperator(int comparison) {
     assert comparison != 0;
     if (comparison > 0) {

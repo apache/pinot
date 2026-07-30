@@ -34,35 +34,31 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 
 
-/**
- * Converts an MSE leaf stage {@link PlanNode} tree to a {@link PinotQuery} for routing purposes. Used by the broker
- * pruning path in {@link WorkerManager} to build a filter-bearing routing query that enables segment pruning at the
- * broker.
- *
- * <p>This is the {@link PlanNode} (logical-planner) counterpart of {@link LeafStageToPinotQuery}, which performs the
- * same leaf-stage → routing-query fold over Calcite {@link org.apache.calcite.rel.RelNode}s for the physical
- * optimizer. The two traversals are intentionally kept as separate builders because they walk different node
- * hierarchies; the shared filter-normalization logic ({@code ensureFilterIsFunctionExpression} /
- * {@code addFilterExpression}) lives in {@link LeafStageToPinotQuery}. Keep the leaf-boundary and filter-combining
- * behavior of the two in sync.
- */
+/// Converts an MSE leaf stage [PlanNode] tree to a [PinotQuery] for routing purposes. Used by the broker
+/// pruning path in [WorkerManager] to build a filter-bearing routing query that enables segment pruning at the
+/// broker.
+///
+/// This is the [PlanNode] (logical-planner) counterpart of [LeafStageToPinotQuery], which performs the
+/// same leaf-stage → routing-query fold over Calcite [org.apache.calcite.rel.RelNode]s for the physical
+/// optimizer. The two traversals are intentionally kept as separate builders because they walk different node
+/// hierarchies; the shared filter-normalization logic (`ensureFilterIsFunctionExpression` /
+/// `addFilterExpression`) lives in [LeafStageToPinotQuery]. Keep the leaf-boundary and filter-combining
+/// behavior of the two in sync.
 public class PlanNodeRoutingQueryBuilder {
   private PlanNodeRoutingQueryBuilder() {
   }
 
-  /**
-   * Converts a PlanNode leaf stage root to a {@link PinotQuery} for routing purposes. Folds Filter and Project nodes
-   * bottom-up starting from the TableScan, stopping at the first node of any other type (a leaf boundary such as an
-   * un-split aggregate): nodes above the boundary operate on a different row space and must not contribute to the
-   * routing filter. Callers should expect this method to throw on malformed trees (e.g., missing TableScanNode,
-   * multi-input nodes) and handle failures gracefully.
-   *
-   * @param tableName the table name (with or without type suffix). Passed explicitly because PlanNode trees
-   *                  don't carry the resolved table name.
-   * @param leafStageRoot the root of the leaf stage
-   * @param skipFilter whether to skip the filter in the query
-   * @return a {@link PinotQuery} representing the leaf stage
-   */
+  /// Converts a PlanNode leaf stage root to a [PinotQuery] for routing purposes. Folds Filter and Project nodes
+  /// bottom-up starting from the TableScan, stopping at the first node of any other type (a leaf boundary such as an
+  /// un-split aggregate): nodes above the boundary operate on a different row space and must not contribute to the
+  /// routing filter. Callers should expect this method to throw on malformed trees (e.g., missing TableScanNode,
+  /// multi-input nodes) and handle failures gracefully.
+  ///
+  /// @param tableName the table name (with or without type suffix). Passed explicitly because PlanNode trees
+  ///                  don't carry the resolved table name.
+  /// @param leafStageRoot the root of the leaf stage
+  /// @param skipFilter whether to skip the filter in the query
+  /// @return a [PinotQuery] representing the leaf stage
   public static PinotQuery createPinotQueryForRouting(String tableName, PlanNode leafStageRoot, boolean skipFilter) {
     List<PlanNode> bottomToTopNodes = new ArrayList<>();
     accumulateBottomToTop(leafStageRoot, bottomToTopNodes);

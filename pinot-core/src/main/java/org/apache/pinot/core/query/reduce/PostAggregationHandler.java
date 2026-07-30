@@ -39,10 +39,8 @@ import org.apache.pinot.core.query.reduce.filter.ValueExtractorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * The {@code PostAggregationHandler} handles the post-aggregation calculation as well as the column re-ordering for the
- * aggregation result.
- */
+/// The `PostAggregationHandler` handles the post-aggregation calculation as well as the column re-ordering for
+/// the aggregation result.
 public class PostAggregationHandler implements ValueExtractorFactory {
   private final Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
   private final int _numGroupByExpressions;
@@ -97,16 +95,12 @@ public class PostAggregationHandler implements ValueExtractorFactory {
     _resultDataSchema = new DataSchema(columnNames, columnDataTypes);
   }
 
-  /**
-   * Returns the DataSchema of the post-aggregation result.
-   */
+  /// Returns the DataSchema of the post-aggregation result.
   public DataSchema getResultDataSchema() {
     return _resultDataSchema;
   }
 
-  /**
-   * Returns the post-aggregation result for the given row.
-   */
+  /// Returns the post-aggregation result for the given row.
   public Object[] getResult(Object[] row) {
     int numValues = _valueExtractors.length;
     Object[] result = new Object[numValues];
@@ -116,9 +110,7 @@ public class PostAggregationHandler implements ValueExtractorFactory {
     return result;
   }
 
-  /**
-   * Returns a ValueExtractor based on the given expression.
-   */
+  /// Returns a ValueExtractor based on the given expression.
   @Override
   public ValueExtractor getValueExtractor(ExpressionContext expression) {
     if (expression.getType() == ExpressionContext.Type.LITERAL) {
@@ -160,9 +152,7 @@ public class PostAggregationHandler implements ValueExtractorFactory {
     }
   }
 
-  /**
-   * Value extractor for a post-aggregation column.
-   */
+  /// Value extractor for a post-aggregation column.
   private class PostAggregationValueExtractor implements ValueExtractor {
     final FunctionContext _function;
     final Object[] _arguments;
@@ -207,11 +197,11 @@ public class PostAggregationHandler implements ValueExtractorFactory {
     }
   }
 
-  /// Value extractor for {@code GROUPING(col, ...)} / {@code GROUPING_ID(col, ...)}. The value is fully
+  /// Value extractor for `GROUPING(col, ...)` / `GROUPING_ID(col, ...)`. The value is fully
   /// determined by the grouping set a row belongs to, so it is precomputed per grouping-set ordinal at
   /// construction (a bit is 1 when the corresponding argument column is rolled up / aggregated away in that
   /// set, PostgreSQL semantics, first argument = most significant bit); extraction is a single lookup on the
-  /// synthetic {@code $groupingId} ordinal column. Returns 0 for every argument when the query has no
+  /// synthetic `$groupingId` ordinal column. Returns 0 for every argument when the query has no
   /// grouping sets (no column is rolled up).
   private class GroupingValueExtractor implements ValueExtractor {
     private final FunctionContext _function;

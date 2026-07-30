@@ -57,21 +57,19 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Aggregation operator that utilizes dictionary or column metadata for serving aggregation queries to avoid scanning.
- * The scanless operator is selected in the plan maker, if the query is of aggregation type min, max, minmaxrange,
- * distinctcount, distinctcounthll, distinctcountrawhll, segmentpartitioneddistinctcount, distinctcountsmarthll,
- * distinctcounthllplus, distinctcountrawhllplus, distinctcountUll, distinctcountsmartUll and the column has a
- * dictionary, or has column metadata with min and max value defined. It also supports count(*) if the query has
- * no filter.
- * We don't use this operator if the segment has star tree, as the dictionary will have aggregated values for the
- * metrics, and dimensions will have star node value.
- *
- * For min value, we use the first value from the dictionary, falling back to the column metadata min value if there
- * is no dictionary.
- * For max value we use the last value from dictionary, falling back to the column metadata max value if there
- * is no dictionary.
- */
+/// Aggregation operator that utilizes dictionary or column metadata for serving aggregation queries to avoid scanning.
+/// The scanless operator is selected in the plan maker, if the query is of aggregation type min, max, minmaxrange,
+/// distinctcount, distinctcounthll, distinctcountrawhll, segmentpartitioneddistinctcount, distinctcountsmarthll,
+/// distinctcounthllplus, distinctcountrawhllplus, distinctcountUll, distinctcountsmartUll and the column has a
+/// dictionary, or has column metadata with min and max value defined. It also supports count(\*) if the query has
+/// no filter.
+/// We don't use this operator if the segment has star tree, as the dictionary will have aggregated values for the
+/// metrics, and dimensions will have star node value.
+///
+/// For min value, we use the first value from the dictionary, falling back to the column metadata min value if there
+/// is no dictionary.
+/// For max value we use the last value from dictionary, falling back to the column metadata max value if there
+/// is no dictionary.
 @SuppressWarnings("rawtypes")
 public class NonScanBasedAggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_NO_SCAN";

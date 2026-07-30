@@ -41,15 +41,15 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * H3 index creator that uses off-heap memory.
- * <p>The posting lists (map from H3 id to doc ids) are initially stored in a TreeMap, then flushed into a file for
- * every 100,000 entries. After all the documents are added, we read all the posting lists from the file and merge them
- * using a priority queue to calculate the final posting lists.
- * <p>Off-heap creator uses less heap memory, but is more expensive on computation and needs flush data to disk which
- * can slow down the creation because of the IO latency. Use off-heap creator in the environment where there is limited
- * heap memory or garbage collection can cause performance issue (e.g. index creation at loading time on Pinot Server).
- */
+/// H3 index creator that uses off-heap memory.
+///
+/// The posting lists (map from H3 id to doc ids) are initially stored in a TreeMap, then flushed into a file for
+/// every 100,000 entries. After all the documents are added, we read all the posting lists from the file and merge them
+/// using a priority queue to calculate the final posting lists.
+///
+/// Off-heap creator uses less heap memory, but is more expensive on computation and needs flush data to disk which
+/// can slow down the creation because of the IO latency. Use off-heap creator in the environment where there is limited
+/// heap memory or garbage collection can cause performance issue (e.g. index creation at loading time on Pinot Server).
 public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
   private static final int FLUSH_THRESHOLD = 100_000;
 
@@ -78,9 +78,7 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
     }
   }
 
-  /**
-   * Flushes the current posting list map into the file.
-   */
+  /// Flushes the current posting list map into the file.
   private void flush()
       throws IOException {
     long length = 0;

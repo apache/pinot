@@ -141,14 +141,12 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  /**
-   * We need not refresh when: There were no tableConfig or schema updates after the last time the segment was
-   * refreshed by this task.
-   *
-   * Note that newly created segments after the latest tableConfig/schema update will still need to be refreshed. This
-   * is because inverted index created is disabled by default during segment generation. This can be added as an
-   * additional check in the future, if required.
-   */
+  /// We need not refresh when: There were no tableConfig or schema updates after the last time the segment was
+  /// refreshed by this task.
+  ///
+  /// Note that newly created segments after the latest tableConfig/schema update will still need to be refreshed. This
+  /// is because inverted index created is disabled by default during segment generation. This can be added as an
+  /// additional check in the future, if required.
   private boolean shouldRefreshSegment(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig, Stat tableStat,
       Stat schemaStat) {
     String tableNameWithType = tableConfig.getTableName();

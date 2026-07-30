@@ -36,20 +36,18 @@ import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Aggregation function which returns the population covariance of 2 expressions.
- * COVAR_POP(exp1, exp2) = mean(exp1 * exp2) - mean(exp1) * mean(exp2)
- * COVAR_SAMP(exp1, exp2) = (sum(exp1 * exp2) - sum(exp1) * sum(exp2)) / (count - 1)
- *
- * Population covariance between two random variables X and Y is defined as either
- * covarPop(X,Y) = E[(X - E[X]) * (Y - E[Y])] or
- * covarPop(X,Y) = E[X*Y] - E[X] * E[Y],
- * here E[X] represents mean of X
- * @see <a href="https://en.wikipedia.org/wiki/Covariance">Covariance</a>
- * The calculations here are based on the second definition shown above.
- * Sample covariance = covarPop(X, Y) * besselCorrection
- * @see <a href="https://en.wikipedia.org/wiki/Bessel%27s_correction">Bessel's correction</a>
- */
+/// Aggregation function which returns the population covariance of 2 expressions.
+/// COVAR_POP(exp1, exp2) = mean(exp1 \* exp2) - mean(exp1) \* mean(exp2)
+/// COVAR_SAMP(exp1, exp2) = (sum(exp1 \* exp2) - sum(exp1) \* sum(exp2)) / (count - 1)
+///
+/// Population covariance between two random variables X and Y is defined as either
+/// covarPop(X,Y) = E\[(X - E\[X\]) \* (Y - E\[Y\])\] or
+/// covarPop(X,Y) = E\[X\*Y\] - E\[X\] \* E\[Y\],
+/// here E\[X\] represents mean of X
+/// @see <a href="https://en.wikipedia.org/wiki/Covariance">Covariance</a>
+/// The calculations here are based on the second definition shown above.
+/// Sample covariance = covarPop(X, Y) \* besselCorrection
+/// @see <a href="https://en.wikipedia.org/wiki/Bessel%27s_correction">Bessel's correction</a>
 public class CovarianceAggregationFunction implements AggregationFunction<CovarianceTuple, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   protected final ExpressionContext _expression1;

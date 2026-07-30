@@ -22,14 +22,10 @@ import java.io.IOException;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 
 
-/**
- * Marker interface for all inverted index creators.
- */
+/// Marker interface for all inverted index creators.
 public interface InvertedIndexCreator extends IndexCreator {
 
-  /**
-   * Seals the index and flushes it to disk.
-   */
+  /// Seals the index and flushes it to disk.
   @Override
   void seal()
       throws IOException;

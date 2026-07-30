@@ -122,9 +122,7 @@ import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNT
 import static org.apache.pinot.segment.spi.AggregationFunctionType.SUMPRECISION;
 
 
-/**
- * Utils related to table config operations
- */
+/// Utils related to table config operations
 public final class TableConfigUtils {
   private TableConfigUtils() {
   }
@@ -156,24 +154,20 @@ public final class TableConfigUtils {
     _enforcePoolBasedAssignment = enforcePoolBasedAssignment;
   }
 
-  /**
-   * @see TableConfigUtils#validate(TableConfig, Schema, String)
-   */
+  /// @see TableConfigUtils#validate(TableConfig, Schema, String)
   public static void validate(TableConfig tableConfig, Schema schema) {
     validate(tableConfig, schema, null);
   }
 
-  /**
-   * Performs table config validations. Includes validations for the following:
-   * 1. Validation config
-   * 2. IngestionConfig
-   * 3. TierConfigs
-   * 4. Indexing config
-   * 5. Field Config List
-   * 6. Instance pool and replica group, if enabled
-   *
-   * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
-   */
+  /// Performs table config validations. Includes validations for the following:
+  /// 1. Validation config
+  /// 2. IngestionConfig
+  /// 3. TierConfigs
+  /// 4. Indexing config
+  /// 5. Field Config List
+  /// 6. Instance pool and replica group, if enabled
+  ///
+  /// TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
   public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
     validate(tableConfig, schema, typesToSkip, null);
   }
@@ -237,11 +231,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the table config is using instance pool and replica group configuration.
-   * @param tableConfig Table config to validate
-   * @return true if the table config is using instance pool and replica group configuration, false otherwise
-   */
+  /// Validates the table config is using instance pool and replica group configuration.
+  /// @param tableConfig Table config to validate
+  /// @return true if the table config is using instance pool and replica group configuration, false otherwise
   static boolean isTableUsingInstancePoolAndReplicaGroup(TableConfig tableConfig) {
     boolean status = true;
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
@@ -288,13 +280,10 @@ public final class TableConfigUtils {
     return typesToSkip;
   }
 
-  /**
-   * Validates the table name with the following rules:
-   * <ul>
-   *   <li>Table name can have at most one dot in it.
-   *   <li>Table name does not have whitespace.</li>
-   * </ul>
-   */
+  /// Validates the table name with the following rules:
+  ///
+  /// - Table name can have at most one dot in it.
+  /// - Table name does not have whitespace.
   public static void validateTableName(TableConfig tableConfig) {
     String tableName = tableConfig.getTableName();
     int dotCount = StringUtils.countMatches(tableName, '.');
@@ -306,11 +295,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates retention config. Checks for following things:
-   * - Valid segmentPushType
-   * - Valid retentionTimeUnit
-   */
+  /// Validates retention config. Checks for following things:
+  /// - Valid segmentPushType
+  /// - Valid retentionTimeUnit
   private static void validateRetentionConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     String tableName = tableConfig.getTableName();
@@ -382,20 +369,18 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the following in the validationConfig of the table
-   * 1. For REALTIME table
-   * - checks for non-null timeColumnName
-   * - checks for valid field spec for timeColumnName in schema
-   * - Validates retention config
-   *
-   * 2. For OFFLINE table
-   * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
-   * - for Dimension tables checks the primary key requirement and incompatible segment assignment strategies
-   *
-   * 3. Checks peerDownloadSchema
-   * 4. Checks time column existence if null handling for time column is enabled
-   */
+  /// Validates the following in the validationConfig of the table
+  /// 1. For REALTIME table
+  /// - checks for non-null timeColumnName
+  /// - checks for valid field spec for timeColumnName in schema
+  /// - Validates retention config
+  ///
+  /// 2. For OFFLINE table
+  /// - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
+  /// - for Dimension tables checks the primary key requirement and incompatible segment assignment strategies
+  ///
+  /// 3. Checks peerDownloadSchema
+  /// 4. Checks time column existence if null handling for time column is enabled
   private static void validateValidationConfig(TableConfig tableConfig, Schema schema) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     String timeColumnName = validationConfig.getTimeColumnName();
@@ -1229,21 +1214,17 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Checks if a data type is valid for time-based comparison operations (upsert/dedup).
-   * Valid types include numeric types and types with stored data as a numeric type:
-   *   e.g. TIMESTAMP which is stored as LONG internally.
-   *
-   * @param dataType the data type to check
-   * @return true if the data type can be used for time-based comparison, false otherwise
-   */
+  /// Checks if a data type is valid for time-based comparison operations (upsert/dedup).
+  /// Valid types include numeric types and types with stored data as a numeric type:
+  ///   e.g. TIMESTAMP which is stored as LONG internally.
+  ///
+  /// @param dataType the data type to check
+  /// @return true if the data type can be used for time-based comparison, false otherwise
   private static boolean isValidTimeComparisonType(DataType dataType) {
     return dataType.isNumeric() || dataType.getStoredType().isNumeric();
   }
 
-  /**
-   * Validates the upsert config related to TTL.
-   */
+  /// Validates the upsert config related to TTL.
   @VisibleForTesting
   static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -1283,9 +1264,7 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the dedup config related to TTL.
-   */
+  /// Validates the dedup config related to TTL.
   @VisibleForTesting
   static void validateTTLForDedupConfig(TableConfig tableConfig, Schema schema) {
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
@@ -1343,11 +1322,9 @@ public final class TableConfigUtils {
         "MetadataTTL: %s(ms) must be smaller than the minimum segmentAge: %s(ms)", ttlInMs, minSegmentAgeInMs);
   }
 
-  /**
-   * Detects whether both InstanceAssignmentConfig and InstancePartitionsMap are set for a given
-   * instance partitions type. Validation fails because the table would ignore InstanceAssignmentConfig
-   * when the partitions are already set.
-   */
+  /// Detects whether both InstanceAssignmentConfig and InstancePartitionsMap are set for a given
+  /// instance partitions type. Validation fails because the table would ignore InstanceAssignmentConfig
+  /// when the partitions are already set.
   @VisibleForTesting
   static void validateInstancePartitionsTypeMapConfig(TableConfig tableConfig) {
     if (MapUtils.isEmpty(tableConfig.getInstancePartitionsMap()) || MapUtils.isEmpty(
@@ -1373,11 +1350,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Detects whether both replicaGroupStrategyConfig and replicaGroupPartitionConfig are set for a given
-   * table. Validation fails because the table would ignore replicaGroupStrategyConfig
-   * when the replicaGroupPartitionConfig is already set.
-   */
+  /// Detects whether both replicaGroupStrategyConfig and replicaGroupPartitionConfig are set for a given
+  /// table. Validation fails because the table would ignore replicaGroupStrategyConfig
+  /// when the replicaGroupPartitionConfig is already set.
   @VisibleForTesting
   static void validatePartitionedReplicaGroupInstance(TableConfig tableConfig) {
     if (tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() == null || MapUtils.isEmpty(
@@ -1421,15 +1396,13 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the partial upsert-related configurations:
-   *  - Null handling must be enabled
-   *  - Merger cannot be applied to private key columns
-   *  - Merger cannot be applied to non-existing columns
-   *  - INCREMENT merger must be applied to numeric columns
-   *  - APPEND/UNION merger cannot be applied to single-value columns
-   *  - INCREMENT merger cannot be applied to date time column
-   */
+  /// Validates the partial upsert-related configurations:
+  ///  - Null handling must be enabled
+  ///  - Merger cannot be applied to private key columns
+  ///  - Merger cannot be applied to non-existing columns
+  ///  - INCREMENT merger must be applied to numeric columns
+  ///  - APPEND/UNION merger cannot be applied to single-value columns
+  ///  - INCREMENT merger cannot be applied to date time column
   @VisibleForTesting
   static void validatePartialUpsertStrategies(TableConfig tableConfig, Schema schema) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -1484,14 +1457,12 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates backward compatibility for table config updates.
-   * Checks critical upsert and dedup configuration fields that should not be changed.
-   *
-   * @param newConfig the new table config being applied
-   * @param existingConfig the existing table config
-   * @return list of violations (empty if no violations)
-   */
+  /// Validates backward compatibility for table config updates.
+  /// Checks critical upsert and dedup configuration fields that should not be changed.
+  ///
+  /// @param newConfig the new table config being applied
+  /// @param existingConfig the existing table config
+  /// @return list of violations (empty if no violations)
   public static List<String> validateBackwardCompatibility(TableConfig newConfig, TableConfig existingConfig) {
     List<String> violations = new ArrayList<>();
     validateUpsertConfigUpdate(newConfig, existingConfig, violations);
@@ -1501,18 +1472,16 @@ public final class TableConfigUtils {
     return violations;
   }
 
-  /**
-   * Validates that critical upsert configuration fields are not changed during table config update.
-   * Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
-   * deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn.
-   *
-   * <p>Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
-   * not validated here — they may be added, removed, or changed on existing tables.
-   *
-   * @param newConfig the new table config being applied
-   * @param existingConfig the existing table config
-   * @param violations list to collect violation messages
-   */
+  /// Validates that critical upsert configuration fields are not changed during table config update.
+  /// Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
+  /// deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn.
+  ///
+  /// Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
+  /// not validated here — they may be added, removed, or changed on existing tables.
+  ///
+  /// @param newConfig the new table config being applied
+  /// @param existingConfig the existing table config
+  /// @param violations list to collect violation messages
   private static void validateUpsertConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
       List<String> violations) {
     boolean existingUpsertEnabled = existingConfig.isUpsertEnabled();
@@ -1573,14 +1542,12 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates that critical dedup configuration fields are not changed during table config update.
-   * Checks: dedupEnabled, hashFunction, dedupTimeColumn, timeColumnName (when dedupTimeColumn not specified).
-   *
-   * @param newConfig the new table config being applied
-   * @param existingConfig the existing table config
-   * @param violations list to collect violation messages
-   */
+  /// Validates that critical dedup configuration fields are not changed during table config update.
+  /// Checks: dedupEnabled, hashFunction, dedupTimeColumn, timeColumnName (when dedupTimeColumn not specified).
+  ///
+  /// @param newConfig the new table config being applied
+  /// @param existingConfig the existing table config
+  /// @param violations list to collect violation messages
   private static void validateDedupConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
       List<String> violations) {
     boolean existingDedupEnabled = existingConfig.isDedupEnabled();
@@ -1620,11 +1587,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates materialized-view table identity and task-config consistency.
-   * Identity is declared only via {@link TableConfig#isMaterializedView()}; task configs alone do not
-   * make a table an MV.
-   */
+  /// Validates materialized-view table identity and task-config consistency.
+  /// Identity is declared only via [TableConfig#isMaterializedView()]; task configs alone do not
+  /// make a table an MV.
   @VisibleForTesting
   static void validateMaterializedViewInvariants(TableConfig tableConfig) {
     boolean isMaterializedView = tableConfig.isMaterializedView();
@@ -1687,9 +1652,7 @@ public final class TableConfigUtils {
     return configs.get(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
   }
 
-  /**
-   * Validates task configuration to ensure no conflicting task types are configured.
-   */
+  /// Validates task configuration to ensure no conflicting task types are configured.
   @VisibleForTesting
   static void validateTaskConfig(TableConfig tableConfig) {
     TableTaskConfig taskConfig = tableConfig.getTaskConfig();
@@ -1718,11 +1681,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the tier configs
-   * Checks for the right segmentSelectorType and its required properties
-   * Checks for the right storageType and its required properties
-   */
+  /// Validates the tier configs
+  /// Checks for the right segmentSelectorType and its required properties
+  /// Checks for the right storageType and its required properties
   private static void validateTierConfigList(@Nullable List<TierConfig> tierConfigList) {
     if (tierConfigList == null) {
       return;
@@ -2085,9 +2046,7 @@ public final class TableConfigUtils {
     return null;
   }
 
-  /**
-   * Ensure that the table config has the minimum number of replicas set as per cluster configs.
-   */
+  /// Ensure that the table config has the minimum number of replicas set as per cluster configs.
   public static void ensureMinReplicas(TableConfig tableConfig, int defaultTableMinReplicas) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     int replication = tableConfig.getReplication();
@@ -2098,10 +2057,8 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Ensure the table config has storage quota set as per cluster configs.
-   * If it doesn't, set the quota config into the table config
-   */
+  /// Ensure the table config has storage quota set as per cluster configs.
+  /// If it doesn't, set the quota config into the table config
   public static void ensureStorageQuotaConstraints(TableConfig tableConfig, String maxAllowedSize) {
     // Dim tables must adhere to cluster level storage size limits
     if (tableConfig.isDimTable()) {
@@ -2130,9 +2087,7 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Consistency checks across the offline and realtime counterparts of a hybrid table
-   */
+  /// Consistency checks across the offline and realtime counterparts of a hybrid table
   public static void verifyHybridTableConfigs(String rawTableName, TableConfig offlineTableConfig,
       TableConfig realtimeTableConfig) {
     Preconditions.checkNotNull(offlineTableConfig,
@@ -2182,13 +2137,11 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Checks if the table config has inconsistent state configurations that could cause
-   * data inconsistency during force commit/reload operations.
-   *
-   * @param tableConfig the table config to check, may be null
-   * @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
-   */
+  /// Checks if the table config has inconsistent state configurations that could cause
+  /// data inconsistency during force commit/reload operations.
+  ///
+  /// @param tableConfig the table config to check, may be null
+  /// @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
   public static boolean isTableTypeInconsistentDuringConsumption(@Nullable TableConfig tableConfig) {
     if (tableConfig == null) {
       return false;
@@ -2210,10 +2163,8 @@ public final class TableConfigUtils {
     ALL, TASK, UPSERT, TENANT, MINION_INSTANCES, ACTIVE_TASKS
   }
 
-  /**
-   * needsEmptySegmentPruner checks if EmptySegmentPruner is needed for a TableConfig.
-   * @param tableConfig Input table config.
-   */
+  /// needsEmptySegmentPruner checks if EmptySegmentPruner is needed for a TableConfig.
+  /// @param tableConfig Input table config.
   public static boolean needsEmptySegmentPruner(TableConfig tableConfig) {
     if (isKinesisConfigured(tableConfig)) {
       return true;
@@ -2263,13 +2214,10 @@ public final class TableConfigUtils {
     return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
   }
 
-  /**
-   * Helper method to extract TableConfig in updated syntax from current TableConfig.
-   * <ul>
-   *   <li>Moves all index configs to FieldConfig.indexes</li>
-   *   <li>Clean up index related configs from IndexingConfig and FieldConfig.IndexTypes</li>
-   * </ul>
-   */
+  /// Helper method to extract TableConfig in updated syntax from current TableConfig.
+  ///
+  /// - Moves all index configs to FieldConfig.indexes
+  /// - Clean up index related configs from IndexingConfig and FieldConfig.IndexTypes
   public static TableConfig createTableConfigFromOldFormat(TableConfig tableConfig, Schema schema) {
     TableConfig clone = new TableConfig(tableConfig);
     for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
@@ -2293,15 +2241,12 @@ public final class TableConfigUtils {
     return upsertConfig != null && upsertConfig.isEnableCommitTimeCompaction();
   }
 
-  /**
-   * Helper method to convert from legacy/deprecated configs into current version of TableConfig.
-   * <ul>
-   *   <li>Moves deprecated ingestion related configs into Ingestion Config.</li>
-   *   <li>The conversion happens in-place, the specified tableConfig is mutated in-place.</li>
-   * </ul>
-   *
-   * @param tableConfig Input table config.
-   */
+  /// Helper method to convert from legacy/deprecated configs into current version of TableConfig.
+  ///
+  /// - Moves deprecated ingestion related configs into Ingestion Config.
+  /// - The conversion happens in-place, the specified tableConfig is mutated in-place.
+  ///
+  /// @param tableConfig Input table config.
   @SuppressWarnings("deprecation")
   public static void convertFromLegacyTableConfig(TableConfig tableConfig) {
     // It is possible that indexing as well as ingestion configs exist, in which case we always honor ingestion config.
@@ -2360,41 +2305,39 @@ public final class TableConfigUtils {
     validationConfig.setSegmentPushType(null);
   }
 
-  /**
-   * Helper method to create a new TableConfig by overwriting the original TableConfig with tier specific configs, so
-   * that the consumers of TableConfig don't have to handle tier overwrites themselves. To begin with, we only
-   * consider to overwrite the index configs in `tableIndexConfig` and `fieldConfigList`, e.g.
-   *
-   * {
-   *   "tableIndexConfig": {
-   *     ... // configs allowed in IndexingConfig, for default tier
-   *     "tierOverwrites": {
-   *       "hotTier": {...}, // configs allowed in IndexingConfig, for hot tier
-   *       "coldTier": {...} // configs allowed in IndexingConfig, for cold tier
-   *     }
-   *   }
-   *   "fieldConfigList": [
-   *     {
-   *       ... // configs allowed in FieldConfig, for default tier
-   *       "tierOverwrites": {
-   *         "hotTier": {...}, // configs allowed in FieldConfig, for hot tier
-   *         "coldTier": {...} // configs allowed in FieldConfig, for cold tier
-   *       }
-   *     },
-   *     ...
-   *   ]
-   * }
-   *
-   * Overwriting is to extract tier specific configs from those `tierOverwrites` sections and replace the
-   * corresponding configs set for default tier.
-   *
-   * TODO: Other tier specific configs like segment assignment policy may be handled in this helper method too, to
-   *       keep tier overwrites transparent to consumers of TableConfig.
-   *
-   * @param tableConfig the input table config which is kept intact
-   * @param tier        the target tier to overwrite the table config
-   * @return a new table config overwritten for the tier, or the original table if overwriting doesn't happen.
-   */
+  /// Helper method to create a new TableConfig by overwriting the original TableConfig with tier specific configs, so
+  /// that the consumers of TableConfig don't have to handle tier overwrites themselves. To begin with, we only
+  /// consider to overwrite the index configs in `tableIndexConfig` and `fieldConfigList`, e.g.
+  ///
+  /// {
+  ///   "tableIndexConfig": {
+  ///     ... // configs allowed in IndexingConfig, for default tier
+  ///     "tierOverwrites": {
+  ///       "hotTier": {...}, // configs allowed in IndexingConfig, for hot tier
+  ///       "coldTier": {...} // configs allowed in IndexingConfig, for cold tier
+  ///     }
+  ///   }
+  ///   "fieldConfigList": \[
+  ///     {
+  ///       ... // configs allowed in FieldConfig, for default tier
+  ///       "tierOverwrites": {
+  ///         "hotTier": {...}, // configs allowed in FieldConfig, for hot tier
+  ///         "coldTier": {...} // configs allowed in FieldConfig, for cold tier
+  ///       }
+  ///     },
+  ///     ...
+  ///   \]
+  /// }
+  ///
+  /// Overwriting is to extract tier specific configs from those `tierOverwrites` sections and replace the
+  /// corresponding configs set for default tier.
+  ///
+  /// TODO: Other tier specific configs like segment assignment policy may be handled in this helper method too, to
+  ///       keep tier overwrites transparent to consumers of TableConfig.
+  ///
+  /// @param tableConfig the input table config which is kept intact
+  /// @param tier        the target tier to overwrite the table config
+  /// @return a new table config overwritten for the tier, or the original table if overwriting doesn't happen.
   public static TableConfig overwriteTableConfigForTier(TableConfig tableConfig, @Nullable String tier) {
     if (tier == null) {
       return tableConfig;
@@ -2544,11 +2487,9 @@ public final class TableConfigUtils {
     return tierOverwrites != null && tierOverwrites.isObject() ? tierOverwrites.get(tier) : null;
   }
 
-  /**
-   * Get the partition column from tableConfig instance assignment config map.
-   * @param tableConfig table config
-   * @return partition column
-   */
+  /// Get the partition column from tableConfig instance assignment config map.
+  /// @param tableConfig table config
+  /// @return partition column
   public static String getPartitionColumn(TableConfig tableConfig) {
     // check InstanceAssignmentConfigMap is null or empty,
     if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {

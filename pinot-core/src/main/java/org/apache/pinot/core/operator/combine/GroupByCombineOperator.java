@@ -48,9 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Combine operator for group-by queries.
- */
+/// Combine operator for group-by queries.
 @SuppressWarnings("rawtypes")
 public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
@@ -82,10 +80,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _operatorLatch = new CountDownLatch(_numTasks);
   }
 
-  /**
-   * For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many tasks
-   * as the default number of query worker threads (or the number of operators / segments if that's lower).
-   */
+  /// For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many tasks
+  /// as the default number of query worker threads (or the number of operators / segments if that's lower).
   private static QueryContext overrideMaxExecutionThreads(QueryContext queryContext, int numOperators) {
     int maxExecutionThreads = queryContext.getMaxExecutionThreads();
     if (maxExecutionThreads <= 0) {
@@ -99,9 +95,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     return EXPLAIN_NAME;
   }
 
-  /**
-   * Executes query on one segment in a worker thread and merges the results into the indexed table.
-   */
+  /// Executes query on one segment in a worker thread and merges the results into the indexed table.
   @Override
   protected void processSegments() {
     int operatorId;
@@ -188,19 +182,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _operatorLatch.countDown();
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Combines intermediate selection result blocks from underlying operators and returns a merged one.
-   * <ul>
-   *   <li>
-   *     Merges multiple intermediate selection result blocks as a merged one.
-   *   </li>
-   *   <li>
-   *     Set all exceptions encountered during execution into the merged result block
-   *   </li>
-   * </ul>
-   */
+  /// {@inheritDoc}
+  ///
+  /// Combines intermediate selection result blocks from underlying operators and returns a merged one.
+  ///
+  /// - Merges multiple intermediate selection result blocks as a merged one.
+  /// - Set all exceptions encountered during execution into the merged result block
   @Override
   public BaseResultsBlock mergeResults()
       throws Exception {

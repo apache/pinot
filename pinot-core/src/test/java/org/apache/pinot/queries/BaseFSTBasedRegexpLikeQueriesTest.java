@@ -101,9 +101,7 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
-  /**
-   * Abstract method to be implemented by derived classes to specify index type.
-   */
+  /// Abstract method to be implemented by derived classes to specify index type.
   protected abstract String getIndexType();
 
   @Override

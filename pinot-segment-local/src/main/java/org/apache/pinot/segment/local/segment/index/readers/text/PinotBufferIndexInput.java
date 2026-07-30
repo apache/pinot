@@ -25,10 +25,8 @@ import org.apache.lucene.store.IndexInput;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * Custom Lucene BufferedIndexInput implementation that reads from a PinotDataBuffer.
- * This allows Lucene to read file data directly from memory buffers with buffering for better performance.
- */
+/// Custom Lucene BufferedIndexInput implementation that reads from a PinotDataBuffer.
+/// This allows Lucene to read file data directly from memory buffers with buffering for better performance.
 public class PinotBufferIndexInput extends BufferedIndexInput {
   private final PinotDataBuffer _buffer;
   private final long _length;

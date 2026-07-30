@@ -88,13 +88,11 @@ public class ServerPlanRequestUtils {
         }, false, rowFilters);
   }
 
-  /**
-   * main entry point for compiling leaf-stage {@link StagePlan}.
-   *
-   * @param executionContext the execution context used by the leaf-stage execution engine.
-   * @param stagePlan the distribute stage plan on the leaf.
-   * @return an opChain that executes the leaf-stage, with the leaf-stage execution encapsulated within.
-   */
+  /// main entry point for compiling leaf-stage [StagePlan].
+  ///
+  /// @param executionContext the execution context used by the leaf-stage execution engine.
+  /// @param stagePlan the distribute stage plan on the leaf.
+  /// @return an opChain that executes the leaf-stage, with the leaf-stage execution encapsulated within.
   public static OpChain compileLeafStage(
       OpChainExecutionContext executionContext,
       StagePlan stagePlan,
@@ -135,13 +133,11 @@ public class ServerPlanRequestUtils {
     return OpChainConverterDispatcher.convert(stagePlan.getRootNode(), executionContext, relationConsumer);
   }
 
-  /**
-   * First step of Server physical plan - construct {@link PinotQuery} and determine the leaf-stage boundary
-   * {@link PlanNode}.
-   *
-   * It constructs the content for {@link ServerPlanRequestContext#getPinotQuery()} and set the boundary via:
-   *   {@link ServerPlanRequestContext#setLeafStageBoundaryNode(PlanNode)}.
-   */
+  /// First step of Server physical plan - construct [PinotQuery] and determine the leaf-stage boundary
+  /// [PlanNode].
+  ///
+  /// It constructs the content for [ServerPlanRequestContext#getPinotQuery()] and set the boundary via:
+  ///   [ServerPlanRequestContext#setLeafStageBoundaryNode(PlanNode)].
   private static void constructPinotQueryPlan(ServerPlanRequestContext serverContext,
       Map<String, String> requestMetadata) {
     StagePlan stagePlan = serverContext.getStagePlan();
@@ -153,9 +149,7 @@ public class ServerPlanRequestUtils {
     ServerPlanRequestVisitor.walkPlanNode(stagePlan.getRootNode(), serverContext);
   }
 
-  /**
-   * Entry point to construct a list of {@link InstanceRequest}s for executing leaf-stage v1 runner.
-   */
+  /// Entry point to construct a list of [InstanceRequest]s for executing leaf-stage v1 runner.
   public static List<InstanceRequest> constructServerQueryRequests(OpChainExecutionContext executionContext,
       PinotQuery pinotQuery, InstanceDataManager instanceDataManager) {
     StageMetadata stageMetadata = executionContext.getStageMetadata();
@@ -215,9 +209,7 @@ public class ServerPlanRequestUtils {
     }
   }
 
-  /**
-   * Convert {@link PinotQuery} into an {@link InstanceRequest}.
-   */
+  /// Convert [PinotQuery] into an [InstanceRequest].
   private static InstanceRequest compileInstanceRequest(OpChainExecutionContext executionContext, PinotQuery pinotQuery,
       @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType,
       String tableNameWithType, TableConfig tableConfig, Schema schema, @Nullable List<String> segmentList,
@@ -271,9 +263,7 @@ public class ServerPlanRequestUtils {
     return instanceRequest;
   }
 
-  /**
-   * Helper method to update query options.
-   */
+  /// Helper method to update query options.
   private static void updateQueryOptions(PinotQuery pinotQuery, OpChainExecutionContext executionContext) {
     Map<String, String> queryOptions = pinotQuery.getQueryOptions();
     if (queryOptions != null) {
@@ -288,9 +278,7 @@ public class ServerPlanRequestUtils {
         Long.toString(executionContext.getPassiveDeadlineMs() - executionContext.getActiveDeadlineMs()));
   }
 
-  /**
-   * Helper method to attach the time boundary to the given PinotQuery.
-   */
+  /// Helper method to attach the time boundary to the given PinotQuery.
   private static void attachTimeBoundary(PinotQuery pinotQuery, TimeBoundaryInfo timeBoundaryInfo,
       boolean isOfflineRequest) {
     String timeColumn = timeBoundaryInfo.getTimeColumn();
@@ -309,9 +297,7 @@ public class ServerPlanRequestUtils {
     }
   }
 
-  /**
-   * attach the dynamic filter to the given PinotQuery.
-   */
+  /// attach the dynamic filter to the given PinotQuery.
   static void attachDynamicFilter(PinotQuery pinotQuery, List<Integer> leftKeys, List<Integer> rightKeys,
       List<Object[]> dataContainer, DataSchema dataSchema) {
     List<Expression> expressions = new ArrayList<>();

@@ -29,17 +29,15 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
 
-/**
- * Base class for the offset-based value window functions {@code LAG} and {@code LEAD}. Both return the value of the
- * function's argument from a row at a fixed offset (default 1) before ({@code LAG}) or after ({@code LEAD}) the current
- * row within the partition, support an optional default value emitted when no such row exists, and support the
- * {@code IGNORE NULLS} option which skips null values when counting the offset.
- *
- * <p>Custom window frames are not allowed for these functions (enforced by Calcite).
- *
- * <p>Instances are not thread-safe. The multi-stage window operator creates one instance per operator and invokes it
- * from at most one thread at a time (never concurrently), so no synchronization is required.
- */
+/// Base class for the offset-based value window functions `LAG` and `LEAD`. Both return the value of the
+/// function's argument from a row at a fixed offset (default 1) before (`LAG`) or after (`LEAD`) the
+/// current row within the partition, support an optional default value emitted when no such row exists, and support the
+/// `IGNORE NULLS` option which skips null values when counting the offset.
+///
+/// Custom window frames are not allowed for these functions (enforced by Calcite).
+///
+/// Instances are not thread-safe. The multi-stage window operator creates one instance per operator and invokes it
+/// from at most one thread at a time (never concurrently), so no synchronization is required.
 public abstract class OffsetValueWindowFunction extends ValueWindowFunction {
   protected final int _offset;
   @Nullable
@@ -84,20 +82,18 @@ public abstract class OffsetValueWindowFunction extends ValueWindowFunction {
     _defaultValue = defaultValue;
   }
 
-  /**
-   * Shared {@code IGNORE NULLS} implementation for {@code LAG}/{@code LEAD}. Walks the partition in the given direction
-   * maintaining a bounded sliding window of the {@code _offset} most-recently-seen non-null values; when the window is
-   * full, its oldest element ({@code peekFirst()}) is the offset-th non-null value in the scan direction relative to
-   * the current row. Until {@code _offset} non-null values have been seen, the default value is emitted.
-   *
-   * <p>Runs in O(numRows) time and O(min(_offset, numRows)) memory. Requires {@code _offset >= 1}; the degenerate
-   * {@code _offset <= 0} case (which has no null-skipping semantics) must be routed through the RESPECT NULLS path by
-   * the caller.
-   *
-   * @param rows the rows of a single partition, in partition/collation order
-   * @param iterateForward {@code true} to iterate front-to-back (used by {@code LAG}, which looks at preceding rows);
-   *                       {@code false} to iterate back-to-front (used by {@code LEAD}, which looks at following rows)
-   */
+  /// Shared `IGNORE NULLS` implementation for `LAG`/`LEAD`. Walks the partition in the given
+  /// direction maintaining a bounded sliding window of the `_offset` most-recently-seen non-null values; when the
+  /// window is full, its oldest element (`peekFirst()`) is the offset-th non-null value in the scan direction
+  /// relative to the current row. Until `_offset` non-null values have been seen, the default value is emitted.
+  ///
+  /// Runs in O(numRows) time and O(min(\_offset, numRows)) memory. Requires `_offset >= 1`; the degenerate
+  /// `_offset <= 0` case (which has no null-skipping semantics) must be routed through the RESPECT NULLS path by
+  /// the caller.
+  ///
+  /// @param rows the rows of a single partition, in partition/collation order
+  /// @param iterateForward `true` to iterate front-to-back (used by `LAG`, which looks at preceding rows);
+  ///                       `false` to iterate back-to-front (used by `LEAD`, which looks at following rows)
   protected List<Object> processRowsIgnoreNulls(List<Object[]> rows, boolean iterateForward) {
     int numRows = rows.size();
     Object[] result = new Object[numRows];

@@ -305,12 +305,11 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
     return intermediateResult.getQuantile(_percentile / 100.0);
   }
 
-  /**
-   * Returns the QuantileDigest from the result holder or creates a new one with default max error if it does not exist.
-   *
-   * @param aggregationResultHolder Result holder
-   * @return QuantileDigest from the result holder
-   */
+  /// Returns the QuantileDigest from the result holder or creates a new one with default max error if it does not
+  /// exist.
+  ///
+  /// @param aggregationResultHolder Result holder
+  /// @return QuantileDigest from the result holder
   protected static QuantileDigest getDefaultQuantileDigest(AggregationResultHolder aggregationResultHolder) {
     QuantileDigest quantileDigest = aggregationResultHolder.getResult();
     if (quantileDigest == null) {
@@ -320,13 +319,11 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
     return quantileDigest;
   }
 
-  /**
-   * Returns the QuantileDigest for the given group key if exists, or creates a new one with default max error.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group key for which to return the QuantileDigest
-   * @return QuantileDigest for the group key
-   */
+  /// Returns the QuantileDigest for the given group key if exists, or creates a new one with default max error.
+  ///
+  /// @param groupByResultHolder Result holder
+  /// @param groupKey Group key for which to return the QuantileDigest
+  /// @return QuantileDigest for the group key
   protected static QuantileDigest getDefaultQuantileDigest(GroupByResultHolder groupByResultHolder, int groupKey) {
     QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
     if (quantileDigest == null) {

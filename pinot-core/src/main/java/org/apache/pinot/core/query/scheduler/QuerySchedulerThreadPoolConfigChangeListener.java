@@ -27,10 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Listens for cluster config changes to dynamically resize the query scheduler thread pools
- * ({@code query_runner_threads} and {@code query_worker_threads}).
- */
+/// Listens for cluster config changes to dynamically resize the query scheduler thread pools
+/// (`query_runner_threads` and `query_worker_threads`).
 public class QuerySchedulerThreadPoolConfigChangeListener implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuerySchedulerThreadPoolConfigChangeListener.class);
 

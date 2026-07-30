@@ -112,14 +112,12 @@ import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
 
 
-/**
- * This class serves as the broker entry-point for handling incoming multi-stage query requests and dispatching them
- * to servers.
- */
+/// This class serves as the broker entry-point for handling incoming multi-stage query requests and dispatching them
+/// to servers.
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
   /// Disabled by default, but can be enabled with
-  ///```xml
+  /// ```xml
   ///  <MarkerFilter marker="MSE_STATS_MARKER" onMatch="ACCEPT" onMismatch="NEUTRAL"/>
   ///  ...
   ///  <Loggers>
@@ -129,7 +127,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   ///      </AppenderRef>
   ///    </Logger>
   ///  </Loggers>
-  ///```
+  /// ```
   private static final Marker MSE_STATS_MARKER = MarkerFactory.getMarker("MSE_STATS_MARKER");
 
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
@@ -256,12 +254,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     warmupCompile();
   }
 
-  /**
-   * Best-effort warmup of the Calcite compile pipeline at broker startup. Running a trivial compile
-   * early ensures that JVM class-loading and Calcite initialization costs are paid before real
-   * queries arrive, so that the first MSE queries do not fail due to tight per-query timeout
-   * constraints.
-   */
+  /// Best-effort warmup of the Calcite compile pipeline at broker startup. Running a trivial compile
+  /// early ensures that JVM class-loading and Calcite initialization costs are paid before real
+  /// queries arrive, so that the first MSE queries do not fail due to tight per-query timeout
+  /// constraints.
   private void warmupCompile() {
     // TODO: extend warmup to exercise the full query execution path (planning + dispatch + execution),
     //       not just compilation, to amortize all cold-start costs before serving traffic.
@@ -599,11 +595,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .build();
   }
 
-  /**
-   * Applies broker-level defaults for MSE query options. Per-query overrides (i.e. {@code SET option = value} in the
-   * SQL text) always win because we use {@link Map#putIfAbsent} — a user can set the option to {@code 0} to opt out of
-   * a streaming default that the cluster has enabled.
-   */
+  /// Applies broker-level defaults for MSE query options. Per-query overrides (i.e. `SET option = value` in the
+  /// SQL text) always win because we use [Map#putIfAbsent] — a user can set the option to `0` to opt out of
+  /// a streaming default that the cluster has enabled.
   @VisibleForTesting
   void applyBrokerDefaultQueryOptions(Map<String, String> queryOptions) {
     if (_defaultStreamingGroupByFlushThreshold != null) {
@@ -612,20 +606,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  /**
-   * Extension hook for preparing a compiled query's planner-visible options after compilation, authorization and
-   * broker defaults, but before planning/explain. Subclasses can use the validated table set from
-   * {@link QueryEnvironment.CompiledQuery#getTableNames()} without re-parsing SQL.
-   */
+  /// Extension hook for preparing a compiled query's planner-visible options after compilation, authorization and
+  /// broker defaults, but before planning/explain. Subclasses can use the validated table set from
+  /// [QueryEnvironment.CompiledQuery#getTableNames()] without re-parsing SQL.
   protected void prepareCompiledQueryForPlanning(QueryEnvironment.CompiledQuery compiledQuery, long requestId,
       RequestContext requestContext, HttpHeaders httpHeaders) {
   }
 
-  /**
-   * Estimates the total number of server query threads the given plan will consume; used to acquire permits from the
-   * multi-stage query throttler before dispatch. Subclasses can override to accurately
-   * estimate the real per-server work.
-   */
+  /// Estimates the total number of server query threads the given plan will consume; used to acquire permits from the
+  /// multi-stage query throttler before dispatch. Subclasses can override to accurately
+  /// estimate the real per-server work.
   protected int getEstimatedNumQueryThreads(DispatchableSubPlan dispatchableSubPlan) {
     return dispatchableSubPlan.getEstimatedNumQueryThreads();
   }
@@ -640,11 +630,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return extraPassiveTimeoutMsFromQueryOption != null ? extraPassiveTimeoutMsFromQueryOption : _extraPassiveTimeoutMs;
   }
 
-  /**
-   * Explains the query and returns the broker response.
-   *
-   * Throws using the same conventions as handleRequestThrowing.
-   */
+  /// Explains the query and returns the broker response.
+  ///
+  /// Throws using the same conventions as handleRequestThrowing.
   private BrokerResponse explain(QueryEnvironment.CompiledQuery query, long requestId, RequestContext requestContext,
       Timer timer)
       throws WebApplicationException, QueryException {
@@ -923,13 +911,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
   }
 
-  /**
-   * Calls the given callable in a separate thread and enforces a timeout on it.
-   *
-   * The only exception that can be thrown by this method is a QueryException. All other exceptions are caught and
-   * wrapped in a QueryException. Specifically, {@link TimeoutException} is caught and wrapped in a QueryException with
-   * the error code {@link QueryErrorCode#BROKER_TIMEOUT} and other exceptions are treated as internal errors.
-   */
+  /// Calls the given callable in a separate thread and enforces a timeout on it.
+  ///
+  /// The only exception that can be thrown by this method is a QueryException. All other exceptions are caught and
+  /// wrapped in a QueryException. Specifically, [TimeoutException] is caught and wrapped in a QueryException with
+  /// the error code [QueryErrorCode#BROKER_TIMEOUT] and other exceptions are treated as internal errors.
   private <E> E callAsync(long requestId, String query, Callable<E> queryPlannerResultCallable, Timer timer)
       throws QueryException {
     Future<E> queryPlanResultFuture = _queryCompileExecutor.submit(queryPlannerResultCallable);
@@ -1042,20 +1028,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return _queryDispatcher.cancel(queryId);
   }
 
-  /**
-   * Returns the string representation of the Set of Strings with a limit on the number of elements.
-   * @param setOfStrings Set of strings
-   * @param limit Limit on the number of elements
-   * @return String representation of the set of the form [a,b,c...].
-   */
+  /// Returns the string representation of the Set of Strings with a limit on the number of elements.
+  /// @param setOfStrings Set of strings
+  /// @param limit Limit on the number of elements
+  /// @return String representation of the set of the form \[a,b,c...\].
   private static String toSizeLimitedString(Set<String> setOfStrings, int limit) {
     return setOfStrings.stream().limit(limit)
         .collect(Collectors.joining(", ", "[", setOfStrings.size() > limit ? "...]" : "]"));
   }
 
-  /**
-   * Check if a server that was previously detected as unhealthy is now healthy.
-   */
+  /// Check if a server that was previously detected as unhealthy is now healthy.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);

@@ -43,9 +43,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * A filter operator that uses H3 index for geospatial data inclusion
- */
+/// A filter operator that uses H3 index for geospatial data inclusion
 public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "INCLUSION_FILTER_H3_INDEX";
   private static final String LITERAL_H3_CELLS_CACHE_NAME = "st_contain_literal_h3_cells";
@@ -117,9 +115,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     }
   }
 
-  /**
-   * Returns the filter block document IDs based on the given the partial match doc ids.
-   */
+  /// Returns the filter block document IDs based on the given the partial match doc ids.
   private BlockDocIdSet getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
     ExpressionFilterOperator expressionFilterOperator =
         new ExpressionFilterOperator(_segment, _queryContext, _predicate, _numDocs);

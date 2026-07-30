@@ -35,12 +35,11 @@ public class ReducerDataSchemaUtils {
   private ReducerDataSchemaUtils() {
   }
 
-  /**
-   * Returns the canonical data schema of the aggregation result based on the query and the data schema returned from
-   * the server.
-   * <p>Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
-   * changing the string representation of the expression.
-   */
+  /// Returns the canonical data schema of the aggregation result based on the query and the data schema returned from
+  /// the server.
+  ///
+  /// Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
+  /// changing the string representation of the expression.
   public static DataSchema canonicalizeDataSchemaForAggregation(QueryContext queryContext, DataSchema dataSchema) {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
@@ -58,12 +57,11 @@ public class ReducerDataSchemaUtils {
     return new DataSchema(columnNames, dataSchema.getColumnDataTypes());
   }
 
-  /**
-   * Returns the canonical data schema of the group-by result based on the query and the data schema returned from the
-   * server. Group-by expressions are always at the beginning of the data schema, followed by the aggregations.
-   * <p>Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
-   * changing the string representation of the expression.
-   */
+  /// Returns the canonical data schema of the group-by result based on the query and the data schema returned from the
+  /// server. Group-by expressions are always at the beginning of the data schema, followed by the aggregations.
+  ///
+  /// Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
+  /// changing the string representation of the expression.
   public static DataSchema canonicalizeDataSchemaForGroupBy(QueryContext queryContext, DataSchema dataSchema) {
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
@@ -105,12 +103,11 @@ public class ReducerDataSchemaUtils {
     return new DataSchema(columnNames, dataSchema.getColumnDataTypes());
   }
 
-  /**
-   * Returns the canonical data schema of the distinct result based on the query and the data schema returned from the
-   * server.
-   * <p>Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
-   * changing the string representation of the expression.
-   */
+  /// Returns the canonical data schema of the distinct result based on the query and the data schema returned from the
+  /// server.
+  ///
+  /// Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
+  /// changing the string representation of the expression.
   public static DataSchema canonicalizeDataSchemaForDistinct(QueryContext queryContext, DataSchema dataSchema) {
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
     int numSelectExpressions = selectExpressions.size();

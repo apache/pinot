@@ -33,9 +33,7 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Base class for transform function providing the default implementation for all data types.
- */
+/// Base class for transform function providing the default implementation for all data types.
 public abstract class BaseTransformFunction implements TransformFunction {
   protected static final TransformResultMetadata INT_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.INT, true, false);

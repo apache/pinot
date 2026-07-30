@@ -308,10 +308,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  /**
-   * Creates a RecordInfoReader for the given segment. When comparison columns are configured, reads comparison values
-   * from the columns. When comparison columns are empty, uses segment creation time as the comparison value.
-   */
+  /// Creates a RecordInfoReader for the given segment. When comparison columns are configured, reads comparison values
+  /// from the columns. When comparison columns are empty, uses segment creation time as the comparison value.
   protected UpsertUtils.RecordInfoReader createRecordInfoReader(IndexSegment segment) {
     if (_comparisonColumns.isEmpty()) {
       long segmentCreationTime = getAuthoritativeUpdateOrCreationTime(segment);
@@ -471,11 +469,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
 
-  /**
-   * NOTE: no need to get segmentLock to preload segment as callers ensure the segment is processed by a single thread.
-   * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
-   *       tests. The passed in bitmaps should always be empty.
-   */
+  /// NOTE: no need to get segmentLock to preload segment as callers ensure the segment is processed by a single thread.
+  /// NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
+  ///       tests. The passed in bitmaps should always be empty.
   @VisibleForTesting
   void doPreloadSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
@@ -488,10 +484,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     addSegmentWithoutUpsert(segment, validDocIds, queryableDocIds, recordInfoIterator);
   }
 
-  /**
-   * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
-   *       tests. The passed in bitmaps should always be empty.
-   */
+  /// NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
+  ///       tests. The passed in bitmaps should always be empty.
   @VisibleForTesting
   public void addSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
@@ -514,20 +508,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
   }
 
-  /**
-   * <li> When the replacing segment and current segment are of {@link LLCSegmentName} then the PK should resolve to
-   * row in segment with higher sequence id.
-   * <li> If either or both are not LLC segment, then resolve based on creation time of segment. If creation time is
-   * same then prefer uploaded segment if other is LLCSegmentName
-   * <li> If both are uploaded segment, prefer standard UploadedRealtimeSegmentName, if still a tie, then resolve to
-   * current segment.
-   *
-   * @param segmentName replacing segment name
-   * @param currentSegmentName current segment name having the record for the given primary key
-   * @param segmentCreationTimeMs replacing segment creation time
-   * @param currentSegmentCreationTimeMs current segment creation time
-   * @return true if the record in replacing segment should replace the record in current segment
-   */
+  /// - When the replacing segment and current segment are of [LLCSegmentName] then the PK should resolve to
+  ///   row in segment with higher sequence id.
+  /// - If either or both are not LLC segment, then resolve based on creation time of segment. If creation time is
+  ///   same then prefer uploaded segment if other is LLCSegmentName
+  /// - If both are uploaded segment, prefer standard UploadedRealtimeSegmentName, if still a tie, then resolve to
+  ///   current segment.
+  ///
+  ///   @param segmentName replacing segment name
+  ///   @param currentSegmentName current segment name having the record for the given primary key
+  ///   @param segmentCreationTimeMs replacing segment creation time
+  ///   @param currentSegmentCreationTimeMs current segment creation time
+  ///   @return true if the record in replacing segment should replace the record in current segment
   protected boolean shouldReplaceOnComparisonTie(String segmentName, String currentSegmentName,
       long segmentCreationTimeMs, long currentSegmentCreationTimeMs) {
     // resolve using sequence id if both are LLCSegmentName
@@ -570,10 +562,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  /**
-   * Returns {@code true} when the record is added to the upsert metadata manager, {@code false} when the record is
-   * out-of-order thus not added.
-   */
+  /// Returns `true` when the record is added to the upsert metadata manager, `false` when the record is
+  /// out-of-order thus not added.
   protected abstract boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo);
 
   @Override
@@ -654,10 +644,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
 
-  /**
-   * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from tests.
-   *       The passed-in bitmaps should always be empty.
-   */
+  /// NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from
+  /// tests.
+  ///       The passed-in bitmaps should always be empty.
   @VisibleForTesting
   public void replaceSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, @Nullable Iterator<RecordInfo> recordInfoIterator,
@@ -706,14 +695,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  /**
-   * Determines whether metadata should be reverted when inconsistencies are detected during segment replacement.
-   * This is only applicable when in PROTECTED mode, the old segment is a mutable segment,
-   * and the table has inconsistent state configurations.
-   *
-   * @param oldSegment the old segment being replaced
-   * @return true if metadata revert should be performed on inconsistency
-   */
+  /// Determines whether metadata should be reverted when inconsistencies are detected during segment replacement.
+  /// This is only applicable when in PROTECTED mode, the old segment is a mutable segment,
+  /// and the table has inconsistent state configurations.
+  ///
+  /// @param oldSegment the old segment being replaced
+  /// @return true if metadata revert should be performed on inconsistency
   public boolean shouldRevertMetadataOnInconsistency(IndexSegment oldSegment) {
     return ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode()
         == ConsumingSegmentConsistencyModeListener.Mode.PROTECTED
@@ -721,9 +708,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         && _context.isTableTypeInconsistentDuringConsumption();
   }
 
-  /**
-   * Reverts segment upsert metadata
-   */
+  /// Reverts segment upsert metadata
   protected void revertSegmentUpsertMetadata(IndexSegment oldSegment, String segmentName,
       MutableRoaringBitmap validDocIdsForOldSegment) {
     _logger.info("Inconsistencies noticed for the segment: {} across servers, reverting the metadata to resolve...",
@@ -852,24 +837,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  /**
-   * When we have to process a new segment, if there are comparison value ties for the same primary-key within the
-   * segment, then for Partial Upsert tables we need to make sure that the record location map is updated only
-   * for the latest version of the record. This is specifically a concern for Partial Upsert tables because Realtime
-   * consumption can potentially end up reading the wrong version of a record, which will lead to permanent
-   * data-inconsistency.
-   *
-   * <p>
-   *  This function returns an iterator that will de-dup records with the same primary-key. Moreover, for comparison
-   *  ties, it will only keep the latest record. This iterator can then further be used to update the primary-key
-   *  record location map safely.
-   * </p>
-   *
-   * @param recordInfoIterator iterator over the new segment
-   * @param hashFunction       hash function configured for Upsert's primary keys
-   * @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
-   *         return the latest record.
-   */
+  /// When we have to process a new segment, if there are comparison value ties for the same primary-key within the
+  /// segment, then for Partial Upsert tables we need to make sure that the record location map is updated only
+  /// for the latest version of the record. This is specifically a concern for Partial Upsert tables because Realtime
+  /// consumption can potentially end up reading the wrong version of a record, which will lead to permanent
+  /// data-inconsistency.
+  ///
+  ///  This function returns an iterator that will de-dup records with the same primary-key. Moreover, for comparison
+  ///  ties, it will only keep the latest record. This iterator can then further be used to update the primary-key
+  ///  record location map safely.
+  ///
+  /// @param recordInfoIterator iterator over the new segment
+  /// @param hashFunction       hash function configured for Upsert's primary keys
+  /// @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
+  ///         return the latest record.
   @SuppressWarnings({"rawtypes", "unchecked"})
   protected static Iterator<RecordInfo> resolveComparisonTies(Iterator<RecordInfo> recordInfoIterator,
       HashFunction hashFunction) {
@@ -1151,9 +1132,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected abstract void revertAndRemoveSegment(IndexSegment segment,
       Iterator<Map.Entry<Integer, PrimaryKey>> primaryKeyIterator);
 
-  /**
-   * Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL).
-   */
+  /// Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL).
   protected abstract void doRemoveExpiredPrimaryKeys();
 
   protected synchronized boolean startOperation() {
@@ -1210,13 +1189,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Closed the metadata manager");
   }
 
-  /**
-   * The same R/WLock is used by the two consistency modes, but they are independent:
-   * - For sync mode, upsert threads take WLock to make updates on two segments' bitmaps atomically, and query threads
-   *   take RLock when to access the segment bitmaps.
-   * - For snapshot mode, upsert threads take RLock to make updates on segments' bitmaps so that they can be
-   *   synchronized with threads taking the snapshot of bitmaps, which take the WLock.
-   */
+  /// The same R/WLock is used by the two consistency modes, but they are independent:
+  /// - For sync mode, upsert threads take WLock to make updates on two segments' bitmaps atomically, and query threads
+  ///   take RLock when to access the segment bitmaps.
+  /// - For snapshot mode, upsert threads take RLock to make updates on segments' bitmaps so that they can be
+  ///   synchronized with threads taking the snapshot of bitmaps, which take the WLock.
   protected void replaceDocId(IndexSegment newSegment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, int oldDocId, int newDocId,
       RecordInfo recordInfo) {
@@ -1230,12 +1207,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     trackUpdatedSegmentsSinceLastSnapshot(oldSegment);
   }
 
-  /**
-   *  There is no need to take the R/WLock to update single bitmap, as all methods to update the bitmap is synchronized.
-   *  But for upsertViewBatchRefresh to work correctly, we need to block updates on bitmaps while doing batch refresh,
-   *  which takes WLock. So wrap bitmap update logic inside RLock to allow concurrent updates but to be blocked when
-   *  there is thread doing batch refresh, i.e. to take copies of all bitmaps.
-   */
+  /// There is no need to take the R/WLock to update single bitmap, as all methods to update the bitmap is synchronized.
+  /// But for upsertViewBatchRefresh to work correctly, we need to block updates on bitmaps while doing batch refresh,
+  /// which takes WLock. So wrap bitmap update logic inside RLock to allow concurrent updates but to be blocked when
+  /// there is thread doing batch refresh, i.e. to take copies of all bitmaps.
   protected void replaceDocId(IndexSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
     if (_upsertViewManager == null) {
@@ -1347,13 +1322,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return Set.of();
   }
 
-  /**
-   * Returns the ZooKeeper update time for upsert consistency.
-   * For realtime table, this refers to the time set by the controller when creating new consuming segment.
-   * For offline table, this refers to the segment push time.
-   * This is used to ensure consistent creation time across replicas for upsert operations.
-   * @return ZK push time or creation time in milliseconds, or Long.MIN_VALUE if not set
-   */
+  /// Returns the ZooKeeper update time for upsert consistency.
+  /// For realtime table, this refers to the time set by the controller when creating new consuming segment.
+  /// For offline table, this refers to the segment push time.
+  /// This is used to ensure consistent creation time across replicas for upsert operations.
+  /// @return ZK push time or creation time in milliseconds, or Long.MIN_VALUE if not set
   protected long getAuthoritativeUpdateOrCreationTime(IndexSegment segment) {
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
     if (segmentMetadata instanceof SegmentMetadataImpl segmentMetadataImpl) {

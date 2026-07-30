@@ -47,13 +47,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class acts as a bridge between the API call to controller and the internal API call made to the
- * server to get segment metadata.
- *
- * Currently has two helper methods: one to retrieve the reload time and one to retrieve the segment metadata including
- * the column indexes available.
- */
+/// This class acts as a bridge between the API call to controller and the internal API call made to the
+/// server to get segment metadata.
+///
+/// Currently has two helper methods: one to retrieve the reload time and one to retrieve the segment metadata including
+/// the column indexes available.
 public class TableMetadataReader {
   private static final Logger log = LoggerFactory.getLogger(TableMetadataReader.class);
   private final Executor _executor;
@@ -67,10 +65,8 @@ public class TableMetadataReader {
     _pinotHelixResourceManager = helixResourceManager;
   }
 
-  /**
-   * Check if segments need a reload on any servers. Server list is obtained from the ExternalView of the table
-   * @return response containing a) number of failed responses, b) reload responses returned
-   */
+  /// Check if segments need a reload on any servers. Server list is obtained from the ExternalView of the table
+  /// @return response containing a) number of failed responses, b) reload responses returned
   public TableReloadJsonResponse getServerCheckSegmentsReloadMetadata(String tableNameWithType,
       int timeoutMs)
       throws InvalidConfigException, IOException {
@@ -79,11 +75,9 @@ public class TableMetadataReader {
     return processSegmentMetadataReloadResponse(segmentsMetadataResponse);
   }
 
-  /**
-   * Only send needReload request to servers that are part of the ExternalView. The tagged server list should not be
-   * used as it may be outdated and may not handle scenarios like tiered storage and COMPLETED segments.
-   * needReload throws an exception for servers that don't contain segments for the given table
-   */
+  /// Only send needReload request to servers that are part of the ExternalView. The tagged server list should not be
+  /// used as it may be outdated and may not handle scenarios like tiered storage and COMPLETED segments.
+  /// needReload throws an exception for servers that don't contain segments for the given table
   public ServerSegmentMetadataReader.TableReloadResponse getReloadCheckResponses(String tableNameWithType,
       int timeoutMs) throws InvalidConfigException {
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
@@ -131,19 +125,15 @@ public class TableMetadataReader {
     return new TableReloadJsonResponse(segmentsMetadataResponse.getNumFailedResponses(), response);
   }
 
-  /**
-   * This api takes in list of segments for which we need the metadata.
-   * This calls the server to get the metadata for all segments instead of making a call per segment.
-   */
+  /// This api takes in list of segments for which we need the metadata.
+  /// This calls the server to get the metadata for all segments instead of making a call per segment.
   public JsonNode getSegmentsMetadata(String tableNameWithType, @Nullable List<String> columns,
       @Nullable List<String> segments, int timeoutMs)
       throws InvalidConfigException, IOException {
     return getSegmentsMetadataInternal(tableNameWithType, columns, segments, timeoutMs);
   }
 
-  /**
-   * Common helper used by both the new (server-level) and legacy (segment-level) endpoints.
-   */
+  /// Common helper used by both the new (server-level) and legacy (segment-level) endpoints.
   private JsonNode fetchAndAggregateMetadata(List<String> urls, BiMap<String, String> endpoints, boolean perSegmentJson,
       String tableNameWithType, int timeoutMs)
       throws InvalidConfigException, IOException {
@@ -224,10 +214,8 @@ public class TableMetadataReader {
         tableNameWithType, timeoutMs);
   }
 
-  /**
-   * This method retrieves the full segment metadata for a given table and segment
-   * @return segment metadata
-   */
+  /// This method retrieves the full segment metadata for a given table and segment
+  /// @return segment metadata
   public JsonNode getSegmentMetadata(String tableNameWithType, String segmentName, List<String> columns, int timeoutMs)
       throws InvalidConfigException, IOException {
     Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
@@ -280,10 +268,8 @@ public class TableMetadataReader {
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
 
-  /**
-   * This method retrieves the aggregated valid doc id metadata for a given table.
-   * @return a list of ValidDocIdsMetadataInfo
-   */
+  /// This method retrieves the aggregated valid doc id metadata for a given table.
+  /// @return a list of ValidDocIdsMetadataInfo
   public JsonNode getAggregateValidDocIdsMetadata(String tableNameWithType, List<String> segmentNames,
       String validDocIdsType, int timeoutMs, int numSegmentsBatchPerServerRequest)
       throws InvalidConfigException {

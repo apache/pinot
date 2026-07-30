@@ -29,19 +29,17 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * Interface for within segment aggregation strategy.
- *
- * <p>The implementation should be stateless, and can be shared among multiple segments in multiple threads. The
- * result for each segment should be stored and passed in via the result holder.
- * There should be no assumptions beyond segment boundaries, different aggregation strategies may be utilized
- * across different segments for a given query.
- *
- * <p>Supports both single-key and multi-key CORRELATE_BY. The single-key path is kept as a zero-overhead fast path
- * (structurally identical to the original single-column implementation) to avoid any regression for existing queries.
- *
- * @param <A> Aggregation result accumulated across blocks within segment, kept by result holder.
- */
+/// Interface for within segment aggregation strategy.
+///
+/// The implementation should be stateless, and can be shared among multiple segments in multiple threads. The
+/// result for each segment should be stored and passed in via the result holder.
+/// There should be no assumptions beyond segment boundaries, different aggregation strategies may be utilized
+/// across different segments for a given query.
+///
+/// Supports both single-key and multi-key CORRELATE_BY. The single-key path is kept as a zero-overhead fast path
+/// (structurally identical to the original single-column implementation) to avoid any regression for existing queries.
+///
+/// @param <A> Aggregation result accumulated across blocks within segment, kept by result holder.
 @ThreadSafe
 public abstract class AggregationStrategy<A> {
 
@@ -59,14 +57,10 @@ public abstract class AggregationStrategy<A> {
     _numCorrelateByKeys = _correlateByExpressions.size();
   }
 
-  /**
-   * Creates an aggregation result for single-key correlation.
-   */
+  /// Creates an aggregation result for single-key correlation.
   abstract A createAggregationResult(Dictionary dictionary);
 
-  /**
-   * Creates an aggregation result for multi-key correlation.
-   */
+  /// Creates an aggregation result for multi-key correlation.
   abstract A createAggregationResultMultiKey(Dictionary[] dictionaries);
 
   public A getAggregationResult(Dictionary dictionary, AggregationResultHolder aggregationResultHolder) {
@@ -107,9 +101,7 @@ public abstract class AggregationStrategy<A> {
     return aggResult;
   }
 
-  /**
-   * Performs aggregation on the given block value sets (aggregation only).
-   */
+  /// Performs aggregation on the given block value sets (aggregation only).
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     final int[][] steps = getSteps(blockValSetMap);
@@ -152,10 +144,8 @@ public abstract class AggregationStrategy<A> {
     }
   }
 
-  /**
-   * Performs aggregation on the given group key array and block value sets (aggregation group-by on single-value
-   * columns).
-   */
+  /// Performs aggregation on the given group key array and block value sets (aggregation group-by on single-value
+  /// columns).
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     final int[][] steps = getSteps(blockValSetMap);
@@ -200,10 +190,8 @@ public abstract class AggregationStrategy<A> {
     }
   }
 
-  /**
-   * Performs aggregation on the given group keys array and block value sets (aggregation group-by on multi-value
-   * columns).
-   */
+  /// Performs aggregation on the given group keys array and block value sets (aggregation group-by on multi-value
+  /// columns).
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     final int[][] steps = getSteps(blockValSetMap);
@@ -250,20 +238,16 @@ public abstract class AggregationStrategy<A> {
     }
   }
 
-  /**
-   * Adds a correlation id to the aggregation counter for a given step in the funnel.
-   */
+  /// Adds a correlation id to the aggregation counter for a given step in the funnel.
   abstract void add(Dictionary dictionary, A aggResult, int step, int correlationId);
 
-  /**
-   * Adds a row's composite correlation identity to the aggregation counter for a given step (multi-key path).
-   *
-   * @param aggResult          the aggregation result to update
-   * @param step               the funnel step index
-   * @param dictionaries       one dictionary per correlate-by column
-   * @param correlationDictIds one dictionary ID per correlate-by column for the current row
-   *                           (this array is reused across rows; implementations must not hold a reference)
-   */
+  /// Adds a row's composite correlation identity to the aggregation counter for a given step (multi-key path).
+  ///
+  /// @param aggResult          the aggregation result to update
+  /// @param step               the funnel step index
+  /// @param dictionaries       one dictionary per correlate-by column
+  /// @param correlationDictIds one dictionary ID per correlate-by column for the current row
+  ///                           (this array is reused across rows; implementations must not hold a reference)
   abstract void addMultiKey(A aggResult, int step, Dictionary[] dictionaries, int[] correlationDictIds);
 
   Dictionary getPrimaryDictionary(Map<ExpressionContext, BlockValSet> blockValSetMap) {

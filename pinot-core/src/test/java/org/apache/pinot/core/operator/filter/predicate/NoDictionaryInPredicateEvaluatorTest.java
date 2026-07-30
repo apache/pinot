@@ -44,9 +44,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for all implementations of no-dictionary based predicate evaluators.
- */
+/// Unit test for all implementations of no-dictionary based predicate evaluators.
 public class NoDictionaryInPredicateEvaluatorTest {
   private static final ExpressionContext COLUMN_EXPRESSION = ExpressionContext.forIdentifier("column");
   private static final int NUM_PREDICATE_VALUES = 100;

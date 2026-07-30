@@ -78,9 +78,7 @@ public class DataSchema {
   /// switches on a `null` stored type and fails with a `NullPointerException`.
   private volatile ColumnDataType[] _storedColumnDataTypes;
 
-  /**
-   * Used by both Broker and Server to generate results for EXPLAIN PLAN queries.
-   */
+  /// Used by both Broker and Server to generate results for EXPLAIN PLAN queries.
   public static final DataSchema EXPLAIN_RESULT_SCHEMA =
       new DataSchema(new String[]{"Operator", "Operator_Id", "Parent_Id"}, new ColumnDataType[]{
           ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT
@@ -159,9 +157,7 @@ public class DataSchema {
     return byteArrayOutputStream.toByteArray();
   }
 
-  /**
-   * This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
-   */
+  /// This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
   public static DataSchema fromBytes(ByteBuffer buffer)
       throws IOException {
     // Read the number of columns.
@@ -464,9 +460,7 @@ public class DataSchema {
       return _nullPlaceholder;
     }
 
-    /**
-     * Returns the data type stored in Pinot.
-     */
+    /// Returns the data type stored in Pinot.
     public ColumnDataType getStoredType() {
       return _storedColumnDataType;
     }
@@ -538,30 +532,26 @@ public class DataSchema {
       }
     }
 
-    /**
-     * Converts the value from external value type to the internal value type.
-     *
-     * <p>External value type is used in the following places:
-     * <ul>
-     *   <li>Data ingestion</li>
-     *   <li>Scalar function arguments (UDF)</li>
-     *   <li>Query response</li>
-     * </ul>
-     *
-     * <p>Internal value type is used within the storage and query engine, where value is always of the stored type. For
-     * BYTES type, we use a wrapper class {@link ByteArray} to make it comparable.
-     *
-     * <p>The conversion applies to the following types:
-     * <ul>
-     *   <li>BOOLEAN: boolean -> int</li>
-     *   <li>TIMESTAMP: Timestamp -> long</li>
-     *   <li>BYTES: byte[] -> ByteArray</li>
-     *   <li>BOOLEAN_ARRAY: boolean[] -> int[]</li>
-     *   <li>TIMESTAMP_ARRAY: Timestamp[] -> long[]</li>
-     *   <li>UUID: UUID/String/byte[]/ByteArray -> ByteArray</li>
-     *   <li>UUID_ARRAY: UUID[]/String[]/byte[][]/ByteArray[] -> ByteArray[]</li>
-     * </ul>
-     */
+    /// Converts the value from external value type to the internal value type.
+    ///
+    /// External value type is used in the following places:
+    ///
+    /// - Data ingestion
+    /// - Scalar function arguments (UDF)
+    /// - Query response
+    ///
+    /// Internal value type is used within the storage and query engine, where value is always of the stored type. For
+    /// BYTES type, we use a wrapper class [ByteArray] to make it comparable.
+    ///
+    /// The conversion applies to the following types:
+    ///
+    /// - BOOLEAN: boolean -> int
+    /// - TIMESTAMP: Timestamp -> long
+    /// - BYTES: byte\[\] -> ByteArray
+    /// - BOOLEAN_ARRAY: boolean\[\] -> int\[\]
+    /// - TIMESTAMP_ARRAY: Timestamp\[\] -> long\[\]
+    /// - UUID: UUID/String/byte\[\]/ByteArray -> ByteArray
+    /// - UUID_ARRAY: UUID\[\]/String\[\]/byte\[\]\[\]/ByteArray\[\] -> ByteArray\[\]
     public Object toInternal(Object value) {
       switch (this) {
         case BOOLEAN:
@@ -605,21 +595,18 @@ public class DataSchema {
       }
     }
 
-    /**
-     * Converts the value from internal value type to the external value type.
-     *
-     * <p>The conversion applies to the following types:
-     * <ul>
-     *   <li>BOOLEAN: int -> boolean</li>
-     *   <li>TIMESTAMP: long -> Timestamp</li>
-     *   <li>BYTES: ByteArray -> byte[]</li>
-     *   <li>BOOLEAN_ARRAY: int[] -> boolean[]</li>
-     *   <li>TIMESTAMP_ARRAY: long[] -> Timestamp[]</li>
-     *   <li>BYTES_ARRAY: ByteArray[] -> byte[][]</li>
-     *   <li>UUID: ByteArray -> UUID</li>
-     *   <li>UUID_ARRAY: ByteArray[] -> UUID[]</li>
-     * </ul>
-     */
+    /// Converts the value from internal value type to the external value type.
+    ///
+    /// The conversion applies to the following types:
+    ///
+    /// - BOOLEAN: int -> boolean
+    /// - TIMESTAMP: long -> Timestamp
+    /// - BYTES: ByteArray -> byte\[\]
+    /// - BOOLEAN_ARRAY: int\[\] -> boolean\[\]
+    /// - TIMESTAMP_ARRAY: long\[\] -> Timestamp\[\]
+    /// - BYTES_ARRAY: ByteArray\[\] -> byte\[\]\[\]
+    /// - UUID: ByteArray -> UUID
+    /// - UUID_ARRAY: ByteArray\[\] -> UUID\[\]
     public Object toExternal(Object value) {
       switch (this) {
         case BOOLEAN:
@@ -643,10 +630,8 @@ public class DataSchema {
       }
     }
 
-    /**
-     * Converts the given internal value to the type for external use (e.g. as UDF argument). The given value should be
-     * compatible with the type. This method should be used on the reducer side of the single-stage engine.
-     */
+    /// Converts the given internal value to the type for external use (e.g. as UDF argument). The given value should be
+    /// compatible with the type. This method should be used on the reducer side of the single-stage engine.
     public Serializable convert(Object value) {
       switch (this) {
         case INT:
@@ -698,10 +683,9 @@ public class DataSchema {
       }
     }
 
-    /**
-     * Formats the value based on the type to be used in the JSON query response. For BIG_DECIMAL, even though JSON can
-     * serialize BigDecimal, it is best practice to convert it to String to avoid precision loss during deserialization.
-     */
+    /// Formats the value based on the type to be used in the JSON query response. For BIG_DECIMAL, even though JSON can
+    /// serialize BigDecimal, it is best practice to convert it to String to avoid precision loss during
+    /// deserialization.
     public Serializable format(Object value) {
       switch (this) {
         case BIG_DECIMAL:
@@ -726,9 +710,7 @@ public class DataSchema {
       }
     }
 
-    /**
-     * Equivalent to {@link #convert(Object)} and {@link #format(Object)} with a single switch statement.
-     */
+    /// Equivalent to [#convert(Object)] and [#format(Object)] with a single switch statement.
     public Serializable convertAndFormat(Object value) {
       switch (this) {
         case INT:

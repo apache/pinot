@@ -29,11 +29,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * This test is created to show the bug in Helix 0.9.8 that if a ZooKeeper IdealState is larger than 1MB after
- * compression, it cannot be updated anymore. Somehow this test can also make sure in future we will support
- * large IdealStates
- */
+/// This test is created to show the bug in Helix 0.9.8 that if a ZooKeeper IdealState is larger than 1MB after
+/// compression, it cannot be updated anymore. Somehow this test can also make sure in future we will support
+/// large IdealStates
 public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
 
   @BeforeClass

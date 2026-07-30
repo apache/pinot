@@ -28,22 +28,20 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
-/**
- * Rewrite non-aggregation group-by query to distinct query.
- * The query can be rewritten only if select expression set and group-by expression set are the same.
- * If they are not, the original query is returned.
- *
- * E.g.
- * SELECT col1, col2 FROM foo GROUP BY col1, col2 --> SELECT DISTINCT col1, col2 FROM foo
- * SELECT col1, col2 FROM foo GROUP BY col2, col1 --> SELECT DISTINCT col1, col2 FROM foo
- * SELECT col1 + col2 FROM foo GROUP BY col1 + col2 --> SELECT DISTINCT col1 + col2 FROM foo
- * SELECT col1 AS c1 FROM foo GROUP BY col1 --> SELECT DISTINCT col1 AS c1 FROM foo
- * SELECT col1, col1 AS c1, col2 FROM foo GROUP BY col1, col2 --> SELECT DISTINCT col1, col1 AS ci, col2 FROM foo
- *
- * Not rewritten queries:
- * SELECT col1 FROM foo GROUP BY col1, col2 (not equivalent to SELECT DISTINCT col1 FROM foo)
- * SELECT col1 + col2 FROM foo GROUP BY col1, col2 (not equivalent to SELECT col1 + col2 FROM foo)
- */
+/// Rewrite non-aggregation group-by query to distinct query.
+/// The query can be rewritten only if select expression set and group-by expression set are the same.
+/// If they are not, the original query is returned.
+///
+/// E.g.
+/// SELECT col1, col2 FROM foo GROUP BY col1, col2 --> SELECT DISTINCT col1, col2 FROM foo
+/// SELECT col1, col2 FROM foo GROUP BY col2, col1 --> SELECT DISTINCT col1, col2 FROM foo
+/// SELECT col1 + col2 FROM foo GROUP BY col1 + col2 --> SELECT DISTINCT col1 + col2 FROM foo
+/// SELECT col1 AS c1 FROM foo GROUP BY col1 --> SELECT DISTINCT col1 AS c1 FROM foo
+/// SELECT col1, col1 AS c1, col2 FROM foo GROUP BY col1, col2 --> SELECT DISTINCT col1, col1 AS ci, col2 FROM foo
+///
+/// Not rewritten queries:
+/// SELECT col1 FROM foo GROUP BY col1, col2 (not equivalent to SELECT DISTINCT col1 FROM foo)
+/// SELECT col1 + col2 FROM foo GROUP BY col1, col2 (not equivalent to SELECT col1 + col2 FROM foo)
 public class NonAggregationGroupByToDistinctQueryRewriter implements QueryRewriter {
 
   @Override

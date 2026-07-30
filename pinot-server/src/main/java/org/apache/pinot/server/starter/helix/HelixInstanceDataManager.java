@@ -81,9 +81,7 @@ import org.slf4j.LoggerFactory;
 import static java.util.Objects.requireNonNull;
 
 
-/**
- * The class <code>HelixInstanceDataManager</code> is the instance data manager based on Helix.
- */
+/// The class `HelixInstanceDataManager` is the instance data manager based on Helix.
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
@@ -520,10 +518,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
   }
 
-  /**
-   * Assemble the path to segment dir directly, when table mgr object is not
-   * created for the given table yet.
-   */
+  /// Assemble the path to segment dir directly, when table mgr object is not
+  /// created for the given table yet.
   @Override
   public File getSegmentDataDirectory(String tableNameWithType, String segmentName) {
     return new File(new File(_instanceDataManagerConfig.getInstanceDataDir(), tableNameWithType), segmentName);

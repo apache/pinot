@@ -23,16 +23,12 @@ import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Class contains a number of non-static scalar functions optimized by re-using various buffers.
- */
+/// Class contains a number of non-static scalar functions optimized by re-using various buffers.
 public class StringFunctions {
 
   private final StringBuilder _buffer = new StringBuilder();
 
-  /**
-   * Joins two input strings with separator in between.
-   */
+  /// Joins two input strings with separator in between.
   @ScalarFunction
   public String concat(String input1, String input2, String separator) {
     _buffer.setLength(0);
@@ -42,9 +38,7 @@ public class StringFunctions {
         .toString();
   }
 
-  /**
-   * Joins two input strings with separator in between.
-   */
+  /// Joins two input strings with separator in between.
   @ScalarFunction
   public String concatWS(String separator, String input1, String input2) {
     _buffer.setLength(0);
@@ -54,9 +48,7 @@ public class StringFunctions {
         .toString();
   }
 
-  /**
-   * @see Strings#replace(String, String, String)
-   */
+  /// @see Strings#replace(String, String, String)
   @ScalarFunction
   public String replace(String text, String searchString, String replacement) {
     if (text.isEmpty() || searchString.isEmpty()) {

@@ -41,10 +41,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Periodic task scheduler will schedule a list of tasks based on their initial delay time and interval time. Tasks
- * can also scheduled of immediate execution by calling the scheduleNow() method.
- */
+/// Periodic task scheduler will schedule a list of tasks based on their initial delay time and interval time. Tasks
+/// can also scheduled of immediate execution by calling the scheduleNow() method.
 public class PeriodicTaskScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskScheduler.class);
   private static final int MAX_QUARTZ_THREADS_HARD_LIMIT = 20;
@@ -57,9 +55,7 @@ public class PeriodicTaskScheduler {
   private Scheduler _scheduler;
   private Map<String, PeriodicTask> _periodicTasks;
 
-  /**
-   * Initializes the periodic task scheduler with a list of periodic tasks.
-   */
+  /// Initializes the periodic task scheduler with a list of periodic tasks.
   public void init(List<PeriodicTask> periodicTasks) {
     _periodicTasks = Maps.newHashMapWithExpectedSize(periodicTasks.size());
     for (PeriodicTask periodicTask : periodicTasks) {
@@ -70,11 +66,8 @@ public class PeriodicTaskScheduler {
     }
   }
 
-  /**
-   * Starts scheduling periodic tasks.
-   * It uses the cron expression if provided, if not, it falls back to the default fixed delay scheduling.
-   *
-   */
+  /// Starts scheduling periodic tasks.
+  /// It uses the cron expression if provided, if not, it falls back to the default fixed delay scheduling.
   public synchronized void start() {
     if (_executorService != null) {
       LOGGER.warn("Periodic task scheduler already started");
@@ -172,9 +165,7 @@ public class PeriodicTaskScheduler {
     }
   }
 
-  /**
-   * Shuts down the executor service and stops the periodic tasks.
-   */
+  /// Shuts down the executor service and stops the periodic tasks.
   public synchronized void stop() {
     if (_executorService != null) {
       LOGGER.info("Stopping periodic task scheduler");
@@ -208,7 +199,7 @@ public class PeriodicTaskScheduler {
     return new ArrayList<>(_periodicTasks.keySet());
   }
 
-  /** Execute {@link PeriodicTask} immediately on the specified table. */
+  /// Execute [PeriodicTask] immediately on the specified table.
   public void scheduleNow(String periodicTaskName, Properties periodicTaskProperties) {
     //in case the executor service hasnt been initialized its better to log a warning than
     // throw a NPE

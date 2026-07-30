@@ -51,9 +51,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Unit tests for PinotAdminClient using mocked transport (no real server).
- */
+/// Unit tests for PinotAdminClient using mocked transport (no real server).
 public class PinotAdminClientTest {
   @Mock
   private PinotAdminTransport _mockTransport;

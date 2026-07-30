@@ -56,9 +56,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests the {@link RealtimeSegmentAssignment#rebalanceTable} method for table with tiers
- */
+/// Tests the [RealtimeSegmentAssignment#rebalanceTable] method for table with tiers
 public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
   private static final int NUM_PARTITIONS = 4;
@@ -375,9 +373,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
         SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
   }
 
-  /**
-   * Selects segments with sequence number 5-14 i.e. 10 segments per partition (40 segments)
-   */
+  /// Selects segments with sequence number 5-14 i.e. 10 segments per partition (40 segments)
   private static class TestSegmentSelectorA implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -391,9 +387,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
   }
 
-  /**
-   * Selects segments with sequence number 0-4 i.e. 5 segments per partition (20 segments)
-   */
+  /// Selects segments with sequence number 0-4 i.e. 5 segments per partition (20 segments)
   private static class TestSegmentSelectorB implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -407,9 +401,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
   }
 
-  /**
-   * Selects no segments
-   */
+  /// Selects no segments
   private static class TestSegmentSelectorC implements TierSegmentSelector {
     @Override
     public String getType() {

@@ -34,11 +34,9 @@ import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.Utf8Utils;
 
 
-/**
- * Utility class to serialize the {@link GenericRow}.
- * The bytes are stored in NATIVE order. The data should be deserialized by the {@link GenericRowDeserializer} on the
- * same host to ensure that both of them are using the same byte order.
- */
+/// Utility class to serialize the [GenericRow].
+/// The bytes are stored in NATIVE order. The data should be deserialized by the [GenericRowDeserializer] on the
+/// same host to ensure that both of them are using the same byte order.
 public class GenericRowSerializer {
   private final int _numFields;
   private final String[] _fieldNames;
@@ -74,9 +72,7 @@ public class GenericRowSerializer {
     }
   }
 
-  /**
-   * Serializes the given {@link GenericRow}.
-   */
+  /// Serializes the given [GenericRow].
   public byte[] serialize(GenericRow row) {
     int numBytes = 0;
 

@@ -44,10 +44,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Immutable segment impl for empty segment
- * Such an IndexSegment contains only the metadata, and no indexes
- */
+/// Immutable segment impl for empty segment
+/// Such an IndexSegment contains only the metadata, and no indexes
 public class EmptyIndexSegment implements ImmutableSegment {
   private static final Logger LOGGER = LoggerFactory.getLogger(EmptyIndexSegment.class);
 

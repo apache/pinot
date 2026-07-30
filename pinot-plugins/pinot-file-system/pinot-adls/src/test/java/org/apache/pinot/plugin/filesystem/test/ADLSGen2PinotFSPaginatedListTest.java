@@ -46,10 +46,8 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for ADLSGen2PinotFS.listFilesWithMetadata(URI, boolean, Predicate, int)
- * — the paginated listing with lazy PagedIterable iteration and early termination.
- */
+/// Unit tests for ADLSGen2PinotFS.listFilesWithMetadata(URI, boolean, Predicate, int)
+/// — the paginated listing with lazy PagedIterable iteration and early termination.
 public class ADLSGen2PinotFSPaginatedListTest {
 
   private static final Predicate<String> ACCEPT_ALL = path -> true;

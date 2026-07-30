@@ -21,9 +21,7 @@ package org.apache.pinot.core.segment.processing.reducer;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 
 
-/**
- * ConcatReducer is a no-op reducer.
- */
+/// ConcatReducer is a no-op reducer.
 public class ConcatReducer implements Reducer {
   private final GenericRowFileManager _fileManager;
 
