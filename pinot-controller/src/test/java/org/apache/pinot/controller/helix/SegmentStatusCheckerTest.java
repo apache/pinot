@@ -578,11 +578,9 @@ public class SegmentStatusCheckerTest {
     return stat;
   }
 
-  /**
-   * A pauseless COMMITTING segment whose replicas are still building (only 1/3 ONLINE in the external view) must not
-   * be counted as under-replicated while it is within the grace window, so percentOfReplicas stays at 100. Regression
-   * test for the SegmentReplicasCriticallyLowForHATable false positive on pauseless tables.
-   */
+  /// A pauseless COMMITTING segment whose replicas are still building (only 1/3 ONLINE in the external view) must not
+  /// be counted as under-replicated while it is within the grace window, so percentOfReplicas stays at 100. Regression
+  /// test for the SegmentReplicasCriticallyLowForHATable false positive on pauseless tables.
   @Test
   public void realtimeCommittingSegmentWithinGraceNotUnderReplicated() {
     TableConfig tableConfig =
@@ -628,10 +626,8 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 0);
   }
 
-  /**
-   * A COMMITTING segment that has been under-replicated for longer than the grace window is a genuinely stuck commit
-   * and must still be flagged (percentOfReplicas drops), so the grace does not mask real problems.
-   */
+  /// A COMMITTING segment that has been under-replicated for longer than the grace window is a genuinely stuck commit
+  /// and must still be flagged (percentOfReplicas drops), so the grace does not mask real problems.
   @Test
   public void realtimeCommittingSegmentBeyondGraceUnderReplicated() {
     TableConfig tableConfig =
