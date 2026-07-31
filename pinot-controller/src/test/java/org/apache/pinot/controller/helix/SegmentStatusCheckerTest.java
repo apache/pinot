@@ -801,6 +801,12 @@ public class SegmentStatusCheckerTest {
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    // myTable_2 was just pushed (znode mtime is now) so it is within the grace window and skipped; the others were
+    // pushed long ago.
+    when(propertyStore.getStat(anyString(), anyInt())).thenAnswer(inv -> {
+      String path = inv.getArgument(0);
+      return mockStatWithMTime(path.endsWith("myTable_2") ? System.currentTimeMillis() : 11111L);
+    });
 
     runSegmentStatusChecker(resourceManager, 600);
     verifyControllerMetrics(OFFLINE_TABLE_NAME, 0, 3, 3, 2, 100, 0, 100, 0, 3702);
@@ -824,6 +830,8 @@ public class SegmentStatusCheckerTest {
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    // Both segments were just updated/created (znode mtime is now), so they are within the grace window and skipped.
+    when(propertyStore.getStat(anyString(), anyInt())).thenReturn(mockStatWithMTime(System.currentTimeMillis()));
 
     runSegmentStatusChecker(resourceManager, 600);
     verifyControllerMetrics(REALTIME_TABLE_NAME, 0, 2, 2, 1, 100, 0, 100, 0, 1234);
