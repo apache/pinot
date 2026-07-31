@@ -36,16 +36,14 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for {@link SortedLongDistinctSet}, the sorted-run backed {@code LongSet} used by the no-scan DISTINCT
- * aggregation path. These verify that it upholds the {@code LongSet} contract and, critically, that its lazy sorted
- * union produces exactly the same distinct set as a {@link LongOpenHashSet} across the code paths the combine phase
- * exercises: single run, multi-run merges, merges with a non-sorted collection, unsorted input, duplicates spanning
- * runs, empty inputs, and post-materialization mutation.
- */
+/// Unit tests for [SortedLongDistinctSet], the sorted-run backed `LongSet` used by the no-scan DISTINCT aggregation
+/// path. These verify that it upholds the `LongSet` contract and, critically, that its lazy sorted union produces
+/// exactly the same distinct set as a `LongOpenHashSet` across the code paths the combine phase exercises: single
+/// run, multi-run merges, mixed-type merges in both operand orders, unsorted input, duplicates spanning runs, empty
+/// inputs, and post-materialization mutation.
 public class SortedLongDistinctSetTest {
 
-  /** Builds a set from an already sorted, duplicate-free run (the constructor is private; use the checked factory). */
+  /// Builds a set from an already sorted, duplicate-free run (the constructor is private; use the checked factory).
   private static SortedLongDistinctSet sortedSet(long[] sortedDistinct) {
     return SortedLongDistinctSet.fromValues(sortedDistinct, sortedDistinct.length, true);
   }
