@@ -22,12 +22,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
+import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
@@ -36,6 +42,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -68,7 +75,7 @@ public class OpenStructColumnSplitterTest {
   }
 
   private OpenStructIndexConfig config(double minFillRate, int maxDenseKeys, Set<String> denseKeys) {
-    return new OpenStructIndexConfig(false, null, maxDenseKeys, denseKeys, minFillRate, null);
+    return new OpenStructIndexConfig(false, null, maxDenseKeys, denseKeys, minFillRate, null, null);
   }
 
   @Test
@@ -267,7 +274,7 @@ public class OpenStructColumnSplitterTest {
     FieldConfig rawConfig = new FieldConfig.Builder("amount")
         .withEncodingType(FieldConfig.EncodingType.RAW).build();
     OpenStructIndexConfig cfg = new OpenStructIndexConfig(
-        false, null, -1, null, 0.5, List.of(rawConfig));
+        false, null, -1, null, 0.5, List.of(rawConfig), null);
     OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("amount", new BigDecimal("7.5").add(BigDecimal.valueOf(d))), d);
@@ -355,7 +362,7 @@ public class OpenStructColumnSplitterTest {
     // A RAW-configured key takes the standard raw var-byte forward index path (no dictionary).
     FieldConfig rawConfig = new FieldConfig.Builder("note")
         .withEncodingType(FieldConfig.EncodingType.RAW).build();
-    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(rawConfig));
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(rawConfig), null);
     OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("note", "n" + d), d);
@@ -378,7 +385,7 @@ public class OpenStructColumnSplitterTest {
     // An INT key configured with range + bloom must produce those index buffers via the generic loop.
     JsonNode indexes = JsonUtils.stringToJsonNode("{\"range\": {}, \"bloom\": {}}");
     FieldConfig keyConfig = new FieldConfig.Builder("clicks").withIndexes(indexes).build();
-    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig));
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig), null);
     OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("clicks", d), d);
@@ -403,12 +410,141 @@ public class OpenStructColumnSplitterTest {
         .withEncodingType(FieldConfig.EncodingType.RAW)
         .withIndexes(indexes)
         .build();
-    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig));
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig), null);
     OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
     for (int d = 0; d < 10; d++) {
       s.add(Map.of("tag", "v" + d), d);
     }
 
     assertThrows(IllegalStateException.class, s::seal);
+  }
+
+  @Test
+  public void testParentMetadataCarriesSparseKeyManifest()
+      throws Exception {
+    // maxDenseKeys=0 forces every key sparse regardless of fill rate.
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+        config(0.5, 0, null));
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("region", "us", "latencyMs", (long) d), d);
+    }
+    s.seal();
+
+    PropertiesConfiguration parentProps = s.getMaterializedColumnMetadata().get("metrics");
+    assertNotNull(parentProps);
+    String jsonManifest = parentProps.getString(
+        V1Constants.MetadataKeys.Column.getKeyFor("metrics", V1Constants.MetadataKeys.Column.SPARSE_KEYS));
+    assertNotNull(jsonManifest);
+    Set<String> sparseKeys = new HashSet<>(
+        JsonUtils.stringToObject(jsonManifest, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() { }));
+    assertEquals(sparseKeys, Set.of("region", "latencyMs"));
+  }
+
+  @Test
+  public void testParentMetadataManifestExcludesDenseKeys()
+      throws Exception {
+    // "clicks" is present on every doc (dense); "rare" is present on one doc (sparse). The manifest
+    // must list only the sparse key, not the dense one.
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+        config(0.5, -1, null));
+    s.add(Map.of("clicks", 1L, "rare", "x"), 0);
+    for (int d = 1; d < 10; d++) {
+      s.add(Map.of("clicks", (long) d), d);
+    }
+    s.seal();
+
+    PropertiesConfiguration parentProps = s.getMaterializedColumnMetadata().get("metrics");
+    assertNotNull(parentProps);
+    String jsonManifest = parentProps.getString(
+        V1Constants.MetadataKeys.Column.getKeyFor("metrics", V1Constants.MetadataKeys.Column.SPARSE_KEYS));
+    assertNotNull(jsonManifest);
+    Set<String> sparseKeys = new HashSet<>(
+        JsonUtils.stringToObject(jsonManifest, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() { }));
+    assertEquals(sparseKeys, Set.of("rare"));
+  }
+
+  @Test
+  public void testParentMetadataOmitsManifestWhenNoSparseKeys()
+      throws Exception {
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+        config(0.5, -1, null));
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("clicks", (long) d), d);
+    }
+    s.seal();
+
+    PropertiesConfiguration parentProps = s.getMaterializedColumnMetadata().get("metrics");
+    assertNotNull(parentProps);
+    assertFalse(parentProps.containsKey(
+        V1Constants.MetadataKeys.Column.getKeyFor("metrics", V1Constants.MetadataKeys.Column.SPARSE_KEYS)));
+    assertEquals(parentProps.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        "metrics", V1Constants.MetadataKeys.Column.HAS_SPARSE_COLUMN)), "false");
+  }
+
+  @Test
+  public void testParentMetadataManifestIncludesCommaKey()
+      throws Exception {
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+        config(0.5, 0, null));
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("region", "us", "weird,key", "x"), d);
+    }
+    s.seal();
+
+    PropertiesConfiguration parentProps = s.getMaterializedColumnMetadata().get("metrics");
+    assertNotNull(parentProps);
+    assertTrue(parentProps.containsKey(
+        V1Constants.MetadataKeys.Column.getKeyFor("metrics", V1Constants.MetadataKeys.Column.SPARSE_KEYS)));
+    assertEquals(parentProps.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        "metrics", V1Constants.MetadataKeys.Column.HAS_SPARSE_COLUMN)), "true");
+  }
+
+  @Test
+  public void testSparseJsonIndexBuiltWhenEnabled()
+      throws Exception {
+    // Pins bare key form (not "$."-prefixed) — MapFilterOperator fast path relies on this.
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, 0, null, null, null, true);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    s.add(Map.of("region", "us"), 0);
+    s.add(Map.of(), 1);
+    s.add(Map.of("region", "eu"), 2);
+    s.seal();
+
+    String sparseCol = OpenStructNaming.sparseColumnName("metrics");
+    File indexFile = new File(_tempDir, sparseCol + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(indexFile.exists());
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
+      ImmutableJsonIndexReader reader = new ImmutableJsonIndexReader(buffer, 3);
+
+      MutableRoaringBitmap us = reader.getMatchingDocIds(FilterContext.forPredicate(
+          new EqPredicate(ExpressionContext.forIdentifier("region"), "us")));
+      assertEquals(us.getCardinality(), 1);
+      assertTrue(us.contains(0));
+      assertFalse(us.contains(1));
+      assertFalse(us.contains(2));
+
+      MutableRoaringBitmap eu = reader.getMatchingDocIds(FilterContext.forPredicate(
+          new EqPredicate(ExpressionContext.forIdentifier("region"), "eu")));
+      assertEquals(eu.getCardinality(), 1);
+      assertTrue(eu.contains(2));
+      assertFalse(eu.contains(0));
+      assertFalse(eu.contains(1));
+    }
+  }
+
+  @Test
+  public void testSparseJsonIndexAbsentByDefault()
+      throws Exception {
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, 0, null, null, null, null);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    s.add(Map.of("region", "us"), 0);
+    s.add(Map.of(), 1);
+    s.add(Map.of("region", "eu"), 2);
+    s.seal();
+
+    String sparseCol = OpenStructNaming.sparseColumnName("metrics");
+    File indexFile = new File(_tempDir, sparseCol + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertFalse(indexFile.exists());
   }
 }

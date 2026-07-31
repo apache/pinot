@@ -199,6 +199,14 @@ public class V1Constants {
       // Whether this OPEN_STRUCT column has a sparse column for keys not materialized as dense.
       public static final String HAS_SPARSE_COLUMN = "hasSparseColumn";
 
+      // Names of the keys stored in this OPEN_STRUCT column's sparse column. Stored as a
+      // multi-value list property (via the list delimiter handler). NOTE: a comma embedded inside
+      // a single key name is NOT preserved — the list delimiter handler splits on every comma with
+      // no per-element escaping, so a key like "weird,key" round-trips as two separate keys. Absent
+      // on segments built before the sparse read path — readers must treat every unmaterialized key
+      // as potentially sparse in that case.
+      public static final String SPARSE_KEYS = "sparseKeys";
+
       /// Partition function, all optional
       public static final String PARTITION_FUNCTION = "partitionFunction";
       public static final String NUM_PARTITIONS = "numPartitions";

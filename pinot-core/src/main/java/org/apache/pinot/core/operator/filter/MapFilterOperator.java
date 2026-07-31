@@ -46,13 +46,15 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /// Filter operator for Map/OPEN_STRUCT matching. Dispatches in priority order:
 /// 1. Per-key materialized index (OPEN_STRUCT columns with per-key inverted/range/bloom indexes)
-/// 2. JSON index (JsonMatchFilterOperator)
-/// 3. Expression scan fallback (ExpressionFilterOperator)
+/// 2. Sparse virtual scan / manifest short-circuit (unmaterialized keys with a sparse blob tier)
+/// 3. JSON index (JsonMatchFilterOperator)
+/// 4. Expression scan fallback (ExpressionFilterOperator)
 public class MapFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_MAP";
 
@@ -65,6 +67,7 @@ public class MapFilterOperator extends BaseFilterOperator {
   private final String _columnName;
   private final String _keyName;
   private final Predicate _predicate;
+  private DelegateType _resolvedType = DelegateType.PER_KEY_INDEX;
 
   public MapFilterOperator(IndexSegment indexSegment, Predicate predicate, QueryContext queryContext,
       int numDocs) {
@@ -85,7 +88,7 @@ public class MapFilterOperator extends BaseFilterOperator {
     BaseFilterOperator perKey = tryPerKeyIndex(columnDs, queryContext, numDocs);
     if (perKey != null) {
       _delegate = perKey;
-      _delegateType = DelegateType.PER_KEY_INDEX;
+      _delegateType = _resolvedType;
       return;
     }
 
@@ -117,9 +120,16 @@ public class MapFilterOperator extends BaseFilterOperator {
       return buildAbsentKeyFilterOperator(osDs, queryContext, numDocs);
     }
 
-    // Sparse — the key may be in the sparse blob, which neither the JSON nor the expression path can
-    // read yet, so it evaluates as NULL. See ImmutableOpenStructDataSource#getDataSource.
-    return null;
+    // Sparse tier: virtual source from blob, or null if manifest proves absence.
+    DataSource sparseKeyDs = osDs.getDataSource(_keyName);
+    if (sparseKeyDs == null) {
+      return buildAbsentKeyFilterOperator(osDs, queryContext, numDocs);
+    }
+    BaseFilterOperator jsonFastPath = trySparseJsonIndex(osDs, sparseKeyDs, queryContext, numDocs);
+    if (jsonFastPath != null) {
+      return jsonFastPath;
+    }
+    return buildPerKeyFilterOperator(sparseKeyDs, queryContext, numDocs);
   }
 
   /// Builds the filter for a key that is definitively absent from a fully materialized segment.
@@ -216,6 +226,54 @@ public class MapFilterOperator extends BaseFilterOperator {
       default:
         return null;
     }
+  }
+
+  @Nullable
+  private BaseFilterOperator trySparseJsonIndex(OpenStructDataSource osDs, DataSource sparseKeyDs,
+      QueryContext queryContext, int numDocs) {
+    JsonIndexReader jsonIndex = osDs.getSparseJsonIndex();
+    if (jsonIndex == null) {
+      return null;
+    }
+    if (sparseKeyDs.getDataSourceMetadata().getDataType().getStoredType() != FieldSpec.DataType.STRING) {
+      return null;
+    }
+    List<String> values;
+    boolean negated;
+    switch (_predicate.getType()) {
+      case EQ:
+        values = List.of(((EqPredicate) _predicate).getValue());
+        negated = false;
+        break;
+      case IN:
+        values = ((InPredicate) _predicate).getValues();
+        negated = false;
+        break;
+      case NOT_EQ:
+        values = List.of(((NotEqPredicate) _predicate).getValue());
+        negated = true;
+        break;
+      case NOT_IN:
+        values = ((NotInPredicate) _predicate).getValues();
+        negated = true;
+        break;
+      default:
+        return null;
+    }
+    if (values.contains(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING)) {
+      return null;
+    }
+    if (negated && queryContext.isNullHandlingEnabled()) {
+      return null;
+    }
+    ExpressionContext keyLhs = ExpressionContext.forIdentifier(_keyName);
+    Predicate positive = values.size() == 1
+        ? new EqPredicate(keyLhs, values.get(0))
+        : new InPredicate(keyLhs, values);
+    JsonMatchFilterOperator jsonOp =
+        new JsonMatchFilterOperator(jsonIndex, FilterContext.forPredicate(positive), numDocs);
+    _resolvedType = DelegateType.JSON_MATCH;
+    return negated ? new NotFilterOperator(jsonOp, numDocs, false) : jsonOp;
   }
 
   @Nullable

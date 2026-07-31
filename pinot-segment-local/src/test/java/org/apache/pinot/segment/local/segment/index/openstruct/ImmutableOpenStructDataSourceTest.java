@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
@@ -54,10 +56,11 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of("clicks", clicksDs),
         sparseDs,
         meta,
-        container);
+        container,
+        null);
 
     assertSame(ds.getDataSource("clicks"), clicksDs);
-    // absent key returns null (callers handle the fallback)
+    // absent key with mock sparse (no real forward index) returns null
     assertNull(ds.getDataSource("unknown"));
   }
 
@@ -72,7 +75,8 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of("clicks", clicksDs),
         null,
         meta,
-        container);
+        container,
+        null);
 
     assertTrue(ds.isMaterialized("clicks"));
     assertFalse(ds.isMaterialized("absent"));
@@ -88,7 +92,8 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of(),
         null,
         meta,
-        container);
+        container,
+        null);
 
     assertTrue(ds.isFullyMaterialized());
   }
@@ -104,7 +109,8 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of(),
         sparseDs,
         meta,
-        container);
+        container,
+        null);
 
     assertFalse(ds.isFullyMaterialized());
   }
@@ -119,7 +125,8 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of(),
         null,
         meta,
-        container);
+        container,
+        null);
 
     ComplexFieldSpec fieldSpec = ds.getFieldSpec();
     assertNotNull(fieldSpec);
@@ -140,7 +147,8 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of("clicks", clicksDs),
         null,
         topMeta,
-        container);
+        container,
+        null);
 
     assertSame(ds.getDataSourceMetadata("clicks"), clicksMeta);
     assertNull(ds.getDataSourceMetadata("absent"));
@@ -158,7 +166,8 @@ public class ImmutableOpenStructDataSourceTest {
         perKeyMap,
         null,
         meta,
-        container);
+        container,
+        null);
 
     assertEquals(ds.getDataSources(), perKeyMap);
   }
@@ -173,7 +182,8 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of(),
         null,
         meta,
-        container);
+        container,
+        null);
 
     assertSame(ds.getDataSourceMetadata(), meta);
     assertSame(ds.getIndexContainer(), container);
@@ -186,7 +196,8 @@ public class ImmutableOpenStructDataSourceTest {
         openStructSpec("event"),
         Map.of("clicks", clicksDs),
         null,
-        42);
+        42,
+        null);
 
     DataSourceMetadata meta = ds.getDataSourceMetadata();
     assertNotNull(meta);
@@ -196,5 +207,94 @@ public class ImmutableOpenStructDataSourceTest {
     assertNotNull(ds.getIndexContainer());
     assertTrue(ds.isFullyMaterialized());
     assertSame(ds.getDataSource("clicks"), clicksDs);
+  }
+
+  // --- sparse key virtual DataSource tests ---
+
+  private static DataSource mockSparseDataSource(String[] blobs) {
+    DataSource ds = mock(DataSource.class);
+    org.mockito.Mockito.doReturn(new FakeStringForwardIndex(blobs)).when(ds).getForwardIndex();
+    org.mockito.Mockito.doReturn(FakeStringForwardIndex.nullVector(blobs)).when(ds).getNullValueVector();
+    return ds;
+  }
+
+  @Test
+  public void testManifestKeyGetsVirtualSparseDataSource() {
+    String[] blobs = {"{\"region\":\"us\"}", null};
+    DataSource sparseDs = mockSparseDataSource(blobs);
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"),
+        Map.of(),
+        sparseDs,
+        blobs.length,
+        List.of("region"));
+
+    DataSource regionDs = ds.getDataSource("region");
+    assertNotNull(regionDs);
+    assertTrue(regionDs instanceof SparseKeyDataSource);
+    assertEquals(regionDs.getForwardIndex().getString(0, null), "us");
+    assertSame(ds.getDataSource("region"), regionDs);
+    assertNull(ds.getDataSource("nope"));
+    assertFalse(ds.isMaterialized("region"));
+    assertFalse(ds.isFullyMaterialized());
+  }
+
+  @Test
+  public void testNoManifestFallsBackToVirtualForAnyKey() {
+    String[] blobs = {"{\"region\":\"us\"}", null};
+    DataSource sparseDs = mockSparseDataSource(blobs);
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"),
+        Map.of(),
+        sparseDs,
+        blobs.length,
+        null);
+
+    DataSource anyDs = ds.getDataSource("anything");
+    assertNotNull(anyDs);
+    assertTrue(anyDs instanceof SparseKeyDataSource);
+  }
+
+  @Test
+  public void testDeclaredChildSpecDrivesVirtualType() {
+    String[] blobs = {"{\"latencyMs\":42}", null};
+    DataSource sparseDs = mockSparseDataSource(blobs);
+
+    ComplexFieldSpec spec = new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true,
+        Map.of("latencyMs", new DimensionFieldSpec("latencyMs", DataType.LONG, true)));
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        spec,
+        Map.of(),
+        sparseDs,
+        blobs.length,
+        List.of("latencyMs"));
+
+    DataSource latDs = ds.getDataSource("latencyMs");
+    assertNotNull(latDs);
+    assertEquals(latDs.getDataSourceMetadata().getFieldSpec().getDataType(), DataType.LONG);
+    assertEquals(latDs.getForwardIndex().getLong(0, null), 42L);
+  }
+
+  @Test
+  public void testGetSparseJsonIndexDelegatesToSparseDataSource() {
+    String[] blobs = {"{\"x\":1}", null};
+    DataSource sparseDs = mockSparseDataSource(blobs);
+    org.apache.pinot.segment.spi.index.reader.JsonIndexReader mockJsonIdx =
+        org.mockito.Mockito.mock(org.apache.pinot.segment.spi.index.reader.JsonIndexReader.class);
+    org.mockito.Mockito.doReturn(mockJsonIdx).when(sparseDs).getJsonIndex();
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), Map.of(), sparseDs, blobs.length, null);
+    assertSame(ds.getSparseJsonIndex(), mockJsonIdx);
+  }
+
+  @Test
+  public void testGetSparseJsonIndexNullWhenNoSparseColumn() {
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), Map.of(), null, 5, null);
+    assertNull(ds.getSparseJsonIndex());
   }
 }

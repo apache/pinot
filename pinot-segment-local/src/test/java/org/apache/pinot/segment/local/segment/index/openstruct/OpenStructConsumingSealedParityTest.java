@@ -134,7 +134,7 @@ public class OpenStructConsumingSealedParityTest {
         .build();
 
     OpenStructIndexConfig osConfig =
-        new OpenStructIndexConfig(false, null, -1, Set.of(KEY, "host"), 0.5, List.of());
+        new OpenStructIndexConfig(false, null, -1, Set.of(KEY, "host"), 0.5, List.of(), null);
 
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));

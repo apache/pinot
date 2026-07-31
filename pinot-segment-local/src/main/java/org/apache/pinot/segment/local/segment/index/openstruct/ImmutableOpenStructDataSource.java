@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
@@ -27,42 +30,46 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-
-/// Per-key [DataSource] accessor for sealed (immutable) segments with an OPEN_STRUCT column.
-///
-/// Always columnar — there is no blob branch. Every key that was dense enough during segment
-/// creation gets its own materialized [DataSource] (forward index + optional inverted index /
-/// dictionary). Keys that did not meet the density threshold are stored in an optional sparse
-/// column. [#getDataSource(String)] returns `null` for any unmaterialized key — the sparse
-/// {@link DataSource} is never returned from it.
-///
-/// Use [#isMaterialized(String)] and [#isFullyMaterialized()] together to choose
-/// the query execution path:
-/// - Materialized key → fast path via per-key DataSource (inverted/dictionary index available).
-/// - Not materialized + not fully materialized → key may be in the sparse blob, which the query
-///   layer cannot read yet; the key reads as NULL.
-/// - Not materialized + fully materialized → key is definitively absent; short-circuit.
-///
-/// Thread-safety: immutable after construction; safe for concurrent reads.
+/// Per-key {@link DataSource} accessor for sealed OPEN_STRUCT segments. Dense keys get
+/// materialized DataSources; sparse keys get virtual [SparseKeyDataSource]s backed by the
+/// shared blob parser. Manifest-absent keys return null (definitively absent).
 public class ImmutableOpenStructDataSource extends BaseDataSource implements OpenStructDataSource {
   private final ComplexFieldSpec _fieldSpec;
   private final Map<String, DataSource> _perKeyDataSources;
-  /// Held only as a presence flag for [#isFullyMaterialized()] — nothing reads it as a DataSource.
   @Nullable
   private final DataSource _sparseDataSource;
+  @Nullable
+  private final Set<String> _sparseKeys;
+  @Nullable
+  private final OpenStructSparseBlobReader _sparseBlobReader;
+  private final ConcurrentHashMap<String, DataSource> _sparseKeyDataSourceCache;
 
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
       @Nullable DataSource sparseDataSource, DataSourceMetadata dataSourceMetadata,
-      ColumnIndexContainer indexContainer) {
+      ColumnIndexContainer indexContainer, @Nullable List<String> sparseKeys) {
     super(dataSourceMetadata, indexContainer);
     _fieldSpec = fieldSpec;
     _perKeyDataSources = perKeyDataSources;
     _sparseDataSource = sparseDataSource;
+    _sparseKeys = sparseKeys != null ? Set.copyOf(sparseKeys) : null;
+    if (sparseDataSource != null) {
+      ForwardIndexReader<?> blobFwd = sparseDataSource.getForwardIndex();
+      _sparseBlobReader = blobFwd != null
+          ? new OpenStructSparseBlobReader(blobFwd, sparseDataSource.getNullValueVector(),
+              dataSourceMetadata.getNumDocs())
+          : null;
+    } else {
+      _sparseBlobReader = null;
+    }
+    _sparseKeyDataSourceCache = new ConcurrentHashMap<>();
   }
 
   /// Convenience constructor for segment-load time. Synthesizes a minimal [DataSourceMetadata]
@@ -73,10 +80,10 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   /// Callers must use [#getDataSource(String)] for per-key access; whole-struct projection
   /// (`SELECT open_struct_col`) is handled by the query layer, not the storage layer.
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
-      @Nullable DataSource sparseDataSource, int numDocs) {
+      @Nullable DataSource sparseDataSource, int numDocs, @Nullable List<String> sparseKeys) {
     this(fieldSpec, perKeyDataSources, sparseDataSource,
         new ImmutableOpenStructDataSourceMetadata(fieldSpec, numDocs),
-        new ColumnIndexContainer.FromMap.Builder().build());
+        new ColumnIndexContainer.FromMap.Builder().build(), sparseKeys);
   }
 
   @Override
@@ -87,8 +94,25 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   @Override
   @Nullable
   public DataSource getDataSource(String key) {
-    // TODO: sparse keys read as NULL on the query path; wire the sparse column in (PR 4/4).
-    return _perKeyDataSources.get(key);
+    DataSource ds = _perKeyDataSources.get(key);
+    if (ds != null) {
+      return ds;
+    }
+    if (_sparseBlobReader == null) {
+      return null;
+    }
+    if (_sparseKeys != null && !_sparseKeys.contains(key)) {
+      return null;
+    }
+    return _sparseKeyDataSourceCache.computeIfAbsent(key, this::buildSparseKeyDataSource);
+  }
+
+  private DataSource buildSparseKeyDataSource(String key) {
+    FieldSpec childSpec = _fieldSpec.getChildFieldSpec(key);
+    if (childSpec == null) {
+      childSpec = new DimensionFieldSpec(key, FieldSpec.DataType.STRING, true);
+    }
+    return new SparseKeyDataSource(childSpec, _sparseBlobReader);
   }
 
   @Override
@@ -102,7 +126,7 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   }
 
   /// Returns only the materialized (dense) key DataSources. Sparse keys are not included because
-  /// they share a single JSON column and have no individual DataSource.
+  /// they share a single JSON column and have no individual materialized DataSource.
   @Override
   public Map<String, DataSource> getDataSources() {
     return _perKeyDataSources;
@@ -111,15 +135,21 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   @Override
   @Nullable
   public DataSourceMetadata getDataSourceMetadata(String key) {
-    DataSource ds = _perKeyDataSources.get(key);
+    DataSource ds = getDataSource(key);
     return ds != null ? ds.getDataSourceMetadata() : null;
   }
 
   @Override
   @Nullable
   public ColumnIndexContainer getIndexContainer(String key) {
-    DataSource ds = _perKeyDataSources.get(key);
+    DataSource ds = getDataSource(key);
     return ds instanceof ImmutableDataSource immutableDs ? immutableDs.getIndexContainer() : null;
+  }
+
+  @Override
+  @Nullable
+  public JsonIndexReader getSparseJsonIndex() {
+    return _sparseDataSource != null ? _sparseDataSource.getJsonIndex() : null;
   }
 
   private static class ImmutableOpenStructDataSourceMetadata implements DataSourceMetadata {

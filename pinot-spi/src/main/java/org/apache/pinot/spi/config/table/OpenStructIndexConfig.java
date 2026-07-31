@@ -61,12 +61,13 @@ public class OpenStructIndexConfig extends IndexConfig {
   private final Set<String> _denseKeys;
   private final double _denseKeyMinFillRate;
   private final List<FieldConfig> _valueFieldConfigs;
+  private final boolean _sparseJsonIndex;
   // Eager lookup from key name → FieldConfig for O(1) per-key access. Built in constructor
   // so the config is fully immutable and safe to share across threads.
   private final Map<String, FieldConfig> _valueFieldConfigIndex;
 
   public OpenStructIndexConfig(boolean enabled) {
-    this(!enabled, null, DEFAULT_MAX_DENSE_KEYS, null, DEFAULT_DENSE_KEY_MIN_FILL_RATE, null);
+    this(!enabled, null, DEFAULT_MAX_DENSE_KEYS, null, DEFAULT_DENSE_KEY_MIN_FILL_RATE, null, null);
   }
 
   @JsonCreator
@@ -76,13 +77,15 @@ public class OpenStructIndexConfig extends IndexConfig {
       @JsonProperty("maxDenseKeys") @Nullable Integer maxDenseKeys,
       @JsonProperty("denseKeys") @Nullable Set<String> denseKeys,
       @JsonProperty("denseKeyMinFillRate") @Nullable Double denseKeyMinFillRate,
-      @JsonProperty("valueFieldConfigs") @Nullable List<FieldConfig> valueFieldConfigs) {
+      @JsonProperty("valueFieldConfigs") @Nullable List<FieldConfig> valueFieldConfigs,
+      @JsonProperty("sparseJsonIndex") @Nullable Boolean sparseJsonIndex) {
     super(disabled);
     _defaultValueFieldConfig = defaultValueFieldConfig;
     _maxDenseKeys = maxDenseKeys != null ? maxDenseKeys : DEFAULT_MAX_DENSE_KEYS;
     _denseKeys = denseKeys;
     _denseKeyMinFillRate = denseKeyMinFillRate != null ? denseKeyMinFillRate : DEFAULT_DENSE_KEY_MIN_FILL_RATE;
     _valueFieldConfigs = valueFieldConfigs;
+    _sparseJsonIndex = sparseJsonIndex != null && sparseJsonIndex;
     if (valueFieldConfigs == null || valueFieldConfigs.isEmpty()) {
       _valueFieldConfigIndex = Map.of();
     } else {
@@ -160,6 +163,13 @@ public class OpenStructIndexConfig extends IndexConfig {
       return _defaultValueFieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW;
     }
     return true;
+  }
+
+  /// `true` to build a JSON index on the sparse `$__sparse__` column at segment creation,
+  /// letting eligible sparse-key filters use postings instead of scanning the blob.
+  /// Default `false`.
+  public boolean isSparseJsonIndex() {
+    return _sparseJsonIndex;
   }
 
   private static boolean invertedFromIndexes(FieldConfig fieldConfig, String key) {
