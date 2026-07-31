@@ -343,6 +343,19 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     return new SegmentVersion[][]{{SegmentVersion.v1}, {SegmentVersion.v3}};
   }
 
+  /// Cartesian product of segment version (v1/v3) and geo-column encoding (DICTIONARY/RAW), so the H3 reload test
+  /// exercises both [org.apache.pinot.segment.local.segment.index.loader.invertedindex.H3IndexHandler]
+  /// paths: the dictionary path and the raw `forwardIndexReader.getBytes(...)` path.
+  @DataProvider(name = "h3VersionAndEncoding")
+  public Object[][] h3VersionAndEncoding() {
+    return new Object[][]{
+        {SegmentVersion.v1, FieldConfig.EncodingType.DICTIONARY},
+        {SegmentVersion.v3, FieldConfig.EncodingType.DICTIONARY},
+        {SegmentVersion.v1, FieldConfig.EncodingType.RAW},
+        {SegmentVersion.v3, FieldConfig.EncodingType.RAW}
+    };
+  }
+
   /// Test to check for default column handling and text index creation during
   /// segment load after a new raw column is added to the schema with text index
   /// creation enabled.
@@ -1663,36 +1676,56 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     assertEquals(singleFileIndex.length(), initFileSize);
   }
 
-  /// Regression test for the H3 index builder crashing a segment on empty/default geometry values.
+  /// Regression test for the H3 index builder crashing a segment on empty/default geometry values,
+  /// covering both the dictionary and the raw reload paths across v1/v3 segments.
   ///
   /// When a geo column is added to the schema after a segment was built, old segments have no source
   /// data to derive it from, so the derived BYTES column is filled with its default null value -- the
   /// empty byte array. Building an H3 index over those rows used to call
   /// [org.apache.pinot.segment.local.utils.GeometrySerializer#deserialize(byte\[\])] directly on the
   /// empty bytes, throwing a `BufferUnderflowException` that propagated out of the reload and parked
-  /// the segment in an ERROR state. The handler now routes through the creator's tolerant add path,
-  /// which skips undeserializable/default values when `continueOnError` is enabled (set by
-  /// [#resetIndexConfigs()]), exactly like the segment-creation path.
-  @Test(dataProvider = "bothV1AndV3")
-  public void testH3IndexCreationOnEmptyDefaultValue(SegmentVersion segmentVersion)
+  /// the segment in an ERROR state. The handler now routes through the creator's tolerant path, which
+  /// fast-paths the empty default value and skips undeserializable values when `continueOnError` is
+  /// enabled (set by [#resetIndexConfigs()]), exactly like the segment-creation path.
+  ///
+  /// The `DICTIONARY` case is the empty-default column itself (auto-generated columns are always
+  /// dictionary-encoded, so their `cardinality == 1` value cannot be stored raw). The `RAW` case
+  /// derives a non-dictionary BYTES column holding values that are not decodable as geometry, so the
+  /// raw `forwardIndexReader.getBytes(...)` path is exercised and its values are tolerated (skipped)
+  /// the same way empty defaults are.
+  @Test(dataProvider = "h3VersionAndEncoding")
+  public void testH3IndexCreationOnEmptyDefaultValue(SegmentVersion segmentVersion,
+      FieldConfig.EncodingType encodingType)
       throws Exception {
     buildSegment(segmentVersion);
 
-    // Add newH3Col as a derived column whose default null value is the empty byte array (no explicit
-    // defaultNullValue in the schema), mirroring old segments reloaded after a geo column was added.
+    boolean rawEncoding = encodingType == FieldConfig.EncodingType.RAW;
+    if (rawEncoding) {
+      // Auto-generated empty-default columns are always dictionary-encoded, so to exercise the raw reload path
+      // derive newH3Col from an existing column as raw BYTES. The values are not valid serialized geometry, so the
+      // handler must skip them (like empty defaults) rather than fail.
+      _noDictionaryColumns.add("newH3Col");
+      _ingestionConfig.setTransformConfigs(List.of(new TransformConfig("newH3Col", "toUtf8(column3)")));
+    }
+
+    // Add newH3Col. For DICTIONARY it is a pure default column whose default null value is the empty byte array (no
+    // explicit defaultNullValue in the schema), mirroring old segments reloaded after a geo column was added.
     runPreProcessor(_newColumnsSchemaWithH3EmptyDefault);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
-    assertNotNull(segmentMetadata.getColumnMetadataFor("newH3Col"));
+    ColumnMetadata newH3ColMetadata = segmentMetadata.getColumnMetadataFor("newH3Col");
+    assertNotNull(newH3ColMetadata);
+    assertEquals(newH3ColMetadata.hasDictionary(), !rawEncoding);
 
-    // Build the H3 index over the empty/default values. This must not throw and must produce the index.
+    // Build the H3 index over the values. This must not throw and must produce the index.
     _fieldConfigMap.put("newH3Col",
-        new FieldConfig("newH3Col", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+        new FieldConfig("newH3Col", encodingType, List.of(FieldConfig.IndexType.H3), null,
             Map.of("resolutions", "5")));
     runPreProcessor(_newColumnsSchemaWithH3EmptyDefault);
 
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       assertTrue(reader.hasIndexFor("newH3Col", StandardIndexes.h3()));
+      assertEquals(reader.hasIndexFor("newH3Col", StandardIndexes.dictionary()), !rawEncoding);
     }
   }
 

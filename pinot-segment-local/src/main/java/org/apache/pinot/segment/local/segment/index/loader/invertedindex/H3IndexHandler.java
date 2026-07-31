@@ -46,6 +46,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -212,12 +213,23 @@ public class H3IndexHandler extends BaseIndexHandler {
             .createIndexReader(segmentWriter, colIndexConf, columnMetadata);
         GeoSpatialIndexCreator h3IndexCreator = StandardIndexes.h3().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
-      for (int i = 0; i < numDocs; i++) {
-        int dictId = forwardIndexReader.getDictId(i, readerContext);
-        // Route through add(value, dictId) so that empty/default geometry values (e.g. old segments reloaded after
-        // the geo column was added, which have no source data to build a Point from) are tolerated the same way the
-        // segment-creation path tolerates them, instead of failing the whole reload with a BufferUnderflowException.
-        h3IndexCreator.add(dictionary.getBytesValue(dictId), dictId);
+      // Old segments reloaded after a geo column was added hold a single empty default value (cardinality 1). Decode
+      // that one value once and reuse it for every doc, so the empty default is decoded a single time rather than per
+      // doc. Decoding through the creator's toGeometry() fast-paths the empty default value to null instead of failing
+      // the whole reload with a BufferUnderflowException, tolerating it the same way the segment-creation path does.
+      // For higher-cardinality columns, decode per doc instead of retaining one Geometry per dict id (which for a
+      // high-cardinality geo column would be roughly one per doc and risk a large heap during reload); the per-doc
+      // path still goes through toGeometry(), so the empty default value never throws.
+      if (dictionary.length() == 1) {
+        Geometry geometry = h3IndexCreator.toGeometry(dictionary.getBytesValue(0));
+        for (int i = 0; i < numDocs; i++) {
+          h3IndexCreator.add(geometry);
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          int dictId = forwardIndexReader.getDictId(i, readerContext);
+          h3IndexCreator.add(h3IndexCreator.toGeometry(dictionary.getBytesValue(dictId)));
+        }
       }
       h3IndexCreator.seal();
     }
@@ -236,8 +248,10 @@ public class H3IndexHandler extends BaseIndexHandler {
         GeoSpatialIndexCreator h3IndexCreator = StandardIndexes.h3().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
-        // See handleDictionaryBasedColumn: add(value, dictId) tolerates empty/default geometry values on reload.
-        h3IndexCreator.add(forwardIndexReader.getBytes(i, readerContext), -1);
+        // See handleDictionaryBasedColumn: toGeometry() fast-paths empty/default geometry values to null (no
+        // per-row exception) and add(Geometry) tolerates them on reload the same way segment creation does. The raw
+        // path has no dictionary, so values cannot be cached across docs.
+        h3IndexCreator.add(h3IndexCreator.toGeometry(forwardIndexReader.getBytes(i, readerContext)));
       }
       h3IndexCreator.seal();
     }
