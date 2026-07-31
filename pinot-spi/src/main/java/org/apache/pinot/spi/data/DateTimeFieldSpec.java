@@ -32,8 +32,13 @@ public final class DateTimeFieldSpec extends FieldSpec {
   private String _format;
   private String _granularity;
   private Object _sampleValue;
-  private transient DateTimeFormatSpec _formatSpec;
-  private transient DateTimeGranularitySpec _granularitySpec;
+  /// Lazily derived caches of [#getFormatSpec] and [#getGranularitySpec].
+  ///
+  /// `volatile` is required, not just for the null checks in those getters: a field spec belongs to a `Schema`, which
+  /// is cached and read concurrently by query threads. Without it these values are published unsafely, so a racing
+  /// thread can read the non-null reference while the contents are not yet visible to it.
+  private transient volatile DateTimeFormatSpec _formatSpec;
+  private transient volatile DateTimeGranularitySpec _granularitySpec;
 
   public enum TimeFormat {
     EPOCH, TIMESTAMP, SIMPLE_DATE_FORMAT
