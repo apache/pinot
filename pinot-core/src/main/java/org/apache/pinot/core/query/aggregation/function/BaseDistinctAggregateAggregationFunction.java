@@ -126,8 +126,9 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
 
     QueryThreadContext.checkTerminationAndSampleUsage(this::getResultColumnName);
 
-    // Segments may mix the no-scan path (SortedLongDistinctSet) with the scan path (hash set); the union helper
-    // makes the sorted set the absorbing side regardless of block merge order.
+    // Segments may mix the no-scan path (SortedLongDistinctSet) with the scan path (hash set); on a mixed merge the
+    // union helper degrades to hash-set semantics (plain O(n) inserts, no sorting) so the worst case matches the
+    // pre-optimization behavior regardless of block merge order.
     return SortedLongDistinctSet.union(intermediateResult1, intermediateResult2);
   }
 

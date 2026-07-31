@@ -44,8 +44,10 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 ///
 /// This replaces per-element hashing (which dominated the wall-clock cost of high-cardinality DISTINCT_COUNT queries)
 /// with sorted merging. Serialization as a `LongSet` and DISTINCT_SUM / DISTINCT_AVG value iteration work unchanged.
-/// Inputs that are not already sorted-and-distinct (e.g. a `LongOpenHashSet` arriving via a mixed merge) are sorted
-/// and de-duplicated before being added. One documented contract deviation: [#addAll(LongCollection)] returns `true`
+/// When scan-based (hash set) and no-scan (this class) segment results mix within one query, [#union] degrades the
+/// merge to plain hash inserts so the worst case matches the pre-optimization behavior; a non-sorted collection
+/// passed directly to [#addAll(LongCollection)] is sorted and de-duplicated before being added. One documented
+/// contract deviation: [#addAll(LongCollection)] returns `true`
 /// for any non-empty operand, even if every element was already present -- computing the exact "changed" answer would
 /// force the union eagerly. No caller on the aggregation path reads the return value.
 ///
@@ -109,20 +111,42 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
   }
 
   /// Unions two distinct-value sets when segments may mix the no-scan path (which produces this class) with the scan
-  /// path (which produces hash sets), e.g. a filter that matches all documents in only some segments: whichever side
-  /// the `SortedLongDistinctSet` arrives on, it absorbs the other operand. Merge order of segment blocks is
-  /// nondeterministic, and letting a hash set absorb a sorted set would re-hash every dictionary-sourced value,
-  /// silently losing the sorted-run optimization. For any other type combination this behaves exactly like
-  /// `set1.addAll(set2)`.
+  /// path (which produces hash sets), e.g. a filter that matches all documents in only some segments. On a mixed
+  /// merge the sorted set is drained into the hash set with plain O(n) hash inserts ([#drainTo]) -- no sorting and no
+  /// forced union -- so a mixed query costs what it did before this optimization existed; the sorted-run optimization
+  /// applies only while every merged block is sorted (the unfiltered case it targets). Merge order of segment blocks
+  /// is nondeterministic, so both operand orders are handled. For any other type combination this behaves exactly
+  /// like `set1.addAll(set2)`.
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static Set union(Set set1, Set set2) {
-    if (set2 instanceof SortedLongDistinctSet && !(set1 instanceof SortedLongDistinctSet)
-        && set1 instanceof LongCollection) {
-      ((SortedLongDistinctSet) set2).addAll((LongCollection) set1);
-      return set2;
+    if (set1 instanceof SortedLongDistinctSet) {
+      if (!(set2 instanceof SortedLongDistinctSet) && set2 instanceof LongCollection) {
+        ((SortedLongDistinctSet) set1).drainTo((LongCollection) set2);
+        return set2;
+      }
+    } else if (set2 instanceof SortedLongDistinctSet && set1 instanceof LongCollection) {
+      ((SortedLongDistinctSet) set2).drainTo((LongCollection) set1);
+      return set1;
     }
     set1.addAll(set2);
     return set1;
+  }
+
+  /// Inserts every value of this set into `sink` without forcing the pending union: values are streamed run by run
+  /// (a value may repeat across runs; a set sink deduplicates on insert). This is the mixed-merge degrade path -- the
+  /// per-value cost is a plain hash insert, identical to the pre-optimization behavior.
+  public void drainTo(LongCollection sink) {
+    if (_runs != null) {
+      for (long[] run : _runs) {
+        for (long value : run) {
+          sink.add(value);
+        }
+      }
+    } else {
+      for (int i = 0; i < _size; i++) {
+        sink.add(_values[i]);
+      }
+    }
   }
 
   /// Removes consecutive duplicates from the sorted prefix `[0, size)`; returns the distinct count.

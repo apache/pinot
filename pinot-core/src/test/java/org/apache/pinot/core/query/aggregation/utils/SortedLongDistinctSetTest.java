@@ -267,21 +267,29 @@ public class SortedLongDistinctSetTest {
   }
 
   @Test
-  public void testUnionNormalizesMixedTypes() {
-    // Whichever side the sorted set arrives on, it must absorb the hash set — a hash set absorbing a sorted set
-    // would re-hash every value and lose the sorted-run optimization (block merge order is nondeterministic when
-    // scan-based and no-scan segments mix within one query).
+  public void testUnionDegradesMixedTypesToHashSet() {
+    // When scan-based (hash) and no-scan (sorted) segment results mix within one query, the union must degrade to
+    // plain hash inserts — never sort the hash set's values (that would be O(n log n) where the pre-optimization
+    // hash merge was O(n)). Block merge order is nondeterministic, so both operand orders must behave the same.
     LongOpenHashSet expected = new LongOpenHashSet(new long[]{1L, 2L, 3L, 4L, 5L});
 
-    Set merged = SortedLongDistinctSet.union(new LongOpenHashSet(new long[]{2L, 4L}),
-        sortedSet(sortedDistinct(1L, 3L, 5L)));
-    assertTrue(merged instanceof SortedLongDistinctSet);
-    assertEquals(new LongOpenHashSet(merged), expected);
+    LongOpenHashSet hashFirst = new LongOpenHashSet(new long[]{2L, 4L});
+    Set merged = SortedLongDistinctSet.union(hashFirst, sortedSet(sortedDistinct(1L, 3L, 5L)));
+    assertSame(merged, hashFirst);
+    assertEquals(merged, expected);
 
-    merged = SortedLongDistinctSet.union(sortedSet(sortedDistinct(1L, 3L, 5L)),
-        new LongOpenHashSet(new long[]{2L, 4L}));
-    assertTrue(merged instanceof SortedLongDistinctSet);
-    assertEquals(new LongOpenHashSet(merged), expected);
+    LongOpenHashSet hashSecond = new LongOpenHashSet(new long[]{2L, 4L});
+    merged = SortedLongDistinctSet.union(sortedSet(sortedDistinct(1L, 3L, 5L)), hashSecond);
+    assertSame(merged, hashSecond);
+    assertEquals(merged, expected);
+
+    // Draining a multi-run (never materialized) sorted set must also produce the correct union
+    SortedLongDistinctSet multiRun = sortedSet(sortedDistinct(1L, 3L));
+    multiRun.addAll(sortedSet(sortedDistinct(3L, 5L)));
+    LongOpenHashSet sink = new LongOpenHashSet(new long[]{2L, 4L});
+    merged = SortedLongDistinctSet.union(sink, multiRun);
+    assertSame(merged, sink);
+    assertEquals(merged, expected);
 
     // Same-type unions keep the plain addAll behavior
     merged = SortedLongDistinctSet.union(new LongOpenHashSet(new long[]{1L, 2L, 3L}),
@@ -296,18 +304,24 @@ public class SortedLongDistinctSetTest {
   }
 
   @Test
-  public void testAggregationFunctionMergeNormalizesMixedTypes() {
-    // End-to-end through DistinctCountAggregationFunction.merge, the path the combine phase actually uses
+  public void testAggregationFunctionMergeMixedTypes() {
+    // End-to-end through DistinctCountAggregationFunction.merge, the path the combine phase actually uses: mixed
+    // operands degrade to the hash set in both orders and the final count stays correct
     DistinctCountAggregationFunction function =
         new DistinctCountAggregationFunction(List.of(ExpressionContext.forIdentifier("col")), false);
     LongOpenHashSet expected = new LongOpenHashSet(new long[]{1L, 2L, 3L, 4L, 5L});
 
     Set merged = function.merge(new LongOpenHashSet(new long[]{2L, 4L}), sortedSet(sortedDistinct(1L, 3L, 5L)));
-    assertTrue(merged instanceof SortedLongDistinctSet);
-    assertEquals(new LongOpenHashSet(merged), expected);
+    assertTrue(merged instanceof LongOpenHashSet);
+    assertEquals(merged, expected);
     assertEquals((int) function.extractFinalResult(merged), 5);
 
     merged = function.merge(sortedSet(sortedDistinct(1L, 3L, 5L)), new LongOpenHashSet(new long[]{2L, 4L}));
+    assertTrue(merged instanceof LongOpenHashSet);
+    assertEquals((int) function.extractFinalResult(merged), 5);
+
+    // Pure sorted merges keep the sorted representation (the optimized path)
+    merged = function.merge(sortedSet(sortedDistinct(1L, 3L, 5L)), sortedSet(sortedDistinct(2L, 4L)));
     assertTrue(merged instanceof SortedLongDistinctSet);
     assertEquals((int) function.extractFinalResult(merged), 5);
   }
