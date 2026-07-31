@@ -38,6 +38,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.utils.SortedLongDistinctSet;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -123,8 +124,10 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
 
     QueryThreadContext.checkTerminationAndSampleUsage(this::getResultColumnName);
 
-    intermediateResult1.addAll(intermediateResult2);
-    return intermediateResult1;
+    // Segments may mix the no-scan path (SortedLongDistinctSet) with the scan path (hash set); on a mixed merge the
+    // union helper degrades to hash-set semantics (plain O(n) inserts, no sorting) so the worst case matches the
+    // pre-optimization behavior regardless of block merge order.
+    return SortedLongDistinctSet.union(intermediateResult1, intermediateResult2);
   }
 
   @Override
