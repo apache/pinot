@@ -256,9 +256,7 @@ public class BenchmarkJsonParsing {
     return result;
   }
 
-  /**
-   * BASELINE DECODER: materialize the top-level map, then copy all fields into GenericRow.
-   */
+  /// BASELINE DECODER: materialize the top-level map, then copy all fields into GenericRow.
   @Benchmark
   public GenericRow mapThenExtractAllFields()
       throws IOException {
@@ -267,9 +265,7 @@ public class BenchmarkJsonParsing {
     return _allFieldsExtractor.extract(JsonUtils.bytesToMap(payload, 0, payload.length), _mapAllFieldsRow);
   }
 
-  /**
-   * OPTIMIZED DECODER: stream all top-level values directly into GenericRow.
-   */
+  /// OPTIMIZED DECODER: stream all top-level values directly into GenericRow.
   @Benchmark
   public GenericRow directToGenericRowAllFields() {
     _directAllFieldsRow.clear();
@@ -277,9 +273,7 @@ public class BenchmarkJsonParsing {
     return _allFieldsDecoder.decode(payload, _directAllFieldsRow);
   }
 
-  /**
-   * BASELINE DECODER: materialize the full top-level map, then copy selected fields into GenericRow.
-   */
+  /// BASELINE DECODER: materialize the full top-level map, then copy selected fields into GenericRow.
   @Benchmark
   public GenericRow mapThenExtractSelectedFields()
       throws IOException {
@@ -288,9 +282,7 @@ public class BenchmarkJsonParsing {
     return _selectedFieldsExtractor.extract(JsonUtils.bytesToMap(payload, 0, payload.length), _mapSelectedFieldsRow);
   }
 
-  /**
-   * OPTIMIZED DECODER: materialize selected values only and skip unselected containers.
-   */
+  /// OPTIMIZED DECODER: materialize selected values only and skip unselected containers.
   @Benchmark
   public GenericRow directToGenericRowSelectedFields() {
     _directSelectedFieldsRow.clear();
