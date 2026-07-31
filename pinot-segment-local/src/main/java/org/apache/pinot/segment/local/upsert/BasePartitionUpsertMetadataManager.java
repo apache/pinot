@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
@@ -155,7 +156,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _comparisonColumns = context.getComparisonColumns();
     _deleteRecordColumn = context.getDeleteRecordColumn();
     _hashFunction = context.getHashFunction();
-    _partialUpsertHandler = context.getPartialUpsertHandler();
+    // Build a handler owned by this partition. PartialUpsertHandler is not thread safe, and merges for a partition
+    // run on one consumer thread at a time, same as the _reusePreviousRow scratch state used alongside it.
+    Supplier<PartialUpsertHandler> partialUpsertHandlerSupplier = context.getPartialUpsertHandlerSupplier();
+    _partialUpsertHandler = partialUpsertHandlerSupplier != null ? partialUpsertHandlerSupplier.get() : null;
     _enableSnapshot = context.isSnapshotEnabled();
     _isPreloading = context.isPreloadEnabled();
     _metadataTTL = context.getMetadataTTL();

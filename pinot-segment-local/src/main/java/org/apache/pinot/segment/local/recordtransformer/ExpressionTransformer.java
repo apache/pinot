@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
@@ -47,7 +48,11 @@ import org.slf4j.LoggerFactory;
 ///
 /// NOTE: should put this before the [DataTypeTransformer]. After this, transformed column can be treated as
 /// regular column for other record transformers.
+///
+/// NOTE: This class is not thread safe. It holds [FunctionEvaluator] instances that keep reusable evaluation
+/// state, so each thread needs its own instance.
 /// TODO: Merge this and CustomFunctionEnricher
+@NotThreadSafe
 public class ExpressionTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExpressionTransformer.class);
 

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
@@ -68,9 +69,12 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       }
     }
 
-    PartialUpsertHandler partialUpsertHandler = null;
+    // PartialUpsertHandler is not thread safe, so hand each partition a factory rather than one shared instance.
+    Supplier<PartialUpsertHandler> partialUpsertHandlerSupplier = null;
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
-      partialUpsertHandler = new PartialUpsertHandler(tableConfig, schema, comparisonColumns, upsertConfig);
+      List<String> handlerComparisonColumns = comparisonColumns;
+      partialUpsertHandlerSupplier =
+          () -> new PartialUpsertHandler(tableConfig, schema, handlerComparisonColumns, upsertConfig);
     }
 
     boolean enableSnapshot = upsertConfig.getSnapshot()
@@ -128,7 +132,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         .setPrimaryKeyColumns(primaryKeyColumns)
         .setHashFunction(upsertConfig.getHashFunction())
         .setComparisonColumns(comparisonColumns)
-        .setPartialUpsertHandler(partialUpsertHandler)
+        .setPartialUpsertHandlerSupplier(partialUpsertHandlerSupplier)
         .setDeleteRecordColumn(upsertConfig.getDeleteRecordColumn())
         .setDropOutOfOrderRecord(upsertConfig.isDropOutOfOrderRecord())
         .setOutOfOrderRecordColumn(upsertConfig.getOutOfOrderRecordColumn())

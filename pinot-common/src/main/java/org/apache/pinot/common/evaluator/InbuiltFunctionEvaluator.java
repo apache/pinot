@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
@@ -42,6 +43,10 @@ import org.apache.pinot.spi.function.FunctionEvaluator;
 /// - FunctionNode - executes a function
 /// - ColumnNode - fetches the value of the column from the input GenericRow
 /// - ConstantNode - returns the literal value
+///
+/// NOTE: This class is not thread safe. Function nodes refill one reusable argument array on every evaluation, so
+/// two threads evaluating the same instance can read each other's argument values. Give each thread its own instance.
+@NotThreadSafe
 public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   // Root of the execution tree
   private final ExecutableNode _rootNode;
