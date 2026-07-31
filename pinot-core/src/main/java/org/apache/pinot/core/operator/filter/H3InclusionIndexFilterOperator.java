@@ -140,11 +140,9 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     };
   }
 
-  /**
-   * Returns the null document IDs for the indexed column when query null handling is enabled and the column has a
-   * non-empty null-value vector, otherwise {@code null}. Used to exclude null rows from the negative-check complement
-   * result, which is built across all document IDs and would otherwise include null rows that have no H3 posting.
-   */
+  /// Returns the null document IDs for the indexed column when query null handling is enabled and the column has a
+  /// non-empty null-value vector, otherwise `null`. Used to exclude null rows from the negative-check complement
+  /// result, which is built across all document IDs and would otherwise include null rows that have no H3 posting.
   @Nullable
   private ImmutableRoaringBitmap getNullDocIds() {
     if (!_queryContext.isNullHandlingEnabled()) {

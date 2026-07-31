@@ -319,15 +319,14 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /**
-   * With query null handling enabled, rows whose geometry is null have no H3 posting and must not leak into
-   * match-all, complement (negative check), or lower-bound H3-index results. Each query below matches every non-null
-   * row, so the correct answer is the non-null record count; before the fix the null rows were wrongly counted too.
-   * <p>Note: this compares against the expected count rather than the scan path, because the geospatial transform
-   * functions do not tolerate the null/empty geometry input on the scan path (they throw a BufferUnderflowException),
-   * so the scan path cannot serve as an oracle for all-null rows here. The H3-index path never deserializes the
-   * column values, so it is unaffected.
-   */
+  /// With query null handling enabled, rows whose geometry is null have no H3 posting and must not leak into
+  /// match-all, complement (negative check), or lower-bound H3-index results. Each query below matches every non-null
+  /// row, so the correct answer is the non-null record count; before the fix the null rows were wrongly counted too.
+  ///
+  /// Note: this compares against the expected count rather than the scan path, because the geospatial transform
+  /// functions do not tolerate the null/empty geometry input on the scan path (they throw a BufferUnderflowException),
+  /// so the scan path cannot serve as an oracle for all-null rows here. The H3-index path never deserializes the
+  /// column values, so it is unaffected.
   @Test
   public void testH3IndexWithNullHandling()
       throws Exception {
