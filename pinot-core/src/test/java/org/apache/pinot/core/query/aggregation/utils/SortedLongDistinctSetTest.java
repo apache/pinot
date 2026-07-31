@@ -267,57 +267,71 @@ public class SortedLongDistinctSetTest {
   }
 
   @Test
-  public void testUnionDegradesMixedTypesToHashSet() {
-    // When scan-based (hash) and no-scan (sorted) segment results mix within one query, the union must degrade to
-    // plain hash inserts — never sort the hash set's values (that would be O(n log n) where the pre-optimization
-    // hash merge was O(n)). Block merge order is nondeterministic, so both operand orders must behave the same.
-    LongOpenHashSet expected = new LongOpenHashSet(new long[]{1L, 2L, 3L, 4L, 5L});
+  public void testUnionAbsorbsSmallerSideOnMixedTypes() {
+    // When scan-based (hash) and no-scan (sorted) segment results mix within one query, the smaller side must be
+    // absorbed into the larger side's representation: a hash set smaller than the sorted set is sorted and appended
+    // (cheap — only the small side is sorted), while a hash set at least as large absorbs the sorted values via
+    // plain hash inserts (exactly the pre-optimization cost). Block merge order is nondeterministic, so both operand
+    // orders must behave the same.
+    LongOpenHashSet expected = new LongOpenHashSet(new long[]{1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L});
 
-    LongOpenHashSet hashFirst = new LongOpenHashSet(new long[]{2L, 4L});
-    Set merged = SortedLongDistinctSet.union(hashFirst, sortedSet(sortedDistinct(1L, 3L, 5L)));
-    assertSame(merged, hashFirst);
+    // Hash clearly smaller than sorted (4x margin) -> sorted representation wins, both operand orders
+    SortedLongDistinctSet bigSorted = sortedSet(sortedDistinct(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L));
+    Set merged = SortedLongDistinctSet.union(new LongOpenHashSet(new long[]{9L}), bigSorted);
+    assertSame(merged, bigSorted);
+    assertEquals(new LongOpenHashSet(merged), expected);
+
+    bigSorted = sortedSet(sortedDistinct(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L));
+    merged = SortedLongDistinctSet.union(bigSorted, new LongOpenHashSet(new long[]{9L}));
+    assertSame(merged, bigSorted);
+    assertEquals(new LongOpenHashSet(merged), expected);
+
+    // Hash not clearly smaller -> sorted values drain into the hash set, both operand orders
+    LongOpenHashSet comparableHash = new LongOpenHashSet(new long[]{2L, 4L, 6L, 8L, 9L});
+    merged = SortedLongDistinctSet.union(comparableHash, sortedSet(sortedDistinct(1L, 3L, 5L, 7L)));
+    assertSame(merged, comparableHash);
     assertEquals(merged, expected);
 
-    LongOpenHashSet hashSecond = new LongOpenHashSet(new long[]{2L, 4L});
-    merged = SortedLongDistinctSet.union(sortedSet(sortedDistinct(1L, 3L, 5L)), hashSecond);
-    assertSame(merged, hashSecond);
+    comparableHash = new LongOpenHashSet(new long[]{2L, 4L, 6L, 8L, 9L});
+    merged = SortedLongDistinctSet.union(sortedSet(sortedDistinct(1L, 3L, 5L, 7L)), comparableHash);
+    assertSame(merged, comparableHash);
     assertEquals(merged, expected);
 
     // Draining a multi-run (never materialized) sorted set must also produce the correct union
     SortedLongDistinctSet multiRun = sortedSet(sortedDistinct(1L, 3L));
     multiRun.addAll(sortedSet(sortedDistinct(3L, 5L)));
-    LongOpenHashSet sink = new LongOpenHashSet(new long[]{2L, 4L});
+    LongOpenHashSet sink = new LongOpenHashSet(new long[]{2L, 4L, 6L, 7L, 8L, 9L});
     merged = SortedLongDistinctSet.union(sink, multiRun);
     assertSame(merged, sink);
     assertEquals(merged, expected);
 
     // Same-type unions keep the plain addAll behavior
+    LongOpenHashSet expectedSameType = new LongOpenHashSet(new long[]{1L, 2L, 3L, 4L, 5L});
     merged = SortedLongDistinctSet.union(new LongOpenHashSet(new long[]{1L, 2L, 3L}),
         new LongOpenHashSet(new long[]{4L, 5L}));
     assertTrue(merged instanceof LongOpenHashSet);
-    assertEquals(merged, expected);
+    assertEquals(merged, expectedSameType);
 
     SortedLongDistinctSet first = sortedSet(sortedDistinct(1L, 2L, 3L));
     merged = SortedLongDistinctSet.union(first, sortedSet(sortedDistinct(4L, 5L)));
     assertSame(merged, first);
-    assertEquals(new LongOpenHashSet(merged), expected);
+    assertEquals(new LongOpenHashSet(merged), expectedSameType);
   }
 
   @Test
   public void testAggregationFunctionMergeMixedTypes() {
     // End-to-end through DistinctCountAggregationFunction.merge, the path the combine phase actually uses: mixed
-    // operands degrade to the hash set in both orders and the final count stays correct
+    // operands in both orders produce the correct count regardless of which representation wins
     DistinctCountAggregationFunction function =
         new DistinctCountAggregationFunction(List.of(ExpressionContext.forIdentifier("col")), false);
     LongOpenHashSet expected = new LongOpenHashSet(new long[]{1L, 2L, 3L, 4L, 5L});
 
     Set merged = function.merge(new LongOpenHashSet(new long[]{2L, 4L}), sortedSet(sortedDistinct(1L, 3L, 5L)));
-    assertTrue(merged instanceof LongOpenHashSet);
-    assertEquals(merged, expected);
+    assertEquals(new LongOpenHashSet(merged), expected);
     assertEquals((int) function.extractFinalResult(merged), 5);
 
     merged = function.merge(sortedSet(sortedDistinct(1L, 3L, 5L)), new LongOpenHashSet(new long[]{2L, 4L}));
-    assertTrue(merged instanceof LongOpenHashSet);
+    assertEquals(new LongOpenHashSet(merged), expected);
     assertEquals((int) function.extractFinalResult(merged), 5);
 
     // Pure sorted merges keep the sorted representation (the optimized path)

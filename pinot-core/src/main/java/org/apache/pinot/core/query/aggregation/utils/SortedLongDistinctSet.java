@@ -112,24 +112,38 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
 
   /// Unions two distinct-value sets when segments may mix the no-scan path (which produces this class) with the scan
   /// path (which produces hash sets), e.g. a filter that matches all documents in only some segments. On a mixed
-  /// merge the sorted set is drained into the hash set with plain O(n) hash inserts ([#drainTo]) -- no sorting and no
-  /// forced union -- so a mixed query costs what it did before this optimization existed; the sorted-run optimization
-  /// applies only while every merged block is sorted (the unfiltered case it targets). Merge order of segment blocks
-  /// is nondeterministic, so both operand orders are handled. For any other type combination this behaves exactly
-  /// like `set1.addAll(set2)`.
+  /// merge the smaller side is absorbed into the larger side's representation: when the hash set is smaller than the
+  /// sorted set's value count it is sorted (`O(m log m)` with small `m`) and appended as a run, keeping the sorted
+  /// representation; otherwise the sorted values are drained into the hash set with plain O(n) inserts ([#drainTo]),
+  /// which is exactly the pre-optimization behavior -- in particular a pure scan query (no sorted blocks) is
+  /// unchanged, and a large accumulated hash set is never sorted. Merge order of segment blocks is nondeterministic,
+  /// so both operand orders are handled. For any other type combination this behaves exactly like `set1.addAll(set2)`.
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static Set union(Set set1, Set set2) {
     if (set1 instanceof SortedLongDistinctSet) {
       if (!(set2 instanceof SortedLongDistinctSet) && set2 instanceof LongCollection) {
-        ((SortedLongDistinctSet) set1).drainTo((LongCollection) set2);
-        return set2;
+        return mixedUnion((SortedLongDistinctSet) set1, (LongCollection) set2);
       }
     } else if (set2 instanceof SortedLongDistinctSet && set1 instanceof LongCollection) {
-      ((SortedLongDistinctSet) set2).drainTo((LongCollection) set1);
-      return set1;
+      return mixedUnion((SortedLongDistinctSet) set2, (LongCollection) set1);
     }
     set1.addAll(set2);
     return set1;
+  }
+
+  /// Absorbs the cheaper operand into the other's representation; see [#union]. Sorting the hash side costs roughly
+  /// as much per element as hash-inserting the sorted side at these scales, so the sorted representation is kept only
+  /// when the hash side is at least 4x smaller -- a conservative margin that makes sorting the clear winner (e.g. one
+  /// small scan segment among many no-scan segments). Otherwise the sorted values are drained into the hash set,
+  /// which is exactly the pre-optimization cost, and the accumulator stays a hash set from then on.
+  private static Set mixedUnion(SortedLongDistinctSet sorted, LongCollection hash) {
+    long sortedCount = sorted._runs != null ? sorted._pendingTotal : sorted._size;
+    if (hash.size() * 4L < sortedCount) {
+      sorted.addAll(hash);
+      return sorted;
+    }
+    sorted.drainTo(hash);
+    return (Set) hash;
   }
 
   /// Inserts every value of this set into `sink` without forcing the pending union: values are streamed run by run
