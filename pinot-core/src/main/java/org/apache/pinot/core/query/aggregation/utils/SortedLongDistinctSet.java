@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.utils;
 
 import it.unimi.dsi.fastutil.longs.AbstractLongSet;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongCollection;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import java.util.ArrayList;
@@ -147,19 +148,17 @@ public final class SortedLongDistinctSet extends AbstractLongSet {
   }
 
   /// Inserts every value of this set into `sink` without forcing the pending union: values are streamed run by run
-  /// (a value may repeat across runs; a set sink deduplicates on insert). This is the mixed-merge degrade path -- the
-  /// per-value cost is a plain hash insert, identical to the pre-optimization behavior.
+  /// (a value may repeat across runs; a set sink deduplicates on insert). Runs are passed as zero-copy
+  /// [LongArrayList#wrap] views so a hash-set sink can pre-size once per run instead of rehashing mid-stream --
+  /// matching how it grows when merging another hash set. This is the mixed-merge degrade path; the per-value cost
+  /// is a plain hash insert, identical to the pre-optimization behavior.
   public void drainTo(LongCollection sink) {
     if (_runs != null) {
       for (long[] run : _runs) {
-        for (long value : run) {
-          sink.add(value);
-        }
+        sink.addAll(LongArrayList.wrap(run));
       }
     } else {
-      for (int i = 0; i < _size; i++) {
-        sink.add(_values[i]);
-      }
+      sink.addAll(LongArrayList.wrap(_values, _size));
     }
   }
 

@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -132,7 +133,8 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
         case DISTINCTCOUNTMV:
         case DISTINCTSUMMV:
         case DISTINCTAVGMV:
-          result = getDistinctValueSet(Objects.requireNonNull(dataSource.getDictionary()));
+          result = getDistinctValueSet(Objects.requireNonNull(dataSource.getDictionary()),
+              _queryContext.getFilter() == null);
           break;
         case DISTINCTCOUNTOFFHEAP:
           result = ((DistinctCountOffHeapAggregationFunction) aggregationFunction).extractAggregationResult(
@@ -163,11 +165,13 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
           result = (long) Objects.requireNonNull(dataSource.getDictionary()).length();
           break;
         case DISTINCTCOUNTSMARTHLL:
-          result = getDistinctCountSmartHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
+          result = getDistinctCountSmartHLLResult(_queryContext.getFilter() == null,
+              Objects.requireNonNull(dataSource.getDictionary()),
               (DistinctCountSmartHLLAggregationFunction) aggregationFunction);
           break;
         case DISTINCTCOUNTSMARTHLLPLUS:
-          result = getDistinctCountSmartHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
+          result = getDistinctCountSmartHLLPlusResult(_queryContext.getFilter() == null,
+              Objects.requireNonNull(dataSource.getDictionary()),
               (DistinctCountSmartHLLPlusAggregationFunction) aggregationFunction);
           break;
         case DISTINCTCOUNTULL:
@@ -175,7 +179,8 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
               (DistinctCountULLAggregationFunction) aggregationFunction);
           break;
         case DISTINCTCOUNTSMARTULL:
-          result = getDistinctCountSmartULLResult(Objects.requireNonNull(dataSource.getDictionary()),
+          result = getDistinctCountSmartULLResult(_queryContext.getFilter() == null,
+              Objects.requireNonNull(dataSource.getDictionary()),
               (DistinctCountSmartULLAggregationFunction) aggregationFunction);
           break;
         case DISTINCTCOUNTRAWULL:
@@ -243,7 +248,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     }
   }
 
-  private static Set getDistinctValueSet(Dictionary dictionary) {
+  private static Set getDistinctValueSet(Dictionary dictionary, boolean useSortedRuns) {
     int dictionarySize = dictionary.length();
     switch (dictionary.getValueType()) {
       case INT:
@@ -259,15 +264,27 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
         // SortedLongDistinctSet then unions the per-segment runs during combine without hashing (the dominant cost
         // for high-cardinality DISTINCT_COUNT). Mutable (realtime) dictionaries are insertion-ordered and report
         // isSorted() = false, in which case the values are sorted first.
+        // Sorted runs are used only for filterless queries: then every segment takes the no-scan path and produces
+        // the same representation. With a filter, segments where the filter matches only some documents take the
+        // scan path and produce hash sets, and merging mixed representations is never faster than the plain hash
+        // merge -- so filtered queries keep the hash-set path everywhere and behave exactly as before.
         // Only LONG is optimized here -- it is the common high-cardinality distinct case (IDs, timestamps); INT /
         // FLOAT / DOUBLE keep the hash-set path. The same sorted-run approach generalizes to them if profiling shows
         // it is worthwhile.
-        long[] longValues = new long[dictionarySize];
+        if (useSortedRuns) {
+          long[] longValues = new long[dictionarySize];
+          for (int dictId = 0; dictId < dictionarySize; dictId++) {
+            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
+            longValues[dictId] = dictionary.getLongValue(dictId);
+          }
+          return SortedLongDistinctSet.fromValues(longValues, dictionarySize, dictionary.isSorted());
+        }
+        LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
-          longValues[dictId] = dictionary.getLongValue(dictId);
+          longSet.add(dictionary.getLongValue(dictId));
         }
-        return SortedLongDistinctSet.fromValues(longValues, dictionarySize, dictionary.isSorted());
+        return longSet;
       case FLOAT:
         FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
@@ -381,23 +398,23 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     }
   }
 
-  private static Object getDistinctCountSmartHLLResult(Dictionary dictionary,
+  private static Object getDistinctCountSmartHLLResult(boolean useSortedRuns, Dictionary dictionary,
       DistinctCountSmartHLLAggregationFunction function) {
     if (dictionary.length() > function.getThreshold()) {
       // Store values into a HLL when the dictionary size exceeds the conversion threshold
       return getDistinctValueHLL(dictionary, function.getLog2m());
     } else {
-      return getDistinctValueSet(dictionary);
+      return getDistinctValueSet(dictionary, useSortedRuns);
     }
   }
 
-  private static Object getDistinctCountSmartHLLPlusResult(Dictionary dictionary,
+  private static Object getDistinctCountSmartHLLPlusResult(boolean useSortedRuns, Dictionary dictionary,
       DistinctCountSmartHLLPlusAggregationFunction function) {
     if (dictionary.length() > function.getThreshold()) {
       // Store values into a HLLPlus when the dictionary size exceeds the conversion threshold
       return getDistinctValueHLLPlus(dictionary, function.getP(), function.getSp());
     } else {
-      return getDistinctValueSet(dictionary);
+      return getDistinctValueSet(dictionary, useSortedRuns);
     }
   }
 
@@ -422,12 +439,12 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     }
   }
 
-  private static Object getDistinctCountSmartULLResult(Dictionary dictionary,
+  private static Object getDistinctCountSmartULLResult(boolean useSortedRuns, Dictionary dictionary,
       DistinctCountSmartULLAggregationFunction function) {
     if (dictionary.length() > function.getThreshold()) {
       return getDistinctValueULL(dictionary, function.getP());
     } else {
-      return getDistinctValueSet(dictionary);
+      return getDistinctValueSet(dictionary, useSortedRuns);
     }
   }
 

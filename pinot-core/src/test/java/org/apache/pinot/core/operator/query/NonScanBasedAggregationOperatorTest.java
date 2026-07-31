@@ -28,6 +28,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /// Unit tests for the dictionary-based distinct value extraction in [NonScanBasedAggregationOperator] for LONG
@@ -38,9 +39,15 @@ public class NonScanBasedAggregationOperatorTest {
 
   private static Set invokeGetDistinctValueSet(Dictionary dictionary)
       throws Exception {
-    Method method = NonScanBasedAggregationOperator.class.getDeclaredMethod("getDistinctValueSet", Dictionary.class);
+    return invokeGetDistinctValueSet(dictionary, true);
+  }
+
+  private static Set invokeGetDistinctValueSet(Dictionary dictionary, boolean useSortedRuns)
+      throws Exception {
+    Method method =
+        NonScanBasedAggregationOperator.class.getDeclaredMethod("getDistinctValueSet", Dictionary.class, boolean.class);
     method.setAccessible(true);
-    return (Set) method.invoke(null, dictionary);
+    return (Set) method.invoke(null, dictionary, useSortedRuns);
   }
 
   private static Dictionary mockLongDictionary(boolean sorted, long... values) {
@@ -88,5 +95,15 @@ public class NonScanBasedAggregationOperatorTest {
       throws Exception {
     assertEquals(invokeGetDistinctValueSet(mockLongDictionary(true)).size(), 0);
     assertEquals(invokeGetDistinctValueSet(mockLongDictionary(false, 7L)).size(), 1);
+  }
+
+  @Test
+  public void testLongDistinctValuesFilteredQueryKeepsHashSet()
+      throws Exception {
+    // With a filter in the query, some segments may take the scan path (hash sets); to avoid mixed-representation
+    // merges the no-scan path must also produce a hash set, keeping filtered queries identical to the old behavior
+    Set set = invokeGetDistinctValueSet(mockLongDictionary(true, -5L, 0L, 3L), false);
+    assertTrue(set instanceof LongOpenHashSet);
+    assertEquals(set.size(), 3);
   }
 }
