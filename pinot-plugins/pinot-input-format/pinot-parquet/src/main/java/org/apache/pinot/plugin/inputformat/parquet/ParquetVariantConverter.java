@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.io.api.Converter;
@@ -69,8 +70,15 @@ final class ParquetVariantConverter {
   /// Pinot currently supports only non-repeated, top-level `VARIANT(1)` values. Failing during reader
   /// initialization avoids silently surfacing an unsupported nested/repeated Variant as an ordinary struct.
   static Set<String> validateAndGetTopLevelVariantFields(GroupType schema) {
+    return validateAndGetTopLevelVariantFields(schema, fieldName -> true);
+  }
+
+  private static Set<String> validateAndGetTopLevelVariantFields(GroupType schema, Predicate<String> fieldSelector) {
     Set<String> variantFields = new HashSet<>();
     for (Type field : schema.getFields()) {
+      if (!fieldSelector.test(field.getName())) {
+        continue;
+      }
       if (isVariant(field)) {
         validateTopLevelVariant(field);
         variantFields.add(field.getName());
@@ -84,6 +92,17 @@ final class ParquetVariantConverter {
   /// Validates the file schema and builds an index-aligned reusable converter tree for each top-level VARIANT column.
   static ParquetVariantConverter[] createTopLevelVariantConverters(GroupType schema) {
     Set<String> variantFields = validateAndGetTopLevelVariantFields(schema);
+    return buildTopLevelVariantConverters(schema, variantFields);
+  }
+
+  /// Validates selected top-level fields and builds index-aligned converters for selected VARIANT columns.
+  static ParquetVariantConverter[] createTopLevelVariantConverters(GroupType schema, Predicate<String> fieldSelector) {
+    Set<String> variantFields = validateAndGetTopLevelVariantFields(schema, fieldSelector);
+    return buildTopLevelVariantConverters(schema, variantFields);
+  }
+
+  private static ParquetVariantConverter[] buildTopLevelVariantConverters(GroupType schema,
+      Set<String> variantFields) {
     ParquetVariantConverter[] variantConverters = new ParquetVariantConverter[schema.getFieldCount()];
     for (int fieldIndex = 0; fieldIndex < schema.getFieldCount(); fieldIndex++) {
       Type field = schema.getType(fieldIndex);

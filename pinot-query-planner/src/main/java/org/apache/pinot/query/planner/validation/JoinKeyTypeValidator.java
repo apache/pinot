@@ -26,12 +26,10 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 
 
-/**
- * Validates the logical types used as join keys.
- *
- * <p>This stateless validator is shared by planning and execution so that mixed-version plans are rejected with the
- * same semantics and error messages regardless of where validation first occurs.
- */
+/// Validates the logical types used as join keys.
+///
+/// <p>This stateless validator is shared by planning and execution so that mixed-version plans are rejected with the
+/// same semantics and error messages regardless of where validation first occurs.
 public final class JoinKeyTypeValidator {
   private static final String JOIN_KEY_ERROR =
       "Raw VARIANT values do not support JOIN keys; extract a typed path with variantGet first";
@@ -41,12 +39,10 @@ public final class JoinKeyTypeValidator {
   private JoinKeyTypeValidator() {
   }
 
-  /**
-   * Validates equality/hash keys and, for ASOF joins, ordering keys.
-   *
-   * <p>The right schema can be absent for legacy SEMI and ANTI join plans whose output schema contains only left
-   * columns. In that case, the caller can validate only the left keys.
-   */
+  /// Validates equality/hash keys and, for ASOF joins, ordering keys.
+  ///
+  /// <p>The right schema can be absent for legacy SEMI and ANTI join plans whose output schema contains only left
+  /// columns. In that case, the caller can validate only the left keys.
   public static void validate(JoinNode joinNode, DataSchema leftSchema, @Nullable DataSchema rightSchema) {
     validateEqualityAndHashing(joinNode.getLeftKeys(), leftSchema);
     if (rightSchema == null) {

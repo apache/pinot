@@ -27,9 +27,7 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-/**
- * Batch quickstart for ingesting and querying an Apache Parquet VARIANT column.
- */
+/// Batch quickstart for ingesting and querying an Apache Parquet VARIANT column.
 public class VariantQuickStart extends Quickstart {
   private static final String[] VARIANT_TABLE_DIRECTORIES = {"examples/batch/variantEvents"};
   private static final int EXPECTED_NUM_ROWS = 5;

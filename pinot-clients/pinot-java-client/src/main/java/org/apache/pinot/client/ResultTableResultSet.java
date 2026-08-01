@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 
 
 /// ResultSet which contains the ResultTable from the broker response of a sql query.
@@ -56,6 +57,7 @@ public class ResultTableResultSet extends AbstractResultSet {
     return _columnDataTypesArray.get(columnIndex).asText();
   }
 
+  @Nullable
   @Override
   public String getString(int rowIndex, int columnIndex) {
     JsonNode jsonValue = _rowsArray.get(rowIndex).get(columnIndex);
