@@ -31,6 +31,7 @@ import com.jayway.jsonpath.spi.cache.CacheProvider;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -291,16 +292,37 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = jsonPath(object, jsonPath);
-      if (jsonValue == null) {
-        return defaultValue;
-      }
-      if (jsonValue instanceof Number) {
-        return ((Number) jsonValue).longValue();
-      }
-      return Long.parseLong(jsonValue.toString());
+      return jsonValue != null ? jsonValueToLong(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
+  }
+
+  /// Converts a value resolved by a JSON path to `long` for the `jsonPathLong*` family, following the
+  /// conversion conventions of [org.apache.pinot.spi.utils.PinotDataType]. A `Number` yields its `longValue`
+  /// and a `Boolean` yields `1` / `0`, matching `jsonExtractScalar` on every value a parsed JSON document can
+  /// produce. [Timestamp] / [LocalDate] / [LocalTime] are non-JSON-native scalars a record extractor can
+  /// materialize; they have no parseable numeric `toString`, so they convert to their Pinot internal numeric
+  /// form - epoch millis, days since epoch, and millis since midnight respectively. Anything else (e.g. a JSON
+  /// string holding a number) is parsed from its `toString`, which throws for a value with no numeric meaning
+  /// (`UUID`, `byte[]`, a container) and leaves the caller returning its default value.
+  private static long jsonValueToLong(Object jsonValue) {
+    if (jsonValue instanceof Number) {
+      return ((Number) jsonValue).longValue();
+    }
+    if (jsonValue instanceof Boolean) {
+      return (Boolean) jsonValue ? 1L : 0L;
+    }
+    if (jsonValue instanceof Timestamp) {
+      return ((Timestamp) jsonValue).getTime();
+    }
+    if (jsonValue instanceof LocalDate) {
+      return ((LocalDate) jsonValue).toEpochDay();
+    }
+    if (jsonValue instanceof LocalTime) {
+      return ((LocalTime) jsonValue).toNanoOfDay() / 1_000_000L;
+    }
+    return Long.parseLong(jsonValue.toString());
   }
 
   /// Opt-in fast variant of [#jsonPathLong(Object, String, long)] with identical results; see
@@ -324,13 +346,7 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = fastJsonPath(object, jsonPath, false, earlyExit);
-      if (jsonValue == null) {
-        return defaultValue;
-      }
-      if (jsonValue instanceof Number) {
-        return ((Number) jsonValue).longValue();
-      }
-      return Long.parseLong(jsonValue.toString());
+      return jsonValue != null ? jsonValueToLong(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
@@ -350,16 +366,36 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = jsonPath(object, jsonPath);
-      if (jsonValue == null) {
-        return defaultValue;
-      }
-      if (jsonValue instanceof Number) {
-        return ((Number) jsonValue).doubleValue();
-      }
-      return Double.parseDouble(jsonValue.toString());
+      return jsonValue != null ? jsonValueToDouble(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
+  }
+
+  /// Double counterpart of [#jsonValueToLong], with the same type dispatch: a `Number` yields its
+  /// `doubleValue`, a `Boolean` yields `1` / `0`, [Timestamp] / [LocalDate] / [LocalTime] yield their internal
+  /// numeric form, and anything else is parsed from its `toString`.
+  ///
+  /// The three temporal forms stay integral here, matching `PinotDataType`: sub-millisecond nanos are truncated
+  /// rather than carried as a fraction, so a value extracted into a `DOUBLE` column holds exactly what the
+  /// corresponding `TIMESTAMP` / `DATE` / `TIME` column would store.
+  private static double jsonValueToDouble(Object jsonValue) {
+    if (jsonValue instanceof Number) {
+      return ((Number) jsonValue).doubleValue();
+    }
+    if (jsonValue instanceof Boolean) {
+      return (Boolean) jsonValue ? 1d : 0d;
+    }
+    if (jsonValue instanceof Timestamp) {
+      return ((Timestamp) jsonValue).getTime();
+    }
+    if (jsonValue instanceof LocalDate) {
+      return ((LocalDate) jsonValue).toEpochDay();
+    }
+    if (jsonValue instanceof LocalTime) {
+      return ((LocalTime) jsonValue).toNanoOfDay() / 1_000_000L;
+    }
+    return Double.parseDouble(jsonValue.toString());
   }
 
   /// Opt-in fast variant of [#jsonPathDouble(Object, String, double)] with identical results; see
@@ -383,13 +419,7 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = fastJsonPath(object, jsonPath, false, earlyExit);
-      if (jsonValue == null) {
-        return defaultValue;
-      }
-      if (jsonValue instanceof Number) {
-        return ((Number) jsonValue).doubleValue();
-      }
-      return Double.parseDouble(jsonValue.toString());
+      return jsonValue != null ? jsonValueToDouble(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
