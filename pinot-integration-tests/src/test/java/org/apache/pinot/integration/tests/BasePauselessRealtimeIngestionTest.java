@@ -24,6 +24,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
@@ -60,6 +61,8 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected boolean _failureEnabled = false;
   private static final Logger LOGGER = LoggerFactory.getLogger(BasePauselessRealtimeIngestionTest.class);
 
+  /// Returns the controller failure point to inject, or null when the test injects no failure.
+  @Nullable
   protected abstract String getFailurePoint();
 
   protected abstract int getExpectedSegmentsWithFailure();
@@ -105,7 +108,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     startBroker();
     startServer();
     setupNonPauselessTable();
-    setMaxSegmentCompletionTimeMillis();
     injectFailure();
     setupPauselessTable();
     waitForAllDocsLoaded(600_000L);
@@ -155,11 +157,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   }
 
   protected void setMaxSegmentCompletionTimeMillis() {
-    // Only shorten the completion timeout while testing an injected controller failure. Normal segment commits can
-    // legitimately take longer than this on a busy CI runner.
-    if (getFailurePoint() == null) {
-      return;
-    }
     PauselessRealtimeTestUtils.setMaxSegmentCompletionTimeoutMs(_helixResourceManager,
         FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
   }
@@ -181,8 +178,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   }
 
   protected void restoreMaxSegmentCompletionTimeMillis() {
-    PauselessRealtimeTestUtils.setMaxSegmentCompletionTimeoutMs(_helixResourceManager,
-        PinotLLCRealtimeSegmentManager.DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+    PauselessRealtimeTestUtils.restoreMaxSegmentCompletionTimeoutMs(_helixResourceManager);
   }
 
   @AfterClass
@@ -215,12 +211,15 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
       return segmentZKMetadataList.size() == getExpectedZKMetadataWithFailure();
     }, 1000, 100000, "New Segment ZK Metadata not created");
 
+    // Shorten the completion deadline only around the repair pass, so the validation manager treats the stuck
+    // commits as expired. Normal segment commits can legitimately take longer than this deadline on a busy CI
+    // runner, so it must never apply to them.
+    setMaxSegmentCompletionTimeMillis();
     try {
       Thread.sleep(FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
       disableFailure();
       _controllerStarter.getRealtimeSegmentValidationManager().run();
     } finally {
-      // Keep the short timeout through the repair pass, then restore the production timeout for normal commits.
       restoreMaxSegmentCompletionTimeMillis();
     }
 

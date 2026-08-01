@@ -38,17 +38,26 @@ public class PauselessRealtimeTestUtils {
   private PauselessRealtimeTestUtils() {
   }
 
-  /// Overrides the segment-completion deadline on the failure-injecting segment manager, if one is installed. Tests
-  /// shorten the deadline right before a validation repair pass and restore
-  /// [PinotLLCRealtimeSegmentManager#DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS] afterwards, so that normal segment
-  /// commits never race against an artificially short deadline.
+  /// Overrides the segment-completion deadline on the [FailureInjectingPinotLLCRealtimeSegmentManager] installed by
+  /// the failure-injecting controller. Tests shorten the deadline right before a validation repair pass and call
+  /// [#restoreMaxSegmentCompletionTimeoutMs] afterwards, so that normal segment commits never race against an
+  /// artificially short deadline.
   public static void setMaxSegmentCompletionTimeoutMs(PinotHelixResourceManager helixResourceManager,
       long timeoutMs) {
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = helixResourceManager.getRealtimeSegmentManager();
-    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)
-          .setMaxSegmentCompletionTimeoutMs(timeoutMs);
+    if (!(realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager)) {
+      throw new IllegalStateException("Expected FailureInjectingPinotLLCRealtimeSegmentManager but got: "
+          + realtimeSegmentManager.getClass().getName());
     }
+    ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)
+        .setMaxSegmentCompletionTimeoutMs(timeoutMs);
+  }
+
+  /// Restores the production segment-completion deadline
+  /// ([PinotLLCRealtimeSegmentManager#DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS]) after a validation repair pass.
+  public static void restoreMaxSegmentCompletionTimeoutMs(PinotHelixResourceManager helixResourceManager) {
+    setMaxSegmentCompletionTimeoutMs(helixResourceManager,
+        PinotLLCRealtimeSegmentManager.DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
   }
 
   public static void verifyIdealState(String tableName, int numSegmentsExpected, HelixManager helixManager) {
