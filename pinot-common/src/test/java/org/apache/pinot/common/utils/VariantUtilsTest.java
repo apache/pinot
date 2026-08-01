@@ -48,6 +48,18 @@ import static org.testng.Assert.assertTrue;
 
 public class VariantUtilsTest {
   @Test
+  public void testRawVariantResultRequiresNullHandling() {
+    DataSchema variantSchema =
+        new DataSchema(new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.VARIANT});
+    DataSchema typedSchema =
+        new DataSchema(new String[]{"eventType"}, new ColumnDataType[]{ColumnDataType.STRING});
+
+    assertTrue(VariantUtils.requiresNullHandlingForRawVariantResult(variantSchema, false));
+    assertFalse(VariantUtils.requiresNullHandlingForRawVariantResult(variantSchema, true));
+    assertFalse(VariantUtils.requiresNullHandlingForRawVariantResult(typedSchema, false));
+  }
+
+  @Test
   public void testResultTypeContract() {
     assertEquals(ResultType.BOOLEAN.getDataType(), DataType.BOOLEAN);
     assertEquals(ResultType.BOOLEAN.getSqlTypeName(), SqlTypeName.BOOLEAN);

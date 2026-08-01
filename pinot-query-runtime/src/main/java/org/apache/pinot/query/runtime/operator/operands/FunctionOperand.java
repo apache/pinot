@@ -51,17 +51,7 @@ public class FunctionOperand implements TransformOperand {
     int numOperands = operands.size();
     ColumnDataType[] argumentTypes = new ColumnDataType[numOperands];
     for (int i = 0; i < numOperands; i++) {
-      RexExpression operand = operands.get(i);
-      ColumnDataType argumentType;
-      if (operand instanceof RexExpression.InputRef) {
-        argumentType = dataSchema.getColumnDataType(((RexExpression.InputRef) operand).getIndex());
-      } else if (operand instanceof RexExpression.Literal) {
-        argumentType = ((RexExpression.Literal) operand).getDataType();
-      } else {
-        assert operand instanceof RexExpression.FunctionCall;
-        argumentType = ((RexExpression.FunctionCall) operand).getDataType();
-      }
-      argumentTypes[i] = argumentType;
+      argumentTypes[i] = TransformOperandFactory.getResultType(operands.get(i), dataSchema);
     }
     String functionName = functionCall.getFunctionName();
     String canonicalName = FunctionRegistry.canonicalize(functionName);
