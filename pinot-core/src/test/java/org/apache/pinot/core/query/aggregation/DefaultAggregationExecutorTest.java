@@ -129,32 +129,37 @@ public class DefaultAggregationExecutorTest {
     }
   }
 
-  /**
-   * Verifies that functions with a pre-aggregated result are not re-computed by scanning: the injected value is
-   * returned as-is, while functions with a {@code null} pre-aggregated entry are still computed from the scanned block.
-   */
+  /// Verifies that functions with a non-scan result are not re-computed by scanning: the injected value is
+  /// returned as-is, while functions with a {@code null} non-scan entry are still computed from the scanned
+  /// block.
   @Test
-  void testPreAggregatedResultsSkipScan() {
+  void testNonScanResultsSkipScan() {
     TransformBlock transformBlock = nextTransformBlock();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
 
-    // Pre-aggregate only the first function (index 0 -> SUM); the rest fall back to scan-based execution.
-    Object[] preAggregatedResults = new Object[aggregationFunctions.length];
-    double injectedSum = 12345.0;
-    preAggregatedResults[0] = injectedSum;
+    // Resolve only the second function (index 1 -> MAX) without scanning; the rest fall back to scan-based execution.
+    int nonScanIndex = 1;
+    Object[] nonScanResults = new Object[aggregationFunctions.length];
+    // inject a Double sentinel that cannot occur in the data (all values
+    // are non-negative), proving the injected value is returned untouched rather than recomputed by scanning.
+    double injectedMax = -1.0;
+    nonScanResults[nonScanIndex] = injectedMax;
 
     AggregationExecutor aggregationExecutor =
-        new DefaultAggregationExecutor(aggregationFunctions, preAggregatedResults);
+        new DefaultAggregationExecutor(aggregationFunctions, nonScanResults);
     aggregationExecutor.aggregate(transformBlock);
     List<Object> result = aggregationExecutor.getResult();
 
-    // Index 0 returns the injected pre-aggregated value untouched (not the scanned SUM).
-    Assert.assertEquals((double) result.get(0), injectedSum,
-        "Pre-aggregated function should return the injected value, not a scanned result");
+    // The non-scan function returns the injected value untouched (not a scanned MAX).
+    Assert.assertEquals(result.get(nonScanIndex), injectedMax,
+        "Non-scan function should return the injected value, not a scanned result");
 
     // Remaining functions are still computed by scanning the segment.
-    for (int i = 1; i < result.size(); i++) {
+    for (int i = 0; i < result.size(); i++) {
+      if (i == nonScanIndex) {
+        continue;
+      }
       double actual = (double) result.get(i);
       double expected = computeAggregation(AGGREGATION_FUNCTIONS[i], _inputData[i]);
       Assert.assertEquals(actual, expected,
@@ -163,9 +168,7 @@ public class DefaultAggregationExecutorTest {
     }
   }
 
-  /**
-   * Builds a transform block over all physical columns of the test segment with a match-all filter.
-   */
+  /// Builds a transform block over all physical columns of the test segment with a match-all filter.
   private TransformBlock nextTransformBlock() {
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     List<ExpressionContext> expressions = new ArrayList<>();

@@ -148,11 +148,9 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     buildPredictableSegment();
   }
 
-  /**
-   * Builds a segment with fully predictable data so that aggregation results can be asserted exactly. It contains the
-   * 10 rows where row {@code i} (for {@code i = 1..10}) has {@code metricCol = i}, {@code intCol = i + 10} and
-   * {@code bytesCol = new byte[]{(byte) i}}, and every row is duplicated (20 rows total).
-   */
+  /// Builds a segment with fully predictable data so that aggregation results can be asserted exactly. It contains the
+  /// 10 rows where row {@code i} (for {@code i = 1..10}) has {@code metricCol = i}, {@code intCol = i + 10} and
+  /// {@code bytesCol = new byte[]{(byte) i}}, and every row is duplicated (20 rows total).
   private void buildPredictableSegment()
       throws Exception {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(PREDICTABLE_TABLE_NAME)
@@ -233,17 +231,15 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     assertTrue(upsertOperatorClass.isInstance(upsertOperator));
   }
 
-  /**
-   * Verifies the partial metadata-based aggregation path. When a query mixes a metadata-eligible function (MAX) with a
-   * non-eligible one (SUM), the plan uses an {@link AggregationOperator} that pre-aggregates the eligible function from
-   * metadata while scanning the rest. Before this feature, a non-scan based operator was used only when <em>all</em>
-   * functions were metadata eligible; a mixed query would have scanned every function.
-   * <p>
-   * To prove the eligible function is actually served from metadata (and not scanned), the column dictionary is
-   * overridden to report a bogus max value that does not exist in the data. MAX equals the bogus value only if the
-   * metadata path is taken (a scan would return the true max of 10), while SUM equals the true scanned sum of
-   * {@code metricCol} ((1 + 2 + ... + 10) over the two row copies = 110).
-   */
+  /// Verifies the partial metadata-based aggregation path. When a query mixes a metadata-eligible function (MAX) with a
+  /// non-eligible one (SUM), the plan uses an {@link AggregationOperator} that pre-aggregates the eligible function
+  /// from metadata while scanning the rest. Before this feature, a non-scan based operator was used only when _all_
+  /// functions were metadata eligible; a mixed query would have scanned every function.
+  ///
+  /// To prove the eligible function is actually served from metadata (and not scanned), the column dictionary is
+  /// overridden to report a bogus max value that does not exist in the data. MAX equals the bogus value only if the
+  /// metadata path is taken (a scan would return the true max of 10), while SUM equals the true scanned sum of
+  /// {@code metricCol} ((1 + 2 + ... + 10) over the two row copies = 110).
   @Test
   public void testPartialMetadataBasedAggregationServesEligibleFromMetadata() {
     int bogusMax = 999_999_999;
@@ -272,12 +268,10 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     assertEquals(((Number) results.get(1)).doubleValue(), 110.0);
   }
 
-  /**
-   * {@code distinctcount} over a dictionary-encoded column is resolved entirely from the dictionary (its cardinality is
-   * the number of distinct values), so it must plan to the fully non-scan {@link NonScanBasedAggregationOperator}
-   * without a mock. {@code metricCol} holds the 10 distinct values 1..10 across 20 (duplicated) rows, so the distinct
-   * count is 10 even though the segment has 20 docs.
-   */
+  /// {@code distinctcount} over a dictionary-encoded column is resolved entirely from the dictionary (its cardinality
+  /// is the number of distinct values), so it must plan to the fully non-scan {@link NonScanBasedAggregationOperator}
+  /// without a mock. {@code metricCol} holds the 10 distinct values 1..10 across 20 (duplicated) rows, so the distinct
+  /// count is 10 even though the segment has 20 docs.
   @Test
   public void testDistinctCountResolvedFromDictionary() {
     // Sanity check that the fixture actually has duplicate rows, so distinct count < total docs is a meaningful result.
@@ -299,17 +293,14 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     assertEquals(((Set<?>) results.get(0)).size(), 10);
   }
 
-  /**
-   * Tests for aggregations that cannot be resolved from dictionary/metadata and must therefore fall back to
-   * the scan-based {@link AggregationOperator}, still returning the correct scanned result:
-   * <ul>
-   *   <li>a single non-resolvable aggregation with no filter ({@code sum(metricCol)}): the partial metadata path
-   *   evaluates eligibility per function, and when none is resolvable it must fall back to a full scan rather than
-   *   emitting a (partial) non-scan operator with zero resolved functions;</li>
-   *   <li>an aggregation over an expression argument ({@code max(add(metricCol, intCol))}): the argument is not a plain
-   *   column reference, so it cannot be resolved from dictionary/metadata.</li>
-   * </ul>
-   */
+  /// Tests for aggregations that cannot be resolved from dictionary/metadata and must therefore fall back to
+  /// the scan-based {@link AggregationOperator}, still returning the correct scanned result:
+  ///
+  /// - a single non-resolvable aggregation with no filter ({@code sum(metricCol)}): the partial metadata path
+  ///   evaluates eligibility per function, and when none is resolvable it must fall back to a full scan rather than
+  ///   emitting a (partial) non-scan operator with zero resolved functions;
+  /// - an aggregation over an expression argument ({@code max(add(metricCol, intCol))}): the argument is not a plain
+  ///   column reference, so it cannot be resolved from dictionary/metadata.
   @Test(dataProvider = "nonResolvableScanQueries")
   public void testNonResolvableAggregationFallsToScan(String description, String query, double expectedResult) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -335,14 +326,12 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     };
   }
 
-  /**
-   * MIN/MAX derive their result numerically from the column min/max, which is only valid for numeric columns.
-   * For a non-numeric (BYTES) column the dictionary stores raw values that cannot be
-   * parsed as numbers, so {@code max(bytesCol)} and {@code min(bytesCol)} must fall back to the scan-based
-   * {@link AggregationOperator} rather than being (wrongly) resolved from the dictionary by a
-   * {@link NonScanBasedAggregationOperator}. The scan path in turn throws a
-   * {@link BadQueryRequestException} for non-numeric aggregation.
-   */
+  /// MIN/MAX derive their result numerically from the column min/max, which is only valid for numeric columns.
+  /// For a non-numeric (BYTES) column the dictionary stores raw values that cannot be
+  /// parsed as numbers, so {@code max(bytesCol)} and {@code min(bytesCol)} must fall back to the scan-based
+  /// {@link AggregationOperator} rather than being (wrongly) resolved from the dictionary by a
+  /// {@link NonScanBasedAggregationOperator}. The scan path in turn throws a
+  /// {@link BadQueryRequestException} for non-numeric aggregation.
   @Test
   public void testMinMaxOnNonNumericColumnFallsToScan() {
     assertNotNull(_predictableSegment.getDataSourceNullable("bytesCol").getDictionary());
@@ -364,11 +353,9 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     }
   }
 
-  /**
-   * Verifies that a column aggregation resolved by metadata is excluded from the scan projection,
-   * so the partial path only reads the columns needed by the scanned aggregations. The reduced projection is also
-   * reflected in numEntriesScannedPostFilter (20 docs * 1 column instead of 40).
-   */
+  /// Verifies that a column aggregation resolved by metadata is excluded from the scan projection,
+  /// so the partial path only reads the columns needed by the scanned aggregations. The reduced projection is also
+  /// reflected in numEntriesScannedPostFilter (20 docs * 1 column instead of 40).
   @Test
   public void testResolvedOnlyColumnExcludedFromProjection() {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
@@ -398,10 +385,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     assertEquals(operator.getExecutionStatistics().getNumEntriesScannedPostFilter(), 20);
   }
 
-  /**
-   * Verifies numDocsScanned and numEntriesScannedPostFilter across the three routing paths: partial metadata
-   * resolution, fully metadata-resolvable (non-scan), and full scan over multiple aggregations.
-   */
+  /// Verifies numDocsScanned and numEntriesScannedPostFilter across the three routing paths: partial metadata
+  /// resolution, fully metadata-resolvable (non-scan), and full scan over multiple aggregations.
   @Test(dataProvider = "scanCostStatistics")
   public void testScanCostStatistics(String description, String query, Class<?> expectedOperatorClass,
       long expectedNumDocsScanned, long expectedNumEntriesScannedPostFilter) {

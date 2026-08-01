@@ -29,10 +29,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-/**
- * Unit test for {@link AggregationFunctionUtils#getAggregationResult}, the metadata/dictionary based aggregation
- * result resolver used by the non-scan based and partial metadata based aggregation paths.
- */
+/// Unit test for {@link AggregationFunctionUtils#getAggregationResult}, the metadata/dictionary based aggregation
+/// result resolver used by the non-scan based and partial metadata based aggregation paths.
 @SuppressWarnings("rawtypes")
 public class AggregationFunctionUtilsTest {
 

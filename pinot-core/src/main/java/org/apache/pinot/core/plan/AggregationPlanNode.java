@@ -121,13 +121,13 @@ public class AggregationPlanNode implements PlanNode {
       // and reused for both the fully non-scan path (all functions resolvable) and
       // the partial path (some functions resolvable).
       if (filterOperator.isResultMatchingAll()) {
-        boolean[] metadataResolvable = new boolean[aggregationFunctions.length];
+        boolean[] nonScanResolvable = new boolean[aggregationFunctions.length];
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
         int numResolved = 0;
         for (int i = 0; i < aggregationFunctions.length; i++) {
           DataSource dataSource = getDataSourceForAggregationFunction(aggregationFunctions[i]);
           if (isFitForNonScanBasedPlan(aggregationFunctions[i], dataSource)) {
-            metadataResolvable[i] = true;
+            nonScanResolvable[i] = true;
             dataSources[i] = dataSource;
             numResolved++;
           }
@@ -143,13 +143,13 @@ public class AggregationPlanNode implements PlanNode {
           // scanned (keeps it out of numEntriesScannedPostFilter).
           AggregationFunction[] scannedFunctions = new AggregationFunction[aggregationFunctions.length - numResolved];
           for (int i = 0, j = 0; i < aggregationFunctions.length; i++) {
-            if (!metadataResolvable[i]) {
+            if (!nonScanResolvable[i]) {
               scannedFunctions[j++] = aggregationFunctions[i];
             }
           }
           aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithoutStarTree(_segmentContext, _queryContext,
               aggregationFunctions, scannedFunctions, filterOperator);
-          return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs, metadataResolvable, dataSources);
+          return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs, nonScanResolvable, dataSources);
         }
       }
 
@@ -195,15 +195,13 @@ public class AggregationPlanNode implements PlanNode {
     return false;
   }
 
-  /**
-   * Returns {@code true} if the given aggregation function can be resolved from the column dictionary or metadata
-   * (without scanning the segment), {@code false} otherwise. {@code COUNT} is always eligible. Functions whose result
-   * is derived numerically from the column min/max (e.g. MIN, MAX, MINMAXRANGE) are only eligible for numeric columns,
-   * since non-numeric columns (e.g. BYTES) store min/max as raw values that cannot be parsed as numbers.
-   *
-   * @param aggregationFunction aggregation function to test
-   * @param dataSource the function argument's data source (see {@link #getDataSourceForAggregationFunction})
-   */
+  /// Returns {@code true} if the given aggregation function can be resolved from the column dictionary or metadata
+  /// (without scanning the segment), {@code false} otherwise. {@code COUNT} is always eligible. Functions whose result
+  /// is derived numerically from the column min/max (e.g. MIN, MAX, MINMAXRANGE) are only eligible for numeric columns,
+  /// since non-numeric columns (e.g. BYTES) store min/max as raw values that cannot be parsed as numbers.
+  ///
+  /// @param aggregationFunction aggregation function to test
+  /// @param dataSource the function argument's data source (see {@link #getDataSourceForAggregationFunction})
   private boolean isFitForNonScanBasedPlan(AggregationFunction<?, ?> aggregationFunction,
       @Nullable DataSource dataSource) {
     AggregationFunctionType functionType = aggregationFunction.getType();
@@ -212,7 +210,7 @@ public class AggregationPlanNode implements PlanNode {
     }
 
     if (dataSource == null) {
-      // Aggregation function does not have a single identifier argument (e.g. COUNT(*) or COUNT(1)),
+      // Aggregation function does not have a single identifier argument (e.g. SUM(1)),
       // so it cannot be resolved from metadata
       return false;
     }
@@ -239,14 +237,12 @@ public class AggregationPlanNode implements PlanNode {
         && filterOperator.canOptimizeCount();
   }
 
-  /**
-   * Returns the data source for the given aggregation function's argument, or {@code null} if the function has no
-   * argument (e.g. {@code COUNT(*)}) or its argument is not a single column identifier (e.g. {@code COUNT(1)} or a
-   * transform expression), in which case it cannot be resolved from dictionary/metadata.
-   *
-   * @param aggregationFunction aggregation function whose argument data source is resolved
-   * @return the argument's data source, or {@code null} if it has no single identifier argument
-   */
+  /// Returns the data source for the given aggregation function's argument, or {@code null} if the function has no
+  /// argument (e.g. {@code COUNT(*)}) or its argument is not a single column identifier (e.g. {@code COUNT(1)} or a
+  /// transform expression), in which case it cannot be resolved from dictionary/metadata.
+  ///
+  /// @param aggregationFunction aggregation function whose argument data source is resolved
+  /// @return the argument's data source, or {@code null} if it has no single identifier argument
   @Nullable
   private DataSource getDataSourceForAggregationFunction(AggregationFunction<?, ?> aggregationFunction) {
     List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();

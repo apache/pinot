@@ -380,12 +380,10 @@ public class AggregationFunctionUtils {
     return new AggregationInfo(aggregationFunctions, projectOperator, false);
   }
 
-  /**
-   * Builds {@link AggregationInfo} for aggregations without using star-tree index, projecting only the columns
-   * required by {@code projectionFunctions} (a subset of {@code allFunctions}). The partial metadata path passes just
-   * the scanned functions here so that columns used solely by metadata-resolved functions are excluded from the scan,
-   * while {@link AggregationInfo} still carries the full function set. For a full scan the two arrays are identical.
-   */
+  /// Builds {@link AggregationInfo} for aggregations without using star-tree index, projecting only the columns
+  /// required by {@code projectionFunctions} (a subset of {@code allFunctions}). The partial metadata path passes just
+  /// the scanned functions here so that columns used solely by metadata-resolved functions are excluded from the scan,
+  /// while {@link AggregationInfo} still carries the full function set. For a full scan the two arrays are identical.
   public static AggregationInfo buildAggregationInfoWithoutStarTree(SegmentContext segmentContext,
       QueryContext queryContext, AggregationFunction[] allFunctions, AggregationFunction[] projectionFunctions,
       BaseFilterOperator filterOperator) {
@@ -397,9 +395,8 @@ public class AggregationFunctionUtils {
     return new AggregationInfo(allFunctions, projectOperator, false);
   }
 
-  /**
-   * Builds swim-lanes (list of {@link AggregationInfo}) for filtered aggregations.
-   */
+
+  /// Builds swim-lanes (list of {@link AggregationInfo}) for filtered aggregations.
   public static List<AggregationInfo> buildFilteredAggregationInfos(SegmentContext segmentContext,
       QueryContext queryContext) {
     assert queryContext.getAggregationFunctions() != null && queryContext.getFilteredAggregationFunctions() != null;
@@ -515,24 +512,22 @@ public class AggregationFunctionUtils {
     return columnName;
   }
 
-  /**
-   * Resolves the result of the given aggregation function from the column dictionary or metadata, without scanning the
-   * segment. This is used by the non-scan based aggregation operator and by the partial metadata-based path in
-   * {@link org.apache.pinot.core.operator.query.AggregationOperator} to resolve metadata-eligible functions.
-   * <p>
-   * {@code COUNT} is resolved directly from {@code numTotalDocs}. Every other supported function reads its result from
-   * the column dictionary or metadata and therefore requires a non-null {@code dataSource}. Callers must only invoke
-   * this method for functions that are metadata/dictionary eligible (as determined by the fitness check in
-   * {@link org.apache.pinot.core.plan.AggregationPlanNode}); unsupported function types cause an
-   * {@link IllegalStateException}.
-   *
-   * @param aggregationFunction aggregation function to resolve
-   * @param dataSource data source of the function argument; may be {@code null} only for {@code COUNT}
-   * @param numTotalDocs total number of documents in the segment, used to resolve {@code COUNT}
-   * @param explainPlanName explain-plan name used for periodic query termination checks
-   * @return the pre-aggregated result for the function
-   * @throws IllegalStateException if the function type cannot be resolved from dictionary or metadata
-   */
+  /// Resolves the result of the given aggregation function from the column dictionary or metadata, without scanning the
+  /// segment. This is used by the non-scan based aggregation operator and by the partial metadata-based path in
+  /// {@link org.apache.pinot.core.operator.query.AggregationOperator} to resolve metadata-eligible functions.
+  /// <p>
+  /// {@code COUNT} is resolved directly from {@code numTotalDocs}. Every other supported function reads its result from
+  /// the column dictionary or metadata and therefore requires a non-null {@code dataSource}. Callers must only invoke
+  /// this method for functions that are metadata/dictionary eligible (as determined by the fitness check in
+  /// {@link org.apache.pinot.core.plan.AggregationPlanNode}); unsupported function types cause an
+  /// {@link IllegalStateException}.
+  ///
+  /// @param aggregationFunction aggregation function to resolve
+  /// @param dataSource data source of the function argument; may be {@code null} only for {@code COUNT}
+  /// @param numTotalDocs total number of documents in the segment, used to resolve {@code COUNT}
+  /// @param explainPlanName explain-plan name used for periodic query termination checks
+  /// @return the result resolved from dictionary/metadata for the function
+  /// @throws IllegalStateException if the function type cannot be resolved from dictionary or metadata
   public static Object getAggregationResult(AggregationFunction aggregationFunction, @Nullable DataSource dataSource,
       int numTotalDocs, String explainPlanName) {
     AggregationFunctionType functionType = aggregationFunction.getType();
@@ -857,7 +852,6 @@ public class AggregationFunctionUtils {
     }
   }
 
-  @Nullable
   private static Object getDistinctCountSmartULLResult(Dictionary dictionary,
       DistinctCountSmartULLAggregationFunction function, String explainPlanName) {
     if (dictionary.length() > function.getThreshold()) {
