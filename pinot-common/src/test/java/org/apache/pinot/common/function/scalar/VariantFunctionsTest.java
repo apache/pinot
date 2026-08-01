@@ -26,9 +26,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests strict and tolerant behavior exposed by the public scalar VARIANT function facade.
- */
+/// Tests strict and tolerant behavior exposed by the public scalar VARIANT function facade.
 public class VariantFunctionsTest {
   @Test
   public void testScalarFunctionFacade() {

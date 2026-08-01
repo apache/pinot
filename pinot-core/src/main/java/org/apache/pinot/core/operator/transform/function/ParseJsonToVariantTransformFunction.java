@@ -31,11 +31,9 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Parses JSON text into a logical Variant value for single-stage queries and ingestion transforms.
- *
- * <p>Instances are query-local and not thread-safe.
- */
+/// Parses JSON text into a logical Variant value for single-stage queries and ingestion transforms.
+///
+/// <p>Instances are query-local and not thread-safe.
 public class ParseJsonToVariantTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "parseJson";
   private static final TransformResultMetadata RESULT_METADATA =
@@ -155,9 +153,7 @@ public class ParseJsonToVariantTransformFunction extends BaseTransformFunction {
     return _tolerant ? VariantUtils.tryParseJsonToVariant(json) : VariantUtils.parseJsonToVariant(json);
   }
 
-  /**
-   * Tolerant JSON-to-Variant parsing.
-   */
+  /// Tolerant JSON-to-Variant parsing.
   public static final class Try extends ParseJsonToVariantTransformFunction {
     public static final String FUNCTION_NAME = "tryParseJson";
 

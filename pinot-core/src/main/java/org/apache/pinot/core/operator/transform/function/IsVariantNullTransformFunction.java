@@ -28,12 +28,10 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 
 
-/**
- * Returns whether a Variant root value or a value selected by a literal path is an encoded Variant null.
- *
- * <p>SQL null and missing paths return a non-null {@code false}; only a present encoded Variant null returns
- * {@code true}. Instances are query-local and not thread-safe.
- */
+/// Returns whether a Variant root value or a value selected by a literal path is an encoded Variant null.
+///
+/// <p>SQL null and missing paths return a non-null {@code false}; only a present encoded Variant null returns
+/// {@code true}. Instances are query-local and not thread-safe.
 public class IsVariantNullTransformFunction extends BaseVariantTransformFunction {
 
   @Override

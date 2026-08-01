@@ -83,17 +83,13 @@ public class ParquetUtils {
     }
   }
 
-  /**
-   * Returns the physical Parquet schema for the given file path.
-   */
+  /// Returns the physical Parquet schema for the given file path.
   public static MessageType getParquetSchema(Path path)
       throws IOException {
     return getParquetFileMetadata(path).getSchema();
   }
 
-  /**
-   * Returns the immutable footer metadata for the given Parquet file path.
-   */
+  /// Returns the immutable footer metadata for the given Parquet file path.
   public static FileMetaData getParquetFileMetadata(Path path)
       throws IOException {
     InputFile inputFile = HadoopInputFile.fromPath(path, getParquetHadoopConfiguration());

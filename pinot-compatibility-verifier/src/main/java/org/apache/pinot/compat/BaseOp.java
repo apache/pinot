@@ -87,9 +87,7 @@ public abstract class BaseOp {
     return _parentDir + CONFIG_PLACEHOLDER + fileName;
   }
 
-  /**
-   * Returns the system property that gates this operation, or {@code null} when the operation is unconditional.
-   */
+  /// Returns the system property that gates this operation, or {@code null} when the operation is unconditional.
   @Nullable
   public String getRunIfSystemProperty() {
     return _runIfSystemProperty;
@@ -99,10 +97,8 @@ public abstract class BaseOp {
     _runIfSystemProperty = runIfSystemProperty;
   }
 
-  /**
-   * Returns the exact property value required to run this operation, or {@code null} when the operation is
-   * unconditional.
-   */
+  /// Returns the exact property value required to run this operation, or {@code null} when the operation is
+  /// unconditional.
   @Nullable
   public String getRunIfSystemPropertyValue() {
     return _runIfSystemPropertyValue;
