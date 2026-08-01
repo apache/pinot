@@ -28,12 +28,10 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 
 
-/**
- * Returns the type name of a Variant root value or a value selected by a literal path.
- *
- * <p>SQL null and missing paths produce SQL null. An encoded Variant null is a present value whose type name is
- * {@code NULL}. Instances are query-local and not thread-safe.
- */
+/// Returns the type name of a Variant root value or a value selected by a literal path.
+///
+/// <p>SQL null and missing paths produce SQL null. An encoded Variant null is a present value whose type name is
+/// {@code NULL}. Instances are query-local and not thread-safe.
 public class VariantTypeOfTransformFunction extends BaseVariantTransformFunction {
   public static final String FUNCTION_NAME = "variantTypeOf";
 

@@ -30,13 +30,11 @@ import org.apache.pinot.common.utils.VariantUtils.VariantPath;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
-/**
- * Query-local multi-stage operand for Variant scalar operations.
- *
- * <p>Literal paths and target types are compiled once at construction. Values enter and leave the operand in
- * {@link DataSchema}'s internal representation, which {@link VariantUtils.ReusableResult} materializes directly after
- * extraction. The reusable extraction result makes instances not thread-safe.
- */
+/// Query-local multi-stage operand for Variant scalar operations.
+///
+/// <p>Literal paths and target types are compiled once at construction. Values enter and leave the operand in
+/// {@link DataSchema}'s internal representation, which {@link VariantUtils.ReusableResult} materializes directly after
+/// extraction. The reusable extraction result makes instances not thread-safe.
 final class VariantOperand implements TransformOperand {
   private static final VariantPath ROOT_PATH = VariantUtils.compilePath("$");
   private static final String VARIANT_GET = "variantget";

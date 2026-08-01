@@ -29,13 +29,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Shared single-stage lifecycle for functions that inspect or extract a VARIANT value.
- *
- * <p>The first argument is consistently validated as a single-value VARIANT-compatible operand, the optional path is
- * compiled once, and each input block is evaluated at most once even when the engine asks for both values and a null
- * bitmap. Instances are query-local and not thread-safe.
- */
+/// Shared single-stage lifecycle for functions that inspect or extract a VARIANT value.
+///
+/// <p>The first argument is consistently validated as a single-value VARIANT-compatible operand, the optional path is
+/// compiled once, and each input block is evaluated at most once even when the engine asks for both values and a null
+/// bitmap. Instances are query-local and not thread-safe.
 abstract class BaseVariantTransformFunction extends BaseTransformFunction {
   private static final VariantPath ROOT_PATH = VariantUtils.compilePath("$");
 
@@ -47,14 +45,12 @@ abstract class BaseVariantTransformFunction extends BaseTransformFunction {
   @Nullable
   private RoaringBitmap _cachedNullBitmap;
 
-  /**
-   * Initializes the common VARIANT operand and path contract.
-   *
-   * @param arguments function arguments
-   * @param minArguments minimum accepted argument count
-   * @param maxArguments maximum accepted argument count
-   * @param pathRequired whether argument 1 is mandatory
-   */
+  /// Initializes the common VARIANT operand and path contract.
+  ///
+  /// @param arguments function arguments
+  /// @param minArguments minimum accepted argument count
+  /// @param maxArguments maximum accepted argument count
+  /// @param pathRequired whether argument 1 is mandatory
   protected final void initVariantArguments(List<TransformFunction> arguments, int minArguments, int maxArguments,
       boolean pathRequired) {
     int numArguments = arguments.size();
@@ -137,25 +133,17 @@ abstract class BaseVariantTransformFunction extends BaseTransformFunction {
     _cachedValueBlock = valueBlock;
   }
 
-  /**
-   * Returns whether an input SQL null should remain SQL null in the result.
-   */
+  /// Returns whether an input SQL null should remain SQL null in the result.
   protected boolean inputNullIsResultNull() {
     return true;
   }
 
-  /**
-   * Initializes the output array for a block.
-   */
+  /// Initializes the output array for a block.
   protected abstract void initResultValues(int numDocs);
 
-  /**
-   * Evaluates one non-SQL-null VARIANT. Returns {@code false} when the result should be SQL null.
-   */
+  /// Evaluates one non-SQL-null VARIANT. Returns {@code false} when the result should be SQL null.
   protected abstract boolean evaluateVariant(@Nullable byte[] variant, int index);
 
-  /**
-   * Stores the type-specific placeholder for a SQL-null result.
-   */
+  /// Stores the type-specific placeholder for a SQL-null result.
   protected abstract void setNullValue(int index);
 }

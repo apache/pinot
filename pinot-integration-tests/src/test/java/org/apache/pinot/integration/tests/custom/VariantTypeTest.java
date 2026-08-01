@@ -35,10 +35,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * End-to-end coverage for creating a VARIANT table, ingesting Parquet VARIANT(1), materializing a hot path, and
- * querying nested values with both Pinot query engines.
- */
+/// End-to-end coverage for creating a VARIANT table, ingesting Parquet VARIANT(1), materializing a hot path, and
+/// querying nested values with both Pinot query engines.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
   private static final String RESOURCE_DIRECTORY = "examples/batch/variantEvents/";
@@ -273,6 +271,12 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
         "SELECT " + EVENT_ID + " FROM " + TABLE_NAME + " WHERE " + PAYLOAD
             + " = parse_json('{\"eventType\":\"checkout\"}')");
     assertExceptionContains(response, "raw variant", "comparison");
+    for (String operator : List.of("IS DISTINCT FROM", "IS NOT DISTINCT FROM")) {
+      response = postVariantQuery(
+          "SELECT " + EVENT_ID + " FROM " + TABLE_NAME + " WHERE " + PAYLOAD + " " + operator
+              + " parse_json(variant_to_json(" + PAYLOAD + "))");
+      assertExceptionContains(response, "raw variant", "comparison");
+    }
     response = postVariantQuery(
         "SELECT " + PAYLOAD + ", COUNT(*) FROM " + TABLE_NAME + " GROUP BY " + PAYLOAD);
     assertExceptionContains(response, "raw variant", "group by");
@@ -313,6 +317,24 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode response = postQuery(
         "SELECT variant_get(" + PAYLOAD + ", '$.eventType', 'STRING') FROM " + TABLE_NAME + " LIMIT 1");
     assertExceptionContains(response, "requires query null handling");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testRawVariantProjectionRequiresQueryNullHandling(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    JsonNode response = postQuery(
+        "SELECT " + PAYLOAD + " FROM " + TABLE_NAME
+            + " WHERE " + EVENT_ID + " IN ('evt-001', 'evt-005') ORDER BY " + EVENT_ID);
+    assertExceptionContains(response, "raw variant", "requires query null handling");
+
+    if (!useMultiStageQueryEngine) {
+      for (String predicate : List.of("1 = 0", "eventTime < 0")) {
+        response = postQuery("SELECT " + PAYLOAD + " FROM " + TABLE_NAME + " WHERE " + predicate);
+        assertExceptionContains(response, "raw variant", "requires query null handling");
+      }
+    }
   }
 
   @Test
