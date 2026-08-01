@@ -26,13 +26,11 @@ import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
-/**
- * Query-local constant operand for parsing a JSON literal into Variant.
- *
- * <p>The literal is parsed exactly once while the expression tree is constructed. The cached internal value is
- * immutable by convention and can therefore be reused for every input row. Instances are thread-safe after
- * construction.
- */
+/// Query-local constant operand for parsing a JSON literal into Variant.
+///
+/// <p>The literal is parsed exactly once while the expression tree is constructed. The cached internal value is
+/// immutable by convention and can therefore be reused for every input row. Instances are thread-safe after
+/// construction.
 final class LiteralParseJsonOperand implements TransformOperand {
   private static final String PARSE_JSON = "parsejson";
   private static final String PARSE_JSON_TO_VARIANT = "parsejsontovariant";

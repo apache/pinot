@@ -70,32 +70,24 @@ public class QueryOp extends BaseOp {
     _queryFileName = queryFileName;
   }
 
-  /**
-   * Returns the expected-results file, or {@code null} when expected-error mode is configured.
-   */
+  /// Returns the expected-results file, or {@code null} when expected-error mode is configured.
   @Nullable
   public String getExpectedResultsFileName() {
     return _expectedResultsFileName;
   }
 
-  /**
-   * Configures result-comparison mode. Pass {@code null} to clear it before configuring expected-error mode.
-   */
+  /// Configures result-comparison mode. Pass {@code null} to clear it before configuring expected-error mode.
   public void setExpectedResultsFileName(@Nullable String expectedResultsFileName) {
     _expectedResultsFileName = expectedResultsFileName;
   }
 
-  /**
-   * Returns the required error-message substring, or {@code null} when result-comparison mode is configured.
-   */
+  /// Returns the required error-message substring, or {@code null} when result-comparison mode is configured.
   @Nullable
   public String getExpectedErrorMessageContains() {
     return _expectedErrorMessageContains;
   }
 
-  /**
-   * Configures expected-error mode. Pass {@code null} to clear it before configuring result-comparison mode.
-   */
+  /// Configures expected-error mode. Pass {@code null} to clear it before configuring result-comparison mode.
   public void setExpectedErrorMessageContains(@Nullable String expectedErrorMessageContains) {
     _expectedErrorMessageContains = expectedErrorMessageContains;
   }
@@ -301,9 +293,7 @@ public class QueryOp extends BaseOp {
         : SqlResultComparator.areEqual(actual, expected, query);
   }
 
-  /**
-   * Returns whether a response has no result rows and contains only errors matching the required substring.
-   */
+  /// Returns whether a response has no result rows and contains only errors matching the required substring.
   static boolean hasExpectedError(@Nullable JsonNode response, @Nullable String expectedErrorMessageContains) {
     if (response == null || expectedErrorMessageContains == null || expectedErrorMessageContains.isEmpty()) {
       return false;

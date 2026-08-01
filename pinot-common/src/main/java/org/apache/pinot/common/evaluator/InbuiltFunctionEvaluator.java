@@ -142,12 +142,10 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     return _functionExpression;
   }
 
-  /**
-   * Planned ingestion evaluator for Variant scalar functions with literal path and target-type operands.
-   *
-   * <p>Each node compiles its literals once and owns a reusable cursor result. Like the enclosing evaluator, instances
-   * are intended to be confined to the record-transformer thread and are not thread-safe.
-   */
+  /// Planned ingestion evaluator for Variant scalar functions with literal path and target-type operands.
+  ///
+  /// <p>Each node compiles its literals once and owns a reusable cursor result. Like the enclosing evaluator, instances
+  /// are intended to be confined to the record-transformer thread and are not thread-safe.
   private static class VariantExecutionNode implements ExecutableNode {
     private static final String VARIANT_GET = "variantget";
     private static final String TRY_VARIANT_GET = "tryvariantget";

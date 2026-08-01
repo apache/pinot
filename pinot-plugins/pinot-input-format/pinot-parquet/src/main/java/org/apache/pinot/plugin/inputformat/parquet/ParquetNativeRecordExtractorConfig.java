@@ -46,13 +46,11 @@ public class ParquetNativeRecordExtractorConfig implements RecordExtractorConfig
     _extractRawTimeValues = extractRawTimeValues;
   }
 
-  /**
-   * Supplies the immutable Parquet record schema used to initialize schema-bound logical-type converters.
-   *
-   * <p>The native record reader sets this before initializing the extractor. Direct extractor users should do the
-   * same when the schema contains VARIANT columns; otherwise the extractor initializes those converters from the
-   * first record as a compatibility fallback.
-   */
+  /// Supplies the immutable Parquet record schema used to initialize schema-bound logical-type converters.
+  ///
+  /// <p>The native record reader sets this before initializing the extractor. Direct extractor users should do the
+  /// same when the schema contains VARIANT columns; otherwise the extractor initializes those converters from the
+  /// first record as a compatibility fallback.
   public void setParquetSchema(GroupType parquetSchema) {
     _parquetSchema = parquetSchema;
   }

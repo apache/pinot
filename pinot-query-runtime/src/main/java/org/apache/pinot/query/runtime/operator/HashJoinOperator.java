@@ -69,13 +69,11 @@ public class HashJoinOperator extends BaseJoinOperator {
   @Nullable
   private List<Object[]> _nullKeyRightRows;
 
-  /**
-   * Creates a hash join using schemas available on the join node.
-   *
-   * <p>For SEMI and ANTI joins whose node does not carry its inputs, the result schema contains only left columns, so
-   * this legacy constructor cannot validate the right key's logical type. New callers that need right-side VARIANT
-   * validation must use the overload that accepts {@code rightSchema}.
-   */
+  /// Creates a hash join using schemas available on the join node.
+  ///
+  /// <p>For SEMI and ANTI joins whose node does not carry its inputs, the result schema contains only left columns, so
+  /// this legacy constructor cannot validate the right key's logical type. New callers that need right-side VARIANT
+  /// validation must use the overload that accepts {@code rightSchema}.
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
     this(context, leftInput, leftSchema, rightInput, tryInferRightSchema(leftSchema, node), node, false);
@@ -101,13 +99,11 @@ public class HashJoinOperator extends BaseJoinOperator {
     _nullKeyRightRows = needUnmatchedRightRows() ? new ArrayList<>() : null;
   }
 
-  /**
-   * Constructor that takes the schema for NonEquiEvaluator as an argument.
-   *
-   * <p>For SEMI and ANTI joins whose node does not carry its inputs, the result schema contains only left columns, so
-   * this legacy constructor cannot validate the right key's logical type. New callers that need right-side VARIANT
-   * validation must use the overload that accepts {@code rightSchema}.
-   */
+  /// Constructor that takes the schema for NonEquiEvaluator as an argument.
+  ///
+  /// <p>For SEMI and ANTI joins whose node does not carry its inputs, the result schema contains only left columns, so
+  /// this legacy constructor cannot validate the right key's logical type. New callers that need right-side VARIANT
+  /// validation must use the overload that accepts {@code rightSchema}.
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node, DataSchema nonEquiEvaluationSchema) {
     this(context, leftInput, leftSchema, rightInput, tryInferRightSchema(leftSchema, node), node,
