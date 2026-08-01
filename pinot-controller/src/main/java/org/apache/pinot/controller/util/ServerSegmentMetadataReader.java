@@ -39,7 +39,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
@@ -48,14 +47,12 @@ import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.controller.api.resources.TableStaleSegmentResponse;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.UrlBuilderUtils;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.ClientProperties;
-import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -397,28 +394,6 @@ public class ServerSegmentMetadataReader {
   /// will pick a server that hosts the target segment and fetch the validDocIds result.
   ///
   /// @return a bitmap of validDocIds
-  @Deprecated
-  public RoaringBitmap getValidDocIdsFromServer(String tableNameWithType, String segmentName, String validDocIdsType,
-      String endpoint, int timeoutMs) {
-    // Build the endpoint url
-    String url = generateValidDocIdsURL(tableNameWithType, segmentName, validDocIdsType, endpoint);
-
-    // Set timeout
-    ClientConfig clientConfig = new ClientConfig();
-    clientConfig.property(ClientProperties.CONNECT_TIMEOUT, timeoutMs);
-    clientConfig.property(ClientProperties.READ_TIMEOUT, timeoutMs);
-
-    Response response = ClientBuilder.newClient(clientConfig).target(url).request().get(Response.class);
-    Preconditions.checkState(response.getStatus() == Response.Status.OK.getStatusCode(),
-        "Unable to retrieve validDocIds from %s", url);
-    byte[] validDocIds = response.readEntity(byte[].class);
-    return RoaringBitmapUtils.deserialize(validDocIds);
-  }
-
-  /// This method is called when the API request is to fetch validDocIds for a segment of the given table. This method
-  /// will pick a server that hosts the target segment and fetch the validDocIds result.
-  ///
-  /// @return a bitmap of validDocIds
   public ValidDocIdsBitmapResponse getValidDocIdsBitmapFromServer(String tableNameWithType, String segmentName,
       String endpoint, String validDocIdsType, int timeoutMs) {
     // Build the endpoint url
@@ -501,18 +476,6 @@ public class ServerSegmentMetadataReader {
   private String generateCheckReloadSegmentsServerURL(String tableNameWithType, String endpoint) {
     tableNameWithType = encode(tableNameWithType);
     return String.format("%s/tables/%s/segments/needReload", endpoint, tableNameWithType);
-  }
-
-  @Deprecated
-  private String generateValidDocIdsURL(String tableNameWithType, String segmentName, String validDocIdsType,
-      String endpoint) {
-    tableNameWithType = encode(tableNameWithType);
-    segmentName = encode(segmentName);
-    String url = String.format("%s/segments/%s/%s/validDocIds", endpoint, tableNameWithType, segmentName);
-    if (validDocIdsType != null) {
-      url = url + "?validDocIdsType=" + validDocIdsType;
-    }
-    return url;
   }
 
   private String generateValidDocIdsBitmapURL(String tableNameWithType, String segmentName, String validDocIdsType,

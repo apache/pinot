@@ -1904,7 +1904,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
     when(helixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-            .setLLC(true)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
             .build());
     PinotLLCRealtimeSegmentManager segmentManager =
