@@ -130,12 +130,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 ///     - "GET /segments/{tableName}/servers"
 ///   - Requests with mandatory "type":
 ///     - "DELETE /segments/{tableName}"
-/// - Deprecated APIs:
-///   - "GET /tables/{tableName}/segments"
-///   - "GET /tables/{tableName}/segments/metadata"
-///   - "GET /tables/{tableName}/segments/crc"
-///   - "GET /tables/{tableName}/segments/{segmentName}"
-///   - "GET /tables/{tableName}/segments/{segmentName}/metadata"
 @Api(tags = Constants.SEGMENT_TAG, authorizations = {
     @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)

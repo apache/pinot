@@ -1787,17 +1787,6 @@ public class PinotHelixResourceManager {
     LOGGER.info("Updated schema: {}", schemaName);
   }
 
-  /// Delete the given schema.
-  /// @param schema The schema to be deleted.
-  /// @return True on success, false otherwise.
-  @Deprecated
-  public boolean deleteSchema(Schema schema) {
-    if (schema != null) {
-      deleteSchema(schema.getSchemaName());
-    }
-    return false;
-  }
-
   /// Deletes the given schema. Returns `true` when schema exists, `false` when schema does not exist.
   public boolean deleteSchema(String schemaName) {
     LOGGER.info("Deleting schema: {}", schemaName);
@@ -1819,12 +1808,6 @@ public class PinotHelixResourceManager {
   @Nullable
   public Schema getTableSchema(String tableName) {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
-  }
-
-  @Deprecated
-  @Nullable
-  public Schema getSchemaForTableConfig(TableConfig tableConfig) {
-    return ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
   }
 
   /// Get all schema names in the cluster across all databases.
