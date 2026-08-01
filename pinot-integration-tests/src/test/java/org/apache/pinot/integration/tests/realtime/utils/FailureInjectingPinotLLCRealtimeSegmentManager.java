@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 public class FailureInjectingPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   private final Map<String, String> _failureConfig;
-  private long _maxSegmentCompletionTimeoutMs = 300000L;
+  private volatile long _maxSegmentCompletionTimeoutMs = DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS;
   private static final Logger LOGGER = LoggerFactory.getLogger(FailureInjectingPinotLLCRealtimeSegmentManager.class);
 
   public FailureInjectingPinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager,

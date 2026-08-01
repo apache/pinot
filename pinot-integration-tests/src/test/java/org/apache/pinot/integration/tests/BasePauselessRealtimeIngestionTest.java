@@ -160,11 +160,8 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     if (getFailurePoint() == null) {
       return;
     }
-    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
-    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)
-          .setMaxSegmentCompletionTimeoutMs(FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    }
+    PauselessRealtimeTestUtils.setMaxSegmentCompletionTimeoutMs(_helixResourceManager,
+        FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
   }
 
   protected void injectFailure() {
@@ -184,11 +181,8 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   }
 
   protected void restoreMaxSegmentCompletionTimeMillis() {
-    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
-    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).setMaxSegmentCompletionTimeoutMs(
-          PinotLLCRealtimeSegmentManager.DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    }
+    PauselessRealtimeTestUtils.setMaxSegmentCompletionTimeoutMs(_helixResourceManager,
+        PinotLLCRealtimeSegmentManager.DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
   }
 
   @AfterClass
@@ -221,10 +215,9 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
       return segmentZKMetadataList.size() == getExpectedZKMetadataWithFailure();
     }, 1000, 100000, "New Segment ZK Metadata not created");
 
-    Thread.sleep(FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    disableFailure();
-
     try {
+      Thread.sleep(FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+      disableFailure();
       _controllerStarter.getRealtimeSegmentValidationManager().run();
     } finally {
       // Keep the short timeout through the repair pass, then restore the production timeout for normal commits.

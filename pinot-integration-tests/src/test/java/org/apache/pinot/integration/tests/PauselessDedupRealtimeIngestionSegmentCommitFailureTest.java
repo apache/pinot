@@ -112,7 +112,6 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
     startKafka();
     pushAvroIntoKafka(avroFiles);
 
-    setMaxSegmentCompletionTimeMillis();
     // create schema for non-pauseless table
     Schema schema = createSchema();
     schema.setSchemaName(getNonPauselessTableName());
