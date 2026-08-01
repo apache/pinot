@@ -69,4 +69,15 @@ public class FilterOperandTest {
             () -> new FilterOperand.In(VARIANT_OPERANDS, VARIANT_SCHEMA, true));
     Assert.assertTrue(exception.getMessage().contains("Raw VARIANT values do not support IN"));
   }
+
+  @Test
+  public void testRawVariantDistinctFromIsRejected() {
+    for (String functionName : List.of("IS_DISTINCT_FROM", "isNotDistinctFrom")) {
+      RexExpression.FunctionCall functionCall =
+          new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, functionName, VARIANT_OPERANDS);
+      IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
+          () -> TransformOperandFactory.getTransformOperand(functionCall, VARIANT_SCHEMA));
+      Assert.assertTrue(exception.getMessage().contains("Raw VARIANT values do not support comparison"));
+    }
+  }
 }

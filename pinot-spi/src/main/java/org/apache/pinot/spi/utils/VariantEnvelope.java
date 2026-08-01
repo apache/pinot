@@ -23,27 +23,25 @@ import java.util.Objects;
 import javax.annotation.Nullable;
 
 
-/**
- * Pinot-owned framing for the two buffers that make up a Parquet Variant value.
- *
- * <p>The version-1 wire format is:
- * <pre>
- *   0        4 bytes  ASCII magic "PVAR"
- *   4        1 byte   envelope version (1)
- *   5        1 byte   flags (0)
- *   6        2 bytes  reserved (0)
- *   8        4 bytes  metadata length, unsigned range restricted to Java array sizes
- *   12       4 bytes  value length, unsigned range restricted to Java array sizes
- *   16       M bytes  Parquet Variant metadata
- *   16 + M   V bytes  Parquet Variant value
- * </pre>
- *
- * <p>An empty byte array is deliberately not an envelope. Pinot reserves it as the default null value for a
- * {@code VARIANT} field, allowing the null-value vector to distinguish SQL null from an encoded Variant null.
- *
- * <p>This class validates only Pinot's stable outer framing. Producers and consumers remain responsible for validating
- * the Parquet Variant metadata and value payloads.
- */
+/// Pinot-owned framing for the two buffers that make up a Parquet Variant value.
+///
+/// The version-1 wire format is:
+/// ```
+/// 0        4 bytes  ASCII magic "PVAR"
+/// 4        1 byte   envelope version (1)
+/// 5        1 byte   flags (0)
+/// 6        2 bytes  reserved (0)
+/// 8        4 bytes  metadata length, unsigned range restricted to Java array sizes
+/// 12       4 bytes  value length, unsigned range restricted to Java array sizes
+/// 16       M bytes  Parquet Variant metadata
+/// 16 + M   V bytes  Parquet Variant value
+/// ```
+///
+/// An empty byte array is deliberately not an envelope. Pinot reserves it as the default null value for a
+/// `VARIANT` field, allowing the null-value vector to distinguish SQL null from an encoded Variant null.
+///
+/// This class validates only Pinot's stable outer framing. Producers and consumers remain responsible for validating
+/// the Parquet Variant metadata and value payloads.
 public final class VariantEnvelope {
   public static final int HEADER_SIZE = 16;
   public static final byte VERSION = 1;
@@ -54,13 +52,11 @@ public final class VariantEnvelope {
   private VariantEnvelope() {
   }
 
-  /**
-   * Encodes the remaining bytes of the supplied metadata and value buffers without changing their positions or
-   * limits.
-   *
-   * <p>Array-backed buffers are copied directly from their backing arrays. Other buffers, including direct and
-   * read-only buffers, are read through independent duplicate views.
-   */
+  /// Encodes the remaining bytes of the supplied metadata and value buffers without changing their positions or
+  /// limits.
+  ///
+  /// Array-backed buffers are copied directly from their backing arrays. Other buffers, including direct and
+  /// read-only buffers, are read through independent duplicate views.
   public static byte[] encode(ByteBuffer metadata, ByteBuffer value) {
     Objects.requireNonNull(metadata, "metadata must not be null");
     Objects.requireNonNull(value, "value must not be null");
@@ -73,9 +69,7 @@ public final class VariantEnvelope {
     return envelope;
   }
 
-  /**
-   * Encodes slices of the supplied arrays without allocating intermediate buffer views.
-   */
+  /// Encodes slices of the supplied arrays without allocating intermediate buffer views.
   public static byte[] encode(byte[] metadata, int metadataOffset, int metadataLength, byte[] value, int valueOffset,
       int valueLength) {
     Objects.requireNonNull(metadata, "metadata must not be null");
@@ -89,19 +83,17 @@ public final class VariantEnvelope {
     return envelope;
   }
 
-  /**
-   * Decodes and validates an envelope, returning zero-copy, read-only views over its metadata and value buffers.
-   *
-   * <p>The returned views alias {@code envelope}; this method does not copy either payload. The decoded object and
-   * any views obtained from it keep the backing array alive, so the caller does not need to retain a separate
-   * reference to {@code envelope}. Mutations made to the input array after this method returns are visible through
-   * the views and can corrupt the decoded payload. Callers must therefore treat the input array as immutable for as
-   * long as the decoded object or any returned view may be used.
-   *
-   * <p>The decoded holder is safe for concurrent reads when the aliased input array is not mutated. Each accessor
-   * returns a read-only view with independent position and limit, so cursor movement by one reader does not affect
-   * another reader.
-   */
+  /// Decodes and validates an envelope, returning zero-copy, read-only views over its metadata and value buffers.
+  ///
+  /// The returned views alias `envelope`; this method does not copy either payload. The decoded object and any views
+  /// obtained from it keep the backing array alive, so the caller does not need to retain a separate reference to
+  /// `envelope`. Mutations made to the input array after this method returns are visible through the views and can
+  /// corrupt the decoded payload. Callers must therefore treat the input array as immutable for as long as the decoded
+  /// object or any returned view may be used.
+  ///
+  /// The decoded holder is safe for concurrent reads when the aliased input array is not mutated. Each accessor returns
+  /// a read-only view with independent position and limit, so cursor movement by one reader does not affect another
+  /// reader.
   public static Decoded decode(byte[] envelope) {
     int metadataLength = validateAndGetMetadataLength(envelope);
     int valueLength = envelope.length - HEADER_SIZE - metadataLength;
@@ -112,11 +104,9 @@ public final class VariantEnvelope {
     return new Decoded(metadata, value);
   }
 
-  /**
-   * Validates the stable outer framing and returns the metadata length without allocating buffer views.
-   *
-   * <p>The value begins at {@code HEADER_SIZE + metadataLength}; its length is the remaining envelope length.
-   */
+  /// Validates the stable outer framing and returns the metadata length without allocating buffer views.
+  ///
+  /// The value begins at `HEADER_SIZE + metadataLength`; its length is the remaining envelope length.
   public static int validateAndGetMetadataLength(byte[] envelope) {
     Objects.requireNonNull(envelope, "envelope must not be null");
     if (envelope.length < HEADER_SIZE) {
@@ -156,9 +146,7 @@ public final class VariantEnvelope {
     return metadataLength;
   }
 
-  /**
-   * Returns whether the bytes form a complete, supported Variant envelope.
-   */
+  /// Returns whether the bytes form a complete, supported Variant envelope.
   public static boolean isEnvelope(@Nullable byte[] envelope) {
     if (envelope == null) {
       return false;
@@ -171,13 +159,11 @@ public final class VariantEnvelope {
     }
   }
 
-  /**
-   * Allocates an initialized envelope with writable, zero-filled metadata and value regions.
-   *
-   * <p>This is the zero-intermediate-copy producer API for sources that can write directly into a destination array.
-   * The metadata region begins at {@link #HEADER_SIZE}; the value region begins at
-   * {@code HEADER_SIZE + metadataLength}. Callers must completely fill both regions before publishing the envelope.
-   */
+  /// Allocates an initialized envelope with writable, zero-filled metadata and value regions.
+  ///
+  /// This is the zero-intermediate-copy producer API for sources that can write directly into a destination array.
+  /// The metadata region begins at [#HEADER_SIZE]; the value region begins at `HEADER_SIZE + metadataLength`. Callers
+  /// must completely fill both regions before publishing the envelope.
   public static byte[] allocate(int metadataLength, int valueLength) {
     if (metadataLength < 0 || valueLength < 0) {
       throw new IllegalArgumentException(
@@ -231,12 +217,10 @@ public final class VariantEnvelope {
     bytes[offset + 3] = (byte) value;
   }
 
-  /**
-   * Read-only views of the two Parquet Variant buffers stored in an envelope.
-   *
-   * <p>Instances retain and alias the envelope array supplied to {@link VariantEnvelope#decode(byte[])}. They are
-   * safe for concurrent reads only while that array remains unmodified.
-   */
+  /// Read-only views of the two Parquet Variant buffers stored in an envelope.
+  ///
+  /// Instances retain and alias the envelope array supplied to [VariantEnvelope#decode(byte[])]. They are safe for
+  /// concurrent reads only while that array remains unmodified.
   public static final class Decoded {
     private final ByteBuffer _metadata;
     private final ByteBuffer _value;
@@ -246,16 +230,12 @@ public final class VariantEnvelope {
       _value = value;
     }
 
-    /**
-     * Returns a read-only metadata view with independent position and limit.
-     */
+    /// Returns a read-only metadata view with independent position and limit.
     public ByteBuffer getMetadata() {
       return _metadata.asReadOnlyBuffer();
     }
 
-    /**
-     * Returns a read-only value view with independent position and limit.
-     */
+    /// Returns a read-only value view with independent position and limit.
     public ByteBuffer getValue() {
       return _value.asReadOnlyBuffer();
     }

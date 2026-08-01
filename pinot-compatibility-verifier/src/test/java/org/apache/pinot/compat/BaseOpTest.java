@@ -25,9 +25,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests capability-gated compatibility operations.
- */
+/// Tests capability-gated compatibility operations.
 public class BaseOpTest {
   private static final String TEST_PROPERTY = BaseOpTest.class.getName() + ".enabled";
 

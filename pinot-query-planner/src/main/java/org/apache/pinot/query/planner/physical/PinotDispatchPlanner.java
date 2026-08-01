@@ -156,6 +156,10 @@ public class PinotDispatchPlanner {
   /// Runs validations on the plan.
   private void runValidations(PlanFragment planFragment, DispatchablePlanContext context) {
     PlanNode rootPlanNode = planFragment.getFragmentRoot();
+    if (rootPlanNode.getStageId() == 0) {
+      VariantTypeValidationVisitor.validateResultSchema(rootPlanNode.getDataSchema(),
+          context.getPlannerContext().getEnvConfig().isNullHandlingEnabled());
+    }
     boolean isIntermediateStage =
         context.getDispatchablePlanMetadataMap().get(rootPlanNode.getStageId()).getScannedTables().isEmpty();
     rootPlanNode.visit(ArrayToMvValidationVisitor.INSTANCE, isIntermediateStage);

@@ -52,15 +52,16 @@ import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.VariantEnvelope;
 
 
-/**
- * Query-side operations for Pinot {@code VARIANT} values.
- *
- * <p>The utility navigates the Parquet Variant binary representation directly. It never materializes a JSON tree.
- * Instances are not required, and stateless convenience methods are thread-safe. Overloads that accept a
- * caller-provided {@link ReusableResult} require that result to be thread-confined and not shared by concurrent calls.
- * An empty byte array is Pinot's SQL-null placeholder and is never decoded as an envelope.
- */
+/// Query-side operations for Pinot {@code VARIANT} values.
+///
+/// <p>The utility navigates the Parquet Variant binary representation directly. It never materializes a JSON tree.
+/// Instances are not required, and stateless convenience methods are thread-safe. Overloads that accept a
+/// caller-provided {@link ReusableResult} require that result to be thread-confined and not shared by concurrent calls.
+/// An empty byte array is Pinot's SQL-null placeholder and is never decoded as an envelope.
 public final class VariantUtils {
+  public static final String RAW_VARIANT_REQUIRES_NULL_HANDLING_ERROR =
+      "Raw VARIANT projection requires query null handling to be enabled; set enableNullHandling=true";
+
   private static final JsonFactory JSON_FACTORY = new JsonFactory();
   private static final BigDecimal MIN_INT_DECIMAL = BigDecimal.valueOf(Integer.MIN_VALUE);
   private static final BigDecimal MAX_INT_DECIMAL = BigDecimal.valueOf(Integer.MAX_VALUE);
@@ -107,9 +108,22 @@ public final class VariantUtils {
   private VariantUtils() {
   }
 
-  /**
-   * Statically supported result types for {@code variantGet} and {@code tryVariantGet}.
-   */
+  /// Returns whether a final result containing raw VARIANT values requires query null handling. Without a null bitmap,
+  /// Pinot's reserved empty-byte SQL-null placeholder cannot be distinguished from a logical Variant value.
+  public static boolean requiresNullHandlingForRawVariantResult(DataSchema resultSchema,
+      boolean nullHandlingEnabled) {
+    if (nullHandlingEnabled) {
+      return false;
+    }
+    for (DataSchema.ColumnDataType dataType : resultSchema.getColumnDataTypes()) {
+      if (dataType == DataSchema.ColumnDataType.VARIANT) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Statically supported result types for {@code variantGet} and {@code tryVariantGet}.
   public enum ResultType {
     BOOLEAN(DataType.BOOLEAN, SqlTypeName.BOOLEAN),
     INT(DataType.INT, SqlTypeName.INTEGER),
@@ -141,10 +155,8 @@ public final class VariantUtils {
     }
   }
 
-  /**
-   * An immutable, pre-parsed Variant path. The v1 grammar supports {@code $}, dot-separated object fields, and
-   * non-negative array subscripts.
-   */
+  /// An immutable, pre-parsed Variant path. The v1 grammar supports {@code $}, dot-separated object fields, and
+  /// non-negative array subscripts.
   public static final class VariantPath {
     private final PathElement[] _elements;
 
@@ -153,15 +165,13 @@ public final class VariantUtils {
     }
   }
 
-  /**
-   * Reusable, unboxed destination for vectorized Variant extraction.
-   *
-   * <p>Only the getter corresponding to the requested {@link ResultType} is defined after a successful extraction.
-   * The instance is mutable and not thread-safe; callers should retain one per transform-function instance. Every
-   * extraction may replace its state. Each successful byte-valued extraction installs a newly materialized array.
-   * Values returned as {@code byte[]} or as a {@link ByteArray} may be retained after this result is reused, but they
-   * are read-only by contract and must be copied before mutation.
-   */
+  /// Reusable, unboxed destination for vectorized Variant extraction.
+  ///
+  /// <p>Only the getter corresponding to the requested {@link ResultType} is defined after a successful extraction.
+  /// The instance is mutable and not thread-safe; callers should retain one per transform-function instance. Every
+  /// extraction may replace its state. Each successful byte-valued extraction installs a newly materialized array.
+  /// Values returned as {@code byte[]} or as a {@link ByteArray} may be retained after this result is reused, but they
+  /// are read-only by contract and must be copied before mutation.
   public static final class ReusableResult {
     private final Cursor _cursor = new Cursor();
     private int _intValue;
@@ -196,12 +206,10 @@ public final class VariantUtils {
       return _stringValue;
     }
 
-    /**
-     * Returns the extracted BYTES, VARIANT, or direct 16-byte UUID representation.
-     *
-     * <p>The returned array is replaced, but not mutated, by the next byte-valued extraction. It may be retained after
-     * this result is reused, but must be treated as immutable and copied before mutation.
-     */
+    /// Returns the extracted BYTES, VARIANT, or direct 16-byte UUID representation.
+    ///
+    /// <p>The returned array is replaced, but not mutated, by the next byte-valued extraction. It may be retained after
+    /// this result is reused, but must be treated as immutable and copied before mutation.
     public byte[] getBytesValue() {
       return _bytesValue;
     }
@@ -210,12 +218,10 @@ public final class VariantUtils {
       return UuidUtils.toUUID(_bytesValue);
     }
 
-    /**
-     * Materializes the extracted value in the external representation used by scalar functions and ingestion.
-     *
-     * <p>For BYTES and VARIANT, the returned {@code byte[]} may be retained after this result is reused. It must be
-     * treated as immutable and copied before mutation.
-     */
+    /// Materializes the extracted value in the external representation used by scalar functions and ingestion.
+    ///
+    /// <p>For BYTES and VARIANT, the returned {@code byte[]} may be retained after this result is reused. It must be
+    /// treated as immutable and copied before mutation.
     public Object getExternalValue(ResultType resultType) {
       switch (resultType) {
         case BOOLEAN:
@@ -245,14 +251,12 @@ public final class VariantUtils {
       }
     }
 
-    /**
-     * Materializes the extracted value in {@link DataSchema}'s internal representation.
-     *
-     * <p>TIMESTAMP remains epoch milliseconds and UUID wraps the directly copied 16-byte value, avoiding an
-     * external-object round trip in the multi-stage engine. For BYTES, UUID, and VARIANT, the returned
-     * {@link ByteArray} wraps a newly materialized array that may be retained after this result is reused. Neither the
-     * wrapper nor its array may be mutated; callers must copy the array before mutation.
-     */
+    /// Materializes the extracted value in {@link DataSchema}'s internal representation.
+    ///
+    /// <p>TIMESTAMP remains epoch milliseconds and UUID wraps the directly copied 16-byte value, avoiding an
+    /// external-object round trip in the multi-stage engine. For BYTES, UUID, and VARIANT, the returned
+    /// {@link ByteArray} wraps a newly materialized array that may be retained after this result is reused. Neither the
+    /// wrapper nor its array may be mutated; callers must copy the array before mutation.
     public Object getInternalValue(ResultType resultType) {
       switch (resultType) {
         case BOOLEAN:
@@ -281,9 +285,7 @@ public final class VariantUtils {
     }
   }
 
-  /**
-   * Parses a target type literal once for reuse by a transform function.
-   */
+  /// Parses a target type literal once for reuse by a transform function.
   public static ResultType parseResultType(String targetType) {
     if (targetType == null) {
       throw new IllegalArgumentException("Variant target type must not be null");
@@ -295,9 +297,7 @@ public final class VariantUtils {
     }
   }
 
-  /**
-   * Compiles a v1 Variant path.
-   */
+  /// Compiles a v1 Variant path.
   public static VariantPath compilePath(String path) {
     if (path == null || path.isEmpty() || path.charAt(0) != '$') {
       throw new IllegalArgumentException("Variant path must start with '$': " + path);
@@ -340,39 +340,31 @@ public final class VariantUtils {
     return new VariantPath(elements.toArray(new PathElement[0]));
   }
 
-  /**
-   * Extracts a Variant value. A missing path or SQL null returns Java null; a Variant null remains an encoded Variant
-   * value.
-   */
+  /// Extracts a Variant value. A missing path or SQL null returns Java null; a Variant null remains an encoded Variant
+  /// value.
   @Nullable
   public static byte[] variantGet(@Nullable byte[] envelope, String path) {
     return (byte[]) variantGet(envelope, compilePath(path), ResultType.VARIANT);
   }
 
-  /**
-   * Strictly extracts and converts a value. A missing path or SQL null returns Java null. A Variant null remains
-   * encoded when the target type is {@link ResultType#VARIANT}, and returns Java null for other target types. An
-   * incompatible non-null value throws.
-   */
+  /// Strictly extracts and converts a value. A missing path or SQL null returns Java null. A Variant null remains
+  /// encoded when the target type is {@link ResultType#VARIANT}, and returns Java null for other target types. An
+  /// incompatible non-null value throws.
   @Nullable
   public static Object variantGet(@Nullable byte[] envelope, String path, String targetType) {
     return variantGet(envelope, compilePath(path), parseResultType(targetType));
   }
 
-  /**
-   * Strictly extracts using pre-parsed path and type values.
-   */
+  /// Strictly extracts using pre-parsed path and type values.
   @Nullable
   public static Object variantGet(@Nullable byte[] envelope, VariantPath path, ResultType targetType) {
     ReusableResult result = new ReusableResult();
     return extractInto(envelope, path, targetType, result) ? result.getExternalValue(targetType) : null;
   }
 
-  /**
-   * Strictly extracts into a reusable, unboxed result.
-   *
-   * @return {@code false} for SQL null, a missing path, or Variant null converted to a non-Variant target
-   */
+  /// Strictly extracts into a reusable, unboxed result.
+  ///
+  /// @return {@code false} for SQL null, a missing path, or Variant null converted to a non-Variant target
   public static boolean extractInto(@Nullable byte[] envelope, VariantPath path, ResultType targetType,
       ReusableResult result) {
     Objects.requireNonNull(result, "result must not be null");
@@ -392,17 +384,13 @@ public final class VariantUtils {
     return true;
   }
 
-  /**
-   * Tolerant Variant extraction. Malformed input returns Java null.
-   */
+  /// Tolerant Variant extraction. Malformed input returns Java null.
   @Nullable
   public static byte[] tryVariantGet(@Nullable byte[] envelope, String path) {
     return (byte[]) tryVariantGet(envelope, compilePath(path), ResultType.VARIANT);
   }
 
-  /**
-   * Tolerant typed extraction. Malformed input and incompatible types return Java null.
-   */
+  /// Tolerant typed extraction. Malformed input and incompatible types return Java null.
   @Nullable
   public static Object tryVariantGet(@Nullable byte[] envelope, String path, String targetType) {
     try {
@@ -412,9 +400,7 @@ public final class VariantUtils {
     }
   }
 
-  /**
-   * Tolerant extraction using pre-parsed path and type values.
-   */
+  /// Tolerant extraction using pre-parsed path and type values.
   @Nullable
   public static Object tryVariantGet(@Nullable byte[] envelope, VariantPath path, ResultType targetType) {
     try {
@@ -425,12 +411,10 @@ public final class VariantUtils {
     }
   }
 
-  /**
-   * Tolerantly extracts into a reusable, unboxed result.
-   *
-   * @return {@code false} for SQL null, missing paths, Variant null converted to a non-Variant target, malformed input,
-   *     or an incompatible conversion
-   */
+  /// Tolerantly extracts into a reusable, unboxed result.
+  ///
+  /// @return {@code false} for SQL null, missing paths, Variant null converted to a non-Variant target,
+  ///     malformed input, or an incompatible conversion
   public static boolean tryExtractInto(@Nullable byte[] envelope, VariantPath path, ResultType targetType,
       ReusableResult result) {
     Objects.requireNonNull(result, "result must not be null");
@@ -455,26 +439,20 @@ public final class VariantUtils {
     }
   }
 
-  /**
-   * Returns whether the path is present. A present Variant null counts as present.
-   */
+  /// Returns whether the path is present. A present Variant null counts as present.
   @Nullable
   public static Boolean variantExists(@Nullable byte[] envelope, String path) {
     return variantExists(envelope, compilePath(path));
   }
 
-  /**
-   * Returns whether a compiled path is present. A present Variant null counts as present.
-   */
+  /// Returns whether a compiled path is present. A present Variant null counts as present.
   @Nullable
   public static Boolean variantExists(@Nullable byte[] envelope, VariantPath path) {
     return variantExists(envelope, path, new ReusableResult());
   }
 
-  /**
-   * Allocation-free compiled-path form of {@link #variantExists(byte[], VariantPath)} when the caller retains the
-   * supplied result between rows.
-   */
+  /// Allocation-free compiled-path form of {@link #variantExists(byte[], VariantPath)} when the caller retains the
+  /// supplied result between rows.
   @Nullable
   public static Boolean variantExists(@Nullable byte[] envelope, VariantPath path, ReusableResult result) {
     Objects.requireNonNull(result, "result must not be null");
@@ -484,31 +462,23 @@ public final class VariantUtils {
     return result._cursor.navigate(envelope, Objects.requireNonNull(path, "path must not be null"));
   }
 
-  /**
-   * Returns whether the root value is a Variant null. SQL null is not a Variant null.
-   */
+  /// Returns whether the root value is a Variant null. SQL null is not a Variant null.
   public static boolean isVariantNull(@Nullable byte[] envelope) {
     return isVariantNull(envelope, ROOT_PATH, new ReusableResult());
   }
 
-  /**
-   * Returns whether a present value at the path is a Variant null. SQL null and missing paths return false.
-   */
+  /// Returns whether a present value at the path is a Variant null. SQL null and missing paths return false.
   public static boolean isVariantNull(@Nullable byte[] envelope, String path) {
     return isVariantNull(envelope, compilePath(path));
   }
 
-  /**
-   * Returns whether a present value at a compiled path is a Variant null. SQL null and missing paths return false.
-   */
+  /// Returns whether a present value at a compiled path is a Variant null. SQL null and missing paths return false.
   public static boolean isVariantNull(@Nullable byte[] envelope, VariantPath path) {
     return isVariantNull(envelope, path, new ReusableResult());
   }
 
-  /**
-   * Allocation-free compiled-path form of {@link #isVariantNull(byte[], VariantPath)} when the caller retains the
-   * supplied result between rows.
-   */
+  /// Allocation-free compiled-path form of {@link #isVariantNull(byte[], VariantPath)} when the caller retains the
+  /// supplied result between rows.
   public static boolean isVariantNull(@Nullable byte[] envelope, VariantPath path, ReusableResult result) {
     Objects.requireNonNull(result, "result must not be null");
     if (isSqlNull(envelope)) {
@@ -519,34 +489,26 @@ public final class VariantUtils {
         && cursor.getType() == Variant.Type.NULL;
   }
 
-  /**
-   * Returns the Variant type name at the root, or Java null for SQL null.
-   */
+  /// Returns the Variant type name at the root, or Java null for SQL null.
   @Nullable
   public static String variantTypeOf(@Nullable byte[] envelope) {
     return variantTypeOf(envelope, ROOT_PATH, new ReusableResult());
   }
 
-  /**
-   * Returns the Variant type name at a path, or Java null for SQL null or a missing path.
-   */
+  /// Returns the Variant type name at a path, or Java null for SQL null or a missing path.
   @Nullable
   public static String variantTypeOf(@Nullable byte[] envelope, String path) {
     return variantTypeOf(envelope, compilePath(path));
   }
 
-  /**
-   * Returns the Variant type name at a compiled path, or Java null for SQL null or a missing path.
-   */
+  /// Returns the Variant type name at a compiled path, or Java null for SQL null or a missing path.
   @Nullable
   public static String variantTypeOf(@Nullable byte[] envelope, VariantPath path) {
     return variantTypeOf(envelope, path, new ReusableResult());
   }
 
-  /**
-   * Allocation-free compiled-path form of {@link #variantTypeOf(byte[], VariantPath)} when the caller retains the
-   * supplied result between rows.
-   */
+  /// Allocation-free compiled-path form of {@link #variantTypeOf(byte[], VariantPath)} when the caller retains the
+  /// supplied result between rows.
   @Nullable
   public static String variantTypeOf(@Nullable byte[] envelope, VariantPath path, ReusableResult result) {
     Objects.requireNonNull(result, "result must not be null");
@@ -558,9 +520,7 @@ public final class VariantUtils {
         ? typeName(cursor.getType()) : null;
   }
 
-  /**
-   * Renders the Variant value as canonical JSON text without constructing a JSON tree.
-   */
+  /// Renders the Variant value as canonical JSON text without constructing a JSON tree.
   @Nullable
   public static String variantToJson(@Nullable byte[] envelope) {
     if (isSqlNull(envelope)) {
@@ -572,9 +532,7 @@ public final class VariantUtils {
     return variantToJson(cursor.asVariant());
   }
 
-  /**
-   * Parses JSON text into a Pinot Variant envelope without constructing a JSON tree.
-   */
+  /// Parses JSON text into a Pinot Variant envelope without constructing a JSON tree.
   @Nullable
   public static byte[] parseJsonToVariant(@Nullable String json) {
     if (json == null) {
@@ -597,9 +555,7 @@ public final class VariantUtils {
     }
   }
 
-  /**
-   * Tolerant JSON parser. Malformed or unsupported input returns Java null.
-   */
+  /// Tolerant JSON parser. Malformed or unsupported input returns Java null.
   @Nullable
   public static byte[] tryParseJsonToVariant(@Nullable String json) {
     try {
@@ -1205,12 +1161,10 @@ public final class VariantUtils {
             + ", scale=" + value.scale());
   }
 
-  /**
-   * Mutable zero-copy view over one selected value in a Pinot envelope.
-   *
-   * <p>The constants and layouts used here mirror Parquet Variant encoding version 1. Keeping this cursor on
-   * {@link ReusableResult} avoids allocating envelope views, Variant wrappers, and navigation wrappers for every row.
-   */
+  /// Mutable zero-copy view over one selected value in a Pinot envelope.
+  ///
+  /// <p>The constants and layouts used here mirror Parquet Variant encoding version 1. Keeping this cursor on
+  /// {@link ReusableResult} avoids allocating envelope views, Variant wrappers, and navigation wrappers for every row.
   private static final class Cursor {
     private byte[] _envelope;
     private int _metadataOffset;

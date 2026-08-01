@@ -31,13 +31,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 
 
-/**
- * Single-stage typed extraction from a Variant envelope.
- *
- * <p>The path and optional target type must be literals, so they are parsed once during initialization. Omitting the
- * target type returns a Variant. A missing path returns SQL null; the strict form throws for an incompatible non-null
- * value, while {@link Try} maps that failure to SQL null. Instances are query-local and not thread-safe.
- */
+/// Single-stage typed extraction from a Variant envelope.
+///
+/// <p>The path and optional target type must be literals, so they are parsed once during initialization. Omitting the
+/// target type returns a Variant. A missing path returns SQL null; the strict form throws for an incompatible non-null
+/// value, while {@link Try} maps that failure to SQL null. Instances are query-local and not thread-safe.
 public class VariantGetTransformFunction extends BaseVariantTransformFunction {
   public static final String FUNCTION_NAME = "variantGet";
   private final boolean _tolerant;
@@ -240,9 +238,7 @@ public class VariantGetTransformFunction extends BaseVariantTransformFunction {
     }
   }
 
-  /**
-   * Tolerant Variant extraction.
-   */
+  /// Tolerant Variant extraction.
   public static final class Try extends VariantGetTransformFunction {
     public static final String FUNCTION_NAME = "tryVariantGet";
 

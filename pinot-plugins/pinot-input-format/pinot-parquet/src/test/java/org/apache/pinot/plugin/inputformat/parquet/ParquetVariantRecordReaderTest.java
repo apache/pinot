@@ -66,9 +66,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * End-to-end coverage for Parquet `VARIANT(1)` reconstruction and reader selection.
- */
+/// End-to-end coverage for Parquet `VARIANT(1)` reconstruction and reader selection.
 public class ParquetVariantRecordReaderTest {
   private static final String VARIANT_FIELD = "variant_col";
 
@@ -426,6 +424,37 @@ public class ParquetVariantRecordReaderTest {
         () -> ParquetVariantConverter.createTopLevelVariantConverters(unsupportedInt96));
     assertTrue(int96Exception.getMessage().contains("Unsupported shredded value type"));
     assertTrue(int96Exception.getMessage().matches("(?i).*int96.*"));
+  }
+
+  @Test
+  public void testNestedVariantValidationHonorsSelectedFields() {
+    MessageType schema = MessageTypeParser.parseMessageType(
+        "message nested {"
+            + " required int32 id;"
+            + " optional group wrapper {"
+            + "   optional group variant_col (VARIANT(1)) {"
+            + "     required binary metadata;"
+            + "     optional binary value;"
+            + "   }"
+            + " }"
+            + "}");
+    ParquetNativeRecordExtractorConfig config = new ParquetNativeRecordExtractorConfig();
+    config.setParquetSchema(schema);
+
+    ParquetNativeRecordExtractor idExtractor = new ParquetNativeRecordExtractor();
+    idExtractor.init(Set.of("id"), config);
+    GenericRow row = idExtractor.extract(new SimpleGroupFactory(schema).newGroup().append("id", 7), new GenericRow());
+    assertEquals(row.getFieldToValueMap(), Map.of("id", 7));
+
+    ParquetNativeRecordExtractor wrapperExtractor = new ParquetNativeRecordExtractor();
+    UnsupportedOperationException selectedException = expectThrows(UnsupportedOperationException.class,
+        () -> wrapperExtractor.init(Set.of("wrapper"), config));
+    assertTrue(selectedException.getMessage().contains("Nested"));
+
+    ParquetNativeRecordExtractor extractAll = new ParquetNativeRecordExtractor();
+    UnsupportedOperationException extractAllException = expectThrows(UnsupportedOperationException.class,
+        () -> extractAll.init(null, config));
+    assertTrue(extractAllException.getMessage().contains("Nested"));
   }
 
   private void assertScalarRows(RecordReader reader, File dataFile)
