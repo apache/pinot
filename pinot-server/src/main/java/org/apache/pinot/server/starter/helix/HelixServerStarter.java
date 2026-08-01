@@ -39,26 +39,6 @@ public class HelixServerStarter extends BaseServerStarter {
   public HelixServerStarter() {
   }
 
-  @Deprecated
-  public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf)
-      throws Exception {
-    init(applyServerConfig(serverConf, helixClusterName, zkAddress));
-  }
-
-  @Deprecated
-  private static PinotConfiguration applyServerConfig(PinotConfiguration serverConf, String helixClusterName,
-      String zkAddress) {
-    serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, helixClusterName);
-    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, zkAddress);
-    return serverConf;
-  }
-
-  @Deprecated
-  public HelixServerStarter(PinotConfiguration serverConf)
-      throws Exception {
-    init(serverConf);
-  }
-
   /// This method is for reference purpose only.
   public static HelixServerStarter startDefault()
       throws Exception {

@@ -330,12 +330,6 @@ public final class Schema implements Serializable {
     _fieldSpecMap.put(columnName, fieldSpec);
   }
 
-  @Deprecated
-  // For third-eye backward compatible.
-  public void addField(String columnName, FieldSpec fieldSpec) {
-    addField(fieldSpec);
-  }
-
   public boolean removeField(String columnName) {
     FieldSpec existingFieldSpec = _fieldSpecMap.remove(columnName);
     if (existingFieldSpec != null) {

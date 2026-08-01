@@ -113,11 +113,6 @@ public class SegmentGenerationUtils {
     }
   }
 
-  @Deprecated
-  public static TableConfig getTableConfig(String tableConfigURIStr) {
-    return getTableConfig(tableConfigURIStr, null);
-  }
-
   public static TableConfig getTableConfig(String tableConfigURIStr, String authToken) {
     return getTableConfig(tableConfigURIStr, authToken, null);
   }

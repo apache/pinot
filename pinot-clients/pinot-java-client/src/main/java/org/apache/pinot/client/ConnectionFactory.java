@@ -66,31 +66,6 @@ public class ConnectionFactory {
     }
   }
 
-  /// @param scheme controller URL scheme
-  /// @param controllerHost controller host
-  /// @param controllerPort controller port
-  /// @return A connection that connects to brokers as per the given controller
-  @Deprecated
-  public static Connection fromController(String scheme, String controllerHost, int controllerPort) {
-    return fromController(new Properties(), scheme, controllerHost, controllerPort);
-  }
-
-  /// @param scheme controller URL scheme
-  /// @param controllerHost controller host
-  /// @param controllerPort controller port
-  /// @return A connection that connects to brokers as per the given controller
-  @Deprecated
-  public static Connection fromController(Properties properties, String scheme,
-      String controllerHost, int controllerPort) {
-    try {
-      return new Connection(properties,
-          new ControllerBasedBrokerSelector(scheme, controllerHost, controllerPort, properties),
-          getDefault());
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
-  }
-
   /// @param controllerUrl url host:port of the controller
   /// @return A connection that connects to brokers as per the given controller
   public static Connection fromController(String controllerUrl) {

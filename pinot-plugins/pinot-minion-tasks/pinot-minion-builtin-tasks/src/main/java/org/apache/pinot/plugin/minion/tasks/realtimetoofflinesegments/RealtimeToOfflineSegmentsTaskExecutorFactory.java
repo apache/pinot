@@ -33,11 +33,6 @@ public class RealtimeToOfflineSegmentsTaskExecutorFactory implements PinotTaskEx
   private MinionConf _minionConf;
 
   @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager) {
-    _zkMetadataManager = zkMetadataManager;
-  }
-
-  @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
     _zkMetadataManager = zkMetadataManager;
     _minionConf = minionConf;

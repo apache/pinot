@@ -27,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
+import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.queries.BaseQueriesTest;
@@ -189,7 +190,7 @@ public class BenchmarkSelectionOrderByFilterPruning extends BaseQueriesTest {
     // Prune first (this is what the fix affects), then execute the surviving segments through the single-stage engine.
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(_query);
     queryContext.setSchema(SCHEMA);
-    _selectedSegments = _segmentPrunerService.prune(_allSegments, queryContext);
+    _selectedSegments = _segmentPrunerService.prune(_allSegments, queryContext, new SegmentPrunerStatistics());
     return getBrokerResponse(_query);
   }
 

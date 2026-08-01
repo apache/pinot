@@ -114,13 +114,4 @@ public class PinotReflectionUtils {
       runnable.run();
     }
   }
-
-  /// Due to the multi-threading issue in org.reflections.vfs.ZipDir, we need to put a lock before calling the
-  /// reflection related methods.
-  ///
-  /// Deprecated: use [#runWithLock(Runnable)] instead
-  @Deprecated
-  public static Object getReflectionLock() {
-    return REFLECTION_LOCK;
-  }
 }
