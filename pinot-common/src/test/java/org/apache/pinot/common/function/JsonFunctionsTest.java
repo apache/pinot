@@ -491,6 +491,50 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathString(Map.of("v", timestamp), "$.v"), JsonUtils.objectToString(timestamp));
   }
 
+  @Test
+  public void testJsonPathLongOnExtractedValues() {
+    // Boolean is JSON-native and follows the numeric convention of jsonExtractScalar: true -> 1, false -> 0.
+    assertEquals(JsonFunctions.jsonPathLong("{\"v\":true}", "$.v"), 1L);
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", false), "$.v"), 0L);
+
+    // A value resolved from an already-parsed record tree (not a JSON string) keeps its runtime Java type.
+    // Timestamp / LocalDate / LocalTime are non-JSON-native scalars a record extractor can materialize; they
+    // convert to their Pinot internal numeric form - epoch millis, days since epoch, millis since midnight.
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", new Timestamp(1000L)), "$.v"), 1000L);
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", LocalDate.of(2026, 7, 20)), "$.v"), 20654L);
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", LocalTime.of(19, 54, 37)), "$.v"), 71677000L);
+
+    // The fast-path variants share the same conversion helper and must produce identical results.
+    assertEquals(JsonFunctions.jsonPathLongFast(Map.of("v", new Timestamp(1000L)), "$.v", -1L), 1000L);
+    assertEquals(JsonFunctions.jsonPathLongFirstMatch(Map.of("v", true), "$.v", -1L), 1L);
+
+    // Every Number narrows through longValue, and a value with no numeric meaning yields the default.
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", new BigDecimal("123.45")), "$.v"), 123L);
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", UUID.randomUUID()), "$.v", -1L), -1L);
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", Map.of("k", "w")), "$.v", -1L), -1L);
+  }
+
+  @Test
+  public void testJsonPathDoubleOnExtractedValues() {
+    // Boolean is JSON-native and follows the numeric convention of jsonExtractScalar: true -> 1, false -> 0.
+    assertEquals(JsonFunctions.jsonPathDouble("{\"v\":true}", "$.v"), 1d);
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", false), "$.v"), 0d);
+
+    // Timestamp / LocalDate / LocalTime convert to the same internal numeric form as jsonPathLong.
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", new Timestamp(1000L)), "$.v"), 1000d);
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", LocalDate.of(2026, 7, 20)), "$.v"), 20654d);
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", LocalTime.of(19, 54, 37)), "$.v"), 71677000d);
+
+    // The fast-path variants share the same conversion helper and must produce identical results.
+    assertEquals(JsonFunctions.jsonPathDoubleFast(Map.of("v", new Timestamp(1000L)), "$.v", -1d), 1000d);
+    assertEquals(JsonFunctions.jsonPathDoubleFirstMatch(Map.of("v", true), "$.v", -1d), 1d);
+
+    // Every Number widens through doubleValue, and a value with no numeric meaning yields the default.
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", new BigDecimal("123.45")), "$.v"), 123.45d);
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", UUID.randomUUID()), "$.v", -1d), -1d);
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", Map.of("k", "w")), "$.v", -1d), -1d);
+  }
+
   @DataProvider
   public static Object[][] jsonPathArrayTestCases() {
     return new Object[][]{
