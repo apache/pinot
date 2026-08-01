@@ -80,6 +80,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -1049,6 +1050,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
     fillEmptyResponseSchema(pinotQuery, brokerResponse, schema, database, query);
+    validateRawVariantResult(brokerResponse, serverPinotQuery, requestContext, tableName);
 
     // Set total query processing time
     long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
@@ -1524,6 +1526,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       LOGGER.warn("Caught exception while building empty response for request {}: {}, {}",
           requestContext.getRequestId(), query, e.getMessage());
     }
+    validateRawVariantResult(brokerResponse, serverPinotQuery, requestContext, tableName);
     brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.logQueryCompleted(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
@@ -1538,6 +1541,23 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           QueryOptionsUtils.isUseMSEToFillEmptySchema(pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
       EmptyResponseUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
     }
+  }
+
+  private void validateRawVariantResult(BrokerResponseNative brokerResponse, PinotQuery serverPinotQuery,
+      RequestContext requestContext, String tableName) {
+    ResultTable resultTable = brokerResponse.getResultTable();
+    Map<String, String> queryOptions = serverPinotQuery.getQueryOptions();
+    boolean nullHandlingEnabled = queryOptions != null && QueryOptionsUtils.isNullHandlingEnabled(queryOptions);
+    if (resultTable == null || !VariantUtils.requiresNullHandlingForRawVariantResult(resultTable.getDataSchema(),
+        nullHandlingEnabled)) {
+      return;
+    }
+    requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+    _brokerMetrics.addMeteredTableValue(TableNameBuilder.extractRawTableName(tableName),
+        BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+    brokerResponse.setResultTable(null);
+    brokerResponse.addException(new QueryProcessingException(QueryErrorCode.QUERY_VALIDATION,
+        VariantUtils.RAW_VARIANT_REQUIRES_NULL_HANDLING_ERROR));
   }
 
   private void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {
@@ -2478,6 +2498,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     viewSplitResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
     fillEmptyResponseSchema(brokerRequest.getPinotQuery(), viewSplitResponse, schema, database, query);
+    validateRawVariantResult(viewSplitResponse, serverPinotQuery, requestContext, tableName);
     long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
     viewSplitResponse.setTimeUsedMs(totalTimeMs);
     augmentStatistics(requestContext, viewSplitResponse);

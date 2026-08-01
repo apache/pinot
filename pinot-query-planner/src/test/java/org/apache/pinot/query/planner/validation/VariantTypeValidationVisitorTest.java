@@ -52,6 +52,16 @@ public class VariantTypeValidationVisitorTest {
   }
 
   @Test
+  public void testRawVariantProjectionRequiresNullHandling() {
+    QueryException exception = Assert.expectThrows(QueryException.class,
+        () -> VariantTypeValidationVisitor.validateResultSchema(VARIANT_SCHEMA, false));
+    Assert.assertTrue(exception.getMessage().contains("requires query null handling"));
+
+    VariantTypeValidationVisitor.validateResultSchema(VARIANT_SCHEMA, true);
+    VariantTypeValidationVisitor.validateResultSchema(TYPED_EXTRACTION_SCHEMA, false);
+  }
+
+  @Test
   public void testRejectsEqualityDependentSetOperations() {
     List<SetOpNode> unsupportedNodes = List.of(
         setOp(SetOpNode.SetOpType.UNION, false),

@@ -46,6 +46,8 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
@@ -73,6 +75,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -1601,6 +1604,104 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     /// And the response must NOT report a materializedViewQueried — no MV was selected.
     Assert.assertNull(response.getMaterializedViewQueried(),
         "Response must not report a materializedViewQueried when the cascade guard fired");
+  }
+
+  /// A split MV response returns before the ordinary single-stage response finalization. Verify
+  /// that this early-return path applies the same raw-VARIANT/null-handling contract, including
+  /// when both split branches are empty and their merged schema is repaired at the broker.
+  @Test
+  public void testMaterializedViewSplitEmptyRawVariantRequiresNullHandling()
+      throws Exception {
+    String baseOfflineTable = "baseTable_OFFLINE";
+    String materializedViewOfflineTable = "mv_baseTable_OFFLINE";
+    String baseRawTable = "baseTable";
+    String materializedViewRawTable = "mv_baseTable";
+
+    String userSql = "SELECT payload FROM baseTable LIMIT 10";
+    PinotQuery materializedViewServerQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT payload FROM mv_baseTable_OFFLINE LIMIT 10");
+    MaterializedViewRewritePlan plan = new MaterializedViewRewritePlan(
+        materializedViewOfflineTable, MatchType.EXACT, ExecutionMode.SPLIT_REWRITE,
+        materializedViewServerQuery, 1.0);
+
+    Schema baseSchema = new Schema.SchemaBuilder()
+        .setSchemaName(baseRawTable)
+        .addSingleValueDimension("payload", DataType.VARIANT)
+        .build();
+    Schema materializedViewSchema = new Schema.SchemaBuilder()
+        .setSchemaName(materializedViewRawTable)
+        .addSingleValueDimension("payload", DataType.VARIANT)
+        .build();
+
+    // Empty server responses can report STRING regardless of the selected column's actual type. The broker must
+    // repair this to VARIANT from the query/schema before enforcing the null-handling contract.
+    DataSchema emptySplitDataSchema = new DataSchema(new String[]{"payload"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    BrokerResponseNative splitResponse = new BrokerResponseNative();
+    splitResponse.setResultTable(new ResultTable(emptySplitDataSchema, List.of()));
+
+    MaterializedViewHandler materializedViewHandler = mock(MaterializedViewHandler.class);
+    when(materializedViewHandler.compile(any(MaterializedViewCompileContext.class)))
+        .thenReturn(MaterializedViewContext.forSplitRewrite(
+            plan, materializedViewServerQuery, materializedViewOfflineTable, materializedViewSchema));
+    when(materializedViewHandler.executeSplit(any(MaterializedViewSplitExecutionContext.class)))
+        .thenReturn(splitResponse);
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(baseRawTable)).thenReturn(baseRawTable);
+    when(tableCache.getSchema(baseRawTable)).thenReturn(baseSchema);
+    when(tableCache.getSchema(materializedViewRawTable)).thenReturn(materializedViewSchema);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("payload", "payload"));
+    TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(new TenantConfig("t_BROKER", "t_SERVER", null));
+    when(tableCache.getTableConfig(baseOfflineTable)).thenReturn(tableConfig);
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(baseOfflineTable)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    RoutingTable routingTable = mock(RoutingTable.class);
+    when(routingTable.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+            new SegmentsToQuery(List.of("seg01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(routingTable);
+
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+
+    BaseSingleStageBrokerRequestHandler handler =
+        new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
+            routingManager, new AllowAllAccessControlFactory(), quotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null, materializedViewHandler) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId,
+              BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+              TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            Assert.fail("Split response must return before the ordinary broker request path");
+            return null;
+          }
+        };
+
+    BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(userSql);
+    Assert.assertNull(response.getResultTable());
+    Assert.assertEquals(response.getExceptionsSize(), 1);
+    Assert.assertEquals(response.getExceptions().get(0).getErrorCode(), QueryErrorCode.QUERY_VALIDATION.getId());
+    Assert.assertTrue(response.getExceptions().get(0).getMessage().contains("null handling"));
+    verify(materializedViewHandler).executeSplit(any(MaterializedViewSplitExecutionContext.class));
   }
 
   /// Pins the fix for the reviewer-flagged regression: `EXPLAIN PLAN FOR <query>` against a
