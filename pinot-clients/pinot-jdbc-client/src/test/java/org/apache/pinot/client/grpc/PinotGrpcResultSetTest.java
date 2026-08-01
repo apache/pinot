@@ -35,10 +35,8 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies the JDBC result contract over the same metadata, schema, and data block sequence emitted by the gRPC
- * broker endpoint.
- */
+/// Verifies the JDBC result contract over the same metadata, schema, and data block sequence emitted by the gRPC
+/// broker endpoint.
 public class PinotGrpcResultSetTest {
 
   @Test

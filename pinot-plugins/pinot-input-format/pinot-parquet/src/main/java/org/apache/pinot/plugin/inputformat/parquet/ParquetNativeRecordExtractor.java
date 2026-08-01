@@ -108,8 +108,9 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
   }
 
   private void initializeFieldPlans(GroupType schema) {
-    ParquetVariantConverter[] variantConverters =
-        ParquetVariantConverter.createTopLevelVariantConverters(schema);
+    ParquetVariantConverter[] variantConverters = _extractAll
+        ? ParquetVariantConverter.createTopLevelVariantConverters(schema)
+        : ParquetVariantConverter.createTopLevelVariantConverters(schema, _fields::contains);
     int fieldCount = schema.getFieldCount();
     int selectedFieldCount = 0;
     for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {

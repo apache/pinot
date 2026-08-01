@@ -23,9 +23,7 @@ import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Scalar functions for the Pinot {@code VARIANT} logical type.
- */
+/// Scalar functions for the Pinot {@code VARIANT} logical type.
 public final class VariantFunctions {
   private VariantFunctions() {
   }
