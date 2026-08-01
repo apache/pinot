@@ -1019,9 +1019,7 @@ public enum PinotDataType {
     }
   },
 
-  /**
-   * Pinot's external representation of a VARIANT value: a validated PVAR envelope in a {@code byte[]}.
-   */
+  /// Pinot's external representation of a VARIANT value: a validated PVAR envelope in a `byte[]`.
   VARIANT {
     @Override
     public int toInt(Object value) {

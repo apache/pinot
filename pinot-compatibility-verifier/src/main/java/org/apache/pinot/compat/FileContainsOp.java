@@ -28,10 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Verifies that at least one file matching a glob in a system-property directory contains an expected text fragment.
- * Instances are configured and invoked serially by the compatibility runner and are not thread-safe.
- */
+/// Verifies that at least one file matching a glob in a system-property directory contains an expected text fragment.
+/// Instances are configured and invoked serially by the compatibility runner and are not thread-safe.
 public class FileContainsOp extends BaseOp {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileContainsOp.class);
   private static final int MAX_ATTEMPTS = 10;

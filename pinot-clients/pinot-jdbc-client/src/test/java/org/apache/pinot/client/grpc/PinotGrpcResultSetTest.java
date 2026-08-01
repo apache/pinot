@@ -47,7 +47,8 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Tests collection-valued results returned by the gRPC JDBC result set.
+/// Verifies the JDBC result contract over the same metadata, schema, and data block sequence emitted by the gRPC
+/// broker endpoint.
 public class PinotGrpcResultSetTest {
 
   @Test

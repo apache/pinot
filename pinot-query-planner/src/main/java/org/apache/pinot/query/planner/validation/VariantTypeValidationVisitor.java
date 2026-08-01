@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.validation;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -33,10 +34,8 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 
 
-/**
- * Rejects operations that would otherwise assign physical byte ordering, equality, or hashing semantics to a raw
- * VARIANT value. The visitor has no mutable state and is thread-safe, so callers may share {@link #INSTANCE}.
- */
+/// Rejects operations that would otherwise assign physical byte ordering, equality, or hashing semantics to a raw
+/// VARIANT value. The visitor has no mutable state and is thread-safe, so callers may share {@link #INSTANCE}.
 public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFirstVisitor<Void, Void> {
   public static final VariantTypeValidationVisitor INSTANCE = new VariantTypeValidationVisitor();
 
@@ -57,19 +56,15 @@ public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFir
     return super.visitAggregate(node, context);
   }
 
-  /**
-   * Validates aggregate operands against their logical input schema.
-   *
-   * <p>This method is also invoked by the runtime as a defensive check for plans that did not pass through the
-   * current broker planner.
-   */
+  /// Validates aggregate operands against their logical input schema.
+  ///
+  /// <p>This method is also invoked by the runtime as a defensive check for plans that did not pass through the
+  /// current broker planner.
   public static void validateAggregateInputs(AggregateNode node, DataSchema inputSchema) {
     validateAggregateInputs(node.getAggCalls(), inputSchema);
   }
 
-  /**
-   * Validates aggregate or window-function operands against their logical input schema.
-   */
+  /// Validates aggregate or window-function operands against their logical input schema.
   public static void validateAggregateInputs(List<RexExpression.FunctionCall> aggCalls, DataSchema inputSchema) {
     for (RexExpression.FunctionCall aggCall : aggCalls) {
       if (isRawVariantIndependent(aggCall)) {
@@ -80,6 +75,16 @@ public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFir
           throw unsupported("Aggregate function " + aggCall.getFunctionName());
         }
       }
+    }
+  }
+
+  /// Rejects a raw VARIANT result when query null handling is disabled. Without the null bitmap, the reserved empty
+  /// byte placeholder cannot participate in normal disabled-null semantics while also remaining distinguishable from
+  /// an encoded Variant null.
+  public static void validateResultSchema(DataSchema resultSchema, boolean nullHandlingEnabled) {
+    if (VariantUtils.requiresNullHandlingForRawVariantResult(resultSchema, nullHandlingEnabled)) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          VariantUtils.RAW_VARIANT_REQUIRES_NULL_HANDLING_ERROR);
     }
   }
 
@@ -116,12 +121,10 @@ public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFir
     return super.visitJoin(node, context);
   }
 
-  /**
-   * Validates equality/hash join keys against both logical input schemas.
-   *
-   * <p>The runtime also invokes this for mixed-version plans, including LOOKUP joins that do not construct a
-   * {@code HashJoinOperator}.
-   */
+  /// Validates equality/hash join keys against both logical input schemas.
+  ///
+  /// <p>The runtime also invokes this for mixed-version plans, including LOOKUP joins that do not construct a
+  /// {@code HashJoinOperator}.
   public static void validateJoinInputs(JoinNode node, DataSchema leftSchema, DataSchema rightSchema) {
     try {
       JoinKeyTypeValidator.validate(node, leftSchema, rightSchema);
@@ -139,12 +142,10 @@ public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFir
     return super.visitWindow(node, context);
   }
 
-  /**
-   * Validates window partition keys, ordering keys, and function operands against their logical input schema.
-   *
-   * <p>This method is also invoked by the runtime as a defensive check for plans that did not pass through the
-   * current broker planner.
-   */
+  /// Validates window partition keys, ordering keys, and function operands against their logical input schema.
+  ///
+  /// <p>This method is also invoked by the runtime as a defensive check for plans that did not pass through the
+  /// current broker planner.
   public static void validateWindowInputs(WindowNode node, DataSchema inputSchema) {
     for (int key : node.getKeys()) {
       DataSchema.ColumnDataType dataType = inputSchema.getColumnDataType(key);

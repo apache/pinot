@@ -27,13 +27,11 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 
 
-/**
- * Vectorized single-stage implementation of {@code variantExists}.
- *
- * <p>The path must be a string literal and is compiled once during initialization. A present encoded Variant null
- * counts as present, a missing path returns {@code false}, and SQL null remains SQL null. Instances are query-local
- * and not thread-safe.
- */
+/// Vectorized single-stage implementation of {@code variantExists}.
+///
+/// <p>The path must be a string literal and is compiled once during initialization. A present encoded Variant null
+/// counts as present, a missing path returns {@code false}, and SQL null remains SQL null. Instances are query-local
+/// and not thread-safe.
 public class VariantExistsTransformFunction extends BaseVariantTransformFunction {
   public static final String FUNCTION_NAME = "variantExists";
 

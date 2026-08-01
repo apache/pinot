@@ -267,6 +267,8 @@ Storage and query null handling are required because four states must remain dis
 Extracting a Variant null as `VARIANT` retains its non-empty envelope.
 `variant_to_json` returns SQL null for SQL null, JSON text `null` for Variant null, and
 JSON text `"null"` (including quotes) for the Variant string.
+Raw Variant projection is rejected when query null handling is disabled because the
+reserved empty-byte placeholder cannot preserve these states under disabled-null semantics.
 
 ## 8. Query wire and client compatibility
 
