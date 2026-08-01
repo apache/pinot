@@ -423,7 +423,8 @@ public class FastJsonPathExtractorTest {
 
   private static Object invoke(String name, Object... arguments)
       throws Exception {
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(name, arguments.length);
+    FunctionInfo functionInfo =
+        FunctionRegistry.lookupFunctionInfo(FunctionRegistry.canonicalize(name), arguments.length);
     assertNotNull(functionInfo, name + "/" + arguments.length + " is not registered");
     FunctionInvoker invoker = new FunctionInvoker(functionInfo);
     Object[] copy = arguments.clone();

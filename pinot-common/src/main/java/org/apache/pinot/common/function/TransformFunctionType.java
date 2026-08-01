@@ -290,11 +290,6 @@ public enum TransformFunctionType {
     return _names;
   }
 
-  @Deprecated
-  public List<String> getAlternativeNames() {
-    return _names;
-  }
-
   public SqlReturnTypeInference getReturnTypeInference() {
     return _returnTypeInference;
   }

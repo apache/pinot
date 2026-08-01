@@ -727,13 +727,6 @@ public class QueryContext {
       return this;
     }
 
-    /// @deprecated Use [#setExplain(ExplainMode)] instead.
-    @Deprecated
-    public Builder setExplain(boolean explain) {
-      _explain = explain ? ExplainMode.DESCRIPTION : ExplainMode.NONE;
-      return this;
-    }
-
     public Builder setExplain(ExplainMode explain) {
       _explain = explain;
       return this;

@@ -389,13 +389,6 @@ public class RealtimeSegmentConfig {
 
     /// Whether null handling is enabled by default. This value is only used if
     /// [Schema#isEnableColumnBasedNullHandling()] is false.
-    @Deprecated
-    public Builder setNullHandlingEnabled(boolean nullHandlingEnabled) {
-      return setDefaultNullHandlingEnabled(nullHandlingEnabled);
-    }
-
-    /// Whether null handling is enabled by default. This value is only used if
-    /// [Schema#isEnableColumnBasedNullHandling()] is false.
     public Builder setDefaultNullHandlingEnabled(boolean defaultNullHandlingEnabled) {
       _defaultNullHandlingEnabled = defaultNullHandlingEnabled;
       return this;
