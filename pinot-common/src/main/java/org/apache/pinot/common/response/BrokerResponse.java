@@ -110,12 +110,6 @@ public interface BrokerResponse {
   /// Returns the processing exceptions encountered during the query execution.
   List<QueryProcessingException> getExceptions();
 
-  @Deprecated
-  @JsonIgnore
-  default List<QueryProcessingException> getProcessingExceptions() {
-    return getExceptions();
-  }
-
   @JsonIgnore
   default int getExceptionsSize() {
     return getExceptions().size();

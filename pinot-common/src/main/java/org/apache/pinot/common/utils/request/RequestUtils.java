@@ -524,15 +524,6 @@ public class RequestUtils {
     return getFunctionExpression(getFunction(canonicalName, operands));
   }
 
-  @Deprecated
-  public static Expression getFunctionExpression(String canonicalName) {
-    assert canonicalName.equalsIgnoreCase(canonicalizeFunctionNamePreservingSpecialKey(canonicalName));
-    Expression expression = new Expression(ExpressionType.FUNCTION);
-    Function function = new Function(canonicalName);
-    expression.setFunctionCall(function);
-    return expression;
-  }
-
   /// Converts the function name into its canonical form.
   public static String canonicalizeFunctionName(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
@@ -682,11 +673,6 @@ public class RequestUtils {
 
   public static Set<String> getTableNames(PinotQuery pinotQuery) {
     return getTableNames(pinotQuery.getDataSource());
-  }
-
-  @Deprecated
-  public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
-    return getOptionsFromString(request.get(optionsKey).asText());
   }
 
   public static Map<String, String> getOptionsFromString(String optionStr) {
