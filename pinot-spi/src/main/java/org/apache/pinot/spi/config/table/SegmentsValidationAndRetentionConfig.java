@@ -264,4 +264,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   public void setUntrackedSegmentsRetentionTimeValue(String untrackedSegmentsRetentionTimeValue) {
     _untrackedSegmentsRetentionTimeValue = untrackedSegmentsRetentionTimeValue;
   }
+
+  public long getRetentionTimeMillis() {
+    return TimeUnit.valueOf(_retentionTimeUnit.toUpperCase()).toMillis(Long.parseLong(_retentionTimeValue));
+  }
 }

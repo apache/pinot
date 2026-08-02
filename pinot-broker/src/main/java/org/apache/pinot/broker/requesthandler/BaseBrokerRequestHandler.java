@@ -29,7 +29,6 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -67,6 +66,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -491,7 +491,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (!Boolean.parseBoolean(options.get(QueryOptionKey.SKIP_OUT_OF_RETENTION_VALUES))) {
       return;
     }
-
+    SegmentsValidationAndRetentionConfig validationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
     SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
     if (sqlNode == null) {
       return;
@@ -537,15 +537,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     //get timestamp column and retention details
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    String retentionTimeUnit = tableConfig.getValidationConfig().getRetentionTimeUnit();
-    String retentionTimeValue = tableConfig.getValidationConfig().getRetentionTimeValue();
-    if (StringUtils.isEmpty(timeColumnName) || StringUtils.isEmpty(retentionTimeUnit)
-        || StringUtils.isEmpty(retentionTimeValue)) {
-      return;
-    }
     try {
-      long retentionTimeMs =
-          TimeUnit.valueOf(retentionTimeUnit.toUpperCase()).toMillis(Long.parseLong(retentionTimeValue));
+      long retentionTimeMs = validationAndRetentionConfig.getRetentionTimeMillis();
       long cutoffMs = System.currentTimeMillis() - retentionTimeMs;
       DateTimeFieldSpec timeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
       if (timeFieldSpec == null) {
@@ -582,6 +575,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
       LOGGER.debug("Injected Calcite AST filter for skipOutOfRetentionValues on table: {}. Cutoff: {}", rawTableName,
           formattedCutoffTime);
+      LOGGER.debug("final sql statement: {}", sqlSelect);
     } catch (RuntimeException e) {
       throw new IllegalStateException("Failed to apply skipOutOfRetentionValues on table: " + rawTableName, e);
     }
