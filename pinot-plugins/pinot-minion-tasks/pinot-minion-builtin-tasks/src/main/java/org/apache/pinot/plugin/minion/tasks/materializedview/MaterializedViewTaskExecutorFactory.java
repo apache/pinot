@@ -60,16 +60,19 @@ public class MaterializedViewTaskExecutorFactory implements PinotTaskExecutorFac
 
   @Override
   public PinotTaskExecutor create() {
+    // Validated on every call rather than only on the first: without a MinionConf we would silently build a
+    // plaintext gRPC client with default limits instead of the configured one, and without a metadata manager
+    // we would hand a null straight to the executor.
+    Preconditions.checkState(_zkMetadataManager != null,
+        "MinionTaskZkMetadataManager is not set; init(zkMetadataManager, minionConf) must be called before create()");
+    Preconditions.checkState(_minionConf != null,
+        "MinionConf is not set; init(zkMetadataManager, minionConf) must be called before create()");
     if (_queryExecutor == null) {
       synchronized (this) {
         if (_queryExecutor == null) {
           // Build the gRPC client config from the minion's own configuration, scoped to the
           // MaterializedViewTask.MINION_BROKER_GRPC_CONFIG_PREFIX prefix.  This is how operators
-          // enable TLS, raise the max inbound message size for large MV result sets, and tune
-          // keepalive.  Defaulting silently would build a plaintext client with default limits,
-          // so fail loudly instead.
-          Preconditions.checkState(_minionConf != null,
-              "MinionConf is not set; init(zkMetadataManager, minionConf) must be called before create()");
+          // enable TLS, raise the max inbound message size for large MV result sets, and tune keepalive.
           PinotConfiguration grpcClientConfig =
               _minionConf.subset(MaterializedViewTask.MINION_BROKER_GRPC_CONFIG_PREFIX);
           _queryExecutor = new GrpcMaterializedViewQueryExecutor(
